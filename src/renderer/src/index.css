@@ -1,0 +1,441 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+   CHECKPOINT DESIGN TOKEN SYSTEM
+   All colors, spacing, typography, and motion values live here as CSS
+   custom properties. Component code NEVER hardcodes hex values.
+   */
+
+
+
+:root {
+  /* Canvas Layers (luminance steps, not arbitrary darks) */
+  --color-background:       #0b0c10;   /* L≈4, deepest canvas, app background */
+  --color-surface-1:        #131622;   /* L≈8, card/panel base */
+  --color-surface-2:        #1b1f30;   /* L≈12, nested panels, input backgrounds */
+  --color-surface-offset:   #24293f;   /* L≈16, hover states, secondary rails, dividers */
+  --color-surface-elevated: #2e3450;   /* L≈20, tooltips, popovers, context menus */
+
+  /* Brand Anchors */
+  --color-primary:          #1e45fc;   /* Electric Blue, interactive, links, focus rings */
+  --color-primary-hover:    #3559ff;   /* Electric Blue +15% for hover */
+  --color-primary-muted:    rgba(30, 69, 252, 0.15); /* 15% opacity, selection bg */
+  --color-secondary:        #cdf12b;   /* Volt Lime, active nav, selected states */
+  --color-secondary-muted:  rgba(205, 241, 43, 0.1); /* 10% opacity, highlight tint */
+  --color-balance:          #535e85;   /* Steel-Slate, neutral midtone, borders */
+
+  /* Semantic Status */
+  --color-success:          #10b981;
+  --color-success-muted:    rgba(16, 185, 129, 0.12);
+  --color-warning:          #f97316;
+  --color-warning-muted:    rgba(249, 115, 22, 0.12);
+  --color-error:            #ef4444;
+  --color-error-muted:      rgba(239, 68, 68, 0.12);
+  --color-gold:             #cdf12b;   /* alias for secondary */
+
+  /* Priority Colors */
+  --color-priority-high:    #ef4444;
+  --color-priority-med:     #f97316;
+  --color-priority-low:     #3b82f6;
+  --color-priority-none:    #535e85;
+
+  /* Text Scale */
+  --color-text-base:        #f1f5f9;   /* Near-white, primary readable text */
+  --color-text-muted:       #94a3b8;   /* Slate-400, secondary labels, metadata */
+  --color-text-faint:       #475569;   /* Slate-600, placeholder, disabled */
+  --color-text-inverted:    #0b0c10;   /* Used on Volt Lime buttons */
+
+  /* Typography */
+  --font-sans: 'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+
+  --text-2xs:  0.625rem;
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  --leading-tight:   1.25;
+  --leading-snug:    1.375;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.625;
+
+  --tracking-tight:   -0.025em;
+  --tracking-normal:   0em;
+  --tracking-wide:     0.05em;
+  --tracking-widest:   0.1em;
+
+  /* Spacing */
+  --space-px:   1px;
+  --space-0-5:  0.125rem;
+  --space-1:    0.25rem;
+  --space-1-5:  0.375rem;
+  --space-2:    0.5rem;
+  --space-3:    0.75rem;
+  --space-4:    1rem;
+  --space-5:    1.25rem;
+  --space-6:    1.5rem;
+  --space-8:    2rem;
+  --space-10:   2.5rem;
+  --space-12:   3rem;
+  --space-16:   4rem;
+
+  /* Border Radius */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  /* Elevation & Shadow */
+  --shadow-none: none;
+  --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg:   0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-hud:  0 0 40px rgba(30, 69, 252, 0.35), 0 8px 32px rgba(0, 0, 0, 0.7);
+
+  /* Motion */
+  --duration-instant: 50ms;
+  --duration-fast:    100ms;
+  --duration-normal:  200ms;
+  --duration-slow:    300ms;
+  --duration-enter:   250ms;
+  --duration-exit:    175ms;
+
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-enter:   cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-exit:    cubic-bezier(0.4, 0.0, 1, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce:  cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html[data-theme="light"] {
+  /* Canvas Layers (luminance steps, not arbitrary darks) */
+  --color-background:       #f8fafc;   /* Light gray canvas */
+  --color-surface-1:        #ffffff;   /* Pure white card base */
+  --color-surface-2:        #f1f5f9;   /* Cool gray element panels */
+  --color-surface-offset:   #e2e8f0;   /* Hover states and borders */
+  --color-surface-elevated: #cbd5e1;   /* Tooltips, context menus */
+
+  /* Brand Anchors */
+  --color-primary:          #1e45fc;   /* Keep Electric Blue */
+  --color-primary-hover:    #1737cc;
+  --color-primary-muted:    rgba(30, 69, 252, 0.1);
+  --color-secondary:        #8da600;   /* Slightly darker Volt Lime for readability in light mode */
+  --color-secondary-muted:  rgba(141, 166, 0, 0.15);
+  --color-balance:          #94a3b8;   /* Slate-300 borders */
+
+  /* Text Scale */
+  --color-text-base:        #0f172a;   /* Dark slate primary text */
+  --color-text-muted:       #475569;   /* Slate-600 secondary text */
+  --color-text-faint:       #94a3b8;   /* Slate-400 disabled/placeholder */
+  --color-text-inverted:    #ffffff;   /* Pure white on Volt Lime */
+
+  /* Elevation & Shadow */
+  --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg:   0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/*
+   BASE RESET
+   */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-normal);
+  color: var(--color-text-base);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+}
+
+/* Allow text selection in content areas */
+p, h1, h2, h3, h4, input, textarea, [contenteditable] {
+  user-select: text;
+}
+
+/* Scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-offset) transparent;
+}
+*:hover {
+  scrollbar-color: var(--color-balance) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-offset);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-balance);
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduced motion guard */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* App shell layout */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--color-background);
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.app-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  view-transition-name: main-content;
+}
+
+/* View transitions */
+::view-transition-old(main-content) {
+  animation: vt-fade-out var(--duration-exit) var(--ease-exit);
+}
+::view-transition-new(main-content) {
+  animation: vt-fade-in var(--duration-enter) var(--ease-enter);
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-8px); }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-offset) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes shimmer {
+  from { background-position: 200% center; }
+  to   { background-position: -200% center; }
+}
+
+/* Common component tokens */
+.surface-card {
+  background-color: var(--color-surface-1);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-md);
+}
+
+.surface-card:hover {
+  background-color: var(--color-surface-2);
+  border-color: var(--color-balance);
+  transition: background-color var(--duration-fast) var(--ease-default),
+              border-color var(--duration-fast) var(--ease-default);
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverted);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-default),
+              transform var(--duration-fast) var(--ease-default);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  filter: brightness(0.9);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-text-base);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  border: 1px solid var(--color-surface-offset);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-default);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-surface-offset);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+}
+
+.btn-ghost:hover {
+  background-color: var(--color-surface-offset);
+  color: var(--color-text-base);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: transparent;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: background-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+}
+
+.btn-icon:hover {
+  background-color: var(--color-surface-offset);
+  color: var(--color-text-base);
+}
+
+/* Input base */
+.input-base {
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  color: var(--color-text-base);
+  width: 100%;
+  transition: border-color var(--duration-fast) var(--ease-default);
+}
+
+.input-base::placeholder {
+  color: var(--color-text-faint);
+}
+
+.input-base:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 0;
+  border-color: var(--color-primary);
+}
+
+/* Tag badge */
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-1-5);
+  height: 18px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Titlebar region */
+.titlebar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3);
+  background-color: var(--color-background);
+  border-bottom: 1px solid var(--color-surface-offset);
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+
+.titlebar-controls {
+  display: flex;
+  gap: var(--space-1);
+  -webkit-app-region: no-drag;
+}
+
+/* Toast animations */
+@keyframes toast-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes toast-out {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(-8px); opacity: 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "phi3-mini-3.8b",
+    "name": "Phi-3 Mini 3.8B",
+    "family": "Phi-3",
+    "parameters": 3.8,
+    "description": "Microsoft's compact model. Punches above its weight for reasoning and code. Ideal for Unity-Safe Mode.",
+    "useCases": ["coding", "reasoning", "chat"],
+    "homepageUrl": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 4,  "vramRequiredGb": 3,  "fileSizeGb": 2.2, "ollamaTag": "phi3:3.8b-mini-instruct-4k-q4_0" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 6,  "vramRequiredGb": 4,  "fileSizeGb": 4.0, "ollamaTag": "phi3:3.8b-mini-instruct-4k-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 10, "vramRequiredGb": 8,  "fileSizeGb": 7.6, "ollamaTag": "phi3:3.8b-mini-instruct-4k-fp16" }
+    }
+  },
+  {
+    "id": "llama3-8b",
+    "name": "Llama 3 8B",
+    "family": "Llama 3",
+    "parameters": 8,
+    "description": "Meta's flagship open model. Strong general-purpose assistant with excellent instruction following.",
+    "useCases": ["chat", "summarization", "coding", "reasoning"],
+    "homepageUrl": "https://ollama.com/library/llama3",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 5,  "fileSizeGb": 4.7, "ollamaTag": "llama3:8b-instruct-q4_0" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9,  "fileSizeGb": 8.5, "ollamaTag": "llama3:8b-instruct-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 17, "fileSizeGb": 16.0,"ollamaTag": "llama3:8b-instruct-fp16" }
+    }
+  },
+  {
+    "id": "mistral-7b",
+    "name": "Mistral 7B",
+    "family": "Mistral",
+    "parameters": 7,
+    "description": "Highly efficient 7B model. Fast inference, strong at code and structured outputs. Good balance for developers.",
+    "useCases": ["coding", "chat", "structured output"],
+    "homepageUrl": "https://ollama.com/library/mistral",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 5,  "fileSizeGb": 4.1, "ollamaTag": "mistral:7b-instruct-v0.3-q4_0" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 8,  "fileSizeGb": 7.7, "ollamaTag": "mistral:7b-instruct-v0.3-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 16, "fileSizeGb": 14.5,"ollamaTag": "mistral:7b-instruct-v0.3-fp16" }
+    }
+  },
+  {
+    "id": "gemma2-2b",
+    "name": "Gemma 2 2B",
+    "family": "Gemma",
+    "parameters": 2,
+    "description": "Google's ultra-lightweight model. Best-in-class for its size. Perfect for always-on background use alongside Unity.",
+    "useCases": ["chat", "summarization", "quick answers"],
+    "homepageUrl": "https://ollama.com/library/gemma2",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 3,  "vramRequiredGb": 2,  "fileSizeGb": 1.6, "ollamaTag": "gemma2:2b-instruct-q4_0" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 4,  "vramRequiredGb": 3,  "fileSizeGb": 2.9, "ollamaTag": "gemma2:2b-instruct-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 6,  "vramRequiredGb": 5,  "fileSizeGb": 5.4, "ollamaTag": "gemma2:2b-instruct-fp16" }
+    }
+  },
+  {
+    "id": "codegemma-7b",
+    "name": "CodeGemma 7B",
+    "family": "CodeGemma",
+    "parameters": 7,
+    "description": "Google's code-specialized model. Trained specifically on code. Ideal for C#/Unity scripting assistance.",
+    "useCases": ["coding", "code completion", "debugging"],
+    "homepageUrl": "https://ollama.com/library/codegemma",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 5,  "fileSizeGb": 4.8, "ollamaTag": "codegemma:7b-instruct-q4_0" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9,  "fileSizeGb": 7.6, "ollamaTag": "codegemma:7b-instruct-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 16, "fileSizeGb": 14.2,"ollamaTag": "codegemma:7b-instruct-fp16" }
+    }
+  },
+  {
+    "id": "llama3-70b",
+    "name": "Llama 3 70B",
+    "family": "Llama 3",
+    "parameters": 70,
+    "description": "Meta's largest open model. Near-GPT-4 quality. Requires a high-end workstation. Not Unity-Safe.",
+    "useCases": ["chat", "complex reasoning", "long-form writing"],
+    "homepageUrl": "https://ollama.com/library/llama3",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 40, "vramRequiredGb": 35, "fileSizeGb": 39.0,"ollamaTag": "llama3:70b-instruct-q4_0" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 75, "vramRequiredGb": 70, "fileSizeGb": 74.0,"ollamaTag": "llama3:70b-instruct-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 144,"vramRequiredGb": 140,"fileSizeGb": 140.0,"ollamaTag": "llama3:70b-instruct-fp16" }
+    }
+  }
+]
