@@ -10,7 +10,7 @@ win:
   target:
     - target: nsis
       arch: x64
-  icon: resources/icon.png
+  icon: resources/icon.ico
 mac:
   target:
     - target: dmg
@@ -24,3 +24,6 @@ linux:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+asar: true
+asarUnpack:
+  - "**/*.node"

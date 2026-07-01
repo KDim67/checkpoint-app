@@ -12,9 +12,9 @@ export default function ContextPill({ item, onClear }: ContextPillProps) {
     switch (item.type) {
       case 'card':
         return {
-          bg: 'rgba(59, 130, 246, 0.15)',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          color: '#60a5fa',
+          bg: 'var(--color-primary-muted)',
+          border: '1px solid rgba(30, 69, 252, 0.3)',
+          color: 'var(--color-primary)',
           label: 'Card',
           icon: <ClipboardList size={10} />
         }
@@ -29,9 +29,9 @@ export default function ContextPill({ item, onClear }: ContextPillProps) {
       case 'log':
       default:
         return {
-          bg: 'rgba(16, 185, 129, 0.15)',
+          bg: 'var(--color-success-muted)',
           border: '1px solid rgba(16, 185, 129, 0.3)',
-          color: '#34d399',
+          color: 'var(--color-success)',
           label: 'Log',
           icon: <FileText size={10} />
         }

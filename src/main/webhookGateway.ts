@@ -1,0 +1,229 @@
+import http from 'http'
+import { Socket } from 'net'
+import { Notification } from 'electron'
+import { z } from 'zod'
+import { getDb, createItem } from './db'
+import { mainWindow } from './index'
+import { IpcChannels } from '../shared/ipcChannels'
+
+// Webhook Schema
+
+const WebhookPayloadSchema = z.object({
+  context: z.string().min(1, 'Context slug cannot be empty'),
+  title: z.string().default(''),
+  body: z.string().default(''),
+  priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).default(0),
+  metadata: z.string().default('{}'),
+  due_at: z.number().nullable().optional().default(null)
+})
+
+// State Variables
+
+let serverInstance: http.Server | null = null
+let currentListeningPort: number | null = null
+const activeSockets = new Set<Socket>()
+
+// Controller Functions
+
+/**
+ * Starts the webhook gateway HTTP server.
+ * Resolves with the actual port the server bound to.
+ */
+export function startWebhookServer(requestedPort: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    if (serverInstance) {
+      resolve(currentListeningPort || requestedPort)
+      return
+    }
+
+    let port = requestedPort
+    const activePortTries = new Set<number>()
+
+    const tryListen = () => {
+      if (activePortTries.has(port)) {
+        reject(new Error('Circular port binding retry detected'))
+        return
+      }
+      activePortTries.add(port)
+
+      const server = http.createServer(async (req, res) => {
+        const { method, url } = req
+
+        // Enable CORS
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+        if (method === 'OPTIONS') {
+          res.writeHead(200)
+          res.end()
+          return
+        }
+
+        if (method !== 'POST') {
+          res.writeHead(405, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: false, error: 'Method Not Allowed' }))
+          return
+        }
+
+        if (url !== '/api/v1/log' && url !== '/webhook/log' && url !== '/api/v1/task') {
+          res.writeHead(404, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: false, error: 'Endpoint Not Found' }))
+          return
+        }
+
+        const type = url === '/api/v1/task' ? 'task' : 'log'
+
+        try {
+          const chunks: Buffer[] = []
+          for await (const chunk of req) {
+            chunks.push(chunk)
+          }
+          const bodyStr = Buffer.concat(chunks).toString()
+
+          let json: unknown
+          try {
+            json = JSON.parse(bodyStr)
+          } catch {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ success: false, error: 'Malformed JSON payload' }))
+            return
+          }
+
+          const parsed = WebhookPayloadSchema.safeParse(json)
+          if (!parsed.success) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({
+              success: false,
+              error: 'Schema Validation Failed',
+              details: parsed.error.format()
+            }))
+            return
+          }
+
+          const db = getDb()
+          const item = createItem(db, {
+            type,
+            context: parsed.data.context,
+            title: parsed.data.title,
+            body: parsed.data.body,
+            priority: parsed.data.priority,
+            metadata: parsed.data.metadata,
+            status: 'open',
+            position: Date.now(),
+            due_at: parsed.data.due_at
+          })
+
+          // Broadcast event to renderer shell
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send(IpcChannels.WEBHOOK_EVENT, {
+              type: 'item_created',
+              item
+            })
+          }
+
+          // Trigger native OS notification
+          if (Notification.isSupported()) {
+            new Notification({
+              title: `Checkpoint Webhook Received (${type})`,
+              body: parsed.data.title || `Added to context: ${parsed.data.context}`,
+              silent: false
+            }).show()
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: true, item }))
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Internal Server Error'
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: false, error: msg }))
+        }
+      })
+
+      server.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          console.warn(`Webhook port ${port} in use, trying alternative port ${port + 1}...`)
+          port++
+          server.close()
+          setTimeout(tryListen, 25)
+        } else {
+          reject(err)
+        }
+      })
+
+      server.on('listening', () => {
+        serverInstance = server
+        currentListeningPort = port
+
+        // Keep track of active sockets for force deconstruction
+        server.on('connection', (socket) => {
+          activeSockets.add(socket)
+          socket.on('close', () => {
+            activeSockets.delete(socket)
+          })
+        })
+
+        if (port !== requestedPort) {
+          // Port collision: send system warning notification
+          if (Notification.isSupported()) {
+            new Notification({
+              title: 'Webhook Port Conflict',
+              body: `Port ${requestedPort} was blocked. Listening on ${port} instead.`,
+              silent: false
+            }).show()
+          }
+        }
+
+        resolve(port)
+      })
+
+      server.listen(port, '127.0.0.1')
+    }
+
+    tryListen()
+  })
+}
+
+/**
+ * Shuts down the webhook server, destroys all open sockets,
+ * and releases server references completely from memory.
+ */
+export async function stopWebhookServer(): Promise<void> {
+  if (!serverInstance) return
+
+  const serverToClose = serverInstance
+  serverInstance = null
+  currentListeningPort = null
+
+  // Force destroy active sockets
+  for (const socket of activeSockets) {
+    socket.destroy()
+  }
+  activeSockets.clear()
+
+  return new Promise((resolve) => {
+    serverToClose.close(() => {
+      resolve()
+    })
+  })
+}
+
+/**
+ * Helper to start/stop the gateway based on a toggle state.
+ */
+export async function toggleWebhookGateway(active: boolean, port: number): Promise<number | null> {
+  if (active) {
+    const actualPort = await startWebhookServer(port)
+    return actualPort
+  } else {
+    await stopWebhookServer()
+    return null
+  }
+}
+
+/**
+ * Returns the currently active port, or null if server is stopped.
+ */
+export function getWebhookPort(): number | null {
+  return currentListeningPort
+}

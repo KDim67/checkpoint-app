@@ -36,7 +36,8 @@ export default function BacklogFilters({
   setHasRelations,
   onReset
 }: BacklogFiltersProps) {
-  
+  const isDateRangeInvalid = dueStart && dueEnd && dueStart > dueEnd
+
   const handleStatusToggle = (statusId: string) => {
     if (selectedStatuses.includes(statusId)) {
       setSelectedStatuses(selectedStatuses.filter(s => s !== statusId))
@@ -238,7 +239,7 @@ export default function BacklogFilters({
                 onChange={e => setDueStart(e.target.value)}
                 style={{
                   background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
+                  border: isDateRangeInvalid ? '1px solid var(--color-warning)' : '1px solid var(--color-surface-offset)',
                   color: 'var(--color-text-base)',
                   borderRadius: '4px',
                   padding: '2px 4px',
@@ -256,7 +257,7 @@ export default function BacklogFilters({
                 onChange={e => setDueEnd(e.target.value)}
                 style={{
                   background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
+                  border: isDateRangeInvalid ? '1px solid var(--color-warning)' : '1px solid var(--color-surface-offset)',
                   color: 'var(--color-text-base)',
                   borderRadius: '4px',
                   padding: '2px 4px',
@@ -266,6 +267,11 @@ export default function BacklogFilters({
                 }}
               />
             </div>
+            {isDateRangeInvalid && (
+              <span style={{ fontSize: '9px', color: 'var(--color-warning)', marginTop: '2px' }}>
+                ⚠️ Start date is after end date
+              </span>
+            )}
           </div>
         </div>
 

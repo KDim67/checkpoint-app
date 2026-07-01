@@ -63,3 +63,11 @@ export const TaskQueryParamsSchema = z.object({
   pageSize: z.number().int().positive().optional().default(50)
 })
 
+export const CreateFocusSessionSchema = z.object({
+  context: z.string().min(1, 'Context slug cannot be empty'),
+  duration_ms: z.number().int().positive('Duration must be a positive integer'),
+  notes: z.string().default(''),
+  tasks_json: z.string().default('[]')
+})
+
+

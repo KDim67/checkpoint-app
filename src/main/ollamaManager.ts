@@ -4,6 +4,7 @@ import { IpcChannels } from '../shared/ipcChannels'
 import type { OllamaStatus, PullProgressEvent } from '../shared/cookbookTypes'
 
 let activeAbortController: AbortController | null = null
+let lastOfflineLogged = false
 
 /**
  * Runs a command with arguments and a timeout.
@@ -178,11 +179,23 @@ export async function listLocalModels(): Promise<string[]> {
       signal: AbortSignal.timeout(2000)
     })
     if (response.ok) {
+      lastOfflineLogged = false
       const data = (await response.json()) as { models?: Array<{ name: string }> }
       return data.models?.map((m) => m.name) || []
     }
   } catch (err) {
-    console.error('Ollama Manager: Failed to list local models:', err)
+    const errorObj = err as Error & { cause?: { code?: string } }
+    const isOffline =
+      errorObj.cause?.code === 'ECONNREFUSED' ||
+      errorObj.message?.toLowerCase().includes('fetch failed')
+    if (isOffline) {
+      if (!lastOfflineLogged) {
+        console.warn('Ollama Manager: Ollama server is offline or unreachable at http://localhost:11434')
+        lastOfflineLogged = true
+      }
+    } else {
+      console.error('Ollama Manager: Failed to list local models:', err)
+    }
   }
   return []
 }

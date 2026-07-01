@@ -1,7 +1,11 @@
-import React, { useEffect, lazy, Suspense, useCallback } from 'react'
-import { useAppStore } from './store/appStore'
+import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
+import { useAppStore, type ActiveView } from './store/appStore'
 import { Sidebar } from './components/Sidebar'
 import AiStreamPanel from './components/AiStreamPanel'
+import GitPanel from './components/GitPanel'
+import ItemDetailPanel from './components/ItemDetailPanel'
+import Logo from './components/ui/Logo'
+import { ToastProvider } from './components/ui/Toast'
 
 // Lazy-loaded views (code split per view)
 const LogView      = lazy(() => import('./components/LogView'))
@@ -9,7 +13,14 @@ const KanbanView   = lazy(() => import('./components/KanbanView'))
 const BacklogView  = lazy(() => import('./components/BacklogView'))
 const CookbookView = lazy(() => import('./components/CookbookView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
-const WidgetView   = lazy(() => import('./components/WidgetView'))
+const WidgetView    = lazy(() => import('./components/WidgetView'))
+const FocusView     = lazy(() => import('./components/FocusView'))
+const NotesView     = lazy(() => import('./components/NotesView'))
+const ClipboardView = lazy(() => import('./components/ClipboardView'))
+const AnalyticsView = lazy(() => import('./components/AnalyticsView'))
+const HudView       = lazy(() => import('./components/HudView'))
+const CheatsheetsView = lazy(() => import('./components/CheatsheetsView'))
+const GameDevView = lazy(() => import('./components/GameDevView'))
 
 // View-level skeleton (shown while lazy chunks load)
 function ViewSkeleton() {
@@ -77,33 +88,22 @@ function ThemeToggle() {
 function Titlebar() {
   return (
     <div className="titlebar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', userSelect: 'none' }}>
-        {/* Brand mark */}
-        <div style={{
-          width: '18px',
-          height: '18px',
-          borderRadius: '4px',
-          background: 'var(--color-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--color-secondary)' }} />
-        </div>
-        <span style={{
-          fontSize: 'var(--text-xs)',
-          fontWeight: 'var(--weight-semibold)',
-          color: 'var(--color-text-muted)',
-          letterSpacing: 'var(--tracking-widest)',
-          textTransform: 'uppercase'
-        }}>
+      <div style={{ display: 'flex', alignItems: 'center', userSelect: 'none' }}>
+        <span
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--weight-bold)',
+            color: 'var(--color-secondary)',
+            letterSpacing: 'var(--tracking-widest)',
+            textTransform: 'uppercase'
+          }}
+        >
           Checkpoint
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion'] }}>
         <ThemeToggle />
-        {window.electronAPI.app.platform !== 'darwin' && (
+        {window.electronAPI.app.platform === 'linux' && (
           <div className="titlebar-controls" style={{ display: 'flex', gap: 'var(--space-0-5)' }}>
             <TitlebarButton onClick={() => window.electronAPI.app.minimize()} label="Minimize">
               <svg width="10" height="1" viewBox="0 0 10 1"><line x1="0" y1="0.5" x2="10" y2="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
@@ -163,51 +163,152 @@ function TitlebarButton({
 function RightPanel() {
   const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
   const rightPanelContent = useAppStore(s => s.rightPanelContent)
-  const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
+  const setRightPanelContent = useAppStore(s => s.setRightPanelContent)
+  const selectedItemId = useAppStore(s => s.selectedItemId)
+
+  const [panelWidth, setPanelWidth] = useState(380)
+  const isResizingRef = useRef(false)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    isResizingRef.current = true
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingRef.current) return
+      const newWidth = window.innerWidth - moveEvent.clientX
+      if (newWidth >= 280 && newWidth <= 800) {
+        setPanelWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      isResizingRef.current = false
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
 
   return (
     <div
       style={{
-        width: rightPanelOpen ? '320px' : '0',
+        width: rightPanelOpen ? `${panelWidth}px` : '0',
         overflow: 'hidden',
-        transition: 'width var(--duration-slow) cubic-bezier(0.32, 0.72, 0, 1)',
+        transition: isResizingRef.current ? 'none' : 'width var(--duration-fast) cubic-bezier(0.32, 0.72, 0, 1)',
         borderLeft: rightPanelOpen ? '1px solid var(--color-surface-offset)' : 'none',
         background: 'var(--color-surface-1)',
         display: 'flex',
         flexDirection: 'column',
-        flexShrink: 0
+        flexShrink: 0,
+        position: 'relative'
       }}
       aria-hidden={!rightPanelOpen}
     >
+      {/* Resizer Handle */}
       {rightPanelOpen && (
-        <div style={{ width: '320px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div
+          onMouseDown={handleMouseDown}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: '6px',
+            cursor: 'col-resize',
+            zIndex: 10,
+            transition: 'background 150ms ease'
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-secondary-muted)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          title="Drag to resize panel"
+        />
+      )}
+      {rightPanelOpen && (
+        <div style={{ width: `${panelWidth}px`, height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{
             height: '44px',
             borderBottom: '1px solid var(--color-surface-offset)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 var(--space-4)',
+            padding: '0 var(--space-2) 0 var(--space-4)',
             flexShrink: 0
           }}>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
-              {rightPanelContent === 'ai-chat' ? 'AI Assistant' : 'Item Detail'}
-            </span>
+            <div role="tablist" style={{ display: 'flex', gap: 'var(--space-1)' }}>
+              <button
+                role="tab"
+                aria-selected={rightPanelContent === 'ai-chat'}
+                onClick={() => setRightPanelContent('ai-chat')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: rightPanelContent === 'ai-chat' ? 'var(--color-secondary)' : 'var(--color-text-faint)',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: rightPanelContent === 'ai-chat' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
+                  padding: 'var(--space-1) var(--space-2)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  transition: 'color var(--duration-fast) var(--ease-default)'
+                }}
+              >
+                AI Assistant
+              </button>
+              <button
+                role="tab"
+                aria-selected={rightPanelContent === 'git'}
+                onClick={() => setRightPanelContent('git')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: rightPanelContent === 'git' ? 'var(--color-secondary)' : 'var(--color-text-faint)',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: rightPanelContent === 'git' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
+                  padding: 'var(--space-1) var(--space-2)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  transition: 'color var(--duration-fast) var(--ease-default)'
+                }}
+              >
+                Git
+              </button>
+              {selectedItemId && (
+                <button
+                  role="tab"
+                  aria-selected={rightPanelContent === 'item-detail'}
+                  onClick={() => setRightPanelContent('item-detail')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: rightPanelContent === 'item-detail' ? 'var(--color-secondary)' : 'var(--color-text-faint)',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: rightPanelContent === 'item-detail' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
+                    padding: 'var(--space-1) var(--space-2)',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    transition: 'color var(--duration-fast) var(--ease-default)'
+                  }}
+                >
+                  Detail
+                </button>
+              )}
+            </div>
             <button
               className="btn-icon"
-              onClick={() => toggleRightPanel()}
+              onClick={() => setRightPanelContent(null)}
               aria-label="Close panel"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          {rightPanelContent === 'ai-chat' ? (
-            <AiStreamPanel />
-          ) : (
-            <div style={{ flex: 1, padding: 'var(--space-4)', overflow: 'auto', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-              <p>Item detail panel, coming in Phase 4.</p>
-            </div>
-          )}
+          {rightPanelContent === 'ai-chat' && <AiStreamPanel />}
+          {rightPanelContent === 'git' && <GitPanel />}
+          {rightPanelContent === 'item-detail' && <ItemDetailPanel />}
         </div>
       )}
     </div>
@@ -343,34 +444,80 @@ function DebugDbPanel() {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+// Google Fonts Downloader
+const GOOGLE_FONTS_URLS: Record<string, string> = {
+  "'Outfit', sans-serif": 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap',
+  "'Roboto', sans-serif": 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap',
+  "'Playfair Display', serif": 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap'
+}
+
+function applyGoogleFont(fontValue: string) {
+  const url = GOOGLE_FONTS_URLS[fontValue]
+  let el = document.getElementById('custom-google-font') as HTMLLinkElement | null
+  if (url) {
+    if (!el) {
+      el = document.createElement('link')
+      el.id = 'custom-google-font'
+      el.rel = 'stylesheet'
+      document.head.appendChild(el)
+    }
+    el.href = url
+  } else {
+    if (el) el.remove()
+  }
+}
+
+// Hash-route shells (widget & HUD live in their own BrowserWindows)
+// These must be top-level components so the hooks inside App() are never
+// called conditionally (Rules of Hooks).
+function WidgetShell() {
+  return (
+    <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Suspense fallback={null}><WidgetView /></Suspense>
+    </div>
+  )
+}
+function HudShell() {
+  return (
+    <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Suspense fallback={null}><HudView /></Suspense>
+    </div>
+  )
+}
+
 // App
 export default function App() {
-  // Phase 9: Widget window uses the #widget hash route, render it standalone
-  if (window.location.hash === '#widget') {
-    return (
-      <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Suspense fallback={null}>
-          <WidgetView />
-        </Suspense>
-      </div>
-    )
-  }
-
   const activeView = useAppStore(s => s.activeView)
+  const setView = useAppStore(s => s.setView)
   const setAvailableContexts = useAppStore(s => s.setAvailableContexts)
+  const setContext = useAppStore(s => s.setContext)
+  const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
 
   // Bootstrap: load available contexts from DB on mount
   const loadContexts = useCallback(async () => {
     try {
       const contexts = await window.electronAPI.db.getContexts()
-      if (contexts.length > 0) setAvailableContexts(contexts)
+      if (contexts.length > 0) {
+        setAvailableContexts(contexts)
+        const savedContext = await window.electronAPI.db.getSetting('active_context') as string | null
+        if (savedContext && contexts.includes(savedContext)) {
+          setContext(savedContext)
+        }
+      }
     } catch {
       // DB not yet initialized, use defaults
     }
-  }, [setAvailableContexts])
+  }, [setAvailableContexts, setContext])
 
   useEffect(() => {
     loadContexts()
+
+    // Load and apply compact mode setting
+    window.electronAPI.db.getSetting('appearance_compact').then((cm) => {
+      if (cm === 'true') {
+        document.documentElement.setAttribute('data-compact', 'true')
+      }
+    }).catch(console.error)
 
     // Hot-reload user theme CSS
     const unsubTheme = window.electronAPI.onThemeUpdate((css: string) => {
@@ -381,39 +528,111 @@ export default function App() {
         document.head.appendChild(el)
       }
       el.textContent = css
+
+      // Extract --font-sans from CSS if present
+      const fontMatch = css.match(/--font-sans\s*:\s*([^;}\n]+)/)
+      if (fontMatch) {
+        const fontValue = fontMatch[1].trim()
+        applyGoogleFont(fontValue)
+      } else {
+        const elFont = document.getElementById('custom-google-font')
+        if (elFont) elFont.remove()
+      }
     })
-    return unsubTheme
-  }, [loadContexts])
+
+    // Navigation hotkey listener
+    const unsubNavigate = window.electronAPI.app.onNavigateToView((view: string) => {
+      setView(view as ActiveView)
+    })
+
+    // Global keyboard navigation shortcuts
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault()
+          toggleRightPanel('ai-chat')
+          return
+        }
+
+        if (e.key === ',') {
+          e.preventDefault()
+          setView('settings')
+          return
+        }
+
+        const keyNum = parseInt(e.key)
+        if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 8) {
+          const views: ActiveView[] = [
+            'log',
+            'kanban',
+            'backlog',
+            'focus',
+            'notes',
+            'clipboard',
+            'cookbook',
+            'analytics'
+          ]
+          e.preventDefault()
+          setView(views[keyNum - 1])
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+
+    return () => {
+      unsubTheme()
+      unsubNavigate()
+      window.removeEventListener('keydown', handleGlobalKeyDown)
+    }
+  }, [loadContexts, setView, toggleRightPanel])
 
   function renderView() {
     switch (activeView) {
-      case 'log':      return <LogView />
-      case 'kanban':   return <KanbanView />
-      case 'backlog':  return <BacklogView />
-      case 'cookbook': return <CookbookView />
-      case 'settings': return <SettingsView />
-      default:         return null
+      case 'log':       return <LogView />
+      case 'kanban':    return <KanbanView />
+      case 'backlog':   return <BacklogView />
+      case 'focus':     return <FocusView />
+      case 'notes':     return <NotesView />
+      case 'clipboard': return <ClipboardView />
+      case 'cookbook':  return <CookbookView />
+      case 'analytics': return <AnalyticsView />
+      case 'settings':  return <SettingsView />
+      case 'cheatsheets': return <CheatsheetsView />
+      case 'gamedev':   return <GameDevView />
+      default:          return null
     }
   }
 
   return (
-    <div className="app-shell">
-      <Titlebar />
-      <div className="app-body">
-        <Sidebar />
-        <main
-          id="main-content"
-          className="app-content"
-          role="main"
-          aria-label={`${activeView} view`}
-        >
-          <Suspense fallback={<ViewSkeleton />}>
-            {renderView()}
-          </Suspense>
-          {import.meta.env.DEV && <DebugDbPanel />}
-        </main>
-        <RightPanel />
+    <ToastProvider>
+      <div className="app-shell">
+        <Titlebar />
+        <div className="app-body">
+          <Sidebar />
+          <main
+            id="main-content"
+            className="app-content"
+            role="main"
+            aria-label={`${activeView} view`}
+          >
+            <Suspense fallback={<ViewSkeleton />}>
+              {renderView()}
+            </Suspense>
+          </main>
+          <RightPanel />
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   )
+}
+
+// Root router, selects between standalone shells and the full app
+// This is what main.tsx should render (or App can be renamed; kept as default
+// export for back-compat and the router wraps it).
+export function AppRouter() {
+  const hash = window.location.hash
+  if (hash === '#widget') return <WidgetShell />
+  if (hash === '#hud')    return <HudShell />
+  return <App />
 }

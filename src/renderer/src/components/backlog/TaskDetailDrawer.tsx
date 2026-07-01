@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
 import { X, Tag, Link2, Sparkles, Check, CheckSquare, Square, Plus } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
+import useEscapeKey from '../ui/useEscapeKey'
+import useFocusTrap from '../ui/useFocusTrap'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -78,12 +80,22 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const [allTags, setAllTags] = useState<TagType[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [showTagSelector, setShowTagSelector] = useState(false)
+  const [selectedTagColor, setSelectedTagColor] = useState('#3b82f6')
 
   // Relations
   const [relations, setRelations] = useState<Relation[]>([])
   const [relationSearchQuery, setRelationSearchQuery] = useState('')
   const [relationSearchResults, setRelationSearchResults] = useState<Item[]>([])
   const [selectedRelationType, setSelectedRelationType] = useState<RelationType>('relates_to')
+
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const containerRef = useFocusTrap(!loading, titleInputRef)
+  useEscapeKey(onClose, true)
+
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   // Load details
   useEffect(() => {
@@ -98,7 +110,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
         })
         const found = itemsResult.items.find(i => i.id === taskId)
         if (!found) {
-          onClose()
+          onCloseRef.current()
           return
         }
         
@@ -130,7 +142,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     }
     loadDetails()
     return () => { active = false }
-  }, [taskId, activeContext, onClose])
+  }, [taskId, activeContext])
 
   // Search relation autocomplete
   useEffect(() => {
@@ -271,7 +283,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     return (
       <div style={{
         position: 'fixed',
-        top: 0,
+        top: '32px',
         right: 0,
         bottom: 0,
         width: '600px',
@@ -293,7 +305,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   return (
     <div style={{
       position: 'fixed',
-      top: 0,
+      top: '32px',
       left: 0,
       right: 0,
       bottom: 0,
@@ -306,6 +318,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     onClick={onClose}
     >
       <div
+        ref={containerRef}
         style={{
           width: '650px',
           height: '100%',
@@ -317,6 +330,9 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
         }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-modal-title"
       >
         {/* Header */}
         <div style={{
@@ -347,21 +363,28 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               onClick={handleAiAssist}
               style={{
                 background: 'var(--color-secondary-muted)',
-                border: '1px solid var(--color-secondary)',
+                border: '1.5px solid var(--color-secondary)',
                 color: 'var(--color-secondary)',
                 borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-1.5) var(--space-3)',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 'var(--weight-semibold)',
+                padding: '6px 14px',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--weight-bold)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 'var(--space-1.5)'
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
               }}
-              onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-              onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+              onMouseEnter={e => {
+                e.currentTarget.style.filter = 'brightness(1.2)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.filter = 'none'
+                e.currentTarget.style.transform = 'none'
+              }}
             >
-              <Sparkles size={12} fill="currentColor" />
+              <Sparkles size={16} fill="currentColor" />
               <span>AI Assist</span>
             </button>
 
@@ -395,6 +418,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           {/* Editable Title */}
           <div>
             <input
+              ref={titleInputRef}
+              id="task-modal-title"
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
@@ -528,6 +553,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               </span>
               <button
                 type="button"
+                aria-expanded={showTagSelector}
+                aria-haspopup="menu"
                 onClick={() => setShowTagSelector(!showTagSelector)}
                 style={{
                   background: 'var(--color-surface-1)',
@@ -560,7 +587,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                   boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)',
                   padding: 'var(--space-2)',
                   zIndex: 200,
-                  maxHeight: '180px',
+                  maxHeight: '320px',
                   overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
@@ -569,33 +596,153 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                   {allTags.map(tag => {
                     const isSelected = selectedTagIds.includes(tag.id)
                     return (
-                      <button
+                      <div
                         key={tag.id}
-                        onClick={() => handleTagToggle(tag.id)}
                         style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--color-text-base)',
-                          padding: 'var(--space-1.5) var(--space-2)',
-                          fontSize: 'var(--text-xs)',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          borderRadius: 'var(--radius-sm)',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between'
+                          justifyContent: 'space-between',
+                          padding: 'var(--space-1) var(--space-2)',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: 'var(--text-xs)',
+                          gap: '6px'
                         }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color }} />
-                          {tag.name}
-                        </span>
-                        {isSelected && <Check size={12} style={{ color: 'var(--color-secondary)' }} />}
-                      </button>
+                        <button
+                          onClick={() => handleTagToggle(tag.id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--color-text-base)',
+                            padding: 0,
+                            fontSize: 'var(--text-xs)',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 'var(--space-2)',
+                            flex: 1
+                          }}
+                        >
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color, flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag.name}</span>
+                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          <ColorPicker
+                            value={tag.color}
+                            showHexInput={false}
+                            swatchSize={14}
+                            title="Edit Tag Color"
+                            onCommit={async (newColor) => {
+                              try {
+                                await window.electronAPI.db.updateTag(tag.id, { color: newColor })
+                                const refreshed = await window.electronAPI.db.getTags()
+                                setAllTags(refreshed)
+                              } catch (err) {
+                                console.error(err)
+                              }
+                            }}
+                          />
+                          {isSelected && <Check size={12} style={{ color: 'var(--color-secondary)' }} />}
+                        </div>
+                      </div>
                     )
                   })}
+                  {allTags.length === 0 && (
+                    <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', padding: 'var(--space-2)' }}>
+                      No tags available.
+                    </span>
+                  )}
+                  
+                  {/* Create custom label inline manager */}
+                  <div style={{ borderTop: '1px solid var(--color-surface-offset)', marginTop: '8px', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>
+                      Create Label
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <input
+                        type="text"
+                        placeholder="Label name..."
+                        id="drawer-new-tag-name"
+                        style={{
+                          flex: 1,
+                          background: 'var(--color-surface-2)',
+                          border: '1px solid var(--color-surface-offset)',
+                          borderRadius: '4px',
+                          color: 'var(--color-text-base)',
+                          fontSize: '11px',
+                          padding: '3px 6px',
+                          outline: 'none',
+                          minWidth: 0
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            document.getElementById('drawer-new-tag-create-btn')?.click()
+                          }
+                        }}
+                      />
+                      <button
+                        id="drawer-new-tag-create-btn"
+                        onClick={async () => {
+                          const el = document.getElementById('drawer-new-tag-name') as HTMLInputElement
+                          if (el && el.value.trim()) {
+                            const name = el.value.trim()
+                            try {
+                              const created = await window.electronAPI.db.createTag({ name, color: selectedTagColor })
+                              const tags = await window.electronAPI.db.getTags()
+                              setAllTags(tags)
+                              handleTagToggle(created.id)
+                              el.value = ''
+                            } catch (err) {
+                              console.error(err)
+                            }
+                          }
+                        }}
+                        style={{
+                          background: 'var(--color-secondary)',
+                          border: 'none',
+                          borderRadius: '4px',
+                          color: 'var(--color-text-inverted)',
+                          fontWeight: 'var(--weight-bold)',
+                          fontSize: '10px',
+                          padding: '3px 8px',
+                          cursor: 'pointer',
+                          flexShrink: 0
+                        }}
+                      >
+                        Create
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#cdf12b', '#ff45b5'].map(color => (
+                          <button
+                            key={color}
+                            onClick={() => setSelectedTagColor(color)}
+                            style={{
+                              width: '14px',
+                              height: '14px',
+                              borderRadius: '50%',
+                              background: color,
+                              border: selectedTagColor === color ? '1px solid var(--color-text-base)' : '1px solid transparent',
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <ColorPicker
+                        value={selectedTagColor}
+                        onCommit={setSelectedTagColor}
+                        swatchSize={18}
+                        hexInputWidth={54}
+                        title="Custom Tag Color"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -941,12 +1088,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
         </div>
       </div>
 
-      <style>{`
-        @keyframes slide-in {
-          from { transform: translateX(100%); }
-          to   { transform: translateX(0); }
-        }
-      `}</style>
+
     </div>
   )
 }

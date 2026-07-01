@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Cpu,
   Database,
@@ -9,13 +9,18 @@ import {
   AlertTriangle,
   StopCircle,
   ExternalLink,
-  Info
+  Info,
+  Search
 } from 'lucide-react'
 import catalogData from '../../../shared/catalog.json'
 import { calculateFitResult } from '../../../shared/scoreEngine'
 import type { CatalogModel, HardwareSpecs, OllamaStatus, PullProgressEvent } from '../../../shared/cookbookTypes'
+import Skeleton from './ui/Skeleton'
+import { useToast } from './ui/Toast'
 
 export default function CookbookView() {
+  const { toast } = useToast()
+  const [searchQuery, setSearchQuery] = useState('')
   const [specs, setSpecs] = useState<HardwareSpecs | null>(null)
   const [loadingSpecs, setLoadingSpecs] = useState(true)
 
@@ -26,9 +31,15 @@ export default function CookbookView() {
 
   // Active pull state tracking
   const [pullingModelTag, setPullingModelTag] = useState<string | null>(null)
+  const pullingModelTagRef = useRef<string | null>(null)
   const [pullPercent, setPullPercent] = useState(0)
   const [pullStatusText, setPullStatusText] = useState('')
   const [pullError, setPullError] = useState<string | null>(null)
+
+  const updatePullingModel = (tag: string | null) => {
+    setPullingModelTag(tag)
+    pullingModelTagRef.current = tag
+  }
 
   const loadHardwareSpecs = async () => {
     setLoadingSpecs(true)
@@ -75,26 +86,30 @@ export default function CookbookView() {
   // Listen for IPC pull progress events
   useEffect(() => {
     const unsubscribeProgress = window.electronAPI.cookbook.onPullProgress((event: PullProgressEvent) => {
-      setPullingModelTag(event.modelId)
+      updatePullingModel(event.modelId)
       setPullPercent(event.percent >= 0 ? event.percent : 0)
       setPullStatusText(event.status)
       setPullError(null)
     })
 
     const cleanDone = window.electronAPI.cookbook.onPullDone(() => {
-      setPullingModelTag(null)
+      const tag = pullingModelTagRef.current
+      updatePullingModel(null)
       setPullPercent(0)
       setPullStatusText('')
       setPullError(null)
-      // Refresh local models
       loadOllamaStatus()
+      if (tag) {
+        toast(`Model "${tag}" installed successfully!`, { type: 'success' })
+      }
     })
 
     const cleanError = window.electronAPI.cookbook.onPullError((data: { modelTag: string; message: string }) => {
-      setPullingModelTag(null)
+      updatePullingModel(null)
       setPullPercent(0)
       setPullStatusText('')
       setPullError(data.message)
+      toast(`Failed to install model "${data.modelTag}": ${data.message}`, { type: 'error' })
     })
 
     return () => {
@@ -115,7 +130,7 @@ export default function CookbookView() {
 
   const handleInstall = async (modelTag: string) => {
     setPullError(null)
-    setPullingModelTag(modelTag)
+    updatePullingModel(modelTag)
     setPullPercent(0)
     setPullStatusText('Connecting to Ollama...')
     try {
@@ -123,17 +138,21 @@ export default function CookbookView() {
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err)
       setPullError(errMsg)
-      setPullingModelTag(null)
+      updatePullingModel(null)
     }
   }
 
   const handleAbort = async () => {
+    const tag = pullingModelTagRef.current
     try {
       await window.electronAPI.cookbook.stopPull()
+      if (tag) {
+        toast(`Pull of "${tag}" canceled.`)
+      }
     } catch (err) {
       console.error('Failed to abort pull:', err)
     } finally {
-      setPullingModelTag(null)
+      updatePullingModel(null)
       setPullPercent(0)
       setPullStatusText('')
     }
@@ -151,6 +170,16 @@ export default function CookbookView() {
   const filteredModels = catalogModels.filter((m) => {
     if (unitySafeMode && m.parameters > 4) {
       return false
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      const matchName = m.name.toLowerCase().includes(q)
+      const matchDesc = m.description.toLowerCase().includes(q)
+      const matchFamily = m.family.toLowerCase().includes(q)
+      const matchUseCases = m.useCases.some(uc => uc.toLowerCase().includes(q))
+      if (!matchName && !matchDesc && !matchFamily && !matchUseCases) {
+        return false
+      }
     }
     return true
   })
@@ -197,9 +226,9 @@ export default function CookbookView() {
       >
         {loadingSpecs ? (
           <>
-            <div className="skeleton" style={{ height: '88px' }} />
-            <div className="skeleton" style={{ height: '88px' }} />
-            <div className="skeleton" style={{ height: '88px' }} />
+            <Skeleton height={88} borderRadius="var(--radius-lg)" />
+            <Skeleton height={88} borderRadius="var(--radius-lg)" />
+            <Skeleton height={88} borderRadius="var(--radius-lg)" />
           </>
         ) : specs ? (
           <>
@@ -405,7 +434,7 @@ export default function CookbookView() {
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
-          justifyContent: 'between',
+          justifyContent: 'space-between',
           gap: 'var(--space-4)',
           boxShadow: 'none'
         }}
@@ -413,18 +442,29 @@ export default function CookbookView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flex: 1 }}>
           <button
             onClick={() => handleToggleSafeMode(!unitySafeMode)}
-            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none"
             style={{
+              position: 'relative',
+              display: 'inline-flex',
+              height: '24px',
+              width: '44px',
+              alignItems: 'center',
+              borderRadius: '9999px',
+              transition: 'background-color 200ms var(--ease-default)',
               backgroundColor: unitySafeMode ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
               border: '1px solid var(--color-surface-offset)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              outline: 'none',
+              padding: 0
             }}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full transition-transform duration-200 ${
-                unitySafeMode ? 'translate-x-6' : 'translate-x-1'
-              }`}
               style={{
+                display: 'inline-block',
+                height: '16px',
+                width: '16px',
+                borderRadius: '50%',
+                transition: 'transform 200ms var(--ease-default), background-color 200ms var(--ease-default)',
+                transform: unitySafeMode ? 'translateX(24px)' : 'translateX(4px)',
                 backgroundColor: unitySafeMode ? 'var(--color-text-inverted)' : 'var(--color-text-muted)'
               }}
             />
@@ -588,29 +628,53 @@ export default function CookbookView() {
 
       {/* Model Catalog List */}
       <div>
-        <h2
-          style={{
-            fontSize: 'var(--text-base)',
-            fontWeight: 'var(--weight-semibold)',
-            marginBottom: 'var(--space-4)',
-            color: 'var(--color-text-base)'
-          }}
-        >
-          Workstation Model Catalog
-        </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <h2
+            style={{
+              fontSize: 'var(--text-base)',
+              fontWeight: 'var(--weight-semibold)',
+              color: 'var(--color-text-base)',
+              margin: 0
+            }}
+          >
+            Workstation Model Catalog
+          </h2>
+          {/* Search Input */}
+          <div style={{ position: 'relative', width: '240px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-faint)' }} />
+            <input
+              type="text"
+              placeholder="Search models..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="input-base"
+              style={{
+                paddingLeft: '32px',
+                height: '32px',
+                fontSize: 'var(--text-xs)'
+              }}
+            />
+          </div>
+        </div>
 
-        {/* Model Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-            gap: 'var(--space-4)'
-          }}
-        >
+        {filteredModels.length === 0 ? (
+          <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--color-text-muted)', border: '1px dashed var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-1)' }}>
+            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', marginBottom: 'var(--space-1)', color: 'var(--color-text-base)' }}>No models match your search</p>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Try searching for a different name, family (e.g. Llama, Mistral) or use case.</span>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+              gap: 'var(--space-4)'
+            }}
+          >
           {filteredModels.map((model) => {
             const fitResult = specs ? calculateFitResult(specs, model) : null
             const recommendedQuant = fitResult?.recommendedVariant || 'q4'
-            const variant = model.variants[recommendedQuant]
+            const variant = model.variants[recommendedQuant] ?? Object.values(model.variants)[0]
+            if (!variant) return null
 
             // Check if installed
             const isInstalled = localModels.some((m) => {
@@ -1001,6 +1065,7 @@ export default function CookbookView() {
             )
           })}
         </div>
+        )}
       </div>
     </div>
   )

@@ -1,39 +1,27 @@
-/**
- * customizer.ts, Phase 9 Customization Engine
- *
- * Watches ~/.config/checkpoint/ for:
- *   - theme.css       → hot-reloads CSS into all open renderer windows via THEME_UPDATE IPC
- *   - plugins/*.js    → validates path and require()s the file in a try/catch
- *
- * Call startCustomizer() after app.whenReady(). Store the returned FSWatcher
- * and call watcher.close() on app.quit() to avoid zombie processes.
- */
-
-import { app, BrowserWindow } from 'electron'
+import { BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { IpcChannels } from '../shared/ipcChannels'
+import {
+  unloadAllPlugins,
+  unloadPlugin,
+  loadPlugin,
+  getPluginsDir,
+  getConfigDir,
+  ensurePluginsDir
+} from './pluginRegistry'
+import { getSetting } from './db'
+import { updateNativeTitleBarFromSettings } from './titleBarSync'
 
-// Resolve the user's ~/.config/checkpoint directory in a cross-platform way
-function getConfigDir(): string {
-  return join(app.getPath('home'), '.config', 'checkpoint')
-}
+let watcher: import('chokidar').FSWatcher | null = null
+let isEngineRunning = false
 
-function getPluginsDir(): string {
-  return join(getConfigDir(), 'plugins')
-}
-
-/** Ensures the config and plugins directories exist. */
-function ensureDirs(): void {
-  const configDir  = getConfigDir()
-  const pluginsDir = getPluginsDir()
-
-  if (!existsSync(configDir))  mkdirSync(configDir,  { recursive: true })
-  if (!existsSync(pluginsDir)) mkdirSync(pluginsDir, { recursive: true })
+function getThemePath(): string {
+  return join(getConfigDir(), 'theme.css')
 }
 
 /** Broadcasts a CSS string to all open renderer windows. */
-function broadcastTheme(css: string): void {
+export function broadcastTheme(css: string): void {
   BrowserWindow.getAllWindows().forEach(win => {
     if (!win.isDestroyed()) {
       win.webContents.send(IpcChannels.THEME_UPDATE, css)
@@ -41,72 +29,173 @@ function broadcastTheme(css: string): void {
   })
 }
 
-/** Safely loads a plugin JS file via require(). */
-function loadPlugin(filePath: string): void {
-  const configDir = getConfigDir()
-
-  // Guard against path traversal, the resolved path must stay inside configDir
-  if (!filePath.startsWith(configDir)) {
-    console.warn(`[customizer] Refused to load plugin outside config dir: ${filePath}`)
-    return
+/**
+ * Parses CSS variable declarations from a CSS variables string.
+ */
+export function parseVarsFromCss(css: string): Record<string, string> {
+  const vars: Record<string, string> = {}
+  const regex = /(--[\w-]+)\s*:\s*([^;}\n]+)/g
+  let match
+  while ((match = regex.exec(css)) !== null) {
+    vars[match[1]] = match[2].trim()
   }
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const result = require(filePath)
-    console.log(`[customizer] Loaded plugin: ${filePath}`, result)
-  } catch (err) {
-    console.error(`[customizer] Failed to load plugin ${filePath}:`, err)
-  }
+  return vars
 }
 
 /**
- * Starts the chokidar file watcher.
- * Returns the FSWatcher so the caller can .close() it on quit.
+ * Updates the native title bar controls overlay colors dynamically on Windows.
  */
-export async function startCustomizer(): Promise<import('chokidar').FSWatcher> {
-  ensureDirs()
-
-  const configDir = getConfigDir()
-  const themePath = join(configDir, 'theme.css')
-
-  // Lazy import chokidar (it's a CJS module; dynamic import avoids bundler issues)
-  const chokidar = await import('chokidar')
-
-  const watcher = chokidar.watch(configDir, {
-    persistent: true,
-    ignoreInitial: false,     // process theme.css on startup if it already exists
-    depth: 1,                 // only watch root and plugins/ subdirectory
-    awaitWriteFinish: {
-      stabilityThreshold: 100,
-      pollInterval: 50
+export function updateTitleBarOverlay(vars: Record<string, string>): void {
+  const color = vars['--color-background'] || '#0b0c10'
+  const symbolColor = vars['--color-text-base'] || '#f1f5f9'
+  BrowserWindow.getAllWindows().forEach(win => {
+    if (!win.isDestroyed() && typeof win.setTitleBarOverlay === 'function') {
+      try {
+        win.setTitleBarOverlay({ color, symbolColor })
+      } catch (err) {
+        console.error('[customizer] Failed to update title bar overlay:', err)
+      }
     }
   })
-
-  watcher
-    .on('add', (filePath: string) => handleFileChange(filePath, themePath))
-    .on('change', (filePath: string) => handleFileChange(filePath, themePath))
-
-  console.log(`[customizer] Watching ${configDir}`)
-  return watcher
 }
 
-function handleFileChange(filePath: string, themePath: string): void {
+/**
+ * Builds a CSS variables override block from key-value mappings.
+ */
+export function buildCssVariablesString(vars: Record<string, string>): string {
+  const entries = Object.entries(vars)
+  if (entries.length === 0) return ''
+  const declarations = entries.map(([k, v]) => `  ${k}: ${v};`).join('\n')
+  return `:root {\n${declarations}\n}`
+}
+
+/**
+ * Starts the customization engine, watcher, plugins, and custom themes.
+ */
+export async function enableCustomizer(): Promise<void> {
+  if (isEngineRunning) return
+
+  ensurePluginsDir()
+  const configDir = getConfigDir()
+  const themePath = getThemePath()
+
+  // 1. Load custom theme variables if defined in DB
+  try {
+    const rawVars = getSetting<string>('customizer_theme_vars', '{}')
+    const vars = JSON.parse(rawVars)
+    const css = buildCssVariablesString(vars)
+    if (css) {
+      console.log(`[customizer] Injecting stored theme variables (${Object.keys(vars).length} vars)`)
+      broadcastTheme(css)
+      updateTitleBarOverlay(vars)
+    } else if (existsSync(themePath)) {
+      // Fallback to theme.css file if it exists
+      const fileCss = readFileSync(themePath, 'utf8')
+      broadcastTheme(fileCss)
+      updateTitleBarOverlay(parseVarsFromCss(fileCss))
+    }
+  } catch (err) {
+    console.error('[customizer] Failed to load initial custom theme variables:', err)
+  }
+
+  // 2. Load active plugins
+  try {
+    const rawPlugins = getSetting<string>('customizer_active_plugins', '[]')
+    const activePlugins: string[] = JSON.parse(rawPlugins)
+    console.log(`[customizer] Loading active plugins:`, activePlugins)
+    for (const pluginFile of activePlugins) {
+      loadPlugin(pluginFile)
+    }
+  } catch (err) {
+    console.error('[customizer] Failed to load active plugins:', err)
+  }
+
+  // 3. Start Chokidar watcher for plugins/theme changes
+  try {
+    const chokidar = await import('chokidar')
+    watcher = chokidar.watch(configDir, {
+      persistent: true,
+      ignoreInitial: true,      // do not re-run on startup files
+      depth: 1,                 // only watch root and plugins/ subdirectory
+      awaitWriteFinish: {
+        stabilityThreshold: 100,
+        pollInterval: 50
+      }
+    })
+
+    watcher
+      .on('add', (filePath: string) => handleFileChange(filePath))
+      .on('change', (filePath: string) => handleFileChange(filePath))
+
+    console.log(`[customizer] Started file watcher on ${configDir}`)
+  } catch (err) {
+    console.error('[customizer] Failed to start customizer watcher:', err)
+  }
+
+  isEngineRunning = true
+}
+
+/**
+ * Halts the customization engine, unloads watchers/plugins, and reverts style variables.
+ */
+export async function disableCustomizer(): Promise<void> {
+  if (!isEngineRunning) return
+
+  // 1. Close chokidar file watcher
+  if (watcher) {
+    await watcher.close()
+    watcher = null
+    console.log('[customizer] Chokidar watcher stopped.')
+  }
+
+  // 2. Unload all plugins
+  unloadAllPlugins()
+
+  // 3. Reset injected theme variables
+  broadcastTheme('')
+  try {
+    const appTheme = getSetting<string>('app_theme', 'dark')
+    updateNativeTitleBarFromSettings(appTheme)
+  } catch (err) {
+    console.error('[customizer] Failed to reset titlebar colors:', err)
+  }
+
+  isEngineRunning = false
+  console.log('[customizer] Customization engine deactivated cleanly.')
+}
+
+export function isCustomizerRunning(): boolean {
+  return isEngineRunning
+}
+
+function handleFileChange(filePath: string): void {
+  const themePath = getThemePath()
   if (filePath === themePath) {
-    // Theme hot-reload
     try {
       const css = readFileSync(filePath, 'utf8')
-      console.log(`[customizer] theme.css changed, broadcasting ${css.length} bytes`)
+      console.log(`[customizer] theme.css file changed, broadcasting ${css.length} bytes`)
       broadcastTheme(css)
+      updateTitleBarOverlay(parseVarsFromCss(css))
     } catch (err) {
-      console.error('[customizer] Failed to read theme.css:', err)
+      console.error('[customizer] Failed to read theme.css file:', err)
     }
     return
   }
 
-  // Plugin loader, only pick up .js files inside plugins/
+  // Hot reload plugins if they are active
   const pluginsDir = getPluginsDir()
   if (filePath.startsWith(pluginsDir) && filePath.endsWith('.js')) {
-    loadPlugin(filePath)
+    const filename = filePath.slice(pluginsDir.length + 1)
+    try {
+      const rawPlugins = getSetting<string>('customizer_active_plugins', '[]')
+      const activePlugins: string[] = JSON.parse(rawPlugins)
+      if (activePlugins.includes(filename)) {
+        console.log(`[customizer] Active plugin file changed, reloading: ${filename}`)
+        unloadPlugin(filename)
+        loadPlugin(filename)
+      }
+    } catch (err) {
+      console.error('[customizer] Error handling plugin file change:', err)
+    }
   }
 }

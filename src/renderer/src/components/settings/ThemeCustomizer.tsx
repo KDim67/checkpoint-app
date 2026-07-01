@@ -1,0 +1,295 @@
+import React, { useState, useEffect } from 'react'
+import { ToggleSwitch, Divider } from './SettingsSection'
+import { useToast } from '../ui/Toast'
+import ColorPicker from '../ui/ColorPicker'
+
+interface ThemeVariables {
+  '--color-background': string
+  '--color-surface-1': string
+  '--color-surface-2': string
+  '--color-surface-offset': string
+  '--color-surface-elevated': string
+  '--color-primary': string
+  '--color-secondary': string
+  '--color-text-base': string
+  '--color-text-muted': string
+  '--color-text-faint': string
+  '--font-sans': string
+}
+
+const DEFAULT_THEME: ThemeVariables = {
+  '--color-background': '#0b0c10',
+  '--color-surface-1': '#131622',
+  '--color-surface-2': '#1b1f30',
+  '--color-surface-offset': '#24293f',
+  '--color-surface-elevated': '#2e3450',
+  '--color-primary': '#1e45fc',
+  '--color-secondary': '#cdf12b',
+  '--color-text-base': '#f1f5f9',
+  '--color-text-muted': '#94a3b8',
+  '--color-text-faint': '#475569',
+  '--font-sans': "'Inter', sans-serif"
+}
+
+const COLOR_VARIABLE_LABELS: Record<Exclude<keyof ThemeVariables, '--font-sans'>, { label: string; desc: string }> = {
+  '--color-background': { label: 'Canvas Background', desc: 'Base color for the entire workspace background.' },
+  '--color-surface-1': { label: 'Panel Base', desc: 'Background color for panels and main container cards.' },
+  '--color-surface-2': { label: 'Input Fields', desc: 'Background color for form inputs and nested lists.' },
+  '--color-surface-offset': { label: 'Hover States & Borders', desc: 'Visual divider line and list hover background.' },
+  '--color-surface-elevated': { label: 'Context Menus & Tooltips', desc: 'Background color for popovers and tooltips.' },
+  '--color-primary': { label: 'Primary Brand Color', desc: 'Brand Electric Blue used for links and focus borders.' },
+  '--color-secondary': { label: 'Secondary Accent Color', desc: 'Brand Volt Lime used for highlight alerts and selections.' },
+  '--color-text-base': { label: 'Primary Text', desc: 'Color of normal, high-visibility body text.' },
+  '--color-text-muted': { label: 'Muted Labels', desc: 'Secondary details, metadata, and description text.' },
+  '--color-text-faint': { label: 'Faint Labels / Placeholders', desc: 'Disabled inputs, metadata timestamps, and placeholder text.' }
+}
+
+const FONTS_OPTIONS = [
+  { label: 'Inter (Default Sans)', value: "'Inter', sans-serif" },
+  { label: 'Outfit (Modern Geometric)', value: "'Outfit', sans-serif" },
+  { label: 'Roboto (Clean Classic)', value: "'Roboto', sans-serif" },
+  { label: 'Playfair Display (Elegant Serif)', value: "'Playfair Display', serif" },
+  { label: 'JetBrains Mono (Technical)', value: "'JetBrains Mono', monospace" }
+]
+
+export default function ThemeCustomizer() {
+  const { toast } = useToast()
+  const [engineEnabled, setEngineEnabled] = useState(false)
+  const [themeVars, setThemeVars] = useState<ThemeVariables>(DEFAULT_THEME)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const enabled = await window.electronAPI.customizer.getEngineState()
+        setEngineEnabled(enabled)
+
+        const stored = await window.electronAPI.customizer.getTheme()
+        if (stored && Object.keys(stored).length > 0) {
+          setThemeVars({ ...DEFAULT_THEME, ...stored })
+        }
+      } catch (err) {
+        console.error('Failed to load customizer state:', err)
+      }
+    }
+    load()
+  }, [])
+
+  const handleEngineToggle = async (checked: boolean) => {
+    try {
+      setEngineEnabled(checked)
+      await window.electronAPI.customizer.toggleEngine(checked)
+      toast(checked ? 'Customization Engine activated' : 'Customization Engine deactivated')
+    } catch (err) {
+      console.error(err)
+      toast('Failed to toggle customization engine')
+    }
+  }
+
+  const handleColorChange = async (name: Exclude<keyof ThemeVariables, '--font-sans'>, hex: string) => {
+    const updated = { ...themeVars, [name]: hex }
+    
+    // Auto-calculate helper opacity channels for primary & secondary
+    if (name === '--color-primary') {
+      // 15% opacity primary muted (26 in hex)
+      Object.assign(updated, { '--color-primary-muted': hex + '26' })
+    } else if (name === '--color-secondary') {
+      // 10% opacity secondary muted (1a in hex)
+      Object.assign(updated, { '--color-secondary-muted': hex + '1a', '--color-gold': hex })
+    }
+
+    setThemeVars(updated)
+
+    if (engineEnabled) {
+      try {
+        await window.electronAPI.customizer.updateTheme(updated)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+  }
+
+  const handleFontChange = async (name: '--font-sans', value: string) => {
+    const updated = { ...themeVars, [name]: value }
+    setThemeVars(updated)
+
+    if (engineEnabled) {
+      try {
+        await window.electronAPI.customizer.updateTheme(updated)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+  }
+
+  const handleReset = async () => {
+    setThemeVars(DEFAULT_THEME)
+    if (engineEnabled) {
+      try {
+        await window.electronAPI.customizer.updateTheme({})
+        toast('Custom theme colors reset to default')
+      } catch (err) {
+        console.error(err)
+      }
+    } else {
+      toast('Defaults restored (enable customization engine to apply)')
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+      <div style={{
+        background: 'var(--color-surface-2)',
+        border: '1px solid var(--color-surface-offset)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-4)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+              Enable Customizer Engine
+            </h3>
+            <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+              Turns on dynamic theme variable overriding and sandboxed plugins.
+            </p>
+          </div>
+          <ToggleSwitch checked={engineEnabled} onChange={handleEngineToggle} />
+        </div>
+      </div>
+
+      <Divider />
+
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-4)',
+        opacity: engineEnabled ? 1 : 0.5,
+        pointerEvents: engineEnabled ? 'auto' : 'none',
+        transition: 'opacity 200ms ease'
+      }}>
+        <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+          Color Scheme Overrides
+        </h4>
+
+        {Object.entries(COLOR_VARIABLE_LABELS).map(([varName, info]) => {
+          const name = varName as Exclude<keyof ThemeVariables, '--font-sans'>
+          return (
+            <div
+              key={name}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 'var(--space-2) var(--space-3)',
+                background: 'var(--color-surface-1)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)'
+              }}
+            >
+              <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+                  {info.label}
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  {info.desc}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <ColorPicker
+                  value={themeVars[name]}
+                  onCommit={val => handleColorChange(name, val)}
+                  showHexInput={false}
+                  swatchSize={32}
+                  title={`Color for ${info.label}`}
+                />
+                <code style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  color: 'var(--color-text-muted)',
+                  textTransform: 'uppercase',
+                  background: 'var(--color-surface-2)',
+                  padding: '2px 6px',
+                  borderRadius: '4px'
+                }}>
+                  {themeVars[name]}
+                </code>
+              </div>
+            </div>
+          )
+        })}
+
+        <Divider />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+            Typography Customization
+          </h4>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: 'var(--space-2) var(--space-3)',
+              background: 'var(--color-surface-1)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)'
+            }}
+          >
+            <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+                Primary Font Family
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                Select the font family used across primary headers and text.
+              </span>
+            </div>
+            <div>
+              <select
+                value={themeVars['--font-sans']}
+                onChange={e => handleFontChange('--font-sans', e.target.value)}
+                style={{
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-surface-offset)',
+                  color: 'var(--color-text-base)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-1-5) var(--space-3)',
+                  fontSize: 'var(--text-xs)',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {FONTS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 'var(--space-2)' }}>
+          <button
+            onClick={handleReset}
+            style={{
+              padding: 'var(--space-2) var(--space-4)',
+              background: 'var(--color-surface-offset)',
+              border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'var(--weight-semibold)',
+              cursor: 'pointer',
+              transition: 'all 100ms ease'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'var(--color-surface-offset)'}
+          >
+            Reset to Defaults
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+

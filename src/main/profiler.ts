@@ -119,7 +119,7 @@ export async function getHardwareSpecs(): Promise<HardwareSpecs> {
       const graphics = await si.graphics()
       if (graphics && graphics.controllers && graphics.controllers.length > 0) {
         const ctrl = graphics.controllers[0]
-        gpuName = ctrl.model || ctrl.device || gpuName
+        gpuName = ctrl.model || gpuName
         vramGb = ctrl.vram ? Math.round((ctrl.vram / 1024) * 10) / 10 : vramGb
 
         const vendorLower = (ctrl.vendor || ctrl.model || '').toLowerCase()

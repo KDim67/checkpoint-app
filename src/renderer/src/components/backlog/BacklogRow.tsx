@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Check, Calendar, Link2, ChevronUp, ChevronDown, Minus } from 'lucide-react'
-import type { Item } from '../../../../shared/types'
+import { useAppStore } from '../../store/appStore'
 
 interface BacklogRowProps {
   item: Item
@@ -78,6 +78,8 @@ export default function BacklogRow({
             }}
           >
             <button
+              aria-expanded={showStatusMenu}
+              aria-haspopup="menu"
               onClick={() => setShowStatusMenu(!showStatusMenu)}
               style={{
                 background: 'var(--color-surface-offset)',
@@ -158,6 +160,8 @@ export default function BacklogRow({
             }}
           >
             <button
+              aria-expanded={showPriorityMenu}
+              aria-haspopup="menu"
               onClick={() => setShowPriorityMenu(!showPriorityMenu)}
               title={`Priority: ${PRIORITY_LABELS[item.priority]}`}
               style={{
@@ -227,20 +231,60 @@ export default function BacklogRow({
         return (
           <div
             key={colKey}
-            onClick={() => onRowDoubleClick(item.id)}
             style={{
               width: columnWidths.title,
               padding: '0 var(--space-3)',
-              color: 'var(--color-text-base)',
-              fontWeight: 'var(--weight-semibold)',
-              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-2)',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
               flexShrink: 0
             }}
+            className="backlog-title-cell"
           >
-            {item.title || 'Untitled Task'}
+            <span
+              onClick={() => onRowDoubleClick(item.id)}
+              style={{
+                color: 'var(--color-text-base)',
+                fontWeight: 'var(--weight-semibold)',
+                cursor: 'pointer',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1
+              }}
+            >
+              {item.title || 'Untitled Task'}
+            </span>
+            <button
+              title="Start Pomodoro Focus Session"
+              onClick={(e) => {
+                e.stopPropagation()
+                useAppStore.getState().setPreselectedTaskId(item.id)
+                useAppStore.getState().setView('focus')
+              }}
+              className="backlog-play-btn"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-secondary)',
+                cursor: 'pointer',
+                display: 'none',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2px',
+                borderRadius: '4px',
+                transition: 'background var(--duration-fast)',
+                flexShrink: 0
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+            </button>
           </div>
         )
 
@@ -256,6 +300,7 @@ export default function BacklogRow({
               gap: '4px',
               overflow: 'hidden',
               whiteSpace: 'nowrap',
+              flexWrap: 'nowrap',
               flexShrink: 0
             }}
           >
@@ -355,9 +400,23 @@ export default function BacklogRow({
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      onRowDoubleClick(item.id)
+    } else if (e.key === ' ') {
+      e.preventDefault()
+      onSelectToggle(item.id, e as unknown as React.MouseEvent)
+    }
+  }
+
   return (
     <div
+      role="button"
+      tabIndex={0}
       onDoubleClick={() => onRowDoubleClick(item.id)}
+      onKeyDown={handleKeyDown}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -365,7 +424,9 @@ export default function BacklogRow({
         borderBottom: '1px solid var(--color-surface-offset)',
         background: isSelected ? 'var(--color-primary-muted)' : 'transparent',
         fontSize: 'var(--text-xs)',
-        transition: 'background var(--duration-fast)'
+        transition: 'background var(--duration-fast)',
+        overflow: 'hidden',
+        outline: 'none'
       }}
       className="backlog-row-container"
     >
@@ -394,9 +455,17 @@ export default function BacklogRow({
         return renderCell(colKey)
       })}
       
-      {/* Hover row style */}
+      {/* Hover and focus row style */}
       <style>{`
         .backlog-row-container:hover {
+          background-color: var(--color-surface-2) !important;
+        }
+        .backlog-row-container:hover .backlog-play-btn {
+          display: inline-flex !important;
+        }
+        .backlog-row-container:focus-visible {
+          outline: 1.5px solid var(--color-secondary) !important;
+          outline-offset: -1.5px;
           background-color: var(--color-surface-2) !important;
         }
       `}</style>

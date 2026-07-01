@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useAppStore, type ActiveView } from '../store/appStore'
+import Logo from './ui/Logo'
 
 // Icons (SVG inline, no icon-lib dependency)
 
@@ -47,6 +48,43 @@ function IconCookbook(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+function IconFocus(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="10"/>
+      <polyline points="12 6 12 12 16 14"/>
+    </svg>
+  )
+}
+
+function IconNotes(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M16 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12l5-5V5a2 2 0 0 0-2-2z"/>
+      <path d="M15 21v-6h6"/>
+    </svg>
+  )
+}
+
+function IconClipboard(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+    </svg>
+  )
+}
+
+function IconAnalytics(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  )
+}
+
 function IconSettings(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -73,6 +111,27 @@ function IconPlus(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+function IconCheatsheets(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </svg>
+  )
+}
+
+function IconGamepad(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="6" y1="12" x2="10" y2="12" />
+      <line x1="8" y1="10" x2="8" y2="14" />
+      <line x1="15" y1="13" x2="15.01" y2="13" />
+      <line x1="18" y1="11" x2="18.01" y2="11" />
+      <rect x="2" y="6" width="20" height="12" rx="3" />
+    </svg>
+  )
+}
+
 // Nav Item Data
 
 const NAV_ITEMS: Array<{
@@ -80,10 +139,15 @@ const NAV_ITEMS: Array<{
   label: string
   Icon: React.FC<React.SVGProps<SVGSVGElement>>
 }> = [
-  { view: 'log',      label: 'Log',      Icon: IconLog },
-  { view: 'kanban',   label: 'Kanban',   Icon: IconKanban },
-  { view: 'backlog',  label: 'Backlog',  Icon: IconBacklog },
-  { view: 'cookbook', label: 'Cookbook', Icon: IconCookbook }
+  { view: 'log',         label: 'Log',         Icon: IconLog },
+  { view: 'kanban',      label: 'Kanban',      Icon: IconKanban },
+  { view: 'backlog',     label: 'Backlog',     Icon: IconBacklog },
+  { view: 'focus',       label: 'Focus',       Icon: IconFocus },
+  { view: 'notes',       label: 'Notes',       Icon: IconNotes },
+  { view: 'clipboard',   label: 'Clipboard',   Icon: IconClipboard },
+  { view: 'analytics',   label: 'Analytics',   Icon: IconAnalytics },
+  { view: 'cookbook',    label: 'Cookbook',    Icon: IconCookbook },
+  { view: 'cheatsheets', label: 'Cheatsheets', Icon: IconCheatsheets }
 ]
 
 // Context Popover
@@ -96,60 +160,63 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
   const activeContext = useAppStore(s => s.activeContext)
   const availableContexts = useAppStore(s => s.availableContexts)
   const setContext = useAppStore(s => s.setContext)
+  const setView = useAppStore(s => s.setView)
+  const setSettingsTab = useAppStore(s => s.setSettingsTab)
 
   return (
     <div
       style={{
         position: 'absolute',
-        top: '42px',
+        top: '12px',
         left: '62px',
         zIndex: 100,
         background: 'var(--color-surface-elevated)',
         border: '1px solid var(--color-surface-offset)',
         borderRadius: 'var(--radius-md)',
         boxShadow: 'var(--shadow-md)',
-        minWidth: '200px',
+        minWidth: '220px',
         padding: '4px 0',
         animation: 'dropdown-in 150ms var(--ease-enter)'
       }}
     >
-      <style>{`
-        @keyframes dropdown-in {
-          from { opacity: 0; transform: scale(0.95) translateY(-4px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-      `}</style>
-      {availableContexts.map(ctx => (
-        <button
-          key={ctx}
-          onClick={() => { setContext(ctx); onClose() }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            width: '100%',
-            padding: '6px 12px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 'var(--text-sm)',
-            color: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-text-base)',
-            textAlign: 'left',
-            transition: 'background var(--duration-fast) var(--ease-default)'
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-        >
-          <span style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-balance)',
-            flexShrink: 0
-          }} />
-          {ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-        </button>
-      ))}
+      <div style={{ padding: '6px 12px 4px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)' }}>
+        Workspaces / Contexts
+      </div>
+      <div style={{ maxHeight: '240px', overflowY: 'auto' }} className="custom-scrollbar">
+        {availableContexts.map(ctx => (
+          <button
+            key={ctx}
+            onClick={() => { setContext(ctx); onClose() }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              width: '100%',
+              padding: '6px 12px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 'var(--text-sm)',
+              color: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-text-base)',
+              textAlign: 'left',
+              transition: 'background var(--duration-fast) var(--ease-default)'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-balance)',
+              flexShrink: 0
+            }} />
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </span>
+          </button>
+        ))}
+      </div>
       <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
       <button
         style={{
@@ -167,10 +234,14 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
         }}
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-        onClick={onClose}
+        onClick={() => {
+          setView('settings')
+          setSettingsTab('contexts')
+          onClose()
+        }}
       >
         <IconPlus style={{ opacity: 0.7 }} />
-        New Context
+        Manage / New Context
       </button>
     </div>
   )
@@ -185,7 +256,23 @@ export function Sidebar() {
 
   const [contextOpen, setContextOpen] = useState(false)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
+  const [gamedevEnabled, setGamedevEnabled] = useState(false)
   const sidebarRef = useRef<HTMLDivElement>(null)
+
+  const checkGamedev = async () => {
+    try {
+      const v = await window.electronAPI.db.getSetting('feature_gamedev_helpers')
+      setGamedevEnabled(v === 'true')
+    } catch (err) {
+      console.error('Failed to read gamedev setting in Sidebar:', err)
+    }
+  }
+
+  useEffect(() => {
+    checkGamedev()
+    window.addEventListener('settings-update-gamedev', checkGamedev)
+    return () => window.removeEventListener('settings-update-gamedev', checkGamedev)
+  }, [])
 
   // Close context popover on outside click
   useEffect(() => {
@@ -227,33 +314,60 @@ export function Sidebar() {
         position: 'relative'
       }}
     >
-      {/* Context switcher */}
+      {/* Interactive Logo Context Switcher */}
       <button
         id="context-switcher"
-        title={ctxLabel}
-        aria-label={`Active context: ${ctxLabel}. Click to switch.`}
+        title={`Active Context: ${ctxLabel}. Click to view all contexts.`}
+        aria-label={`Active context: ${ctxLabel}. Click to view contexts list.`}
         aria-expanded={contextOpen}
         aria-haspopup="listbox"
         onClick={() => setContextOpen(v => !v)}
         style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: 'var(--radius-sm)',
-          background: contextOpen ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
-          border: `1px solid ${contextOpen ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-          color: 'var(--color-secondary)',
-          fontSize: 'var(--text-sm)',
-          fontWeight: 'var(--weight-bold)',
+          position: 'relative',
+          padding: '4px',
+          borderRadius: 'var(--radius-md)',
+          background: contextOpen ? 'var(--color-secondary-muted)' : 'transparent',
+          border: `1px solid ${contextOpen ? 'var(--color-secondary)' : 'transparent'}`,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: 'var(--space-2)',
-          transition: 'background var(--duration-fast) var(--ease-default), border-color var(--duration-fast) var(--ease-default)',
+          transition: 'all var(--duration-fast) var(--ease-default)',
           flexShrink: 0
         }}
+        onMouseEnter={e => {
+          if (!contextOpen) e.currentTarget.style.background = 'var(--color-surface-2)'
+        }}
+        onMouseLeave={e => {
+          if (!contextOpen) e.currentTarget.style.background = 'transparent'
+        }}
       >
-        {ctxInitial}
+        <div style={{ filter: 'drop-shadow(0 2px 6px rgba(187, 254, 43, 0.35))', display: 'flex' }}>
+          <Logo size={32} />
+        </div>
+        <span
+          style={{
+            position: 'absolute',
+            bottom: '0px',
+            right: '0px',
+            width: '14px',
+            height: '14px',
+            borderRadius: '50%',
+            background: 'var(--color-surface-1)',
+            border: '1.5px solid var(--color-secondary)',
+            color: 'var(--color-secondary)',
+            fontSize: '8.5px',
+            fontWeight: 'var(--weight-extrabold)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.5)'
+          }}
+        >
+          {ctxInitial}
+        </span>
       </button>
 
       {contextOpen && <ContextPopover onClose={() => setContextOpen(false)} />}
@@ -261,8 +375,21 @@ export function Sidebar() {
       <div style={{ height: '1px', width: '32px', background: 'var(--color-surface-offset)', margin: '2px 0 4px' }} />
 
       {/* Nav items */}
-      <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', width: '100%', alignItems: 'center' }}>
-        {NAV_ITEMS.map(({ view, label, Icon }) => {
+      <nav
+        aria-label="Main navigation"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-1)',
+          width: '100%',
+          alignItems: 'center',
+          flex: 1
+        }}
+      >
+        {(gamedevEnabled 
+          ? [...NAV_ITEMS, { view: 'gamedev' as ActiveView, label: 'Game Dev', Icon: IconGamepad }]
+          : NAV_ITEMS
+        ).map(({ view, label, Icon }) => {
           const isActive = activeView === view
           return (
             <button
@@ -308,6 +435,35 @@ export function Sidebar() {
             </button>
           )
         })}
+
+        {/* Settings, pinned to bottom, inside <nav> for accessibility */}
+        <button
+          id="nav-settings"
+          aria-label="Settings"
+          aria-current={activeView === 'settings' ? 'page' : undefined}
+          onClick={() => handleNavClick('settings')}
+          onMouseEnter={e => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            setTooltip({ label: 'Settings', y: rect.top + rect.height / 2 })
+          }}
+          onMouseLeave={() => setTooltip(null)}
+          style={{
+            marginTop: 'auto',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: activeView === 'settings' ? 'var(--color-secondary-muted)' : 'transparent',
+            color: activeView === 'settings' ? 'var(--color-secondary)' : 'var(--color-balance)',
+            cursor: 'pointer',
+            transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
+          }}
+        >
+          <IconSettings />
+        </button>
       </nav>
 
       {/* Tooltip */}
@@ -335,30 +491,6 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Settings, pinned to bottom */}
-      <button
-        id="nav-settings"
-        aria-label="Settings"
-        aria-current={activeView === 'settings' ? 'page' : undefined}
-        onClick={() => handleNavClick('settings')}
-        style={{
-          marginTop: 'auto',
-          width: '40px',
-          height: '40px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 'var(--radius-md)',
-          border: 'none',
-          background: activeView === 'settings' ? 'var(--color-secondary-muted)' : 'transparent',
-          color: activeView === 'settings' ? 'var(--color-secondary)' : 'var(--color-balance)',
-          cursor: 'pointer',
-          transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
-        }}
-      >
-        <IconSettings />
-      </button>
-
       <style>{`
         @keyframes tooltip-in {
           from { opacity: 0; transform: translateX(-4px); }
@@ -367,7 +499,13 @@ export function Sidebar() {
         #nav-log:not([aria-current]):hover,
         #nav-kanban:not([aria-current]):hover,
         #nav-backlog:not([aria-current]):hover,
+        #nav-focus:not([aria-current]):hover,
+        #nav-notes:not([aria-current]):hover,
+        #nav-clipboard:not([aria-current]):hover,
+        #nav-analytics:not([aria-current]):hover,
         #nav-cookbook:not([aria-current]):hover,
+        #nav-cheatsheets:not([aria-current]):hover,
+        #nav-gamedev:not([aria-current]):hover,
         #nav-settings:not([aria-current]):hover {
           background: var(--color-surface-offset) !important;
           color: var(--color-text-base) !important;

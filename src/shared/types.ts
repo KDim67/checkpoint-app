@@ -179,3 +179,97 @@ export interface TaskQueryParams {
   pageSize?: number
 }
 
+export interface FocusSession {
+  id: string
+  context: string
+  duration_ms: number
+  completed_at: number
+  notes: string
+  tasks_json: string // JSON array of selected task titles/details
+}
+
+export interface CreateFocusSessionPayload {
+  context: string
+  duration_ms: number
+  notes: string
+  tasks_json: string
+}
+
+export interface NoteMetadata {
+  title: string
+  tags: string[]
+  links: string[]
+  updatedAt: number
+  size: number
+}
+
+export interface GitCommit {
+  hash: string
+  message: string
+  author: string
+  date: string
+}
+
+export interface GitStatusResult {
+  branch: string
+  changesCount: number
+  installed: boolean
+}
+
+export interface ClipboardItem {
+  id: string
+  content: string
+  is_pinned: number // 0 = false, 1 = true
+  label: string | null
+  created_at: number
+}
+
+export interface AnalyticsData {
+  focusStats: {
+    totalSessions: number
+    totalDurationMins: number
+    avgSessionMins: number
+  }
+  tasksCompletedWeekly: Array<{
+    week: string
+    count: number
+  }>
+  logHeatmap: Array<{
+    date: string
+    count: number
+  }>
+  mostUsedTags: Array<{
+    name: string
+    color: string
+    count: number
+  }>
+  columnTime: Array<{
+    column: string
+    avgMs: number
+  }>
+  recentFocusSessions: Array<{
+    completedAt: number
+    durationMinutes: number
+    notes: string
+    context: string
+  }>
+  activityAllocation: Array<{
+    context: string
+    durationMins: number
+  }>
+}
+
+export interface PluginInfo {
+  filename: string
+  name: string
+  description: string
+  version: string
+  active: boolean
+}
+
+export type ShortcutMap = Record<string, string>;
+
+
+
+
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Webhook, Crosshair, Archive, Activity } from 'lucide-react'
+import { Webhook, Crosshair, Archive, Activity, Gamepad } from 'lucide-react'
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 
 interface ToggleConfig {
@@ -40,7 +40,7 @@ const TOGGLE_CONFIGS: ToggleConfig[] = [
     },
     toggle: async (active: boolean) => {
       await window.electronAPI.db.setSetting('feature_hud', String(active))
-      if (!active) await window.electronAPI.hud.toggle()
+      await window.electronAPI.hud.toggle(active)
     }
   },
   {
@@ -71,6 +71,22 @@ const TOGGLE_CONFIGS: ToggleConfig[] = [
     toggle: async (active: boolean) => {
       await window.electronAPI.db.setSetting('feature_tracker', String(active))
       await window.electronAPI.tracker.toggle(active)
+    }
+  },
+  {
+    key: 'gamedev_helpers',
+    icon: <Gamepad size={16} />,
+    title: 'Game Development Helpers',
+    description: 'Unlocks a specialized tab with batch asset renamer, frame budget calculator, dialogue editor, and shader color palette code exporters.',
+    warning: 'Disabling hides the sidebar workspace and resets active sub-views.',
+    getState: async () => {
+      const v = await window.electronAPI.db.getSetting('feature_gamedev_helpers')
+      return v === 'true'
+    },
+    toggle: async (active: boolean) => {
+      await window.electronAPI.db.setSetting('feature_gamedev_helpers', String(active))
+      // Sidebar will pick it up on mount/events or store sync. We can also emit a custom window event to force Sidebar updates
+      window.dispatchEvent(new CustomEvent('settings-update-gamedev'))
     }
   }
 ]

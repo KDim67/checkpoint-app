@@ -413,6 +413,15 @@ export default function BacklogTable({
             >
               <div
                 onClick={() => isSortable && onSortChange(colKey)}
+                onKeyDown={(e) => {
+                  if (isSortable && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault()
+                    onSortChange(colKey)
+                  }
+                }}
+                role={isSortable ? 'button' : undefined}
+                tabIndex={isSortable ? 0 : undefined}
+                className={isSortable ? 'backlog-header-sortable' : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -421,7 +430,8 @@ export default function BacklogTable({
                   flex: 1,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  outline: 'none'
                 }}
               >
                 <span>{label}</span>
@@ -484,10 +494,23 @@ export default function BacklogTable({
                   bottom: 0,
                   width: '6px',
                   cursor: 'col-resize',
-                  zIndex: 10
+                  zIndex: 10,
+                  display: 'flex',
+                  justifyContent: 'center'
                 }}
+                className="col-resize-handle"
                 title="Drag to resize column"
-              />
+              >
+                <div
+                  style={{
+                    width: '1px',
+                    height: '100%',
+                    background: 'transparent',
+                    transition: 'background var(--duration-fast), width var(--duration-fast)'
+                  }}
+                  className="col-resize-line"
+                />
+              </div>
             </div>
           )
         })}
@@ -649,7 +672,16 @@ export default function BacklogTable({
                   return (
                     <div
                       key={row.key}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => toggleGroupCollapse(row.key)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          toggleGroupCollapse(row.key)
+                        }
+                      }}
+                      className="backlog-group-header"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -662,7 +694,8 @@ export default function BacklogTable({
                         fontWeight: 'var(--weight-bold)',
                         color: 'var(--color-text-base)',
                         gap: 'var(--space-2)',
-                        userSelect: 'none'
+                        userSelect: 'none',
+                        outline: 'none'
                       }}
                     >
                       {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -714,6 +747,24 @@ export default function BacklogTable({
         .column-reorder-buttons {
           opacity: 0;
           transition: opacity var(--duration-fast);
+        }
+        .backlog-header-sortable:focus-visible {
+          outline: 1.5px solid var(--color-secondary) !important;
+          outline-offset: -2px;
+          border-radius: var(--radius-sm);
+        }
+        .backlog-group-header:focus-visible {
+          outline: 1.5px solid var(--color-secondary) !important;
+          outline-offset: -1.5px;
+          background-color: var(--color-surface-offset) !important;
+        }
+        .backlog-col-header:hover .col-resize-line,
+        .col-resize-handle:hover .col-resize-line {
+          background: var(--color-surface-offset) !important;
+        }
+        .col-resize-handle:active .col-resize-line {
+          background: var(--color-secondary) !important;
+          width: 2px !important;
         }
       `}</style>
     </div>

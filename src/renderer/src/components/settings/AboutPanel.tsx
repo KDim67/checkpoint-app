@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ExternalLink, FolderOpen, Info } from 'lucide-react'
 import { Divider } from './SettingsSection'
+import Logo from '../ui/Logo'
 
 interface VersionInfo {
   app: string
@@ -13,9 +14,9 @@ interface VersionInfo {
 export default function AboutPanel() {
   const [info, setInfo] = useState<VersionInfo>({
     app: '…',
-    electron: process.versions.electron ?? '…',
-    node: process.versions.node ?? '…',
-    chrome: process.versions.chrome ?? '…',
+    electron: window.electronAPI.app.versions?.electron ?? '…',
+    node: window.electronAPI.app.versions?.node ?? '…',
+    chrome: window.electronAPI.app.versions?.chrome ?? '…',
     dataPath: '…'
   })
 
@@ -45,18 +46,7 @@ export default function AboutPanel() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
       {/* Brand header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-        <div style={{
-          width: '48px',
-          height: '48px',
-          borderRadius: '12px',
-          background: 'var(--color-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}>
-          <div style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'var(--color-secondary)' }} />
-        </div>
+        <Logo size={48} />
         <div>
           <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
             Checkpoint

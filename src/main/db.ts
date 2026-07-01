@@ -21,9 +21,11 @@ import {
   RelationTypeSchema,
   BulkUpdateSchema,
   SearchQuerySchema,
-  TaskQueryParamsSchema
+  TaskQueryParamsSchema,
+  CreateFocusSessionSchema
 } from './validation'
 import { IpcChannels } from '../shared/ipcChannels'
+import { updateNativeTitleBarFromSettings } from './titleBarSync'
 import type {
   Item,
   Tag,
@@ -33,13 +35,80 @@ import type {
   Relation,
   RelationType,
   SearchQuery,
-  TaskQueryParams
+  TaskQueryParams,
+  FocusSession,
+  CreateFocusSessionPayload,
+  ClipboardItem
 } from '../shared/types'
 
+export let dbInstance: Database.Database | null = null
+
+export function getDb(): Database.Database {
+  if (!dbInstance) throw new Error('Database not initialized')
+  return dbInstance
+}
+
 // Current schema version
-const CURRENT_VERSION = 1
+const CURRENT_VERSION = 5
 
 // Prepared statement cache (populated by initDb)
+function runMigrations(db: Database.Database): void {
+  const userVersion = (db.pragma('user_version', { simple: true }) as number) ?? 0
+  if (userVersion >= CURRENT_VERSION) return
+
+  db.transaction(() => {
+    if (userVersion < 2) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS focus_sessions (
+          id           TEXT PRIMARY KEY,
+          context      TEXT NOT NULL,
+          duration_ms  INTEGER NOT NULL,
+          completed_at INTEGER NOT NULL,
+          notes        TEXT NOT NULL DEFAULT '',
+          tasks_json   TEXT NOT NULL DEFAULT '[]'
+        );
+      `)
+    }
+    if (userVersion < 3) {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_focus_sessions_context ON focus_sessions(context, completed_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_id);
+        CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_id);
+      `)
+    }
+    if (userVersion < 4) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS clipboard_items (
+          id          TEXT PRIMARY KEY,
+          content     TEXT NOT NULL,
+          is_pinned   INTEGER NOT NULL DEFAULT 0,
+          label       TEXT,
+          created_at  INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_clipboard_created ON clipboard_items(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_clipboard_pinned ON clipboard_items(is_pinned);
+      `)
+    }
+    if (userVersion < 5) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS ai_memories (
+          id           TEXT PRIMARY KEY,
+          context      TEXT NOT NULL,
+          category     TEXT NOT NULL DEFAULT 'semantic',
+          memory_key   TEXT NOT NULL,
+          content      TEXT NOT NULL,
+          is_pinned    INTEGER NOT NULL DEFAULT 0,
+          access_count INTEGER NOT NULL DEFAULT 0,
+          created_at   INTEGER NOT NULL,
+          updated_at   INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_ai_memories_context ON ai_memories(context, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_ai_memories_key ON ai_memories(memory_key);
+      `)
+    }
+    db.pragma(`user_version = ${CURRENT_VERSION}`)
+  })()
+}
 let stmtGetItemsPaginated: Database.Statement
 let stmtGetItemsTotal: Database.Statement
 let stmtGetItemById: Database.Statement
@@ -63,6 +132,19 @@ let stmtGetContexts: Database.Statement
 let stmtBulkUpdateStatus: Database.Statement
 let stmtGetItemsForRebalance: Database.Statement
 let stmtUpdateItemPosition: Database.Statement
+let stmtInsertFocusSession: Database.Statement
+let stmtGetFocusSessions: Database.Statement
+let stmtInsertActivityLog: Database.Statement
+
+let stmtGetClipboardHistory: Database.Statement
+let stmtInsertClipboardItem: Database.Statement
+let stmtFindClipboardItemByContent: Database.Statement
+let stmtUpdateClipboardItemTimestamp: Database.Statement
+let stmtUpdateClipboardItemPin: Database.Statement
+let stmtUpdateClipboardItemLabel: Database.Statement
+let stmtDeleteClipboardItem: Database.Statement
+let stmtClearClipboardHistory: Database.Statement
+let stmtDeleteClipboardHistoryOverflow: Database.Statement
 
 // Schema
 
@@ -139,17 +221,7 @@ CREATE TRIGGER IF NOT EXISTS items_fts_update AFTER UPDATE ON items BEGIN
 END;
 `
 
-// Migrations
 
-function runMigrations(db: Database.Database): void {
-  const userVersion = (db.pragma('user_version', { simple: true }) as number) ?? 0
-  if (userVersion >= CURRENT_VERSION) return
-
-  db.transaction(() => {
-    // v1: initial schema (applied via SCHEMA_SQL above)
-    db.pragma(`user_version = ${CURRENT_VERSION}`)
-  })()
-}
 
 // Init
 
@@ -157,6 +229,7 @@ export function initDb(dataPath: string): Database.Database {
   // Lazy import: better-sqlite3 is a native module, loaded only when needed
   const dbPath = join(dataPath, 'checkpoint.db')
   const db = new Database(dbPath)
+  dbInstance = db
 
   // Performance & safety PRAGMAs
   db.pragma('journal_mode = WAL')     // non-blocking concurrent reads
@@ -261,6 +334,51 @@ export function initDb(dataPath: string): Database.Database {
     UPDATE items SET position = ?, updated_at = ? WHERE id = ?
   `)
 
+  stmtInsertFocusSession = db.prepare(`
+    INSERT INTO focus_sessions (id, context, duration_ms, completed_at, notes, tasks_json)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+
+  stmtGetFocusSessions = db.prepare(`
+    SELECT * FROM focus_sessions WHERE context = ? ORDER BY completed_at DESC
+  `)
+
+  stmtGetClipboardHistory = db.prepare(`
+    SELECT * FROM clipboard_items ORDER BY is_pinned DESC, created_at DESC
+  `)
+  stmtInsertClipboardItem = db.prepare(`
+    INSERT INTO clipboard_items (id, content, is_pinned, label, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `)
+  stmtFindClipboardItemByContent = db.prepare(`
+    SELECT id, is_pinned FROM clipboard_items WHERE content = ? LIMIT 1
+  `)
+  stmtUpdateClipboardItemTimestamp = db.prepare(`
+    UPDATE clipboard_items SET created_at = ? WHERE id = ?
+  `)
+  stmtUpdateClipboardItemPin = db.prepare(`
+    UPDATE clipboard_items SET is_pinned = ? WHERE id = ?
+  `)
+  stmtUpdateClipboardItemLabel = db.prepare(`
+    UPDATE clipboard_items SET label = ? WHERE id = ?
+  `)
+  stmtDeleteClipboardItem = db.prepare(`
+    DELETE FROM clipboard_items WHERE id = ?
+  `)
+  stmtClearClipboardHistory = db.prepare(`
+    DELETE FROM clipboard_items WHERE is_pinned = 0
+  `)
+  stmtDeleteClipboardHistoryOverflow = db.prepare(`
+    DELETE FROM clipboard_items WHERE is_pinned = 0 AND id NOT IN (
+      SELECT id FROM clipboard_items WHERE is_pinned = 0 ORDER BY created_at DESC LIMIT 200
+    )
+  `)
+
+  stmtInsertActivityLog = db.prepare(`
+    INSERT INTO activity_tracking_logs (id, context, window_title, process_name, duration_ms, captured_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+
   return db
 }
 
@@ -302,7 +420,8 @@ export function getItemsPaginated(
   page: number,
   pageSize: number
 ): PaginatedResult<Item> {
-  const offset = page * pageSize
+  const pageIndex = page > 0 ? page - 1 : 0
+  const offset = pageIndex * pageSize
   const rows = stmtGetItemsPaginated.all(context, type, pageSize, offset) as Record<string, unknown>[]
   const total = (stmtGetItemsTotal.get(context, type) as { count: number }).count
   return { items: rows.map(rowToItem), total, page, pageSize }
@@ -422,6 +541,13 @@ export function getSetting<T>(key: string, defaultValue: T): T {
 
 export function setSetting(key: string, value: unknown): void {
   stmtSetSetting.run(key, JSON.stringify(value))
+  if (key === 'app_theme') {
+    try {
+      updateNativeTitleBarFromSettings(value as string)
+    } catch (err) {
+      console.error('[db] Failed to sync titlebar overlay:', err)
+    }
+  }
 }
 
 export function getRelations(itemId: string): Relation[] {
@@ -439,14 +565,38 @@ export function deleteRelation(id: string): void {
 }
 
 export function searchItems(query: SearchQuery): PaginatedResult<Item> {
-  const page = query.page ?? 0
+  const page = query.page ?? 1
   const pageSize = query.pageSize ?? 20
-  const offset = page * pageSize
-  const ftsQuery = `${query.query}*`
+  const pageIndex = page > 0 ? page - 1 : 0
+  const offset = pageIndex * pageSize
+  
+  const rawQuery = (query.query || '').trim()
+  if (!rawQuery) {
+    return { items: [], total: 0, page, pageSize }
+  }
+
+  // If the query is exactly a UUID, return the direct item lookup
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawQuery)
+  if (isUuid) {
+    const item = getItemById(rawQuery)
+    return {
+      items: item ? [item] : [],
+      total: item ? 1 : 0,
+      page,
+      pageSize
+    }
+  }
+
+  // Split by whitespace, escape double quotes, and wrap each term in double quotes with prefix match wildcard
+  const terms = rawQuery.split(/\s+/).filter(Boolean)
+  const ftsQuery = terms.map(t => `"${t.replace(/"/g, '""')}*"`).join(' AND ')
+
   const rows = stmtSearchItems.all(ftsQuery, pageSize, offset) as Record<string, unknown>[]
   const total = (stmtSearchTotal.get(ftsQuery) as { count: number }).count
   return { items: rows.map(rowToItem), total, page, pageSize }
 }
+
+
 
 export function queryTasks(db: Database.Database, context: string, params: TaskQueryParams): PaginatedResult<Item> {
   const page = params.page ?? 1
@@ -542,8 +692,25 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
 }
 
 export function getContextSlugs(): string[] {
+  try {
+    const raw = getSetting<string>('contexts_list', '')
+    if (raw) {
+      const parsed = JSON.parse(raw) as Array<{ slug: string }>
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map(c => c.slug)
+      }
+    }
+  } catch (err) {
+    console.error('[db] Failed to parse contexts_list setting:', err)
+  }
+
+  // Fallback to distinct contexts from items table
   const rows = stmtGetContexts.all() as { slug: string }[]
-  return rows.map(r => r.slug)
+  const slugs = rows.map(r => r.slug).filter(Boolean)
+  if (!slugs.includes('default')) {
+    slugs.unshift('default')
+  }
+  return slugs
 }
 
 export function rebalancePositions(db: Database.Database, context: string, status: string): void {
@@ -554,6 +721,174 @@ export function rebalancePositions(db: Database.Database, context: string, statu
       stmtUpdateItemPosition.run((index + 1) * 1000.0, now, row.id)
     })
   })()
+}
+
+export function createFocusSession(payload: CreateFocusSessionPayload): FocusSession {
+  const id = uuidv4()
+  const completed_at = Date.now()
+  stmtInsertFocusSession.run(
+    id,
+    payload.context,
+    payload.duration_ms,
+    completed_at,
+    payload.notes,
+    payload.tasks_json
+  )
+  return {
+    id,
+    context: payload.context,
+    duration_ms: payload.duration_ms,
+    completed_at,
+    notes: payload.notes,
+    tasks_json: payload.tasks_json
+  }
+}
+
+export function getFocusSessions(context: string): FocusSession[] {
+  const rows = stmtGetFocusSessions.all(context) as Record<string, unknown>[]
+  return rows.map(row => ({
+    id: row.id as string,
+    context: row.context as string,
+    duration_ms: row.duration_ms as number,
+    completed_at: row.completed_at as number,
+    notes: row.notes as string,
+    tasks_json: row.tasks_json as string
+  }))
+}
+
+export function getClipboardHistory(): ClipboardItem[] {
+  const rows = stmtGetClipboardHistory.all() as Record<string, unknown>[]
+  return rows.map(row => ({
+    id: row.id as string,
+    content: row.content as string,
+    is_pinned: row.is_pinned as number,
+    label: row.label as string | null,
+    created_at: row.created_at as number
+  }))
+}
+
+export function recordClipboardCopy(content: string): void {
+  const existing = stmtFindClipboardItemByContent.get(content) as { id: string; is_pinned: number } | undefined
+  const now = Date.now()
+  if (existing) {
+    stmtUpdateClipboardItemTimestamp.run(now, existing.id)
+  } else {
+    const id = uuidv4()
+    stmtInsertClipboardItem.run(id, content, 0, null, now)
+    stmtDeleteClipboardHistoryOverflow.run()
+  }
+}
+
+export function createClipboardSnippet(content: string, label: string | null): void {
+  const existing = stmtFindClipboardItemByContent.get(content) as { id: string; is_pinned: number } | undefined
+  const now = Date.now()
+  if (existing) {
+    stmtUpdateClipboardItemTimestamp.run(now, existing.id)
+    stmtUpdateClipboardItemPin.run(1, existing.id)
+    if (label) {
+      stmtUpdateClipboardItemLabel.run(label, existing.id)
+    }
+  } else {
+    const id = uuidv4()
+    stmtInsertClipboardItem.run(id, content, 1, label || null, now)
+    stmtDeleteClipboardHistoryOverflow.run()
+  }
+}
+
+export function toggleClipboardPin(id: string, isPinned: boolean): void {
+  stmtUpdateClipboardItemPin.run(isPinned ? 1 : 0, id)
+}
+
+export function updateClipboardLabel(id: string, label: string | null): void {
+  stmtUpdateClipboardItemLabel.run(label || null, id)
+}
+
+export function deleteClipboardItem(id: string): void {
+  stmtDeleteClipboardItem.run(id)
+}
+
+export function restoreClipboardItem(content: string, isPinned: boolean, label: string | null): void {
+  const existing = stmtFindClipboardItemByContent.get(content) as { id: string; is_pinned: number } | undefined
+  const now = Date.now()
+  if (existing) {
+    stmtUpdateClipboardItemTimestamp.run(now, existing.id)
+    stmtUpdateClipboardItemPin.run(isPinned ? 1 : 0, existing.id)
+    stmtUpdateClipboardItemLabel.run(label || null, existing.id)
+  } else {
+    const id = uuidv4()
+    stmtInsertClipboardItem.run(id, content, isPinned ? 1 : 0, label || null, now)
+    stmtDeleteClipboardHistoryOverflow.run()
+  }
+}
+
+export function clearClipboardHistory(): void {
+  stmtClearClipboardHistory.run()
+}
+
+export function insertActivityLog(context: string, windowTitle: string, processName: string, durationMs: number): void {
+  const id = uuidv4()
+  const capturedAt = Date.now()
+  stmtInsertActivityLog.run(id, context, windowTitle, processName, durationMs, capturedAt)
+}
+
+export function getActivityStats(
+  context: string | null,
+  timeStart: number,
+  timeEnd: number
+): {
+  totalDurationMs: number
+  byProcess: Array<{ processName: string; durationMs: number }>
+  byContext: Array<{ context: string; durationMs: number }>
+  byTitle: Array<{ windowTitle: string; processName: string; durationMs: number }>
+} {
+  const isContextFilter = context && context !== 'all' && context !== ''
+  const contextFilter = isContextFilter ? 'AND context = ?' : ''
+  const params: any[] = [timeStart, timeEnd]
+  if (isContextFilter) params.push(context)
+
+  // 1. Total duration
+  const totalRow = getDb().prepare(`
+    SELECT SUM(duration_ms) as total 
+    FROM activity_tracking_logs 
+    WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}
+  `).get(...params) as { total: number | null }
+  const totalDurationMs = totalRow?.total || 0
+
+  // 2. By Process
+  const byProcessRows = getDb().prepare(`
+    SELECT process_name as processName, SUM(duration_ms) as durationMs 
+    FROM activity_tracking_logs 
+    WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}
+    GROUP BY process_name
+    ORDER BY durationMs DESC
+    LIMIT 15
+  `).all(...params) as Array<{ processName: string; durationMs: number }>
+
+  // 3. By Context
+  const byContextRows = getDb().prepare(`
+    SELECT context, SUM(duration_ms) as durationMs 
+    FROM activity_tracking_logs 
+    WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}
+    GROUP BY context
+    ORDER BY durationMs DESC
+  `).all(...params) as Array<{ context: string; durationMs: number }>
+
+  // 4. By Title
+  const byTitleRows = getDb().prepare(`
+    SELECT window_title as windowTitle, process_name as processName, SUM(duration_ms) as durationMs 
+    FROM activity_tracking_logs 
+    WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}
+    GROUP BY window_title, process_name
+    ORDER BY durationMs DESC
+    LIMIT 20
+  `).all(...params) as Array<{ windowTitle: string; processName: string; durationMs: number }>
+
+  return {
+    totalDurationMs,
+    byProcess: byProcessRows,
+    byContext: byContextRows,
+    byTitle: byTitleRows
+  }
 }
 
 // IPC Handler Registration
@@ -717,6 +1052,79 @@ export function registerDbHandlers(db: Database.Database): void {
       const parsedContext = z.string().parse(context)
       const parsedParams = TaskQueryParamsSchema.parse(params)
       return queryTasks(db, parsedContext, parsedParams)
+    })
+  })
+
+  ipcMain.handle(IpcChannels.DB_CREATE_FOCUS_SESSION, (_event, payload: unknown) => {
+    return handleSafe(() => {
+      const parsedPayload = CreateFocusSessionSchema.parse(payload)
+      return createFocusSession(parsedPayload)
+    })
+  })
+
+  ipcMain.handle(IpcChannels.DB_GET_FOCUS_SESSIONS, (_event, context: unknown) => {
+    return handleSafe(() => {
+      const parsedContext = z.string().parse(context)
+      return getFocusSessions(parsedContext)
+    })
+  })
+
+  ipcMain.handle(IpcChannels.TRACKER_GET_STATS, (_event, context: unknown, timeStart: unknown, timeEnd: unknown) => {
+    return handleSafe(() => {
+      const parsedContext = z.string().nullable().parse(context)
+      const parsedStart = z.number().parse(timeStart)
+      const parsedEnd = z.number().parse(timeEnd)
+      return getActivityStats(parsedContext, parsedStart, parsedEnd)
+    })
+  })
+
+  // Clipboard History Handlers
+  ipcMain.handle(IpcChannels.CLIPBOARD_GET_HISTORY, () => {
+    return handleSafe(() => getClipboardHistory())
+  })
+
+  ipcMain.handle(IpcChannels.CLIPBOARD_TOGGLE_PIN, (_event, id: unknown, isPinned: unknown) => {
+    return handleSafe(() => {
+      const parsedId = z.string().parse(id)
+      const parsedPin = z.boolean().parse(isPinned)
+      toggleClipboardPin(parsedId, parsedPin)
+    })
+  })
+
+  ipcMain.handle(IpcChannels.CLIPBOARD_UPDATE_LABEL, (_event, id: unknown, label: unknown) => {
+    return handleSafe(() => {
+      const parsedId = z.string().parse(id)
+      const parsedLabel = z.string().nullable().parse(label)
+      updateClipboardLabel(parsedId, parsedLabel)
+    })
+  })
+
+  ipcMain.handle(IpcChannels.CLIPBOARD_DELETE_ITEM, (_event, id: unknown) => {
+    return handleSafe(() => {
+      const parsedId = z.string().parse(id)
+      deleteClipboardItem(parsedId)
+    })
+  })
+
+  ipcMain.handle(IpcChannels.CLIPBOARD_RESTORE_ITEM, (_event, content: unknown, isPinned: unknown, label: unknown) => {
+    return handleSafe(() => {
+      const parsedContent = z.string().parse(content)
+      const parsedPin = z.boolean().parse(isPinned)
+      const parsedLabel = z.string().nullable().parse(label)
+      restoreClipboardItem(parsedContent, parsedPin, parsedLabel)
+    })
+  })
+
+
+  ipcMain.handle(IpcChannels.CLIPBOARD_CLEAR_HISTORY, () => {
+    return handleSafe(() => clearClipboardHistory())
+  })
+
+  ipcMain.handle(IpcChannels.CLIPBOARD_CREATE_SNIPPET, (_event, content: unknown, label: unknown) => {
+    return handleSafe(() => {
+      const parsedContent = z.string().parse(content)
+      const parsedLabel = z.string().nullable().parse(label)
+      createClipboardSnippet(parsedContent, parsedLabel)
     })
   })
 }

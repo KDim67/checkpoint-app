@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Edit2, Trash2, ArrowRightLeft, Calendar, GripVertical } from 'lucide-react'
+import { Edit2, Trash2, ArrowRightLeft, Calendar, GripVertical, Play, Check, CheckSquare } from 'lucide-react'
+import { useAppStore } from '../../store/appStore'
 import type { Item } from '../../../../shared/types'
 
 interface KanbanCardProps {
@@ -9,18 +10,59 @@ interface KanbanCardProps {
   onClick: (id: string) => void
   onDelete: (id: string) => void
   onConvertToTask: (id: string) => void
+  onUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
+  isOverlay?: boolean
 }
 
 const PRIORITY_COLORS: Record<number, { bar: string; label: string; bg: string }> = {
   3: { bar: '#ef4444', label: 'High',   bg: 'rgba(239,68,68,0.08)' },
-  2: { bar: '#f97316', label: 'Med',    bg: 'rgba(249,115,22,0.08)' },
+  2: { bar: '#eab308', label: 'Med',    bg: 'rgba(234,179,8,0.12)' },
   1: { bar: '#3b82f6', label: 'Low',    bg: 'rgba(59,130,246,0.08)' },
   0: { bar: 'transparent', label: '', bg: 'transparent' }
 }
 
-export default function KanbanCard({ card, onClick, onDelete, onConvertToTask }: KanbanCardProps) {
+function stripMarkdown(md: string): string {
+  if (!md) return ''
+  return md
+    // Remove headers
+    .replace(/^#+\s+/gm, '')
+    // Remove bold/italic formatting
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    // Remove inline code block ticks
+    .replace(/`([^`]+)`/g, '$1')
+    // Remove code blocks
+    .replace(/```[\s\S]*?```/g, '')
+    // Remove links [text](url) -> text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Remove images ![alt](url) -> alt
+    .replace(/!\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Remove blockquotes
+    .replace(/^\s*>\s+/gm, '')
+    // Remove bullet points
+    .replace(/^\s*[-*+]\s+/gm, '')
+    // Remove numbered lists
+    .replace(/^\s*\d+\.\s+/gm, '')
+    // Clean up multiple spaces/newlines
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getTextColorForBackground(bgColor?: string): string {
+  if (!bgColor) return 'var(--color-text-base)'
+  const hex = bgColor.replace('#', '')
+  if (hex.length !== 6) return '#ffffff'
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000
+  return yiq >= 115 ? '#0f172a' : '#ffffff'
+}
+
+function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOverlay = false }: KanbanCardProps) {
   const [hovered, setHovered] = useState(false)
 
+  const sortable = useSortable({ id: card.id, disabled: isOverlay })
   const {
     attributes,
     listeners,
@@ -28,198 +70,352 @@ export default function KanbanCard({ card, onClick, onDelete, onConvertToTask }:
     transform,
     transition,
     isDragging
-  } = useSortable({ id: card.id })
+  } = isOverlay
+    ? { attributes: {}, listeners: {}, setNodeRef: null, transform: null, transition: undefined, isDragging: false }
+    : sortable
 
   const priority = PRIORITY_COLORS[card.priority] ?? PRIORITY_COLORS[0]
 
+  // Parse Trello Metadata properties
+  let meta: any = {}
+  try {
+    meta = JSON.parse(card.metadata || '{}')
+  } catch {}
+
+  const cover = meta.cover || null
+  const checklist = meta.checklist || []
+  const isTemplate = meta.isTemplate === true
+  const dueDateCompleted = meta.dueDateCompleted === true
+
+  const totalChecklist = checklist.length
+  const completedChecklist = checklist.filter((i: any) => i.done).length
+  const isFullCover = cover && cover.type === 'color' && cover.size === 'full'
+  const isHeaderCover = cover && cover.type === 'color' && cover.size !== 'full'
+  const coverTextColor = isFullCover ? getTextColorForBackground(cover.value) : 'var(--color-text-base)'
+
   const cardStyle: React.CSSProperties = {
-    transform: isDragging
-      ? `${CSS.Transform.toString(transform) ?? ''} scale(1.02)`.trim()
-      : CSS.Transform.toString(transform) ?? undefined,
-    transition: isDragging ? transition : `${transition ?? ''}, box-shadow 120ms ease, transform 120ms ease`.trim(),
-    opacity: isDragging ? 0.35 : 1,
+    transform: CSS.Transform.toString(transform) ?? undefined,
+    transition: transition ?? 'none',
+    opacity: isDragging ? 0.4 : 1,
     position: 'relative',
     display: 'flex',
+    flexDirection: 'column',
     cursor: isDragging ? 'grabbing' : 'pointer',
     borderRadius: 'var(--radius-md)',
-    border: hovered && !isDragging
-      ? '1px solid var(--color-balance)'
-      : '1px solid var(--color-surface-offset)',
-    background: 'var(--color-surface-1)',
-    boxShadow: isDragging
-      ? '0 16px 32px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.3)'
-      : hovered
-        ? '0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)'
-        : '0 1px 3px rgba(0,0,0,0.2)',
+    border: isDragging
+      ? '2px dashed var(--color-secondary)'
+      : hovered && !isDragging
+        ? '1px solid var(--color-balance)'
+        : '1px solid var(--color-surface-offset)',
+    backgroundColor: isFullCover ? cover.value : (isDragging ? 'var(--color-surface-2)' : 'var(--color-surface-1)'),
+    boxShadow: hovered && !isDragging
+      ? '0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)'
+      : '0 1px 3px rgba(0,0,0,0.2)',
     zIndex: isDragging ? 999 : 1,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    flexShrink: 0
   }
 
-  const truncatedBody = card.body.length > 100
-    ? `${card.body.substring(0, 100)}...`
-    : card.body
+  const plainText = stripMarkdown(card.body)
+  const truncatedBody = plainText.length > 100
+    ? `${plainText.substring(0, 100)}...`
+    : plainText
 
-  const isOverdue = card.due_at && card.due_at < Date.now() && card.status !== 'done'
+  const isOverdue = card.due_at && card.due_at < Date.now() && card.status !== 'done' && !dueDateCompleted
   const dueDateStr = card.due_at
     ? new Date(card.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     : null
 
+  const handleKeyDown = async (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return
+
+    // Space: Start Pomodoro Focus Session
+    if (e.key === ' ') {
+      e.preventDefault()
+      useAppStore.getState().setPreselectedTaskId(card.id)
+      useAppStore.getState().setView('focus')
+      return
+    }
+
+    // Enter or e: Open Details Modal
+    if (e.key === 'Enter' || e.key === 'e') {
+      e.preventDefault()
+      onClick(card.id)
+      return
+    }
+
+    // d: Toggle Due Date Completed
+    if (e.key === 'd' && card.due_at) {
+      e.preventDefault()
+      const nextVal = !dueDateCompleted
+      const updatedMeta = { ...meta, dueDateCompleted: nextVal }
+      if (onUpdate) {
+        await onUpdate(card.id, { metadata: JSON.stringify(updatedMeta) })
+      }
+      return
+    }
+
+    // t: Toggle Template Status
+    if (e.key === 't') {
+      e.preventDefault()
+      const nextVal = !isTemplate
+      const updatedMeta = { ...meta, isTemplate: nextVal }
+      if (onUpdate) {
+        await onUpdate(card.id, { metadata: JSON.stringify(updatedMeta) })
+      }
+      return
+    }
+
+    // c: Archive (Delete) Card
+    if (e.key === 'c') {
+      e.preventDefault()
+      onDelete(card.id)
+      return
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
-      style={cardStyle}
+      style={{ ...cardStyle, outline: 'none' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => onClick(card.id)}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      className="kanban-card"
     >
-      {/* Priority accent bar on left edge */}
-      {card.priority > 0 && (
+      {/* Cover Header Banner */}
+      {isHeaderCover && (
+        <div style={{ height: '28px', backgroundColor: cover.value, width: '100%', flexShrink: 0 }} />
+      )}
+      {cover && cover.type === 'image' && (
         <div style={{
-          width: '3px',
-          flexShrink: 0,
-          background: priority.bar,
-          borderRadius: '8px 0 0 8px'
+          height: '50px',
+          backgroundImage: `url(${cover.value})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          width: '100%',
+          flexShrink: 0
         }} />
       )}
 
-      {/* Main content */}
-      <div style={{
-        flex: 1,
-        padding: 'var(--space-3) var(--space-3) var(--space-2-5) var(--space-3)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-2)',
-        minWidth: 0
-      }}>
-        {/* Drag handle + title row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-1-5)' }}>
-          {/* Drag handle */}
-          <div
-            {...attributes}
-            {...listeners}
-            onClick={e => e.stopPropagation()}
-            style={{
-              color: hovered ? 'var(--color-balance)' : 'transparent',
-              cursor: 'grab',
-              flexShrink: 0,
-              marginTop: '2px',
-              transition: 'color 100ms ease'
-            }}
-          >
-            <GripVertical size={14} />
-          </div>
-
-          <h4 style={{
-            margin: 0,
-            fontSize: 'var(--text-sm)',
-            fontWeight: 'var(--weight-semibold)',
-            color: 'var(--color-text-base)',
-            lineHeight: 1.4,
-            wordBreak: 'break-word',
-            flex: 1
-          }}>
-            {card.title}
-          </h4>
-        </div>
-
-        {/* Body preview */}
-        {card.body && (
-          <p style={{
-            margin: 0,
-            fontSize: 'var(--text-xs)',
-            color: 'var(--color-text-muted)',
-            lineHeight: 1.5,
-            wordBreak: 'break-word',
-            whiteSpace: 'pre-wrap',
-            paddingLeft: '22px'  // align with title (past drag handle)
-          }}>
-            {truncatedBody}
-          </p>
+      <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
+        {/* Priority accent bar on left edge */}
+        {card.priority > 0 && (
+          <div style={{
+            width: '3px',
+            flexShrink: 0,
+            background: priority.bar
+          }} />
         )}
 
-        {/* Tags */}
-        {card.tags && card.tags.length > 0 && (
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '4px',
-            paddingLeft: '22px'
-          }}>
-            {card.tags.map(tag => (
-              <span
-                key={tag.id}
+        {/* Main content */}
+        <div style={{
+          flex: 1,
+          padding: 'var(--space-3)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-2)',
+          minWidth: 0
+        }}>
+          {/* Title, Quick Actions & Drag Handle */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', justifyContent: 'space-between' }}>
+            <h4 style={{
+              margin: 0,
+              fontSize: 'var(--text-sm)',
+              fontWeight: 'var(--weight-semibold)',
+              color: coverTextColor,
+              lineHeight: 1.35,
+              wordBreak: 'break-word',
+              flex: 1
+            }}>
+              {card.title}
+            </h4>
+
+            {/* Top Right Quick Actions & Drag Handle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                flexShrink: 0
+              }}
+              onClick={e => e.stopPropagation()}
+              onMouseDown={e => e.stopPropagation()}
+            >
+              <div
                 style={{
-                  fontSize: '10px',
-                  fontWeight: 'var(--weight-semibold)',
-                  color: tag.color,
-                  background: `${tag.color}18`,
-                  border: `1px solid ${tag.color}30`,
-                  padding: '1px 6px',
-                  borderRadius: '4px',
-                  whiteSpace: 'nowrap',
-                  letterSpacing: '0.02em'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  opacity: hovered ? 1 : 0,
+                  transition: 'opacity 150ms ease'
                 }}
               >
-                {tag.name}
-              </span>
-            ))}
-          </div>
-        )}
+                <ActionBtn
+                  title="Start Pomodoro Focus Session (Space)"
+                  textColor={isFullCover ? coverTextColor : undefined}
+                  onClick={() => {
+                    useAppStore.getState().setPreselectedTaskId(card.id)
+                    useAppStore.getState().setView('focus')
+                  }}
+                >
+                  <Play size={11} fill="currentColor" />
+                </ActionBtn>
+                <ActionBtn title="Edit Card (E / Enter)" textColor={isFullCover ? coverTextColor : undefined} onClick={() => onClick(card.id)}>
+                  <Edit2 size={11} />
+                </ActionBtn>
+                <ActionBtn title="Convert to Task" textColor={isFullCover ? coverTextColor : undefined} onClick={() => onConvertToTask(card.id)}>
+                  <ArrowRightLeft size={11} />
+                </ActionBtn>
+                <ActionBtn title="Delete Card (C)" textColor={isFullCover ? coverTextColor : undefined} onClick={() => onDelete(card.id)} danger>
+                  <Trash2 size={11} />
+                </ActionBtn>
+              </div>
 
-        {/* Footer: due date + actions */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingLeft: '22px',
-          minHeight: '22px',
-          marginTop: 'var(--space-1)'
-        }}>
-          {/* Due date */}
-          {dueDateStr ? (
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '3px',
-              fontSize: '10px',
-              fontWeight: 'var(--weight-medium)',
-              color: isOverdue ? 'white' : 'var(--color-text-faint)',
-              backgroundColor: isOverdue ? 'var(--color-error)' : 'var(--color-surface-2)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              border: isOverdue ? 'none' : '1px solid var(--color-surface-offset)'
+              <div
+                {...attributes}
+                {...listeners}
+                style={{
+                  color: hovered ? (isFullCover ? coverTextColor : 'var(--color-text-muted)') : 'transparent',
+                  cursor: 'grab',
+                  padding: '2px',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                title="Drag to reorder card"
+              >
+                <GripVertical size={14} />
+              </div>
+            </div>
+          </div>
+
+          {/* Body preview */}
+          {card.body && (
+            <p style={{
+              margin: 0,
+              fontSize: 'var(--text-xs)',
+              color: isFullCover ? coverTextColor : 'var(--color-text-muted)',
+              opacity: isFullCover ? 0.9 : 1,
+              lineHeight: 1.45,
+              wordBreak: 'break-word',
+              whiteSpace: 'pre-wrap'
             }}>
-              <Calendar size={9} />
-              {dueDateStr}
-            </span>
-          ) : (
-            <div />
+              {truncatedBody}
+            </p>
           )}
 
-          {/* Quick-action buttons - fade in on hover */}
-          <div
-            style={{
+          {/* Tags */}
+          {card.tags && card.tags.length > 0 && (
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '6px',
+              marginTop: '2px'
+            }}>
+              {card.tags.map(tag => (
+                <span
+                  key={tag.id}
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 'var(--weight-bold)',
+                    color: tag.color,
+                    backgroundColor: isFullCover ? (coverTextColor === '#ffffff' ? '#0f172a' : '#ffffff') : `${tag.color}18`,
+                    border: isFullCover ? `1.5px solid ${tag.color}` : `1px solid ${tag.color}30`,
+                    boxShadow: isFullCover ? '0 1px 3px rgba(0,0,0,0.15)' : undefined,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    whiteSpace: 'nowrap',
+                    letterSpacing: '0.02em'
+                  }}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Footer: due date & checklists */}
+          {(dueDateStr || totalChecklist > 0 || isTemplate) && (
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '2px',
-              opacity: hovered ? 1 : 0,
-              transition: 'opacity 100ms ease'
-            }}
-            onClick={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
-          >
-            <ActionBtn title="Edit Card" onClick={() => onClick(card.id)}>
-              <Edit2 size={11} />
-            </ActionBtn>
-            <ActionBtn title="Convert to Task" onClick={() => onConvertToTask(card.id)}>
-              <ArrowRightLeft size={11} />
-            </ActionBtn>
-            <ActionBtn title="Delete Card" onClick={() => onDelete(card.id)} danger>
-              <Trash2 size={11} />
-            </ActionBtn>
-          </div>
+              justifyContent: 'flex-start',
+              minHeight: '20px',
+              marginTop: '4px',
+              gap: '6px',
+              flexWrap: 'wrap'
+            }}>
+              {dueDateStr && (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  fontWeight: 'var(--weight-medium)',
+                  color: isFullCover ? coverTextColor : (dueDateCompleted ? 'var(--color-text-inverted)' : (isOverdue ? 'white' : 'var(--color-text-faint)')),
+                  backgroundColor: isFullCover 
+                    ? (coverTextColor === '#ffffff' ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.6)')
+                    : (dueDateCompleted ? 'var(--color-secondary)' : (isOverdue ? 'var(--color-error)' : 'var(--color-surface-2)')),
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  border: isFullCover ? `1px solid ${coverTextColor === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}` : ((dueDateCompleted || isOverdue) ? 'none' : '1px solid var(--color-surface-offset)')
+                }}>
+                  {dueDateCompleted ? <Check size={10} strokeWidth={3} /> : <Calendar size={10} />}
+                  {dueDateStr}
+                </span>
+              )}
+
+              {totalChecklist > 0 && (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  fontWeight: 'var(--weight-medium)',
+                  color: isFullCover ? coverTextColor : (completedChecklist === totalChecklist ? 'var(--color-text-inverted)' : 'var(--color-text-faint)'),
+                  backgroundColor: isFullCover
+                    ? (coverTextColor === '#ffffff' ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.6)')
+                    : (completedChecklist === totalChecklist ? 'var(--color-secondary)' : 'var(--color-surface-2)'),
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  border: isFullCover ? `1px solid ${coverTextColor === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}` : (completedChecklist === totalChecklist ? 'none' : '1px solid var(--color-surface-offset)')
+                }}>
+                  <CheckSquare size={10} />
+                  {completedChecklist}/{totalChecklist}
+                </span>
+              )}
+
+              {isTemplate && (
+                <span style={{
+                  fontSize: '9px',
+                  fontWeight: 'var(--weight-bold)',
+                  backgroundColor: isFullCover ? (coverTextColor === '#ffffff' ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.6)') : 'var(--color-surface-offset)',
+                  border: isFullCover ? `1px solid ${coverTextColor === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}` : '1px solid var(--color-surface-offset)',
+                  color: isFullCover ? coverTextColor : 'var(--color-secondary)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  letterSpacing: '0.02em',
+                  textTransform: 'uppercase'
+                }}>
+                  Template
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      <style>{`
+        .kanban-card:focus-visible {
+          outline: 1.5px solid var(--color-secondary) !important;
+          outline-offset: -1.5px;
+          border-color: var(--color-secondary) !important;
+        }
+      `}</style>
     </div>
   )
 }
@@ -228,12 +424,14 @@ function ActionBtn({
   children,
   title,
   onClick,
-  danger = false
+  danger = false,
+  textColor
 }: {
   children: React.ReactNode
   title: string
   onClick: () => void
   danger?: boolean
+  textColor?: string
 }) {
   const [hover, setHover] = useState(false)
   return (
@@ -243,23 +441,22 @@ function ActionBtn({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        background: hover
-          ? danger ? 'rgba(239,68,68,0.15)' : 'var(--color-surface-offset)'
+        backgroundColor: hover
+          ? (danger ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.25)')
           : 'transparent',
         border: 'none',
-        color: hover
-          ? danger ? 'var(--color-error)' : 'var(--color-text-base)'
-          : 'var(--color-text-muted)',
+        color: danger ? (hover ? 'var(--color-error)' : (textColor || 'var(--color-error)')) : (textColor || (hover ? 'var(--color-text-base)' : 'var(--color-text-muted)')),
         cursor: 'pointer',
         padding: '3px 4px',
         borderRadius: '4px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        transition: 'background 100ms ease, color 100ms ease'
+        justifyContent: 'center'
       }}
     >
       {children}
     </button>
   )
 }
+
+export default React.memo(KanbanCard)

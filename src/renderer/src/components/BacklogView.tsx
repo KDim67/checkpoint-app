@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, RotateCcw, X } from 'lucide-react'
+import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { Item, Tag as TagType } from '../../../shared/types'
 import BacklogFilters from './backlog/BacklogFilters'
 import BacklogTable from './backlog/BacklogTable'
 import BulkActionsBar from './backlog/BulkActionsBar'
 import TaskDetailDrawer from './backlog/TaskDetailDrawer'
+import Skeleton from './ui/Skeleton'
+import EmptyState from './ui/EmptyState'
+import { useToast } from './ui/Toast'
+import StandupTranslatorView from './StandupTranslatorView'
+import ConfirmDialog from './ui/ConfirmDialog'
 
 interface WorkflowColumn {
   id: string
@@ -14,12 +19,15 @@ interface WorkflowColumn {
 
 export default function BacklogView() {
   const activeContext = useAppStore(s => s.activeContext)
+  const { toast } = useToast()
 
   // Items and Schema configurations
   const [tasks, setTasks] = useState<Item[]>([])
   const [totalTasks, setTotalTasks] = useState(0)
   const [workflowColumns, setWorkflowColumns] = useState<WorkflowColumn[]>([])
+  const [showStandupModal, setShowStandupModal] = useState(false)
   const [allTags, setAllTags] = useState<TagType[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Query & pagination state
   const [searchQuery, setSearchQuery] = useState('')
@@ -75,15 +83,27 @@ export default function BacklogView() {
     created_at: true
   })
 
+  // Computed filter count
+  const activeFilterCount = useMemo(() => {
+    return (
+      selectedStatuses.length +
+      selectedPriorities.length +
+      selectedTagIds.length +
+      (dueStart ? 1 : 0) +
+      (dueEnd ? 1 : 0) +
+      (hasRelations !== 'all' ? 1 : 0)
+    )
+  }, [
+    selectedStatuses,
+    selectedPriorities,
+    selectedTagIds,
+    dueStart,
+    dueEnd,
+    hasRelations
+  ])
+
   // Selected item detail drawer
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
-
-  // Soft-delete undo state
-  const [showUndo, setShowUndo] = useState(false)
-  const [undoData, setUndoData] = useState<{
-    items: Item[]
-    originalStatuses: Array<{ id: string; status: string }>
-  } | null>(null)
 
   // 1. Debounce Search Input
   useEffect(() => {
@@ -160,6 +180,7 @@ export default function BacklogView() {
 
   // 5. Load Tasks
   const loadTasks = useCallback(async () => {
+    setLoading(true)
     try {
       const params = {
         query: debouncedQuery,
@@ -180,6 +201,8 @@ export default function BacklogView() {
       setTotalTasks(res.total)
     } catch (err) {
       console.error('Failed to load tasks:', err)
+    } finally {
+      setLoading(false)
     }
   }, [
     activeContext,
@@ -207,6 +230,14 @@ export default function BacklogView() {
   // Reload tasks when filter dependencies alter
   useEffect(() => {
     loadTasks()
+  }, [loadTasks])
+
+  useEffect(() => {
+    const handleItemUpdated = () => {
+      loadTasks()
+    }
+    window.addEventListener('item-updated', handleItemUpdated)
+    return () => window.removeEventListener('item-updated', handleItemUpdated)
   }, [loadTasks])
 
   // Reset filters handler
@@ -244,6 +275,7 @@ export default function BacklogView() {
         ids: selectedIds,
         patch: { status }
       })
+      toast(`Updated status of ${selectedIds.length} tasks`)
       setSelectedIds([])
       await loadTasks()
     } catch (err) {
@@ -253,13 +285,11 @@ export default function BacklogView() {
 
   const handleBulkUpdatePriority = async (priority: number) => {
     try {
-      await Promise.all(
-        selectedIds.map(id =>
-          window.electronAPI.db.updateItem(id, {
-            priority: priority as Item['priority']
-          })
-        )
-      )
+      await window.electronAPI.db.bulkUpdateItems({
+        ids: selectedIds,
+        patch: { priority: priority as Item['priority'] }
+      })
+      toast(`Updated priority of ${selectedIds.length} tasks`)
       setSelectedIds([])
       await loadTasks()
     } catch (err) {
@@ -279,6 +309,7 @@ export default function BacklogView() {
           ])
         })
       )
+      toast(`Added tag to ${selectedItems.length} tasks`)
       setSelectedIds([])
       await loadTasks()
     } catch (err) {
@@ -286,41 +317,51 @@ export default function BacklogView() {
     }
   }
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
   const handleBulkDelete = async () => {
+    setShowDeleteConfirm(true)
+  }
+
+  const performBulkDelete = async () => {
+    setShowDeleteConfirm(false)
     try {
       const originalStatuses = selectedItems.map(item => ({
         id: item.id,
         status: item.status
       }))
+      const deletedIds = [...selectedIds]
+      const deletedItems = [...selectedItems]
 
       // Soft delete by updating status to 'archived'
       await window.electronAPI.db.bulkUpdateItems({
-        ids: selectedIds,
+        ids: deletedIds,
         patch: { status: 'archived' }
       })
 
-      setUndoData({ items: selectedItems, originalStatuses })
-      setShowUndo(true)
       setSelectedIds([])
       await loadTasks()
+
+      toast(`Deleted ${deletedItems.length} tasks.`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await Promise.all(
+                originalStatuses.map(os =>
+                  window.electronAPI.db.updateItem(os.id, { status: os.status })
+                )
+              )
+              await loadTasks()
+              toast('Tasks restored')
+            } catch (err) {
+              console.error('Failed to undo deletion:', err)
+            }
+          }
+        }
+      })
     } catch (err) {
       console.error('Failed to bulk delete tasks:', err)
-    }
-  }
-
-  const handleUndoDelete = async () => {
-    if (!undoData) return
-    try {
-      await Promise.all(
-        undoData.originalStatuses.map(os =>
-          window.electronAPI.db.updateItem(os.id, { status: os.status })
-        )
-      )
-      setShowUndo(false)
-      setUndoData(null)
-      await loadTasks()
-    } catch (err) {
-      console.error('Failed to undo deletion:', err)
     }
   }
 
@@ -370,7 +411,10 @@ export default function BacklogView() {
 
     const success = await window.electronAPI.app.saveFile('backlog-export.md', content)
     if (success) {
+      toast(`Exported ${selectedItems.length} tasks to markdown file`)
       setSelectedIds([])
+    } else {
+      toast('Export failed, file could not be saved', { type: 'error' })
     }
   }
 
@@ -390,6 +434,7 @@ export default function BacklogView() {
       })
       await loadTasks()
       setActiveTaskId(newTask.id)
+      toast('Task created')
     } catch (err) {
       console.error('Failed to create new backlog task:', err)
     }
@@ -478,36 +523,70 @@ export default function BacklogView() {
           </div>
         </div>
 
-        <button
-          onClick={handleCreateTask}
-          style={{
-            background: 'var(--color-secondary)',
-            border: 'none',
-            color: 'var(--color-text-inverted)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-2) var(--space-4)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--weight-bold)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-1-5)',
-            height: '32px',
-            letterSpacing: '0.01em',
-            transition: 'filter 120ms ease, transform 120ms ease'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.filter = 'brightness(1.15)'
-            e.currentTarget.style.transform = 'translateY(-1px)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.filter = 'none'
-            e.currentTarget.style.transform = 'translateY(0)'
-          }}
-        >
-          <Plus size={13} />
-          New Task
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <button
+            onClick={() => setShowStandupModal(true)}
+            style={{
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-4)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'var(--weight-semibold)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1.5)',
+              height: '32px',
+              transition: 'filter 120ms ease, transform 120ms ease'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.filter = 'brightness(1.15)'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.filter = 'none'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-secondary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+            </svg>
+            AI Standup
+          </button>
+
+          <button
+            onClick={handleCreateTask}
+            style={{
+              background: 'var(--color-secondary)',
+              border: 'none',
+              color: 'var(--color-text-inverted)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-4)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'var(--weight-bold)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1-5)',
+              height: '32px',
+              letterSpacing: '0.01em',
+              transition: 'filter 120ms ease, transform 120ms ease'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.filter = 'brightness(1.15)'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.filter = 'none'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <Plus size={13} />
+            New Task
+          </button>
+        </div>
       </div>
 
       {/* Control bar */}
@@ -595,13 +674,11 @@ export default function BacklogView() {
         <button
           onClick={() => setShowFilters(!showFilters)}
           style={{
-            background: showFilters ? 'var(--color-secondary-muted, rgba(205,241,43,0.12))' : 'transparent',
-            border: showFilters ? '1px solid var(--color-secondary)' : '1px solid transparent',
-            color: showFilters ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-            borderRadius: 'var(--radius-sm)',
-            padding: 'var(--space-1) var(--space-2)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--weight-semibold)',
+            background: showFilters ? 'var(--color-surface-offset)' : 'transparent',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-md)',
+            color: showFilters ? 'var(--color-text-base)' : 'var(--color-text-muted)',
+            padding: '6px 12px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -618,6 +695,26 @@ export default function BacklogView() {
         >
           <SlidersHorizontal size={12} />
           <span>Filters</span>
+          {activeFilterCount > 0 && (
+            <span
+              style={{
+                background: 'var(--color-secondary)',
+                color: 'var(--color-text-inverted)',
+                borderRadius: 'var(--radius-full)',
+                fontSize: '9px',
+                fontWeight: 'bold',
+                minWidth: '16px',
+                height: '16px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 4px',
+                boxSizing: 'border-box'
+              }}
+            >
+              {activeFilterCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -646,82 +743,174 @@ export default function BacklogView() {
 
       {/* Main registry Table area */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <BacklogTable
-          items={tasks}
-          columns={workflowColumns}
-          allTags={allTags}
-          selectedIds={selectedIds}
-          setSelectedIds={setSelectedIds}
-          visibleColumns={visibleColumns}
-          columnWidths={columnWidths}
-          columnOrder={columnOrder}
-          grouping={grouping}
-          sortBy={sortBy}
-          sortDesc={sortDesc}
-          onSortChange={handleSortChange}
-          onColumnWidthChange={handleColumnWidthChange}
-          onColumnOrderChange={handleColumnOrderChange}
-          onColumnVisibilityToggle={handleColumnVisibilityToggle}
-          onRowDoubleClick={id => setActiveTaskId(id)}
-          onUpdateField={handleUpdateField}
-        />
+        {loading ? (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'var(--color-surface-1)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-lg)',
+            height: '100%',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
+          }}>
+            {/* Mock Table Header */}
+            <div style={{
+              display: 'flex',
+              height: '36px',
+              alignItems: 'center',
+              background: 'var(--color-surface-2)',
+              borderBottom: '1px solid var(--color-surface-offset)',
+              paddingLeft: 'var(--space-4)',
+              fontWeight: 'var(--weight-semibold)',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-text-muted)',
+              flexShrink: 0
+            }}>
+              <div style={{ width: '30px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                <Skeleton width={16} height={16} borderRadius="3px" />
+              </div>
+              {columnOrder.filter(k => visibleColumns[k]).map(colKey => {
+                const width = columnWidths[colKey] ?? 100
+                const label = colKey.charAt(0).toUpperCase() + colKey.slice(1).replace('_', ' ')
+                return (
+                  <div key={colKey} style={{ width, padding: '0 var(--space-3)', flexShrink: 0, boxSizing: 'border-box' }}>
+                    {label}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Mock Table Rows */}
+            <div style={{ flex: 1, overflow: 'hidden', padding: '0 var(--space-4)' }}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
+                <div key={i} style={{
+                  display: 'flex',
+                  height: '40px',
+                  alignItems: 'center',
+                  borderBottom: '1px solid var(--color-surface-offset)'
+                }}>
+                  {/* Checkbox */}
+                  <div style={{ width: '30px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                    <Skeleton width={16} height={16} borderRadius="3px" />
+                  </div>
+                  {/* Cells */}
+                  {columnOrder.filter(k => visibleColumns[k]).map(colKey => {
+                    const width = columnWidths[colKey] ?? 100
+                    const skeletonW = colKey === 'title' ? `${Math.max(40, 80 - (i % 3) * 15)}%` : '60%'
+                    return (
+                      <div key={colKey} style={{ width, padding: '0 var(--space-3)', flexShrink: 0, boxSizing: 'border-box' }}>
+                        <Skeleton width={skeletonW} height={14} />
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : tasks.length === 0 ? (
+          <EmptyState
+            icon={<Search size={48} />}
+            title="No Tasks Found"
+            description="Your backlog is clear. Add structured tasks or adjust filters to see existing items."
+            actionLabel="Create Task"
+            onActionClick={handleCreateTask}
+          />
+        ) : (
+          <BacklogTable
+            items={tasks}
+            columns={workflowColumns}
+            allTags={allTags}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
+            visibleColumns={visibleColumns}
+            columnWidths={columnWidths}
+            columnOrder={columnOrder}
+            grouping={grouping}
+            sortBy={sortBy}
+            sortDesc={sortDesc}
+            onSortChange={handleSortChange}
+            onColumnWidthChange={handleColumnWidthChange}
+            onColumnOrderChange={handleColumnOrderChange}
+            onColumnVisibilityToggle={handleColumnVisibilityToggle}
+            onRowDoubleClick={id => setActiveTaskId(id)}
+            onUpdateField={handleUpdateField}
+          />
+        )}
       </div>
 
       {/* Pagination control footer bar */}
-      {totalPages > 1 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--space-4)',
-            marginTop: 'var(--space-4)',
-            flexShrink: 0
-          }}
-        >
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: 'var(--space-4)',
+          flexShrink: 0,
+          borderTop: '1px solid var(--color-surface-offset)',
+          paddingTop: 'var(--space-3)'
+        }}
+      >
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+          {totalTasks > 0 ? (
+            `Showing ${Math.min(totalTasks, (page - 1) * pageSize + 1)}–${Math.min(totalTasks, page * pageSize)} of ${totalTasks} tasks`
+          ) : (
+            'No tasks found'
+          )}
+        </span>
+
+        {totalPages > 1 && (
+          <div
             style={{
-              background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              color: page === 1 ? 'var(--color-text-faint)' : 'var(--color-text-base)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-1.5) var(--space-3)',
-              fontSize: 'var(--text-xs)',
-              cursor: page === 1 ? 'default' : 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: 'var(--space-4)'
             }}
           >
-            <ArrowLeft size={12} /> Previous
-          </button>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-surface-offset)',
+                color: page === 1 ? 'var(--color-text-faint)' : 'var(--color-text-base)',
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-1.5) var(--space-3)',
+                fontSize: 'var(--text-xs)',
+                cursor: page === 1 ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <ArrowLeft size={12} /> Previous
+            </button>
 
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            Page {page} of {totalPages}
-          </span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+              Page {page} of {totalPages}
+            </span>
 
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            style={{
-              background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              color: page === totalPages ? 'var(--color-text-faint)' : 'var(--color-text-base)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-1.5) var(--space-3)',
-              fontSize: 'var(--text-xs)',
-              cursor: page === totalPages ? 'default' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            Next <ArrowRight size={12} />
-          </button>
-        </div>
-      )}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              style={{
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-surface-offset)',
+                color: page === totalPages ? 'var(--color-text-faint)' : 'var(--color-text-base)',
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-1.5) var(--space-3)',
+                fontSize: 'var(--text-xs)',
+                cursor: page === totalPages ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              Next <ArrowRight size={12} />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Task details drawer */}
       {activeTaskId && (
@@ -745,68 +934,24 @@ export default function BacklogView() {
         onBulkUpdateStatus={handleBulkUpdateStatus}
         onBulkUpdatePriority={handleBulkUpdatePriority}
         onBulkAddTag={handleBulkAddTag}
-        onBulkDelete={handleBulkDelete}
+        onBulkDelete={() => setShowDeleteConfirm(true)}
         onExportMarkdown={handleExportMarkdown}
       />
 
-      {/* Undo Toast SnackBar */}
-      {showUndo && undoData && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            background: 'var(--color-surface-elevated)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-3) var(--space-4)',
-            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-3)',
-            zIndex: 1000,
-            animation: 'slide-in 0.2s cubic-bezier(0.32, 0.72, 0, 1)'
-          }}
-        >
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>
-            Deleted {undoData.items.length} tasks
-          </span>
-          <button
-            onClick={handleUndoDelete}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-secondary)',
-              fontWeight: 'var(--weight-bold)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-xs)',
-              padding: '2px 4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            <RotateCcw size={12} />
-            <span>Undo</span>
-          </button>
-          <button
-            onClick={() => {
-              setShowUndo(false)
-              setUndoData(null)
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-text-muted)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-xs)',
-              display: 'flex'
-            }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      <StandupTranslatorView
+        isOpen={showStandupModal}
+        onClose={() => setShowStandupModal(false)}
+      />
+      {/* Confirm Bulk Delete Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Confirm Bulk Deletion"
+        message={`Are you sure you want to delete ${selectedItems.length} selected tasks?`}
+        confirmText="Delete Tasks"
+        isDestructive
+        onConfirm={performBulkDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   )
 }

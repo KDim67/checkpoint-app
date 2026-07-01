@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import Logo from './ui/Logo'
 
 interface WidgetData {
   todayTaskCount: number
@@ -11,24 +12,24 @@ function formatTime(): string {
   return new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
-async function fetchWidgetData(): Promise<WidgetData> {
+async function fetchWidgetData(context: string): Promise<WidgetData> {
   const now = Date.now()
   const dayStart = new Date()
   dayStart.setHours(0, 0, 0, 0)
 
   try {
     // Tasks due today or active
-    const taskRes = await window.electronAPI.db.getItems('default', 'task', 1, 200)
+    const taskRes = await window.electronAPI.db.getItems(context, 'task', 1, 200)
     const todayTasks = taskRes.items.filter(
       i => i.status !== 'archived' && i.status !== 'done'
     )
 
     // In-progress kanban cards
-    const cardRes = await window.electronAPI.db.getItems('default', 'card', 1, 200)
+    const cardRes = await window.electronAPI.db.getItems(context, 'card', 1, 200)
     const inProgress = cardRes.items.filter(i => i.status === 'in_progress')
 
     // Most recent log entry
-    const logRes = await window.electronAPI.db.getItems('default', 'log', 1, 1)
+    const logRes = await window.electronAPI.db.getItems(context, 'log', 1, 1)
     const rawLog = logRes.items[0]?.title ?? null
     const recentLog = rawLog
       ? rawLog.length > 60
@@ -61,14 +62,22 @@ export default function WidgetView() {
     time: formatTime()
   })
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const contextRef = useRef<string>('default')
 
   const refresh = async () => {
-    const d = await fetchWidgetData()
+    const d = await fetchWidgetData(contextRef.current)
     setData(d)
   }
 
   useEffect(() => {
-    refresh()
+    // Load the saved active context before first data fetch
+    window.electronAPI.db.getSetting('active_context').then((ctx) => {
+      if (typeof ctx === 'string' && ctx) {
+        contextRef.current = ctx
+      }
+      refresh()
+    }).catch(() => refresh())
+
     intervalRef.current = setInterval(() => {
       refresh()
     }, 60_000)
@@ -93,29 +102,13 @@ export default function WidgetView() {
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: 'var(--font-sans)',
       userSelect: 'none',
       overflow: 'hidden'
     }}>
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '2px',
-            background: '#1e45fc'
-          }} />
-          <span style={{
-            fontSize: '10px',
-            fontWeight: 700,
-            color: 'rgba(255,255,255,0.4)',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase'
-          }}>
-            Checkpoint
-          </span>
-        </div>
+        <Logo size={16} showText />
         <span style={{
           fontSize: '13px',
           fontWeight: 600,

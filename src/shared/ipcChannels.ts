@@ -24,6 +24,31 @@ export const enum IpcChannels {
   DB_BULK_DELETE_ITEMS   = 'db:bulkDeleteItems',
   DB_REBALANCE_POSITIONS = 'db:rebalancePositions',
   DB_QUERY_TASKS         = 'db:queryTasks',
+  DB_CREATE_FOCUS_SESSION = 'db:createFocusSession',
+  DB_GET_FOCUS_SESSIONS   = 'db:getFocusSessions',
+
+  // Markdown Notes
+  NOTES_LIST             = 'notes:list',
+  NOTES_READ             = 'notes:read',
+  NOTES_WRITE            = 'notes:write',
+  NOTES_DELETE           = 'notes:delete',
+
+  // Git Integration
+  GIT_CHECK              = 'git:check',
+  GIT_STATUS             = 'git:status',
+  GIT_LOG                = 'git:log',
+
+  // Clipboard History
+  CLIPBOARD_GET_HISTORY  = 'clipboard:getHistory',
+  CLIPBOARD_TOGGLE_PIN   = 'clipboard:togglePin',
+  CLIPBOARD_UPDATE_LABEL = 'clipboard:updateLabel',
+  CLIPBOARD_DELETE_ITEM  = 'clipboard:deleteItem',
+  CLIPBOARD_CLEAR_HISTORY = 'clipboard:clearHistory',
+  CLIPBOARD_CREATE_SNIPPET = 'clipboard:createSnippet',
+  CLIPBOARD_RESTORE_ITEM = 'clipboard:restoreItem',
+  CLIPBOARD_PASTE        = 'clipboard:paste',
+  APP_NAVIGATE_TO_VIEW   = 'app:navigateToView',
+  ANALYTICS_GET_DATA     = 'analytics:getData',
 
   // AI Streaming
   AI_STREAM_START        = 'ai:streamStart',
@@ -70,6 +95,7 @@ export const enum IpcChannels {
   TRACKER_TOGGLE         = 'tracker:toggle',
   TRACKER_GET_STATE      = 'tracker:getState',
   TRACKER_ACTIVITY_LOG   = 'tracker:activityLog',
+  TRACKER_GET_STATS      = 'tracker:getStats',
 
   // App
   APP_GET_VERSION        = 'app:getVersion',
@@ -78,5 +104,45 @@ export const enum IpcChannels {
   APP_MINIMIZE           = 'app:minimize',
   APP_MAXIMIZE           = 'app:maximize',
   APP_CLOSE              = 'app:close',
-  APP_SAVE_FILE          = 'app:saveFile'
+  APP_SAVE_FILE          = 'app:saveFile',
+
+  // Phase 22 Customizer & Extensions
+  CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
+  CUSTOMIZER_TOGGLE_PLUGIN       = 'customizer:togglePlugin',
+  CUSTOMIZER_OPEN_PLUGINS_FOLDER = 'customizer:openPluginsFolder',
+  CUSTOMIZER_UPDATE_THEME        = 'customizer:updateTheme',
+  CUSTOMIZER_REGISTER_SHORTCUTS  = 'customizer:registerShortcuts',
+
+  // Cheatsheets
+  CHEATSHEETS_LIST              = 'cheatsheets:list',
+  CHEATSHEETS_ADD               = 'cheatsheets:add',
+  CHEATSHEETS_REMOVE            = 'cheatsheets:remove',
+  CHEATSHEETS_RENAME            = 'cheatsheets:rename',
+  CHEATSHEETS_SELECT            = 'cheatsheets:select',
+  CHEATSHEETS_GET_TEXT          = 'cheatsheets:getText',
+
+  // Game Dev Helpers
+  GAMEDEV_BATCH_RENAME          = 'gamedev:batchRename',
+  GAMEDEV_SELECT_TEXTURE        = 'gamedev:selectTexture',
+  GAMEDEV_LOAD_TEXTURE          = 'gamedev:loadTexture',
+  GAMEDEV_SAVE_MAPS             = 'gamedev:saveMaps',
+  GAMEDEV_SAVE_SEAMLESS         = 'gamedev:saveSeamless',
+  GAMEDEV_SELECT_SPRITE_FOLDER  = 'gamedev:selectSpriteFolder',
+  GAMEDEV_SAVE_SPRITE_ATLAS     = 'gamedev:saveSpriteAtlas',
+  GAMEDEV_SAVE_SLICES           = 'gamedev:saveSlices',
+  GAMEDEV_SAVE_LUT              = 'gamedev:saveLut',
+  GAMEDEV_SAVE_UPSCALED         = 'gamedev:saveUpscaled',
+
+  // AI Memory Engine & Workspace Indexing
+  AI_GET_MEMORIES               = 'ai:getMemories',
+  AI_SAVE_MEMORY                = 'ai:saveMemory',
+  AI_DELETE_MEMORY              = 'ai:deleteMemory',
+  AI_SEARCH_MEMORIES            = 'ai:searchMemories',
+  AI_TOGGLE_PIN_MEMORY          = 'ai:togglePinMemory',
+  AI_UPDATE_MEMORY_CONTENT      = 'ai:updateMemoryContent',
+  AI_BATCH_SAVE_MEMORIES        = 'ai:batchSaveMemories',
+  AI_CONSOLIDATE_MEMORY         = 'ai:consolidateMemory',
+  WORKSPACE_SELECT_FOLDER       = 'workspace:selectFolder',
+  WORKSPACE_GET_STRUCTURE        = 'workspace:getStructure',
+  WORKSPACE_READ_FILE           = 'workspace:readFile'
 }

@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Edit2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react'
 import { Divider, RowBetween } from './SettingsSection'
 import { useAppStore } from '../../store/appStore'
+import ColorPicker from '../ui/ColorPicker'
 
 interface ContextEntry {
   slug: string
   name: string
   color: string
+  gitPath?: string
 }
 
 const PRESET_COLORS = [
@@ -30,8 +32,11 @@ export default function ContextManager() {
   const [loading, setLoading] = useState(true)
   const [editingSlug, setEditingSlug] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [editGitPath, setEditGitPath] = useState('')
+  const [editColor, setEditColor] = useState(PRESET_COLORS[0])
   const [deleteWarning, setDeleteWarning] = useState<{ slug: string; count: number } | null>(null)
   const [addName, setAddName] = useState('')
+  const [addGitPath, setAddGitPath] = useState('')
   const [addColor, setAddColor] = useState(PRESET_COLORS[0])
   const [showAddForm, setShowAddForm] = useState(false)
 
@@ -72,17 +77,25 @@ export default function ContextManager() {
     const slug = slugify(trimmed)
     if (contexts.some(c => c.slug === slug)) return
 
-    const newEntry: ContextEntry = { slug, name: trimmed, color: addColor }
+    const newEntry: ContextEntry = {
+      slug,
+      name: trimmed,
+      color: addColor,
+      gitPath: addGitPath.trim() || undefined
+    }
     await persist([...contexts, newEntry])
     setAddName('')
+    setAddGitPath('')
     setAddColor(PRESET_COLORS[0])
     setShowAddForm(false)
   }
 
-  const handleRename = async (slug: string) => {
+  const handleSaveEdit = async (slug: string) => {
     const trimmed = editName.trim()
     if (!trimmed) { setEditingSlug(null); return }
-    const updated = contexts.map(c => c.slug === slug ? { ...c, name: trimmed } : c)
+    const updated = contexts.map(c =>
+      c.slug === slug ? { ...c, name: trimmed, color: editColor, gitPath: editGitPath.trim() || undefined } : c
+    )
     await persist(updated)
     setEditingSlug(null)
   }
@@ -154,38 +167,93 @@ export default function ContextManager() {
 
           {/* Name or edit input */}
           {editingSlug === ctx.slug ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1 }}>
-              <input
-                autoFocus
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleRename(ctx.slug)
-                  if (e.key === 'Escape') setEditingSlug(null)
-                }}
-                style={{
-                  flex: 1,
-                  background: 'var(--color-surface-1)',
-                  border: `1px solid ${ctx.color}`,
-                  color: 'var(--color-text-base)',
-                  borderRadius: '4px',
-                  padding: '3px 8px',
-                  fontSize: 'var(--text-sm)',
-                  outline: 'none'
-                }}
-              />
-              <button className="btn-icon" style={{ width: '24px', height: '24px' }}
-                onClick={() => handleRename(ctx.slug)}>
-                <Check size={12} color="var(--color-secondary)" />
-              </button>
-              <button className="btn-icon" style={{ width: '24px', height: '24px' }}
-                onClick={() => setEditingSlug(null)}>
-                <X size={12} />
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Name:</span>
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEdit(ctx.slug)
+                    if (e.key === 'Escape') setEditingSlug(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    background: 'var(--color-surface-1)',
+                    border: `1px solid ${ctx.color}`,
+                    color: 'var(--color-text-base)',
+                    borderRadius: '4px',
+                    padding: '3px 8px',
+                    fontSize: 'var(--text-sm)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Git Path:</span>
+                <input
+                  value={editGitPath}
+                  onChange={e => setEditGitPath(e.target.value)}
+                  placeholder="e.g. C:/projects/my-repo"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEdit(ctx.slug)
+                    if (e.key === 'Escape') setEditingSlug(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    background: 'var(--color-surface-1)',
+                    border: `1px solid ${ctx.color}50`,
+                    color: 'var(--color-text-base)',
+                    borderRadius: '4px',
+                    padding: '3px 8px',
+                    fontSize: 'var(--text-sm)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Color:</span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {PRESET_COLORS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setEditColor(c)}
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: c,
+                        border: editColor === c ? '2px solid white' : '2px solid transparent',
+                        cursor: 'pointer',
+                        padding: 0,
+                        flexShrink: 0
+                      }}
+                    />
+                  ))}
+                  <ColorPicker
+                    value={editColor}
+                    onCommit={cVal => setEditColor(cVal)}
+                    swatchSize={20}
+                    hexInputWidth={62}
+                    title="Custom Context Color"
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: '2px' }}>
+                <button className="btn-primary" style={{ fontSize: '11px', padding: '2px 8px', height: '22px', display: 'flex', alignItems: 'center' }}
+                  onClick={() => handleSaveEdit(ctx.slug)}>
+                  Save
+                </button>
+                <button className="btn-secondary" style={{ fontSize: '11px', padding: '2px 8px', height: '22px', display: 'flex', alignItems: 'center' }}
+                  onClick={() => setEditingSlug(null)}>
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : (
             <>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontSize: 'var(--text-sm)',
                   fontWeight: 'var(--weight-medium)',
@@ -194,11 +262,35 @@ export default function ContextManager() {
                   {ctx.name}
                 </div>
                 <div style={{
-                  fontSize: '11px',
-                  color: 'var(--color-text-faint)',
-                  fontFamily: 'var(--font-mono)'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  flexWrap: 'wrap',
+                  marginTop: '2px'
                 }}>
-                  #{ctx.slug}
+                  <span style={{
+                    fontSize: '11px',
+                    color: 'var(--color-text-faint)',
+                    fontFamily: 'var(--font-mono)'
+                  }}>
+                    #{ctx.slug}
+                  </span>
+                  {ctx.gitPath && (
+                    <span style={{
+                      fontSize: '10px',
+                      color: 'var(--color-secondary)',
+                      fontFamily: 'var(--font-mono)',
+                      background: 'rgba(205, 241, 43, 0.1)',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      whiteSpace: 'nowrap',
+                      textOverflow: 'ellipsis',
+                      overflow: 'hidden',
+                      maxWidth: '180px'
+                    }} title={ctx.gitPath}>
+                      git: {ctx.gitPath}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -211,7 +303,7 @@ export default function ContextManager() {
                   onClick={() => handleMoveUp(i)}
                   title="Move up"
                 >
-                  <GripVertical size={12} />
+                  <ChevronUp size={14} />
                 </button>
                 <button
                   className="btn-icon"
@@ -219,13 +311,18 @@ export default function ContextManager() {
                   onClick={() => handleMoveDown(i)}
                   title="Move down"
                 >
-                  <GripVertical size={12} style={{ transform: 'rotate(180deg)' }} />
+                  <ChevronDown size={14} />
                 </button>
                 <button
                   className="btn-icon"
                   style={{ width: '24px', height: '24px' }}
-                  onClick={() => { setEditingSlug(ctx.slug); setEditName(ctx.name) }}
-                  title="Rename"
+                  onClick={() => {
+                    setEditingSlug(ctx.slug)
+                    setEditName(ctx.name)
+                    setEditColor(ctx.color)
+                    setEditGitPath(ctx.gitPath || '')
+                  }}
+                  title="Edit Context"
                 >
                   <Edit2 size={11} />
                 </button>
@@ -276,24 +373,50 @@ export default function ContextManager() {
               boxSizing: 'border-box'
             }}
           />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          <input
+            value={addGitPath}
+            onChange={e => setAddGitPath(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowAddForm(false) }}
+            placeholder="Git Repository Path (optional, e.g. C:/projects/my-repo)"
+            style={{
+              background: 'var(--color-surface-1)',
+              border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-3)',
+              fontSize: 'var(--text-sm)',
+              outline: 'none',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          />
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', flexShrink: 0 }}>Color:</span>
-            {PRESET_COLORS.map(c => (
-              <button
-                key={c}
-                onClick={() => setAddColor(c)}
-                style={{
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  background: c,
-                  border: addColor === c ? '2px solid white' : '2px solid transparent',
-                  cursor: 'pointer',
-                  padding: 0,
-                  flexShrink: 0
-                }}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {PRESET_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setAddColor(c)}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    background: c,
+                    border: addColor === c ? '2px solid white' : '2px solid transparent',
+                    cursor: 'pointer',
+                    padding: 0,
+                    flexShrink: 0
+                  }}
+                />
+              ))}
+              <ColorPicker
+                value={addColor}
+                onCommit={cVal => setAddColor(cVal)}
+                swatchSize={20}
+                hexInputWidth={62}
+                title="Custom Context Color"
               />
-            ))}
+            </div>
           </div>
           {addName.trim() && (
             <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
@@ -306,7 +429,7 @@ export default function ContextManager() {
               Add Context
             </button>
             <button className="btn-secondary" style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-1-5) var(--space-4)' }}
-              onClick={() => { setShowAddForm(false); setAddName('') }}>
+              onClick={() => { setShowAddForm(false); setAddName(''); setAddGitPath('') }}>
               Cancel
             </button>
           </div>
