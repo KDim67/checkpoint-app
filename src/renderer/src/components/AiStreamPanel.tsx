@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Sparkles, Trash2, BookOpen, X, Download, Check, RefreshCw, MessageSquare, Plus, Edit2, Brain, Sliders, Copy, FileDown, FolderOpen, Gauge } from 'lucide-react'
+import { Sparkles, Trash2, BookOpen, X, Download, Check, RefreshCw, MessageSquare, Plus, Edit2, Brain, Sliders, Copy, FileDown, FolderOpen, Gauge, Search, Pin } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
 import catalogData from '../../../shared/catalog.json'
@@ -70,6 +70,53 @@ function pruneHistory(history: Message[], maxHistoryTokens: number): Message[] {
   return pruned
 }
 
+/**
+ * Helper to parse assistant response content and extract the exact card titles
+ * and column names that the AI attempted to create.
+ */
+function getAIEntitiesFromMessage(content: string): { cardTitles: string[]; columnNames: string[] } {
+  const cardTitles: string[] = []
+  const columnNames: string[] = []
+
+  // Regex to extract text inside ```json ... ``` blocks
+  const regex = /```json(?::\w+)?\s*([\s\S]*?)\s*```/g
+  let match
+  while ((match = regex.exec(content)) !== null) {
+    try {
+      const jsonText = match[1].trim()
+      const parsed = JSON.parse(jsonText)
+      
+      if (parsed && typeof parsed === 'object') {
+        // 1. Batch format
+        if (Array.isArray(parsed.cards)) {
+          parsed.cards.forEach((c: any) => {
+            if (c && c.title) cardTitles.push(c.title.trim())
+          })
+        }
+        if (Array.isArray(parsed.columns)) {
+          parsed.columns.forEach((col: any) => {
+            if (col && col.name) columnNames.push(col.name.trim())
+          })
+        }
+
+        // 2. Single card format
+        if (parsed.title && !parsed.cards) {
+          cardTitles.push(parsed.title.trim())
+        }
+
+        // 3. Single column format
+        if (parsed.name && !parsed.columns) {
+          columnNames.push(parsed.name.trim())
+        }
+      }
+    } catch (e) {
+      // Skip invalid JSON
+    }
+  }
+
+  return { cardTitles, columnNames }
+}
+
 interface SavedChat {
   id: string
   title: string
@@ -112,7 +159,7 @@ export default function AiStreamPanel() {
   })
   const [currentChatId, setCurrentChatId] = useState<string>(() => `chat_${Date.now()}`)
   const [showSavedChatsModal, setShowSavedChatsModal] = useState(false)
-  const [revertConfirmData, setRevertConfirmData] = useState<{ snapshot: { columns: any[]; cards: any[] }; index: number } | null>(null)
+  const [revertConfirmData, setRevertConfirmData] = useState<{ cardTitles: string[]; columnNames: string[]; index: number } | null>(null)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
 
@@ -519,101 +566,64 @@ export default function AiStreamPanel() {
   }
 
   // Snapshots & Board Reversion
-  const captureBoardSnapshot = async (): Promise<{ columns: any[]; cards: any[] }> => {
-    const validContext = activeContext || 'default'
-    const key = `kanban_columns_${validContext}`
-    
-    // Get columns
-    const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-    let columns: any[] = []
-    if (typeof rawCols === 'string') {
-      try { columns = JSON.parse(rawCols) } catch { columns = [] }
-    } else if (Array.isArray(rawCols)) {
-      columns = rawCols
-    }
-    if (columns.length === 0) {
-      columns = [
-        { id: 'open', name: 'Backlog' },
-        { id: 'in_progress', name: 'In Progress' },
-        { id: 'in_review', name: 'In Review' },
-        { id: 'done', name: 'Done' }
-      ]
-    }
-
-    // Get cards
-    const [tasksRes, cardsRes] = await Promise.all([
-      window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
-      window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
-    ])
-    const cards = [...(tasksRes?.items || []), ...(cardsRes?.items || [])]
-
-    return { columns, cards }
-  }
-
-  const restoreBoardFromSnapshot = async (snapshot: { columns: any[]; cards: any[] }) => {
+  const revertAICreatedEntities = async (cardTitles: string[], columnNames: string[]) => {
     const validContext = activeContext || 'default'
 
-    // 1. Delete all current items in the context
-    const [tasksRes, cardsRes] = await Promise.all([
-      window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
-      window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
-    ])
-    const itemsToDelete = [...(tasksRes?.items || []), ...(cardsRes?.items || [])].map(i => i.id)
-    if (itemsToDelete.length > 0) {
-      await window.electronAPI.db.bulkDeleteItems(itemsToDelete).catch(() => {})
+    // 1. Delete cards/tasks with matching titles in this context
+    if (cardTitles.length > 0) {
+      const [tasksRes, cardsRes] = await Promise.all([
+        window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
+        window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
+      ])
+      const allItems = [...(tasksRes?.items || []), ...(cardsRes?.items || [])]
+      const itemsToDelete = allItems
+        .filter(item => cardTitles.includes(item.title.trim()))
+        .map(item => item.id)
+
+      if (itemsToDelete.length > 0) {
+        await window.electronAPI.db.bulkDeleteItems(itemsToDelete).catch(() => {})
+      }
     }
 
-    // 2. Restore columns setting
-    const key = `kanban_columns_${validContext}`
-    await window.electronAPI.db.setSetting(key, JSON.stringify(snapshot.columns)).catch(() => {})
+    // 2. Delete columns with matching names in this context
+    if (columnNames.length > 0) {
+      const key = `kanban_columns_${validContext}`
+      const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
+      let columns: any[] = []
+      if (typeof rawCols === 'string') {
+        try { columns = JSON.parse(rawCols) } catch { columns = [] }
+      } else if (Array.isArray(rawCols)) {
+        columns = rawCols
+      }
 
-    // 3. Re-create all snapshot cards
-    for (const card of snapshot.cards) {
-      const tagIds = card.tags ? card.tags.map((t: any) => t.id) : []
-      await window.electronAPI.db.createItem({
-        type: card.type || 'card',
-        context: validContext,
-        title: card.title,
-        body: card.body || '',
-        status: card.status || 'open',
-        priority: card.priority ?? 0,
-        position: card.position,
-        due_at: card.due_at || null,
-        metadata: card.metadata || '{}'
-      }, tagIds).catch((err) => {
-        console.error('Failed to restore snapshot item:', err)
-      })
+      if (columns.length > 0) {
+        const updatedCols = columns.filter(col => !columnNames.includes(col.name.trim()))
+        await window.electronAPI.db.setSetting(key, JSON.stringify(updatedCols)).catch(() => {})
+      }
     }
 
-    // 4. Trigger UI refresh
+    // 3. Trigger UI reload
     window.dispatchEvent(new CustomEvent('kanban-refresh'))
     window.dispatchEvent(new CustomEvent('item-updated'))
   }
 
-  const handleRevert = async (snapshot: { columns: any[]; cards: any[] }, messageIndex: number) => {
-    try {
-      await restoreBoardFromSnapshot(snapshot)
-      setMessages(prev => prev.slice(0, messageIndex))
-    } catch (err) {
-      console.error('Failed to revert board snapshot:', err)
-    }
+  const handleRevert = async (messageIndex: number) => {
+    const assistantMsg = messages[messageIndex + 1]
+    if (!assistantMsg) return
+
+    const { cardTitles, columnNames } = getAIEntitiesFromMessage(assistantMsg.content)
+    setRevertConfirmData({ cardTitles, columnNames, index: messageIndex })
   }
 
   // Rewrite & Resend handlers
   const handleRewrite = async (newContent: string, messageIndex: number) => {
     if (isStreaming) return
 
-    let snapshot
-    try {
-      snapshot = await captureBoardSnapshot()
-    } catch {}
-
     const originalMsg = messages[messageIndex]
     const updatedUserMsg: Message = {
       ...originalMsg,
       content: newContent,
-      timestamp: Date.now(),
-      boardSnapshot: snapshot
+      timestamp: Date.now()
     }
 
     const historyToKeep = messages.slice(0, messageIndex)
@@ -633,23 +643,97 @@ export default function AiStreamPanel() {
   }
 
   // 5. Submit Query
-  const handleSubmitWithText = async (textToSubmit?: string, options?: { mode?: string; cheatsheets?: string[] }) => {
+  const handleSubmitWithText = async (textToSubmit?: string, options?: { mode?: string; cheatsheets?: string[]; displayContent?: string }) => {
     const text = (textToSubmit ?? inputValue).trim()
     if (!text && !options?.cheatsheets?.length) return
     if (isStreaming) return
 
-    let snapshot
-    try {
-      snapshot = await captureBoardSnapshot()
-    } catch {}
+    // Slash Commands Parser
+    if (text.startsWith('/')) {
+      const parts = text.split(/\s+/)
+      const cmd = parts[0].toLowerCase()
+      const remainingText = parts.slice(1).join(' ').trim()
+
+      if (cmd === '/clear') {
+        setMessages([])
+        setInputValue('')
+        return
+      }
+
+      if (cmd === '/mem' || cmd === '/memory') {
+        setShowMemoryPanel(true)
+        setInputValue('')
+        return
+      }
+
+      if (cmd === '/help') {
+        const userMsg: Message = {
+          role: 'user',
+          content: text,
+          timestamp: Date.now()
+        }
+        const helpMsg: Message = {
+          role: 'assistant',
+          content: `### 🤖 Checkpoint AI Slash Commands\n\n` +
+            `Use the following slash commands to quickly trigger active skills or workspace tools:\n\n` +
+            `* **\`\/clear\`**, Clears the current chat thread.\n` +
+            `* **\`\/mem\`** or **\`\/memory\`**, Opens the **Memory Vault** overlay.\n` +
+            `* **\`\/narrative [query]\`**, Switches active skill to **Narrative Specialist** (submits optional query).\n` +
+            `* **\`\/kanban [query]\`**, Switches active skill to **Kanban Architect** (submits optional query).\n` +
+            `* **\`\/plan\`** or **\`\/planner [query]\`**, Switches active skill to **Implementation Planner** (submits optional query).\n` +
+            `* **\`\/help\`**, Displays this command help menu.`,
+          timestamp: Date.now()
+        }
+        setMessages(prev => [...prev, userMsg, helpMsg])
+        setInputValue('')
+        return
+      }
+
+      // Skill switching commands
+      let matchedSkillId: string | null = null
+      if (cmd === '/narrative') matchedSkillId = 'narrative_specialist'
+      else if (cmd === '/kanban') matchedSkillId = 'kanban_architect'
+      else if (cmd === '/plan' || cmd === '/planner') matchedSkillId = 'implementation_planner'
+
+      if (matchedSkillId) {
+        // Switch the skill
+        setActiveSkillId(matchedSkillId)
+        try { localStorage.setItem(STORAGE_KEY_ACTIVE_SKILL, matchedSkillId) } catch {}
+
+        if (remainingText) {
+          // Submit the rest of the text under this new skill
+          const userMessage: Message = {
+            role: 'user',
+            content: remainingText,
+            mode: options?.mode,
+            cheatsheets: options?.cheatsheets,
+            timestamp: Date.now()
+          }
+          const nextMessages = [...messages, userMessage]
+          setMessages(nextMessages)
+          setInputValue('')
+          await runChatStream(nextMessages)
+        } else {
+          // Just print a system confirmation message
+          const systemMsg: Message = {
+            role: 'assistant',
+            content: `✨ Switched active skill to **${getSkillById(matchedSkillId)?.label}**.`,
+            timestamp: Date.now()
+          }
+          setMessages(prev => [...prev, { role: 'user', content: text, timestamp: Date.now() }, systemMsg])
+          setInputValue('')
+        }
+        return
+      }
+    }
 
     const userMessage: Message = {
       role: 'user',
       content: text || 'Analyze attached cheatsheet(s).',
+      displayContent: options?.displayContent,
       mode: options?.mode,
       cheatsheets: options?.cheatsheets,
-      timestamp: Date.now(),
-      boardSnapshot: snapshot
+      timestamp: Date.now()
     }
     const nextMessages = [...messages, userMessage]
     setMessages(nextMessages)
@@ -684,45 +768,33 @@ export default function AiStreamPanel() {
       const baseSystemPromptContent = isSmallModel
         ? `You are Checkpoint AI, an assistant with DIRECT WRITE ACCESS to the user's Kanban board.
 
-██ MANDATORY ACTION RULE ██
-When the user explicitly asks to create or add items (e.g. "add tasks", "create cards", "make columns", "build the board", "set up tasks for X", "add more tasks", "give me cards for Y", "populate the board"):
-→ You MUST immediately output JSON action blocks that CREATE those items directly on the board.
-→ DO NOT explain what you will do. DO NOT ask for confirmation. JUST OUTPUT THE JSON BLOCKS.
-→ NEVER say "I'll create..." or "Here are the tasks...", just output the JSON block.
-
-██ CONVERSATIONAL & INQUIRY RULE ██
-- When the user sends a greeting (e.g. "hello", "hey", "hi") or asks a general question:
-  → Respond with a helpful, friendly, natural-language text answer.
-  → DO NOT output any JSON action blocks unless specifically asked to add/create items.
+██ ACTION RULES ██
+1. When asked to add/create tasks, output a JSON block that creates them.
+2. DO NOT DUPLICATE: Never create cards with the same titles as existing ones.
+3. REUSE COLUMNS: If existing columns fit, place new cards in them. Omit the "columns" key.
+4. Keep replies direct and output JSON immediately.
 
 ██ JSON FORMAT (BATCH) ██
-To create columns and cards, output exactly this JSON format:
 \`\`\`json
 {
-  "columns": [
-    { "name": "Backlog", "color": "#6b7280", "colorMode": "header" },
-    { "name": "In Progress", "color": "#3b82f6", "colorMode": "header" },
-    { "name": "Done", "color": "#22c55e", "colorMode": "header" }
-  ],
   "cards": [
     { "title": "Task Title", "body": "Description", "status": "Backlog", "priority": 2 }
   ]
 }
-\`\`\`
-- Valid JSON only. No trailing commas. No comments inside JSON.
-- "priority": 1=Low, 2=Medium, 3=High.
-- "color": hex value like "#a855f7".`
-      : `You are Checkpoint AI, an intelligent project assistant with DIRECT WRITE ACCESS to the user's Kanban board, columns, and cards. You CREATE things, not describe them.
+\`\`\``
+        : `You are the Checkpoint AI Assistant, a pair-programming partner and project coordinator integrated directly into a visual game developer's Kanban workspace.
 
-██ MANDATORY ACTION RULE ██
-When the user explicitly asks to create, plan, or add items (e.g. "add tasks", "create cards", "make columns", "build the board", "set up tasks for X", "add more tasks", "give me cards for Y", "populate the board", "start building Z"):
-→ You MUST immediately output JSON action blocks that CREATE those items directly on the board.
-→ DO NOT explain what you will do. DO NOT ask for confirmation. JUST OUTPUT THE JSON BLOCKS.
-→ NEVER say "I'll create..." or "Here are the tasks I'd suggest...", just output the blocks.
-→ If the user says "add tasks" you add tasks. If they say "more" you add more. No avoidance.
+██ ACTION EVALUATION & CREATION RULES ██
+When the user asks to create, plan, or add items (e.g. "add tasks", "create cards", "make columns", "populate the board"):
+1. CRITICALLY AUDIT the current live board state first (provided below). Read columns and card titles.
+2. PREVENT DUPLICATION: Never create columns or cards that duplicate or heavily overlap with what already exists.
+3. REUSE COLUMNS: If the existing columns are sufficient, NEVER create new columns. In your JSON, map cards to existing column IDs (e.g. "open", "in_progress", "done"). Do not recreate columns.
+4. QUALITY & PARSIMONY: Propose only essential, high-impact, actionable cards representing genuine missing gaps (by default 3 to 6 tasks, or however many the user explicitly requests). Do not spam the board with redundant or low-value cards.
+5. JSON OMISSION: In your batch JSON, ONLY include the "columns" array if you are introducing brand new workflow stages. If you are just adding cards to existing columns, OMIT the "columns" array entirely.
+6. When creation is truly justified, output the JSON blocks immediately. Do not explain what you will do or ask for permission.
 
 ██ CONVERSATIONAL & INQUIRY RULE ██
-- When the user sends a greeting (e.g. "hello", "hey", "hi"), asks a general question, or requests a project audit:
+- When the user asks a general question, requests an explanation, or requests a project audit:
   → Respond with a helpful, friendly, natural-language text answer.
   → DO NOT output any JSON action blocks (cards/columns) unless specifically asked to add or create them.
   → Act as an intelligent project partner, answering questions clearly based on the live board state, codebase structure, and recalled memories.
@@ -742,11 +814,6 @@ When the user explicitly asks to create, plan, or add items (e.g. "add tasks", "
 ━━━ BATCH FORMAT (PREFERRED, use this for 2+ items) ━━━
 \`\`\`json
 {
-  "columns": [
-    { "name": "Backlog",     "color": "#6b7280", "colorMode": "header" },
-    { "name": "In Progress", "color": "#3b82f6", "colorMode": "header" },
-    { "name": "Done",        "color": "#22c55e", "colorMode": "header" }
-  ],
   "cards": [
     { "title": "Task One",   "body": "Description here", "status": "Backlog",     "priority": 2 },
     { "title": "Task Two",   "body": "Description here", "status": "In Progress", "priority": 3 }
@@ -796,8 +863,7 @@ When the user explicitly asks to create, plan, or add items (e.g. "add tasks", "
 }
 \`\`\`
 
-When creating multiple cards or setting up a board, ALWAYS use the BATCH format, it is the most reliable and creates everything in a single step.
-You MUST output populated JSON blocks with multiple columns AND cards whenever asked to set up a project, game, or task list.`
+When creating multiple cards, ALWAYS use the BATCH format, it is the most reliable. Only include the "columns" key if you are defining brand new stages; otherwise, omit "columns" and only provide the "cards" list.`
 
       // Seed context as a system instruction if preset
       const systemPrompt: Message[] = [
@@ -865,7 +931,7 @@ You MUST output populated JSON blocks with multiple columns AND cards whenever a
         }
 
         const existingCardTitles = allItems.map((i: any) => i.title).join(', ')
-        const liveBoardStateText = `CURRENT LIVE KANBAN BOARD STATE (Context: ${validContext}):\nExisting Board Columns & Cards:\n${colSummaries.join('\n\n')}\n\nEXISTING CARD TITLES (DO NOT DUPLICATE THESE EXACT TITLES): ${existingCardTitles || 'none yet'}\n\nBOARD RULES:\n1. READ the existing columns and cards above before responding.\n2. NEVER create cards with the same title as an existing card (titles listed above).\n3. When asked to 'add more tasks' or 'add another': generate BRAND NEW tasks with completely different titles that complement but do not repeat what exists.\n4. You CAN add cards to existing columns, just use new unique titles.`
+        const liveBoardStateText = `CURRENT LIVE KANBAN BOARD STATE (Context: ${validContext}):\nExisting Board Columns & Cards:\n${colSummaries.join('\n\n')}\n\nEXISTING CARD TITLES (DO NOT DUPLICATE THESE EXACT TITLES): ${existingCardTitles || 'none yet'}\n\nBOARD RULES:\n1. READ the existing columns and cards above before responding.\n2. NEVER create cards with the same title as an existing card (titles listed above).\n3. When asked to 'add more tasks' or 'add another': generate BRAND NEW tasks with completely different titles that complement but do not repeat what exists.\n4. You CAN add cards to existing columns, just use new unique titles.\n5. NEVER output existing columns or cards inside a JSON block (e.g. \`\`\`json). JSON blocks ALWAYS create NEW columns and cards on the board. If you want to explain, summarize, or audit the existing state, write your answer in PLAIN TEXT/markdown only. NEVER repeat existing items in a JSON block, otherwise they will be duplicated in the database.`
 
         systemPrompt.push({
           role: 'system',
@@ -1576,19 +1642,30 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
           </div>
         )}
 
-        {messages.map((msg, index) => (
-          <ChatMessage
-            key={index}
-            message={msg}
-            messageIndex={index}
-            onResend={handleResend}
-            onRewrite={handleRewrite}
-            onRevert={handleRevert}
-            onCopy={handleCopyMessage}
-            isCopied={copiedMsgIndex === index}
-            isStreaming={isStreaming}
-          />
-        ))}
+        {messages.map((msg, index) => {
+          // Check if subsequent message has JSON entities that can be reverted
+          const nextMsg = messages[index + 1]
+          const hasRevertAction = !!(
+            nextMsg &&
+            nextMsg.role === 'assistant' &&
+            nextMsg.content.includes('```json')
+          )
+
+          return (
+            <ChatMessage
+              key={index}
+              message={msg}
+              messageIndex={index}
+              onResend={handleResend}
+              onRewrite={handleRewrite}
+              onRevert={handleRevert}
+              onCopy={handleCopyMessage}
+              isCopied={copiedMsgIndex === index}
+              isStreaming={isStreaming}
+              hasRevertAction={hasRevertAction}
+            />
+          )
+        })}
 
         {/* "Thinking…" indicator while waiting for first chunk */}
         {isWaitingForFirstChunk && !streamingText && (
@@ -1722,7 +1799,9 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
           onAbort={handleAbort}
           isStreaming={isStreaming}
           contextItem={contextItem}
-          onTriggerPrompt={handleSubmitWithText}
+          onTriggerPrompt={(prompt, displayContent) => handleSubmitWithText(prompt, { displayContent })}
+          activeSkill={getSkillById(activeSkillId)}
+          onClearSkill={() => handleSelectSkill(null)}
         />
       </div>
 
@@ -2093,35 +2172,51 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
         const orderedMems = [...pinnedMems, ...unpinnedMems]
 
         return (
-          <div style={{
+          <div className="memory-vault-overlay" style={{
             position: 'absolute', inset: 0, zIndex: 100,
-            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
+            background: 'rgba(10, 12, 18, 0.82)', backdropFilter: 'blur(10px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: '16px'
           }}>
-            <div style={{
+            <style>{`
+              .memory-vault-overlay {
+                animation: memory-fade-in 150ms ease-out;
+              }
+              .memory-vault-card {
+                animation: memory-scale-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+              }
+              @keyframes memory-fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+              @keyframes memory-scale-in {
+                from { transform: scale(0.96); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
+            <div className="memory-vault-card" style={{
               background: 'var(--color-surface-1)',
               border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)', width: '100%', maxHeight: '92%',
+              borderRadius: 'var(--radius-lg)', width: '100%', maxHeight: '92%',
               display: 'flex', flexDirection: 'column',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.6)', overflow: 'hidden'
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)', overflow: 'hidden'
             }}>
               {/* Header */}
               <div style={{
-                padding: '10px 14px',
+                padding: '12px 16px',
                 borderBottom: '1px solid var(--color-surface-offset)',
                 background: 'var(--color-surface-2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Brain size={14} style={{ color: '#a855f7' }} />
-                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>
+                  <Brain size={15} style={{ color: '#a855f7' }} />
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', letterSpacing: '0.01em' }}>
                     Memory Vault
                   </span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '1px 7px', borderRadius: '10px' }}>
+                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
                     {activeContext}
                   </span>
-                  <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.1)', padding: '1px 7px', borderRadius: '10px', fontWeight: 'bold' }}>
+                  <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
                     {memories.length} memories
                   </span>
                   {memoryConsolidating && (
@@ -2131,51 +2226,95 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button
                     onClick={() => setShowAddMemoryForm(v => !v)}
                     style={{
                       background: showAddMemoryForm ? 'var(--color-secondary)' : 'rgba(168,85,247,0.12)',
                       border: '1px solid rgba(168,85,247,0.3)',
                       color: showAddMemoryForm ? '#fff' : '#a855f7',
-                      borderRadius: 'var(--radius-sm)', padding: '3px 8px',
+                      borderRadius: 'var(--radius-sm)', padding: '4px 10px',
                       fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '4px'
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                      transition: 'all 150ms'
                     }}
                   >
                     <Plus size={10} /> Add Memory
                   </button>
                   <button onClick={() => { setShowMemoryPanel(false); setShowAddMemoryForm(false); setEditingMemoryId(null); setMemorySearchQuery('') }}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px' }}>
-                    <X size={14} />
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifycontent: 'center' }}>
+                    <X size={15} />
                   </button>
                 </div>
               </div>
 
               {/* Search Bar */}
-              <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--color-surface-offset)', flexShrink: 0 }}>
+              <div style={{
+                padding: '10px 16px',
+                borderBottom: '1px solid var(--color-surface-offset)',
+                background: 'var(--color-surface-1)',
+                flexShrink: 0,
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <Search
+                  size={12}
+                  style={{
+                    position: 'absolute',
+                    left: '26px',
+                    color: 'var(--color-text-faint)',
+                    pointerEvents: 'none'
+                  }}
+                />
                 <input
                   type="text"
-                  placeholder="Search memories…"
+                  placeholder="Search memories by keyword, fact, or type…"
                   value={memorySearchQuery}
                   onChange={e => setMemorySearchQuery(e.target.value)}
                   style={{
-                    width: '100%', boxSizing: 'border-box',
+                    width: '100%',
+                    boxSizing: 'border-box',
                     background: 'var(--color-surface-2)',
                     border: '1px solid var(--color-surface-offset)',
-                    borderRadius: 'var(--radius-sm)',
+                    borderRadius: 'var(--radius-md)',
                     color: 'var(--color-text-base)',
-                    fontSize: '11px', padding: '5px 10px', outline: 'none'
+                    fontSize: '11px',
+                    padding: '8px 12px 8px 30px',
+                    outline: 'none',
+                    transition: 'border-color 150ms ease, box-shadow 150ms ease'
                   }}
                 />
+                {memorySearchQuery && (
+                  <button
+                    onClick={() => setMemorySearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '26px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--color-text-muted)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '2px'
+                    }}
+                  >
+                    <X size={10} />
+                  </button>
+                )}
               </div>
 
               {/* Add Memory Form */}
               {showAddMemoryForm && (
                 <div style={{
-                  padding: '10px 14px',
+                  padding: '12px 16px',
                   borderBottom: '1px solid var(--color-surface-offset)',
-                  background: 'rgba(168,85,247,0.05)',
+                  background: 'rgba(168,85,247,0.04)',
+                  border: '1px dashed rgba(168,85,247,0.2)',
+                  borderRadius: 'var(--radius-md)',
+                  margin: '8px 16px 0 16px',
                   display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0
                 }}>
                   <div style={{ display: 'flex', gap: '6px' }}>
@@ -2239,7 +2378,7 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
               )}
 
               {/* Memory List */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {memoryLoading ? (
                   <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                     <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
@@ -2254,62 +2393,127 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
                 ) : (
                   orderedMems.map((mem: any) => (
                     <div key={mem.id} style={{
-                      padding: '8px 10px',
+                      padding: '14px 16px',
                       background: mem.is_pinned
-                        ? 'linear-gradient(135deg, rgba(168,85,247,0.1) 0%, rgba(59,130,246,0.06) 100%)'
-                        : 'var(--color-surface-2)',
-                      border: `1px solid ${mem.is_pinned ? 'rgba(168,85,247,0.35)' : 'var(--color-surface-offset)'}`,
-                      borderRadius: 'var(--radius-sm)',
-                      display: 'flex', flexDirection: 'column', gap: '5px',
-                      transition: 'border-color 150ms'
+                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%)'
+                        : 'var(--color-surface-2)90',
+                      border: mem.is_pinned ? '1px solid rgba(168, 85, 247, 0.35)' : '1px solid var(--color-surface-offset)',
+                      borderLeft: mem.is_pinned ? '4px solid #a855f7' : '1px solid var(--color-surface-offset)',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      transition: 'all 200ms ease',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)'
                     }}>
                       {/* Memory Header Row */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1, overflow: 'hidden', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden', minWidth: 0 }}>
                           <span style={{
-                            fontSize: '9px', fontWeight: 'bold', flexShrink: 0,
-                            color: CATEGORY_COLORS[mem.category] || '#6b7280',
-                            background: `${CATEGORY_COLORS[mem.category] || '#6b7280'}18`,
-                            border: `1px solid ${CATEGORY_COLORS[mem.category] || '#6b7280'}40`,
-                            padding: '1px 5px', borderRadius: '3px'
+                            fontSize: '9px',
+                            fontWeight: 'var(--weight-bold)',
+                            flexShrink: 0,
+                            letterSpacing: '0.04em',
+                            color: mem.category === 'semantic' ? '#60a5fa' : mem.category === 'episodic' ? '#fbbf24' : '#9ca3af',
+                            background: mem.category === 'semantic' ? 'rgba(59, 130, 246, 0.1)' : mem.category === 'episodic' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                            border: `1px solid ${mem.category === 'semantic' ? 'rgba(59, 130, 246, 0.2)' : mem.category === 'episodic' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(107, 114, 128, 0.2)'}`,
+                            padding: '2px 6px',
+                            borderRadius: '4px'
                           }}>
                             {CATEGORY_LABELS[mem.category] || mem.category.toUpperCase()}
                           </span>
                           <span style={{
-                            fontSize: '11px', fontWeight: 'bold',
-                            color: mem.is_pinned ? '#c084fc' : 'var(--color-text-base)',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                            fontSize: '12px',
+                            fontWeight: 'var(--weight-semibold)',
+                            color: mem.is_pinned ? '#d8b4fe' : 'var(--color-text-base)',
+                            fontFamily: 'var(--font-mono)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
                           }}>
                             {mem.memory_key}
                           </span>
                         </div>
                         {/* Action Buttons */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                           <button
                             onClick={() => handleTogglePinMemory(mem.id)}
                             title={mem.is_pinned ? 'Unpin memory' : 'Pin memory (always recalled first)'}
                             style={{
-                              background: mem.is_pinned ? 'rgba(168,85,247,0.15)' : 'transparent',
+                              background: 'transparent',
                               border: 'none',
                               color: mem.is_pinned ? '#a855f7' : 'var(--color-text-faint)',
-                              cursor: 'pointer', padding: '2px 4px', borderRadius: '3px', fontSize: '11px'
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'color 150ms, background-color 150ms'
                             }}
-                          >📌</button>
+                            onMouseEnter={e => {
+                              e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.15)'
+                              e.currentTarget.style.color = '#a855f7'
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              if (!mem.is_pinned) e.currentTarget.style.color = 'var(--color-text-faint)'
+                            }}
+                          >
+                            <Pin size={11} fill={mem.is_pinned ? 'currentColor' : 'none'} style={{ transform: mem.is_pinned ? 'none' : 'rotate(45deg)' }} />
+                          </button>
                           <button
                             onClick={() => editingMemoryId === mem.id ? setEditingMemoryId(null) : handleStartEditMemory(mem)}
                             title="Edit memory content"
                             style={{
-                              background: editingMemoryId === mem.id ? 'rgba(59,130,246,0.15)' : 'transparent',
+                              background: 'transparent',
                               border: 'none',
-                              color: editingMemoryId === mem.id ? '#3b82f6' : 'var(--color-text-faint)',
-                              cursor: 'pointer', padding: '2px 4px', borderRadius: '3px'
+                              color: 'var(--color-text-faint)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'color 150ms, background-color 150ms'
                             }}
-                          ><Edit2 size={10} /></button>
+                            onMouseEnter={e => {
+                              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'
+                              e.currentTarget.style.color = '#3b82f6'
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = 'var(--color-text-faint)'
+                            }}
+                          >
+                            <Edit2 size={11} />
+                          </button>
                           <button
                             onClick={() => handleDeleteMemory(mem.id)}
                             title="Delete memory"
-                            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', padding: '2px 4px', borderRadius: '3px' }}
-                          ><Trash2 size={10} /></button>
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--color-text-faint)',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'color 150ms, background-color 150ms'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'
+                              e.currentTarget.style.color = '#ef4444'
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = 'var(--color-text-faint)'
+                            }}
+                          >
+                            <Trash2 size={11} />
+                          </button>
                         </div>
                       </div>
 
@@ -2342,13 +2546,13 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
                           </div>
                         </div>
                       ) : (
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.5, paddingLeft: '2px' }}>
                           {mem.content}
                         </div>
                       )}
 
                       {/* Footer meta */}
-                      <div style={{ fontSize: '9px', color: 'var(--color-text-faint)', display: 'flex', gap: '8px' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--color-text-faint)', display: 'flex', gap: '8px', paddingLeft: '2px' }}>
                         <span>Recalled {mem.access_count}×</span>
                         <span>·</span>
                         <span>Updated {new Date(mem.updated_at).toLocaleDateString()}</span>
@@ -2464,10 +2668,10 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
                   const data = revertConfirmData
                   setRevertConfirmData(null)
                   try {
-                    await restoreBoardFromSnapshot(data.snapshot)
+                    await revertAICreatedEntities(data.cardTitles, data.columnNames)
                     setMessages(prev => prev.slice(0, data.index))
                   } catch (err) {
-                    console.error('Failed to revert board snapshot:', err)
+                    console.error('Failed to revert AI changes:', err)
                   }
                 }}
                 style={{

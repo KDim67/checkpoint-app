@@ -10,6 +10,8 @@ interface ChatInputProps {
   isStreaming: boolean
   contextItem: Item | null
   onTriggerPrompt: (prompt: string) => void
+  activeSkill?: { id: string; label: string; shortLabel: string; color: string } | null
+  onClearSkill?: () => void
 }
 
 interface CheatsheetFile {
@@ -24,7 +26,9 @@ export default function ChatInput({
   onAbort,
   isStreaming,
   contextItem,
-  onTriggerPrompt
+  onTriggerPrompt,
+  activeSkill,
+  onClearSkill
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -34,7 +38,19 @@ export default function ChatInput({
   const [attachedCheatsheets, setAttachedCheatsheets] = useState<string[]>([])
   const [showCheatsheetSubmenu, setShowCheatsheetSubmenu] = useState(false)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [slashQuery, setSlashQuery] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
+
+  const SLASH_COMMANDS = [
+    { name: '/clear', desc: 'Clear the current chat thread' },
+    { name: '/mem', desc: 'Open the Memory Vault panel' },
+    { name: '/memory', desc: 'Open the Memory Vault panel' },
+    { name: '/narrative', desc: 'Switch active skill to Narrative Specialist' },
+    { name: '/kanban', desc: 'Switch active skill to Kanban Architect' },
+    { name: '/plan', desc: 'Switch active skill to Implementation Planner' },
+    { name: '/planner', desc: 'Switch active skill to Implementation Planner' },
+    { name: '/help', desc: 'Show the slash command help menu' }
+  ]
 
   const handleToggleListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -98,6 +114,19 @@ export default function ChatInput({
     } else {
       setMentionQuery(null)
     }
+
+    // Detect / trigger for slash command popup
+    const lastSlashIdx = textBeforeCursor.lastIndexOf('/')
+    if (
+      lastSlashIdx !== -1 &&
+      (lastSlashIdx === 0 || textBeforeCursor[lastSlashIdx - 1] === ' ') &&
+      !textBeforeCursor.slice(lastSlashIdx).includes(' ')
+    ) {
+      const query = textBeforeCursor.slice(lastSlashIdx + 1).toLowerCase()
+      setSlashQuery(query)
+    } else {
+      setSlashQuery(null)
+    }
   }, [value])
 
   // Close plus menu on outside click
@@ -139,6 +168,20 @@ export default function ChatInput({
     textareaRef.current?.focus()
   }
 
+  const handleSelectSlash = (cmd: string) => {
+    const textarea = textareaRef.current
+    const cursor = textarea?.selectionStart || value.length
+    const textBeforeCursor = value.slice(0, cursor)
+    const lastSlashIdx = textBeforeCursor.lastIndexOf('/')
+    
+    if (lastSlashIdx !== -1) {
+      const newVal = value.slice(0, lastSlashIdx) + cmd + value.slice(cursor)
+      onChange(newVal)
+    }
+    setSlashQuery(null)
+    textareaRef.current?.focus()
+  }
+
   const [promptHistory, setPromptHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState<number>(-1)
   const [savedInputBeforeHistory, setSavedInputBeforeHistory] = useState<string>('')
@@ -161,6 +204,11 @@ export default function ChatInput({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mentionQuery !== null && e.key === 'Escape') {
       setMentionQuery(null)
+      return
+    }
+
+    if (slashQuery !== null && e.key === 'Escape') {
+      setSlashQuery(null)
       return
     }
 
@@ -200,6 +248,11 @@ export default function ChatInput({
         handleSelectMention(filteredCheatsheets[0].name)
         return
       }
+      if (slashQuery !== null && filteredSlashCommands.length > 0) {
+        e.preventDefault()
+        handleSelectSlash(filteredSlashCommands[0].name)
+        return
+      }
       e.preventDefault()
       handleFormSubmit()
     }
@@ -209,8 +262,69 @@ export default function ChatInput({
     mentionQuery === null ? true : cs.name.toLowerCase().includes(mentionQuery)
   )
 
+  const filteredSlashCommands = SLASH_COMMANDS.filter(cmd =>
+    slashQuery === null ? true : cmd.name.slice(1).toLowerCase().includes(slashQuery)
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', width: '100%', position: 'relative' }}>
+      {/* Slash Commands Auto-complete Popover */}
+      {slashQuery !== null && filteredSlashCommands.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: 0,
+            marginBottom: '8px',
+            width: '260px',
+            maxHeight: '220px',
+            overflowY: 'auto',
+            background: 'var(--color-surface-1)',
+            border: '1px solid var(--color-secondary)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+            padding: '4px',
+            zIndex: 150,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px'
+          }}
+        >
+          <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Slash Commands (/)
+          </div>
+          {filteredSlashCommands.map(cmd => (
+            <button
+              key={cmd.name}
+              onClick={() => handleSelectSlash(cmd.name)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
+                padding: '6px 8px',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-text-base)',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)' }}>
+                  {cmd.name}
+                </span>
+              </div>
+              <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>
+                {cmd.desc}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Mentions Auto-complete Popover */}
       {mentionQuery !== null && filteredCheatsheets.length > 0 && (
         <div
@@ -437,7 +551,10 @@ export default function ChatInput({
               <button
                 onClick={() => {
                   setShowPlusMenu(false)
-                  onTriggerPrompt('Summarize all my tasks and current board progress in detail.')
+                  onTriggerPrompt(
+                    'Summarize all my tasks and current board progress in detail. (Note: Do NOT output any JSON blocks. Just return a plain text/markdown summary.)',
+                    'Summarize Tasks'
+                  )
                 }}
                 style={{
                   display: 'flex',
@@ -462,7 +579,10 @@ export default function ChatInput({
               <button
                 onClick={() => {
                   setShowPlusMenu(false)
-                  onTriggerPrompt('Based on my current workspace items, suggest 3 actionable new tasks.')
+                  onTriggerPrompt(
+                    'Suggest 3 actionable new tasks based on my current workspace items. Output them in a JSON block. CRITICAL: The JSON block must ONLY contain the "cards" array with the NEW cards. Do NOT include any "columns" array or any of the existing cards in the JSON, otherwise they will be duplicated on the board.',
+                    'Suggest New Tasks'
+                  )
                 }}
                 style={{
                   display: 'flex',
@@ -487,7 +607,10 @@ export default function ChatInput({
               <button
                 onClick={() => {
                   setShowPlusMenu(false)
-                  onTriggerPrompt('Explain the current state of my project and active tasks.')
+                  onTriggerPrompt(
+                    'Explain the current state of my project and active tasks. (Note: Do NOT output any JSON blocks. Just return a plain text/markdown description.)',
+                    'Explain Workspace'
+                  )
                 }}
                 style={{
                   display: 'flex',
@@ -551,6 +674,45 @@ export default function ChatInput({
           </div>
         )}
 
+        {/* Active Skill Pill */}
+        {activeSkill && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: `${activeSkill.color}18`,
+              border: `1px solid ${activeSkill.color}50`,
+              borderRadius: 'var(--radius-sm)',
+              padding: '2px 8px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              color: activeSkill.color,
+              alignSelf: 'center',
+              flexShrink: 0
+            }}
+          >
+            <Sparkles size={10} />
+            <span>{activeSkill.shortLabel}</span>
+            <button
+              onClick={onClearSkill}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: activeSkill.color,
+                cursor: 'pointer',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                marginLeft: '3px'
+              }}
+              title="Remove active skill"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        )}
+
         {/* Attached Cheatsheets Pills */}
         {attachedCheatsheets.map(csName => (
           <div
@@ -601,7 +763,9 @@ export default function ChatInput({
               ? 'Streaming completion...'
               : isEmailDraftMode
               ? 'Describe the email you want to draft...'
-              : 'Ask assistant... (type @ to reference a cheatsheet)'
+              : activeSkill
+              ? `Ask the ${activeSkill.shortLabel}... (type @ to reference cheatsheets)`
+              : 'Ask assistant... (type @ to reference cheatsheets)'
           }
           disabled={isStreaming}
           rows={1}

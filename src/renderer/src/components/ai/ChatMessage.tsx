@@ -2,14 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
-import { Sparkles, User, Mail, BookOpen, CheckCircle2, Layout, RefreshCw, Columns, ArrowRight, Pencil, Copy, Check, Trash2 } from 'lucide-react'
+import { Sparkles, User, Mail, BookOpen, CheckCircle2, Layout, RefreshCw, Columns, ArrowRight, Pencil, Copy, Check, Trash2, FileText } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { withLock } from '../../lib/asyncMutex'
+import { useToast } from '../ui/Toast'
 
 interface ChatMessageProps {
   message: {
     role: 'system' | 'user' | 'assistant'
     content: string
+    displayContent?: string
     mode?: string
     cheatsheets?: string[]
     timestamp?: number
@@ -21,10 +23,11 @@ interface ChatMessageProps {
   messageIndex?: number
   onResend?: (index: number) => void
   onRewrite?: (newContent: string, index: number) => void
-  onRevert?: (snapshot: { columns: any[]; cards: any[] }, index: number) => void
+  onRevert?: (index: number) => void
   onCopy?: (content: string, index: number) => void
   isCopied?: boolean
   isStreaming?: boolean
+  hasRevertAction?: boolean
 }
 
 // Global execution & caching locks, prevent duplicate DB calls and React Strict Mode double-fires
@@ -928,6 +931,7 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
 function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
+  const { toast } = useToast()
   const [exportedCount, setExportedCount] = useState<number | null>(null)
 
   let parsed: any = null
@@ -957,6 +961,26 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
     window.dispatchEvent(new CustomEvent('kanban-refresh'))
   }
 
+  const handleExportMarkdown = async () => {
+    let md = `# ${parsed.title || 'Implementation Plan'}\n\n`
+    if (parsed.overview) {
+      md += `## Overview\n\n${parsed.overview}\n\n`
+    }
+    md += `## Proposed Steps\n\n`
+    for (const step of steps) {
+      md += `- [ ] **${step.title}**\n`
+      if (step.details) {
+        md += `  ${step.details}\n`
+      }
+      md += `\n`
+    }
+
+    const success = await window.electronAPI.app.saveFile('implementation_plan.md', md)
+    if (success) {
+      toast('Implementation plan saved successfully!', { type: 'success' })
+    }
+  }
+
   return (
     <div style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: 'var(--radius-md)', padding: '12px 14px', margin: '12px 0', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -981,6 +1005,28 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <button
+          onClick={handleExportMarkdown}
+          style={{
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: '#fff',
+            borderRadius: 'var(--radius-sm)',
+            padding: '5px 12px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
+        >
+          <FileText size={12} style={{ color: '#38bdf8' }} />
+          <span>Save as Markdown (.md)</span>
+        </button>
+
         <button onClick={handleBatchExport} disabled={exportedCount !== null} style={{ background: exportedCount !== null ? 'rgba(255,255,255,0.1)' : '#0284c7', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', padding: '5px 12px', fontSize: '11px', fontWeight: 'bold', cursor: exportedCount !== null ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Layout size={12} />
           <span>{exportedCount !== null ? 'Tasks Exported' : 'Export All Steps to Kanban'}</span>
@@ -1040,15 +1086,16 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
   )
 }
 
-export default function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onCopy, isCopied, isStreaming }: ChatMessageProps) {
+export default function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onCopy, isCopied, isStreaming, hasRevertAction }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const [showTimestamp, setShowTimestamp] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [editText, setEditText] = useState(message.content)
+  const [editText, setEditText] = useState(message.displayContent || message.content)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setEditText(message.content)
-  }, [message.content])
+    setEditText(message.displayContent || message.content)
+  }, [message.content, message.displayContent])
 
   const handleSaveEdit = () => {
     if (editText.trim() && onRewrite) {
@@ -1214,7 +1261,7 @@ export default function ChatMessage({ message, messageIndex, onResend, onRewrite
                 </div>
               </div>
             ) : (
-              <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{message.displayContent || message.content}</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '6px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
               {/* Timestamp */}
@@ -1257,10 +1304,10 @@ export default function ChatMessage({ message, messageIndex, onResend, onRewrite
                     <span>Resend</span>
                   </button>
                 )}
-                {message.boardSnapshot && onRevert && !isEditing && (
+                {hasRevertAction && onRevert && !isEditing && (
                   <button
                     onClick={() => {
-                      onRevert(message.boardSnapshot!, messageIndex ?? 0)
+                      onRevert(messageIndex ?? 0)
                     }}
                     style={{
                       background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -1367,7 +1414,7 @@ export default function ChatMessage({ message, messageIndex, onResend, onRewrite
               </span>
               {onCopy && messageIndex !== undefined && (
                 <button
-                  onClick={() => onCopy(message.content, messageIndex)}
+                  onClick={() => onCopy(message.displayContent || message.content, messageIndex)}
                   style={{
                     background: 'transparent', border: 'none',
                     color: isCopied ? 'var(--color-secondary)' : 'var(--color-text-muted)',

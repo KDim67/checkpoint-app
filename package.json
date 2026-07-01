@@ -5,6 +5,7 @@
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/cleanup.js",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",

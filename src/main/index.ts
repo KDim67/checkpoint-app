@@ -147,8 +147,21 @@ function createWindow(): void {
 
   // Load the renderer
   if (process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    mainWindow.loadURL(devUrl)
     mainWindow.webContents.openDevTools()
+
+    // Retry loading if dev server is not warm yet
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, _errorDescription, validatedURL) => {
+      if (validatedURL.startsWith(devUrl)) {
+        console.log(`[Dev Server] Port not ready yet (error code: ${errorCode}). Retrying load in 1s...`)
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.loadURL(devUrl)
+          }
+        }, 1000)
+      }
+    })
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
