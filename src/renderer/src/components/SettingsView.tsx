@@ -941,9 +941,9 @@ export default function SettingsView() {
       <div style={{
         flex: 1,
         minHeight: 0,
-        height: '100%',
         overflowY: 'auto',
         padding: 'var(--space-6)',
+        paddingBottom: 'var(--space-10)',
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--space-6)'

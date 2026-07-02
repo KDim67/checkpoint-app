@@ -515,6 +515,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke(IpcChannels.AI_UPDATE_MEMORY_CONTENT, id, content),
     batchSaveMemories: (items: any[], context: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.AI_BATCH_SAVE_MEMORIES, items, context),
+    pruneMemories: (context: string, limit: number): Promise<void> =>
+      ipcRenderer.invoke('ai:pruneMemories', context, limit),
+    auditMemories: (context: string, model: string): Promise<any[]> =>
+      ipcRenderer.invoke('ai:auditMemories', context, model),
     consolidateMemory: (params: {
       context: string
       userText: string

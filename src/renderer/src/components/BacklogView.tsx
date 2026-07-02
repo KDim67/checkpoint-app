@@ -105,6 +105,24 @@ export default function BacklogView() {
   // Selected item detail drawer
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
 
+  const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
+
+  // Mutual exclusivity between Task details drawer and AI assistant panel
+  useEffect(() => {
+    if (activeTaskId) {
+      const store = useAppStore.getState()
+      if (store.rightPanelOpen) {
+        store.setRightPanelContent(null)
+      }
+    }
+  }, [activeTaskId])
+
+  useEffect(() => {
+    if (rightPanelOpen && activeTaskId) {
+      setActiveTaskId(null)
+    }
+  }, [rightPanelOpen])
+
   // 1. Debounce Search Input
   useEffect(() => {
     const handler = setTimeout(() => {

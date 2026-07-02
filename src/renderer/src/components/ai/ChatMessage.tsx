@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
-import { Sparkles, User, Mail, BookOpen, CheckCircle2, Layout, RefreshCw, Columns, ArrowRight, Pencil, Copy, Check, Trash2, FileText } from 'lucide-react'
+import { Sparkles, User, Mail, BookOpen, CheckCircle2, Layout, RefreshCw, Columns, ArrowRight, Pencil, Copy, Check, Trash2, FileText, FileDown, Brain, X } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { withLock } from '../../lib/asyncMutex'
 import { useToast } from '../ui/Toast'
@@ -12,6 +12,7 @@ interface ChatMessageProps {
     role: 'system' | 'user' | 'assistant'
     content: string
     displayContent?: string
+    thinking?: string
     mode?: string
     cheatsheets?: string[]
     timestamp?: number
@@ -58,6 +59,28 @@ function resolveColor(val?: string): string {
   return NAMED_COLORS[v.toLowerCase()] ?? '#3b82f6'
 }
 
+function faultTolerantParseJSON(jsonStr: string): any {
+  const clean = jsonStr.trim()
+  try {
+    return JSON.parse(clean)
+  } catch (err) {
+    try {
+      let repaired = clean
+        .replace(/(["\d])\s*[\r\n]+\s*(?="[^"]+"\s*:)/g, '$1,')
+        .replace(/(true|false|null)\s*[\r\n]+\s*(?="[^"]+"\s*:)/gi, '$1,')
+        .replace(/\}\s*[\r\n]+\s*\{/g, '},{')
+        .replace(/\]\s*[\r\n]+\s*\{/g, '],{')
+        .replace(/,\s*([\]}])/g, '$1')
+        .replace(/\/\/.*/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+
+      return JSON.parse(repaired)
+    } catch {
+      return null
+    }
+  }
+}
+
 // Type detectors
 function looksLikeColumn(obj: any): boolean {
   return !!(
@@ -75,7 +98,7 @@ function looksLikeCard(obj: any): boolean {
 
 function normalizeCardJson(jsonString: string) {
   let parsed: any = null
-  try { parsed = JSON.parse(jsonString.trim()) } catch { return null }
+  parsed = faultTolerantParseJSON(jsonString)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
 
   // Hard-reject anything that looks exclusively like a column
@@ -104,7 +127,7 @@ function normalizeCardJson(jsonString: string) {
 
 function normalizeColumnJson(jsonString: string) {
   let parsed: any = null
-  try { parsed = JSON.parse(jsonString.trim()) } catch { return null }
+  parsed = faultTolerantParseJSON(jsonString)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
 
   // Hard-reject anything that looks like a card
@@ -126,7 +149,7 @@ function normalizeColumnJson(jsonString: string) {
 
 function parseBatchBoardJson(jsonString: string) {
   let parsed: any = null
-  try { parsed = JSON.parse(jsonString.trim()) } catch { return null }
+  parsed = faultTolerantParseJSON(jsonString)
   if (!parsed) return null
 
   const columns: any[] = []
@@ -932,24 +955,60 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
-  const [exportedCount, setExportedCount] = useState<number | null>(null)
 
-  let parsed: any = null
-  try { parsed = JSON.parse(jsonString.trim()) } catch (e) {}
+  let parsed: any = faultTolerantParseJSON(jsonString)
 
   if (!parsed) return <pre>{jsonString}</pre>
 
-  const steps = Array.isArray(parsed.steps) ? parsed.steps : []
+  const steps: any[] = Array.isArray(parsed.steps) ? parsed.steps : []
 
-  const handleBatchExport = async () => {
+  // Stable localStorage key for per-step approval persistence (survives chat reload)
+  const planSignature = `checkpoint_plan::${(parsed.title || '').replace(/\s+/g, '_').slice(0, 40)}::${steps.length}`
+
+  const [stepApprovals, setStepApprovals] = useState<boolean[]>(() => {
+    try {
+      const stored = localStorage.getItem(planSignature)
+      if (stored) {
+        const arr = JSON.parse(stored)
+        if (Array.isArray(arr) && arr.length === steps.length) return arr
+      }
+    } catch {}
+    return steps.map(() => true) // all approved by default
+  })
+
+  const [phase, setPhase] = useState<'review' | 'committed'>(() => {
+    try {
+      return localStorage.getItem(planSignature + '_committed') === '1' ? 'committed' : 'review'
+    } catch {}
+    return 'review'
+  })
+
+  const [exportedCount, setExportedCount] = useState<number | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [activeStepIndex, setActiveStepIndex] = useState(0)
+
+  const toggleStep = (idx: number) => {
+    if (phase !== 'review') return
+    setStepApprovals(prev => {
+      const next = [...prev]
+      next[idx] = !next[idx]
+      try { localStorage.setItem(planSignature, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
+  const approvedSteps = steps.filter((_: any, i: number) => stepApprovals[i] !== false)
+  const approvedCount = approvedSteps.length
+  const skippedCount = steps.length - approvedCount
+
+  const handleCommit = async () => {
     let count = 0
     const context = activeContext || 'default'
-    for (const step of steps) {
+    for (const step of approvedSteps) {
       try {
         await window.electronAPI.db.createItem({
-          context,
-          type: 'card',
-          title: step.title || 'Plan Task',
+          context, type: 'card',
+          title: step.title || 'Plan Step',
           body: step.details || '',
           status: 'open',
           priority: 2
@@ -958,92 +1017,480 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
       } catch (e) { console.warn('Failed to export plan step:', e) }
     }
     setExportedCount(count)
+    setPhase('committed')
+    try { localStorage.setItem(planSignature + '_committed', '1') } catch {}
     window.dispatchEvent(new CustomEvent('kanban-refresh'))
+    toast(`${count} plan step${count !== 1 ? 's' : ''} added to Kanban board!`, { type: 'success' })
   }
 
   const handleExportMarkdown = async () => {
     let md = `# ${parsed.title || 'Implementation Plan'}\n\n`
-    if (parsed.overview) {
-      md += `## Overview\n\n${parsed.overview}\n\n`
+    if (parsed.overview) md += `## Overview\n\n${parsed.overview}\n\n`
+    md += `## Steps\n\n`
+    for (let i = 0; i < steps.length; i++) {
+      const s = steps[i]
+      const approved = stepApprovals[i] !== false
+      md += `- [${approved ? ' ' : 'x'}] **${s.title}**\n${s.details ? `  ${s.details}\n` : ''}\n`
     }
-    md += `## Proposed Steps\n\n`
-    for (const step of steps) {
-      md += `- [ ] **${step.title}**\n`
-      if (step.details) {
-        md += `  ${step.details}\n`
-      }
-      md += `\n`
-    }
-
     const success = await window.electronAPI.app.saveFile('implementation_plan.md', md)
-    if (success) {
-      toast('Implementation plan saved successfully!', { type: 'success' })
-    }
+    if (success) toast('Implementation plan saved as Markdown!', { type: 'success' })
+  }
+
+  const btnBase: React.CSSProperties = {
+    border: 'none', borderRadius: 'var(--radius-sm)',
+    padding: '5px 12px', fontSize: '11px', fontWeight: 'bold',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
   }
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))', border: '1px solid rgba(148, 163, 184, 0.2)', borderRadius: 'var(--radius-md)', padding: '12px 14px', margin: '12px 0', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: '#38bdf8' }}>
-          <Sparkles size={14} />
+    <div style={{
+      background: 'var(--color-surface-2)',
+      border: '1px solid var(--color-surface-offset)',
+      borderRadius: 'var(--radius-md)',
+      padding: '14px 16px',
+      margin: '12px 0',
+      boxShadow: 'var(--shadow-sm)',
+      transition: 'border-color 300ms ease'
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px',
+        marginBottom: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: phase === 'committed' ? '#4ade80' : '#38bdf8' }}>
+          <Sparkles size={14} style={{ flexShrink: 0 }} />
           <span>Implementation Plan</span>
+          {phase === 'review' && (
+            <span style={{ background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: '#7dd3fc', fontSize: '9px', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
+              Awaiting Approval
+            </span>
+          )}
+          {phase === 'committed' && (
+            <span style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '9px', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
+              ✓ Committed
+            </span>
+          )}
         </div>
-        {exportedCount !== null && (
-          <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-            ✓ {exportedCount} Cards Added to Kanban
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              background: 'rgba(56, 189, 248, 0.1)',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              color: '#38bdf8',
+              borderRadius: 'var(--radius-sm)',
+              padding: '3px 8px',
+              fontSize: '10px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Layout size={11} /> Expand Plan
+          </button>
+          {phase === 'review' && (
+            <span style={{ fontSize: '9px', color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              {approvedCount}/{steps.length} approved
+            </span>
+          )}
+          {phase === 'committed' && exportedCount !== null && (
+            <span style={{ fontSize: '9px', color: '#4ade80', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+              {exportedCount} card{exportedCount !== 1 ? 's' : ''} created
+            </span>
+          )}
+        </div>
       </div>
-      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#f8fafc', marginBottom: '4px' }}>{parsed.title}</div>
-      {parsed.overview && <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '10px' }}>{parsed.overview}</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-        {steps.map((s: any, idx: number) => (
-          <div key={idx} style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', fontSize: '11px' }}>
-            <div style={{ fontWeight: 'bold', color: '#e2e8f0' }}>{s.title}</div>
-            {s.details && <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{s.details}</div>}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-        <button
-          onClick={handleExportMarkdown}
-          style={{
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: '#fff',
-            borderRadius: 'var(--radius-sm)',
-            padding: '5px 12px',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-        >
-          <FileText size={12} style={{ color: '#38bdf8' }} />
-          <span>Save as Markdown (.md)</span>
-        </button>
 
-        <button onClick={handleBatchExport} disabled={exportedCount !== null} style={{ background: exportedCount !== null ? 'rgba(255,255,255,0.1)' : '#0284c7', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', padding: '5px 12px', fontSize: '11px', fontWeight: 'bold', cursor: exportedCount !== null ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Layout size={12} />
-          <span>{exportedCount !== null ? 'Tasks Exported' : 'Export All Steps to Kanban'}</span>
-        </button>
+      {/* Plan Title + Overview */}
+      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9', marginBottom: parsed.overview ? '6px' : '10px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{parsed.title}</div>
+      {parsed.overview && (
+        <div style={{
+          fontSize: '11px', color: '#94a3b8', marginBottom: '12px', lineHeight: 1.6,
+          background: 'rgba(255,255,255,0.03)',
+          borderLeft: `2px solid ${phase === 'committed' ? 'rgba(34,197,94,0.4)' : 'rgba(56,189,248,0.4)'}`,
+          paddingLeft: '10px', borderRadius: '0 4px 4px 0',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word'
+        }}>
+          {parsed.overview}
+        </div>
+      )}
+
+      {/* Step List, Phase 1: clickable toggles */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
+        {steps.map((s: any, idx: number) => {
+          const isApproved = stepApprovals[idx] !== false
+          return (
+            <div
+              key={idx}
+              onClick={() => toggleStep(idx)}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: '10px',
+                background: isApproved ? 'rgba(56,189,248,0.05)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isApproved ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: 'var(--radius-sm)', padding: '8px 10px',
+                cursor: phase === 'review' ? 'pointer' : 'default',
+                transition: 'all 150ms ease',
+                opacity: isApproved ? 1 : 0.45
+              }}
+            >
+              {/* Toggle indicator */}
+              <div style={{
+                width: '16px', height: '16px', borderRadius: '4px', flexShrink: 0, marginTop: '1px',
+                border: `2px solid ${isApproved ? '#38bdf8' : 'rgba(255,255,255,0.2)'}`,
+                background: isApproved ? 'rgba(56,189,248,0.2)' : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 150ms ease'
+              }}>
+                {isApproved && <Check size={10} color="#38bdf8" />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: '11px', fontWeight: 'bold',
+                  color: isApproved ? '#e2e8f0' : '#64748b',
+                  textDecoration: isApproved ? 'none' : 'line-through',
+                  marginBottom: s.details ? '2px' : '0'
+                }}>
+                  {s.title}
+                </div>
+                {s.details && (
+                  <div style={{ fontSize: '10px', color: isApproved ? '#94a3b8' : '#475569', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                    {s.details}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
+
+      {/* Action Buttons */}
+      {phase === 'review' ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+          <button
+            onClick={handleExportMarkdown}
+            style={{ ...btnBase, background: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+          >
+            <FileText size={12} style={{ color: '#38bdf8' }} />
+            <span>Save as .md</span>
+          </button>
+          <button
+            onClick={handleCommit}
+            disabled={approvedCount === 0}
+            style={{
+              ...btnBase,
+              background: approvedCount === 0 ? 'rgba(255,255,255,0.05)' : '#0284c7',
+              color: approvedCount === 0 ? '#475569' : '#fff',
+              cursor: approvedCount === 0 ? 'not-allowed' : 'pointer'
+            }}
+            onMouseEnter={e => { if (approvedCount > 0) (e.currentTarget as HTMLButtonElement).style.background = '#0369a1' }}
+            onMouseLeave={e => { if (approvedCount > 0) (e.currentTarget as HTMLButtonElement).style.background = '#0284c7' }}
+          >
+            <CheckCircle2 size={12} />
+            <span>Approve &amp; Export to Kanban ({approvedCount})</span>
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+          <span style={{ fontSize: '10px', color: '#64748b' }}>
+            {skippedCount > 0 ? `${skippedCount} step${skippedCount !== 1 ? 's' : ''} skipped` : 'All steps exported'}
+          </span>
+          <button
+            onClick={() => setView('kanban')}
+            style={{ ...btnBase, background: 'var(--color-surface-offset)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-text-base)' }}
+          >
+            <Layout size={12} />
+            <span>View on Kanban</span>
+            <ArrowRight size={11} />
+          </button>
+        </div>
+      )}
+
+      {/* Modal Overlay detail view */}
+      {showModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(10, 12, 18, 0.85)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px', boxSizing: 'border-box'
+        }}>
+          <style>{`
+            .plan-markdown-body {
+              font-size: 11px;
+              line-height: 1.5;
+              color: var(--color-text-muted);
+              white-space: normal;
+              word-break: break-word;
+            }
+            .plan-markdown-body p {
+              margin: 0 0 6px 0;
+              white-space: normal;
+              word-break: break-word;
+            }
+            .plan-markdown-body p:last-child {
+              margin-bottom: 0;
+            }
+            .plan-markdown-body ul, .plan-markdown-body ol {
+              margin: 2px 0 6px 0;
+              padding-left: 16px;
+            }
+            .plan-markdown-body li {
+              margin-bottom: 3px;
+            }
+            .plan-markdown-body li > p {
+              margin: 0;
+              display: inline;
+            }
+            .plan-markdown-body li::marker {
+              color: var(--color-secondary);
+            }
+            .plan-markdown-body strong, .plan-markdown-body b {
+              color: var(--color-text-base);
+              font-weight: bold;
+            }
+            .plan-markdown-body blockquote {
+              border-left: 3px solid var(--color-secondary);
+              background: var(--color-surface-offset);
+              margin: 8px 0;
+              padding: 6px 10px;
+              color: var(--color-text-muted);
+              font-style: italic;
+              border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            }
+            .plan-markdown-body code {
+              background: var(--color-surface-offset);
+              color: var(--color-text-base);
+              padding: 2px 4px;
+              border-radius: var(--radius-sm);
+              font-family: var(--font-mono);
+              font-size: 10px;
+            }
+          `}</style>
+          <div style={{
+            background: 'var(--color-surface-1)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-lg)',
+            width: '100%', maxWidth: '1000px', height: '85vh',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: 'var(--shadow-lg)', overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 24px',
+              borderBottom: '1px solid var(--color-surface-offset)',
+              background: 'var(--color-surface-2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Sparkles size={16} style={{ color: 'var(--color-secondary)' }} />
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', letterSpacing: '-0.01em' }}>
+                  Plan Review: {parsed.title}
+                </span>
+              </div>
+              <button onClick={() => setShowModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 150ms' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--color-text-base)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+              {/* Left Column: Steps list */}
+              <div style={{
+                width: '320px', borderRight: '1px solid var(--color-surface-offset)',
+                overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px',
+                padding: '18px', background: 'var(--color-surface-1)', flexShrink: 0
+              }}>
+                <div style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.08em' }}>
+                  Steps Checklist ({approvedCount}/{steps.length} approved)
+                </div>
+                {steps.map((s: any, idx: number) => {
+                  const isApproved = stepApprovals[idx] !== false
+                  const isSelected = activeStepIndex === idx
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setActiveStepIndex(idx)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        background: isSelected ? 'var(--color-surface-offset)' : 'transparent',
+                        borderLeft: `3px solid ${isSelected ? 'var(--color-secondary)' : 'transparent'}`,
+                        borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+                        padding: '10px 14px 10px 10px',
+                        cursor: 'pointer', transition: 'all 150ms ease',
+                        marginBottom: '2px'
+                      }}
+                      onMouseEnter={e => {
+                        if (!isSelected) e.currentTarget.style.background = 'var(--color-surface-offset)'
+                      }}
+                      onMouseLeave={e => {
+                        if (!isSelected) e.currentTarget.style.background = 'transparent'
+                      }}
+                    >
+                      {/* Round Checkbox indicator */}
+                      <div
+                        onClick={(e) => { e.stopPropagation(); toggleStep(idx) }}
+                        style={{
+                          width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
+                          border: `2px solid ${isApproved ? '#22c55e' : 'var(--color-text-faint)'}`,
+                          background: isApproved ? '#22c55e' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 150ms ease',
+                          cursor: 'pointer'
+                        }}
+                        title={isApproved ? "Click to Skip step" : "Click to Approve step"}
+                      >
+                        {isApproved && <Check size={10} color="#fff" strokeWidth={3} />}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: isSelected ? 'var(--color-secondary)' : 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+                          Step 0{idx + 1}
+                        </span>
+                        <span style={{
+                          fontSize: '11px', fontWeight: isSelected ? 'bold' : 'normal',
+                          color: isApproved ? (isSelected ? 'var(--color-text-base)' : 'var(--color-text-muted)') : 'var(--color-text-faint)',
+                          textDecoration: isApproved ? 'none' : 'line-through',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        }}>
+                          {s.title}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Right Column: Step details */}
+              <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '32px', background: 'var(--color-surface-2)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {steps[activeStepIndex] ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold', letterSpacing: '0.1em' }}>
+                          STEP DETAILS • 0{activeStepIndex + 1} OF {steps.length}
+                        </span>
+                        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--color-text-base)', letterSpacing: '-0.01em' }}>
+                          {steps[activeStepIndex].title}
+                        </h2>
+                      </div>
+                      <button
+                        onClick={() => toggleStep(activeStepIndex)}
+                        style={{
+                          background: stepApprovals[activeStepIndex] !== false ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                          border: `1px solid ${stepApprovals[activeStepIndex] !== false ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+                          color: stepApprovals[activeStepIndex] !== false ? '#4ade80' : '#f87171',
+                          borderRadius: '20px', padding: '6px 14px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 150ms ease'
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: stepApprovals[activeStepIndex] !== false ? '#22c55e' : '#ef4444' }} />
+                        {stepApprovals[activeStepIndex] !== false ? 'Approved' : 'Skipped'}
+                      </button>
+                    </div>
+
+                    <div className="plan-markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {steps[activeStepIndex].details || '*No details provided for this step.*'}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-faint)', fontSize: '12px' }}>
+                    Select a step on the left to see details
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '14px 24px',
+              borderTop: '1px solid var(--color-surface-offset)',
+              background: 'var(--color-surface-2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', flexShrink: 0
+            }}>
+              {phase === 'review' ? (
+                <>
+                  <button
+                    onClick={handleExportMarkdown}
+                    style={{
+                      ...btnBase,
+                      background: 'var(--color-surface-offset)',
+                      border: '1px solid var(--color-surface-offset)',
+                      color: 'var(--color-text-base)',
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-sm)',
+                      transition: 'opacity 150ms ease'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                  >
+                    <FileDown size={13} /> Save as .md
+                  </button>
+                  <button
+                    onClick={() => { handleCommit(); setShowModal(false) }}
+                    style={{
+                      ...btnBase,
+                      background: 'var(--color-secondary)',
+                      color: 'var(--color-text-inverted)',
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-sm)',
+                      transition: 'opacity 150ms ease'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.9' }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                  >
+                    <CheckCircle2 size={13} /> Approve &amp; Export to Kanban ({approvedCount})
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowModal(false)}
+                  style={{
+                    ...btnBase,
+                    background: 'var(--color-surface-offset)',
+                    border: '1px solid var(--color-surface-offset)',
+                    color: 'var(--color-text-base)',
+                    padding: '8px 20px',
+                    borderRadius: 'var(--radius-sm)',
+                    transition: 'opacity 150ms ease'
+                  }}
+                >
+                  Close
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
   const setView = useAppStore(s => s.setView)
+  const { toast } = useToast()
   const [loaded, setLoaded] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
-  let parsed: any = null
-  try { parsed = JSON.parse(jsonString.trim()) } catch (e) {}
-
+  let parsed: any = faultTolerantParseJSON(jsonString)
   if (!parsed) return <pre>{jsonString}</pre>
+
+  const nodes: any[] = Array.isArray(parsed.nodes) ? parsed.nodes : []
+  const PREVIEW_LIMIT = 3
+  const visibleNodes = expanded ? nodes : nodes.slice(0, PREVIEW_LIMIT)
 
   const handleLoadTree = () => {
     window.dispatchEvent(new CustomEvent('ai-load-dialogue-tree', { detail: parsed }))
@@ -1051,35 +1498,155 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
     setView('gamedev')
   }
 
-  const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : []
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(JSON.stringify(parsed, null, 2))
+      .then(() => toast('Dialogue tree JSON copied!', { type: 'success' }))
+      .catch(() => {})
+  }
+
+  const handleSaveJson = async () => {
+    const fname = `dialogue_${(parsed.startNode || 'tree').toString().replace(/\s+/g, '_')}.json`
+    const success = await window.electronAPI.app.saveFile(fname, JSON.stringify(parsed, null, 2))
+    if (success) toast('Dialogue tree saved as JSON!', { type: 'success' })
+  }
+
+  const handleSaveMd = async () => {
+    let md = `# Dialogue Tree\n\nStart Node: \`${parsed.startNode || 'start'}\`\n\n---\n\n`
+    for (const n of nodes) {
+      md += `## Node: \`${n.id}\`\n\n**${n.speaker || 'NPC'}:** "${n.text}"\n\n`
+      if (Array.isArray(n.choices) && n.choices.length > 0) {
+        md += `**Player Choices:**\n\n`
+        for (const c of n.choices) md += `- "${c.text}" → \`${c.target}\`\n`
+        md += '\n'
+      }
+      md += '---\n\n'
+    }
+    const success = await window.electronAPI.app.saveFile('dialogue_tree.md', md)
+    if (success) toast('Dialogue tree saved as Markdown!', { type: 'success' })
+  }
+
+  const iconBtn: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    color: '#94a3b8', borderRadius: 'var(--radius-sm)', padding: '4px 10px',
+    fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: '5px'
+  }
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, rgba(24, 24, 27, 0.95), rgba(9, 9, 11, 0.98))', border: '1px solid rgba(161, 161, 170, 0.2)', borderRadius: 'var(--radius-md)', padding: '12px 14px', margin: '12px 0', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: '#a855f7' }}>
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(18, 10, 32, 0.97), rgba(10, 5, 20, 0.99))',
+      border: '1px solid rgba(168, 85, 247, 0.3)',
+      borderRadius: 'var(--radius-md)',
+      padding: '14px 16px',
+      margin: '12px 0',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.35)'
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', fontWeight: 'bold', color: '#a855f7' }}>
           <Sparkles size={14} />
-          <span>Branching Dialogue & Quest Flow ({nodes.length} Nodes)</span>
+          <span>Branching Dialogue &amp; Quest Flow</span>
         </div>
+        <span style={{ fontSize: '10px', color: '#94a3b8', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', padding: '2px 8px', borderRadius: '10px' }}>
+          {nodes.length} node{nodes.length !== 1 ? 's' : ''}
+        </span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', maxHeight: '160px', overflowY: 'auto' }}>
-        {nodes.map((n: any, idx: number) => (
-          <div key={idx} style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', fontSize: '11px' }}>
-            <div style={{ fontWeight: 'bold', color: '#e4e4e7' }}><span style={{ color: '#c084fc' }}>{n.speaker || 'NPC'}:</span> "{n.text}"</div>
+
+      {/* Node List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+        {visibleNodes.map((n: any, idx: number) => (
+          <div key={idx} style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(168,85,247,0.15)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 10px'
+          }}>
+            {/* Speaker chip + node ID */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+              <span style={{
+                fontSize: '9px', background: 'rgba(168,85,247,0.2)',
+                border: '1px solid rgba(168,85,247,0.4)', color: '#c084fc',
+                padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold'
+              }}>{n.speaker || 'NPC'}</span>
+              <span style={{ fontSize: '9px', color: '#475569', fontFamily: 'var(--font-mono)' }}>id: {n.id}</span>
+            </div>
+            {/* Dialogue text */}
+            <div style={{ fontSize: '11px', color: '#e4e4e7', lineHeight: 1.5, marginBottom: Array.isArray(n.choices) && n.choices.length > 0 ? '6px' : '0' }}>
+              &ldquo;{n.text}&rdquo;
+            </div>
+            {/* Choices with target arrows */}
             {Array.isArray(n.choices) && n.choices.length > 0 && (
-              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 {n.choices.map((c: any, ci: number) => (
-                  <span key={ci} style={{ fontSize: '9px', background: 'rgba(168, 85, 247, 0.15)', color: '#d8b4fe', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(168, 85, 247, 0.3)' }}>➜ {c.text}</span>
+                  <span key={ci} style={{
+                    fontSize: '9px', background: 'rgba(168,85,247,0.1)',
+                    color: '#d8b4fe', padding: '2px 7px', borderRadius: '4px',
+                    border: '1px solid rgba(168,85,247,0.25)',
+                    display: 'flex', alignItems: 'center', gap: '4px'
+                  }}>
+                    <span>{c.text}</span>
+                    <ArrowRight size={8} style={{ opacity: 0.6 }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', color: '#a78bfa', fontSize: '8px' }}>{c.target}</span>
+                  </span>
                 ))}
               </div>
             )}
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={handleLoadTree} style={{ background: loaded ? 'rgba(255,255,255,0.1)' : '#9333ea', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', padding: '5px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Layout size={12} />
-          <span>{loaded ? 'Loaded in Game Dev' : 'Load into Dialogue Quest Builder'}</span>
-          <ArrowRight size={11} />
+
+      {/* Expand/collapse toggle */}
+      {nodes.length > PREVIEW_LIMIT && (
+        <button
+          onClick={() => setExpanded(prev => !prev)}
+          style={{ background: 'none', border: 'none', color: '#a855f7', fontSize: '11px', cursor: 'pointer', padding: '2px 0', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+        >
+          {expanded
+            ? `▲ Collapse (${nodes.length} nodes total)`
+            : `▼ Show all ${nodes.length} nodes (${nodes.length - PREVIEW_LIMIT} hidden)`}
+        </button>
+      )}
+
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', borderTop: '1px solid rgba(168,85,247,0.15)', paddingTop: '10px', justifyContent: 'flex-end' }}>
+        <button
+          onClick={handleCopyJson}
+          style={iconBtn}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+        >
+          <Copy size={11} /> <span>Copy JSON</span>
+        </button>
+        <button
+          onClick={handleSaveJson}
+          style={iconBtn}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+        >
+          <FileDown size={11} /> <span>Save .json</span>
+        </button>
+        <button
+          onClick={handleSaveMd}
+          style={iconBtn}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+        >
+          <FileText size={11} /> <span>Save .md</span>
+        </button>
+        <button
+          onClick={handleLoadTree}
+          style={{
+            background: loaded ? 'rgba(255,255,255,0.1)' : '#9333ea',
+            border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)',
+            padding: '4px 12px', fontSize: '10px', fontWeight: 'bold',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+          }}
+          onMouseEnter={e => { if (!loaded) (e.currentTarget as HTMLButtonElement).style.background = '#7c3aed' }}
+          onMouseLeave={e => { if (!loaded) (e.currentTarget as HTMLButtonElement).style.background = '#9333ea' }}
+        >
+          <Layout size={11} />
+          <span>{loaded ? 'Loaded in Game Dev' : 'Load into Dialogue Builder'}</span>
+          <ArrowRight size={10} />
         </button>
       </div>
     </div>
@@ -1092,6 +1659,7 @@ export default function ChatMessage({ message, messageIndex, onResend, onRewrite
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(message.displayContent || message.content)
   const [error, setError] = useState<string | null>(null)
+  const [showThinking, setShowThinking] = useState(false)
 
   useEffect(() => {
     setEditText(message.displayContent || message.content)
@@ -1325,6 +1893,47 @@ export default function ChatMessage({ message, messageIndex, onResend, onRewrite
           </div>
         ) : (
           <div style={{ position: 'relative' }}>
+            {message.thinking && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px',
+                marginBottom: '10px',
+                fontSize: '11px'
+              }}>
+                <button
+                  onClick={() => setShowThinking(prev => !prev)}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    color: 'var(--color-secondary)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    fontSize: '10px', fontWeight: 'bold'
+                  }}
+                >
+                  <Brain size={12} style={{ color: 'var(--color-secondary)' }} />
+                  <span>{showThinking ? 'Hide Thinking Process' : 'Show Thinking Process'}</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+                    ({Math.ceil(message.thinking.length / 4)} tokens)
+                  </span>
+                </button>
+                {showThinking && (
+                  <div style={{
+                    marginTop: '6px',
+                    paddingTop: '6px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+                    color: 'var(--color-text-muted)',
+                    lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap',
+                    fontStyle: 'italic',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10px'
+                  }}>
+                    {message.thinking}
+                  </div>
+                )}
+              </div>
+            )}
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{

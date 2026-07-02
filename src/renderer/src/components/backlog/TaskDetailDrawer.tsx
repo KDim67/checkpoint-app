@@ -289,7 +289,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
         width: '600px',
         background: 'var(--color-surface-1)',
         borderLeft: '1px solid var(--color-surface-offset)',
-        zIndex: 900,
+        zIndex: 1100,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -310,7 +310,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
       right: 0,
       bottom: 0,
       background: 'rgba(0,0,0,0.5)',
-      zIndex: 900,
+      zIndex: 1100,
       display: 'flex',
       justifyContent: 'flex-end',
       backdropFilter: 'blur(2px)'

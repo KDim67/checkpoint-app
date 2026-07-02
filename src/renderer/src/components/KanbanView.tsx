@@ -202,6 +202,25 @@ export default function KanbanView() {
 
   const [showAddColModal, setShowAddColModal] = useState(false)
   const [activeCardId, setActiveCardId] = useState<string | null>(null)
+
+  const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
+
+  // Mutual exclusivity between Card details drawer and AI assistant panel
+  useEffect(() => {
+    if (activeCardId) {
+      const store = useAppStore.getState()
+      if (store.rightPanelOpen) {
+        store.setRightPanelContent(null)
+      }
+    }
+  }, [activeCardId])
+
+  useEffect(() => {
+    if (rightPanelOpen && activeCardId) {
+      setActiveCardId(null)
+    }
+  }, [rightPanelOpen])
+
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [activeDragCard, setActiveDragCard] = useState<Item | null>(null)
   const [pendingDeleteColId, setPendingDeleteColId] = useState<string | null>(null)

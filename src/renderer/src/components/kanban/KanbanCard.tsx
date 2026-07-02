@@ -95,7 +95,9 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
 
   const cardStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform) ?? undefined,
-    transition: transition ?? 'none',
+    transition: transition && transition !== 'none'
+      ? `${transition}, height 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms ease, box-shadow 150ms ease`
+      : 'height 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms ease, box-shadow 150ms ease',
     opacity: isDragging ? 0.4 : 1,
     position: 'relative',
     display: 'flex',
@@ -172,6 +174,27 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
       onDelete(card.id)
       return
     }
+
+    // x: Toggle Done status of card
+    if (e.key === 'x') {
+      e.preventDefault()
+      if (onUpdate) {
+        const isCurrentlyDone = card.status === 'done'
+        let newStatus = 'done'
+        let nextMeta = { ...meta }
+        if (isCurrentlyDone) {
+          newStatus = meta.prevStatus || 'backlog'
+          delete nextMeta.prevStatus
+        } else {
+          nextMeta.prevStatus = card.status
+        }
+        await onUpdate(card.id, {
+          status: newStatus,
+          metadata: JSON.stringify(nextMeta)
+        })
+      }
+      return
+    }
   }
 
   return (
@@ -220,19 +243,81 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
           gap: 'var(--space-2)',
           minWidth: 0
         }}>
-          {/* Title, Quick Actions & Drag Handle */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', justifyContent: 'space-between' }}>
-            <h4 style={{
-              margin: 0,
-              fontSize: 'var(--text-sm)',
-              fontWeight: 'var(--weight-semibold)',
-              color: coverTextColor,
-              lineHeight: 1.35,
-              wordBreak: 'break-word',
-              flex: 1
-            }}>
-              {card.title}
-            </h4>
+            <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
+              {/* Quick Completion Checkbox */}
+              <button
+                title={card.status === 'done' ? "Mark as Incomplete (X)" : "Mark as Done (X)"}
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  if (onUpdate) {
+                    const isCurrentlyDone = card.status === 'done'
+                    let newStatus = 'done'
+                    let nextMeta = { ...meta }
+                    if (isCurrentlyDone) {
+                      newStatus = meta.prevStatus || 'backlog'
+                      delete nextMeta.prevStatus
+                    } else {
+                      nextMeta.prevStatus = card.status
+                    }
+                    await onUpdate(card.id, {
+                      status: newStatus,
+                      metadata: JSON.stringify(nextMeta)
+                    })
+                  }
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginTop: '2px',
+                  color: card.status === 'done' ? '#22c55e' : 'var(--color-text-faint)',
+                  transition: 'all 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+                  opacity: (hovered || card.status === 'done') ? 1 : 0,
+                  width: (hovered || card.status === 'done') ? '14px' : '0px',
+                  marginRight: (hovered || card.status === 'done') ? '8px' : '0px',
+                  overflow: 'hidden',
+                  pointerEvents: (hovered || card.status === 'done') ? 'auto' : 'none',
+                  flexShrink: 0
+                }}
+                onMouseEnter={e => {
+                  if (card.status !== 'done') e.currentTarget.style.color = 'var(--color-text-muted)'
+                }}
+                onMouseLeave={e => {
+                  if (card.status !== 'done') e.currentTarget.style.color = 'var(--color-text-faint)'
+                }}
+              >
+                <div style={{
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  border: `1.5px solid ${card.status === 'done' ? '#22c55e' : 'var(--color-text-faint)'}`,
+                  background: card.status === 'done' ? '#22c55e' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 150ms ease',
+                  flexShrink: 0
+                }}>
+                  {card.status === 'done' && <Check size={10} color="#fff" strokeWidth={4} />}
+                </div>
+              </button>
+
+              <h4 style={{
+                margin: 0,
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--weight-semibold)',
+                color: coverTextColor,
+                lineHeight: 1.35,
+                wordBreak: 'break-word',
+                flex: 1
+              }}>
+                {card.title}
+              </h4>
+            </div>
 
             {/* Top Right Quick Actions & Drag Handle */}
             <div

@@ -197,6 +197,8 @@ export interface ElectronAPI {
     togglePinMemory: (id: string) => Promise<boolean>
     updateMemoryContent: (id: string, content: string) => Promise<boolean>
     batchSaveMemories: (items: any[], context: string) => Promise<void>
+    pruneMemories: (context: string, limit: number) => Promise<void>
+    auditMemories: (context: string, model: string) => Promise<any[]>
     consolidateMemory: (params: {
       context: string
       userText: string

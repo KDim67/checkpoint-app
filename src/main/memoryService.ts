@@ -222,13 +222,128 @@ export function batchSaveMemories(
 }
 
 /**
+ * Sequential processing of AI-directed memory adjustments (save, update, delete).
+ */
+export function processMemoryActions(
+  actions: Array<{ action: 'save' | 'update' | 'delete'; category?: 'semantic' | 'episodic' | 'working'; memory_key: string; content?: string }>,
+  context: string
+): void {
+  const db = getDb()
+  for (const item of actions) {
+    try {
+      const key = item.memory_key.trim().toLowerCase().slice(0, 120)
+      if (item.action === 'delete') {
+        db.prepare(`DELETE FROM ai_memories WHERE context = ? AND memory_key = ?`).run(context, key)
+      } else if (item.action === 'update' && item.content) {
+        db.prepare(`UPDATE ai_memories SET content = ?, updated_at = ? WHERE context = ? AND memory_key = ?`).run(
+          item.content.slice(0, 2000),
+          Date.now(),
+          context,
+          key
+        )
+      } else if (item.action === 'save' && item.content) {
+        saveMemory({
+          context,
+          category: item.category || 'semantic',
+          memory_key: key,
+          content: item.content
+        })
+      }
+    } catch (e) {
+      console.warn('[MemoryService] Failed to process memory action:', e)
+    }
+  }
+}
+
+/**
+ * Prunes the database to enforce memory limits (40 for small models, 120 for large).
+ * Evicts oldest unpinned memories first.
+ */
+export function pruneMemories(context: string = 'default', limit: number = 40): void {
+  const db = getDb()
+  const countRow = db.prepare(`SELECT COUNT(*) as cnt FROM ai_memories WHERE context = ?`).get(context) as { cnt: number }
+  if (countRow.cnt <= limit) return
+
+  const excess = countRow.cnt - limit
+  const selectStmt = db.prepare(`
+    SELECT id FROM ai_memories
+    WHERE context = ? AND is_pinned = 0
+    ORDER BY access_count ASC, updated_at ASC
+    LIMIT ?
+  `)
+  const toDelete = selectStmt.all(context, excess) as Array<{ id: string }>
+  if (toDelete.length === 0) return
+
+  const deleteStmt = db.prepare(`DELETE FROM ai_memories WHERE id = ?`)
+  const transaction = db.transaction((ids: Array<{ id: string }>) => {
+    for (const item of ids) {
+      deleteStmt.run(item.id)
+    }
+  })
+  transaction(toDelete)
+}
+
+/**
+ * Audit pass: asks the AI to inspect all active memories to resolve redundancies, contradictions, or stale information.
+ */
+export async function auditMemories(context: string, model: string): Promise<AiMemory[]> {
+  const existingMems = getMemories(context)
+  if (existingMems.length === 0) return []
+
+  const auditPrompt = `You are an AI memory auditor. Review the following list of active memories for this workspace. Identify redundancies, obsolete items, or contradictions.
+
+ACTIVE MEMORIES:
+${existingMems.map(m => `- Key: "${m.memory_key}" [Category: ${m.category}]: "${m.content}"`).join('\n')}
+
+For any issues found, specify "delete" or "update" actions.
+Return ONLY a JSON array of actions (no explanation, no markdown):
+[
+  { "action": "delete", "memory_key": "key_to_delete" },
+  { "action": "update", "memory_key": "key_to_update", "content": "updated merged/simplified content" }
+]
+Return [] if all memories are clean and relevant.`
+
+  try {
+    const { runCompletion } = await import('./aiService')
+    const raw = await runCompletion({
+      model,
+      messages: [{ role: 'user', content: auditPrompt }],
+      temperature: 0.1,
+      maxTokens: 1000
+    })
+
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+    let jsonString = cleaned
+    const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/)
+    if (arrayMatch) {
+      jsonString = arrayMatch[0]
+    }
+
+    let actions: any[] = []
+    try {
+      const parsed = JSON.parse(jsonString)
+      if (Array.isArray(parsed)) actions = parsed
+    } catch {
+      return existingMems
+    }
+
+    if (actions.length > 0) {
+      processMemoryActions(actions, context)
+    }
+    // Prune after consolidation/audit as well
+    const isSmall = model.toLowerCase().includes('2b') || model.toLowerCase().includes('3b') || model.toLowerCase().includes('7b') || model.toLowerCase().includes('8b') || model.toLowerCase().includes('phi') || model.toLowerCase().includes('gemma') || model.toLowerCase().includes('llama3:8b')
+    pruneMemories(context, isSmall ? 40 : 120)
+
+    return getMemories(context)
+  } catch (e) {
+    console.warn('[MemoryService] Audit memories failed:', e)
+    return existingMems
+  }
+}
+
+/**
  * Runs the AI memory-extraction pass for a single user/assistant exchange and
- * saves whatever durable facts come back. This used to be done from the renderer
- * by importing the `openai` package directly there, but the OpenAI SDK refuses
- * to construct a client in a browser-like context (which Electron's renderer is),
- * so that call always threw and was silently swallowed. Nothing was ever actually
- * being written. Running it here, in the main process, the same place every other
- * model call in the app already happens, fixes that for real.
+ * saves/updates/deletes whatever durable facts come back.
  */
 export async function consolidateFromExchange(params: {
   context: string
@@ -244,31 +359,40 @@ export async function consolidateFromExchange(params: {
   const existingMems = getMemories(context)
   const existingKeys = existingMems.map(m => m.memory_key).slice(0, 60).join(', ')
 
-  const consolidationPrompt = `You are an AI memory extraction specialist. Analyze this conversation exchange and extract important, durable facts to remember for future conversations.
+  const consolidationPrompt = `You are an AI memory extraction and optimization specialist. Analyze this conversation exchange and determine how to update your long-term memories.
 
 CONVERSATION:
 User: ${params.userText.slice(0, 1500)}
 Assistant: ${params.assistantText.slice(0, 1500)}
 
-ALREADY KNOWN FACTS (do NOT repeat these): ${existingKeys || 'none yet'}
+EXISTING MEMORIES:
+${existingMems.map(m => `- [${m.category.toUpperCase()}] Key: "${m.memory_key}": "${m.content}"`).join('\n') || '(none yet)'}
 
-Extract 0–4 important facts worth remembering. Focus on:
-- Project decisions, game design choices, rules, constraints
-- User preferences, workflow patterns
-- Key task/feature descriptions
-- Important milestones or decisions made
+You can perform three actions:
+1. "save": Record a brand new fact.
+2. "update": Modify an existing memory if the conversation corrects, refines, or updates it.
+3. "delete": Delete an existing memory if it is directly contradicted, obsolete, or no longer true.
 
-Return ONLY a JSON array (no markdown, no explanation):
+Return ONLY a JSON array of actions (no explanation, no markdown):
 [
   {
+    "action": "save",
     "category": "semantic",
     "memory_key": "short_descriptive_key",
     "content": "The fact to remember in 1-2 sentences"
+  },
+  {
+    "action": "update",
+    "memory_key": "existing_key_to_update",
+    "content": "The corrected or updated memory content"
+  },
+  {
+    "action": "delete",
+    "memory_key": "existing_key_to_delete"
   }
 ]
 
-Categories: "semantic" (project facts/rules/lore), "episodic" (decisions/milestones), "working" (temp session state).
-Return [] if nothing important to save. Keep memory_key under 60 chars, content under 300 chars.`
+Keep keys concise (under 60 chars), content brief (under 300 chars). Return [] if no memory adjustments are needed.`
 
   try {
     const { runCompletion } = await import('./aiService')
@@ -276,28 +400,32 @@ Return [] if nothing important to save. Keep memory_key under 60 chars, content 
       model: params.model,
       messages: [{ role: 'user', content: consolidationPrompt }],
       temperature: 0.2,
-      maxTokens: 600
+      maxTokens: 800
     })
 
     const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
     let jsonString = cleaned
-    // Extract only the JSON array block to tolerate conversational prefixes/suffixes from smaller models
     const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/)
     if (arrayMatch) {
       jsonString = arrayMatch[0]
     }
 
-    let extracted: Array<{ category: 'semantic' | 'episodic' | 'working'; memory_key: string; content: string }> = []
+    let actions: any[] = []
     try {
       const parsed = JSON.parse(jsonString)
-      if (Array.isArray(parsed)) extracted = parsed
+      if (Array.isArray(parsed)) actions = parsed
     } catch {
-      return [] // Model didn't return valid JSON, nothing to save, fail silently
+      return []
     }
 
-    if (extracted.length === 0) return []
+    if (actions.length === 0) return []
 
-    batchSaveMemories(extracted, context)
+    processMemoryActions(actions, context)
+
+    // Enforce size limits dynamically based on model size
+    const isSmall = params.model.toLowerCase().includes('2b') || params.model.toLowerCase().includes('3b') || params.model.toLowerCase().includes('7b') || params.model.toLowerCase().includes('8b') || params.model.toLowerCase().includes('phi') || params.model.toLowerCase().includes('gemma') || params.model.toLowerCase().includes('llama3:8b')
+    pruneMemories(context, isSmall ? 40 : 120)
+
     return getMemories(context)
   } catch (e) {
     console.warn('[MemoryService] Consolidation pass failed:', e)
@@ -332,6 +460,14 @@ export function initMemoryIpc(): void {
 
   ipcMain.handle('ai:batchSaveMemories', (_event, items: any[], context: string) => {
     return batchSaveMemories(items, context)
+  })
+
+  ipcMain.handle('ai:pruneMemories', (_event, context: string, limit: number) => {
+    return pruneMemories(context, limit)
+  })
+
+  ipcMain.handle('ai:auditMemories', (_event, context: string, model: string) => {
+    return auditMemories(context, model)
   })
 
   ipcMain.handle(IpcChannels.AI_CONSOLIDATE_MEMORY, (_event, params: {

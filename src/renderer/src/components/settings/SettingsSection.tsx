@@ -21,8 +21,7 @@ export default function SettingsSection({
     <div style={{
       background: 'var(--color-surface-1)',
       border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-lg)',
-      overflow: 'hidden'
+      borderRadius: 'var(--radius-lg)'
     }}>
       {/* Section header */}
       <div style={{

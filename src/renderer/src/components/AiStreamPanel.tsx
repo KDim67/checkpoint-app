@@ -7,6 +7,7 @@ import ContextPill from './ai/ContextPill'
 import ChatMessage, { clearActionCaches } from './ai/ChatMessage'
 import ChatInput from './ai/ChatInput'
 import { AI_SKILLS, getSkillById } from './ai/skills'
+import { useToast } from './ui/Toast'
 
 interface Message {
   role: 'system' | 'user' | 'assistant'
@@ -24,9 +25,35 @@ const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
 const STORAGE_KEY_WORKSPACE_FOLDER = 'checkpoint_ai_workspace_folder'
 
-// Mirrors the `num_ctx` value sent to the model in aiService.ts, used purely
-// as a rough visual budget reference for the context-window indicator.
-const CONTEXT_WINDOW_TOKENS = 32768
+export function getModelProfile(modelName: string) {
+  const m = (modelName || '').toLowerCase()
+  const isSmall = m.includes('2b') || m.includes('3b') || m.includes('7b') || m.includes('8b') || m.includes('phi') || m.includes('gemma') || m.includes('llama3:8b') || (m.includes('qwen') && (m.includes('0.5b') || m.includes('1.5b') || m.includes('7b')))
+  return {
+    isSmall,
+    memoryRecallLimit: isSmall ? 4 : 10,
+    memoryStoreLimit: isSmall ? 40 : 120,
+    workspaceFileCap: isSmall ? 250 : 1000,
+    contextTokens: isSmall ? 16384 : 65536
+  }
+}
+
+export function parseThinkingAndContent(text: string) {
+  let thinking = ''
+  let content = text
+
+  const thinkStartIdx = text.indexOf('<think>')
+  if (thinkStartIdx !== -1) {
+    const thinkEndIdx = text.indexOf('</think>')
+    if (thinkEndIdx !== -1) {
+      thinking = text.slice(thinkStartIdx + 7, thinkEndIdx).trim()
+      content = (text.slice(0, thinkStartIdx) + text.slice(thinkEndIdx + 8)).trim()
+    } else {
+      thinking = text.slice(thinkStartIdx + 7).trim()
+      content = text.slice(0, thinkStartIdx).trim()
+    }
+  }
+  return { thinking, content }
+}
 
 interface WorkspaceFileInfo {
   name: string
@@ -68,6 +95,44 @@ function pruneHistory(history: Message[], maxHistoryTokens: number): Message[] {
   }
 
   return pruned
+}
+
+// Semantic intent classifier, replaces the fragile keyword-heuristic approach.
+// Returns what action type the model should take, factoring in the active skill.
+// Defaults to 'converse' to prevent hallucination when intent is ambiguous.
+type IntentType = 'create_items' | 'create_plan' | 'create_dialogue' | 'converse'
+
+function classifyIntent(text: string, activeSkillId: string | null): IntentType {
+  const lower = text.toLowerCase().trim()
+
+  // Skill-specific intent elevation: active skill biases strongly toward its native format
+  if (activeSkillId === 'narrative_specialist') {
+    const dialogueTriggers = ['dialogue', 'dialog', 'quest', 'story', 'narrative', 'write', 'create', 'generate', 'design', 'character', 'npc', 'scene', 'conversation', 'lore', 'plot']
+    if (dialogueTriggers.some(t => lower.includes(t))) return 'create_dialogue'
+  }
+  if (activeSkillId === 'implementation_planner') {
+    const planTriggers = ['plan', 'implement', 'build', 'design', 'system', 'feature', 'how', 'approach', 'steps', 'architect', 'refactor', 'create', 'generate', 'scaffold']
+    if (planTriggers.some(t => lower.includes(t))) return 'create_plan'
+  }
+
+  // High-confidence dialogue signals (explicit multi-word patterns)
+  if (/dialogue tree|quest flow|branching dialogue|npc dialogue|create.*dialogue|dialogue.*for|conversation.*tree/.test(lower)) return 'create_dialogue'
+
+  // High-confidence plan signals
+  if (/implementation plan|create.*plan|make.*plan|step.by.step plan|detailed plan|plan for/.test(lower)) return 'create_plan'
+
+  // Item creation: requires BOTH an imperative verb AND an item noun (high-precision pairing)
+  const CREATE_VERBS = ['create', 'add', 'make', 'generate', 'build', 'populate', 'set up', 'scaffold', 'give me', 'list', 'suggest', 'produce', 'output']
+  const ITEM_NOUNS  = ['card', 'task', 'column', 'board', 'ticket', 'item', 'stage', 'more task', 'another task', 'some task', 'few task']
+  const hasCreateVerb = CREATE_VERBS.some(v => lower.includes(v))
+  const hasItemNoun   = ITEM_NOUNS.some(n => lower.includes(n))
+  if (hasCreateVerb && hasItemNoun) return 'create_items'
+
+  // "more" / "another" as standalone follow-up → create more of whatever the current topic is
+  if (/^(more|add more|another|give me more|a few more|some more)/.test(lower)) return 'create_items'
+
+  // Default to conversational, only output JSON when explicitly requested
+  return 'converse'
 }
 
 /**
@@ -128,6 +193,7 @@ export default function AiStreamPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
   const selectItem = useAppStore(s => s.selectItem)
   const activeContext = useAppStore(s => s.activeContext)
+  const { toast } = useToast()
 
   // Chat message history
   const [messages, setMessages] = useState<Message[]>([])
@@ -285,6 +351,21 @@ export default function AiStreamPanel() {
   const [newMemoryCategory, setNewMemoryCategory] = useState<'semantic' | 'episodic' | 'working'>('semantic')
   const [memoryConsolidating, setMemoryConsolidating] = useState(false)
   const consolidationTurnRef = useRef(0) // Only consolidate every N turns to save API calls
+  const auditTurnRef = useRef(0)
+
+  const handleAuditMemories = async () => {
+    try {
+      setMemoryLoading(true)
+      const validContext = activeContext || 'default'
+      const audited = await window.electronAPI.memory.auditMemories(validContext, selectedModel)
+      setMemories(audited)
+      toast('Memory vault audited and optimized!', { type: 'success' })
+    } catch (e) {
+      console.warn('Memory audit failed:', e)
+    } finally {
+      setMemoryLoading(false)
+    }
+  }
 
   // Settings panel
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
@@ -433,8 +514,14 @@ export default function AiStreamPanel() {
 
       // Only append to UI if user is still on the same chat
       if (streamingChatIdRef.current === currentChatIdRef.current) {
+        const { thinking, content: finalContent } = parseThinkingAndContent(finalAssistantResponse)
         setMessages(prev => {
-          const updated = [...prev, { role: 'assistant' as const, content: finalAssistantResponse, timestamp: Date.now() }]
+          const updated = [...prev, {
+            role: 'assistant' as const,
+            content: finalContent,
+            thinking: thinking || undefined,
+            timestamp: Date.now()
+          }]
           // Kick off background memory consolidation after message is committed
           setTimeout(() => triggerMemoryConsolidation(updated), 100)
           return updated
@@ -460,7 +547,13 @@ export default function AiStreamPanel() {
       const errText = `\n\n**Error:** ${errMessage}`
       const finalAssistantResponse = chunkBufferRef.current + errText
       if (streamingChatIdRef.current === currentChatIdRef.current) {
-        setMessages(prev => [...prev, { role: 'assistant', content: finalAssistantResponse, timestamp: Date.now() }])
+        const { thinking, content: finalContent } = parseThinkingAndContent(finalAssistantResponse)
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: finalContent,
+          thinking: thinking || undefined,
+          timestamp: Date.now()
+        }])
         setStreamingText('')
       }
       chunkBufferRef.current = ''
@@ -729,44 +822,39 @@ export default function AiStreamPanel() {
 
     const userMessage: Message = {
       role: 'user',
-      content: text || 'Analyze attached cheatsheet(s).',
-      displayContent: options?.displayContent,
+      content: text,
       mode: options?.mode,
       cheatsheets: options?.cheatsheets,
       timestamp: Date.now()
     }
     const nextMessages = [...messages, userMessage]
     setMessages(nextMessages)
-    if (!textToSubmit) setInputValue('')
-
+    setInputValue('')
     await runChatStream(nextMessages)
   }
 
   const runChatStream = async (nextMessages: Message[]) => {
     setIsStreaming(true)
     setIsWaitingForFirstChunk(true)
+    streamingChatIdRef.current = currentChatIdRef.current
     hasReceivedFirstChunkRef.current = false
-    streamingChatIdRef.current = currentChatId
+    isAbortedRef.current = false
     chunkBufferRef.current = ''
     setStreamingText('')
+    const modelLower = selectedModel.toLowerCase()
 
-    try {
-      const lastUserMsg = [...nextMessages].reverse().find(m => m.role === 'user')
-      const text = lastUserMsg?.content || ''
+      try {
+        const lastUserMsg = [...nextMessages].reverse().find(m => m.role === 'user')
+        const text = lastUserMsg?.content || ''
 
-      // Check if the selected model is small (e.g. < 4B parameters)
-      const modelLower = (selectedModel || '').toLowerCase()
-      const isSmallModel =
-        modelLower.includes('2b') ||
-        modelLower.includes('1.5b') ||
-        modelLower.includes('3b') ||
-        modelLower.includes('0.5b') ||
-        modelLower.includes('tiny') ||
-        modelLower.includes('mini') ||
-        modelLower.includes('small')
+        const profile = getModelProfile(selectedModel)
+        const isSmallModel = profile.isSmall
+        const memoryRecallLimit = profile.memoryRecallLimit
+        const workspaceFileCap = profile.workspaceFileCap
+        const contextWindowTokens = profile.contextTokens
 
-      const baseSystemPromptContent = isSmallModel
-        ? `You are Checkpoint AI, an assistant with DIRECT WRITE ACCESS to the user's Kanban board.
+        const baseSystemPromptContent = isSmallModel
+          ? `You are Checkpoint AI, an assistant with DIRECT WRITE ACCESS to the user's Kanban board.
 
 ██ ACTION RULES ██
 1. When asked to add/create tasks, output a JSON block that creates them.
@@ -782,7 +870,7 @@ export default function AiStreamPanel() {
   ]
 }
 \`\`\``
-        : `You are the Checkpoint AI Assistant, a pair-programming partner and project coordinator integrated directly into a visual game developer's Kanban workspace.
+          : `You are the Checkpoint AI Assistant, a pair-programming partner and project coordinator integrated directly into a visual game developer's Kanban workspace.
 
 ██ ACTION EVALUATION & CREATION RULES ██
 When the user asks to create, plan, or add items (e.g. "add tasks", "create cards", "make columns", "populate the board"):
@@ -865,102 +953,159 @@ When the user asks to create, plan, or add items (e.g. "add tasks", "create card
 
 When creating multiple cards, ALWAYS use the BATCH format, it is the most reliable. Only include the "columns" key if you are defining brand new stages; otherwise, omit "columns" and only provide the "cards" list.`
 
-      // Seed context as a system instruction if preset
-      const systemPrompt: Message[] = [
-        {
-          role: 'system',
-          content: baseSystemPromptContent
-        }
-      ]
+        // Seed context as a system instruction if preset
+        const systemPrompt: Message[] = [
+          {
+            role: 'system',
+            content: baseSystemPromptContent
+          }
+        ]
 
-      // 1. Semantic Memory Vector Retrieval
-      try {
-        const validContext = activeContext || 'default'
-        const memories = await window.electronAPI.memory.searchMemories(text, validContext, 8).catch(() => [])
-        if (memories && memories.length > 0) {
-          const memFormatted = memories.map(m => `- [${m.category.toUpperCase()}] ${m.memory_key}: ${m.content}`).join('\n')
+        // Scrape live board state (columns, cards) and then retrieve semantic memories.
+        // Board state comes FIRST so memories have board context when recalled.
+        try {
+          const validContext = activeContext || 'default'
+          const key = `kanban_columns_${validContext}`
+          const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
+          let colsList: any[] = []
+          if (typeof rawCols === 'string') {
+            try { colsList = JSON.parse(rawCols) } catch (e) { colsList = [] }
+          } else if (Array.isArray(rawCols)) {
+            colsList = rawCols
+          }
+          if (colsList.length === 0) {
+            colsList = [
+              { id: 'open', name: 'Backlog' },
+              { id: 'in_progress', name: 'In Progress' },
+              { id: 'in_review', name: 'In Review' },
+              { id: 'done', name: 'Done' }
+            ]
+          }
+
+          const [tasksRes, cardsRes] = await Promise.all([
+            window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
+            window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
+          ])
+          const allItems = [...(tasksRes?.items || []), ...(cardsRes?.items || [])]
+
+          // Per-column card summaries
+          const colSummaries: string[] = []
+          for (const col of colsList) {
+            const colCards = allItems.filter(i => i.status === col.id || i.status.toLowerCase() === col.name.toLowerCase())
+            let cardListText = ''
+            if (colCards.length > 0) {
+              cardListText = colCards.map(c => {
+                const bodySnippet = c.body ? `, "${c.body.slice(0, 120).replace(/\n/g, ' ')}"` : ''
+                const tagsText = c.tags && c.tags.length > 0 ? ` [Tags: ${c.tags.map((t: any) => t.name).join(', ')}]` : ''
+                return `    • "${c.title}" (Priority: ${c.priority === 3 ? 'High' : c.priority === 2 ? 'Med' : 'Low'})${tagsText}${bodySnippet}`
+              }).join('\n')
+            } else {
+              cardListText = '    (empty)'
+            }
+            colSummaries.push(`Column "${col.name}" [ID: "${col.id}"]:\n${cardListText}`)
+          }
+
+          // VALID COLUMN IDs as a bullet list so the model can copy them exactly
+          const validColIds = colsList.map(c => `  • "${c.id}" → "${c.name}"`).join('\n')
+
+          // FORBIDDEN DUPLICATE TITLES as a bullet list (easier to match than CSV)
+          const forbiddenTitles = allItems.length > 0
+            ? allItems.map((i: any) => `  • ${i.title}`).join('\n')
+            : '  (none yet)'
+
+          const liveBoardStateText = [
+            `CURRENT LIVE KANBAN BOARD STATE (Context: ${validContext})`,
+            '',
+            `VALID COLUMN IDs, use ONLY these exact strings in any "status" field:`,
+            validColIds,
+            '',
+            `CARDS PER COLUMN:`,
+            colSummaries.join('\n\n'),
+            '',
+            `FORBIDDEN DUPLICATE TITLES, NEVER create cards with these exact titles:`,
+            forbiddenTitles,
+            '',
+            `BOARD RULES:`,
+            `1. Use ONLY the column IDs from VALID COLUMN IDs above in any JSON "status" field. Never invent IDs.`,
+            `2. NEVER create cards with titles from the FORBIDDEN list above.`,
+            `3. JSON blocks ALWAYS create NEW items. Use plain text to reference or discuss existing items.`,
+            `4. "Add more tasks" = generate entirely NEW tasks with completely different titles.`
+          ].join('\n')
+
           systemPrompt.push({
             role: 'system',
-            content: `RECALLED PROJECT MEMORIES & KNOWN FACTS:\n${memFormatted}\n\nUse these persistent memories to maintain consistency with past decisions, user rules, and game lore.`
+            content: liveBoardStateText
+          })
+
+          // 2. Semantic Memory Vector Retrieval (runs AFTER board state so memories interpret board context)
+          try {
+            const memories = await window.electronAPI.memory.searchMemories(text, validContext, memoryRecallLimit).catch(() => [])
+            if (memories && memories.length > 0) {
+              const memFormatted = memories.map(m => `- [${m.category.toUpperCase()}] ${m.memory_key}: ${m.content}`).join('\n')
+              systemPrompt.push({
+                role: 'system',
+                content: `RECALLED PROJECT MEMORIES & KNOWN FACTS:\n${memFormatted}\n\nUse these persistent memories to maintain consistency with past decisions, user rules, and game lore.`
+              })
+            }
+          } catch (memErr) {
+            console.warn('Failed to retrieve semantic memories for AI context:', memErr)
+          }
+        } catch (err) {
+          console.warn('Failed to scrape workspace items for AI context:', err)
+        }
+
+        // Specialized Skill Workflow injection (auto-elevated if not manually overridden)
+        const lastUserContentForSkill = nextMessages[nextMessages.length - 1]?.content || text
+        const predictedIntent = classifyIntent(lastUserContentForSkill, activeSkillId)
+        let resolvedSkillId = activeSkillId
+        if (!resolvedSkillId) {
+          if (predictedIntent === 'create_dialogue') resolvedSkillId = 'narrative_specialist'
+          else if (predictedIntent === 'create_plan') resolvedSkillId = 'implementation_planner'
+        }
+
+        const activeSkill = getSkillById(resolvedSkillId)
+        if (activeSkill) {
+          systemPrompt.push({
+            role: 'system',
+            content: activeSkill.systemPrompt
           })
         }
-      } catch (memErr) {
-        console.warn('Failed to retrieve semantic memories for AI context:', memErr)
-      }
 
-      // Automatically scrape all workspace columns and items to give AI full knowledge of tasks & board structure
-      try {
-        const validContext = activeContext || 'default'
-        const key = `kanban_columns_${validContext}`
-        const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-        let colsList: any[] = []
-        if (typeof rawCols === 'string') {
-          try { colsList = JSON.parse(rawCols) } catch (e) { colsList = [] }
-        } else if (Array.isArray(rawCols)) {
-          colsList = rawCols
-        }
-        if (colsList.length === 0) {
-          colsList = [
-            { id: 'open', name: 'Backlog' },
-            { id: 'in_progress', name: 'In Progress' },
-            { id: 'in_review', name: 'In Review' },
-            { id: 'done', name: 'Done' }
-          ]
-        }
+        // Workspace codebase index injection, grouped by top-level folder and file-type buckets
+        // so the model understands project structure, not just a flat list of filenames.
+        if (workspaceFolder && workspaceFiles.length > 0) {
+          const cappedFiles = workspaceFiles.slice(0, workspaceFileCap)
 
-        const [tasksRes, cardsRes] = await Promise.all([
-          window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
-          window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
-        ])
-        const allItems = [...(tasksRes?.items || []), ...(cardsRes?.items || [])]
-
-        let colSummaries: string[] = []
-        for (const col of colsList) {
-          const colCards = allItems.filter(i => i.status === col.id || i.status.toLowerCase() === col.name.toLowerCase())
-          let cardListText = ''
-          if (colCards.length > 0) {
-            cardListText = colCards.map(c => {
-              const bodySnippet = c.body ? `, Description: "${c.body.slice(0, 150).replace(/\n/g, ' ')}"` : ''
-              const tagsText = c.tags && c.tags.length > 0 ? ` [Tags: ${c.tags.map((t: any) => t.name).join(', ')}]` : ''
-              return `    * Card Title: "${c.title}" (Priority: ${c.priority === 3 ? 'High' : c.priority === 2 ? 'Med' : 'Low'})${tagsText}${bodySnippet}`
-            }).join('\n')
-          } else {
-            cardListText = '    * (No cards in this column yet)'
+          // Group files by top-level folder
+          const folderGroups: Record<string, typeof cappedFiles[0][]> = {}
+          for (const f of cappedFiles) {
+            const parts = f.relativePath.replace(/\\/g, '/').split('/')
+            const topFolder = parts.length > 1 ? parts[0] : '(root)'
+            if (!folderGroups[topFolder]) folderGroups[topFolder] = []
+            folderGroups[topFolder].push(f)
           }
-          colSummaries.push(`- Column Name: "${col.name}" (ID: "${col.id}"):\n${cardListText}`)
+
+          // Summarize each folder: file count + extension buckets
+          const folderSummaries = Object.entries(folderGroups)
+            .map(([folder, files]) => {
+              const extBuckets: Record<string, number> = {}
+              for (const f of files) {
+                const ext = f.extension || '(no ext)'
+                extBuckets[ext] = (extBuckets[ext] || 0) + 1
+              }
+              const bucketStr = Object.entries(extBuckets)
+                .sort((a, b) => b[1] - a[1])
+                .map(([ext, count]) => `${ext}\u00d7${count}`)
+                .join(', ')
+              return `  \u{1F4C1} ${folder}/, ${files.length} file${files.length !== 1 ? 's' : ''} (${bucketStr})`
+            })
+            .join('\n')
+
+          systemPrompt.push({
+            role: 'system',
+            content: `IMPORTED WORKSPACE CODEBASE INDEX:\nProject folder: ${workspaceFolder}\nTotal files: ${workspaceFiles.length}${workspaceFiles.length > 500 ? ' (capped at 500)' : ''}\n\nFile structure by folder:\n${folderSummaries}\n\nUse this structure to understand the project architecture. If you need a specific file's contents, ask the user to paste it or attach it as a cheatsheet.`
+          })
         }
-
-        const existingCardTitles = allItems.map((i: any) => i.title).join(', ')
-        const liveBoardStateText = `CURRENT LIVE KANBAN BOARD STATE (Context: ${validContext}):\nExisting Board Columns & Cards:\n${colSummaries.join('\n\n')}\n\nEXISTING CARD TITLES (DO NOT DUPLICATE THESE EXACT TITLES): ${existingCardTitles || 'none yet'}\n\nBOARD RULES:\n1. READ the existing columns and cards above before responding.\n2. NEVER create cards with the same title as an existing card (titles listed above).\n3. When asked to 'add more tasks' or 'add another': generate BRAND NEW tasks with completely different titles that complement but do not repeat what exists.\n4. You CAN add cards to existing columns, just use new unique titles.\n5. NEVER output existing columns or cards inside a JSON block (e.g. \`\`\`json). JSON blocks ALWAYS create NEW columns and cards on the board. If you want to explain, summarize, or audit the existing state, write your answer in PLAIN TEXT/markdown only. NEVER repeat existing items in a JSON block, otherwise they will be duplicated in the database.`
-
-        systemPrompt.push({
-          role: 'system',
-          content: liveBoardStateText
-        })
-      } catch (err) {
-        console.warn('Failed to scrape workspace items for AI context:', err)
-      }
-
-      // Specialized Skill Workflow injection
-      const activeSkill = getSkillById(activeSkillId)
-      if (activeSkill) {
-        systemPrompt.push({
-          role: 'system',
-          content: activeSkill.systemPrompt
-        })
-      }
-
-      // Imported workspace codebase index injection
-      if (workspaceFolder && workspaceFiles.length > 0) {
-        const fileTree = workspaceFiles
-          .slice(0, 300)
-          .map(f => `  ${f.relativePath} (${f.extension || 'no ext'}, ${f.size}b)`)
-          .join('\n')
-        systemPrompt.push({
-          role: 'system',
-          content: `IMPORTED WORKSPACE CODEBASE INDEX:\nProject folder: ${workspaceFolder}\nIndexed files (${workspaceFiles.length} total${workspaceFiles.length > 300 ? ', showing first 300' : ''}):\n${fileTree}\n\nUse this file listing to understand the project's architecture. You do not have file contents yet, if you need to read a specific file's contents to answer accurately, ask the user to paste it or attach it as a cheatsheet.`
-        })
-      }
 
       if (contextItem) {
         systemPrompt.push({
@@ -977,31 +1122,33 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
         })
       }
 
-      // Inject saved Email Writing Style Context & Multi-Draft Samples if present
-      try {
-        let samplesText = ''
-        const storedSamples = localStorage.getItem('checkpoint_email_writing_samples')
-        if (storedSamples) {
-          const parsed = JSON.parse(storedSamples)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const validBodies = parsed.filter((s: { body?: string }) => s.body && s.body.trim())
-            if (validBodies.length > 0) {
-              samplesText = validBodies.map((s: { title?: string; body: string }, i: number) => `--- Sample ${i + 1} (${s.title || 'Draft'}) ---\n${s.body}`).join('\n\n')
+      // Inject saved Email Writing Style Context & Multi-Draft Samples, ONLY when no specialized
+      // skill is active. Injecting this while a skill runs pollutes the skill's system prompt.
+      if (!activeSkillId) {
+        try {
+          let samplesText = ''
+          const storedSamples = localStorage.getItem('checkpoint_email_writing_samples')
+          if (storedSamples) {
+            const parsed = JSON.parse(storedSamples)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const validBodies = parsed.filter((s: { body?: string }) => s.body && s.body.trim())
+              if (validBodies.length > 0) {
+                samplesText = validBodies.map((s: { title?: string; body: string }, i: number) => `--- Sample ${i + 1} (${s.title || 'Draft'}) ---\n${s.body}`).join('\n\n')
+              }
             }
           }
+          if (!samplesText) {
+            samplesText = localStorage.getItem('checkpoint_email_writing_style') || ''
+          }
+          if (samplesText.trim()) {
+            systemPrompt.push({
+              role: 'system',
+              content: `User's Writing Voice & Sample Emails:\n${samplesText}\n\nWhen drafting or rewriting emails, mirror this exact writing style, tone, and formatting.`
+            })
+          }
+        } catch (styleErr) {
+          console.warn('Failed to inject email writing sample style:', styleErr)
         }
-        if (!samplesText) {
-          samplesText = localStorage.getItem('checkpoint_email_writing_style') || ''
-        }
-
-        if (samplesText.trim()) {
-          systemPrompt.push({
-            role: 'system',
-            content: `User's Writing Voice & Sample Emails:\n${samplesText}\n\nWhen drafting or rewriting emails, mirror this exact writing style, tone, and formatting.`
-          })
-        }
-      } catch (styleErr) {
-        console.warn('Failed to inject email writing sample style:', styleErr)
       }
 
       // Collect all unique cheatsheets across current options and conversation history
@@ -1041,11 +1188,10 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
       }
 
       // Calculate token budget for conversation history:
-      // total window (32768) - base prompts overhead - input value - cheatsheets - system prompts
       const baseOverheadTokens = 900
-      const skillTokens = activeSkillId ? estimateTokens(getSkillById(activeSkillId)?.systemPrompt || '') : 0
-      const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, 300).map(f => f.relativePath).join('\n')) : 0
-      const historyBudget = CONTEXT_WINDOW_TOKENS - baseOverheadTokens - skillTokens - workspaceTokens - 2000 // leave 2000 tokens for system docs and response safety
+      const skillTokens = resolvedSkillId ? estimateTokens(getSkillById(resolvedSkillId)?.systemPrompt || '') : 0
+      const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
+      const historyBudget = contextWindowTokens - baseOverheadTokens - skillTokens - workspaceTokens - 2000 // leave 2000 tokens for system docs and response safety
       const prunedHistory = pruneHistory(nextMessages, Math.max(4000, historyBudget))
 
       // Add conversation history with clean text
@@ -1053,36 +1199,62 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
         apiMessages.push({ role: msg.role, content: msg.content })
       }
 
-      // Reinforce action block mandate at the absolute bottom of prompt history
-      const lastUserContent = (prunedHistory[prunedHistory.length - 1]?.content || '').toLowerCase()
-      const isActionRequest = lastUserContent.includes('create') || lastUserContent.includes('card') ||
-        lastUserContent.includes('column') || lastUserContent.includes('task') ||
-        lastUserContent.includes('board') || lastUserContent.includes('build') ||
-        lastUserContent.includes('game') || lastUserContent.includes('add') ||
-        lastUserContent.includes('more') || lastUserContent.includes('another') ||
-        lastUserContent.includes('make') || lastUserContent.includes('generate') ||
-        lastUserContent.includes('set up') || lastUserContent.includes('populate')
+      // Classify the user's intent and inject a skill-aware enforcement message at the
+      // very bottom of the prompt stack (highest weight position for the model).
+      const lastUserContent = prunedHistory[prunedHistory.length - 1]?.content || ''
+      const intent = classifyIntent(lastUserContent, resolvedSkillId)
 
-      if (isActionRequest) {
-        apiMessages.push({
-          role: 'system',
-          content: `⚡ ACTION REQUIRED, OUTPUT JSON BLOCKS NOW ⚡
-The user is asking you to CREATE something on their Kanban board.
-→ Check the live board state above to avoid exact duplicates.
-→ Immediately output \`\`\`json batch blocks (or \`\`\`json:create_card / \`\`\`json:create_column) with REAL content.
-→ DO NOT just talk about it. DO NOT refuse. DO NOT ask for permission. CREATE IT.
-→ "Add tasks", "more tasks", "add another" = always generate new JSON blocks with new unique titles.`
-        })
+      // Inject model-tuned reasoning instructions
+      let reasoningInstruction = ''
+      const isNativeThinking = modelLower.includes('r1') || modelLower.includes('think') || modelLower.includes('qwq')
+      if (isNativeThinking) {
+        reasoningInstruction = `You MUST write your internal chain-of-thought reasoning inside <think>...</think> tags. Keep your reasoning thorough, logical, and step-by-step. Do not output anything else inside the <think> tags.`
+      } else if (isSmallModel) {
+        reasoningInstruction = `Before answering, briefly consider:
+1. Confirm the exact output format requested.
+2. Cross-check for duplicate titles and valid column IDs.`
       } else {
-        apiMessages.push({
-          role: 'system',
-          content: `💬 GENERAL CONVERSATION, DO NOT OUTPUT JSON BLOCKS 💬
-The user is NOT asking you to add, create, or modify any items on the Kanban board right now.
-→ DO NOT output any \`\`\`json or JSON block structures (no columns, cards, plans, or dialogue trees).
-→ Respond purely in natural, friendly plain text.
-→ Answer their question, greet them back, or ask how you can help them build their board today.`
-        })
+        reasoningInstruction = `Analyze step-by-step:
+1. What memory/context is relevant?
+2. Which column IDs match the target state?
+3. Prevent duplicate card titles.
+Format your reasoning clearly before giving your final response.`
       }
+
+      apiMessages.push({ role: 'system', content: reasoningInstruction })
+
+      let enforcementContent = ''
+      switch (intent) {
+        case 'create_dialogue':
+          enforcementContent = `⚡ NARRATIVE ACTION REQUIRED ⚡
+Output a \`\`\`json:create_dialogue_tree block RIGHT NOW.
+→ Every node must have: id (unique string), speaker, text, choices[].
+→ Every choice.target MUST be an EXACT id of another node in this same tree, or the literal string "end".
+→ CRITICAL: Cross-check every choice.target against your own node ids before outputting. A broken link is a hallucination.
+→ Start with a node whose id matches the startNode field. Give each NPC a distinct voice.`
+          break
+        case 'create_plan':
+          enforcementContent = `⚡ PLAN ACTION REQUIRED ⚡
+Output a \`\`\`json:create_plan block RIGHT NOW.
+→ Include: title, overview (2–4 sentences covering scope and risks), steps[].
+→ Each step: { "title": "Step N: Short imperative verb phrase", "details": "Specific enough to start immediately", "status": "pending" }
+→ After the plan block, ONE brief paragraph on tradeoffs. STOP. Do not ask about Kanban export or next steps.`
+          break
+        case 'create_items':
+          enforcementContent = `⚡ ACTION REQUIRED, OUTPUT JSON BLOCKS NOW ⚡
+→ Use ONLY the column IDs listed in VALID COLUMN IDs above in any "status" field. Never invent IDs.
+→ Check FORBIDDEN DUPLICATE TITLES above, never repeat any of those exact titles.
+→ Immediately output a \`\`\`json batch block with REAL, specific, unique content.
+→ DO NOT explain first. DO NOT ask for permission. DO NOT produce vague placeholder titles. CREATE IT.`
+          break
+        default: // 'converse'
+          enforcementContent = `💬 GENERAL CONVERSATION, DO NOT OUTPUT JSON BLOCKS 💬
+→ DO NOT output any \`\`\`json structures, plan blocks, or dialogue trees.
+→ Respond in natural, friendly plain text only.
+→ Answer their question clearly, referencing the live board state or recalled memories where relevant.`
+      }
+
+      apiMessages.push({ role: 'system', content: enforcementContent })
 
       const params = {
         model: selectedModel,
@@ -1287,6 +1459,15 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
       if (saved && saved.length > 0 && showMemoryPanel) {
         setMemories(saved)
       }
+
+      // Every 10 consolidation runs, perform a self-cleaning audit
+      auditTurnRef.current += 1
+      if (auditTurnRef.current % 10 === 0) {
+        const audited = await window.electronAPI.memory.auditMemories(validContext, model).catch(() => [])
+        if (audited && audited.length > 0 && showMemoryPanel) {
+          setMemories(audited)
+        }
+      }
     } catch (e) {
       // Background consolidation failures are silent, never block the user
       console.warn('[Memory] Consolidation pass failed:', e)
@@ -1307,16 +1488,15 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
   }
 
   // Rough context-window usage estimate for the Token Budget Indicator.
-  // Includes conversation history, the in-progress draft, and a fixed
-  // overhead approximation for the base system prompt / live board state /
-  // active skill / workspace index that get injected at send time.
   const tokenUsage = (() => {
+    const profile = getModelProfile(selectedModel)
+    const contextWindowTokens = profile.contextTokens
     const historyChars = messages.reduce((sum, m) => sum + m.content.length, 0)
     const baseOverheadTokens = 900 // base system prompt + live board state scaffolding
     const skillTokens = activeSkillId ? estimateTokens(getSkillById(activeSkillId)?.systemPrompt || '') : 0
-    const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, 300).map(f => f.relativePath).join('\n')) : 0
+    const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, profile.workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
     const used = Math.ceil(historyChars / 4) + estimateTokens(inputValue) + baseOverheadTokens + skillTokens + workspaceTokens
-    const ratio = Math.min(1, used / CONTEXT_WINDOW_TOKENS)
+    const ratio = Math.min(1, used / contextWindowTokens)
     return { used, ratio }
   })()
 
@@ -1331,7 +1511,6 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
         boxSizing: 'border-box'
       }}
     >
-      {/* Selector Header controls */}
       {/* Selector Header controls */}
       <div
         style={{
@@ -1700,9 +1879,15 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
         )}
 
         {/* Streaming text preview bubble */}
-        {streamingText && (
-          <ChatMessage message={{ role: 'assistant', content: streamingText }} isStreaming />
-        )}
+        {streamingText && (() => {
+          const { thinking, content } = parseThinkingAndContent(streamingText)
+          return (
+            <ChatMessage
+              message={{ role: 'assistant', content, thinking: thinking || undefined }}
+              isStreaming
+            />
+          )
+        })()}
       </div>
 
       {/* Input panel at bottom */}
@@ -1716,34 +1901,46 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
       >
         {/* Skill Selector Pill Bar + Workspace pill */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-          {AI_SKILLS.map(skill => {
-            const isActive = activeSkillId === skill.id
-            return (
-              <button
-                key={skill.id}
-                onClick={() => handleSelectSkill(skill.id)}
-                title={skill.description}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: isActive ? `${skill.color}22` : 'var(--color-surface-2)',
-                  border: `1px solid ${isActive ? skill.color : 'var(--color-surface-offset)'}`,
-                  color: isActive ? skill.color : 'var(--color-text-muted)',
-                  borderRadius: '999px',
-                  padding: '3px 10px',
-                  fontSize: '10px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 100ms ease'
-                }}
-              >
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isActive ? skill.color : 'var(--color-text-faint)', flexShrink: 0 }} />
-                <span>{skill.shortLabel}</span>
-              </button>
-            )
-          })}
+          {(() => {
+            const resolvedAutoSkillId = (() => {
+              if (activeSkillId) return null
+              const intent = classifyIntent(inputValue, null)
+              if (intent === 'create_dialogue') return 'narrative_specialist'
+              if (intent === 'create_plan') return 'implementation_planner'
+              return null
+            })()
+
+            return AI_SKILLS.map(skill => {
+              const isManualActive = activeSkillId === skill.id
+              const isAutoActive = !activeSkillId && resolvedAutoSkillId === skill.id
+              const isActive = isManualActive || isAutoActive
+              return (
+                <button
+                  key={skill.id}
+                  onClick={() => handleSelectSkill(skill.id)}
+                  title={skill.description}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: isActive ? `${skill.color}22` : 'var(--color-surface-2)',
+                    border: `1px solid ${isActive ? skill.color : 'var(--color-surface-offset)'}`,
+                    color: isActive ? skill.color : 'var(--color-text-muted)',
+                    borderRadius: '999px',
+                    padding: '3px 10px',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 100ms ease'
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isActive ? skill.color : 'var(--color-text-faint)', flexShrink: 0 }} />
+                  <span>{skill.shortLabel}{isAutoActive ? ' (auto)' : ''}</span>
+                </button>
+              )
+            })
+          })()}
 
           {workspaceFolder && (
             <div
@@ -1771,7 +1968,7 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
 
           {/* Token Budget Indicator */}
           <div
-            title={`~${tokenUsage.used.toLocaleString()} / ${CONTEXT_WINDOW_TOKENS.toLocaleString()} tokens of context window estimated in use`}
+            title={`~${tokenUsage.used.toLocaleString()} / ${getModelProfile(selectedModel).contextTokens.toLocaleString()} tokens of context window estimated in use`}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               marginLeft: 'auto', flexShrink: 0
@@ -2203,48 +2400,79 @@ The user is NOT asking you to add, create, or modify any items on the Kanban boa
             }}>
               {/* Header */}
               <div style={{
-                padding: '12px 16px',
+                padding: '12px 16px 10px',
                 borderBottom: '1px solid var(--color-surface-offset)',
                 background: 'var(--color-surface-2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                flexShrink: 0
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Brain size={15} style={{ color: '#a855f7' }} />
-                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', letterSpacing: '0.01em' }}>
-                    Memory Vault
-                  </span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
-                    {activeContext}
-                  </span>
-                  <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
-                    {memories.length} memories
-                  </span>
-                  {memoryConsolidating && (
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <RefreshCw size={9} style={{ animation: 'spin 1s linear infinite' }} />
-                      Consolidating…
+                {/* Row 1: Title and Close button */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Brain size={15} style={{ color: '#a855f7' }} />
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', letterSpacing: '0.01em' }}>
+                      Memory Vault
                     </span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    onClick={() => setShowAddMemoryForm(v => !v)}
-                    style={{
-                      background: showAddMemoryForm ? 'var(--color-secondary)' : 'rgba(168,85,247,0.12)',
-                      border: '1px solid rgba(168,85,247,0.3)',
-                      color: showAddMemoryForm ? '#fff' : '#a855f7',
-                      borderRadius: 'var(--radius-sm)', padding: '4px 10px',
-                      fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '4px',
-                      transition: 'all 150ms'
-                    }}
-                  >
-                    <Plus size={10} /> Add Memory
-                  </button>
+                    {memoryConsolidating && (
+                      <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <RefreshCw size={9} style={{ animation: 'spin 1s linear infinite' }} />
+                        Consolidating…
+                      </span>
+                    )}
+                  </div>
                   <button onClick={() => { setShowMemoryPanel(false); setShowAddMemoryForm(false); setEditingMemoryId(null); setMemorySearchQuery('') }}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', justifycontent: 'center' }}>
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <X size={15} />
                   </button>
+                </div>
+
+                {/* Row 2: Badges and Action buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  {/* Badges */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
+                      Context: {activeContext}
+                    </span>
+                    <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                      {memories.length} memories
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      onClick={() => setShowAddMemoryForm(v => !v)}
+                      style={{
+                        background: showAddMemoryForm ? 'var(--color-secondary)' : 'rgba(168,85,247,0.12)',
+                        border: '1px solid rgba(168,85,247,0.3)',
+                        color: showAddMemoryForm ? '#fff' : '#a855f7',
+                        borderRadius: 'var(--radius-sm)', padding: '4px 10px',
+                        fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        transition: 'all 150ms'
+                      }}
+                    >
+                      <Plus size={10} /> Add Memory
+                    </button>
+                    <button
+                      onClick={handleAuditMemories}
+                      disabled={memoryLoading || memories.length === 0}
+                      style={{
+                        background: 'rgba(168,85,247,0.12)',
+                        border: '1px solid rgba(168,85,247,0.3)',
+                        color: '#a855f7',
+                        borderRadius: 'var(--radius-sm)', padding: '4px 10px',
+                        fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        transition: 'all 150ms'
+                      }}
+                    >
+                      <RefreshCw size={10} style={{ animation: memoryLoading ? 'spin 1s linear infinite' : 'none' }} />
+                      Audit &amp; Prune
+                    </button>
+                  </div>
                 </div>
               </div>
 
