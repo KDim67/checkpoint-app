@@ -60,7 +60,8 @@ export const TaskQueryParamsSchema = z.object({
   sortBy: z.string().optional(),
   sortDesc: z.boolean().optional(),
   page: z.number().int().positive().optional().default(1),
-  pageSize: z.number().int().positive().optional().default(50)
+  pageSize: z.number().int().positive().optional().default(50),
+  archivedOnly: z.boolean().optional()
 })
 
 export const CreateFocusSessionSchema = z.object({

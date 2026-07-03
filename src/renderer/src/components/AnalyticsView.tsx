@@ -6,45 +6,47 @@ const ALLOCATION_COLORS = ['#10b981', '#1e45fc', '#f97316', '#8b5cf6', '#ef4444'
 
 // SVG Icons
 
-function IconFocus(props: React.SVGProps<SVGSVGElement>) {
+type IconProps = React.SVGProps<SVGSVGElement> & { size?: number }
+
+function IconFocus({ size = 18, ...props }: IconProps) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
     </svg>
   )
 }
 
-function IconChart(props: React.SVGProps<SVGSVGElement>) {
+function IconChart({ size = 18, ...props }: IconProps) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M3 3v18h18" />
       <path d="m19 9-5 5-4-4-3 3" />
     </svg>
   )
 }
 
-function IconTag(props: React.SVGProps<SVGSVGElement>) {
+function IconTag({ size = 18, ...props }: IconProps) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
       <path d="M7 7h.01" />
     </svg>
   )
 }
 
-function IconClock(props: React.SVGProps<SVGSVGElement>) {
+function IconClock({ size = 18, ...props }: IconProps) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 15 15" />
     </svg>
   )
 }
 
-function IconHourglass(props: React.SVGProps<SVGSVGElement>) {
+function IconHourglass({ size = 18, ...props }: IconProps) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M5 2h14" />
       <path d="M5 22h14" />
       <path d="M19 2v4c0 3.3-2.7 6-6 6H11C7.7 12 5 9.3 5 6V2" />
@@ -53,9 +55,9 @@ function IconHourglass(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
-function IconRefresh(props: React.SVGProps<SVGSVGElement>) {
+function IconRefresh({ size = 12, ...props }: IconProps) {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
       <path d="M3 3v5h5" />
       <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
@@ -87,6 +89,21 @@ const formatDate = (timestamp: number) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// Turn a raw column status id into a readable label. Handles the default columns
+// and the custom "col-<slug>-<timestamp>" ids the board generates.
+const DEFAULT_COLUMN_LABELS: Record<string, string> = {
+  open: 'Backlog',
+  in_progress: 'In Progress',
+  in_review: 'In Review',
+  done: 'Done'
+}
+const formatColumnLabel = (status: string): string => {
+  if (DEFAULT_COLUMN_LABELS[status]) return DEFAULT_COLUMN_LABELS[status]
+  const custom = status.match(/^col-(.+)-\d+$/)
+  if (custom) return custom[1].replace(/-/g, ' ')
+  return status.replace(/[_-]/g, ' ')
 }
 
 // Main Component
@@ -133,7 +150,8 @@ export default function AnalyticsView() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await window.electronAPI.analytics.getAnalytics()
+      // Scope to the active workspace (null = all) so the dashboard matches its header.
+      const res = await window.electronAPI.analytics.getAnalytics(activeContext === 'all' ? null : activeContext)
       setData(res)
       setError(null)
     } catch (err) {
@@ -142,7 +160,7 @@ export default function AnalyticsView() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeContext])
 
   const formatMsToHoursAndMins = (ms: number) => {
     const totalMins = Math.floor(ms / (1000 * 60))
@@ -189,11 +207,13 @@ export default function AnalyticsView() {
         start,
         end
       )
-      if (res.success) {
-        setTimelineData(res.data)
-      } else {
-        console.error('Failed to load activity stats:', res.error)
-      }
+      // Normalize so the render never crashes on a missing array.
+      setTimelineData({
+        totalDurationMs: res?.totalDurationMs || 0,
+        byProcess: res?.byProcess || [],
+        byContext: res?.byContext || [],
+        byTitle: res?.byTitle || []
+      })
     } catch (err) {
       console.error('Error fetching activity stats:', err)
     } finally {
@@ -508,9 +528,10 @@ export default function AnalyticsView() {
                   background: timelineRange === range ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
                   border: '1px solid ' + (timelineRange === range ? 'var(--color-secondary)' : 'var(--color-surface-offset)'),
                   color: timelineRange === range ? 'var(--color-secondary)' : 'var(--color-text-base)',
-                  padding: 'var(--space-1) var(--space-3)',
+                  padding: 'var(--space-2) var(--space-4)',
                   borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--text-xs)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--weight-medium)',
                   cursor: 'pointer',
                   textTransform: 'capitalize',
                   transition: 'all 120ms ease'
@@ -529,16 +550,17 @@ export default function AnalyticsView() {
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-1.5) var(--space-3)',
-              fontSize: 'var(--text-xs)',
+              padding: 'var(--space-2) var(--space-4)',
+              fontSize: 'var(--text-sm)',
+              fontWeight: 'var(--weight-medium)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               opacity: timelineLoading ? 0.6 : 1
             }}
           >
-            <IconRefresh />
+            <IconRefresh size={15} />
             <span>Refresh</span>
           </button>
         </div>
@@ -656,9 +678,10 @@ export default function AnalyticsView() {
       padding: 'var(--space-6)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 'var(--space-5)',
+      alignItems: 'center',
       overflowY: 'auto',
       height: '100%',
+      boxSizing: 'border-box',
       backgroundColor: 'var(--color-background)',
       color: 'var(--color-text-base)',
       fontFamily: 'var(--font-sans)'
@@ -705,14 +728,18 @@ export default function AnalyticsView() {
         }
       `}</style>
 
+      <div className="analytics-inner" style={{ width: '100%', maxWidth: '1400px', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
         <div>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
-            Focus Analytics
+            Analytics
           </h2>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-            Historical insights and metrics mapped to context: <strong style={{ color: 'var(--color-secondary)' }}>{activeContext}</strong>
+            {activeContext === 'all'
+              ? <>Insights across <strong style={{ color: 'var(--color-secondary)' }}>all workspaces</strong></>
+              : <>Insights for workspace <strong style={{ color: 'var(--color-secondary)' }}>{activeContext}</strong></>}
           </p>
         </div>
         <button
@@ -722,12 +749,13 @@ export default function AnalyticsView() {
             border: '1px solid var(--color-surface-offset)',
             color: 'var(--color-text-base)',
             borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-1.5) var(--space-3)',
-            fontSize: 'var(--text-xs)',
+            padding: 'var(--space-2) var(--space-4)',
+            fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--weight-medium)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '8px',
             transition: 'all 120ms ease'
           }}
           onMouseEnter={e => {
@@ -737,7 +765,7 @@ export default function AnalyticsView() {
             e.currentTarget.style.background = 'var(--color-surface-2)'
           }}
         >
-          <IconRefresh />
+          <IconRefresh size={15} />
           <span>Refresh</span>
         </button>
       </div>
@@ -760,9 +788,9 @@ export default function AnalyticsView() {
             border: 'none',
             color: activeTab === 'focus' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
             fontWeight: activeTab === 'focus' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
-            padding: 'var(--space-1.5) var(--space-4)',
+            padding: 'var(--space-2) var(--space-5)',
             borderRadius: 'var(--radius-sm)',
-            fontSize: 'var(--text-xs)',
+            fontSize: 'var(--text-sm)',
             cursor: 'pointer',
             transition: 'all 150ms ease',
             boxShadow: activeTab === 'focus' ? 'var(--shadow-sm)' : 'none'
@@ -777,9 +805,9 @@ export default function AnalyticsView() {
             border: 'none',
             color: activeTab === 'timeline' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
             fontWeight: activeTab === 'timeline' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
-            padding: 'var(--space-1.5) var(--space-4)',
+            padding: 'var(--space-2) var(--space-5)',
             borderRadius: 'var(--radius-sm)',
-            fontSize: 'var(--text-xs)',
+            fontSize: 'var(--text-sm)',
             cursor: 'pointer',
             transition: 'all 150ms ease',
             boxShadow: activeTab === 'timeline' ? 'var(--shadow-sm)' : 'none'
@@ -846,6 +874,8 @@ export default function AnalyticsView() {
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Past 365 Days</span>
         </div>
 
+        <div style={{ display: 'flex', gap: 'var(--space-6)', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: '0 1 auto' }}>
         <div style={{ overflowX: 'auto', paddingBottom: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {/* Month Headers */}
           <div style={{ display: 'flex', position: 'relative', height: '14px', marginLeft: '26px' }}>
@@ -916,6 +946,27 @@ export default function AnalyticsView() {
           <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: 'var(--color-secondary)', opacity: 0.8 }} />
           <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: 'var(--color-secondary)', opacity: 1 }} />
           <span>More</span>
+        </div>
+        </div>
+
+        <div style={{ flex: '1 1 200px', minWidth: '170px', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderLeft: '1px solid var(--color-surface-offset)', paddingLeft: 'var(--space-5)' }}>
+          {(() => {
+            const total = data.logHeatmap.reduce((a, d) => a + d.count, 0)
+            const activeDays = data.logHeatmap.filter(d => d.count > 0).length
+            const busiest = data.logHeatmap.reduce((a, d) => Math.max(a, d.count), 0)
+            const stats = [
+              { label: 'Total logs', value: total },
+              { label: 'Active days', value: activeDays },
+              { label: 'Busiest day', value: busiest }
+            ]
+            return stats.map(s => (
+              <div key={s.label}>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', lineHeight: 1.1 }}>{s.value}</div>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
+              </div>
+            ))
+          })()}
+        </div>
         </div>
 
         {/* Heatmap Tooltip */}
@@ -1117,7 +1168,7 @@ export default function AnalyticsView() {
                         fill="var(--color-text-muted)"
                         style={{ fontSize: '9px', textTransform: 'capitalize' }}
                       >
-                        {d.column}
+                        {formatColumnLabel(d.column)}
                       </text>
                     </g>
                   )
@@ -1142,7 +1193,7 @@ export default function AnalyticsView() {
                   boxShadow: 'var(--shadow-md)',
                   animation: 'tooltip-in 100ms var(--ease-enter)'
                 }}>
-                  <strong>{formatDuration(hoveredBar.avgMs)}</strong> on average in status: <span style={{ textTransform: 'capitalize' }}>{hoveredBar.column}</span>
+                  <strong>{formatDuration(hoveredBar.avgMs)}</strong> avg time in <span style={{ textTransform: 'capitalize' }}>{formatColumnLabel(hoveredBar.column)}</span>
                 </div>
               )}
             </div>
@@ -1280,6 +1331,7 @@ export default function AnalyticsView() {
       ) : (
         renderTimelineView()
       )}
+      </div>
     </div>
   )
 }

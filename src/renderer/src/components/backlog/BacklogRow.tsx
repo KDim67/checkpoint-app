@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Check, Calendar, Link2, ChevronUp, ChevronDown, Minus } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
+import type { Item } from '../../../../shared/types'
 
 interface BacklogRowProps {
   item: Item

@@ -139,8 +139,8 @@ const NAV_ITEMS: Array<{
   label: string
   Icon: React.FC<React.SVGProps<SVGSVGElement>>
 }> = [
-  { view: 'log',         label: 'Log',         Icon: IconLog },
   { view: 'kanban',      label: 'Kanban',      Icon: IconKanban },
+  { view: 'log',         label: 'Log',         Icon: IconLog },
   { view: 'backlog',     label: 'Backlog',     Icon: IconBacklog },
   { view: 'focus',       label: 'Focus',       Icon: IconFocus },
   { view: 'notes',       label: 'Notes',       Icon: IconNotes },
@@ -253,6 +253,7 @@ export function Sidebar() {
   const activeView = useAppStore(s => s.activeView)
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
+  const focusIsRunning = useAppStore(s => s.focusIsRunning)
 
   const [contextOpen, setContextOpen] = useState(false)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
@@ -432,6 +433,25 @@ export function Sidebar() {
                 }} />
               )}
               <Icon />
+
+              {/* Running-timer indicator, visible from any view, so a session
+                  never silently ticks away unnoticed while you work elsewhere */}
+              {view === 'focus' && focusIsRunning && !isActive && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: '4px',
+                    right: '4px',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'var(--color-secondary)',
+                    boxShadow: '0 0 0 2px var(--color-surface-1)',
+                    animation: 'focus-pulse 1.6s ease-in-out infinite'
+                  }}
+                />
+              )}
             </button>
           )
         })}
@@ -495,6 +515,10 @@ export function Sidebar() {
         @keyframes tooltip-in {
           from { opacity: 0; transform: translateX(-4px); }
           to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes focus-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.55; transform: scale(0.8); }
         }
         #nav-log:not([aria-current]):hover,
         #nav-kanban:not([aria-current]):hover,

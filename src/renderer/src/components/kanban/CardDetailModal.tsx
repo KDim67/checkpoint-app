@@ -264,7 +264,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
       const name = file.name
-      const path = file.path || ''
+      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+      const path = window.electronAPI.app.getPathForFile(file)
       const isImage = file.type.startsWith('image/')
       
       const newAttachment = {

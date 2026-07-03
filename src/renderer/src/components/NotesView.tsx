@@ -1,105 +1,21 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
-import { Plus, Search, Trash2, Save, FileText, Eye, Edit3, Columns, Hash, Link as LinkIcon, AlertCircle } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import mermaid from 'mermaid'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import {
+  Save, Trash2, FileText, Eye, Edit3, Columns,
+  Download, PanelRightOpen, PanelRightClose, ArrowLeft, ArrowRight, FileWarning
+} from 'lucide-react'
 import { useToast } from './ui/Toast'
 import GraphView from './notes/GraphView'
-import type { NoteMetadata } from '../../../shared/types'
+import NotesSidebar, { type SidebarItem } from './notes/NotesSidebar'
+import NoteEditor from './notes/NoteEditor'
+import MarkdownPreview from './notes/MarkdownPreview'
+import {
+  prefs, formatRelativeTime, formatBytes, countWords,
+  NOTE_TEMPLATES, isoDate, dailyNoteContent,
+  type SortKey, type ViewMode
+} from './notes/notesUtils'
+import type { NoteMetadata, NoteSearchResult } from '../../../shared/types'
 
-// Initialize Mermaid for local dark theme diagram rendering
-try {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'dark',
-    securityLevel: 'loose',
-    themeVariables: {
-      background: '#131622',
-      primaryColor: '#1e45fc',
-      secondaryColor: '#cdf12b',
-      lineColor: '#535e85',
-      textColor: '#f1f5f9'
-    }
-  })
-} catch (err) {
-  console.error('Failed to initialize mermaid:', err)
-}
-
-// Inline Mermaid chart renderer component
-function MermaidChart({ code }: { code: string }) {
-  const [svg, setSvg] = useState<string>('')
-  const [error, setError] = useState<string | null>(null)
-  const reactId = useId()
-  const elementId = `mermaid-${reactId.replace(/:/g, '')}`
-
-  useEffect(() => {
-    let isMounted = true
-    setError(null)
-
-    const renderChart = async () => {
-      try {
-        // Clear elements from previous renders if any
-        const { svg: renderedSvg } = await mermaid.render(elementId, code)
-        if (isMounted) {
-          setSvg(renderedSvg)
-        }
-      } catch (err) {
-        console.error('Mermaid render error:', err)
-        if (isMounted) {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          setError(errMsg || 'Failed to render Mermaid chart')
-        }
-      }
-    }
-
-    renderChart()
-    return () => {
-      isMounted = false
-    }
-  }, [code, elementId])
-
-  if (error) {
-    return (
-      <pre style={{
-        color: 'var(--color-error)',
-        background: 'var(--color-error-muted)',
-        padding: 'var(--space-3)',
-        borderRadius: 'var(--radius-md)',
-        fontSize: 'var(--text-xs)',
-        overflowX: 'auto',
-        whiteSpace: 'pre-wrap'
-      }}>
-        {error}
-      </pre>
-    )
-  }
-
-  if (!svg) {
-    return (
-      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', fontStyle: 'italic', padding: 'var(--space-2)' }}>
-        Rendering diagram...
-      </div>
-    )
-  }
-
-  return (
-    <div
-      dangerouslySetInnerHTML={{ __html: svg }}
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        background: 'var(--color-surface-2)',
-        padding: 'var(--space-4)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--color-surface-offset)',
-        overflowX: 'auto',
-        margin: 'var(--space-4) 0'
-      }}
-    />
-  )
-}
-
-export default function NotesView() {
+export default function NotesView(): React.JSX.Element {
   const { toast } = useToast()
 
   // State
@@ -108,853 +24,808 @@ export default function NotesView() {
   const [activeNoteContent, setActiveNoteContent] = useState<string>('')
   const [tempTitle, setTempTitle] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const [searchResults, setSearchResults] = useState<NoteSearchResult[] | null>(null)
+  const [searching, setSearching] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
-  const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('split')
+  const [mode, setMode] = useState<ViewMode>(prefs.getMode())
+  const [showInfo, setShowInfo] = useState<boolean>(prefs.getShowInfo())
   const [isDirty, setIsDirty] = useState<boolean>(false)
+  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState<boolean>(true)
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState<string | null>(null)
+  const [pins, setPins] = useState<string[]>(prefs.getPins())
+  const [sort, setSort] = useState<SortKey>(prefs.getSort())
 
-  // Character and Word count computations
-  const charCount = useMemo(() => {
-    return activeNoteContent.length
-  }, [activeNoteContent])
+  const renamingRef = useRef(false)
 
-  const wordCount = useMemo(() => {
-    const trimmed = activeNoteContent.trim()
-    if (!trimmed) return 0
-    return trimmed.split(/\s+/).length
-  }, [activeNoteContent])
+  const pinnedSet = useMemo(() => new Set(pins), [pins])
+  const noteTitles = useMemo(() => notes.map(n => n.title), [notes])
+  const titleLookup = useMemo(() => new Set(notes.map(n => n.title.toLowerCase())), [notes])
 
-  // Fetch Notes List
-  const loadNotesList = useCallback(async () => {
-    setLoading(true)
+  // Persist simple prefs
+  useEffect(() => { prefs.setMode(mode) }, [mode])
+  useEffect(() => { prefs.setShowInfo(showInfo) }, [showInfo])
+  useEffect(() => { prefs.setSort(sort) }, [sort])
+  useEffect(() => { prefs.setPins(pins) }, [pins])
+  useEffect(() => { prefs.setLastNote(activeNoteTitle) }, [activeNoteTitle])
+
+  // Load notes list
+  const loadNotesList = useCallback(async (): Promise<NoteMetadata[]> => {
     try {
       const list = await window.electronAPI.notes.listNotes()
       setNotes(list)
+      return list
     } catch (err) {
       console.error('Failed to list notes:', err)
       toast('Failed to load notes', { type: 'error' })
-    } finally {
-      setLoading(false)
+      return []
     }
   }, [toast])
 
   useEffect(() => {
-    loadNotesList()
+    ;(async () => {
+      setLoading(true)
+      const list = await loadNotesList()
+      // Restore last-opened note if it still exists
+      const last = prefs.getLastNote()
+      if (last && list.some(n => n.title === last)) {
+        setActiveNoteTitle(last)
+      }
+      setLoading(false)
+    })()
   }, [loadNotesList])
 
-  // Load Note Content
-  const loadNoteContent = useCallback(async (title: string) => {
-    try {
-      const content = await window.electronAPI.notes.readNote(title)
-      setActiveNoteContent(content)
-      setTempTitle(title)
-      setIsDirty(false)
-    } catch (err) {
-      console.error('Failed to read note content:', err)
-      toast('Failed to read note', { type: 'error' })
-    }
-  }, [toast])
-
+  // Load note content on selection
   useEffect(() => {
-    if (activeNoteTitle) {
-      loadNoteContent(activeNoteTitle)
-    } else {
+    if (!activeNoteTitle) {
       setActiveNoteContent('')
       setTempTitle('')
       setIsDirty(false)
+      return
     }
-  }, [activeNoteTitle, loadNoteContent])
-
-  // Save / Auto-Save Debouncer
-  const handleSaveNote = useCallback(async () => {
-    if (!activeNoteTitle) return
-
-    let finalTitle = tempTitle.trim()
-    if (!finalTitle) {
-      toast('Note title cannot be empty. Reverting to original title.', { type: 'error' })
-      finalTitle = activeNoteTitle
-      setTempTitle(activeNoteTitle)
-    }
-
-    try {
-      await window.electronAPI.notes.writeNote(
-        finalTitle,
-        activeNoteContent,
-        activeNoteTitle
-      )
-      setIsDirty(false)
-      if (activeNoteTitle !== finalTitle) {
-        setActiveNoteTitle(finalTitle)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const content = await window.electronAPI.notes.readNote(activeNoteTitle)
+        if (cancelled) return
+        setActiveNoteContent(content)
+        setTempTitle(activeNoteTitle)
+        setIsDirty(false)
+      } catch (err) {
+        console.error('Failed to read note content:', err)
+        toast('Failed to read note', { type: 'error' })
       }
-      // Refresh list
-      const list = await window.electronAPI.notes.listNotes()
-      setNotes(list)
+    })()
+    return () => { cancelled = true }
+  }, [activeNoteTitle, toast])
+
+  // Save current content (no rename)
+  const saveContent = useCallback(async () => {
+    if (!activeNoteTitle) return
+    setSaving(true)
+    try {
+      await window.electronAPI.notes.writeNote(activeNoteTitle, activeNoteContent, activeNoteTitle)
+      setIsDirty(false)
+      await loadNotesList()
     } catch (err) {
       console.error('Failed to save note:', err)
       toast('Failed to save note', { type: 'error' })
+    } finally {
+      setSaving(false)
     }
-  }, [activeNoteTitle, tempTitle, activeNoteContent, toast])
+  }, [activeNoteTitle, activeNoteContent, loadNotesList, toast])
 
-  const handleSwitchNote = useCallback(async (newTitle: string | null) => {
-    if (isDirty && activeNoteTitle) {
-      await handleSaveNote()
-    }
-    setActiveNoteTitle(newTitle)
-  }, [isDirty, activeNoteTitle, handleSaveNote])
-
-  // Auto-save debouncer: saves changes 1.5s after editing halts
+  // Auto-save content 1.2s after typing stops
   useEffect(() => {
     if (!activeNoteTitle || !isDirty) return
-    const timer = setTimeout(() => {
-      handleSaveNote()
-    }, 1500)
+    const timer = setTimeout(() => { saveContent() }, 1200)
     return () => clearTimeout(timer)
-  }, [activeNoteContent, tempTitle, isDirty, activeNoteTitle, handleSaveNote])
+  }, [activeNoteContent, isDirty, activeNoteTitle, saveContent])
 
-  // Keyboard shortcut Ctrl+S, only toast if a save actually fires
+  // Rename (collision-safe, explicit commit)
+  const commitRename = useCallback(async (desired: string): Promise<boolean> => {
+    if (!activeNoteTitle || renamingRef.current) return false
+    const next = desired.trim()
+    if (!next || next === activeNoteTitle) return false
+    if (titleLookup.has(next.toLowerCase())) {
+      toast(`A note titled “${next}” already exists`, { type: 'error' })
+      setTempTitle(activeNoteTitle)
+      return false
+    }
+    renamingRef.current = true
+    try {
+      await window.electronAPI.notes.writeNote(next, activeNoteContent, activeNoteTitle)
+      // Migrate pin + active selection to the new title
+      setPins(p => p.map(t => (t === activeNoteTitle ? next : t)))
+      setIsDirty(false)
+      setActiveNoteTitle(next)
+      await loadNotesList()
+      return true
+    } catch (err) {
+      console.error('Failed to rename note:', err)
+      const msg = err instanceof Error ? err.message : 'Failed to rename note'
+      toast(msg, { type: 'error' })
+      setTempTitle(activeNoteTitle)
+      return false
+    } finally {
+      renamingRef.current = false
+    }
+  }, [activeNoteTitle, activeNoteContent, titleLookup, loadNotesList, toast])
+
+  // Flush any pending title rename / content edits before navigating away.
+  // Serialized so a title blur and a sidebar click in the same gesture can't
+  // both fire a rename (which would duplicate the file).
+  const flushRef = useRef<Promise<void> | null>(null)
+  const flushPending = useCallback((): Promise<void> => {
+    if (flushRef.current) return flushRef.current
+    if (!activeNoteTitle) return Promise.resolve()
+    const run = (async () => {
+      const desired = tempTitle.trim()
+      if (desired && desired !== activeNoteTitle) {
+        const renamed = await commitRename(desired)
+        if (renamed) return
+      }
+      if (isDirty) await saveContent()
+    })().finally(() => { flushRef.current = null })
+    flushRef.current = run
+    return run
+  }, [activeNoteTitle, tempTitle, isDirty, commitRename, saveContent])
+
+  const handleSelectNote = useCallback(async (title: string | null) => {
+    if (title === activeNoteTitle) return
+    await flushPending()
+    setActiveNoteTitle(title)
+  }, [activeNoteTitle, flushPending])
+
+  // Ctrl+S
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         if (activeNoteTitle && isDirty) {
-          handleSaveNote()
-          if (tempTitle.trim()) {
-            toast('Note saved', { type: 'success' })
-          }
+          saveContent()
+          toast('Note saved', { type: 'success' })
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSaveNote, toast, activeNoteTitle, tempTitle, isDirty])
+  }, [saveContent, activeNoteTitle, isDirty, toast])
 
-  // Note Action Handlers
-  const handleCreateNote = async () => {
-    if (isDirty && activeNoteTitle) {
-      await handleSaveNote()
-    }
-    // Generate a unique title
-    let count = 0
-    let newTitle = 'Untitled Note'
-    const existingTitles = new Set(notes.map(n => n.title.toLowerCase()))
-
-    while (existingTitles.has(newTitle.toLowerCase())) {
-      count++
-      newTitle = `Untitled Note ${count}`
-    }
-
+  // Create / templates / daily
+  const createNote = useCallback(async (title: string, content: string, activate = true) => {
     try {
-      const defaultContent = `# ${newTitle}\n\nStart writing notes here...`
-      await window.electronAPI.notes.writeNote(newTitle, defaultContent)
-      toast('Note created', { type: 'success' })
-
-      // Refresh list and activate new note
-      const list = await window.electronAPI.notes.listNotes()
-      setNotes(list)
-      setActiveNoteTitle(newTitle)
-      setMode('edit')
+      await window.electronAPI.notes.writeNote(title, content)
+      const list = await loadNotesList()
+      if (activate && list.some(n => n.title === title)) {
+        setActiveNoteTitle(title)
+        setMode(m => (m === 'preview' ? 'split' : m))
+      }
     } catch (err) {
       console.error('Failed to create note:', err)
       toast('Failed to create note', { type: 'error' })
     }
-  }
+  }, [loadNotesList, toast])
 
-  const handleDeleteNote = async (title: string) => {
-    // Use inline confirmation state instead of blocking window.confirm()
-    setPendingDeleteTitle(title)
-  }
+  const uniqueTitle = useCallback((base: string): string => {
+    const existing = new Set(notes.map(n => n.title.toLowerCase()))
+    if (!existing.has(base.toLowerCase())) return base
+    let i = 1
+    while (existing.has(`${base} ${i}`.toLowerCase())) i++
+    return `${base} ${i}`
+  }, [notes])
 
-  const confirmDeleteNote = async () => {
+  const handleCreate = useCallback(async (templateId?: string) => {
+    await flushPending()
+    const template = NOTE_TEMPLATES.find(t => t.id === templateId)
+    const title = uniqueTitle(template && template.id !== 'blank' ? template.label : 'Untitled Note')
+    const content = template ? template.build(title) : `# ${title}\n\nStart writing…\n`
+    await createNote(title, content)
+    toast('Note created', { type: 'success' })
+  }, [flushPending, uniqueTitle, createNote, toast])
+
+  const handleDailyNote = useCallback(async () => {
+    await flushPending()
+    const title = isoDate()
+    if (notes.some(n => n.title === title)) {
+      setActiveNoteTitle(title)
+      return
+    }
+    await createNote(title, dailyNoteContent(title))
+    toast(`Opened daily note for ${title}`, { type: 'success' })
+  }, [flushPending, notes, createNote, toast])
+
+  // Wiki links
+  const handleOpenWikiLink = useCallback((title: string) => {
+    const match = notes.find(n => n.title.toLowerCase() === title.toLowerCase())
+    if (match) {
+      handleSelectNote(match.title)
+    } else {
+      ;(async () => {
+        await flushPending()
+        await createNote(title, `# ${title}\n\nCreated from a wiki link.\n`)
+        toast(`Created note “${title}”`, { type: 'success' })
+      })()
+    }
+  }, [notes, handleSelectNote, flushPending, createNote, toast])
+
+  // Delete
+  const confirmDeleteNote = useCallback(async () => {
     if (!pendingDeleteTitle) return
     const title = pendingDeleteTitle
     setPendingDeleteTitle(null)
     try {
       await window.electronAPI.notes.deleteNote(title)
+      setPins(p => p.filter(t => t !== title))
       toast('Note deleted', { type: 'success' })
-      setActiveNoteTitle(null)
-      loadNotesList()
+      if (activeNoteTitle === title) setActiveNoteTitle(null)
+      await loadNotesList()
     } catch (err) {
       console.error('Failed to delete note:', err)
       toast('Failed to delete note', { type: 'error' })
     }
-  }
+  }, [pendingDeleteTitle, activeNoteTitle, loadNotesList, toast])
 
-  const handleOpenWikiLink = (title: string) => {
-    const titleLower = title.toLowerCase()
-    const match = notes.find(n => n.title.toLowerCase() === titleLower)
-
-    if (match) {
-      // Load existing note
-      handleSwitchNote(match.title)
-    } else {
-      // Create new note, use toast instead of blocking confirm()
-      toast(`Creating note "${title}"…`, { type: 'info' })
-      createNamedNote(title)
-    }
-  }
-
-  const createNamedNote = async (title: string) => {
-    if (isDirty && activeNoteTitle) {
-      await handleSaveNote()
-    }
+  // Export
+  const handleExport = useCallback(async () => {
+    if (!activeNoteTitle) return
     try {
-      const defaultContent = `# ${title}\n\nCreated from Wiki Link.`
-      await window.electronAPI.notes.writeNote(title, defaultContent)
-      toast(`Created note "${title}"`, { type: 'success' })
-
-      const list = await window.electronAPI.notes.listNotes()
-      setNotes(list)
-      setActiveNoteTitle(title)
-      setMode('edit')
+      const ok = await window.electronAPI.app.saveFile(`${activeNoteTitle}.md`, activeNoteContent)
+      if (ok) toast('Note exported', { type: 'success' })
     } catch (err) {
-      console.error('Failed to create named note:', err)
-      toast('Failed to create linked note', { type: 'error' })
+      console.error('Failed to export note:', err)
+      toast('Failed to export note', { type: 'error' })
     }
-  }
+  }, [activeNoteTitle, activeNoteContent, toast])
 
-  // Filter Computations
+  const togglePin = useCallback((title: string) => {
+    setPins(p => (p.includes(title) ? p.filter(t => t !== title) : [...p, title]))
+  }, [])
+
+  // Search (debounced full-text via main process)
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (!q) {
+      setSearchResults(null)
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    const timer = setTimeout(async () => {
+      try {
+        const results = await window.electronAPI.notes.searchNotes(q)
+        setSearchResults(results)
+      } catch (err) {
+        console.error('Note search failed:', err)
+        setSearchResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 220)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Derived: tags, display list, links
   const uniqueTags = useMemo(() => {
-    const tagsSet = new Set<string>()
-    notes.forEach(note => {
-      note.tags.forEach(t => tagsSet.add(t))
-    })
-    return Array.from(tagsSet).sort()
+    const set = new Set<string>()
+    notes.forEach(n => n.tags.forEach(t => set.add(t)))
+    return Array.from(set).sort()
   }, [notes])
 
-  const filteredNotesList = useMemo(() => {
-    return notes.filter(note => {
-      const matchesSearch =
-        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+  const displayItems = useMemo<SidebarItem[]>(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const byTitle = new Map(notes.map(n => [n.title, n]))
 
-      const matchesTag = selectedTag ? note.tags.includes(selectedTag) : true
+    if (q) {
+      const items: SidebarItem[] = []
+      const added = new Set<string>()
+      // 1) Backend full-text / title matches (ranked)
+      if (searchResults) {
+        for (const r of searchResults) {
+          const note = byTitle.get(r.title)
+          if (note) { items.push({ note, snippet: r.snippet }); added.add(r.title) }
+        }
+      }
+      // 2) Supplement with tag matches the backend text search doesn't cover
+      for (const note of notes) {
+        if (added.has(note.title)) continue
+        if (note.tags.some(t => t.toLowerCase().includes(q))) {
+          items.push({ note }); added.add(note.title)
+        }
+      }
+      return items
+    }
 
-      return matchesSearch && matchesTag
+    // No search: filter by tag, sort, pinned first
+    let list = notes.filter(n => (selectedTag ? n.tags.includes(selectedTag) : true))
+    list = [...list].sort((a, b) => {
+      if (sort === 'title') return a.title.localeCompare(b.title)
+      if (sort === 'size') return b.size - a.size
+      return b.updatedAt - a.updatedAt
     })
-  }, [notes, searchQuery, selectedTag])
+    const pinnedItems = list.filter(n => pinnedSet.has(n.title))
+    const rest = list.filter(n => !pinnedSet.has(n.title))
+    return [...pinnedItems, ...rest].map(note => ({ note }))
+  }, [notes, searchQuery, searchResults, selectedTag, sort, pinnedSet])
 
-  // Backlink computations
-  const currentNoteMetadata = useMemo(() => {
-    if (!activeNoteTitle) return null
-    return notes.find(n => n.title === activeNoteTitle) || null
-  }, [notes, activeNoteTitle])
+  const currentNoteMetadata = useMemo(
+    () => (activeNoteTitle ? notes.find(n => n.title === activeNoteTitle) ?? null : null),
+    [notes, activeNoteTitle]
+  )
 
   const backlinks = useMemo(() => {
     if (!activeNoteTitle) return []
-    const titleLower = activeNoteTitle.toLowerCase()
+    const lower = activeNoteTitle.toLowerCase()
     return notes
-      .filter(n => n.title !== activeNoteTitle && n.links.some(l => l.toLowerCase() === titleLower))
+      .filter(n => n.title !== activeNoteTitle && n.links.some(l => l.toLowerCase() === lower))
       .map(n => n.title)
   }, [notes, activeNoteTitle])
 
-  // Render-time Wiki-link Markdown Transformer
-  const processedMarkdown = useMemo(() => {
-    // Replaces [[Wiki Link]] with [Wiki Link](#wiki-link-Wiki%20Link) for markdown parser compatibility
-    return activeNoteContent.replace(/\[\[([^\]]+)\]\]/g, (_, title) => {
-      const encoded = encodeURIComponent(title.trim())
-      return `[${title.trim()}](#wiki-link-${encoded})`
-    })
-  }, [activeNoteContent])
+  const liveWordCount = useMemo(() => countWords(activeNoteContent), [activeNoteContent])
+  const noteExists = useCallback((title: string) => titleLookup.has(title.toLowerCase()), [titleLookup])
+
+  const saveLabel = saving ? 'Saving…' : isDirty ? 'Unsaved' : 'Saved'
 
   return (
-    <div className="notes-layout-grid">
-      <style>{`
-        .notes-layout-grid {
-          display: grid;
-          grid-template-columns: 240px 1fr 300px;
-          width: 100%;
-          height: 100%;
-          background: var(--color-background);
-          overflow: hidden;
-          transition: grid-template-columns 0.2s ease;
-        }
-        .notes-editor-panel {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          overflow: hidden;
-          border-right: 1px solid var(--color-surface-offset);
-        }
-        .notes-right-panel {
-          background: var(--color-surface-1);
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          overflow: hidden;
-          padding: var(--space-4);
-          gap: var(--space-4);
-          flex-shrink: 0;
-          width: 300px;
-        }
-        .notes-sidebar {
-          background: var(--color-surface-1);
-          border-right: 1px solid var(--color-surface-offset);
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          overflow: hidden;
-        }
-        .notes-list-item {
-          padding: var(--space-3) var(--space-4);
-          cursor: pointer;
-          border-bottom: 1px solid var(--color-surface-offset);
-          transition: all var(--duration-fast);
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-        .notes-list-item:hover {
-          background: var(--color-surface-offset);
-        }
-        .notes-list-item.active {
-          background: var(--color-primary-muted);
-          border-left: 3px solid var(--color-primary);
-        }
-        .segment-btn {
-          background: var(--color-surface-2);
-          border: 1px solid var(--color-surface-offset);
-          color: var(--color-text-muted);
-          padding: 6px 12px;
-          font-size: var(--text-xs);
-          cursor: pointer;
-          transition: all var(--duration-fast);
-        }
-        .segment-btn:hover {
-          color: var(--color-text-base);
-          background: var(--color-surface-offset);
-        }
-        .segment-btn.active {
-          background: var(--color-primary);
-          border-color: var(--color-primary);
-          color: white;
-        }
-        .notes-textarea {
-          flex: 1;
-          width: 100%;
-          height: 100%;
-          background: transparent;
-          border: none;
-          color: var(--color-text-base);
-          font-family: var(--font-mono);
-          font-size: var(--text-sm);
-          line-height: var(--leading-relaxed);
-          padding: var(--space-4);
-          resize: none;
-          outline: none;
-        }
-        .markdown-preview {
-          flex: 1;
-          height: 100%;
-          overflow-y: auto;
-          padding: var(--space-4) var(--space-6);
-          color: var(--color-text-base);
-          font-size: var(--text-sm);
-          line-height: var(--leading-relaxed);
-        }
-        .markdown-preview p {
-          margin-bottom: var(--space-3);
-        }
-        .markdown-preview h1 {
-          font-size: var(--text-xl);
-          font-weight: var(--weight-bold);
-          margin-top: var(--space-4);
-          margin-bottom: var(--space-3);
-          border-bottom: 1px solid var(--color-surface-offset);
-          padding-bottom: 4px;
-        }
-        .markdown-preview h2 {
-          font-size: var(--text-lg);
-          font-weight: var(--weight-semibold);
-          margin-top: var(--space-4);
-          margin-bottom: var(--space-2);
-        }
-        .markdown-preview h3 {
-          font-size: var(--text-sm);
-          font-weight: var(--weight-semibold);
-          margin-top: var(--space-3);
-          margin-bottom: var(--space-1);
-        }
-        .markdown-preview ul, .markdown-preview ol {
-          margin-left: var(--space-4);
-          margin-bottom: var(--space-3);
-        }
-        .markdown-preview li {
-          margin-bottom: var(--space-1);
-        }
-        .markdown-preview code {
-          background: var(--color-surface-offset);
-          padding: 2px 5px;
-          border-radius: var(--radius-sm);
-          font-family: var(--font-mono);
-          font-size: var(--text-xs);
-        }
-        .tag-pill {
-          font-size: var(--text-2xs);
-          padding: 2px 8px;
-          border-radius: var(--radius-full);
-          background: var(--color-surface-2);
-          border: 1px solid var(--color-surface-offset);
-          color: var(--color-text-muted);
-          cursor: pointer;
-          transition: all var(--duration-fast);
-          display: inline-flex;
-          align-items: center;
+    <div className={`notes-layout-grid ${showInfo ? '' : 'no-info'}`}>
+      <style>{NOTES_CSS}</style>
 
-        /* Responsive Media Queries */
-        @media (max-width: 900px) {
-          .notes-layout-grid {
-            grid-template-columns: 240px 1fr 0px;
-          }
-          .notes-right-panel {
-            display: none !important;
-          }
-        }
-        @media (max-width: 650px) {
-          .notes-layout-grid {
-            grid-template-columns: 0px 1fr 0px;
-          }
-          .notes-sidebar {
-            display: none !important;
-          }
-          .notes-right-panel {
-            display: none !important;
-          }
-        }
-          gap: 2px;
-        }
-        .tag-pill:hover {
-          border-color: var(--color-balance);
-          color: var(--color-text-base);
-        }
-        .tag-pill.active {
-          background: var(--color-secondary-muted);
-          border-color: var(--color-secondary);
-          color: var(--color-secondary);
-        }
-      `}</style>
+      {/* COLUMN 1: SIDEBAR */}
+      <NotesSidebar
+        items={displayItems}
+        allTags={uniqueTags}
+        totalCount={notes.length}
+        activeTitle={activeNoteTitle}
+        pinned={pinnedSet}
+        loading={loading}
+        searching={searching}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sort={sort}
+        onSortChange={setSort}
+        selectedTag={selectedTag}
+        onSelectTag={setSelectedTag}
+        onSelect={handleSelectNote}
+        onTogglePin={togglePin}
+        onCreate={handleCreate}
+        onDaily={handleDailyNote}
+      />
 
-      {/* COLUMN 1: SIDEBAR (Notes & Tags) */}
-      <div className="notes-sidebar">
-        {/* Sidebar Header */}
-        <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderBottom: '1px solid var(--color-surface-offset)', flexShrink: 0 }}>
-          <button
-            onClick={handleCreateNote}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--space-2)',
-              background: 'var(--color-secondary)',
-              color: 'var(--color-text-inverted)',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              padding: '8px',
-              fontWeight: 'var(--weight-bold)',
-              cursor: 'pointer'
-            }}
-          >
-            <Plus size={16} />
-            New Note
-          </button>
-
-          {/* Search bar */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--color-text-faint)' }} />
-            <input
-              type="text"
-              placeholder="Search notes..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--color-text-base)',
-                fontSize: 'var(--text-xs)',
-                padding: '6px 12px 6px 30px',
-                outline: 'none'
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Notes List */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: 'var(--space-4)', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)', textAlign: 'center' }}>
-              Loading notes...
-            </div>
-          ) : filteredNotesList.length === 0 ? (
-            <div style={{ padding: 'var(--space-6)', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)', textAlign: 'center' }}>
-              No notes found.
-            </div>
-          ) : (
-            filteredNotesList.map(note => {
-              const isActive = note.title === activeNoteTitle
-              return (
-                <div
-                  key={note.title}
-                  className={`notes-list-item ${isActive ? 'active' : ''}`}
-                  onClick={() => handleSwitchNote(note.title)}
-                >
-                  <span style={{ fontWeight: 'var(--weight-medium)', fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {note.title}
-                  </span>
-                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
-                    {note.tags.map(tag => (
-                      <span key={tag} style={{ fontSize: '9px', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', padding: '1px 4px', borderRadius: 'var(--radius-sm)' }}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-
-        {/* Tags sidebar list */}
-        {uniqueTags.length > 0 && (
-          <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--color-surface-offset)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '180px', overflowY: 'auto', flexShrink: 0 }}>
-            <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
-              Tags
-            </span>
-            <div style={{ display: 'flex', gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
-              {uniqueTags.map(tag => {
-                const isActive = selectedTag === tag
-                return (
-                  <button
-                    key={tag}
-                    className={`tag-pill ${isActive ? 'active' : ''}`}
-                    onClick={() => setSelectedTag(isActive ? null : tag)}
-                  >
-                    <Hash size={10} />
-                    {tag.replace('#', '')}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* COLUMN 2: EDITOR / PREVIEWER */}
+      {/* COLUMN 2: EDITOR / PREVIEW */}
       <div className="notes-editor-panel">
         {activeNoteTitle ? (
           <>
             {/* Header toolbar */}
-            <div style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--color-surface-1)', borderBottom: '1px solid var(--color-surface-offset)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              {/* Title input */}
+            <div className="notes-editor-header">
               <input
                 type="text"
+                className="notes-title-input"
                 value={tempTitle}
-                onChange={e => {
-                  setTempTitle(e.target.value)
-                  setIsDirty(true)
+                onChange={e => setTempTitle(e.target.value)}
+                onBlur={() => { flushPending() }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() }
+                  if (e.key === 'Escape') { setTempTitle(activeNoteTitle); e.currentTarget.blur() }
                 }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: 'var(--text-base)',
-                  fontWeight: 'var(--weight-semibold)',
-                  color: 'var(--color-text-base)',
-                  outline: 'none',
-                  width: '240px'
-                }}
+                aria-label="Note title"
+                spellCheck={false}
               />
 
-              {/* Toolbar Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-                {/* Segment Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexShrink: 0 }}>
+                <span className="notes-save-status" data-dirty={isDirty}>{saveLabel}</span>
+
+                {/* View-mode segmented control */}
                 <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                  <button
-                    className={`segment-btn ${mode === 'edit' ? 'active' : ''}`}
-                    onClick={() => setMode('edit')}
-                    title="Edit markdown"
-                  >
-                    <Edit3 size={14} />
-                  </button>
-                  <button
-                    className={`segment-btn ${mode === 'preview' ? 'active' : ''}`}
-                    onClick={() => setMode('preview')}
-                    title="Live preview"
-                  >
-                    <Eye size={14} />
-                  </button>
-                  <button
-                    className={`segment-btn ${mode === 'split' ? 'active' : ''}`}
-                    onClick={() => setMode('split')}
-                    title="Side-by-side split screen"
-                  >
-                    <Columns size={14} />
-                  </button>
+                  <button className={`segment-btn ${mode === 'edit' ? 'active' : ''}`} onClick={() => setMode('edit')} title="Edit"><Edit3 size={14} /></button>
+                  <button className={`segment-btn ${mode === 'split' ? 'active' : ''}`} onClick={() => setMode('split')} title="Split view"><Columns size={14} /></button>
+                  <button className={`segment-btn ${mode === 'preview' ? 'active' : ''}`} onClick={() => setMode('preview')} title="Preview"><Eye size={14} /></button>
                 </div>
 
-                {/* Save & Delete */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <button
-                    onClick={handleSaveNote}
-                    disabled={!isDirty}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      background: isDirty ? 'var(--color-secondary)' : 'var(--color-surface-2)',
-                      color: isDirty ? 'var(--color-text-inverted)' : 'var(--color-text-faint)',
-                      border: 'none',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '5px 10px',
-                      fontSize: 'var(--text-xs)',
-                      fontWeight: 'var(--weight-semibold)',
-                      cursor: isDirty ? 'pointer' : 'default',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <Save size={12} />
-                    {isDirty ? 'Save' : 'Saved'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <button className="notes-icon-btn" onClick={saveContent} disabled={!isDirty} title="Save (Ctrl+S)" aria-label="Save"><Save size={15} /></button>
+                  <button className="notes-icon-btn" onClick={handleExport} title="Export as .md" aria-label="Export note"><Download size={15} /></button>
+                  <button className="notes-icon-btn" onClick={() => setShowInfo(v => !v)} title={showInfo ? 'Hide info panel' : 'Show info panel'} aria-label="Toggle info panel">
+                    {showInfo ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
                   </button>
 
                   {pendingDeleteTitle === activeNoteTitle ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>Delete?</span>
-                      <button
-                        onClick={confirmDeleteNote}
-                        style={{ background: 'var(--color-error)', border: 'none', color: '#fff', borderRadius: '4px', padding: '2px 8px', fontSize: 'var(--text-xs)', cursor: 'pointer' }}
-                      >Yes</button>
-                      <button
-                        onClick={() => setPendingDeleteTitle(null)}
-                        style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', borderRadius: '4px', padding: '2px 6px', fontSize: 'var(--text-xs)', cursor: 'pointer' }}
-                      >No</button>
-                    </div>
+                      <button onClick={confirmDeleteNote} style={{ background: 'var(--color-error)', border: 'none', color: '#fff', borderRadius: '4px', padding: '2px 8px', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>Yes</button>
+                      <button onClick={() => setPendingDeleteTitle(null)} style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', borderRadius: '4px', padding: '2px 6px', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>No</button>
+                    </span>
                   ) : (
-                    <button
-                      onClick={() => handleDeleteNote(activeNoteTitle)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--color-text-muted)',
-                        cursor: 'pointer',
-                        padding: '4px'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-error)')}
-                      onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
-                      title="Delete Note"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <button className="notes-icon-btn notes-icon-btn-danger" onClick={() => setPendingDeleteTitle(activeNoteTitle)} title="Delete note" aria-label="Delete note"><Trash2 size={15} /></button>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Split / Editor Panel */}
+            {/* Editor + preview body */}
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
               {(mode === 'edit' || mode === 'split') && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                  <textarea
-                    className="notes-textarea"
-                    value={activeNoteContent}
-                    onChange={e => {
-                      setActiveNoteContent(e.target.value)
-                      setIsDirty(true)
-                    }}
-                    placeholder="Type in markdown... Use #tags to organize or [[Wiki Links]] to connect notes."
-                  />
-                  <div style={{
-                    padding: '6px var(--space-4)',
-                    background: 'var(--color-surface-1)',
-                    borderTop: '1px solid var(--color-surface-offset)',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '12px',
-                    fontSize: '10px',
-                    color: 'var(--color-text-faint)',
-                    userSelect: 'none'
-                  }}>
-                    <span>{charCount} characters</span>
-                    <span>{wordCount} words</span>
-                  </div>
-                </div>
+                <NoteEditor
+                  content={activeNoteContent}
+                  onChange={value => { setActiveNoteContent(value); setIsDirty(true) }}
+                  noteTitles={noteTitles}
+                />
               )}
 
-              {mode === 'split' && (
-                <div style={{ width: '1px', background: 'var(--color-surface-offset)', height: '100%' }} />
-              )}
+              {mode === 'split' && <div style={{ width: '1px', background: 'var(--color-surface-offset)', flexShrink: 0 }} />}
 
               {(mode === 'preview' || mode === 'split') && (
                 <div className="markdown-preview">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      // Custom link renderer: intercept wiki-links
-                      a: ({ href, children, ...props }) => {
-                        if (href && href.startsWith('#wiki-link-')) {
-                          const title = decodeURIComponent(href.replace('#wiki-link-', ''))
-                          return (
-                            <a
-                              href="#"
-                              onClick={e => {
-                                e.preventDefault()
-                                handleOpenWikiLink(title)
-                              }}
-                              style={{ color: 'var(--color-secondary)', textDecoration: 'underline', fontWeight: 'var(--weight-semibold)' }}
-                            >
-                              {children}
-                            </a>
-                          )
-                        }
-                        return (
-                          <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }} {...props}>
-                            {children}
-                          </a>
-                        )
-                      },
-                      // Custom code renderer: render Mermaid diagrams inline
-                      code: ({ className, children, ...props }) => {
-                        const match = /language-mermaid/.exec(className || '')
-                        if (match) {
-                          return <MermaidChart code={String(children).trim()} />
-                        }
-                        return (
-                          <code className={className} {...props}>
-                            {children}
-                          </code>
-                        )
-                      }
-                    }}
-                  >
-                    {processedMarkdown}
-                  </ReactMarkdown>
+                  <MarkdownPreview
+                    content={activeNoteContent}
+                    onOpenWikiLink={handleOpenWikiLink}
+                    noteExists={noteExists}
+                  />
                 </div>
               )}
             </div>
           </>
         ) : (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)', color: 'var(--color-text-faint)' }}>
-            <FileText size={48} style={{ opacity: 0.5 }} />
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' }}>
-              No note selected
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)', color: 'var(--color-text-faint)', padding: 'var(--space-6)', textAlign: 'center' }}>
+            <FileText size={48} style={{ opacity: 0.4 }} />
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+              {notes.length === 0 ? 'Your notebook is empty' : 'No note selected'}
             </div>
-            <button
-              onClick={handleCreateNote}
-              style={{
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-muted)',
-                borderRadius: 'var(--radius-md)',
-                padding: '6px 12px',
-                fontSize: 'var(--text-xs)',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-balance)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
-            >
-              Create note
+            <div style={{ fontSize: 'var(--text-xs)', maxWidth: '300px', lineHeight: 1.6 }}>
+              Create markdown notes, link them with <code style={{ background: 'var(--color-surface-2)', padding: '1px 4px', borderRadius: '3px' }}>[[Wiki Links]]</code>, organize with <code style={{ background: 'var(--color-surface-2)', padding: '1px 4px', borderRadius: '3px' }}>#tags</code>, and visualize the connections.
+            </div>
+            <button onClick={() => handleCreate()} style={{ marginTop: 'var(--space-2)', background: 'var(--color-secondary)', border: 'none', color: 'var(--color-text-inverted)', borderRadius: 'var(--radius-md)', padding: '8px 16px', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', cursor: 'pointer' }}>
+              Create your first note
             </button>
           </div>
         )}
       </div>
 
-      {/* COLUMN 3: RIGHT PANEL (Graph & Connected Backlinks) */}
-      <div className="notes-right-panel">
-        <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
-          Note Connections
-        </span>
+      {/* COLUMN 3: INFO PANEL */}
+      {showInfo && (
+        <div className="notes-right-panel">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span className="notes-panel-label">Connections</span>
+          </div>
 
-        {/* SVG connection graph */}
-        <div style={{ height: '240px', flexShrink: 0 }}>
-          <GraphView
-            notes={notes}
-            activeTitle={activeNoteTitle}
-            onSelectNote={handleOpenWikiLink}
-          />
-        </div>
+          <div style={{ height: '220px', flexShrink: 0 }}>
+            <GraphView notes={notes} activeTitle={activeNoteTitle} onSelectNote={handleSelectNote} />
+          </div>
 
-        {/* Backlinks / outgoing links panel */}
-        {activeNoteTitle && (
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
-            {/* Outgoing links list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
-                <LinkIcon size={10} />
-                Outgoing Links
+          {activeNoteTitle && currentNoteMetadata && (
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
+              {/* Metadata */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                <span title={new Date(currentNoteMetadata.updatedAt).toLocaleString()}>Updated {formatRelativeTime(currentNoteMetadata.updatedAt)}</span>
+                <span>{liveWordCount} words</span>
+                <span>{formatBytes(currentNoteMetadata.size)}</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {currentNoteMetadata && currentNoteMetadata.links.length > 0 ? (
-                  currentNoteMetadata.links.map(link => (
-                    <button
-                      key={link}
-                      onClick={() => handleOpenWikiLink(link)}
-                      style={{
-                        background: 'var(--color-surface-2)',
-                        border: '1px solid var(--color-surface-offset)',
-                        borderRadius: 'var(--radius-sm)',
-                        padding: '6px 8px',
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-base)',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-secondary)')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
-                    >
-                      {link}
-                    </button>
-                  ))
+              {/* Outgoing links */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="notes-panel-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ArrowRight size={11} /> Outgoing links
+                </div>
+                {currentNoteMetadata.links.length > 0 ? (
+                  currentNoteMetadata.links.map(link => {
+                    const exists = noteExists(link)
+                    return (
+                      <button key={link} onClick={() => handleOpenWikiLink(link)} className="notes-link-chip">
+                        {!exists && <FileWarning size={11} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</span>
+                        {!exists && <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>new</span>}
+                      </button>
+                    )
+                  })
                 ) : (
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>
-                    No outgoing links.
-                  </span>
+                  <span className="notes-empty-hint">No outgoing links.</span>
                 )}
               </div>
-            </div>
 
-            {/* Backlinks list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
-                <LinkIcon size={10} />
-                Backlinks
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {/* Backlinks */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="notes-panel-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ArrowLeft size={11} /> Backlinks
+                </div>
                 {backlinks.length > 0 ? (
                   backlinks.map(link => (
-                    <button
-                      key={link}
-                      onClick={() => handleOpenWikiLink(link)}
-                      style={{
-                        background: 'var(--color-surface-2)',
-                        border: '1px solid var(--color-surface-offset)',
-                        borderRadius: 'var(--radius-sm)',
-                        padding: '6px 8px',
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-base)',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-secondary)')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
-                    >
-                      {link}
+                    <button key={link} onClick={() => handleSelectNote(link)} className="notes-link-chip">
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</span>
                     </button>
                   ))
                 ) : (
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>
-                    No backlinks pointing here.
-                  </span>
+                  <span className="notes-empty-hint">No backlinks pointing here.</span>
                 )}
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+
+          {!activeNoteTitle && (
+            <span className="notes-empty-hint" style={{ marginTop: 'var(--space-2)' }}>
+              Select a note to see its links and metadata.
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
+
+// Styles (single injected block, shared with subcomponents)
+const NOTES_CSS = `
+  .notes-layout-grid {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr) 320px;
+    width: 100%;
+    height: 100%;
+    background: var(--color-background);
+    overflow: hidden;
+    transition: grid-template-columns var(--duration-normal) ease;
+  }
+  .notes-layout-grid.no-info {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+  .notes-sidebar {
+    background: var(--color-surface-1);
+    border-right: 1px solid var(--color-surface-offset);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .notes-editor-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .notes-right-panel {
+    background: var(--color-surface-1);
+    border-left: 1px solid var(--color-surface-offset);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    padding: var(--space-4);
+    gap: var(--space-4);
+    min-width: 0;
+  }
+  .notes-editor-header {
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-surface-1);
+    border-bottom: 1px solid var(--color-surface-offset);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-shrink: 0;
+  }
+  .notes-title-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid transparent;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text-base);
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    padding: 2px 0;
+    transition: border-color var(--duration-fast);
+  }
+  .notes-title-input:focus { border-bottom-color: var(--color-primary); }
+  .notes-save-status {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: var(--weight-bold);
+    color: var(--color-text-faint);
+    white-space: nowrap;
+  }
+  .notes-save-status[data-dirty="true"] { color: var(--color-warning); }
+  .notes-list-item {
+    padding: var(--space-3) var(--space-4);
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-surface-offset);
+    transition: background var(--duration-fast);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .notes-list-item:hover { background: var(--color-surface-offset); }
+  .notes-list-item.active {
+    background: var(--color-primary-muted);
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
+  .notes-pin-toggle {
+    background: none;
+    border: none;
+    color: var(--color-text-faint);
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    opacity: 0;
+    flex-shrink: 0;
+    transition: opacity var(--duration-fast), color var(--duration-fast);
+  }
+  .notes-list-item:hover .notes-pin-toggle { opacity: 1; }
+  .notes-pin-toggle:hover { color: var(--color-secondary); }
+  .segment-btn {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-surface-offset);
+    color: var(--color-text-muted);
+    padding: 5px 10px;
+    font-size: var(--text-xs);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: all var(--duration-fast);
+  }
+  .segment-btn:hover { color: var(--color-text-base); background: var(--color-surface-offset); }
+  .segment-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .notes-icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    transition: all var(--duration-fast);
+  }
+  .notes-icon-btn:hover { color: var(--color-text-base); background: var(--color-surface-offset); }
+  .notes-icon-btn:disabled { color: var(--color-text-faint); cursor: default; opacity: 0.5; }
+  .notes-icon-btn-danger:hover { color: var(--color-error); }
+  .note-tool-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    transition: all var(--duration-fast);
+  }
+  .note-tool-btn:hover { color: var(--color-text-base); background: var(--color-surface-offset); }
+  .notes-menu-item {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 7px 10px;
+    cursor: pointer;
+    transition: background var(--duration-fast);
+  }
+  .notes-menu-item:hover { background: var(--color-surface-offset); }
+  .notes-sort-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    transition: all var(--duration-fast);
+  }
+  .notes-sort-btn:hover { color: var(--color-text-base); background: var(--color-surface-2); }
+  .notes-textarea {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    color: var(--color-text-base);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+    padding: var(--space-4);
+    resize: none;
+    outline: none;
+  }
+  .notes-link-chip {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-surface-offset);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    font-size: var(--text-xs);
+    color: var(--color-text-base);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--duration-fast);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .notes-link-chip:hover { border-color: var(--color-secondary); }
+  .notes-panel-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: var(--weight-bold);
+    color: var(--color-text-faint);
+  }
+  .notes-empty-hint {
+    font-size: var(--text-xs);
+    color: var(--color-text-faint);
+    font-style: italic;
+  }
+  .notes-spin { animation: notes-spin 0.8s linear infinite; }
+  @keyframes notes-spin { to { transform: rotate(360deg); } }
+  .markdown-preview {
+    flex: 1;
+    height: 100%;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-6);
+    color: var(--color-text-base);
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+    min-width: 0;
+  }
+  .markdown-preview p { margin-bottom: var(--space-3); }
+  .markdown-preview h1 {
+    font-size: var(--text-xl);
+    font-weight: var(--weight-bold);
+    margin-top: var(--space-4);
+    margin-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-surface-offset);
+    padding-bottom: 4px;
+  }
+  .markdown-preview h2 { font-size: var(--text-lg); font-weight: var(--weight-semibold); margin-top: var(--space-4); margin-bottom: var(--space-2); }
+  .markdown-preview h3 { font-size: var(--text-base); font-weight: var(--weight-semibold); margin-top: var(--space-3); margin-bottom: var(--space-1); }
+  .markdown-preview ul, .markdown-preview ol { margin-left: var(--space-4); margin-bottom: var(--space-3); }
+  .markdown-preview li { margin-bottom: var(--space-1); }
+  .markdown-preview blockquote {
+    border-left: 3px solid var(--color-surface-offset);
+    padding-left: var(--space-3);
+    color: var(--color-text-muted);
+    margin: var(--space-3) 0;
+  }
+  .markdown-preview code {
+    background: var(--color-surface-offset);
+    padding: 2px 5px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+  .markdown-preview pre { background: var(--color-surface-2); padding: var(--space-3); border-radius: var(--radius-md); overflow-x: auto; margin: var(--space-3) 0; }
+  .markdown-preview pre code { background: transparent; padding: 0; }
+  .markdown-preview table { border-collapse: collapse; margin: var(--space-3) 0; width: 100%; }
+  .markdown-preview th, .markdown-preview td { border: 1px solid var(--color-surface-offset); padding: 6px 10px; text-align: left; font-size: var(--text-xs); }
+  .markdown-preview th { background: var(--color-surface-2); font-weight: var(--weight-semibold); }
+  .markdown-preview a { color: var(--color-primary); }
+  .markdown-preview hr { border: none; border-top: 1px solid var(--color-surface-offset); margin: var(--space-4) 0; }
+  .tag-pill {
+    font-size: var(--text-2xs);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-surface-offset);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all var(--duration-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .tag-pill:hover { border-color: var(--color-balance); color: var(--color-text-base); }
+  .tag-pill.active { background: var(--color-secondary-muted); border-color: var(--color-secondary); color: var(--color-secondary); }
+
+  @media (max-width: 1100px) {
+    .notes-layout-grid, .notes-layout-grid.no-info { grid-template-columns: 240px minmax(0, 1fr); }
+    .notes-right-panel { display: none; }
+  }
+  @media (max-width: 680px) {
+    .notes-layout-grid, .notes-layout-grid.no-info { grid-template-columns: minmax(0, 1fr); }
+    .notes-sidebar { display: none; }
+  }
+`

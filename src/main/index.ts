@@ -129,10 +129,21 @@ function createWindow(): void {
     }
   })
 
-  // Show window only after it's ready to paint, eliminates white flash
-  mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
-  })
+  // Reveal the window once it can paint, eliminates the white flash. This is
+  // guarded and backed by `did-finish-load` plus a safety timeout so a slow or
+  // racy dev server (where `ready-to-show` may never fire after a failed initial
+  // load) can never leave us with only a detached DevTools window and no app.
+  let hasShown = false
+  const revealWindow = (): void => {
+    if (hasShown || !mainWindow || mainWindow.isDestroyed()) return
+    hasShown = true
+    mainWindow.show()
+    mainWindow.focus()
+  }
+  mainWindow.on('ready-to-show', revealWindow)
+  mainWindow.webContents.on('did-finish-load', revealWindow)
+  // Absolute fallback: if neither event fires (hard load-failure loop), show anyway.
+  setTimeout(revealWindow, 8000)
 
   // Null reference on close, allows V8 garbage collection of the window
   mainWindow.on('closed', () => {
@@ -149,9 +160,16 @@ function createWindow(): void {
   if (process.env['ELECTRON_RENDERER_URL']) {
     const devUrl = process.env['ELECTRON_RENDERER_URL']
     mainWindow.loadURL(devUrl)
-    mainWindow.webContents.openDevTools()
 
-    // Retry loading if dev server is not warm yet
+    // Open DevTools only AFTER the app has actually loaded, so a failed initial
+    // load can never leave a lone DevTools window floating over a hidden app.
+    mainWindow.webContents.once('did-finish-load', () => {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.openDevTools()
+      }
+    })
+
+    // Retry loading if the dev server is not warm yet
     mainWindow.webContents.on('did-fail-load', (_event, errorCode, _errorDescription, validatedURL) => {
       if (validatedURL.startsWith(devUrl)) {
         console.log(`[Dev Server] Port not ready yet (error code: ${errorCode}). Retrying load in 1s...`)
@@ -169,7 +187,10 @@ function createWindow(): void {
 
 // IPC Handlers
 
-let activeAbortController: AbortController | null = null
+// One live stream per consumer channel ('assistant', 'standup', …). The legacy
+// no-id call maps to the '' channel, so old callers keep single-stream semantics.
+const aiStreamControllers = new Map<string, AbortController>()
+let structuredAbortController: AbortController | null = null
 
 function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.APP_GET_VERSION, () => app.getVersion())
@@ -207,51 +228,112 @@ function registerIpcHandlers(): void {
   })
 
   // AI Streaming Handlers
-  ipcMain.handle(IpcChannels.AI_STREAM_START, async (_event, params: unknown) => {
-    if (activeAbortController) {
-      activeAbortController.abort()
-      activeAbortController = null
+  // Each consumer passes a streamId ('assistant', 'standup', …) so multiple
+  // features can stream concurrently without cross-talk. Events carry the id
+  // back so renderer subscribers can filter to their own stream.
+  ipcMain.handle(IpcChannels.AI_STREAM_START, async (_event, params: unknown, streamId?: unknown) => {
+    const id = typeof streamId === 'string' ? streamId : ''
+
+    // Starting a new stream on the same channel replaces the old one
+    const existing = aiStreamControllers.get(id)
+    if (existing) {
+      existing.abort()
+      aiStreamControllers.delete(id)
+    }
+
+    const send = (channel: string, ...args: unknown[]): void => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, ...args)
+      }
     }
 
     try {
       const parsedParams = params as import('../shared/types').AiStreamParams
       const { startAiStream } = await import('./aiService')
 
-      activeAbortController = startAiStream(
+      const controller = startAiStream(
         parsedParams,
-        (chunk) => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send(IpcChannels.AI_CHUNK, chunk)
-          }
-        },
+        (chunk) => send(IpcChannels.AI_CHUNK, chunk, id),
         () => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send(IpcChannels.AI_DONE)
-          }
-          activeAbortController = null
+          send(IpcChannels.AI_DONE, id)
+          aiStreamControllers.delete(id)
         },
         (err) => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send(IpcChannels.AI_ERROR, err.message)
-          }
-          activeAbortController = null
+          send(IpcChannels.AI_ERROR, err.message, id)
+          aiStreamControllers.delete(id)
         }
       )
+      aiStreamControllers.set(id, controller)
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error)
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(IpcChannels.AI_ERROR, errMsg)
-      }
-      activeAbortController = null
+      send(IpcChannels.AI_ERROR, errMsg, id)
+      aiStreamControllers.delete(id)
     }
   })
 
-  ipcMain.handle(IpcChannels.AI_STREAM_ABORT, () => {
-    if (activeAbortController) {
-      activeAbortController.abort()
-      activeAbortController = null
+  ipcMain.handle(IpcChannels.AI_STREAM_ABORT, (_event, streamId?: unknown) => {
+    const id = typeof streamId === 'string' ? streamId : undefined
+    if (id === undefined) {
+      // Legacy no-id abort: stop everything
+      for (const controller of aiStreamControllers.values()) controller.abort()
+      aiStreamControllers.clear()
+    } else {
+      aiStreamControllers.get(id)?.abort()
+      aiStreamControllers.delete(id)
     }
     return true
+  })
+
+  // Reliable structured generation (board / plan / dialogue), request/response,
+  // not streamed. Uses tool-calling / JSON-schema when the endpoint supports it.
+  ipcMain.handle(IpcChannels.AI_GENERATE_STRUCTURED, async (_event, params: unknown) => {
+    if (structuredAbortController) {
+      structuredAbortController.abort()
+    }
+    const controller = new AbortController()
+    structuredAbortController = controller
+    try {
+      const { generateStructured } = await import('./aiActions')
+      const typed = params as import('../shared/types').AiStructuredParams
+      const result = await generateStructured(typed, controller.signal)
+      return result
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error)
+      return { ok: false, error: errMsg }
+    } finally {
+      if (structuredAbortController === controller) structuredAbortController = null
+    }
+  })
+
+  ipcMain.handle(IpcChannels.AI_GENERATE_ABORT, () => {
+    if (structuredAbortController) {
+      structuredAbortController.abort()
+      structuredAbortController = null
+    }
+    return true
+  })
+  
+  ipcMain.handle(IpcChannels.AI_TEST_CONNECTION, async (_event, baseURL: string, apiKey: string) => {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const trimmedKey = apiKey.trim()
+      if (trimmedKey && trimmedKey !== 'ollama') {
+        headers['Authorization'] = `Bearer ${trimmedKey}`
+      }
+      const res = await fetch(`${baseURL.replace(/\/+$/, '')}/models`, {
+        method: 'GET',
+        headers,
+        signal: AbortSignal.timeout(8000)
+      })
+      if (res.ok) {
+        return { success: true }
+      } else {
+        const text = await res.text().catch(() => '')
+        return { success: false, error: `HTTP ${res.status}: ${text || res.statusText}` }
+      }
+    } catch (err) {
+      return { success: false, error: (err as Error).message || 'Network request failed' }
+    }
   })
 
   // AI Cookbook Handlers
@@ -280,6 +362,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.OLLAMA_STOP, async () => {
     const { stopPull } = await import('./ollamaManager')
     stopPull()
+  })
+
+  ipcMain.handle(IpcChannels.OLLAMA_DELETE, async (_event, modelTag: string) => {
+    const { deleteModel } = await import('./ollamaManager')
+    return deleteModel(modelTag)
   })
   // Widget Handlers
   ipcMain.handle(IpcChannels.WIDGET_TOGGLE, async () => {
@@ -318,6 +405,11 @@ function registerIpcHandlers(): void {
     return deleteNote(title)
   })
 
+  ipcMain.handle(IpcChannels.NOTES_SEARCH, async (_event, query: string) => {
+    const { searchNotes } = await import('./notesFsService')
+    return searchNotes(query)
+  })
+
   // Git Integration Handlers
   ipcMain.handle(IpcChannels.GIT_CHECK, async (_event, repoPath: string) => {
     const { checkRepo } = await import('./gitService')
@@ -340,9 +432,9 @@ function registerIpcHandlers(): void {
     return true
   })
 
-  ipcMain.handle(IpcChannels.ANALYTICS_GET_DATA, async () => {
+  ipcMain.handle(IpcChannels.ANALYTICS_GET_DATA, async (_event, context?: string | null) => {
     const { getAnalyticsData } = await import('./analyticsService')
-    return getAnalyticsData()
+    return getAnalyticsData(context ?? null)
   })
 
   ipcMain.handle(IpcChannels.WEBHOOK_TOGGLE, async (_event, active: boolean, port: number) => {
@@ -532,6 +624,16 @@ function registerIpcHandlers(): void {
     return getCheatsheetText(name)
   })
 
+  ipcMain.handle(IpcChannels.CHEATSHEETS_GET_RELEVANT, async (_event, name: string, query: string, maxChars?: number) => {
+    const { getCheatsheetRelevant } = await import('./cheatsheetService')
+    return getCheatsheetRelevant(name, query, maxChars)
+  })
+
+  ipcMain.handle(IpcChannels.CHEATSHEETS_SEARCH, async (_event, query: string) => {
+    const { searchCheatsheets } = await import('./cheatsheetService')
+    return searchCheatsheets(typeof query === 'string' ? query : '')
+  })
+
   ipcMain.handle(IpcChannels.GAMEDEV_BATCH_RENAME, async (_event, files: any) => {
     try {
       return await batchRenameFiles(files)
@@ -695,10 +797,14 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize Backup Vaulting:', err)
   }
 
-  // Start Clipboard Watcher
+  // Start Clipboard Watcher, record the capture, then push a change event so
+  // the renderer refreshes instantly instead of waiting on a slow poll.
   const { startClipboardWatcher } = await import('./clipboardWatcher')
   const { recordClipboardCopy } = await import('./db')
-  startClipboardWatcher((text) => recordClipboardCopy(text))
+  startClipboardWatcher((text) => {
+    recordClipboardCopy(text)
+    mainWindow?.webContents.send(IpcChannels.CLIPBOARD_HISTORY_CHANGED)
+  })
 
   // Load customization engine if enabled
   try {

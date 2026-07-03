@@ -67,9 +67,34 @@ export default function ExtensionsTab() {
           gap: 'var(--space-3)'
         }}>
           <AlertTriangle size={18} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
-            Customization Engine is disabled. Enable it in the <strong>Theme Builder</strong> settings tab first to activate external plugin hooks.
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', flex: 1 }}>
+            The Customization Engine is disabled, so plugin hooks are inactive. It also powers the Theme Builder in <strong>Appearance &amp; Theme</strong>.
           </div>
+          <button
+            onClick={async () => {
+              try {
+                await window.electronAPI.customizer.toggleEngine(true)
+                setEngineEnabled(true)
+                toast('Customization Engine activated')
+              } catch (err) {
+                console.error(err)
+                toast('Failed to enable the Customization Engine')
+              }
+            }}
+            style={{
+              flexShrink: 0,
+              background: 'var(--color-warning)',
+              border: 'none',
+              color: '#0b0c10',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-3)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'var(--weight-bold)',
+              cursor: 'pointer'
+            }}
+          >
+            Enable now
+          </button>
         </div>
       )}
 

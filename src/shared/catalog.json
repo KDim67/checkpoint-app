@@ -1,30 +1,240 @@
 [
   {
-    "id": "phi3-mini-3.8b",
-    "name": "Phi-3 Mini 3.8B",
-    "family": "Phi-3",
-    "parameters": 3.8,
-    "description": "Microsoft's compact model. Punches above its weight for reasoning and code. Ideal for Unity-Safe Mode.",
-    "useCases": ["coding", "reasoning", "chat"],
-    "homepageUrl": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct",
+    "id": "llama3.2-3b",
+    "name": "Llama 3.2 3B",
+    "family": "Llama 3.2",
+    "parameters": 3,
+    "description": "Meta's compact 2024 model with tool-calling and a 128K context. Fast, always-on assistant that stays out of your GPU's way.",
+    "useCases": ["chat", "summarization", "tools"],
+    "capabilities": ["chat", "tools"],
+    "contextLength": 131072,
+    "license": "Llama 3.2",
+    "homepageUrl": "https://ollama.com/library/llama3.2",
     "variants": {
-      "q4": { "quantization": "q4", "ramRequiredGb": 4,  "vramRequiredGb": 3,  "fileSizeGb": 2.2, "ollamaTag": "phi3:3.8b-mini-instruct-4k-q4_0" },
-      "q8": { "quantization": "q8", "ramRequiredGb": 6,  "vramRequiredGb": 4,  "fileSizeGb": 4.0, "ollamaTag": "phi3:3.8b-mini-instruct-4k-q8_0" },
-      "f16": { "quantization": "f16","ramRequiredGb": 10, "vramRequiredGb": 8,  "fileSizeGb": 7.6, "ollamaTag": "phi3:3.8b-mini-instruct-4k-fp16" }
+      "q4": { "quantization": "q4", "ramRequiredGb": 4,  "vramRequiredGb": 3,  "fileSizeGb": 2.0, "ollamaTag": "llama3.2:3b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 6,  "vramRequiredGb": 5,  "fileSizeGb": 3.4, "ollamaTag": "llama3.2:3b-instruct-q8_0" }
     }
   },
   {
-    "id": "llama3-8b",
-    "name": "Llama 3 8B",
-    "family": "Llama 3",
+    "id": "llama3.1-8b",
+    "name": "Llama 3.1 8B",
+    "family": "Llama 3.1",
     "parameters": 8,
-    "description": "Meta's flagship open model. Strong general-purpose assistant with excellent instruction following.",
-    "useCases": ["chat", "summarization", "coding", "reasoning"],
-    "homepageUrl": "https://ollama.com/library/llama3",
+    "description": "Meta's workhorse open model. Excellent instruction following, native tool-calling, and a 128K context. The safe default for most workstations.",
+    "useCases": ["chat", "coding", "reasoning", "tools"],
+    "capabilities": ["chat", "code", "reasoning", "tools"],
+    "contextLength": 131072,
+    "license": "Llama 3.1",
+    "homepageUrl": "https://ollama.com/library/llama3.1",
     "variants": {
-      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 5,  "fileSizeGb": 4.7, "ollamaTag": "llama3:8b-instruct-q4_0" },
-      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9,  "fileSizeGb": 8.5, "ollamaTag": "llama3:8b-instruct-q8_0" },
-      "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 17, "fileSizeGb": 16.0,"ollamaTag": "llama3:8b-instruct-fp16" }
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 6,  "fileSizeGb": 4.9, "ollamaTag": "llama3.1:8b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9,  "fileSizeGb": 8.5, "ollamaTag": "llama3.1:8b-instruct-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 17, "fileSizeGb": 16.1,"ollamaTag": "llama3.1:8b-instruct-fp16" }
+    }
+  },
+  {
+    "id": "llama3.3-70b",
+    "name": "Llama 3.3 70B",
+    "family": "Llama 3.3",
+    "parameters": 70,
+    "description": "Meta's flagship. Near-GPT-4o quality at a fraction of 405B's cost, with tool-calling and 128K context. Needs a high-end workstation.",
+    "useCases": ["complex reasoning", "long-form writing", "tools"],
+    "capabilities": ["chat", "reasoning", "code", "tools"],
+    "contextLength": 131072,
+    "license": "Llama 3.3",
+    "homepageUrl": "https://ollama.com/library/llama3.3",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 48, "vramRequiredGb": 40, "fileSizeGb": 43.0,"ollamaTag": "llama3.3:70b" }
+    }
+  },
+  {
+    "id": "qwen2.5-0.5b",
+    "name": "Qwen 2.5 0.5B",
+    "family": "Qwen 2.5",
+    "parameters": 0.5,
+    "description": "Alibaba's tiniest model. Runs on almost anything, great for autocomplete, quick edits, and edge/background tasks.",
+    "useCases": ["quick answers", "edge"],
+    "capabilities": ["chat"],
+    "contextLength": 32768,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/qwen2.5",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 2, "vramRequiredGb": 1, "fileSizeGb": 0.4, "ollamaTag": "qwen2.5:0.5b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 3, "vramRequiredGb": 2, "fileSizeGb": 0.7, "ollamaTag": "qwen2.5:0.5b-instruct-q8_0" }
+    }
+  },
+  {
+    "id": "qwen2.5-3b",
+    "name": "Qwen 2.5 3B",
+    "family": "Qwen 2.5",
+    "parameters": 3,
+    "description": "A remarkably capable small model with tool-calling. Strong at structured output and JSON, a great fit for driving the Kanban assistant.",
+    "useCases": ["chat", "structured output", "tools"],
+    "capabilities": ["chat", "tools", "code"],
+    "contextLength": 32768,
+    "license": "Qwen",
+    "homepageUrl": "https://ollama.com/library/qwen2.5",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 4, "vramRequiredGb": 3, "fileSizeGb": 1.9, "ollamaTag": "qwen2.5:3b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 6, "vramRequiredGb": 5, "fileSizeGb": 3.3, "ollamaTag": "qwen2.5:3b-instruct-q8_0" }
+    }
+  },
+  {
+    "id": "qwen2.5-7b",
+    "name": "Qwen 2.5 7B",
+    "family": "Qwen 2.5",
+    "parameters": 7,
+    "description": "One of the best all-round 7B models of 2024. Excellent reasoning, tool-calling, and structured output with a 128K context.",
+    "useCases": ["chat", "coding", "reasoning", "tools"],
+    "capabilities": ["chat", "code", "reasoning", "tools"],
+    "contextLength": 131072,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/qwen2.5",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 6,  "fileSizeGb": 4.7, "ollamaTag": "qwen2.5:7b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9,  "fileSizeGb": 8.1, "ollamaTag": "qwen2.5:7b-instruct-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 16, "fileSizeGb": 15.2,"ollamaTag": "qwen2.5:7b-instruct-fp16" }
+    }
+  },
+  {
+    "id": "qwen2.5-14b",
+    "name": "Qwen 2.5 14B",
+    "family": "Qwen 2.5",
+    "parameters": 14,
+    "description": "A big step up in reasoning and knowledge over 7B while still fitting a single mid/high-end GPU. Tool-calling, 128K context.",
+    "useCases": ["reasoning", "coding", "tools"],
+    "capabilities": ["chat", "code", "reasoning", "tools"],
+    "contextLength": 131072,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/qwen2.5",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 14, "vramRequiredGb": 11, "fileSizeGb": 9.0, "ollamaTag": "qwen2.5:14b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 22, "vramRequiredGb": 17, "fileSizeGb": 15.7,"ollamaTag": "qwen2.5:14b-instruct-q8_0" }
+    }
+  },
+  {
+    "id": "qwen2.5-32b",
+    "name": "Qwen 2.5 32B",
+    "family": "Qwen 2.5",
+    "parameters": 32,
+    "description": "Flagship-class reasoning that rivals much larger models. For 24GB+ GPUs or plenty of RAM. Tool-calling, 128K context.",
+    "useCases": ["complex reasoning", "coding", "tools"],
+    "capabilities": ["chat", "code", "reasoning", "tools"],
+    "contextLength": 131072,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/qwen2.5",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 28, "vramRequiredGb": 22, "fileSizeGb": 20.0,"ollamaTag": "qwen2.5:32b" }
+    }
+  },
+  {
+    "id": "qwen2.5-coder-7b",
+    "name": "Qwen 2.5 Coder 7B",
+    "family": "Qwen 2.5 Coder",
+    "parameters": 7,
+    "description": "Code-specialized Qwen. Strong at C#/Unity, refactors, and completion. Trained on 5.5T code tokens with a 128K context.",
+    "useCases": ["coding", "code completion", "debugging"],
+    "capabilities": ["code", "chat", "tools"],
+    "contextLength": 131072,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/qwen2.5-coder",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 6,  "fileSizeGb": 4.7, "ollamaTag": "qwen2.5-coder:7b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9,  "fileSizeGb": 8.1, "ollamaTag": "qwen2.5-coder:7b-instruct-q8_0" }
+    }
+  },
+  {
+    "id": "qwen2.5-coder-32b",
+    "name": "Qwen 2.5 Coder 32B",
+    "family": "Qwen 2.5 Coder",
+    "parameters": 32,
+    "description": "State-of-the-art open coding model, competitive with GPT-4o on code. The best local choice for serious C#/Unity scripting help.",
+    "useCases": ["coding", "debugging", "refactoring"],
+    "capabilities": ["code", "chat", "tools", "reasoning"],
+    "contextLength": 131072,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/qwen2.5-coder",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 28, "vramRequiredGb": 22, "fileSizeGb": 20.0,"ollamaTag": "qwen2.5-coder:32b" }
+    }
+  },
+  {
+    "id": "gemma2-2b",
+    "name": "Gemma 2 2B",
+    "family": "Gemma 2",
+    "parameters": 2,
+    "description": "Google's best-in-class tiny model. Perfect for always-on background use alongside Unity without hogging resources.",
+    "useCases": ["chat", "summarization", "quick answers"],
+    "capabilities": ["chat"],
+    "contextLength": 8192,
+    "license": "Gemma",
+    "homepageUrl": "https://ollama.com/library/gemma2",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 3, "vramRequiredGb": 2, "fileSizeGb": 1.6, "ollamaTag": "gemma2:2b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 4, "vramRequiredGb": 3, "fileSizeGb": 2.7, "ollamaTag": "gemma2:2b-instruct-q8_0" },
+      "f16": { "quantization": "f16","ramRequiredGb": 6, "vramRequiredGb": 5, "fileSizeGb": 5.2, "ollamaTag": "gemma2:2b-instruct-fp16" }
+    }
+  },
+  {
+    "id": "gemma2-9b",
+    "name": "Gemma 2 9B",
+    "family": "Gemma 2",
+    "parameters": 9,
+    "description": "Google's mid-size model with excellent writing quality and general knowledge. A great balance for a single GPU.",
+    "useCases": ["chat", "summarization", "reasoning"],
+    "capabilities": ["chat", "reasoning"],
+    "contextLength": 8192,
+    "license": "Gemma",
+    "homepageUrl": "https://ollama.com/library/gemma2",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 10, "vramRequiredGb": 7,  "fileSizeGb": 5.4, "ollamaTag": "gemma2:9b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 14, "vramRequiredGb": 11, "fileSizeGb": 9.8, "ollamaTag": "gemma2:9b-instruct-q8_0" }
+    }
+  },
+  {
+    "id": "gemma2-27b",
+    "name": "Gemma 2 27B",
+    "family": "Gemma 2",
+    "parameters": 27,
+    "description": "Google's largest Gemma 2. Punches near 70B-class quality for its size. For 24GB GPUs or high-RAM machines.",
+    "useCases": ["complex reasoning", "long-form writing"],
+    "capabilities": ["chat", "reasoning"],
+    "contextLength": 8192,
+    "license": "Gemma",
+    "homepageUrl": "https://ollama.com/library/gemma2",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 24, "vramRequiredGb": 18, "fileSizeGb": 16.0,"ollamaTag": "gemma2:27b" }
+    }
+  },
+  {
+    "id": "phi3.5-mini",
+    "name": "Phi-3.5 Mini 3.8B",
+    "family": "Phi-3.5",
+    "parameters": 3.8,
+    "description": "Microsoft's compact powerhouse. Punches far above its weight on reasoning and code, with a 128K context.",
+    "useCases": ["coding", "reasoning", "chat"],
+    "capabilities": ["chat", "code", "reasoning"],
+    "contextLength": 131072,
+    "license": "MIT",
+    "homepageUrl": "https://ollama.com/library/phi3.5",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 4, "vramRequiredGb": 3, "fileSizeGb": 2.2, "ollamaTag": "phi3.5:3.8b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 6, "vramRequiredGb": 4, "fileSizeGb": 4.0, "ollamaTag": "phi3.5:3.8b-mini-instruct-q8_0" }
+    }
+  },
+  {
+    "id": "phi4-14b",
+    "name": "Phi-4 14B",
+    "family": "Phi-4",
+    "parameters": 14,
+    "description": "Microsoft's 2025 reasoning model. Exceptional math, logic, and code for its size, competitive with much larger models.",
+    "useCases": ["reasoning", "coding", "math"],
+    "capabilities": ["chat", "reasoning", "code"],
+    "contextLength": 16384,
+    "license": "MIT",
+    "homepageUrl": "https://ollama.com/library/phi4",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 14, "vramRequiredGb": 11, "fileSizeGb": 9.1, "ollamaTag": "phi4" }
     }
   },
   {
@@ -32,55 +242,122 @@
     "name": "Mistral 7B",
     "family": "Mistral",
     "parameters": 7,
-    "description": "Highly efficient 7B model. Fast inference, strong at code and structured outputs. Good balance for developers.",
+    "description": "Efficient, fast, and reliable. Strong at code and structured outputs, a proven developer workhorse.",
     "useCases": ["coding", "chat", "structured output"],
+    "capabilities": ["chat", "code", "tools"],
+    "contextLength": 32768,
+    "license": "Apache 2.0",
     "homepageUrl": "https://ollama.com/library/mistral",
     "variants": {
-      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 5,  "fileSizeGb": 4.1, "ollamaTag": "mistral:7b-instruct-v0.3-q4_0" },
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 6,  "fileSizeGb": 4.1, "ollamaTag": "mistral:7b" },
       "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 8,  "fileSizeGb": 7.7, "ollamaTag": "mistral:7b-instruct-v0.3-q8_0" },
       "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 16, "fileSizeGb": 14.5,"ollamaTag": "mistral:7b-instruct-v0.3-fp16" }
     }
   },
   {
-    "id": "gemma2-2b",
-    "name": "Gemma 2 2B",
-    "family": "Gemma",
-    "parameters": 2,
-    "description": "Google's ultra-lightweight model. Best-in-class for its size. Perfect for always-on background use alongside Unity.",
-    "useCases": ["chat", "summarization", "quick answers"],
-    "homepageUrl": "https://ollama.com/library/gemma2",
+    "id": "mistral-nemo-12b",
+    "name": "Mistral Nemo 12B",
+    "family": "Mistral",
+    "parameters": 12,
+    "description": "A 12B built with NVIDIA, featuring tool-calling and a 128K context. Great multilingual and structured-output performance.",
+    "useCases": ["chat", "tools", "multilingual"],
+    "capabilities": ["chat", "tools", "code"],
+    "contextLength": 131072,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/mistral-nemo",
     "variants": {
-      "q4": { "quantization": "q4", "ramRequiredGb": 3,  "vramRequiredGb": 2,  "fileSizeGb": 1.6, "ollamaTag": "gemma2:2b-instruct-q4_0" },
-      "q8": { "quantization": "q8", "ramRequiredGb": 4,  "vramRequiredGb": 3,  "fileSizeGb": 2.9, "ollamaTag": "gemma2:2b-instruct-q8_0" },
-      "f16": { "quantization": "f16","ramRequiredGb": 6,  "vramRequiredGb": 5,  "fileSizeGb": 5.4, "ollamaTag": "gemma2:2b-instruct-fp16" }
+      "q4": { "quantization": "q4", "ramRequiredGb": 12, "vramRequiredGb": 9, "fileSizeGb": 7.1, "ollamaTag": "mistral-nemo:12b" }
     }
   },
   {
-    "id": "codegemma-7b",
-    "name": "CodeGemma 7B",
-    "family": "CodeGemma",
+    "id": "deepseek-r1-7b",
+    "name": "DeepSeek-R1 7B",
+    "family": "DeepSeek-R1",
     "parameters": 7,
-    "description": "Google's code-specialized model. Trained specifically on code. Ideal for C#/Unity scripting assistance.",
-    "useCases": ["coding", "code completion", "debugging"],
-    "homepageUrl": "https://ollama.com/library/codegemma",
+    "description": "Reasoning-tuned distill that thinks step-by-step in <think> tags before answering. Great for tough logic and planning on modest hardware.",
+    "useCases": ["reasoning", "math", "planning"],
+    "capabilities": ["reasoning", "chat", "code"],
+    "contextLength": 131072,
+    "license": "MIT",
+    "homepageUrl": "https://ollama.com/library/deepseek-r1",
     "variants": {
-      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 5,  "fileSizeGb": 4.8, "ollamaTag": "codegemma:7b-instruct-q4_0" },
-      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9,  "fileSizeGb": 7.6, "ollamaTag": "codegemma:7b-instruct-q8_0" },
-      "f16": { "quantization": "f16","ramRequiredGb": 20, "vramRequiredGb": 16, "fileSizeGb": 14.2,"ollamaTag": "codegemma:7b-instruct-fp16" }
+      "q4": { "quantization": "q4", "ramRequiredGb": 8,  "vramRequiredGb": 6, "fileSizeGb": 4.7, "ollamaTag": "deepseek-r1:7b" },
+      "q8": { "quantization": "q8", "ramRequiredGb": 12, "vramRequiredGb": 9, "fileSizeGb": 8.1, "ollamaTag": "deepseek-r1:7b-qwen-distill-q8_0" }
     }
   },
   {
-    "id": "llama3-70b",
-    "name": "Llama 3 70B",
-    "family": "Llama 3",
-    "parameters": 70,
-    "description": "Meta's largest open model. Near-GPT-4 quality. Requires a high-end workstation. Not Unity-Safe.",
-    "useCases": ["chat", "complex reasoning", "long-form writing"],
-    "homepageUrl": "https://ollama.com/library/llama3",
+    "id": "deepseek-r1-14b",
+    "name": "DeepSeek-R1 14B",
+    "family": "DeepSeek-R1",
+    "parameters": 14,
+    "description": "Stronger reasoning distill. Excellent chain-of-thought for architecture decisions and complex debugging.",
+    "useCases": ["complex reasoning", "math", "planning"],
+    "capabilities": ["reasoning", "chat", "code"],
+    "contextLength": 131072,
+    "license": "MIT",
+    "homepageUrl": "https://ollama.com/library/deepseek-r1",
     "variants": {
-      "q4": { "quantization": "q4", "ramRequiredGb": 40, "vramRequiredGb": 35, "fileSizeGb": 39.0,"ollamaTag": "llama3:70b-instruct-q4_0" },
-      "q8": { "quantization": "q8", "ramRequiredGb": 75, "vramRequiredGb": 70, "fileSizeGb": 74.0,"ollamaTag": "llama3:70b-instruct-q8_0" },
-      "f16": { "quantization": "f16","ramRequiredGb": 144,"vramRequiredGb": 140,"fileSizeGb": 140.0,"ollamaTag": "llama3:70b-instruct-fp16" }
+      "q4": { "quantization": "q4", "ramRequiredGb": 14, "vramRequiredGb": 11, "fileSizeGb": 9.0, "ollamaTag": "deepseek-r1:14b" }
+    }
+  },
+  {
+    "id": "deepseek-r1-32b",
+    "name": "DeepSeek-R1 32B",
+    "family": "DeepSeek-R1",
+    "parameters": 32,
+    "description": "Top-tier open reasoning. Approaches o1-mini on math and code reasoning. For 24GB+ GPUs or high-RAM rigs.",
+    "useCases": ["complex reasoning", "math", "coding"],
+    "capabilities": ["reasoning", "chat", "code"],
+    "contextLength": 131072,
+    "license": "MIT",
+    "homepageUrl": "https://ollama.com/library/deepseek-r1",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 28, "vramRequiredGb": 22, "fileSizeGb": 20.0,"ollamaTag": "deepseek-r1:32b" }
+    }
+  },
+  {
+    "id": "llama3.2-vision-11b",
+    "name": "Llama 3.2 Vision 11B",
+    "family": "Llama 3.2 Vision",
+    "parameters": 11,
+    "description": "Multimodal Llama, send it screenshots, mockups, or reference art and ask questions. Great for UI/UX and asset review.",
+    "useCases": ["vision", "image Q&A", "chat"],
+    "capabilities": ["vision", "chat"],
+    "contextLength": 131072,
+    "license": "Llama 3.2",
+    "homepageUrl": "https://ollama.com/library/llama3.2-vision",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 12, "vramRequiredGb": 9, "fileSizeGb": 7.9, "ollamaTag": "llama3.2-vision:11b" }
+    }
+  },
+  {
+    "id": "llava-7b",
+    "name": "LLaVA 7B",
+    "family": "LLaVA",
+    "parameters": 7,
+    "description": "Lightweight multimodal model for image understanding on modest hardware. Describe or reason about screenshots and art.",
+    "useCases": ["vision", "image Q&A"],
+    "capabilities": ["vision", "chat"],
+    "contextLength": 4096,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/llava",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 8, "vramRequiredGb": 6, "fileSizeGb": 4.7, "ollamaTag": "llava:7b" }
+    }
+  },
+  {
+    "id": "nomic-embed-text",
+    "name": "Nomic Embed Text",
+    "family": "Nomic",
+    "parameters": 0.1,
+    "description": "A top open embedding model for semantic search and RAG. Tiny and fast, powers similarity/memory features, not chat.",
+    "useCases": ["embeddings", "search", "RAG"],
+    "capabilities": ["embedding"],
+    "contextLength": 8192,
+    "license": "Apache 2.0",
+    "homepageUrl": "https://ollama.com/library/nomic-embed-text",
+    "variants": {
+      "q4": { "quantization": "q4", "ramRequiredGb": 2, "vramRequiredGb": 1, "fileSizeGb": 0.3, "ollamaTag": "nomic-embed-text" }
     }
   }
 ]

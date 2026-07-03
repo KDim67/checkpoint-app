@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useId, useRef } from 'react'
-import { Play, FileText, Download, Code, Layers, RefreshCw, Trash2, Plus, Copy, AlertTriangle, CheckCircle, HelpCircle, Activity, GitFork, Palette, Info, Sparkles, Box, Eye, Settings, Loader, Repeat, Grid, Scissors, Sliders, Maximize2 } from 'lucide-react'
+import { Download, Layers, RefreshCw, Trash2, Plus, Copy, AlertTriangle, CheckCircle, GitFork, Palette, Info, Sparkles, Box, Settings, Loader, Repeat, Grid, Scissors, Sliders, Maximize2 } from 'lucide-react'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
 import mermaid from 'mermaid'
@@ -45,6 +45,8 @@ interface PbrParams {
   roughnessContrast: number
   roughnessBase: number
   aoIntensity: number
+  /** Treat dark pixels as high instead of low (crevices vs. ridges). */
+  invertHeight?: boolean
 }
 
 /**
@@ -54,14 +56,16 @@ interface PbrParams {
  * full-resolution export path without duplicating the loop.
  */
 function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, params: PbrParams) {
-  const { normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity } = params
+  const { normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight } = params
 
-  // Luma-weighted grayscale with clamped border reads
+  // Luma-weighted grayscale with clamped border reads. Applying the height
+  // inversion here keeps height, normal direction, roughness and AO coherent.
   const getGray = (x: number, y: number): number => {
     const cx = Math.max(0, Math.min(W - 1, x))
     const cy = Math.max(0, Math.min(H - 1, y))
     const i = (cy * W + cx) * 4
-    return (0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]) / 255
+    const g = (0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]) / 255
+    return invertHeight ? 1 - g : g
   }
 
   const len = W * H * 4
@@ -110,6 +114,90 @@ function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, params: Pb
   return { hData, nData, rData, aData }
 }
 
+// Pixel-art scaling cores (EPX / AdvMAME family)
+// Pure functions over raw RGBA buffers, shared by the live preview and the
+// export path, and composable (Scale4x = Scale2x applied twice).
+
+/** Read a pixel as a packed 32-bit RGBA value with clamped border reads. */
+function makePixelReaders(s: Uint8ClampedArray, w: number, h: number) {
+  const idx = (x: number, y: number): number => {
+    const cx = x < 0 ? 0 : x >= w ? w - 1 : x
+    const cy = y < 0 ? 0 : y >= h ? h - 1 : y
+    return (cy * w + cx) * 4
+  }
+  const pix = (x: number, y: number): number => {
+    const i = idx(x, y)
+    return ((s[i] << 24) | (s[i + 1] << 16) | (s[i + 2] << 8) | s[i + 3]) >>> 0
+  }
+  return { idx, pix }
+}
+
+/** Scale2x (EPX): doubles dimensions, preserving hard pixel-art edges. */
+function scale2xData(s: Uint8ClampedArray, w: number, h: number) {
+  const { idx, pix } = makePixelReaders(s, w, h)
+  const out = new Uint8ClampedArray(w * 2 * h * 2 * 4)
+  const put = (dx: number, dy: number, si: number) => {
+    const di = (dy * w * 2 + dx) * 4
+    out[di] = s[si]; out[di + 1] = s[si + 1]; out[di + 2] = s[si + 2]; out[di + 3] = s[si + 3]
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const A = pix(x, y - 1)
+      const C = pix(x - 1, y)
+      const B = pix(x + 1, y)
+      const D = pix(x, y + 1)
+      const self = idx(x, y)
+      put(x * 2,     y * 2,     (C === A && C !== D && A !== B) ? idx(x, y - 1) : self)
+      put(x * 2 + 1, y * 2,     (A === B && A !== C && B !== D) ? idx(x + 1, y) : self)
+      put(x * 2,     y * 2 + 1, (D === C && D !== B && C !== A) ? idx(x - 1, y) : self)
+      put(x * 2 + 1, y * 2 + 1, (B === D && B !== A && D !== C) ? idx(x + 1, y) : self)
+    }
+  }
+  return out
+}
+
+/** Scale3x (AdvMAME3x): triples dimensions with the 9-subpixel rule set. */
+function scale3xData(s: Uint8ClampedArray, w: number, h: number) {
+  const { idx, pix } = makePixelReaders(s, w, h)
+  const out = new Uint8ClampedArray(w * 3 * h * 3 * 4)
+  const put = (dx: number, dy: number, si: number) => {
+    const di = (dy * w * 3 + dx) * 4
+    out[di] = s[si]; out[di + 1] = s[si + 1]; out[di + 2] = s[si + 2]; out[di + 3] = s[si + 3]
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const E = pix(x, y)
+      const A = pix(x - 1, y - 1)
+      const B = pix(x, y - 1)
+      const C = pix(x + 1, y - 1)
+      const D = pix(x - 1, y)
+      const F = pix(x + 1, y)
+      const G = pix(x - 1, y + 1)
+      const H = pix(x, y + 1)
+      const I = pix(x + 1, y + 1)
+      const self = idx(x, y)
+      const e1 = (D === B && D !== H && B !== F) ? idx(x - 1, y) : self
+      const e2 = ((D === B && D !== H && B !== F && E !== C) || (B === F && B !== D && F !== H && E !== A)) ? idx(x, y - 1) : self
+      const e3 = (B === F && B !== D && F !== H) ? idx(x + 1, y) : self
+      const e4 = ((D === B && D !== H && B !== F && E !== G) || (D === H && D !== B && H !== F && E !== A)) ? idx(x - 1, y) : self
+      const e6 = ((B === F && B !== D && F !== H && E !== I) || (H === F && H !== D && F !== B && E !== C)) ? idx(x + 1, y) : self
+      const e7 = (D === H && D !== B && H !== F) ? idx(x - 1, y) : self
+      const e8 = ((D === H && D !== B && H !== F && E !== I) || (H === F && H !== D && F !== B && E !== G)) ? idx(x, y + 1) : self
+      const e9 = (H === F && H !== D && F !== B) ? idx(x + 1, y) : self
+      put(x * 3,     y * 3,     e1)
+      put(x * 3 + 1, y * 3,     e2)
+      put(x * 3 + 2, y * 3,     e3)
+      put(x * 3,     y * 3 + 1, e4)
+      put(x * 3 + 1, y * 3 + 1, self)
+      put(x * 3 + 2, y * 3 + 1, e6)
+      put(x * 3,     y * 3 + 2, e7)
+      put(x * 3 + 1, y * 3 + 2, e8)
+      put(x * 3 + 2, y * 3 + 2, e9)
+    }
+  }
+  return out
+}
+
 // Shared LUT Builder Utility
 interface LutParams {
   exposure: number
@@ -124,7 +212,7 @@ interface LutParams {
  * A single source of truth consumed by both the live preview renderer and the export
  * path, keeping both pixel-perfect identical with no code duplication.
  */
-function buildLutData(params: LutParams): Uint8ClampedArray {
+function buildLutData(params: LutParams) {
   const { exposure, brightness, contrast, saturation, temperature } = params
   const expScale = Math.pow(2, exposure / 100)
   const contrastFactor = (100 + contrast) / 100
@@ -182,14 +270,6 @@ interface DialogueNode {
 }
 
 // Constants
-
-const FPS_PRESETS = [
-  { fps: 60, ms: 16.67 },
-  { fps: 90, ms: 11.11 },
-  { fps: 120, ms: 8.33 },
-  { fps: 144, ms: 6.94 },
-  { fps: 240, ms: 4.17 }
-]
 
 const PALETTE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
@@ -299,7 +379,7 @@ function MermaidChart({ code }: { code: string }) {
 
 export default function GameDevView() {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<'renamer' | 'budget' | 'dialogue' | 'palette' | 'pbr' | 'seamless' | 'atlas' | 'slicer' | 'lut' | 'upscaler'>('renamer')
+  const [activeTab, setActiveTab] = useState<'renamer' | 'dialogue' | 'palette' | 'pbr' | 'seamless' | 'atlas' | 'slicer' | 'lut' | 'upscaler'>('pbr')
 
   // Tab 1: Batch Asset Renamer State
   const [files, setFiles] = useState<AssetFile[]>([])
@@ -314,7 +394,7 @@ export default function GameDevView() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [exportedFiles, setExportedFiles] = useState<string[]>([])
-  const [shape, setShape] = useState<'sphere' | 'cube'>('sphere')
+  const [shape, setShape] = useState<'sphere' | 'cube' | 'plane'>('sphere')
   const [rotate, setRotate] = useState(true)
 
   // Sliders
@@ -323,6 +403,7 @@ export default function GameDevView() {
   const [roughnessContrast, setRoughnessContrast] = useState(1.0)
   const [roughnessBase, setRoughnessBase] = useState(0.5)
   const [aoIntensity, setAoIntensity] = useState(1.0)
+  const [invertHeight, setInvertHeight] = useState(false)
 
   // Canvases
   const albedoCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -365,7 +446,6 @@ export default function GameDevView() {
   const [atlasPadding, setAtlasPadding] = useState(2)
   const [atlasMaxSize, setAtlasMaxSize] = useState<1024 | 2048 | 4096>(2048)
   const [atlasAutoTrim, setAtlasAutoTrim] = useState(true)
-  const [atlasForcePowerOfTwo, setAtlasForcePowerOfTwo] = useState(false)
   const [isAtlasPacking, setIsAtlasPacking] = useState(false)
   const [isAtlasSaving, setIsAtlasSaving] = useState(false)
   const [atlasExportedPng, setAtlasExportedPng] = useState<string | null>(null)
@@ -399,9 +479,11 @@ export default function GameDevView() {
   // Tab 10: Pixel Art Upscaler State
   const [upscalePath, setUpscalePath] = useState<string | null>(null)
   const [upscaleUrl, setUpscaleUrl] = useState<string | null>(null)
-  const [upscaleAlgorithm, setUpscaleAlgorithm] = useState<'nearest2x' | 'nearest4x' | 'nearest8x' | 'scale2x' | 'scale3x'>('nearest4x')
+  const [upscaleAlgorithm, setUpscaleAlgorithm] = useState<'nearest2x' | 'nearest4x' | 'nearest8x' | 'scale2x' | 'scale3x' | 'scale4x'>('scale2x')
   const [upscaleExportedPath, setUpscaleExportedPath] = useState<string | null>(null)
   const [isUpscaleSaving, setIsUpscaleSaving] = useState(false)
+  const [upscaleDims, setUpscaleDims] = useState<{ w: number; h: number; ow: number; oh: number } | null>(null)
+  const [upscaleShowOriginal, setUpscaleShowOriginal] = useState(false)
   const upscalePreviewCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [renamerSuffixPreset, setRenamerSuffixPreset] = useState<'none' | 'diffuse' | 'normal'>('none')
   const [searchStr, setSearchStr] = useState('')
@@ -413,14 +495,6 @@ export default function GameDevView() {
   const [indexPadding, setIndexPadding] = useState(2)
   const [renaming, setRenaming] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
-
-  // Tab 2: Frame Budget State
-  const [targetFps, setTargetFps] = useState(60)
-  const [cpuGameTick, setCpuGameTick] = useState(4.5)
-  const [cpuRenderThread, setCpuRenderThread] = useState(3.2)
-  const [gpuDrawTime, setGpuDrawTime] = useState(11.5)
-  const [physicsTime, setPhysicsTime] = useState(1.8)
-  const [uiLayoutTime, setUiLayoutTime] = useState(0.8)
 
   // Tab 3: Dialogue Quest Flow State
   const [dialogueNodes, setDialogueNodes] = useState<DialogueNode[]>([
@@ -517,7 +591,8 @@ export default function GameDevView() {
 
     setIsProcessing(true)
     try {
-      const path = (file as any).path || ''
+      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+      const path = window.electronAPI.app.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {
         setAlbedoPath(path)
@@ -576,7 +651,7 @@ export default function GameDevView() {
     if (!heightCtx || !normalCtx || !roughnessCtx || !aoCtx) return
 
     const { hData, nData, rData, aData } = computePbrMaps(src, size, size, {
-      normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity
+      normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight
     })
 
     heightCtx.putImageData(new ImageData(hData, size, size), 0, 0)
@@ -589,7 +664,7 @@ export default function GameDevView() {
     if (threeTexturesRef.current.bumpMap) threeTexturesRef.current.bumpMap.needsUpdate = true
     if (threeTexturesRef.current.roughnessMap) threeTexturesRef.current.roughnessMap.needsUpdate = true
     if (threeTexturesRef.current.aoMap) threeTexturesRef.current.aoMap.needsUpdate = true
-  }, [normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity])
+  }, [normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight])
 
   // Full-resolution export, also delegates to computePbrMaps() for identical output
   const handleExport = useCallback(async () => {
@@ -610,11 +685,11 @@ export default function GameDevView() {
       const src = offCtx.getImageData(0, 0, W, H).data
 
       const { hData, nData, rData, aData } = computePbrMaps(src, W, H, {
-        normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity
+        normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight
       })
 
       // Convert each typed array to a data URL via an off-screen canvas
-      const toDataUrl = (data: Uint8ClampedArray) => {
+      const toDataUrl = (data: Uint8ClampedArray<ArrayBuffer>) => {
         const c = document.createElement('canvas')
         c.width = W; c.height = H
         c.getContext('2d')!.putImageData(new ImageData(data, W, H), 0, 0)
@@ -641,7 +716,7 @@ export default function GameDevView() {
     } finally {
       setIsSaving(false)
     }
-  }, [albedoPath, normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, toast])
+  }, [albedoPath, normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight, toast])
 
   // Watch preload texture path from appStore
   useEffect(() => {
@@ -682,8 +757,11 @@ export default function GameDevView() {
   //   1. All parameters are explicit, no closure captures. Empty dep array = stable ref.
   //   2. Center offset uses Math.round() to prevent half-pixel drift on odd dimensions.
   //   3. Toroidal luminance equalisation pad avoids edge-bleed from CSS blur().
-  //   4. Blend mask uses a smooth algebraic union to prevent diagonal crease artefacts.
-  //   5. Wave-warp displacement is amplitude-limited (J > 0) to prevent fold artefacts.
+  //   4. Four-offset separable blend: every seam of every wrap-offset copy gets
+  //      exactly zero weight, so the result is fully seamless by construction
+  //      (see the detailed derivation at the blend loop below).
+  //   5. Wave modulation is multiplicative on the border distance, so tile-edge
+  //      continuity is preserved for any wave amplitude.
   const runSeamlessStitch = useCallback((
     img: HTMLImageElement,
     blendWidth: number,
@@ -797,74 +875,108 @@ export default function GameDevView() {
 
       const activeSrc = equalizedData || src
 
-      // 2. Cross-Dissolve Offset Blending
+      // 2. Four-offset separable border blend.
+      //
+      // A two-sample "half-shift + blend the centre cross" can never be fully
+      // seamless: wherever a cross arm meets the tile border, either the
+      // original's border mismatch or the shifted copy's centre seam is
+      // exposed, visible as short "whisker" artefacts at tile-boundary
+      // midpoints. Blending FOUR wrap-offset copies with separable weights
+      // gives every seam of every copy exactly zero weight:
+      //   S00 unshifted, seams at the borders          (w = ax·ay)
+      //   S10 x-shifted by cx, seams at x=cx and y-borders   (w = bx·ay)
+      //   S01 y-shifted by cy, seams at y=cy and x-borders   (w = ax·by)
+      //   S11 xy-shifted, seams at x=cx and y=cy        (w = bx·by)
+      // ax rises 0→1 over the blend band measured inward from the x-borders:
+      // it is 0 at the borders (hiding S00/S01 there) and 1 in the interior
+      // (where bx = 1−ax = 0 hides S10/S11's centre seams). ay likewise.
+      // The border ring is therefore toroidally continuous by construction
+      // and the interior remains the untouched original.
       const outImgData = ctx.createImageData(targetW, targetH)
       const dst = outImgData.data
 
-      const B_w = Math.max(4, Math.round(targetW * blendWidth))
-      const B_h = Math.max(4, Math.round(targetH * blendWidth))
       // Integer center prevents sub-pixel drift on odd-dimension textures
       const cx = Math.round(targetW / 2)
       const cy = Math.round(targetH / 2)
+      // Blend band width, clamped so it can never reach the shifted copies'
+      // centre seams (which must stay strictly inside the bx=0 region).
+      const B_w = Math.min(cx - 2, Math.max(4, Math.round(targetW * blendWidth)))
+      const B_h = Math.min(cy - 2, Math.max(4, Math.round(targetH * blendWidth)))
 
       // Toroidal coordinate wrap that handles negative values correctly
       const wrapVal = (v: number, limit: number) =>
         ((Math.round(v) % limit) + limit) % limit
 
-      const sampleUnshifted = (px: number, py: number) => {
-        const idx = (wrapVal(py, targetH) * targetW + wrapVal(px, targetW)) * 4
-        return { r: activeSrc[idx], g: activeSrc[idx + 1], b: activeSrc[idx + 2], a: activeSrc[idx + 3] }
-      }
+      const sampleAt = (px: number, py: number): number =>
+        (wrapVal(py, targetH) * targetW + wrapVal(px, targetW)) * 4
 
-      const sampleShifted = (px: number, py: number) => {
-        // Half-shift produces the seam-crossing sample; integer cx/cy prevents drift
-        const idx = (wrapVal(py + cy, targetH) * targetW + wrapVal(px + cx, targetW)) * 4
-        return { r: activeSrc[idx], g: activeSrc[idx + 1], b: activeSrc[idx + 2], a: activeSrc[idx + 3] }
-      }
-
-      // Low-cost deterministic 2D hash for noise in the blend mask
+      // Low-cost deterministic 2D hash for dithering the blend transitions
       const hash2d = (x: number, y: number) => {
         const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123
         return h - Math.floor(h)
       }
 
+      const smooth01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v))
+
       for (let y = 0; y < targetH; y++) {
-        // Periodic wave displacement along rows (3 cycles, amplitude-clamped for J > 0)
+        // Wave along the x-transition, driven by y (toroidally periodic, 
+        // whole numbers of cycles, so it matches across tile copies)
         const angleX = (2 * Math.PI * 3 * y) / targetH
-        const waveX  = Math.sin(angleX) * 0.08 + Math.cos(angleX * 2) * 0.03
+        const waveX = Math.sin(angleX) * 0.08 + Math.cos(angleX * 2) * 0.03
+
+        const dyB = Math.min(y, targetH - 1 - y)
 
         for (let x = 0; x < targetW; x++) {
           const idx = (y * targetW + x) * 4
 
           const angleY = (2 * Math.PI * 3 * x) / targetW
-          const waveY  = Math.sin(angleY) * 0.08 + Math.cos(angleY * 2) * 0.03
+          const waveY = Math.sin(angleY) * 0.08 + Math.cos(angleY * 2) * 0.03
 
-          // Warp both lookup coordinates AND the mask distance together to align seams
-          const xw = x + waveX * wavySeams * B_w
-          const yw = y + waveY * wavySeams * B_h
+          const dxB = Math.min(x, targetW - 1 - x)
 
-          const dx = Math.abs(xw - cx)
-          const dy = Math.abs(yw - cy)
+          // Normalised distance inward from the nearest border. The wave
+          // modulates multiplicatively so the value stays exactly 0 at the
+          // border, continuity across tile copies is never broken.
+          let ax = smooth01((dxB / B_w) * (1 + waveX * wavySeams))
+          let ay = smooth01((dyB / B_h) * (1 + waveY * wavySeams))
 
-          // Per-axis blend weights
-          let tx = dx < 0.5 ? 1.0 : dx < B_w / 2 ? 1 - (dx - 0.5) / (B_w / 2 - 0.5) : 0
-          let ty = dy < 0.5 ? 1.0 : dy < B_h / 2 ? 1 - (dy - 0.5) / (B_h / 2 - 0.5) : 0
-
-          // Algebraic smooth union prevents diagonal crease artefacts
-          let t = tx + ty - tx * ty
-          t = t * t * (3 - 2 * t) // smoothstep for flat edge easing
-
-          if (wavySeams > 0 && t > 0.02 && t < 0.98) {
-            t = Math.max(0, Math.min(1, t + (hash2d(x, y) - 0.5) * 0.12 * wavySeams))
+          // Dither the transition zones to mask any residual banding
+          if (wavySeams > 0) {
+            if (ax > 0.02 && ax < 0.98) {
+              ax = Math.max(0, Math.min(1, ax + (hash2d(x, y) - 0.5) * 0.12 * wavySeams))
+            }
+            if (ay > 0.02 && ay < 0.98) {
+              ay = Math.max(0, Math.min(1, ay + (hash2d(x + 131.7, y + 57.3) - 0.5) * 0.12 * wavySeams))
+            }
           }
 
-          const pS = sampleShifted(xw, yw)
-          const pU = sampleUnshifted(xw, yw)
+          const i00 = sampleAt(x, y)
 
-          dst[idx]     = Math.round(pS.r * (1 - t) + pU.r * t)
-          dst[idx + 1] = Math.round(pS.g * (1 - t) + pU.g * t)
-          dst[idx + 2] = Math.round(pS.b * (1 - t) + pU.b * t)
-          dst[idx + 3] = Math.round(pS.a * (1 - t) + pU.a * t)
+          // Fast path: the interior (the vast majority of pixels) is the
+          // untouched original, skip the other three samples entirely.
+          if (ax === 1 && ay === 1) {
+            dst[idx]     = activeSrc[i00]
+            dst[idx + 1] = activeSrc[i00 + 1]
+            dst[idx + 2] = activeSrc[i00 + 2]
+            dst[idx + 3] = activeSrc[i00 + 3]
+            continue
+          }
+
+          const bx = 1 - ax
+          const by = 1 - ay
+          const w00 = ax * ay
+          const w10 = bx * ay
+          const w01 = ax * by
+          const w11 = bx * by
+
+          const i10 = sampleAt(x + cx, y)
+          const i01 = sampleAt(x, y + cy)
+          const i11 = sampleAt(x + cx, y + cy)
+
+          dst[idx]     = Math.round(activeSrc[i00] * w00 + activeSrc[i10] * w10 + activeSrc[i01] * w01 + activeSrc[i11] * w11)
+          dst[idx + 1] = Math.round(activeSrc[i00 + 1] * w00 + activeSrc[i10 + 1] * w10 + activeSrc[i01 + 1] * w01 + activeSrc[i11 + 1] * w11)
+          dst[idx + 2] = Math.round(activeSrc[i00 + 2] * w00 + activeSrc[i10 + 2] * w10 + activeSrc[i01 + 2] * w01 + activeSrc[i11 + 2] * w11)
+          dst[idx + 3] = Math.round(activeSrc[i00 + 3] * w00 + activeSrc[i10 + 3] * w10 + activeSrc[i01 + 3] * w01 + activeSrc[i11 + 3] * w11)
         }
       }
 
@@ -874,10 +986,19 @@ export default function GameDevView() {
 
   // Helper that tiles a canvas (either the seamless result or the raw original)
   // onto the visible tiling preview canvas, optionally overlaying grid lines.
+  // Tiles are drawn at the source's true aspect ratio, a 2:1 texture renders
+  // as 2:1 tiles instead of being squashed into squares.
+  //
+  // The tile is downscaled ONCE into an integer-sized stamp, then blitted as
+  // byte-identical unscaled copies. Scaling each tile individually (and at
+  // fractional positions) filters every tile's edges independently, which
+  // shows up as faint hairlines along the tile boundaries, artifacts of the
+  // preview, not the texture.
   const drawTilingCanvas = useCallback((
     sourceCanvas: HTMLCanvasElement | HTMLImageElement,
     reps: number,
-    showGrid: boolean
+    showGrid: boolean,
+    aspect: number = 1
   ) => {
     const tilingCanvas = seamlessTilingCanvasRef.current
     if (!tilingCanvas) return
@@ -886,10 +1007,24 @@ export default function GameDevView() {
     const ctx = tilingCanvas.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, 600, 600)
-    const size = 600 / reps
-    for (let row = 0; row < reps; row++) {
-      for (let col = 0; col < reps; col++) {
-        ctx.drawImage(sourceCanvas, col * size, row * size, size, size)
+
+    const tileW = Math.max(1, Math.round(600 / reps))
+    const tileH = Math.max(1, Math.round(tileW / (aspect || 1)))
+
+    const stamp = document.createElement('canvas')
+    stamp.width = tileW
+    stamp.height = tileH
+    const sctx = stamp.getContext('2d')
+    if (!sctx) return
+    sctx.imageSmoothingEnabled = true
+    sctx.imageSmoothingQuality = 'high'
+    sctx.drawImage(sourceCanvas, 0, 0, tileW, tileH)
+
+    const cols = Math.ceil(600 / tileW)
+    const rows = Math.ceil(600 / tileH)
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        ctx.drawImage(stamp, col * tileW, row * tileH)
       }
     }
     if (showGrid) {
@@ -897,9 +1032,11 @@ export default function GameDevView() {
       ctx.setLineDash([4, 4])
       ctx.lineWidth = 1.5
       ctx.beginPath()
-      for (let i = 1; i < reps; i++) {
-        ctx.moveTo(i * size, 0);   ctx.lineTo(i * size, 600)
-        ctx.moveTo(0, i * size);   ctx.lineTo(600, i * size)
+      for (let i = 1; i < cols; i++) {
+        ctx.moveTo(i * tileW, 0); ctx.lineTo(i * tileW, 600)
+      }
+      for (let i = 1; i < rows; i++) {
+        ctx.moveTo(0, i * tileH); ctx.lineTo(600, i * tileH)
       }
       ctx.stroke()
       ctx.setLineDash([])
@@ -910,9 +1047,13 @@ export default function GameDevView() {
     const img = seamlessOriginalImageRef.current
     if (!img) return
 
+    const srcW = img.naturalWidth || img.width
+    const srcH = img.naturalHeight || img.height
+    const aspect = srcW > 0 && srcH > 0 ? srcW / srcH : 1
+
     if (seamlessShowOriginal) {
       // Before/after compare: tile the unmodified source image directly
-      drawTilingCanvas(img, seamlessTilingScale, seamlessShowGrid)
+      drawTilingCanvas(img, seamlessTilingScale, seamlessShowGrid, aspect)
       return
     }
 
@@ -923,18 +1064,23 @@ export default function GameDevView() {
       seamlessGeneratedCanvasRef.current = singleTileCanvas
     }
 
+    // Preview at aspect-correct proxy resolution (longest side 512) so the
+    // stitch math sees the same proportions the full-resolution export will.
+    const previewW = aspect >= 1 ? 512 : Math.max(64, Math.round(512 * aspect))
+    const previewH = aspect >= 1 ? Math.max(64, Math.round(512 / aspect)) : 512
+
     runSeamlessStitch(
       img,
       seamlessBlendWidth,
       seamlessAlgorithm,
       seamlessEqualizer,
       seamlessWavySeams,
-      512,
-      512,
+      previewW,
+      previewH,
       singleTileCanvas
     )
 
-    drawTilingCanvas(singleTileCanvas, seamlessTilingScale, seamlessShowGrid)
+    drawTilingCanvas(singleTileCanvas, seamlessTilingScale, seamlessShowGrid, aspect)
   }, [
     seamlessBlendWidth, seamlessAlgorithm, seamlessTilingScale,
     seamlessShowGrid, seamlessShowOriginal, seamlessEqualizer, seamlessWavySeams,
@@ -1034,7 +1180,8 @@ export default function GameDevView() {
     setIsSeamlessProcessing(true)
     setSeamlessShowOriginal(false) // reset compare to 'result' on new file
     try {
-      const path = (file as any).path || ''
+      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+      const path = window.electronAPI.app.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {
         setSeamlessPath(path)
@@ -1164,7 +1311,7 @@ export default function GameDevView() {
       // 3. Find smallest fitting size
       const sizes = [128, 256, 512, 1024, 2048, 4096]
       const allowedSizes = sizes.filter(s => s <= atlasMaxSize)
-      let finalSize = atlasMaxSize
+      let finalSize: number = atlasMaxSize
       let fitsAll = false
 
       // Sort blocks by max side descending (helps packing efficiency)
@@ -1639,9 +1786,12 @@ export default function GameDevView() {
       exportCanvas.getContext('2d')!.putImageData(new ImageData(d, 256, 16), 0, 0)
 
       const base64Data = exportCanvas.toDataURL('image/png')
-      const basePath = slicerPath || seamlessPath || albedoPath || (window.electronAPI.gamedev.selectSpriteFolder ? 'C:/temp/lut.png' : '')
+      // Anchor the export next to whichever asset is loaded in a sibling tool.
+      // No silent fallback directory, exporting somewhere the user never
+      // chose is worse than asking them to load an asset first.
+      const basePath = slicerPath || seamlessPath || albedoPath || upscalePath
       if (!basePath) {
-        toast('Please load a sprite or texture sheet first to establish an export folder directory.', { type: 'warning' })
+        toast('Load an image in any texture tool first, the LUT is saved next to that asset.', { type: 'warning' })
         return
       }
 
@@ -1658,7 +1808,7 @@ export default function GameDevView() {
     } finally {
       setIsLutSaving(false)
     }
-  }, [slicerPath, seamlessPath, albedoPath, lutBrightness, lutContrast, lutSaturation, lutTemperature, lutExposure, toast])
+  }, [slicerPath, seamlessPath, albedoPath, upscalePath, lutBrightness, lutContrast, lutSaturation, lutTemperature, lutExposure, toast])
 
   useEffect(() => {
     if (activeTab === 'lut') {
@@ -1681,6 +1831,32 @@ export default function GameDevView() {
     }
   }, [toast])
 
+  // Drag & drop a source image straight onto the upscaler viewport
+  const handleUpscaleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast('Invalid File: Please drop an image file.', { type: 'error' })
+      return
+    }
+    // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+    const path = window.electronAPI.app.getPathForFile(file)
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setUpscalePath(path)
+      setUpscaleUrl(event.target?.result as string)
+      setUpscaleExportedPath(null)
+      setUpscaleShowOriginal(false)
+    }
+    reader.readAsDataURL(file)
+  }, [toast])
+
+  // Persistent off-screen canvas holding the true upscale result. The export
+  // path reads from here, so the before/after compare toggle can never
+  // accidentally export the nearest-scaled original.
+  const upscaleResultCanvasRef = useRef<HTMLCanvasElement | null>(null)
+
   const runUpscale = useCallback(async () => {
     if (!upscaleUrl) return
 
@@ -1688,174 +1864,84 @@ export default function GameDevView() {
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image()
         image.onload = () => resolve(image)
-        image.onerror = () => reject()
+        image.onerror = () => reject(new Error('Image failed to decode'))
         image.src = upscaleUrl
       })
 
+      const w = img.width
+      const h = img.height
+
+      // 1. Compute the upscaled result into the persistent off-screen canvas
+      let result = upscaleResultCanvasRef.current
+      if (!result) {
+        result = document.createElement('canvas')
+        upscaleResultCanvasRef.current = result
+      }
+      const rctx = result.getContext('2d')
+      if (!rctx) return
+
+      if (upscaleAlgorithm.startsWith('nearest')) {
+        const factor = parseInt(upscaleAlgorithm.replace('nearest', '').replace('x', ''), 10) || 2
+        result.width = w * factor
+        result.height = h * factor
+        rctx.imageSmoothingEnabled = false
+        rctx.clearRect(0, 0, result.width, result.height)
+        rctx.drawImage(img, 0, 0, result.width, result.height)
+      } else {
+        // EPX family, operate on the raw RGBA buffer via the shared pure cores
+        const tmp = document.createElement('canvas')
+        tmp.width = w
+        tmp.height = h
+        const tctx = tmp.getContext('2d')
+        if (!tctx) return
+        tctx.drawImage(img, 0, 0)
+        // Copy once so the buffer is plain-ArrayBuffer-backed (matches what
+        // the scaling cores return and what the ImageData constructor wants)
+        let data = new Uint8ClampedArray(tctx.getImageData(0, 0, w, h).data)
+        let ow = w
+        let oh = h
+        if (upscaleAlgorithm === 'scale2x') {
+          data = scale2xData(data, ow, oh); ow *= 2; oh *= 2
+        } else if (upscaleAlgorithm === 'scale3x') {
+          data = scale3xData(data, ow, oh); ow *= 3; oh *= 3
+        } else {
+          // Scale4x (AdvMAME4x) = Scale2x applied twice
+          data = scale2xData(data, ow, oh); ow *= 2; oh *= 2
+          data = scale2xData(data, ow, oh); ow *= 2; oh *= 2
+        }
+        result.width = ow
+        result.height = oh
+        rctx.putImageData(new ImageData(data, ow, oh), 0, 0)
+      }
+
+      setUpscaleDims({ w, h, ow: result.width, oh: result.height })
+
+      // 2. Blit either the result or the nearest-scaled original (compare
+      //    mode) onto the visible canvas at the same output size.
       const canvas = upscalePreviewCanvasRef.current
       if (!canvas) return
       const ctx = canvas.getContext('2d')
       if (!ctx) return
-
-      if (upscaleAlgorithm.startsWith('nearest')) {
-        const factor = parseInt(upscaleAlgorithm.replace('nearest', '').replace('x', '')) || 2
-        canvas.width = img.width * factor
-        canvas.height = img.height * factor
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      canvas.width = result.width
+      canvas.height = result.height
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      if (upscaleShowOriginal) {
         ctx.imageSmoothingEnabled = false
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      } else if (upscaleAlgorithm === 'scale2x') {
-        const tempCanvas = document.createElement('canvas')
-        tempCanvas.width = img.width
-        tempCanvas.height = img.height
-        const tempCtx = tempCanvas.getContext('2d')
-        if (tempCtx) {
-          tempCtx.drawImage(img, 0, 0)
-          const srcData = tempCtx.getImageData(0, 0, img.width, img.height)
-
-          const sData = srcData.data
-          const w = img.width
-          const h = img.height
-
-          // Compare full 32-bit RGBA values so semi-transparent pixels are distinguished correctly
-          const getPixel = (x: number, y: number): number => {
-            const cx = Math.max(0, Math.min(w - 1, x))
-            const cy = Math.max(0, Math.min(h - 1, y))
-            const i = (cy * w + cx) * 4
-            return ((sData[i] << 24) | (sData[i + 1] << 16) | (sData[i + 2] << 8) | sData[i + 3]) >>> 0
-          }
-
-          canvas.width = w * 2
-          canvas.height = h * 2
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-          const dstData = ctx.createImageData(w * 2, h * 2)
-          const dData = dstData.data
-
-          const setDestPixel = (dx: number, dy: number, src: number, srcI: number) => {
-            const di = (dy * (w * 2) + dx) * 4
-            // Copy all four channels from the source pixel
-            dData[di]     = sData[srcI]
-            dData[di + 1] = sData[srcI + 1]
-            dData[di + 2] = sData[srcI + 2]
-            dData[di + 3] = sData[srcI + 3]
-          }
-
-          const getSrcIdx = (x: number, y: number) => {
-            const cx = Math.max(0, Math.min(w - 1, x))
-            const cy = Math.max(0, Math.min(h - 1, y))
-            return (cy * w + cx) * 4
-          }
-
-          for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-              const P = getPixel(x, y)
-              const A = getPixel(x, y - 1)
-              const C = getPixel(x - 1, y)
-              const B = getPixel(x + 1, y)
-              const D = getPixel(x, y + 1)
-
-              // Scale2x rules (RGBA-aware neighbour comparison)
-              const p1src = (C === A && C !== D && A !== B) ? getSrcIdx(x, y - 1) : getSrcIdx(x, y)
-              const p2src = (A === B && A !== C && B !== D) ? getSrcIdx(x + 1, y) : getSrcIdx(x, y)
-              const p3src = (D === C && D !== B && C !== A) ? getSrcIdx(x - 1, y) : getSrcIdx(x, y)
-              const p4src = (B === D && B !== A && D !== C) ? getSrcIdx(x + 1, y) : getSrcIdx(x, y)
-
-              setDestPixel(x * 2,     y * 2,     P, p1src)
-              setDestPixel(x * 2 + 1, y * 2,     P, p2src)
-              setDestPixel(x * 2,     y * 2 + 1, P, p3src)
-              setDestPixel(x * 2 + 1, y * 2 + 1, P, p4src)
-            }
-          }
-          ctx.putImageData(dstData, 0, 0)
-        }
-      } else if (upscaleAlgorithm === 'scale3x') {
-        const tempCanvas = document.createElement('canvas')
-        tempCanvas.width = img.width
-        tempCanvas.height = img.height
-        const tempCtx = tempCanvas.getContext('2d')
-        if (tempCtx) {
-          tempCtx.drawImage(img, 0, 0)
-          const srcData = tempCtx.getImageData(0, 0, img.width, img.height)
-
-          const sData = srcData.data
-          const w = img.width
-          const h = img.height
-
-          // Compare full 32-bit RGBA values
-          const getPixel = (x: number, y: number): number => {
-            const cx = Math.max(0, Math.min(w - 1, x))
-            const cy = Math.max(0, Math.min(h - 1, y))
-            const i = (cy * w + cx) * 4
-            return ((sData[i] << 24) | (sData[i + 1] << 16) | (sData[i + 2] << 8) | sData[i + 3]) >>> 0
-          }
-
-          const getSrcIdx = (x: number, y: number) => {
-            const cx = Math.max(0, Math.min(w - 1, x))
-            const cy = Math.max(0, Math.min(h - 1, y))
-            return (cy * w + cx) * 4
-          }
-
-          canvas.width = w * 3
-          canvas.height = h * 3
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
-          const dstData = ctx.createImageData(w * 3, h * 3)
-          const dData = dstData.data
-
-          const setDestPixel = (dx: number, dy: number, srcI: number) => {
-            const di = (dy * (w * 3) + dx) * 4
-            dData[di]     = sData[srcI]
-            dData[di + 1] = sData[srcI + 1]
-            dData[di + 2] = sData[srcI + 2]
-            dData[di + 3] = sData[srcI + 3]
-          }
-
-          for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-              const E = getPixel(x, y)
-              const A = getPixel(x - 1, y - 1)
-              const B = getPixel(x, y - 1)
-              const C = getPixel(x + 1, y - 1)
-              const D = getPixel(x - 1, y)
-              const F = getPixel(x + 1, y)
-              const G = getPixel(x - 1, y + 1)
-              const H = getPixel(x, y + 1)
-              const I = getPixel(x + 1, y + 1)
-
-              // Scale3x rules (RGBA-aware)
-              const e1 = (D === B && D !== H && B !== F)                                                                       ? getSrcIdx(x - 1, y) : getSrcIdx(x, y)
-              const e2 = ((D === B && D !== H && B !== F && E !== C) || (B === F && B !== D && F !== H && E !== A))            ? getSrcIdx(x, y - 1) : getSrcIdx(x, y)
-              const e3 = (B === F && B !== D && F !== H)                                                                       ? getSrcIdx(x + 1, y) : getSrcIdx(x, y)
-              const e4 = ((D === B && D !== H && B !== F && E !== G) || (D === H && D !== B && H !== F && E !== A))            ? getSrcIdx(x - 1, y) : getSrcIdx(x, y)
-              const e5 =                                                                                                          getSrcIdx(x, y)
-              const e6 = ((B === F && B !== D && F !== H && E !== I) || (H === F && H !== D && F !== B && E !== C))            ? getSrcIdx(x + 1, y) : getSrcIdx(x, y)
-              const e7 = (D === H && D !== B && H !== F)                                                                       ? getSrcIdx(x - 1, y) : getSrcIdx(x, y)
-              const e8 = ((D === H && D !== B && H !== F && E !== I) || (H === F && H !== D && F !== B && E !== G))            ? getSrcIdx(x, y + 1) : getSrcIdx(x, y)
-              const e9 = (H === F && H !== D && F !== B)                                                                       ? getSrcIdx(x + 1, y) : getSrcIdx(x, y)
-
-              setDestPixel(x * 3,     y * 3,     e1)
-              setDestPixel(x * 3 + 1, y * 3,     e2)
-              setDestPixel(x * 3 + 2, y * 3,     e3)
-              setDestPixel(x * 3,     y * 3 + 1, e4)
-              setDestPixel(x * 3 + 1, y * 3 + 1, e5)
-              setDestPixel(x * 3 + 2, y * 3 + 1, e6)
-              setDestPixel(x * 3,     y * 3 + 2, e7)
-              setDestPixel(x * 3 + 1, y * 3 + 2, e8)
-              setDestPixel(x * 3 + 2, y * 3 + 2, e9)
-            }
-          }
-          ctx.putImageData(dstData, 0, 0)
-        }
+      } else {
+        ctx.drawImage(result, 0, 0)
       }
     } catch (err) {
       console.error(err)
       toast('Failed to upscale texture.', { type: 'error' })
     }
-  }, [upscaleUrl, upscaleAlgorithm, toast])
+  }, [upscaleUrl, upscaleAlgorithm, upscaleShowOriginal, toast])
 
   const handleUpscaleExport = useCallback(async () => {
     if (!upscalePath) return
 
-    const canvas = upscalePreviewCanvasRef.current
+    // Always export the computed result, never the compare-mode view
+    const canvas = upscaleResultCanvasRef.current
     if (!canvas) return
 
     setIsUpscaleSaving(true)
@@ -2033,13 +2119,16 @@ export default function GameDevView() {
       bumpScale: 0.08,
       roughnessMap: roughnessMap,
       aoMap: aoMap,
-      metalness: 0.05
+      metalness: 0.05,
+      side: THREE.DoubleSide // keeps the plane visible from behind while rotating
     })
     threeSceneRef.current.material = material
 
     let geometry: THREE.BufferGeometry
     if (shape === 'cube') {
       geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9)
+    } else if (shape === 'plane') {
+      geometry = new THREE.PlaneGeometry(1.35, 1.35)
     } else {
       geometry = new THREE.SphereGeometry(0.65, 64, 64)
     }
@@ -2161,9 +2250,10 @@ export default function GameDevView() {
     e.preventDefault()
     setIsDragOver(false)
     if (e.dataTransfer.files) {
+      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
       const dropped = Array.from(e.dataTransfer.files).map(f => ({
         name: f.name,
-        path: f.path || '',
+        path: window.electronAPI.app.getPathForFile(f),
         status: 'pending' as const
       })).filter(f => f.path !== '')
       setFiles(prev => [...prev, ...dropped])
@@ -2174,7 +2264,7 @@ export default function GameDevView() {
     if (e.target.files) {
       const selected = Array.from(e.target.files).map(f => ({
         name: f.name,
-        path: f.path || '',
+        path: window.electronAPI.app.getPathForFile(f),
         status: 'pending' as const
       })).filter(f => f.path !== '')
       setFiles(prev => [...prev, ...selected])
@@ -2216,41 +2306,6 @@ export default function GameDevView() {
       setRenaming(false)
     }
   }, [files, getNewName, toast])
-
-  // Tab 2: Frame Budget Computations
-  const budgetMs = useMemo(() => {
-    const preset = FPS_PRESETS.find(p => p.fps === targetFps)
-    return preset ? preset.ms : 16.67
-  }, [targetFps])
-
-  const totalCpuTime = useMemo(() => {
-    const gameThreadTotal = cpuGameTick + physicsTime + uiLayoutTime
-    return Math.max(gameThreadTotal, cpuRenderThread)
-  }, [cpuGameTick, cpuRenderThread, physicsTime, uiLayoutTime])
-
-  const totalFrameTime = useMemo(() => {
-    return Math.max(totalCpuTime, gpuDrawTime)
-  }, [totalCpuTime, gpuDrawTime])
-
-  const budgetRatio = useMemo(() => {
-    return (totalFrameTime / budgetMs) * 100
-  }, [totalFrameTime, budgetMs])
-
-  const performanceBottleneck = useMemo(() => {
-    const gameThreadTotal = cpuGameTick + physicsTime + uiLayoutTime
-    if (totalFrameTime <= budgetMs) return 'Optimized (Under budget)'
-    if (gpuDrawTime > totalCpuTime) {
-      if (gpuDrawTime > budgetMs) return 'GPU Bound (Post-processing or Shadow pass bottleneck)'
-      return 'GPU Bound'
-    } else {
-      if (gameThreadTotal > cpuRenderThread) {
-        if (physicsTime > cpuGameTick) return 'CPU Bound (Physics simulation overload)'
-        if (uiLayoutTime > cpuGameTick) return 'CPU Bound (UI layout rendering thread blocking)'
-        return 'CPU Bound (Gameplay logic / script tick overhead)'
-      }
-      return 'CPU Bound (Render draw-call submission thread backlog)'
-    }
-  }, [totalFrameTime, budgetMs, gpuDrawTime, totalCpuTime, cpuGameTick, cpuRenderThread, physicsTime, uiLayoutTime])
 
   // Tab 3: Dialogue Editor Logic
   const addDialogueNode = useCallback(() => {
@@ -2381,166 +2436,124 @@ export default function GameDevView() {
           Game Development Workspace
         </h2>
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-          Specialized utilities for asset management, performance budget calculations, quest branching, and shader code generation.
+          Texture authoring, sprite pipeline and narrative tools, all processing runs locally.
         </p>
       </div>
 
-      {/* Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: 'var(--space-2)',
-        background: 'var(--color-surface-1)',
-        padding: '6px',
-        borderRadius: 'var(--radius-lg)',
-        width: 'fit-content',
-        border: '1px solid var(--color-surface-offset)',
-        marginBottom: 'var(--space-2)'
-      }}>
-        <style>{`
-          .gamedev-tab-btn {
-            background: transparent;
-            border: 1px solid transparent;
-            color: var(--color-text-muted);
-            font-size: var(--text-xs);
-            font-weight: var(--weight-medium);
-            padding: 8px 16px;
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            transition: all 120ms ease;
+      {/* Grouped tool navigation */}
+      <style>{`
+        .gamedev-tab-btn {
+          background: transparent;
+          border: 1px solid transparent;
+          color: var(--color-text-muted);
+          font-size: var(--text-xs);
+          font-weight: var(--weight-medium);
+          padding: 7px 13px;
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: var(--space-2);
+          white-space: nowrap;
+          transition: all 120ms ease;
+        }
+        .gamedev-tab-btn:hover {
+          background: var(--color-surface-2);
+          color: var(--color-text-base);
+        }
+        .gamedev-tab-btn.active {
+          background: var(--color-secondary-muted);
+          color: var(--color-secondary);
+          border-color: var(--color-secondary);
+          font-weight: var(--weight-semibold);
+          box-shadow: var(--shadow-sm);
+        }
+        .gamedev-info-banner {
+          display: flex;
+          align-items: flex-start;
+          gap: var(--space-3);
+          padding: 12px 16px;
+          background: var(--color-surface-1);
+          border: 1px solid var(--color-surface-offset);
+          border-radius: var(--radius-lg);
+          font-size: var(--text-xs);
+          line-height: 1.5;
+          color: var(--color-text-muted);
+          margin-bottom: var(--space-4);
+        }
+        .gamedev-info-banner strong {
+          color: var(--color-text-base);
+          font-weight: var(--weight-semibold);
+        }
+        .gamedev-info-banner-icon {
+          color: var(--color-secondary);
+          flex-shrink: 0;
+          margin-top: 2px;
+        }
+      `}</style>
+      <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        {([
+          {
+            group: 'Textures',
+            tools: [
+              { id: 'pbr' as const,      label: 'PBR Maps',       icon: <Sparkles size={14} /> },
+              { id: 'seamless' as const, label: 'Seamless Tiler', icon: <Repeat size={14} /> },
+              { id: 'upscaler' as const, label: 'Pixel Upscaler', icon: <Maximize2 size={14} /> },
+              { id: 'lut' as const,      label: 'LUT Grader',     icon: <Sliders size={14} /> }
+            ]
+          },
+          {
+            group: 'Sprites',
+            tools: [
+              { id: 'atlas' as const,  label: 'Atlas Packer',  icon: <Grid size={14} /> },
+              { id: 'slicer' as const, label: 'Sprite Slicer', icon: <Scissors size={14} /> }
+            ]
+          },
+          {
+            group: 'Pipeline',
+            tools: [
+              { id: 'renamer' as const,  label: 'Batch Renamer',  icon: <Layers size={14} /> },
+              { id: 'dialogue' as const, label: 'Dialogue Flow',  icon: <GitFork size={14} /> },
+              { id: 'palette' as const,  label: 'Shader Palette', icon: <Palette size={14} /> }
+            ]
           }
-          .gamedev-tab-btn:hover {
-            background: var(--color-surface-2);
-            color: var(--color-text-base);
-          }
-          .gamedev-tab-btn.active {
-            background: var(--color-secondary-muted);
-            color: var(--color-secondary);
-            border-color: var(--color-secondary);
-            font-weight: var(--weight-semibold);
-            box-shadow: var(--shadow-sm);
-          }
-
-          .framerate-btn {
-            background: var(--color-surface-2);
-            border: 1px solid var(--color-surface-offset);
-            color: var(--color-text-muted);
-            font-size: var(--text-xs);
-            font-weight: var(--weight-medium);
-            padding: 6px 12px;
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            transition: all 120ms ease;
-          }
-          .framerate-btn:hover {
-            background: var(--color-surface-offset);
-            color: var(--color-text-base);
-            border-color: var(--color-balance);
-          }
-          .framerate-btn.active {
-            background: var(--color-secondary-muted);
-            color: var(--color-secondary);
-            border-color: var(--color-secondary);
-            font-weight: var(--weight-semibold);
-            box-shadow: var(--shadow-sm);
-          }
-          
-          .gamedev-info-banner {
-            display: flex;
-            align-items: flex-start;
-            gap: var(--space-3);
-            padding: 12px 16px;
-            background: var(--color-surface-1);
-            border: 1px solid var(--color-surface-offset);
-            border-radius: var(--radius-lg);
-            font-size: var(--text-xs);
-            line-height: 1.5;
-            color: var(--color-text-muted);
-            margin-bottom: var(--space-4);
-          }
-          .gamedev-info-banner strong {
-            color: var(--color-text-base);
-            font-weight: var(--weight-semibold);
-          }
-          .gamedev-info-banner-icon {
-            color: var(--color-secondary);
-            flex-shrink: 0;
-            margin-top: 2px;
-          }
-        `}</style>
-        {(['renamer', 'budget', 'dialogue', 'palette', 'pbr', 'seamless', 'atlas', 'slicer', 'lut', 'upscaler'] as const).map(tab => {
-          const isActive = activeTab === tab
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`gamedev-tab-btn ${isActive ? 'active' : ''}`}
-            >
-              {tab === 'renamer' && (
-                <>
-                  <Layers size={14} />
-                  <span>Batch Renamer</span>
-                </>
-              )}
-              {tab === 'budget' && (
-                <>
-                  <Activity size={14} />
-                  <span>Budget Calculator</span>
-                </>
-              )}
-              {tab === 'dialogue' && (
-                <>
-                  <GitFork size={14} />
-                  <span>Dialogue Quest Flow</span>
-                </>
-              )}
-              {tab === 'palette' && (
-                <>
-                  <Palette size={14} />
-                  <span>Shader Palette</span>
-                </>
-              )}
-              {tab === 'pbr' && (
-                <>
-                  <Sparkles size={14} />
-                  <span>PBR Map Generator</span>
-                </>
-              )}
-              {tab === 'seamless' && (
-                <>
-                  <Repeat size={14} />
-                  <span>Seamless Texture Generator</span>
-                </>
-              )}
-              {tab === 'atlas' && (
-                <>
-                  <Grid size={14} />
-                  <span>Atlas Forge</span>
-                </>
-              )}
-              {tab === 'slicer' && (
-                <>
-                  <Scissors size={14} />
-                  <span>Sprite Slicer</span>
-                </>
-              )}
-              {tab === 'lut' && (
-                <>
-                  <Sliders size={14} />
-                  <span>LUT Color Grader</span>
-                </>
-              )}
-              {tab === 'upscaler' && (
-                <>
-                  <Maximize2 size={14} />
-                  <span>Pixel Art Upscaler</span>
-                </>
-              )}
-            </button>
-          )
-        })}
+        ]).map(section => (
+          <div
+            key={section.group}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              background: 'var(--color-surface-1)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '6px 8px 8px'
+            }}
+          >
+            <span style={{
+              fontSize: '9px',
+              fontWeight: 'var(--weight-bold)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.07em',
+              color: 'var(--color-text-faint)',
+              padding: '0 6px'
+            }}>
+              {section.group}
+            </span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {section.tools.map(tool => (
+                <button
+                  key={tool.id}
+                  onClick={() => setActiveTab(tool.id)}
+                  className={`gamedev-tab-btn ${activeTab === tool.id ? 'active' : ''}`}
+                >
+                  {tool.icon}
+                  <span>{tool.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Tab Panels */}
@@ -2881,226 +2894,6 @@ export default function GameDevView() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* TAB 2: FRAME BUDGET CALCULATOR */}
-        {activeTab === 'budget' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <div className="gamedev-info-banner">
-              <Info size={15} className="gamedev-info-banner-icon" />
-              <div>
-                <strong>Frame Budget & Bottleneck Calculator:</strong> Diagnose performance limits. Set your target framerate and adjust CPU/GPU ticks to isolate render thread submission lags, game loop bottlenecks, or GPU workloads.
-              </div>
-            </div>
-            
-            {/* Target Selectors */}
-            <div className="analytics-card" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', marginRight: 'var(--space-2)' }}>
-                Target Framerate:
-              </span>
-              {FPS_PRESETS.map(preset => (
-                <button
-                  key={preset.fps}
-                  onClick={() => setTargetFps(preset.fps)}
-                  className={`framerate-btn ${targetFps === preset.fps ? 'active' : ''}`}
-                >
-                  {preset.fps} FPS ({preset.ms}ms)
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-4)' }}>
-              
-              {/* Sliders Container */}
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-3)'
-              }}>
-                <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Frame Timings (ms)</h3>
-                
-                {/* CPU Game Tick */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
-                    <span>CPU Game Logic Tick</span>
-                    <strong style={{ color: 'var(--color-primary)' }}>{cpuGameTick} ms</strong>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="33"
-                    step="0.1"
-                    value={cpuGameTick}
-                    onChange={e => setCpuGameTick(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
-                  />
-                </div>
-
-                {/* Physics Sim */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
-                    <span>CPU Physics Simulation</span>
-                    <strong style={{ color: 'var(--color-primary)' }}>{physicsTime} ms</strong>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="16"
-                    step="0.1"
-                    value={physicsTime}
-                    onChange={e => setPhysicsTime(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
-                  />
-                </div>
-
-                {/* UI Layout */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
-                    <span>CPU UI Layout / Canvas</span>
-                    <strong style={{ color: 'var(--color-primary)' }}>{uiLayoutTime} ms</strong>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    value={uiLayoutTime}
-                    onChange={e => setUiLayoutTime(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
-                  />
-                </div>
-
-                {/* CPU Render Thread */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
-                    <span>CPU Render Thread (Draw Calls Submit)</span>
-                    <strong style={{ color: '#cdf12b' }}>{cpuRenderThread} ms</strong>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="33"
-                    step="0.1"
-                    value={cpuRenderThread}
-                    onChange={e => setCpuRenderThread(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: '#cdf12b' }}
-                  />
-                </div>
-
-                {/* GPU Draw Time */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
-                    <span>GPU Draw time (Base pass & Shadow map)</span>
-                    <strong style={{ color: 'var(--color-secondary)' }}>{gpuDrawTime} ms</strong>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="33"
-                    step="0.1"
-                    value={gpuDrawTime}
-                    onChange={e => setGpuDrawTime(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-secondary)' }}
-                  />
-                </div>
-              </div>
-
-              {/* Chart Visualizer */}
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-4)',
-                justifyContent: 'space-between'
-              }}>
-                <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Frame Share Visualizer</h3>
-                
-                {/* SVG Visual Stack */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                  <svg width="100%" height="80" style={{ overflow: 'visible' }}>
-                    {/* Background track */}
-                    <rect x="0" y="24" width="100%" height="16" fill="var(--color-surface-2)" rx="4" />
-                    
-                    {/* Stacked Bars representing pipeline components */}
-                    {(() => {
-                      const totalWidth = 100 // percent
-                      const scale = 100 / Math.max(budgetMs, totalFrameTime)
-                      const gameW = (cpuGameTick + physicsTime + uiLayoutTime) * scale
-                      const renderW = cpuRenderThread * scale
-                      const gpuW = gpuDrawTime * scale
-
-                      // Display stacked bars side-by-side or layered
-                      // In double-buffered game rendering, CPU and GPU run concurrently.
-                      // Let's render two tracks: Track 1 = CPU Pipeline, Track 2 = GPU Pipeline.
-                      return (
-                        <>
-                          {/* CPU Track */}
-                          <text x="0" y="14" fill="var(--color-text-muted)" style={{ fontSize: '9px' }}>CPU PIPELINE ({totalCpuTime.toFixed(1)} ms)</text>
-                          <rect x="0" y="18" width={`${(cpuGameTick + physicsTime + uiLayoutTime) * scale}%`} height="8" fill="var(--color-primary)" rx="2" />
-                          <rect x={`${(cpuGameTick + physicsTime + uiLayoutTime) * scale}%`} y="18" width={`${renderW}%`} height="8" fill="#cdf12b" rx="2" />
-
-                          {/* GPU Track */}
-                          <text x="0" y="44" fill="var(--color-text-muted)" style={{ fontSize: '9px' }}>GPU PIPELINE ({gpuDrawTime.toFixed(1)} ms)</text>
-                          <rect x="0" y="48" width={`${gpuW}%`} height="8" fill="var(--color-secondary)" rx="2" />
-
-                          {/* Budget threshold line */}
-                          <line x1={`${budgetMs * scale}%`} y1="0" x2={`${budgetMs * scale}%`} y2="70" stroke="var(--color-error)" strokeWidth="1.5" strokeDasharray="3,3" />
-                          <text x={`${budgetMs * scale}%`} y="-2" fill="var(--color-error)" style={{ fontSize: '8px', textAnchor: 'middle' }}>LIMIT ({budgetMs.toFixed(1)}ms)</text>
-                        </>
-                      )
-                    })()}
-                  </svg>
-
-                  {/* Legend */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', fontSize: '9px', color: 'var(--color-text-muted)' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '6px', height: '6px', background: 'var(--color-primary)', borderRadius: '50%' }} /> Game Logic Thread
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '6px', height: '6px', background: '#cdf12b', borderRadius: '50%' }} /> Render Submit Thread
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '6px', height: '6px', background: 'var(--color-secondary)', borderRadius: '50%' }} /> GPU Render Time
-                    </span>
-                  </div>
-                </div>
-
-                {/* Warning Card */}
-                <div style={{
-                  background: totalFrameTime > budgetMs ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
-                  border: '1px solid ' + (totalFrameTime > budgetMs ? 'var(--color-error)' : 'var(--color-success)'),
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-3)',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 'var(--space-2)'
-                }}>
-                  {totalFrameTime > budgetMs ? (
-                    <AlertTriangle size={16} style={{ color: 'var(--color-error)', flexShrink: 0, marginTop: '2px' }} />
-                  ) : (
-                    <CheckCircle size={16} style={{ color: 'var(--color-success)', flexShrink: 0, marginTop: '2px' }} />
-                  )}
-                  <div>
-                    <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: totalFrameTime > budgetMs ? 'var(--color-error)' : 'var(--color-success)' }}>
-                      {totalFrameTime > budgetMs ? 'Frame Budget Exceeded' : 'Under Frame Budget'}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-base)', marginTop: '2px', lineHeight: 1.4 }}>
-                      Current Frame Time: <strong>{totalFrameTime.toFixed(1)} ms</strong> ({budgetRatio.toFixed(0)}% of budget).
-                      <br />
-                      Primary Bottleneck: <strong style={{ color: 'var(--color-secondary)' }}>{performanceBottleneck}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -3479,7 +3272,7 @@ export default function GameDevView() {
 
               {/* Grid of colors */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                {paletteColors.map((col, idx) => (
+                {paletteColors.map((col) => (
                   <div
                     key={col}
                     style={{
@@ -3684,7 +3477,8 @@ export default function GameDevView() {
                     {/* Floating Controls */}
                     <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '6px' }}>
                       <button
-                        onClick={() => setShape(prev => prev === 'sphere' ? 'cube' : 'sphere')}
+                        onClick={() => setShape(prev => prev === 'sphere' ? 'cube' : prev === 'cube' ? 'plane' : 'sphere')}
+                        title="Cycle preview mesh: sphere → cube → plane"
                         style={{
                           background: 'rgba(19, 22, 34, 0.8)',
                           border: '1px solid var(--color-surface-offset)',
@@ -3700,7 +3494,7 @@ export default function GameDevView() {
                         }}
                       >
                         <Box size={10} />
-                        <span>{shape === 'sphere' ? 'Cube Preview' : 'Sphere Preview'}</span>
+                        <span style={{ textTransform: 'capitalize' }}>{shape}</span>
                       </button>
                       
                       <button
@@ -3735,7 +3529,32 @@ export default function GameDevView() {
 
                   {/* Sliders Container */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    
+
+                    {/* Invert height, dark pixels read as crevices vs. ridges */}
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--space-2)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      background: 'var(--color-surface-2)',
+                      border: '1px solid var(--color-surface-offset)',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Invert Height</span>
+                        <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>Treat dark pixels as raised instead of recessed</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={invertHeight}
+                        onChange={e => setInvertHeight(e.target.checked)}
+                        style={{ accentColor: 'var(--color-secondary)' }}
+                      />
+                    </label>
+
                     {/* Normal Intensity */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
@@ -5422,13 +5241,33 @@ export default function GameDevView() {
                       outline: 'none'
                     }}
                   >
-                    <option value="nearest2x">Nearest Neighbor 2x</option>
-                    <option value="nearest4x">Nearest Neighbor 4x (Default)</option>
-                    <option value="nearest8x">Nearest Neighbor 8x</option>
-                    <option value="scale2x">Scale2x (Smoothed Retro)</option>
-                    <option value="scale3x">Scale3x (Smoothed Retro)</option>
+                    <optgroup label="Edge-smart (EPX / AdvMAME)">
+                      <option value="scale2x">Scale2x, smoothed edges, 2×</option>
+                      <option value="scale3x">Scale3x, smoothed edges, 3×</option>
+                      <option value="scale4x">Scale4x, smoothed edges, 4×</option>
+                    </optgroup>
+                    <optgroup label="Crisp (Nearest Neighbor)">
+                      <option value="nearest2x">Nearest 2×, exact pixels</option>
+                      <option value="nearest4x">Nearest 4×, exact pixels</option>
+                      <option value="nearest8x">Nearest 8×, exact pixels</option>
+                    </optgroup>
                   </select>
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>
+                    Scale2x/3x/4x round jagged staircase edges without blurring. Nearest keeps every pixel perfectly square.
+                  </span>
                 </div>
+
+                {/* Before / after compare */}
+                {upscaleUrl && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={upscaleShowOriginal}
+                      onChange={e => setUpscaleShowOriginal(e.target.checked)}
+                    />
+                    <span>Compare: show original (nearest-scaled)</span>
+                  </label>
+                )}
               </div>
 
               {/* Right Viewport Column */}
@@ -5444,31 +5283,39 @@ export default function GameDevView() {
                   justifyContent: 'space-between'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Upscaler Status:</span>
-                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
-                      {upscalePath ? 'Texture Loaded' : 'Idle - Please load image'}
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                      {upscaleShowOriginal ? 'Viewing: Original (nearest-scaled for comparison)' : 'Viewing: Upscaled result'}
+                    </span>
+                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', fontFamily: 'var(--font-mono)' }}>
+                      {upscaleDims
+                        ? `${upscaleDims.w}×${upscaleDims.h} → ${upscaleDims.ow}×${upscaleDims.oh} (${Math.round(upscaleDims.ow / upscaleDims.w)}×)`
+                        : 'Idle, load or drop an image'}
                     </span>
                   </div>
                 </div>
 
-                {/* Viewport canvas */}
-                <div style={{
-                  flex: 1,
-                  background: 'var(--color-background)',
-                  borderRadius: 'var(--radius-lg)',
-                  border: '1px solid var(--color-surface-offset)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 'var(--space-4)',
-                  overflow: 'hidden'
-                }}>
+                {/* Viewport canvas, accepts drag & drop */}
+                <div
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={handleUpscaleDrop}
+                  style={{
+                    flex: 1,
+                    background: 'var(--color-background)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-surface-offset)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 'var(--space-4)',
+                    overflow: 'hidden'
+                  }}
+                >
                   {!upscaleUrl ? (
                     <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
                       <Maximize2 size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>No Image Loaded</span>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Choose a pixel art image to upscale cleanly.</span>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Drop a pixel-art image here, or browse for one.</span>
                       </div>
                       <button
                         onClick={handleSelectUpscaleFile}
@@ -5488,7 +5335,22 @@ export default function GameDevView() {
                       </button>
                     </div>
                   ) : (
-                    <canvas ref={upscalePreviewCanvasRef} style={{ width: '100%', height: '100%', maxWidth: '500px', maxHeight: '500px', objectFit: 'contain', background: '#0b0c10', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+                    // imageRendering: pixelated, without it the browser's smooth
+                    // downscale blurs the crisp result, defeating the whole tool
+                    <canvas
+                      ref={upscalePreviewCanvasRef}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        maxWidth: '520px',
+                        maxHeight: '520px',
+                        objectFit: 'contain',
+                        imageRendering: 'pixelated',
+                        background: '#0b0c10',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+                      }}
+                    />
                   )}
                 </div>
 

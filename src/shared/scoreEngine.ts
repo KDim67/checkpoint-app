@@ -31,6 +31,14 @@ export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): F
   }
 
   const bestVariant = model.variants[bestVariantName]
+  if (!bestVariant) {
+    return {
+      status: 'not_recommended',
+      score: 0,
+      reason: 'No installable quantization is available for this model.',
+      recommendedVariant: 'q4'
+    }
+  }
 
   // 2. Determine GPU viability
   let gpuViable = false

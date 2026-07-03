@@ -3,6 +3,64 @@ import type { AiStreamParams } from '../shared/types'
 import { getSetting } from './db'
 
 /**
+ * Resolves the configured OpenAI-compatible endpoint (base URL + API key) from
+ * the settings DB, applying sane Ollama defaults when unset.
+ */
+export function getAiConfig(): { baseURL: string; apiKey: string; isOllama: boolean } {
+  let baseURL = getSetting<string>('ai_base_url', 'http://localhost:11434/v1')
+  if (!baseURL || baseURL.trim() === '') {
+    baseURL = 'http://localhost:11434/v1'
+  }
+  let apiKey = getSetting<string>('ai_api_key', 'ollama')
+  if (!apiKey || apiKey.trim() === '') {
+    apiKey = 'ollama'
+  }
+  const isOllama =
+    baseURL.includes('localhost') || baseURL.includes('127.0.0.1') || apiKey === 'ollama'
+  return { baseURL, apiKey, isOllama }
+}
+
+/**
+ * Turns a raw provider/SDK error into an actionable, human-readable message.
+ * A bare "404 status code (no body)" tells the user nothing; this names the
+ * likely cause (missing model, wrong URL, server down, bad key).
+ */
+export function humanizeAiError(err: unknown, ctx: { model?: string; baseURL?: string }): string {
+  const e = err as { status?: number; code?: string; message?: string }
+  const status = e?.status
+  const raw = (e?.message || String(err) || '').trim()
+  const model = ctx.model || 'the selected model'
+  const base = ctx.baseURL || 'the configured endpoint'
+
+  if (status === 404 || /\b404\b/.test(raw)) {
+    return `Model "${model}" or endpoint not found (404) at ${base}. ` +
+      `If you're using Ollama, install the model first ("ollama pull ${model}") and make sure the Base URL ends in /v1. ` +
+      `If you're using a cloud API, double-check the model name and Base URL in AI Settings.`
+  }
+  if (status === 401 || status === 403) {
+    return `Authentication failed (${status}) at ${base}. Check your API key in AI Settings.`
+  }
+  if (status === 429) {
+    return `Rate limited (429) by ${base}. Wait a moment and try again.`
+  }
+  if (e?.code === 'ECONNREFUSED' || /econnrefused|fetch failed|failed to fetch|enotfound|network|connect(ion)?\s|timed out/i.test(raw)) {
+    return `Could not connect to ${base}. Make sure your AI server (e.g. Ollama) is running and the Base URL is correct in AI Settings.`
+  }
+  return raw || 'Unknown AI error'
+}
+
+/**
+ * Constructs an OpenAI SDK client bound to the configured endpoint. Shared by the
+ * streaming chat path and the structured-action generator (aiActions.ts).
+ */
+export async function createOpenAiClient(): Promise<{ client: OpenAI; isOllama: boolean }> {
+  const { default: OpenAI } = await import('openai')
+  const { baseURL, apiKey, isOllama } = getAiConfig()
+  const client = new OpenAI({ baseURL, apiKey, dangerouslyAllowBrowser: false })
+  return { client, isOllama }
+}
+
+/**
  * Initiates an AI completion stream from the configured OpenAI-compatible endpoint.
  * Lazily loads the 'openai' npm package and checks database configuration at run-time.
  */
@@ -17,35 +75,18 @@ export function startAiStream(
   // Run the async streaming logic in the background
   ;(async () => {
     try {
-      const { default: OpenAI } = await import('openai')
-
-      let baseURL = getSetting<string>('ai_base_url', 'http://localhost:11434/v1')
-      if (!baseURL || baseURL.trim() === '') {
-        baseURL = 'http://localhost:11434/v1'
-      }
-      let apiKey = getSetting<string>('ai_api_key', 'ollama')
-      if (!apiKey || apiKey.trim() === '') {
-        apiKey = 'ollama'
-      }
-
-      const openai = new OpenAI({
-        baseURL,
-        apiKey,
-        dangerouslyAllowBrowser: false
-      })
+      const { client: openai, isOllama } = await createOpenAiClient()
 
       const body: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
         model: params.model,
-        messages: params.messages,
+        // AiChatMessage permits multimodal parts on any role for simplicity;
+        // in practice only user messages carry image parts, which matches the
+        // OpenAI wire format, hence the narrowing cast.
+        messages: params.messages as OpenAI.Chat.ChatCompletionMessageParam[],
         temperature: params.temperature ?? 0.7,
         max_tokens: params.maxTokens ?? 2048,
         stream: true,
-        // Ollama-compatible extension for full context window; not part of the
-        // official OpenAI param set, so it's appended via a narrow cast rather
-        // than casting the whole request body (which previously broke the SDK's
-        // streaming overload resolution and silently returned a non-streaming
-        // response type).
-        ...({ extra_body: { num_ctx: 32768 } } as object)
+        ...(isOllama ? ({ extra_body: { num_ctx: 32768 } } as object) : {})
       }
 
       const stream = await openai.chat.completions.create(body, {
@@ -71,7 +112,8 @@ export function startAiStream(
         error.status === 499
 
       if (!isAbort) {
-        onError(err instanceof Error ? err : new Error(String(err)))
+        const { baseURL } = getAiConfig()
+        onError(new Error(humanizeAiError(error, { model: params.model, baseURL })))
       }
     }
   })()
@@ -95,22 +137,7 @@ export async function runCompletion(params: {
   temperature?: number
   maxTokens?: number
 }): Promise<string> {
-  const { default: OpenAI } = await import('openai')
-
-  let baseURL = getSetting<string>('ai_base_url', 'http://localhost:11434/v1')
-  if (!baseURL || baseURL.trim() === '') {
-    baseURL = 'http://localhost:11434/v1'
-  }
-  let apiKey = getSetting<string>('ai_api_key', 'ollama')
-  if (!apiKey || apiKey.trim() === '') {
-    apiKey = 'ollama'
-  }
-
-  const openai = new OpenAI({
-    baseURL,
-    apiKey,
-    dangerouslyAllowBrowser: false
-  })
+  const { client: openai } = await createOpenAiClient()
 
   const response = await openai.chat.completions.create({
     model: params.model,

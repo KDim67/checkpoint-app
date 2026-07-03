@@ -6,6 +6,8 @@ import GitPanel from './components/GitPanel'
 import ItemDetailPanel from './components/ItemDetailPanel'
 import Logo from './components/ui/Logo'
 import { ToastProvider } from './components/ui/Toast'
+import FocusTimerEngine from './components/focus/FocusTimerEngine'
+import { applyFontSize } from './components/settings/AppearanceSettings'
 
 // Lazy-loaded views (code split per view)
 const LogView      = lazy(() => import('./components/LogView'))
@@ -43,10 +45,25 @@ function ThemeToggle() {
     return (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
   })
 
+  // Track external theme changes (startup application of the persisted
+  // setting, or the Appearance settings tab) so the icon never goes stale.
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+      setTheme(current)
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [])
+
   const toggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+    // Read the live attribute (not state) so we can never double-toggle out of sync
+    const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+    const nextTheme = current === 'dark' ? 'light' : 'dark'
     setTheme(nextTheme)
     document.documentElement.setAttribute('data-theme', nextTheme)
+    // Persist so the choice survives restarts (same key the Settings page uses)
+    window.electronAPI.db.setSetting('app_theme', nextTheme).catch(console.error)
   }
 
   return (
@@ -493,15 +510,22 @@ export default function App() {
   const setContext = useAppStore(s => s.setContext)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
 
-  // Bootstrap: load available contexts from DB on mount
+  // Bootstrap: load available contexts from DB on mount.
+  // An explicitly-set "default context" (Settings → General) wins over the
+  // last-active one, previously that setting was saved but never read.
   const loadContexts = useCallback(async () => {
     try {
       const contexts = await window.electronAPI.db.getContexts()
       if (contexts.length > 0) {
         setAvailableContexts(contexts)
+        const defaultContext = await window.electronAPI.db.getSetting('default_context') as string | null
         const savedContext = await window.electronAPI.db.getSetting('active_context') as string | null
-        if (savedContext && contexts.includes(savedContext)) {
-          setContext(savedContext)
+        const startContext =
+          defaultContext && contexts.includes(defaultContext) ? defaultContext
+          : savedContext && contexts.includes(savedContext) ? savedContext
+          : null
+        if (startContext) {
+          setContext(startContext)
         }
       }
     } catch {
@@ -516,6 +540,26 @@ export default function App() {
     window.electronAPI.db.getSetting('appearance_compact').then((cm) => {
       if (cm === 'true') {
         document.documentElement.setAttribute('data-compact', 'true')
+      }
+    }).catch(console.error)
+
+    // Apply the persisted interface theme, previously saved by Settings but
+    // never read on boot, so the app silently reset to dark every launch.
+    window.electronAPI.db.getSetting('app_theme').then((t) => {
+      if (!t) return
+      if (t === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
+      } else if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t)
+      }
+    }).catch(console.error)
+
+    // Apply the persisted font scale, previously only applied once the
+    // Appearance settings tab was opened.
+    window.electronAPI.db.getSetting('appearance_font_size').then((fs) => {
+      if (fs === 'small' || fs === 'medium' || fs === 'large') {
+        applyFontSize(fs)
       }
     }).catch(console.error)
 
@@ -606,6 +650,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+      <FocusTimerEngine />
       <div className="app-shell">
         <Titlebar />
         <div className="app-body">

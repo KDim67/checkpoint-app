@@ -7,6 +7,8 @@ import type {
   Relation,
   RelationType,
   AiStreamParams,
+  AiStructuredParams,
+  AiStructuredResult,
   BulkUpdatePayload,
   SearchQuery,
   HardwareSpecs,
@@ -16,6 +18,7 @@ import type {
   FocusSession,
   CreateFocusSessionPayload,
   NoteMetadata,
+  NoteSearchResult,
   GitCommit,
   GitStatusResult,
   ClipboardItem,
@@ -39,6 +42,7 @@ export interface ElectronAPI {
     maximize: () => void
     close: () => void
     saveFile: (defaultName: string, content: string) => Promise<boolean>
+    getPathForFile: (file: File) => string
     onNavigateToView: (callback: (view: string) => void) => () => void
   }
   db: {
@@ -65,11 +69,14 @@ export interface ElectronAPI {
     getFocusSessions: (context: string) => Promise<FocusSession[]>
   }
   ai: {
-    startStream: (params: AiStreamParams) => Promise<void>
-    abortStream: () => Promise<void>
-    onChunk: (callback: (chunk: string) => void) => () => void
-    onDone: (callback: () => void) => () => void
-    onError: (callback: (errMessage: string) => void) => () => void
+    startStream: (params: AiStreamParams, streamId?: string) => Promise<void>
+    generateStructured: (params: AiStructuredParams) => Promise<AiStructuredResult>
+    abortStructured: () => Promise<void>
+    abortStream: (streamId?: string) => Promise<void>
+    testConnection: (baseURL: string, apiKey: string) => Promise<{ success: boolean; error?: string }>
+    onChunk: (callback: (chunk: string, streamId?: string) => void) => () => void
+    onDone: (callback: (streamId?: string) => void) => () => void
+    onError: (callback: (errMessage: string, streamId?: string) => void) => () => void
   }
   widget: {
     toggle: () => Promise<void>
@@ -125,6 +132,7 @@ export interface ElectronAPI {
     checkOllama: () => Promise<OllamaStatus>
     pullModel: (modelTag: string) => Promise<void>
     stopPull: () => Promise<void>
+    deleteModel: (modelTag: string) => Promise<boolean>
     listLocalModels: () => Promise<string[]>
     onPullProgress: (callback: (event: PullProgressEvent) => void) => () => void
     onPullDone: (callback: (data: { modelTag: string }) => void) => () => void
@@ -135,6 +143,7 @@ export interface ElectronAPI {
     readNote: (title: string) => Promise<string>
     writeNote: (title: string, content: string, oldTitle?: string) => Promise<void>
     deleteNote: (title: string) => Promise<void>
+    searchNotes: (query: string) => Promise<NoteSearchResult[]>
   }
   git: {
     checkRepo: (path: string) => Promise<boolean>
@@ -150,9 +159,10 @@ export interface ElectronAPI {
     clearHistory: () => Promise<void>
     createSnippet: (content: string, label: string | null) => Promise<void>
     paste: (content: string) => Promise<void>
+    onHistoryChanged: (callback: () => void) => () => void
   }
   analytics: {
-    getAnalytics: () => Promise<AnalyticsData>
+    getAnalytics: (context?: string | null) => Promise<AnalyticsData>
   }
   customizer: {
     toggleEngine: (active: boolean) => Promise<void>
@@ -172,6 +182,8 @@ export interface ElectronAPI {
     rename: (oldName: string, newName: string) => Promise<void>
     selectFile: () => Promise<string | null>
     getText: (name: string) => Promise<string>
+    getRelevant: (name: string, query: string, maxChars?: number) => Promise<string>
+    search: (query: string) => Promise<Array<{ name: string; matchCount: number; snippets: string[] }>>
   }
   gamedev: {
     batchRename: (files: Array<{ oldPath: string; newPath: string }>) => Promise<{

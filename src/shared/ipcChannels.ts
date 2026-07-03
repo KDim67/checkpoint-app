@@ -32,6 +32,7 @@ export const enum IpcChannels {
   NOTES_READ             = 'notes:read',
   NOTES_WRITE            = 'notes:write',
   NOTES_DELETE           = 'notes:delete',
+  NOTES_SEARCH           = 'notes:search',
 
   // Git Integration
   GIT_CHECK              = 'git:check',
@@ -47,12 +48,16 @@ export const enum IpcChannels {
   CLIPBOARD_CREATE_SNIPPET = 'clipboard:createSnippet',
   CLIPBOARD_RESTORE_ITEM = 'clipboard:restoreItem',
   CLIPBOARD_PASTE        = 'clipboard:paste',
+  CLIPBOARD_HISTORY_CHANGED = 'clipboard:historyChanged',
   APP_NAVIGATE_TO_VIEW   = 'app:navigateToView',
   ANALYTICS_GET_DATA     = 'analytics:getData',
 
   // AI Streaming
   AI_STREAM_START        = 'ai:streamStart',
   AI_STREAM_ABORT        = 'ai:streamAbort',
+  AI_TEST_CONNECTION     = 'ai:testConnection',
+  AI_GENERATE_STRUCTURED = 'ai:generateStructured',
+  AI_GENERATE_ABORT      = 'ai:generateAbort',
   AI_CHUNK               = 'ai:chunk',
   AI_DONE                = 'ai:done',
   AI_ERROR               = 'ai:error',
@@ -120,6 +125,8 @@ export const enum IpcChannels {
   CHEATSHEETS_RENAME            = 'cheatsheets:rename',
   CHEATSHEETS_SELECT            = 'cheatsheets:select',
   CHEATSHEETS_GET_TEXT          = 'cheatsheets:getText',
+  CHEATSHEETS_GET_RELEVANT      = 'cheatsheets:getRelevant',
+  CHEATSHEETS_SEARCH            = 'cheatsheets:search',
 
   // Game Dev Helpers
   GAMEDEV_BATCH_RENAME          = 'gamedev:batchRename',

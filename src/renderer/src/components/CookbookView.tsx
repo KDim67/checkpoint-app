@@ -10,7 +10,8 @@ import {
   StopCircle,
   ExternalLink,
   Info,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react'
 import catalogData from '../../../shared/catalog.json'
 import { calculateFitResult } from '../../../shared/scoreEngine'
@@ -18,9 +19,39 @@ import type { CatalogModel, HardwareSpecs, OllamaStatus, PullProgressEvent } fro
 import Skeleton from './ui/Skeleton'
 import { useToast } from './ui/Toast'
 
+// Capability filters + display metadata for badges.
+const CAP_FILTERS: { id: string; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'chat', label: 'Chat' },
+  { id: 'code', label: 'Coding' },
+  { id: 'reasoning', label: 'Reasoning' },
+  { id: 'vision', label: 'Vision' },
+  { id: 'tools', label: 'Tools' },
+  { id: 'embedding', label: 'Embedding' },
+  { id: 'tiny', label: 'Tiny ≤3B' }
+]
+
+const CAP_META: Record<string, { label: string; color: string }> = {
+  code:      { label: 'Code',      color: '#3b82f6' },
+  reasoning: { label: 'Reasoning', color: '#a855f7' },
+  vision:    { label: 'Vision',    color: '#ec4899' },
+  tools:     { label: 'Tools',     color: '#22c55e' },
+  chat:      { label: 'Chat',      color: '#64748b' },
+  embedding: { label: 'Embedding', color: '#f59e0b' }
+}
+
+function formatContext(tokens?: number): string {
+  if (!tokens) return ''
+  if (tokens >= 1000) return `${Math.round(tokens / 1024)}K ctx`
+  return `${tokens} ctx`
+}
+
 export default function CookbookView() {
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
+  const [capFilter, setCapFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'fit' | 'params_asc' | 'params_desc'>('fit')
+  const [deletingTag, setDeletingTag] = useState<string | null>(null)
   const [specs, setSpecs] = useState<HardwareSpecs | null>(null)
   const [loadingSpecs, setLoadingSpecs] = useState(true)
 
@@ -166,23 +197,54 @@ export default function CookbookView() {
     }
   }
 
-  const catalogModels: CatalogModel[] = catalogData as CatalogModel[]
-  const filteredModels = catalogModels.filter((m) => {
-    if (unitySafeMode && m.parameters > 4) {
-      return false
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      const matchName = m.name.toLowerCase().includes(q)
-      const matchDesc = m.description.toLowerCase().includes(q)
-      const matchFamily = m.family.toLowerCase().includes(q)
-      const matchUseCases = m.useCases.some(uc => uc.toLowerCase().includes(q))
-      if (!matchName && !matchDesc && !matchFamily && !matchUseCases) {
-        return false
+  const handleDeleteModel = async (modelTag: string) => {
+    if (!confirm(`Delete "${modelTag}" from your machine? You can always reinstall it later.`)) return
+    setDeletingTag(modelTag)
+    try {
+      const ok = await window.electronAPI.cookbook.deleteModel(modelTag)
+      if (ok) {
+        toast(`Removed "${modelTag}"`, { type: 'success' })
+        await loadOllamaStatus()
+      } else {
+        toast(`Could not remove "${modelTag}"`, { type: 'error' })
       }
+    } catch (err) {
+      console.error('Failed to delete model:', err)
+      toast('Failed to remove model', { type: 'error' })
+    } finally {
+      setDeletingTag(null)
     }
-    return true
-  })
+  }
+
+  const catalogModels: CatalogModel[] = catalogData as CatalogModel[]
+  const filteredModels = catalogModels
+    .filter((m) => {
+      if (unitySafeMode && m.parameters > 4) return false
+      if (capFilter === 'tiny') {
+        if (m.parameters > 3) return false
+      } else if (capFilter !== 'all') {
+        if (!m.capabilities?.includes(capFilter as never)) return false
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchName = m.name.toLowerCase().includes(q)
+        const matchDesc = m.description.toLowerCase().includes(q)
+        const matchFamily = m.family.toLowerCase().includes(q)
+        const matchUseCases = m.useCases.some(uc => uc.toLowerCase().includes(q))
+        const matchCaps = (m.capabilities || []).some(c => c.toLowerCase().includes(q))
+        if (!matchName && !matchDesc && !matchFamily && !matchUseCases && !matchCaps) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (sortBy === 'params_asc') return a.parameters - b.parameters
+      if (sortBy === 'params_desc') return b.parameters - a.parameters
+      // 'fit' (default): best hardware fit first, then smaller models
+      const fa = specs ? calculateFitResult(specs, a).score : 0
+      const fb = specs ? calculateFitResult(specs, b).score : 0
+      if (fb !== fa) return fb - fa
+      return a.parameters - b.parameters
+    })
 
   const localModels = ollamaStatus?.localModels || []
 
@@ -626,6 +688,34 @@ export default function CookbookView() {
         </div>
       )}
 
+      {/* Installed models management */}
+      {localModels.length > 0 && (
+        <div>
+          <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', margin: '0 0 var(--space-3)' }}>
+            Installed Models ({localModels.length})
+          </h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            {localModels.map(m => (
+              <div key={m} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }}>
+                <CheckCircle size={13} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontFamily: 'var(--font-mono)' }}>{m}</span>
+                <button
+                  onClick={() => handleDeleteModel(m)}
+                  disabled={deletingTag === m}
+                  title="Delete model"
+                  aria-label={`Delete ${m}`}
+                  style={{ background: 'transparent', border: 'none', color: deletingTag === m ? 'var(--color-text-faint)' : 'var(--color-text-muted)', cursor: deletingTag === m ? 'default' : 'pointer', display: 'flex', padding: '2px' }}
+                  onMouseEnter={e => { if (deletingTag !== m) e.currentTarget.style.color = 'var(--color-error)' }}
+                  onMouseLeave={e => { if (deletingTag !== m) e.currentTarget.style.color = 'var(--color-text-muted)' }}
+                >
+                  {deletingTag === m ? <RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Trash2 size={13} />}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Model Catalog List */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
@@ -654,6 +744,42 @@ export default function CookbookView() {
                 fontSize: 'var(--text-xs)'
               }}
             />
+          </div>
+        </div>
+
+        {/* Capability filters + sort */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {CAP_FILTERS.map(f => {
+              const active = capFilter === f.id
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setCapFilter(f.id)}
+                  style={{
+                    fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-semibold)', padding: '4px 10px',
+                    borderRadius: 'var(--radius-full)', cursor: 'pointer',
+                    background: active ? 'var(--color-primary)' : 'var(--color-surface-2)',
+                    color: active ? '#fff' : 'var(--color-text-muted)',
+                    border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-surface-offset)'}`
+                  }}
+                >
+                  {f.label}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>{filteredModels.length} models</span>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as 'fit' | 'params_asc' | 'params_desc')}
+              style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)', borderRadius: 'var(--radius-md)', padding: '5px 8px', fontSize: 'var(--text-2xs)', cursor: 'pointer' }}
+            >
+              <option value="fit">Best for my hardware</option>
+              <option value="params_asc">Smallest first</option>
+              <option value="params_desc">Largest first</option>
+            </select>
           </div>
         </div>
 
@@ -786,22 +912,33 @@ export default function CookbookView() {
                   {model.description}
                 </p>
 
-                {/* Use Cases tags */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
-                  {model.useCases.map((uc) => (
-                    <span
-                      key={uc}
-                      style={{
-                        fontSize: 'var(--text-2xs)',
-                        color: 'var(--color-text-muted)',
-                        background: 'var(--color-surface-2)',
-                        padding: '1px 6px',
-                        borderRadius: 'var(--radius-sm)'
-                      }}
-                    >
-                      {uc}
-                    </span>
-                  ))}
+                {/* Capability badges */}
+                {model.capabilities && model.capabilities.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
+                    {model.capabilities.map((cap) => {
+                      const meta = CAP_META[cap]
+                      if (!meta) return null
+                      return (
+                        <span
+                          key={cap}
+                          style={{
+                            fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-semibold)',
+                            color: meta.color, background: `${meta.color}18`, border: `1px solid ${meta.color}44`,
+                            padding: '1px 7px', borderRadius: 'var(--radius-full)'
+                          }}
+                        >
+                          {meta.label}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Meta line: params · context · license */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)' }}>
+                  <span>{model.parameters < 1 ? `${Math.round(model.parameters * 1000)}M` : `${model.parameters}B`} params</span>
+                  {model.contextLength ? <span>{formatContext(model.contextLength)}</span> : null}
+                  {model.license ? <span>{model.license}</span> : null}
                 </div>
 
                 {/* Score bar */}

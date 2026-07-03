@@ -76,9 +76,19 @@ export interface PaginatedResult<T> {
 
 // AI
 
+/** Multimodal content part (OpenAI-compatible), used for vision-model image input. */
+export type AiContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
+export interface AiChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string | AiContentPart[]
+}
+
 export interface AiStreamParams {
   model: string
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  messages: AiChatMessage[]
   temperature?: number
   maxTokens?: number
 }
@@ -87,6 +97,26 @@ export interface AiSettings {
   baseURL: string        // e.g. 'http://localhost:11434/v1' for Ollama
   apiKey: string         // 'ollama' for local, real key for OpenAI
   model: string
+}
+
+// Structured AI actions (reliable board/plan/dialogue/update generation)
+
+export type AiStructuredKind = 'board' | 'plan' | 'dialogue' | 'update'
+
+export interface AiStructuredParams {
+  kind: AiStructuredKind
+  model: string
+  messages: AiChatMessage[]
+  temperature?: number
+}
+
+export interface AiStructuredResult {
+  ok: boolean
+  /** Parsed JSON object whose shape depends on `kind`. */
+  data?: unknown
+  /** Which generation strategy succeeded: tools | json_schema | json_object | text. */
+  method?: string
+  error?: string
 }
 
 // AI Cookbook / Hardware
@@ -121,6 +151,9 @@ export interface FitResult {
   recommendedVariant: QuantizationLevel
 }
 
+/** Model capabilities used for filtering and capability badges. */
+export type ModelCapability = 'chat' | 'code' | 'reasoning' | 'vision' | 'tools' | 'embedding'
+
 export interface CatalogModel {
   id: string
   name: string
@@ -129,7 +162,14 @@ export interface CatalogModel {
   description: string
   useCases: string[]
   homepageUrl: string
-  variants: Record<QuantizationLevel, ModelVariant>
+  /** Not every model ships every quantization on Ollama, so variants are partial. */
+  variants: Partial<Record<QuantizationLevel, ModelVariant>>
+  /** Capabilities for filtering + badges (tools = function calling, vision = multimodal). */
+  capabilities?: ModelCapability[]
+  /** Max context window in tokens. */
+  contextLength?: number
+  /** License short name, e.g. "Apache 2.0", "MIT", "Llama 3.1". */
+  license?: string
 }
 
 export interface OllamaStatus {
@@ -177,6 +217,8 @@ export interface TaskQueryParams {
   sortDesc?: boolean
   page?: number
   pageSize?: number
+  /** When true, returns only archived (soft-deleted) tasks instead of the normal active set. */
+  archivedOnly?: boolean
 }
 
 export interface FocusSession {
@@ -201,6 +243,18 @@ export interface NoteMetadata {
   links: string[]
   updatedAt: number
   size: number
+  /** Short plain-text preview of the note body (markdown stripped). */
+  excerpt: string
+}
+
+export interface NoteSearchResult {
+  title: string
+  /** Contextual snippet around the first content match, with markers stripped. */
+  snippet: string
+  /** Number of matches of the query within the note body. */
+  matchCount: number
+  /** True when the query also matches the note title. */
+  titleMatch: boolean
 }
 
 export interface GitCommit {
@@ -246,6 +300,7 @@ export interface AnalyticsData {
   columnTime: Array<{
     column: string
     avgMs: number
+    count?: number
   }>
   recentFocusSessions: Array<{
     completedAt: number

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Sparkles, Trash2, BookOpen, X, Download, Check, RefreshCw, MessageSquare, Plus, Edit2, Brain, Sliders, Copy, FileDown, FolderOpen, Gauge, Search, Pin } from 'lucide-react'
+import { Sparkles, Trash2, BookOpen, X, Download, RefreshCw, MessageSquare, Plus, Edit2, Brain, Sliders, FileDown, FolderOpen, Gauge, Search, Pin, ArrowDown } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
 import catalogData from '../../../shared/catalog.json'
@@ -7,13 +7,27 @@ import ContextPill from './ai/ContextPill'
 import ChatMessage, { clearActionCaches } from './ai/ChatMessage'
 import ChatInput from './ai/ChatInput'
 import { AI_SKILLS, getSkillById } from './ai/skills'
+import { buildAssistantMessage, PALETTE_HINT } from './ai/boardEnrich'
+import { loadProviders, persistProviders, activateProvider, isLocalUrl, type AiProvider } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
 
 interface Message {
   role: 'system' | 'user' | 'assistant'
   content: string
+  /** Chain-of-thought extracted from <think>…</think> tags (reasoning models). */
+  thinking?: string
+  /** Optional concise label shown in the bubble instead of the full prompt (quick actions). */
+  displayContent?: string
+  /** Explicit intent from a quick-action button, so it can't be mis-classified by keywords. */
+  intentHint?: 'create' | 'analyze'
   mode?: string
   cheatsheets?: string[]
+  /** Attached note titles (from the Notes feature). */
+  notes?: string[]
+  /** Attached workspace file relative paths. */
+  files?: string[]
+  /** Attached images as data URLs (vision models). */
+  images?: string[]
   timestamp?: number
   boardSnapshot?: {
     columns: any[]
@@ -24,6 +38,17 @@ interface Message {
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
 const STORAGE_KEY_WORKSPACE_FOLDER = 'checkpoint_ai_workspace_folder'
+
+// Dedicated stream channel, keeps this panel's stream isolated from other
+// consumers (e.g. the Standup Translator) so both can run concurrently.
+const ASSISTANT_STREAM_ID = 'assistant'
+
+// Vision-capable model heuristic, used to gate image attachments so users
+// don't paste screenshots into text-only models that silently ignore them.
+const VISION_MODEL_RE = /llava|moondream|bakllava|minicpm|qwen[\w.-]*vl|internvl|vision|pixtral|gpt-4o|gpt-4\.\d|gpt-4-turbo|gemini|claude|grok/i
+export function supportsVision(modelName: string): boolean {
+  return VISION_MODEL_RE.test(modelName || '')
+}
 
 export function getModelProfile(modelName: string) {
   const m = (modelName || '').toLowerCase()
@@ -41,14 +66,32 @@ export function parseThinkingAndContent(text: string) {
   let thinking = ''
   let content = text
 
-  const thinkStartIdx = text.indexOf('<think>')
+  let thinkStartIdx = -1
+  let tagLength = 0
+  let endTag = ''
+
+  const startTags = [
+    { tag: '<think>', end: '</think>' },
+    { tag: '<thought>', end: '</thought>' },
+    { tag: '<thinking>', end: '</thinking>' }
+  ]
+
+  for (const item of startTags) {
+    const idx = text.indexOf(item.tag)
+    if (idx !== -1 && (thinkStartIdx === -1 || idx < thinkStartIdx)) {
+      thinkStartIdx = idx
+      tagLength = item.tag.length
+      endTag = item.end
+    }
+  }
+
   if (thinkStartIdx !== -1) {
-    const thinkEndIdx = text.indexOf('</think>')
+    const thinkEndIdx = text.indexOf(endTag)
     if (thinkEndIdx !== -1) {
-      thinking = text.slice(thinkStartIdx + 7, thinkEndIdx).trim()
-      content = (text.slice(0, thinkStartIdx) + text.slice(thinkEndIdx + 8)).trim()
+      thinking = text.slice(thinkStartIdx + tagLength, thinkEndIdx).trim()
+      content = (text.slice(0, thinkStartIdx) + text.slice(thinkEndIdx + endTag.length)).trim()
     } else {
-      thinking = text.slice(thinkStartIdx + 7).trim()
+      thinking = text.slice(thinkStartIdx + tagLength).trim()
       content = text.slice(0, thinkStartIdx).trim()
     }
   }
@@ -100,10 +143,23 @@ function pruneHistory(history: Message[], maxHistoryTokens: number): Message[] {
 // Semantic intent classifier, replaces the fragile keyword-heuristic approach.
 // Returns what action type the model should take, factoring in the active skill.
 // Defaults to 'converse' to prevent hallucination when intent is ambiguous.
-type IntentType = 'create_items' | 'create_plan' | 'create_dialogue' | 'converse'
+type IntentType = 'create_items' | 'create_plan' | 'create_dialogue' | 'update_items' | 'converse'
 
 function classifyIntent(text: string, activeSkillId: string | null): IntentType {
   const lower = text.toLowerCase().trim()
+
+  // Board EDITING signals (existing cards), checked before creation so
+  // "move X to done" never reads as a create request. High-precision patterns.
+  if (
+    /\b(move|put|shift|transfer)\b[\s\S]{0,60}\b(to|into|in)\b[\s\S]{0,40}\b(column|done|progress|review|backlog|lane|stage)\b/.test(lower) ||
+    /\barchive\b[\s\S]{0,60}\b(card|task|item|column|everything|all|done)\b/.test(lower) ||
+    /\b(set|change|bump|raise|lower|update|increase|decrease)\b[\s\S]{0,50}\bpriorit/.test(lower) ||
+    /\bmark\b[\s\S]{0,60}\bas\b[\s\S]{0,20}\b(done|complete|completed|finished|in.progress|review)\b/.test(lower) ||
+    /\brename\b[\s\S]{0,60}\b(card|task|item)\b/.test(lower) ||
+    /\b(reprioriti[sz]e|re-prioriti[sz]e)\b/.test(lower) ||
+    /\b(set|change|add|update|clear|remove|push|extend)\b[\s\S]{0,50}\b(due date|deadline|due)\b/.test(lower) ||
+    /\b(due|deadline)\b[\s\S]{0,30}\b(to|for|on|by)\b[\s\S]{0,30}\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|next week|\d)/.test(lower)
+  ) return 'update_items'
 
   // Skill-specific intent elevation: active skill biases strongly toward its native format
   if (activeSkillId === 'narrative_specialist') {
@@ -122,7 +178,7 @@ function classifyIntent(text: string, activeSkillId: string | null): IntentType 
   if (/implementation plan|create.*plan|make.*plan|step.by.step plan|detailed plan|plan for/.test(lower)) return 'create_plan'
 
   // Item creation: requires BOTH an imperative verb AND an item noun (high-precision pairing)
-  const CREATE_VERBS = ['create', 'add', 'make', 'generate', 'build', 'populate', 'set up', 'scaffold', 'give me', 'list', 'suggest', 'produce', 'output']
+  const CREATE_VERBS = ['create', 'add', 'make', 'generate', 'build', 'populate', 'set up', 'scaffold', 'give me', 'suggest', 'produce']
   const ITEM_NOUNS  = ['card', 'task', 'column', 'board', 'ticket', 'item', 'stage', 'more task', 'another task', 'some task', 'few task']
   const hasCreateVerb = CREATE_VERBS.some(v => lower.includes(v))
   const hasItemNoun   = ITEM_NOUNS.some(n => lower.includes(n))
@@ -133,6 +189,43 @@ function classifyIntent(text: string, activeSkillId: string | null): IntentType 
 
   // Default to conversational, only output JSON when explicitly requested
   return 'converse'
+}
+
+// Automatic skill recall, infers which specialized skill best fits the message
+// so the user never has to manually pick one (they still can, to pin it).
+function detectSkill(text: string): string | null {
+  const t = (text || '').toLowerCase()
+  if (!t.trim()) return null
+
+  const scores: Record<string, number> = {
+    narrative_specialist: 0,
+    implementation_planner: 0,
+    kanban_architect: 0
+  }
+  const bump = (id: string, kws: string[], w = 1): void => {
+    for (const k of kws) if (t.includes(k)) scores[id] += w
+  }
+
+  bump('narrative_specialist', ['dialogue', 'dialog', 'quest', 'story', 'narrative', 'lore', 'npc', 'cutscene', 'worldbuild', 'character arc', 'branching', 'conversation tree'], 2)
+  bump('narrative_specialist', ['character', 'plot', 'scene', 'voice'])
+
+  bump('implementation_planner', ['implementation plan', 'step-by-step', 'step by step', 'roadmap', 'architecture', 'design doc', 'technical spec', 'how should i build', 'how do i implement', 'approach for'], 2)
+  bump('implementation_planner', ['plan', 'implement', 'architect', 'refactor', 'strategy', 'milestone'])
+
+  bump('kanban_architect', ['column', 'columns', 'board', 'kanban', 'backlog', 'sprint', 'workflow', 'lane', 'wip', 'swimlane', 'pipeline stage'], 2)
+  bump('kanban_architect', ['card', 'cards', 'task', 'tasks', 'ticket', 'prioriti', 'organize', 'break down'])
+
+  let best: string | null = null
+  let bestScore = 0
+  for (const [id, s] of Object.entries(scores)) {
+    if (s > bestScore) { bestScore = s; best = id }
+  }
+  return bestScore >= 2 ? best : null
+}
+
+/** True when the user is asking for board structure (columns/stages/lanes), not just cards. */
+function wantsColumns(text: string): boolean {
+  return /\b(column|columns|lane|lanes|stage|stages|swimlane|set ?up (a|the|my)? ?board|board structure|workflow|pipeline|restructure)\b/i.test(text || '')
 }
 
 /**
@@ -193,6 +286,8 @@ export default function AiStreamPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
   const selectItem = useAppStore(s => s.selectItem)
   const activeContext = useAppStore(s => s.activeContext)
+  const availableContexts = useAppStore(s => s.availableContexts)
+  const setContext = useAppStore(s => s.setContext)
   const { toast } = useToast()
 
   // Chat message history
@@ -209,8 +304,11 @@ export default function AiStreamPanel() {
   const [localModels, setLocalModels] = useState<string[]>([])
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(2048)
-  const [useOllamaSelector, setUseOllamaSelector] = useState(false)
+  const [providers, setProviders] = useState<AiProvider[]>([])
+  const [activeProviderId, setActiveProviderId] = useState<string>('')
   const [showCookbookModal, setShowCookbookModal] = useState(false)
+  const [showCustomModelPrompt, setShowCustomModelPrompt] = useState(false)
+  const [customModelInput, setCustomModelInput] = useState('')
   const [pullingTag, setPullingTag] = useState<string | null>(null)
   const [pullProgress, setPullProgress] = useState<number>(0)
 
@@ -225,6 +323,7 @@ export default function AiStreamPanel() {
   })
   const [currentChatId, setCurrentChatId] = useState<string>(() => `chat_${Date.now()}`)
   const [showSavedChatsModal, setShowSavedChatsModal] = useState(false)
+  const [chatSearchQuery, setChatSearchQuery] = useState('')
   const [revertConfirmData, setRevertConfirmData] = useState<{ cardTitles: string[]; columnNames: string[]; index: number } | null>(null)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
@@ -267,7 +366,7 @@ export default function AiStreamPanel() {
 
   const handleNewChat = () => {
     if (isStreaming) {
-      window.electronAPI.ai.abortStream().catch(() => {})
+      window.electronAPI.ai.abortStream(ASSISTANT_STREAM_ID).catch(() => {})
     }
     setMessages([])
     setStreamingText('')
@@ -277,6 +376,7 @@ export default function AiStreamPanel() {
     hasReceivedFirstChunkRef.current = false
     isAbortedRef.current = false
     setIsWaitingForFirstChunk(false)
+    setRecalledMemCount(0)
     setCurrentChatId(`chat_${Date.now()}`)
     setShowSavedChatsModal(false)
     // Clear action caches so cards/columns can be re-created in a fresh chat
@@ -285,7 +385,7 @@ export default function AiStreamPanel() {
 
   const handleLoadChat = (chat: SavedChat) => {
     if (isStreaming) {
-      window.electronAPI.ai.abortStream().catch(() => {})
+      window.electronAPI.ai.abortStream(ASSISTANT_STREAM_ID).catch(() => {})
     }
     setMessages(chat.messages)
     setStreamingText('')
@@ -340,6 +440,8 @@ export default function AiStreamPanel() {
 
   // Memory panel
   const [showMemoryPanel, setShowMemoryPanel] = useState(false)
+  const [recalledMemCount, setRecalledMemCount] = useState(0)
+  const [waitingLabel, setWaitingLabel] = useState('Thinking…')
   const [memories, setMemories] = useState<any[]>([])
   const [memoryLoading, setMemoryLoading] = useState(false)
   const [memorySearchQuery, setMemorySearchQuery] = useState('')
@@ -391,6 +493,42 @@ export default function AiStreamPanel() {
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileInfo[]>([])
   const [workspaceIndexing, setWorkspaceIndexing] = useState(false)
 
+  // Custom quick actions (user-defined prompt library)
+  interface CustomAction { id: string; label: string; prompt: string; intent: 'create' | 'analyze' }
+  const [customActions, setCustomActions] = useState<CustomAction[]>([])
+  const [showCustomActionsModal, setShowCustomActionsModal] = useState(false)
+  const [caLabel, setCaLabel] = useState('')
+  const [caPrompt, setCaPrompt] = useState('')
+  const [caIntent, setCaIntent] = useState<'create' | 'analyze'>('analyze')
+
+  useEffect(() => {
+    window.electronAPI.db.getSetting('ai_custom_actions').then(raw => {
+      if (typeof raw !== 'string' || !raw) return
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          setCustomActions(parsed.filter(a => a && a.id && a.label && a.prompt))
+        }
+      } catch { /* corrupted setting, start fresh */ }
+    }).catch(() => {})
+  }, [])
+
+  const persistCustomActions = (list: CustomAction[]): void => {
+    setCustomActions(list)
+    window.electronAPI.db.setSetting('ai_custom_actions', JSON.stringify(list)).catch(() => {})
+  }
+
+  const handleAddCustomAction = (): void => {
+    if (!caLabel.trim() || !caPrompt.trim()) return
+    persistCustomActions([
+      ...customActions,
+      { id: `ca_${Date.now()}`, label: caLabel.trim().slice(0, 40), prompt: caPrompt.trim(), intent: caIntent }
+    ])
+    setCaLabel('')
+    setCaPrompt('')
+    setCaIntent('analyze')
+  }
+
   // Copy toast
   const [copiedMsgIndex, setCopiedMsgIndex] = useState<number | null>(null)
 
@@ -422,38 +560,64 @@ export default function AiStreamPanel() {
     loadContextDetails()
   }, [selectedItemId, activeContext])
 
-  // 2. Load Configuration and Local Models on mount
-  useEffect(() => {
-    const loadAiConfig = async () => {
-      try {
-        const dbModel = await window.electronAPI.db.getSetting('ai_model')
-        const dbTemp = await window.electronAPI.db.getSetting('ai_temperature')
-        const dbMaxTokens = await window.electronAPI.db.getSetting('ai_max_tokens')
+  // 2. Load provider profiles + models. Provider-aware: the model list and the
+  //    Ollama dropdown only apply to LOCAL endpoints; cloud providers use the
+  //    profile's typed model. Re-runs whenever the active provider changes.
+  const loadAiConfig = useCallback(async () => {
+    try {
+      const { providers: provs, activeId } = await loadProviders()
+      setProviders(provs)
+      setActiveProviderId(activeId)
 
-        if (dbModel) setSelectedModel(dbModel as string)
-        if (dbTemp !== null) setTemperature(Number(dbTemp))
-        if (dbMaxTokens !== null) setMaxTokens(Number(dbMaxTokens))
+      const active = provs.find(p => p.id === activeId)
+      const baseUrl = active?.baseURL || ''
+      const savedModel = active?.model || ''
+      const isLocalEndpoint = isLocalUrl(baseUrl)
 
-        // Check local models from Ollama
-        const list = await window.electronAPI.ollama.listLocal()
+      if (savedModel) setSelectedModel(savedModel)
+
+      const dbTemp = await window.electronAPI.db.getSetting('ai_temperature')
+      const dbMaxTokens = await window.electronAPI.db.getSetting('ai_max_tokens')
+      if (dbTemp !== null) setTemperature(Number(dbTemp))
+      if (dbMaxTokens !== null) setMaxTokens(Number(dbMaxTokens))
+
+      if (isLocalEndpoint) {
+        // Local endpoint: the model MUST be one Ollama actually has installed.
+        const list = await window.electronAPI.ollama.listLocal().catch(() => [] as string[])
         if (list && list.length > 0) {
           setLocalModels(list)
-          setUseOllamaSelector(true)
-          // Default to the first local model if selectedModel is empty
-          if (!dbModel) {
+          // Auto-heal the "default model not installed → 404" trap.
+          const savedInstalled = savedModel && list.includes(savedModel)
+          if (!savedModel || !savedInstalled) {
             setSelectedModel(list[0])
-            await window.electronAPI.db.setSetting('ai_model', list[0])
+            const next = provs.map(p => (p.id === activeId ? { ...p, model: list[0] } : p))
+            setProviders(next)
+            await persistProviders(next, activeId)
           }
         } else {
-          setUseOllamaSelector(false)
+          setLocalModels([])
         }
-      } catch {
-        // Fallback to text input model selector if Ollama is not running/available
-        setUseOllamaSelector(false)
+      } else {
+        // Cloud provider: use the profile's typed model, no Ollama dropdown.
+        setLocalModels([])
       }
+    } catch (err) {
+      console.warn('Failed to load AI config:', err)
     }
-    loadAiConfig()
   }, [])
+
+  useEffect(() => {
+    loadAiConfig()
+    const handler = (): void => { loadAiConfig() }
+    window.addEventListener('checkpoint-ai-provider-changed', handler)
+    return () => window.removeEventListener('checkpoint-ai-provider-changed', handler)
+  }, [loadAiConfig])
+
+  const handleSwitchProvider = useCallback(async (id: string) => {
+    setActiveProviderId(id)
+    await activateProvider(providers, id)
+    await loadAiConfig()
+  }, [providers, loadAiConfig])
 
   // Auto-scroll to bottom of messages container
   const scrollToBottom = useCallback((force = false) => {
@@ -462,10 +626,15 @@ export default function AiStreamPanel() {
     }
   }, [])
 
+  // Floating "jump to latest" affordance while scrolled up (mirrors isAtBottomRef in state)
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+
   const handleScroll = () => {
     if (!scrollContainerRef.current) return
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current
-    isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 40
+    const atBottom = scrollHeight - scrollTop - clientHeight < 40
+    isAtBottomRef.current = atBottom
+    setShowJumpToLatest(!atBottom)
   }
 
   useEffect(() => {
@@ -474,9 +643,25 @@ export default function AiStreamPanel() {
     scrollToBottom(messageAdded)
   }, [messages, streamingText])
 
+  // Esc anywhere stops an in-flight generation, the input is disabled while
+  // streaming, so a keyboard-only user otherwise has no way to abort.
+  useEffect(() => {
+    if (!isStreaming) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        handleAbort()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreaming])
+
   // 4. Mount IPC Streaming Listeners with cleanups to prevent leaks
   useEffect(() => {
-    const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk) => {
+    const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk, streamId) => {
+      if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       if (isAbortedRef.current) return
       // Ignore chunks if current chat is no longer the streaming chat
       if (streamingChatIdRef.current !== currentChatIdRef.current) return
@@ -501,7 +686,8 @@ export default function AiStreamPanel() {
       }
     })
 
-    const unsubscribeDone = window.electronAPI.ai.onDone(() => {
+    const unsubscribeDone = window.electronAPI.ai.onDone((streamId) => {
+      if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       if (isAbortedRef.current) {
         isAbortedRef.current = false
         return
@@ -535,7 +721,8 @@ export default function AiStreamPanel() {
       setIsStreaming(false)
     })
 
-    const unsubscribeError = window.electronAPI.ai.onError((errMessage) => {
+    const unsubscribeError = window.electronAPI.ai.onError((errMessage, streamId) => {
+      if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       if (isAbortedRef.current) {
         isAbortedRef.current = false
         return
@@ -618,14 +805,30 @@ export default function AiStreamPanel() {
     })
   }
 
+  // Set the model and keep the active provider profile (the source of truth) in sync.
+  const applyModel = useCallback(async (val: string) => {
+    setSelectedModel(val)
+    await window.electronAPI.db.setSetting('ai_model', val)
+    setProviders(prev => {
+      if (!activeProviderId) return prev
+      const next = prev.map(p => (p.id === activeProviderId ? { ...p, model: val } : p))
+      persistProviders(next, activeProviderId)
+      return next
+    })
+  }, [activeProviderId])
+
   const handleModelChange = async (val: string) => {
     if (val === '__OPEN_COOKBOOK__') {
       setShowCookbookModal(true)
       refreshLocalModels()
       return
     }
-    setSelectedModel(val)
-    await window.electronAPI.db.setSetting('ai_model', val)
+    if (val === '__CUSTOM_MODEL__') {
+      setCustomModelInput('')
+      setShowCustomModelPrompt(true)
+      return
+    }
+    await applyModel(val)
   }
 
   const refreshLocalModels = async () => {
@@ -633,7 +836,6 @@ export default function AiStreamPanel() {
       const list = await window.electronAPI.ollama.listLocal()
       if (list && list.length > 0) {
         setLocalModels(list)
-        setUseOllamaSelector(true)
       }
     } catch (e) {
       console.warn('Failed to refresh local models:', e)
@@ -668,7 +870,7 @@ export default function AiStreamPanel() {
         window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
         window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
       ])
-      const allItems = [...(tasksRes?.items || []), ...(cardsRes?.items || [])]
+      const allItems = [...(tasksRes?.items || []), ...(cardsRes?.items || [])].filter(i => i.status !== 'archived')
       const itemsToDelete = allItems
         .filter(item => cardTitles.includes(item.title.trim()))
         .map(item => item.id)
@@ -736,9 +938,19 @@ export default function AiStreamPanel() {
   }
 
   // 5. Submit Query
-  const handleSubmitWithText = async (textToSubmit?: string, options?: { mode?: string; cheatsheets?: string[]; displayContent?: string }) => {
+  interface SubmitOptions {
+    mode?: string
+    cheatsheets?: string[]
+    notes?: string[]
+    files?: string[]
+    images?: string[]
+    displayContent?: string
+    intentHint?: 'create' | 'analyze'
+  }
+  const handleSubmitWithText = async (textToSubmit?: string, options?: SubmitOptions) => {
     const text = (textToSubmit ?? inputValue).trim()
-    if (!text && !options?.cheatsheets?.length) return
+    const hasAttachment = !!(options?.cheatsheets?.length || options?.notes?.length || options?.files?.length || options?.images?.length)
+    if (!text && !hasAttachment) return
     if (isStreaming) return
 
     // Slash Commands Parser
@@ -748,7 +960,9 @@ export default function AiStreamPanel() {
       const remainingText = parts.slice(1).join(' ').trim()
 
       if (cmd === '/clear') {
-        setMessages([])
+        // Full reset (same as New Chat), also clears the action caches so
+        // previously created card titles can be recreated in the fresh thread.
+        handleNewChat()
         setInputValue('')
         return
       }
@@ -822,9 +1036,14 @@ export default function AiStreamPanel() {
 
     const userMessage: Message = {
       role: 'user',
-      content: text,
+      content: text || '(see attachments)',
+      displayContent: options?.displayContent,
+      intentHint: options?.intentHint,
       mode: options?.mode,
       cheatsheets: options?.cheatsheets,
+      notes: options?.notes,
+      files: options?.files,
+      images: options?.images,
       timestamp: Date.now()
     }
     const nextMessages = [...messages, userMessage]
@@ -836,6 +1055,7 @@ export default function AiStreamPanel() {
   const runChatStream = async (nextMessages: Message[]) => {
     setIsStreaming(true)
     setIsWaitingForFirstChunk(true)
+    setWaitingLabel('Thinking…')
     streamingChatIdRef.current = currentChatIdRef.current
     hasReceivedFirstChunkRef.current = false
     isAbortedRef.current = false
@@ -854,104 +1074,42 @@ export default function AiStreamPanel() {
         const contextWindowTokens = profile.contextTokens
 
         const baseSystemPromptContent = isSmallModel
-          ? `You are Checkpoint AI, an assistant with DIRECT WRITE ACCESS to the user's Kanban board.
+          ? `You are Checkpoint AI, a helpful project assistant with DIRECT WRITE ACCESS to the user's Kanban board. Anything you create is added to the board automatically.
 
-██ ACTION RULES ██
-1. When asked to add/create tasks, output a JSON block that creates them.
-2. DO NOT DUPLICATE: Never create cards with the same titles as existing ones.
-3. REUSE COLUMNS: If existing columns fit, place new cards in them. Omit the "columns" key.
-4. Keep replies direct and output JSON immediately.
+WHEN CREATING CARDS:
+- Give every card a clear title, a concrete one-line body, a priority (1=Low, 2=Medium, 3=High), and 1-3 short tags, each tag with a hex color.
+- Reuse existing columns when they fit; only add a new column for a genuinely new stage.
+- Never duplicate a card title that already exists on the board.
+- ${PALETTE_HINT}
 
-██ JSON FORMAT (BATCH) ██
+If asked to create, respond with a JSON batch block:
 \`\`\`json
 {
   "cards": [
-    { "title": "Task Title", "body": "Description", "status": "Backlog", "priority": 2 }
-  ]
-}
-\`\`\``
-          : `You are the Checkpoint AI Assistant, a pair-programming partner and project coordinator integrated directly into a visual game developer's Kanban workspace.
-
-██ ACTION EVALUATION & CREATION RULES ██
-When the user asks to create, plan, or add items (e.g. "add tasks", "create cards", "make columns", "populate the board"):
-1. CRITICALLY AUDIT the current live board state first (provided below). Read columns and card titles.
-2. PREVENT DUPLICATION: Never create columns or cards that duplicate or heavily overlap with what already exists.
-3. REUSE COLUMNS: If the existing columns are sufficient, NEVER create new columns. In your JSON, map cards to existing column IDs (e.g. "open", "in_progress", "done"). Do not recreate columns.
-4. QUALITY & PARSIMONY: Propose only essential, high-impact, actionable cards representing genuine missing gaps (by default 3 to 6 tasks, or however many the user explicitly requests). Do not spam the board with redundant or low-value cards.
-5. JSON OMISSION: In your batch JSON, ONLY include the "columns" array if you are introducing brand new workflow stages. If you are just adding cards to existing columns, OMIT the "columns" array entirely.
-6. When creation is truly justified, output the JSON blocks immediately. Do not explain what you will do or ask for permission.
-
-██ CONVERSATIONAL & INQUIRY RULE ██
-- When the user asks a general question, requests an explanation, or requests a project audit:
-  → Respond with a helpful, friendly, natural-language text answer.
-  → DO NOT output any JSON action blocks (cards/columns) unless specifically asked to add or create them.
-  → Act as an intelligent project partner, answering questions clearly based on the live board state, codebase structure, and recalled memories.
-
-██ DISAMBIGUATION ██
-- "Cards" and "Columns" = Kanban board items in Checkpoint. NOT playing cards. NOT Trello.
-- Everything you generate is AUTOMATICALLY added to the board. No copy-pasting needed.
-- NEVER mention external tools (Trello, Asana, Jira, Notion). Everything works here.
-
-██ JSON RULES ██
-- Valid JSON only. No trailing commas. No comments inside JSON.
-- "priority": 1=Low, 2=Medium, 3=High
-- "color": hex value like "#a855f7" (NOT color names like "purple")
-- "colorMode": "header" or "full"
-- "status": must match an existing column NAME (e.g. "Backlog", "In Progress")
-
-━━━ BATCH FORMAT (PREFERRED, use this for 2+ items) ━━━
-\`\`\`json
-{
-  "cards": [
-    { "title": "Task One",   "body": "Description here", "status": "Backlog",     "priority": 2 },
-    { "title": "Task Two",   "body": "Description here", "status": "In Progress", "priority": 3 }
+    { "title": "Task Title", "body": "What to do / definition of done", "status": "Backlog", "priority": 2, "tags": [{ "name": "gameplay", "color": "#22c55e" }] }
   ]
 }
 \`\`\`
+Otherwise, answer the user's question in friendly plain text.`
+          : `You are the Checkpoint AI Assistant, a pair-programming partner and project coordinator built directly into a game developer's visual Kanban workspace. Everything you create is automatically added to the board; there is no copy-paste and no external tool (never mention Trello/Jira/Asana/Notion).
 
-━━━ SINGLE CARD ━━━
-\`\`\`json:create_card
-{
-  "title": "Core System: Character Movement",
-  "body": "Implement player controls and physics-based movement",
-  "status": "Backlog",
-  "priority": 2,
-  "tags": [{ "name": "gameplay", "color": "#a855f7" }]
-}
-\`\`\`
+██ WHEN CREATING BOARD ITEMS ██
+1. AUDIT first: read the live board state below (columns + card titles) before creating anything.
+2. NO DUPLICATES: never create a card whose title matches or heavily overlaps an existing one.
+3. REUSE COLUMNS: if the existing columns fit, place cards in them and DO NOT create columns. Only introduce a column for a genuinely new workflow stage.
+4. QUALITY over quantity: propose essential, high-impact, well-scoped cards (3-6 by default, or the number requested), no filler.
+5. BE CREATIVE & VISUAL: give every card a fitting priority (1-3) and 1-3 topical tags, each with a hex color. Give any new column a fitting hex color. ${PALETTE_HINT}
+6. When creation is justified, just do it, don't ask permission or explain first.
 
-━━━ SINGLE COLUMN ━━━
-\`\`\`json:create_column
-{
-  "name": "Story & Worldbuilding",
-  "wipLimit": 10,
-  "color": "#a855f7",
-  "colorMode": "header"
-}
-\`\`\`
+██ WHEN CONVERSING ██
+- For questions, explanations, audits, or advice: reply in friendly natural-language text. Do NOT emit JSON action blocks unless the user asked to create/add something.
+- "Cards" and "Columns" are Checkpoint Kanban items (not playing cards).
 
-━━━ IMPLEMENTATION PLAN ━━━
-\`\`\`json:create_plan
-{
-  "title": "Implementation Plan Title",
-  "overview": "Overview of goals and steps",
-  "steps": [
-    { "title": "Step 1: Setup Game Engine", "details": "Initialize project assets", "status": "pending" }
-  ]
-}
-\`\`\`
-
-━━━ BRANCHING DIALOGUE / QUEST FLOW ━━━
-\`\`\`json:create_dialogue_tree
-{
-  "startNode": "start",
-  "nodes": [
-    { "id": "start", "speaker": "Elder", "text": "Greetings traveler!", "choices": [{ "text": "Hello!", "target": "quest_1" }] }
-  ]
-}
-\`\`\`
-
-When creating multiple cards, ALWAYS use the BATCH format, it is the most reliable. Only include the "columns" key if you are defining brand new stages; otherwise, omit "columns" and only provide the "cards" list.`
+██ FORMAT (only when creating) ██
+- Batch (preferred for cards): \`\`\`json { "cards": [ { "title", "body", "status", "priority", "tags": [{ "name", "color" }] } ], "columns": [ { "name", "color", "colorMode": "header" } ] } \`\`\`, omit "columns" unless adding new stages.
+- Implementation plan: \`\`\`json:create_plan { "title", "overview", "steps": [{ "title", "details", "status": "pending" }] } \`\`\`
+- Branching dialogue: \`\`\`json:create_dialogue_tree { "startNode", "nodes": [{ "id", "speaker", "text", "choices": [{ "text", "target" }] }] } \`\`\`
+- Valid JSON only: no trailing commas, no comments. priority is 1|2|3. colors are hex like "#a855f7". status is an existing column name or id.`
 
         // Seed context as a system instruction if preset
         const systemPrompt: Message[] = [
@@ -960,6 +1118,14 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
             content: baseSystemPromptContent
           }
         ]
+
+        // Ground all date/deadline reasoning, models have no clock of their
+        // own, so "Friday", "next week" and "overdue" are meaningless without this.
+        const nowDate = new Date()
+        systemPrompt.push({
+          role: 'system',
+          content: `CURRENT DATE & TIME: ${nowDate.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (ISO date: ${nowDate.toISOString().slice(0, 10)}). Resolve every relative date ("Friday", "next week", "overdue", "this sprint") against this moment. Cards may carry a deadline shown as (Due: …) in the board state below.`
+        })
 
         // Scrape live board state (columns, cards) and then retrieve semantic memories.
         // Board state comes FIRST so memories have board context when recalled.
@@ -986,18 +1152,22 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
             window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
             window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
           ])
-          const allItems = [...(tasksRes?.items || []), ...(cardsRes?.items || [])]
+          const cardOnlyItems = (cardsRes?.items || []).filter(i => i.status !== 'archived')
+          const allItems = [...(tasksRes?.items || []), ...cardOnlyItems].filter(i => i.status !== 'archived')
 
-          // Per-column card summaries
+          // Per-column card summaries, ONLY type 'card' items: that is what
+          // the Kanban board actually renders. Listing backlog tasks here made
+          // the model (and the edit executor) target invisible items.
           const colSummaries: string[] = []
           for (const col of colsList) {
-            const colCards = allItems.filter(i => i.status === col.id || i.status.toLowerCase() === col.name.toLowerCase())
+            const colCards = cardOnlyItems.filter(i => i.status === col.id || i.status.toLowerCase() === col.name.toLowerCase())
             let cardListText = ''
             if (colCards.length > 0) {
               cardListText = colCards.map(c => {
                 const bodySnippet = c.body ? `, "${c.body.slice(0, 120).replace(/\n/g, ' ')}"` : ''
                 const tagsText = c.tags && c.tags.length > 0 ? ` [Tags: ${c.tags.map((t: any) => t.name).join(', ')}]` : ''
-                return `    • "${c.title}" (Priority: ${c.priority === 3 ? 'High' : c.priority === 2 ? 'Med' : 'Low'})${tagsText}${bodySnippet}`
+                const dueText = c.due_at ? ` (Due: ${new Date(c.due_at).toISOString().slice(0, 10)})` : ''
+                return `    • "${c.title}" (Priority: ${c.priority === 3 ? 'High' : c.priority === 2 ? 'Med' : 'Low'})${dueText}${tagsText}${bodySnippet}`
               }).join('\n')
             } else {
               cardListText = '    (empty)'
@@ -1040,6 +1210,7 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
           // 2. Semantic Memory Vector Retrieval (runs AFTER board state so memories interpret board context)
           try {
             const memories = await window.electronAPI.memory.searchMemories(text, validContext, memoryRecallLimit).catch(() => [])
+            setRecalledMemCount(memories?.length || 0)
             if (memories && memories.length > 0) {
               const memFormatted = memories.map(m => `- [${m.category.toUpperCase()}] ${m.memory_key}: ${m.content}`).join('\n')
               systemPrompt.push({
@@ -1057,7 +1228,8 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
         // Specialized Skill Workflow injection (auto-elevated if not manually overridden)
         const lastUserContentForSkill = nextMessages[nextMessages.length - 1]?.content || text
         const predictedIntent = classifyIntent(lastUserContentForSkill, activeSkillId)
-        let resolvedSkillId = activeSkillId
+        // Auto-recall the best-fitting skill when the user hasn't pinned one.
+        let resolvedSkillId = activeSkillId || detectSkill(lastUserContentForSkill)
         if (!resolvedSkillId) {
           if (predictedIntent === 'create_dialogue') resolvedSkillId = 'narrative_specialist'
           else if (predictedIntent === 'create_plan') resolvedSkillId = 'implementation_planner'
@@ -1151,28 +1323,34 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
         }
       }
 
-      // Collect all unique cheatsheets across current options and conversation history
+      // Collect all unique cheatsheets/notes/files across the conversation
       const allActiveCheatsheets = new Set<string>()
+      const allActiveNotes = new Set<string>()
+      const allActiveFiles = new Set<string>()
       nextMessages.forEach(m => {
-        if (m.cheatsheets && Array.isArray(m.cheatsheets)) {
-          m.cheatsheets.forEach(cs => allActiveCheatsheets.add(cs))
-        }
+        if (Array.isArray(m.cheatsheets)) m.cheatsheets.forEach(cs => allActiveCheatsheets.add(cs))
+        if (Array.isArray(m.notes)) m.notes.forEach(n => allActiveNotes.add(n))
+        if (Array.isArray(m.files)) m.files.forEach(f => allActiveFiles.add(f))
       })
 
       // Prepare final API messages payload
-      const apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [...systemPrompt]
+      const apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> }> = [...systemPrompt]
 
-      // Attach full document text ONCE at the top as a system knowledge base
+      // Attach reference-document text as a system knowledge base. Rather than
+      // dumping every full PDF (which floods a small model's context and buries
+      // the relevant part), pull only the passages relevant to the user's
+      // question, sized to the model's context window and split across sheets.
       if (allActiveCheatsheets.size > 0) {
+        const sheetNames = Array.from(allActiveCheatsheets)
+        // Total char budget for all attached docs, scaled to the context window.
+        const totalBudget = isSmallModel ? 6000 : Math.min(60000, Math.round(contextWindowTokens * 1.2))
+        const perSheet = Math.max(1500, Math.floor(totalBudget / sheetNames.length))
         let fullDocText = ''
-        for (const sheetName of Array.from(allActiveCheatsheets)) {
+        for (const sheetName of sheetNames) {
           try {
-            const rawText = await window.electronAPI.cheatsheets.getText(sheetName)
-            if (rawText && rawText.trim()) {
-              let cleanText = rawText.trim()
-              if (cleanText.length > 45000) {
-                cleanText = cleanText.slice(0, 45000) + '\n\n[... Remaining document text truncated for context memory ...]'
-              }
+            const relevant = await window.electronAPI.cheatsheets.getRelevant(sheetName, text, perSheet)
+            const cleanText = (relevant || '').trim()
+            if (cleanText) {
               fullDocText += `\n\n=== ATTACHED CHEATSHEET / REFERENCE DOCUMENT: "${sheetName}" ===\n${cleanText}\n=== END OF DOCUMENT: "${sheetName}" ===\n`
             }
           } catch (pdfErr) {
@@ -1187,6 +1365,62 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
         }
       }
 
+      // Attached NOTES (from the Notes feature), full content, size-capped
+      if (allActiveNotes.size > 0) {
+        const perNoteCap = isSmallModel ? 3000 : 9000
+        let notesText = ''
+        for (const noteTitle of Array.from(allActiveNotes)) {
+          try {
+            const content = await window.electronAPI.notes.readNote(noteTitle)
+            const clean = (content || '').trim().slice(0, perNoteCap)
+            if (clean) notesText += `\n\n=== ATTACHED NOTE: "${noteTitle}" ===\n${clean}\n=== END OF NOTE ===\n`
+          } catch (noteErr) {
+            console.warn(`Failed to read note "${noteTitle}":`, noteErr)
+          }
+        }
+        if (notesText) {
+          apiMessages.push({
+            role: 'system',
+            content: `USER'S PROJECT NOTES (attached by the user, you HAVE their full content below):${notesText}`
+          })
+        }
+      } else if (text.length > 12) {
+        // Auto-recall: no notes attached, surface the 2 most relevant note
+        // snippets so lore/design decisions written in Notes stay consistent.
+        try {
+          const hits = await window.electronAPI.notes.searchNotes(text)
+          const top = (hits || []).slice(0, 2).filter(h => h.snippet && h.snippet.trim())
+          if (top.length > 0) {
+            const recall = top.map(h => `- Note "${h.title}": …${h.snippet.trim().slice(0, 280)}…`).join('\n')
+            apiMessages.push({
+              role: 'system',
+              content: `RELEVANT PROJECT NOTES (auto-recalled snippets, the user can attach the full note with @):\n${recall}`
+            })
+          }
+        } catch { /* auto-recall is best-effort */ }
+      }
+
+      // Attached WORKSPACE FILES, actual source contents, size-capped
+      if (allActiveFiles.size > 0 && workspaceFolder) {
+        const perFileCap = isSmallModel ? 4000 : 12000
+        let filesText = ''
+        for (const relPath of Array.from(allActiveFiles)) {
+          try {
+            const content = await window.electronAPI.workspace.readFile(workspaceFolder, relPath)
+            const clean = (content || '').trim().slice(0, perFileCap)
+            if (clean) filesText += `\n\n=== ATTACHED FILE: "${relPath}" ===\n\`\`\`\n${clean}\n\`\`\`\n=== END OF FILE ===\n`
+          } catch (fileErr) {
+            console.warn(`Failed to read workspace file "${relPath}":`, fileErr)
+          }
+        }
+        if (filesText) {
+          apiMessages.push({
+            role: 'system',
+            content: `WORKSPACE SOURCE FILES (attached by the user, you HAVE their contents below):${filesText}`
+          })
+        }
+      }
+
       // Calculate token budget for conversation history:
       const baseOverheadTokens = 900
       const skillTokens = resolvedSkillId ? estimateTokens(getSkillById(resolvedSkillId)?.systemPrompt || '') : 0
@@ -1194,15 +1428,109 @@ When creating multiple cards, ALWAYS use the BATCH format, it is the most reliab
       const historyBudget = contextWindowTokens - baseOverheadTokens - skillTokens - workspaceTokens - 2000 // leave 2000 tokens for system docs and response safety
       const prunedHistory = pruneHistory(nextMessages, Math.max(4000, historyBudget))
 
-      // Add conversation history with clean text
+      // Add conversation history. User messages with image attachments become
+      // multimodal content parts (vision-capable models read them directly).
       for (const msg of prunedHistory) {
-        apiMessages.push({ role: msg.role, content: msg.content })
+        if (msg.role === 'user' && msg.images && msg.images.length > 0) {
+          apiMessages.push({
+            role: 'user',
+            content: [
+              { type: 'text', text: msg.content },
+              ...msg.images.map(url => ({ type: 'image_url' as const, image_url: { url } }))
+            ]
+          })
+        } else {
+          apiMessages.push({ role: msg.role, content: msg.content })
+        }
       }
 
       // Classify the user's intent and inject a skill-aware enforcement message at the
       // very bottom of the prompt stack (highest weight position for the model).
+      // NOTE: only a MANUALLY-pinned skill (activeSkillId) forces its structured
+      // output. An auto-recalled skill only sets tone/expertise, so a casual
+      // mention ("what tasks…", "the character…") won't surprise the user with a
+      // plan or dialogue block; clear create-requests still trigger via the base classifier.
       const lastUserContent = prunedHistory[prunedHistory.length - 1]?.content || ''
-      const intent = classifyIntent(lastUserContent, resolvedSkillId)
+      let intent = classifyIntent(lastUserContent, activeSkillId)
+      // An explicit quick-action intent is authoritative, a "Do NOT output JSON"
+      // analyze prompt must never be mis-read as a create request, and vice versa.
+      if (lastUserMsg?.intentHint === 'analyze') intent = 'converse'
+      else if (lastUserMsg?.intentHint === 'create') intent = 'create_items'
+
+      // Reliable structured action path
+      // For creation intents, generate the action through the structured generator
+      // (tool-calling / JSON-schema / JSON-mode), which forces valid, schema-shaped
+      // output even on tiny local models, then deterministically enriches it with
+      // tags + colors. Falls back to the streaming path below on any failure, so
+      // this can only improve reliability, never regress it.
+      const structuredKind: 'board' | 'plan' | 'dialogue' | 'update' | null =
+        intent === 'create_items' ? 'board' :
+        intent === 'create_plan' ? 'plan' :
+        intent === 'create_dialogue' ? 'dialogue' :
+        intent === 'update_items' ? 'update' : null
+
+      if (structuredKind) {
+        setWaitingLabel(
+          structuredKind === 'board' ? 'Composing board changes…' :
+          structuredKind === 'plan' ? 'Drafting a plan…' :
+          structuredKind === 'update' ? 'Applying board edits…' : 'Writing dialogue…'
+        )
+        const columnGuidance = wantsColumns(lastUserContent)
+          ? `The user is asking about BOARD STRUCTURE, include a "columns" array of the workflow stages (each with a name and a hex color), and place the cards into those columns. Design a sensible pipeline (e.g. Backlog → In Progress → Review → Done) if none fits.`
+          : `Reuse existing columns when they fit; only add columns for genuinely new stages.`
+        const instruction = structuredKind === 'board'
+          ? `Create the requested board items now. FIRST read the CURRENT LIVE KANBAN BOARD STATE above: do NOT create any card whose title matches or closely overlaps one already on the board (see the FORBIDDEN DUPLICATE TITLES list), only propose genuinely new, non-duplicate work. Give EVERY card a fitting priority (1-3) and 1-3 topical tags, each with a hex color. ${columnGuidance} ${PALETTE_HINT}`
+          : structuredKind === 'plan'
+          ? `Produce a concrete, specific implementation plan with actionable steps.`
+          : structuredKind === 'update'
+          ? `Apply the requested edits to EXISTING cards now. Read the CURRENT LIVE KANBAN BOARD STATE above. RULES: (1) "target" is ALWAYS a CARD TITLE copied exactly from CARDS PER COLUMN above, NEVER a column name. (2) The destination column goes ONLY in "toColumn" (a VALID COLUMN ID or name). (3) One operation per card: to move 2 cards, emit 2 move operations, each with one card title as target. (4) Do NOT use update_body unless the user explicitly asked to rewrite a description. (5) For deadlines use set_due_date with "due" as an ISO date YYYY-MM-DD, resolving relative dates against the CURRENT DATE above (empty string clears). (6) Only include operations the user actually asked for.`
+          : `Produce a branching dialogue tree. Every choice.target must be an exact node id in the tree, or "end".`
+
+        const structuredMessages = [...apiMessages, { role: 'system' as const, content: instruction }]
+        try {
+          const result = await window.electronAPI.ai.generateStructured({
+            kind: structuredKind,
+            model: selectedModel,
+            messages: structuredMessages,
+            temperature
+          })
+
+          // Respect an in-flight user abort, don't post or fall back.
+          if (isAbortedRef.current) {
+            isAbortedRef.current = false
+            setStreamingText('')
+            chunkBufferRef.current = ''
+            streamingChatIdRef.current = null
+            hasReceivedFirstChunkRef.current = false
+            setIsWaitingForFirstChunk(false)
+            setIsStreaming(false)
+            return
+          }
+
+          if (result.ok && result.data) {
+            const content = buildAssistantMessage(structuredKind, result.data)
+            if (content) {
+              if (streamingChatIdRef.current === currentChatIdRef.current) {
+                setMessages(prev => {
+                  const updated = [...prev, { role: 'assistant' as const, content, timestamp: Date.now() }]
+                  setTimeout(() => triggerMemoryConsolidation(updated), 100)
+                  return updated
+                })
+              }
+              setStreamingText('')
+              chunkBufferRef.current = ''
+              streamingChatIdRef.current = null
+              hasReceivedFirstChunkRef.current = false
+              setIsWaitingForFirstChunk(false)
+              setIsStreaming(false)
+              return
+            }
+          }
+          console.warn('Structured generation unusable, falling back to streaming:', result.error)
+        } catch (structErr) {
+          console.warn('Structured generation threw, falling back to streaming:', structErr)
+        }
+      }
 
       // Inject model-tuned reasoning instructions
       let reasoningInstruction = ''
@@ -1247,6 +1575,15 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
 → Immediately output a \`\`\`json batch block with REAL, specific, unique content.
 → DO NOT explain first. DO NOT ask for permission. DO NOT produce vague placeholder titles. CREATE IT.`
           break
+        case 'update_items':
+          enforcementContent = `⚡ BOARD EDIT REQUIRED, OUTPUT AN update_board BLOCK NOW ⚡
+Output a \`\`\`json:update_board block of this shape:
+{ "operations": [ { "op": "move", "target": "Exact Existing Card Title", "toColumn": "Done" } ] }
+→ op is one of: move | set_priority | retitle | update_body | archive.
+→ "target" MUST be copied EXACTLY from the card titles in the CURRENT LIVE KANBAN BOARD STATE above. Never invent titles.
+→ For "move", "toColumn" must be a VALID COLUMN ID or name from above.
+→ Only the operations the user asked for. DO NOT create new cards.`
+          break
         default: // 'converse'
           enforcementContent = `💬 GENERAL CONVERSATION, DO NOT OUTPUT JSON BLOCKS 💬
 → DO NOT output any \`\`\`json structures, plan blocks, or dialogue trees.
@@ -1262,7 +1599,7 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
         temperature,
         maxTokens
       }
-      await window.electronAPI.ai.startStream(params)
+      await window.electronAPI.ai.startStream(params, ASSISTANT_STREAM_ID)
     } catch (err) {
       const error = err as Error
       setIsStreaming(false)
@@ -1270,12 +1607,14 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
     }
   }
 
-  const handleSubmit = (options?: { mode?: string; cheatsheets?: string[] }) => handleSubmitWithText(undefined, options)
+  const handleSubmit = (options?: { mode?: string; cheatsheets?: string[]; notes?: string[]; files?: string[]; images?: string[] }) =>
+    handleSubmitWithText(undefined, options)
 
   const handleAbort = async () => {
     try {
       isAbortedRef.current = true
-      await window.electronAPI.ai.abortStream()
+      await window.electronAPI.ai.abortStream(ASSISTANT_STREAM_ID)
+      await window.electronAPI.ai.abortStructured().catch(() => {})
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
@@ -1302,33 +1641,6 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
     }
   }
 
-  const handleClearChat = async () => {
-    // Abort any in-progress stream first to prevent ghost messages
-    if (isStreaming) {
-      try {
-        isAbortedRef.current = true
-        await window.electronAPI.ai.abortStream()
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current)
-          animationFrameRef.current = null
-        }
-      } catch {
-        // ignore abort errors on clear
-      }
-    }
-    setMessages([])
-    setStreamingText('')
-    chunkBufferRef.current = ''
-    // FIX: Reset the streaming chat reference so future streams on a fresh chat work correctly
-    streamingChatIdRef.current = null
-    hasReceivedFirstChunkRef.current = false
-    isAbortedRef.current = false
-    setIsWaitingForFirstChunk(false)
-    setIsStreaming(false)
-    // Clear action caches so the same titles can be recreated after a clear
-    clearActionCaches()
-  }
-
   // Export chat as Markdown
   const handleExportChat = () => {
     const chatMessages = messages.filter(m => m.role !== 'system')
@@ -1352,18 +1664,23 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
   }
 
   // Memory panel
-  const handleOpenMemoryPanel = async () => {
+  // Load memories whenever the panel opens (from ANY entry point, the button,
+  // the /mem command, or the "N recalled" chip) and whenever the workspace
+  // changes while it's open. This is what keeps the panel in sync with the
+  // Settings memory vault instead of showing a stale/empty count.
+  useEffect(() => {
+    if (!showMemoryPanel) return
+    let cancelled = false
     setMemoryLoading(true)
+    window.electronAPI.memory.getMemories(activeContext)
+      .then(mems => { if (!cancelled) setMemories(mems || []) })
+      .catch(e => { if (!cancelled) { console.warn('Failed to load memories:', e); setMemories([]) } })
+      .finally(() => { if (!cancelled) setMemoryLoading(false) })
+    return () => { cancelled = true }
+  }, [showMemoryPanel, activeContext])
+
+  const handleOpenMemoryPanel = (): void => {
     setShowMemoryPanel(true)
-    try {
-      const mems = await window.electronAPI.memory.getMemories(activeContext)
-      setMemories(mems || [])
-    } catch (e) {
-      console.warn('Failed to load memories:', e)
-      setMemories([])
-    } finally {
-      setMemoryLoading(false)
-    }
   }
 
   const handleDeleteMemory = async (id: string) => {
@@ -1523,6 +1840,29 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
           flexShrink: 0
         }}
       >
+        {/* Row 0: Provider Selection (manage profiles in Settings → AI) */}
+        {providers.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
+            <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
+              Provider
+            </span>
+            <select
+              value={activeProviderId}
+              onChange={e => handleSwitchProvider(e.target.value)}
+              title="Switch AI provider, add/edit profiles in Settings → AI"
+              style={{
+                background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
+                color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '3px 8px',
+                fontSize: '11px', outline: 'none', cursor: 'pointer', flex: 1, minWidth: 0
+              }}
+            >
+              {providers.map(p => (
+                <option key={p.id} value={p.id}>{p.name}{isLocalUrl(p.baseURL) ? ' (local)' : ' (cloud)'}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Row 1: Model Selection */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
@@ -1551,12 +1891,34 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
                 }}
               >
                 {dropdownModels.map(m => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>{m}{supportsVision(m) ? ' 👁' : ''}</option>
                 ))}
+                <option value="__CUSTOM_MODEL__">+ Use Custom Model...</option>
                 <option value="__OPEN_COOKBOOK__">+ Get More Models (Cookbook)...</option>
               </select>
             )
           })()}
+        </div>
+
+        {/* Row 1b: Workspace / Context Selection, the board the AI reads & writes */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
+          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
+            Workspace
+          </span>
+          <select
+            value={activeContext}
+            onChange={e => setContext(e.target.value)}
+            title="Which workspace/context the assistant reads from and creates items in"
+            style={{
+              background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '3px 8px',
+              fontSize: '11px', outline: 'none', cursor: 'pointer', flex: 1, minWidth: 0
+            }}
+          >
+            {(availableContexts.length > 0 ? availableContexts : ['default']).map(ctx => (
+              <option key={ctx} value={ctx}>{ctx}</option>
+            ))}
+          </select>
         </div>
 
         {/* Row 2: Action Buttons */}
@@ -1651,7 +2013,7 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
             </button>
 
             <button
-              onClick={() => setShowSavedChatsModal(true)}
+              onClick={() => { setChatSearchQuery(''); setShowSavedChatsModal(true) }}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -1809,14 +2171,53 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
               justifyContent: 'center',
               color: 'var(--color-text-muted)',
               fontSize: 'var(--text-xs)',
-              gap: 'var(--space-2)',
+              gap: 'var(--space-3)',
               textAlign: 'center',
               padding: 'var(--space-6)'
             }}
           >
-            <Sparkles size={24} style={{ color: 'var(--color-secondary)' }} />
-            <span>
-              Pre-seed task context from details view, click "AI Assist", or write a question below.
+            <Sparkles size={26} style={{ color: 'var(--color-secondary)' }} />
+            <div>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+                Your project co-pilot
+              </div>
+              <div style={{ fontSize: '11px', marginTop: '2px' }}>
+                It reads your board, creates and edits cards, and remembers your project.
+              </div>
+            </div>
+
+            {/* Example chips, make the invisible feature surface visible */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', maxWidth: '340px' }}>
+              {[
+                { label: '🗂 Set up a board for my project', action: () => handleSubmitWithText('Design a Kanban board for this project: propose the workflow COLUMNS (each with a fitting color) and seed each column with a few well-scoped starter cards (with tags and priorities).', { displayContent: 'Set up a board', intentHint: 'create' }) },
+                { label: '✅ Move finished cards to Done', action: () => handleSubmitWithText('Move every card that is clearly finished to the Done column.') },
+                { label: '💡 What should I work on next?', action: () => handleSubmitWithText('Review my current board and tell me what to work on next and why. Do NOT output JSON, give a prioritized, reasoned plain-text list.', { displayContent: 'What should I work on next?', intentHint: 'analyze' }) },
+                { label: '📎 @-mention notes, files & PDFs', action: () => setInputValue('@') }
+              ].map(chip => (
+                <button
+                  key={chip.label}
+                  onClick={chip.action}
+                  style={{
+                    background: 'var(--color-surface-2)',
+                    border: '1px solid var(--color-surface-offset)',
+                    color: 'var(--color-text-base)',
+                    borderRadius: '999px',
+                    padding: '5px 12px',
+                    fontSize: '10px',
+                    fontWeight: 'var(--weight-medium)',
+                    cursor: 'pointer',
+                    transition: 'all 120ms ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-secondary)'; e.currentTarget.style.color = 'var(--color-secondary)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-surface-offset)'; e.currentTarget.style.color = 'var(--color-text-base)' }}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+              / commands · @ mentions · paste screenshots (👁 models) · Esc stops generation
             </span>
           </div>
         )}
@@ -1840,8 +2241,11 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
               onRevert={handleRevert}
               onCopy={handleCopyMessage}
               isCopied={copiedMsgIndex === index}
-              isStreaming={isStreaming}
+              // Committed messages are final, the blinking cursor belongs ONLY to
+              // the live streaming preview below, never to already-written messages.
+              isStreaming={false}
               hasRevertAction={hasRevertAction}
+              actionsLocked={isStreaming}
             />
           )
         })}
@@ -1873,7 +2277,7 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
                 <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-secondary)', display: 'inline-block', animation: 'pulse 1.2s ease-in-out infinite', animationDelay: '0.2s' }} />
                 <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-secondary)', display: 'inline-block', animation: 'pulse 1.2s ease-in-out infinite', animationDelay: '0.4s' }} />
               </span>
-              <span>Thinking…</span>
+              <span>{waitingLabel}</span>
             </div>
           </div>
         )}
@@ -1896,14 +2300,49 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
           padding: 'var(--space-3) var(--space-4) var(--space-4)',
           borderTop: '1px solid var(--color-surface-offset)',
           background: 'var(--color-surface-1)',
-          flexShrink: 0
+          flexShrink: 0,
+          position: 'relative'
         }}
       >
+        {/* Jump back to the newest message when scrolled up */}
+        {showJumpToLatest && (
+          <button
+            onClick={() => {
+              isAtBottomRef.current = true
+              setShowJumpToLatest(false)
+              scrollToBottom(true)
+            }}
+            title="Jump to the latest message"
+            style={{
+              position: 'absolute',
+              top: '-40px',
+              right: 'var(--space-4)',
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              background: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)',
+              borderRadius: '999px',
+              padding: '5px 12px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+            }}
+          >
+            <ArrowDown size={12} style={{ color: 'var(--color-secondary)' }} />
+            <span>{isStreaming ? 'Following live…' : 'Latest'}</span>
+          </button>
+        )}
         {/* Skill Selector Pill Bar + Workspace pill */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
           {(() => {
             const resolvedAutoSkillId = (() => {
               if (activeSkillId) return null
+              const skill = detectSkill(inputValue)
+              if (skill) return skill
               const intent = classifyIntent(inputValue, null)
               if (intent === 'create_dialogue') return 'narrative_specialist'
               if (intent === 'create_plan') return 'implementation_planner'
@@ -1966,6 +2405,22 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
             </div>
           )}
 
+          {recalledMemCount > 0 && (
+            <button
+              onClick={() => setShowMemoryPanel(true)}
+              title={`${recalledMemCount} project memories were recalled for the last message. Click to open the Memory Vault.`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.4)',
+                color: '#c084fc', borderRadius: '999px', padding: '3px 10px',
+                fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap', cursor: 'pointer'
+              }}
+            >
+              <Brain size={11} />
+              <span>{recalledMemCount} recalled</span>
+            </button>
+          )}
+
           {/* Token Budget Indicator */}
           <div
             title={`~${tokenUsage.used.toLocaleString()} / ${getModelProfile(selectedModel).contextTokens.toLocaleString()} tokens of context window estimated in use`}
@@ -1996,11 +2451,142 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
           onAbort={handleAbort}
           isStreaming={isStreaming}
           contextItem={contextItem}
-          onTriggerPrompt={(prompt, displayContent) => handleSubmitWithText(prompt, { displayContent })}
+          onTriggerPrompt={(prompt, displayContent, intentHint) => handleSubmitWithText(prompt, { displayContent, intentHint })}
           activeSkill={getSkillById(activeSkillId)}
           onClearSkill={() => handleSelectSkill(null)}
+          workspaceFiles={workspaceFiles.map(f => ({ name: f.name, relativePath: f.relativePath }))}
+          customActions={customActions}
+          onManageCustomActions={() => setShowCustomActionsModal(true)}
+          visionCapable={supportsVision(selectedModel)}
         />
       </div>
+
+      {/* Custom Quick Actions Manager Modal */}
+      {showCustomActionsModal && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 110,
+          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)'
+        }}>
+          <div style={{
+            background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-md)', width: '100%', maxHeight: '90%',
+            display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', overflow: 'hidden'
+          }}>
+            <div style={{
+              padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)',
+              background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <Sparkles size={14} style={{ color: 'var(--color-secondary)' }} />
+                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+                  My Quick Actions ({customActions.length})
+                </span>
+              </div>
+              <button
+                onClick={() => setShowCustomActionsModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {/* Existing actions */}
+              {customActions.length === 0 ? (
+                <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-3)' }}>
+                  No custom actions yet. Save the prompts you find yourself retyping, they'll appear in the ＋ menu.
+                </div>
+              ) : (
+                customActions.map(a => (
+                  <div key={a.id} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 10px',
+                    background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)'
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{a.label}</span>
+                        <span style={{
+                          fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', padding: '1px 6px', borderRadius: '6px',
+                          background: a.intent === 'create' ? 'rgba(205,241,43,0.12)' : 'rgba(59,130,246,0.12)',
+                          color: a.intent === 'create' ? 'var(--color-secondary)' : '#60a5fa'
+                        }}>
+                          {a.intent === 'create' ? 'Creates items' : 'Analyzes'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {a.prompt}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => persistCustomActions(customActions.filter(x => x.id !== a.id))}
+                      title="Delete action"
+                      style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px', flexShrink: 0 }}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))
+              )}
+
+              {/* Add form */}
+              <div style={{
+                borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-3)',
+                display: 'flex', flexDirection: 'column', gap: '6px'
+              }}>
+                <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>New quick action</span>
+                <input
+                  type="text"
+                  value={caLabel}
+                  onChange={e => setCaLabel(e.target.value)}
+                  placeholder="Label (e.g. Write patch notes)"
+                  style={{
+                    background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)',
+                    color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', fontSize: '11px', outline: 'none'
+                  }}
+                />
+                <textarea
+                  value={caPrompt}
+                  onChange={e => setCaPrompt(e.target.value)}
+                  placeholder="The full prompt to send…"
+                  rows={3}
+                  style={{
+                    background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)',
+                    color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '6px 8px',
+                    fontSize: '11px', outline: 'none', resize: 'vertical', fontFamily: 'inherit'
+                  }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <select
+                    value={caIntent}
+                    onChange={e => setCaIntent(e.target.value as 'create' | 'analyze')}
+                    title="'Creates items' routes through the structured board generator; 'Analyzes' guarantees a plain-text answer."
+                    style={{
+                      background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)',
+                      color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '4px 8px', fontSize: '10px', outline: 'none', cursor: 'pointer'
+                    }}
+                  >
+                    <option value="analyze">Analyzes (plain text)</option>
+                    <option value="create">Creates board items</option>
+                  </select>
+                  <button
+                    onClick={handleAddCustomAction}
+                    disabled={!caLabel.trim() || !caPrompt.trim()}
+                    style={{
+                      background: caLabel.trim() && caPrompt.trim() ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
+                      color: caLabel.trim() && caPrompt.trim() ? '#000' : 'var(--color-text-faint)',
+                      border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 12px',
+                      fontSize: '10px', fontWeight: 'bold', cursor: caLabel.trim() && caPrompt.trim() ? 'pointer' : 'default'
+                    }}
+                  >
+                    Save Action
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cookbook Model Manager Popup Modal */}
       {showCookbookModal && (
@@ -2257,14 +2843,55 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
               </div>
             </div>
 
+            {/* Search */}
+            {savedChats.length > 3 && (
+              <div style={{ padding: 'var(--space-2) var(--space-3) 0', position: 'relative', flexShrink: 0 }}>
+                <Search size={12} style={{ position: 'absolute', left: 'calc(var(--space-3) + 8px)', top: 'calc(50% + 4px)', transform: 'translateY(-50%)', color: 'var(--color-text-faint)', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  placeholder="Search chats…"
+                  value={chatSearchQuery}
+                  onChange={e => setChatSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Escape') setChatSearchQuery('') }}
+                  style={{
+                    width: '100%',
+                    background: 'var(--color-surface-2)',
+                    border: '1px solid var(--color-surface-offset)',
+                    color: 'var(--color-text-base)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '5px 8px 5px 26px',
+                    fontSize: '11px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            )}
+
             {/* List */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {savedChats.length === 0 ? (
-                <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-4)' }}>
-                  No saved conversations yet. Start chatting to auto-save!
-                </div>
-              ) : (
-                savedChats.map(chat => {
+              {(() => {
+                const q = chatSearchQuery.trim().toLowerCase()
+                const visibleChats = q
+                  ? savedChats.filter(c =>
+                      c.title.toLowerCase().includes(q) ||
+                      c.messages.some(m => m.content.toLowerCase().includes(q)))
+                  : savedChats
+                if (savedChats.length === 0) {
+                  return (
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-4)' }}>
+                      No saved conversations yet. Start chatting to auto-save!
+                    </div>
+                  )
+                }
+                if (visibleChats.length === 0) {
+                  return (
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-4)' }}>
+                      No chats match “{chatSearchQuery.trim()}”.
+                    </div>
+                  )
+                }
+                return visibleChats.map(chat => {
                   const isActive = chat.id === currentChatId
                   const isEditing = editingChatId === chat.id
                   return (
@@ -2339,7 +2966,7 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
                     </div>
                   )
                 })
-              )}
+              })()}
             </div>
           </div>
         </div>
@@ -2917,6 +3544,95 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
                 onMouseLeave={e => e.currentTarget.style.opacity = '1'}
               >
                 Revert Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Model Prompt Modal */}
+      {showCustomModelPrompt && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 1000,
+          background: 'rgba(10, 12, 18, 0.75)', backdropFilter: 'blur(3px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div style={{
+            background: 'var(--color-surface-1)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-md)',
+            padding: '16px', width: '100%', maxWidth: '320px',
+            display: 'flex', flexDirection: 'column', gap: '12px',
+            boxShadow: 'var(--shadow-lg)'
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>
+              Enter Model Name
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+              Specify any custom cloud model (e.g. <code>gemini-2.5-flash</code>, <code>gpt-4o</code>, <code>deepseek-chat</code>).
+            </div>
+            <input
+              type="text"
+              value={customModelInput}
+              onChange={e => setCustomModelInput(e.target.value)}
+              placeholder="e.g. gemini-2.5-flash"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  const val = customModelInput.trim()
+                  if (val) applyModel(val)
+                  setShowCustomModelPrompt(false)
+                } else if (e.key === 'Escape') {
+                  setShowCustomModelPrompt(false)
+                }
+              }}
+              style={{
+                width: '100%',
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '6px 10px',
+                fontSize: '11px',
+                color: 'var(--color-text-base)',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+              <button
+                onClick={() => setShowCustomModelPrompt(false)}
+                style={{
+                  background: 'var(--color-surface-offset)',
+                  color: 'var(--color-text-base)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '5px 12px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const val = customModelInput.trim()
+                  if (val) await applyModel(val)
+                  setShowCustomModelPrompt(false)
+                }}
+                style={{
+                  background: 'var(--color-secondary)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '5px 12px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                OK
               </button>
             </div>
           </div>

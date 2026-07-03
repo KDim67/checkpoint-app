@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   DndContext,
   DragEndEvent,
   DragStartEvent,
-  DragOverEvent,
   DragOverlay,
   useSensor,
   useSensors,
@@ -84,6 +83,10 @@ const customCollisionDetection: CollisionDetection = (args) => {
   if (pointerCollisions.length > 0) return pointerCollisions
   return rectIntersection(args)
 }
+
+// Shared stable reference for empty columns, so the memoized column never
+// re-renders just because it received a freshly-allocated [] each render.
+const EMPTY_ITEMS: Item[] = []
 
 function areSortableColumnPropsEqual(prev: any, next: any) {
   if (
@@ -200,6 +203,24 @@ export default function KanbanView() {
   const [swimlanesEnabled, setSwimlanesEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Always-latest columns snapshot. Column mutations read/write through this so
+  // two quick edits (e.g. deleting two columns in a row) can never operate on a
+  // stale closure and resurrect a just-removed column.
+  const columnsRef = useRef<ColumnConfig[]>([])
+  useEffect(() => { columnsRef.current = columns }, [columns])
+
+  // Single source of truth for writing the column list: updates the ref
+  // synchronously, the state, and the persisted setting the AI also reads.
+  const persistColumns = useCallback(async (next: ColumnConfig[]): Promise<void> => {
+    columnsRef.current = next
+    setColumns(next)
+    try {
+      await window.electronAPI.db.setSetting(`kanban_columns_${activeContext}`, JSON.stringify(next))
+    } catch (err) {
+      console.error('Failed to persist columns:', err)
+    }
+  }, [activeContext])
+
   const [showAddColModal, setShowAddColModal] = useState(false)
   const [activeCardId, setActiveCardId] = useState<string | null>(null)
 
@@ -241,6 +262,7 @@ export default function KanbanView() {
 
   const [archivedColumns, setArchivedColumns] = useState<ColumnConfig[]>([])
   const [showArchiveBin, setShowArchiveBin] = useState(false)
+  const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set())
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [showBgSelector, setShowBgSelector] = useState(false)
 
@@ -386,37 +408,14 @@ export default function KanbanView() {
     }
   }, [])
 
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event
-    if (!over) return
-
-    const activeId = active.id as string
-    const overId = over.id as string
-
-    if (activeId.startsWith('col::')) return
-
-    setCards(prev => {
-      const activeCard = prev.find(c => c.id === activeId)
-      if (!activeCard) return prev
-
-      const isOverColumn = columns.some(c => c.id === overId)
-      const overCard = prev.find(c => c.id === overId)
-
-      const targetStatus = isOverColumn ? overId : overCard ? overCard.status : null
-      if (!targetStatus) return prev
-
-      if (activeCard.status !== targetStatus) {
-        const activeIndex = prev.findIndex(c => c.id === activeId)
-        const overIndex = isOverColumn
-          ? prev.length
-          : prev.findIndex(c => c.id === overId)
-
-        const updated = prev.map((c, i) => i === activeIndex ? { ...c, status: targetStatus } : c)
-        return arrayMove(updated, activeIndex, overIndex >= 0 ? overIndex : prev.length)
-      }
-      return prev
-    })
-  }, [columns])
+  // NOTE: we deliberately do NOT move a card into another column during dragOver.
+  // Doing so unmounts/remounts the card in a different SortableContext on every
+  // frame you hover a new column, which forces dnd-kit to re-register and
+  // re-measure, the cause of the cross-column drag lag. Instead, the target
+  // column's own `isOver` droppable highlight provides live feedback, the drag
+  // overlay follows the cursor, and the actual move is committed once in
+  // handleDragEnd. Within-column reordering still previews smoothly via dnd-kit's
+  // built-in SortableContext transforms (no state churn).
 
   const handleDragCancel = useCallback(() => {
     setActiveDragId(null)
@@ -436,17 +435,11 @@ export default function KanbanView() {
 
     // Column reorder: ids are prefixed with "col::"
     if (activeId.startsWith('col::')) {
-      const fromIdx = columns.findIndex(c => `col::${c.id}` === activeId)
-      const toIdx   = columns.findIndex(c => `col::${c.id}` === overId)
+      const current = columnsRef.current
+      const fromIdx = current.findIndex(c => `col::${c.id}` === activeId)
+      const toIdx   = current.findIndex(c => `col::${c.id}` === overId)
       if (fromIdx === -1 || toIdx === -1) return
-      const reordered = arrayMove(columns, fromIdx, toIdx)
-      setColumns(reordered)
-      try {
-        const key = `kanban_columns_${activeContext}`
-        await window.electronAPI.db.setSetting(key, JSON.stringify(reordered))
-      } catch (err) {
-        console.error('Failed to persist column order:', err)
-      }
+      await persistColumns(arrayMove(current, fromIdx, toIdx))
       return
     }
 
@@ -529,17 +522,15 @@ export default function KanbanView() {
       console.error('Failed to update card position:', err)
       loadCards()
     }
-  }, [cards, columns, swimlanesEnabled, activeContext, loadCards])
+  }, [cards, columns, swimlanesEnabled, activeContext, loadCards, persistColumns])
 
   // Column Management
 
   const handleCreateColumnSubmit = async (name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full') => {
     const id = `col-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`
-    const updatedCols = [...columns, { id, name, wipLimit, color, colorMode }]
+    const updatedCols = [...columnsRef.current, { id, name, wipLimit, color, colorMode }]
     try {
-      const key = `kanban_columns_${activeContext}`
-      await window.electronAPI.db.setSetting(key, JSON.stringify(updatedCols))
-      setColumns(updatedCols)
+      await persistColumns(updatedCols)
       setShowAddColModal(false)
       toast(`Column "${name}" created`)
     } catch (err) {
@@ -548,18 +539,17 @@ export default function KanbanView() {
   }
 
   const handleRenameColumn = useCallback(async (colId: string, newName: string, newWipLimit: number | null, color?: string, colorMode?: 'header' | 'full') => {
-    setColumns(prev => {
-      const updatedCols = prev.map(c => c.id === colId ? { ...c, name: newName, wipLimit: newWipLimit, color, colorMode } : c)
-      const key = `kanban_columns_${activeContext}`
-      window.electronAPI.db.setSetting(key, JSON.stringify(updatedCols)).catch(err => console.error('Failed to rename column:', err))
-      return updatedCols
-    })
+    const updatedCols = columnsRef.current.map(c => c.id === colId ? { ...c, name: newName, wipLimit: newWipLimit, color, colorMode } : c)
+    await persistColumns(updatedCols)
     toast(`Column "${newName}" updated`)
-  }, [activeContext, toast])
+  }, [persistColumns, toast])
 
   const performDeleteColumn = useCallback(async (colId: string) => {
-    const colName = columns.find(c => c.id === colId)?.name || 'Column'
-    const updatedCols = columns.filter(c => c.id !== colId)
+    // Read the LATEST columns (via ref) so deleting two in a row can't operate on
+    // a stale list and write back a column that was just removed.
+    const current = columnsRef.current
+    const colName = current.find(c => c.id === colId)?.name || 'Column'
+    const updatedCols = current.filter(c => c.id !== colId)
     try {
       const cardsToMove = cards.filter(c => c.status === colId)
       if (cardsToMove.length > 0) {
@@ -569,16 +559,14 @@ export default function KanbanView() {
           patch: { status: fallbackColId }
         })
       }
-      const key = `kanban_columns_${activeContext}`
-      await window.electronAPI.db.setSetting(key, JSON.stringify(updatedCols))
-      setColumns(updatedCols)
+      await persistColumns(updatedCols)
       setPendingDeleteColId(null)
       loadCards()
       toast(`Column "${colName}" deleted. Remaining cards moved.`)
     } catch (err) {
       console.error('Failed to delete column:', err)
     }
-  }, [columns, cards, activeContext, loadCards, toast])
+  }, [cards, persistColumns, loadCards, toast])
 
   const handleDeleteColumn = useCallback(async (colId: string) => {
     const cardsToMove = cards.filter(c => c.status === colId)
@@ -637,7 +625,8 @@ export default function KanbanView() {
   }, [cards, loadCards, toast])
 
   const handleArchiveColumn = useCallback(async (colId: string) => {
-    const colToArchive = columns.find(c => c.id === colId)
+    const current = columnsRef.current
+    const colToArchive = current.find(c => c.id === colId)
     if (!colToArchive) return
 
     try {
@@ -647,18 +636,16 @@ export default function KanbanView() {
       const updatedArchived = [...archivedList, colToArchive]
       await window.electronAPI.db.setSetting(key, JSON.stringify(updatedArchived))
 
-      const updatedCols = columns.filter(c => c.id !== colId)
-      const activeKey = `kanban_columns_${activeContext}`
-      await window.electronAPI.db.setSetting(activeKey, JSON.stringify(updatedCols))
+      const updatedCols = current.filter(c => c.id !== colId)
+      await persistColumns(updatedCols)
 
-      setColumns(updatedCols)
       setArchivedColumns(updatedArchived)
       loadCards()
       toast(`Column "${colToArchive.name}" archived`)
     } catch (err) {
       console.error(err)
     }
-  }, [columns, activeContext, loadCards, toast])
+  }, [activeContext, persistColumns, loadCards, toast])
 
   // Card Management
 
@@ -871,38 +858,93 @@ export default function KanbanView() {
     }
   }
 
-  // Cards for a column, filtered and sorted appropriately
-  const getCardsForColumn = (columnId: string) => {
-    let colCards = cards.filter(c => c.status === columnId)
+  // Archive Bin multi-select (bulk restore / delete)
+  const toggleArchivedSelection = (id: string): void => {
+    setSelectedArchived(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
-    // Apply Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim()
-      colCards = colCards.filter(c => 
-        c.title.toLowerCase().includes(q) || 
+  const handleBulkDeleteArchived = async (): Promise<void> => {
+    const ids = Array.from(selectedArchived)
+    if (ids.length === 0) return
+    if (!confirm(`Permanently delete ${ids.length} archived card${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return
+    try {
+      await Promise.all(ids.map(id => window.electronAPI.db.deleteItem(id)))
+      setCards(prev => prev.filter(c => !selectedArchived.has(c.id)))
+      setSelectedArchived(new Set())
+      toast(`${ids.length} card${ids.length > 1 ? 's' : ''} deleted permanently`)
+    } catch (err) {
+      console.error(err)
+      toast('Failed to delete some cards', { type: 'error' })
+    }
+  }
+
+  const handleBulkRestoreArchived = async (): Promise<void> => {
+    const ids = Array.from(selectedArchived)
+    if (ids.length === 0) return
+    const fallbackCol = columns[0]
+    if (!fallbackCol) {
+      toast('Add a column first to restore cards.', { type: 'info' })
+      return
+    }
+    try {
+      await Promise.all(ids.map(id => {
+        const card = cards.find(c => c.id === id)
+        const dest = card && columns.some(c => c.id === card.status) ? card.status : fallbackCol.id
+        return window.electronAPI.db.updateItem(id, { status: dest })
+      }))
+      setSelectedArchived(new Set())
+      loadCards()
+      toast(`${ids.length} card${ids.length > 1 ? 's' : ''} restored`)
+    } catch (err) {
+      console.error(err)
+      toast('Failed to restore some cards', { type: 'error' })
+    }
+  }
+
+  // Clear any archive-bin selection whenever the drawer closes.
+  useEffect(() => {
+    if (!showArchiveBin) setSelectedArchived(new Set())
+  }, [showArchiveBin])
+
+  // Cards for a column, filtered and sorted appropriately
+  // Group + filter + sort all cards into their columns in a SINGLE pass, memoized
+  // on the inputs. Previously each column re-filtered the whole card list on every
+  // render, so a drag (which calls setCards on each cross-column move) did O(columns
+  // × cards) work per frame, the main source of drag lag. Now it's one pass, and
+  // card object refs are preserved so the memoized columns only re-render when their
+  // own cards actually change.
+  const cardsByColumn = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const map = new Map<string, Item[]>()
+    for (const c of cards) {
+      if (c.status === 'archived') continue
+      if (q && !(
+        c.title.toLowerCase().includes(q) ||
         c.body.toLowerCase().includes(q) ||
         (c.tags && c.tags.some(t => t.name.toLowerCase().includes(q)))
-      )
+      )) continue
+      if (filterPriority !== -1 && c.priority !== filterPriority) continue
+      if (filterTagId !== 'all' && !(c.tags && c.tags.some(t => t.id === filterTagId))) continue
+      let arr = map.get(c.status)
+      if (!arr) { arr = []; map.set(c.status, arr) }
+      arr.push(c)
     }
+    const sortFn = swimlanesEnabled
+      ? (a: Item, b: Item) => (b.priority !== a.priority ? b.priority - a.priority : a.position - b.position)
+      : (a: Item, b: Item) => a.position - b.position
+    for (const arr of map.values()) arr.sort(sortFn)
+    return map
+  }, [cards, searchQuery, filterPriority, filterTagId, swimlanesEnabled])
 
-    // Apply Priority filter
-    if (filterPriority !== -1) {
-      colCards = colCards.filter(c => c.priority === filterPriority)
-    }
-
-    // Apply Tag filter
-    if (filterTagId !== 'all') {
-      colCards = colCards.filter(c => c.tags && c.tags.some(t => t.id === filterTagId))
-    }
-
-    if (swimlanesEnabled) {
-      return [...colCards].sort((a, b) => {
-        if (b.priority !== a.priority) return b.priority - a.priority
-        return a.position - b.position
-      })
-    }
-    return [...colCards].sort((a, b) => a.position - b.position)
-  }
+  const getCardsForColumn = useCallback(
+    (columnId: string): Item[] => cardsByColumn.get(columnId) || EMPTY_ITEMS,
+    [cardsByColumn]
+  )
 
   const templateCards = cards.filter(c => {
     try {
@@ -1904,7 +1946,6 @@ export default function KanbanView() {
             }
           }}
           onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
@@ -2083,56 +2124,117 @@ export default function KanbanView() {
               </div>
 
               {/* Archived Cards List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                  Archived Cards ({cards.filter(c => c.status === 'archived').length})
-                </span>
-                {cards.filter(c => c.status === 'archived').map(card => (
-                  <div
-                    key={card.id}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-md)'
-                    }}
-                  >
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)' }}>
-                      {card.title}
-                    </span>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                      <button
-                        onClick={() => handleRestoreCard(card.id)}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', fontSize: '10px', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
-                      >
-                        Restore
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (confirm(`Permanently delete card "${card.title}"? This cannot be undone.`)) {
-                            try {
-                              await window.electronAPI.db.deleteItem(card.id)
-                              setCards(prev => prev.filter(c => c.id !== card.id))
-                              toast('Card deleted permanently')
-                            } catch (err) {
-                              console.error(err)
-                            }
-                          }
-                        }}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}
-                      >
-                        Delete
-                      </button>
+              {(() => {
+                const archivedCards = cards.filter(c => c.status === 'archived')
+                const allSelected = archivedCards.length > 0 && archivedCards.every(c => selectedArchived.has(c.id))
+                const selCount = archivedCards.reduce((n, c) => n + (selectedArchived.has(c.id) ? 1 : 0), 0)
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                        Archived Cards ({archivedCards.length})
+                      </span>
+                      {archivedCards.length > 0 && (
+                        <button
+                          onClick={() => setSelectedArchived(allSelected ? new Set() : new Set(archivedCards.map(c => c.id)))}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '10px', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
+                        >
+                          {allSelected ? 'Clear' : 'Select all'}
+                        </button>
+                      )}
                     </div>
+
+                    {/* Bulk action bar, appears when items are selected */}
+                    {selCount > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--color-primary-muted)', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }}>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)' }}>
+                          {selCount} selected
+                        </span>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={handleBulkRestoreArchived}
+                            style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-secondary)', fontSize: '10px', fontWeight: 'var(--weight-semibold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
+                          >
+                            Restore
+                          </button>
+                          <button
+                            onClick={handleBulkDeleteArchived}
+                            style={{ background: 'var(--color-error)', border: 'none', color: '#fff', fontSize: '10px', fontWeight: 'var(--weight-bold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
+                          >
+                            Delete ({selCount})
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {archivedCards.map(card => {
+                      const selected = selectedArchived.has(card.id)
+                      return (
+                        <div
+                          key={card.id}
+                          onClick={() => toggleArchivedSelection(card.id)}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            background: selected ? 'var(--color-primary-muted)' : 'var(--color-surface-2)',
+                            border: `1px solid ${selected ? 'var(--color-primary)' : 'var(--color-surface-offset)'}`,
+                            padding: '8px 12px',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <span
+                              aria-hidden
+                              style={{
+                                width: '15px', height: '15px', flexShrink: 0, borderRadius: '4px',
+                                border: `1.5px solid ${selected ? 'var(--color-primary)' : 'var(--color-balance)'}`,
+                                background: selected ? 'var(--color-primary)' : 'transparent',
+                                color: '#fff', fontSize: '10px', lineHeight: '13px', textAlign: 'center', fontWeight: 'bold'
+                              }}
+                            >
+                              {selected ? '✓' : ''}
+                            </span>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }} title={card.title}>
+                              {card.title}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleRestoreCard(card.id) }}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', fontSize: '10px', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
+                            >
+                              Restore
+                            </button>
+                            <button
+                              onClick={async e => {
+                                e.stopPropagation()
+                                if (confirm(`Permanently delete card "${card.title}"? This cannot be undone.`)) {
+                                  try {
+                                    await window.electronAPI.db.deleteItem(card.id)
+                                    setCards(prev => prev.filter(c => c.id !== card.id))
+                                    setSelectedArchived(prev => { const n = new Set(prev); n.delete(card.id); return n })
+                                    toast('Card deleted permanently')
+                                  } catch (err) {
+                                    console.error(err)
+                                  }
+                                }
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {archivedCards.length === 0 && (
+                      <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No archived cards.</span>
+                    )}
                   </div>
-                ))}
-                {cards.filter(c => c.status === 'archived').length === 0 && (
-                  <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No archived cards.</span>
-                )}
-              </div>
+                )
+              })()}
 
             </div>
           </div>

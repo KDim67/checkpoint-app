@@ -570,6 +570,18 @@ function KanbanColumn({
         )}
       </div>
 
+      {/* WIP-limit progress bar, visualizes how full the column is vs its limit */}
+      {wipLimit !== null && wipLimit > 0 && (
+        <div style={{ height: '3px', margin: '0 var(--space-3) 2px', background: 'var(--color-surface-offset)', borderRadius: '2px', overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{
+            height: '100%',
+            width: `${Math.min(100, (cards.length / wipLimit) * 100)}%`,
+            background: isWipExceeded ? 'var(--color-warning)' : accentColor,
+            transition: 'width 200ms ease, background-color 200ms ease'
+          }} />
+        </div>
+      )}
+
       {/* Cards Area */}
       <div
         ref={setNodeRef}

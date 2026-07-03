@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { Item, Tag as TagType } from '../../../shared/types'
 import BacklogFilters from './backlog/BacklogFilters'
@@ -337,8 +337,56 @@ export default function BacklogView() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const handleBulkDelete = async () => {
-    setShowDeleteConfirm(true)
+  // Archived task browser, lets people find and restore (or permanently delete) tasks
+  // that were removed via bulk delete, since the toast "Undo" only lasts a few seconds.
+  const [showArchive, setShowArchive] = useState(false)
+  const [archivedTasks, setArchivedTasks] = useState<Item[]>([])
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [deleteArchivedId, setDeleteArchivedId] = useState<string | null>(null)
+
+  const loadArchivedTasks = useCallback(async () => {
+    setArchiveLoading(true)
+    try {
+      const res = await window.electronAPI.db.queryTasks(activeContext, {
+        archivedOnly: true,
+        sortBy: 'created_at',
+        sortDesc: true,
+        page: 1,
+        pageSize: 200
+      })
+      setArchivedTasks(res.items)
+    } catch (err) {
+      console.error('Failed to load archived tasks:', err)
+    } finally {
+      setArchiveLoading(false)
+    }
+  }, [activeContext])
+
+  useEffect(() => {
+    if (showArchive) loadArchivedTasks()
+  }, [showArchive, loadArchivedTasks])
+
+  const handleRestoreArchivedTask = async (id: string) => {
+    try {
+      const restoredStatus = workflowColumns[0]?.id || 'open'
+      await window.electronAPI.db.updateItem(id, { status: restoredStatus })
+      setArchivedTasks(prev => prev.filter(t => t.id !== id))
+      toast('Task restored to ' + (workflowColumns[0]?.name || 'Backlog'))
+      await loadTasks()
+    } catch (err) {
+      console.error('Failed to restore archived task:', err)
+    }
+  }
+
+  const handlePermanentlyDeleteArchivedTask = async (id: string) => {
+    try {
+      await window.electronAPI.db.bulkDeleteItems([id])
+      setArchivedTasks(prev => prev.filter(t => t.id !== id))
+      setDeleteArchivedId(null)
+      toast('Task permanently deleted')
+    } catch (err) {
+      console.error('Failed to permanently delete archived task:', err)
+    }
   }
 
   const performBulkDelete = async () => {
@@ -572,6 +620,37 @@ export default function BacklogView() {
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
             </svg>
             AI Standup
+          </button>
+
+          <button
+            onClick={() => setShowArchive(true)}
+            title="View archived tasks"
+            style={{
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-4)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'var(--weight-semibold)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1.5)',
+              height: '32px',
+              transition: 'filter 120ms ease, transform 120ms ease'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.filter = 'brightness(1.15)'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.filter = 'none'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <Archive size={13} />
+            Archive
           </button>
 
           <button
@@ -969,6 +1048,158 @@ export default function BacklogView() {
         isDestructive
         onConfirm={performBulkDelete}
         onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      {/* Archived Tasks Panel */}
+      {showArchive && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '32px',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1100,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            backdropFilter: 'blur(2px)'
+          }}
+          onClick={() => setShowArchive(false)}
+        >
+          <div
+            style={{
+              width: '420px',
+              height: '100%',
+              background: 'var(--color-surface-1)',
+              borderLeft: '1px solid var(--color-surface-offset)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
+              animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
+            }}
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-panel-title"
+          >
+            {/* Header */}
+            <div style={{
+              height: '56px',
+              padding: '0 var(--space-5)',
+              borderBottom: '1px solid var(--color-surface-offset)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0
+            }}>
+              <span
+                id="archive-panel-title"
+                style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+              >
+                <Archive size={15} /> Archived Tasks
+              </span>
+              <button
+                onClick={() => setShowArchive(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', padding: '4px' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {archiveLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} width="100%" height={52} borderRadius="var(--radius-md)" />
+                  ))}
+                </div>
+              ) : archivedTasks.length === 0 ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-8) var(--space-4)',
+                  textAlign: 'center'
+                }}>
+                  <Archive size={28} style={{ color: 'var(--color-text-faint)' }} />
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+                    No archived tasks. Deleted tasks show up here so you can restore them later.
+                  </span>
+                </div>
+              ) : (
+                archivedTasks.map(task => (
+                  <div
+                    key={task.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      background: 'var(--color-surface-2)',
+                      border: '1px solid var(--color-surface-offset)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 'var(--space-3)'
+                    }}
+                  >
+                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+                      {task.title || 'Untitled Task'}
+                    </span>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+                      <button
+                        onClick={() => handleRestoreArchivedTask(task.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-secondary)',
+                          fontSize: '11px',
+                          fontWeight: 'var(--weight-semibold)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <RotateCcw size={11} /> Restore
+                      </button>
+                      <button
+                        onClick={() => setDeleteArchivedId(task.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-error)',
+                          fontSize: '11px',
+                          fontWeight: 'var(--weight-semibold)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Trash2 size={11} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Permanent Deletion of a single archived task */}
+      <ConfirmDialog
+        isOpen={!!deleteArchivedId}
+        title="Delete Permanently"
+        message="This task will be permanently deleted and cannot be restored. Are you sure?"
+        confirmText="Delete Permanently"
+        isDestructive
+        onConfirm={() => deleteArchivedId && handlePermanentlyDeleteArchivedTask(deleteArchivedId)}
+        onCancel={() => setDeleteArchivedId(null)}
       />
     </div>
   )

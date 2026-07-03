@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
 import type {
   Item,
@@ -9,6 +9,8 @@ import type {
   Relation,
   RelationType,
   AiStreamParams,
+  AiStructuredParams,
+  AiStructuredResult,
   BulkUpdatePayload,
   SearchQuery,
   TaskQueryParams,
@@ -18,6 +20,7 @@ import type {
   FocusSession,
   CreateFocusSessionPayload,
   NoteMetadata,
+  NoteSearchResult,
   GitCommit,
   GitStatusResult,
   ClipboardItem,
@@ -54,6 +57,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: (): void => ipcRenderer.send(IpcChannels.APP_CLOSE),
     saveFile: (defaultName: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.APP_SAVE_FILE, defaultName, content),
+    // Electron ≥32 removed File.path from renderer File objects, this is the
+    // only sanctioned way to resolve the absolute path of a dropped file.
+    getPathForFile: (file: File): string => {
+      try {
+        return webUtils.getPathForFile(file)
+      } catch {
+        return ''
+      }
+    },
     onNavigateToView: (callback: (view: string) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, view: string) => callback(view)
       ipcRenderer.on(IpcChannels.APP_NAVIGATE_TO_VIEW, handler)
@@ -198,28 +210,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // AI Streaming
+  // streamId identifies the consumer channel ('assistant', 'standup', …) so
+  // several features can stream concurrently. Subscribers receive the id and
+  // filter to their own stream; omitting it preserves legacy global behavior.
   ai: {
-    startStream: (params: AiStreamParams): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.AI_STREAM_START, params),
+    startStream: (params: AiStreamParams, streamId?: string): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.AI_STREAM_START, params, streamId),
 
-    abortStream: (): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.AI_STREAM_ABORT),
+    abortStream: (streamId?: string): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.AI_STREAM_ABORT, streamId),
+
+    testConnection: (baseURL: string, apiKey: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.AI_TEST_CONNECTION, baseURL, apiKey),
+
+    generateStructured: (params: AiStructuredParams): Promise<AiStructuredResult> =>
+      ipcRenderer.invoke(IpcChannels.AI_GENERATE_STRUCTURED, params),
+
+    abortStructured: (): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.AI_GENERATE_ABORT),
 
     // Returns an unsubscribe function, MUST be called on component unmount
-    onChunk: (callback: (chunk: string) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, chunk: string) => callback(chunk)
+    onChunk: (callback: (chunk: string, streamId?: string) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, chunk: string, streamId?: string) => callback(chunk, streamId)
       ipcRenderer.on(IpcChannels.AI_CHUNK, handler)
       return () => ipcRenderer.removeListener(IpcChannels.AI_CHUNK, handler)
     },
 
-    onDone: (callback: () => void): (() => void) => {
-      const handler = () => callback()
+    onDone: (callback: (streamId?: string) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, streamId?: string) => callback(streamId)
       ipcRenderer.on(IpcChannels.AI_DONE, handler)
       return () => ipcRenderer.removeListener(IpcChannels.AI_DONE, handler)
     },
 
-    onError: (callback: (errMessage: string) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, errMessage: string) => callback(errMessage)
+    onError: (callback: (errMessage: string, streamId?: string) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, errMessage: string, streamId?: string) => callback(errMessage, streamId)
       ipcRenderer.on(IpcChannels.AI_ERROR, handler)
       return () => ipcRenderer.removeListener(IpcChannels.AI_ERROR, handler)
     }
@@ -295,12 +319,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke(IpcChannels.TRACKER_TOGGLE, active),
     getState: (): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.TRACKER_GET_STATE),
-    getActivityStats: (context: string | null, start: number, end: number): Promise<{
+    getActivityStats: async (context: string | null, start: number, end: number): Promise<{
       totalDurationMs: number
       byProcess: Array<{ processName: string; durationMs: number }>
       byContext: Array<{ context: string; durationMs: number }>
       byTitle: Array<{ windowTitle: string; processName: string; durationMs: number }>
-    }> => ipcRenderer.invoke(IpcChannels.TRACKER_GET_STATS, context, start, end)
+    }> => {
+      // The TRACKER_GET_STATS handler wraps its result in handleSafe's
+      // { success, data } envelope, unwrap it here so callers get the stats
+      // object directly (matching the db.* methods and this return type).
+      const res = await ipcRenderer.invoke(IpcChannels.TRACKER_GET_STATS, context, start, end)
+      if (!res.success) throw new Error(res.error)
+      return res.data
+    }
   },
 
   // Hardware profiling (AI Cookbook)
@@ -359,6 +390,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stopPull: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.OLLAMA_STOP),
 
+    deleteModel: (modelTag: string): Promise<boolean> =>
+      ipcRenderer.invoke(IpcChannels.OLLAMA_DELETE, modelTag),
+
     listLocalModels: (): Promise<string[]> =>
       ipcRenderer.invoke(IpcChannels.OLLAMA_LIST_LOCAL),
 
@@ -389,7 +423,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     writeNote: (title: string, content: string, oldTitle?: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.NOTES_WRITE, title, content, oldTitle),
     deleteNote: (title: string): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.NOTES_DELETE, title)
+      ipcRenderer.invoke(IpcChannels.NOTES_DELETE, title),
+    searchNotes: (query: string): Promise<NoteSearchResult[]> =>
+      ipcRenderer.invoke(IpcChannels.NOTES_SEARCH, query)
   },
 
   git: {
@@ -432,12 +468,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       if (!res.success) throw new Error(res.error)
     },
     paste: (content: string): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.CLIPBOARD_PASTE, content)
+      ipcRenderer.invoke(IpcChannels.CLIPBOARD_PASTE, content),
+    onHistoryChanged: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on(IpcChannels.CLIPBOARD_HISTORY_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IpcChannels.CLIPBOARD_HISTORY_CHANGED, handler)
+    }
   },
 
   analytics: {
-    getAnalytics: (): Promise<AnalyticsData> =>
-      ipcRenderer.invoke(IpcChannels.ANALYTICS_GET_DATA)
+    getAnalytics: (context?: string | null): Promise<AnalyticsData> =>
+      ipcRenderer.invoke(IpcChannels.ANALYTICS_GET_DATA, context)
   },
 
   customizer: {
@@ -473,7 +514,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectFile: (): Promise<string | null> =>
       ipcRenderer.invoke(IpcChannels.CHEATSHEETS_SELECT),
     getText: (name: string): Promise<string> =>
-      ipcRenderer.invoke(IpcChannels.CHEATSHEETS_GET_TEXT, name)
+      ipcRenderer.invoke(IpcChannels.CHEATSHEETS_GET_TEXT, name),
+    getRelevant: (name: string, query: string, maxChars?: number): Promise<string> =>
+      ipcRenderer.invoke(IpcChannels.CHEATSHEETS_GET_RELEVANT, name, query, maxChars),
+    search: (query: string): Promise<Array<{ name: string; matchCount: number; snippets: string[] }>> =>
+      ipcRenderer.invoke(IpcChannels.CHEATSHEETS_SEARCH, query)
   },
   gamedev: {
     batchRename: (files: Array<{ oldPath: string; newPath: string }>): Promise<{

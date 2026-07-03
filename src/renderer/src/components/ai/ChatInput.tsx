@@ -1,18 +1,103 @@
 import React, { useRef, useEffect, useState } from 'react'
-import { Send, Square, Plus, Mail, Sparkles, FileText, X, BookOpen, Mic } from 'lucide-react'
+import { Send, Square, Plus, Mail, Sparkles, FileText, X, BookOpen, Mic, LayoutGrid, ListTree, ArrowUpDown, ShieldAlert, Image as ImageIcon, Settings2, FileCode } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
+import { useToast } from '../ui/Toast'
+
+export interface CustomQuickAction {
+  id: string
+  label: string
+  prompt: string
+  intent: 'create' | 'analyze'
+}
 
 interface ChatInputProps {
   value: string
   onChange: (val: string) => void
-  onSubmit: (options?: { mode?: string; cheatsheets?: string[] }) => void
+  onSubmit: (options?: { mode?: string; cheatsheets?: string[]; notes?: string[]; files?: string[]; images?: string[] }) => void
   onAbort: () => void
   isStreaming: boolean
   contextItem: Item | null
-  onTriggerPrompt: (prompt: string) => void
+  onTriggerPrompt: (prompt: string, displayContent?: string, intentHint?: 'create' | 'analyze') => void
   activeSkill?: { id: string; label: string; shortLabel: string; color: string } | null
   onClearSkill?: () => void
+  /** Indexed files of the imported workspace folder (for @-mentions). */
+  workspaceFiles?: Array<{ name: string; relativePath: string }>
+  /** User-defined saved prompts, shown in the ＋ menu. */
+  customActions?: CustomQuickAction[]
+  onManageCustomActions?: () => void
+  /** Whether the selected model accepts image input, gates attach & paste. */
+  visionCapable?: boolean
 }
+
+/** Downscale an image file to a reasonable size for model input (max 1280px). */
+async function fileToDataUrl(file: File): Promise<string | null> {
+  return new Promise(resolve => {
+    const reader = new FileReader()
+    reader.onerror = () => resolve(null)
+    reader.onload = () => {
+      const raw = reader.result as string
+      const img = new Image()
+      img.onerror = () => resolve(null)
+      img.onload = () => {
+        const MAX = 1280
+        if (img.width <= MAX && img.height <= MAX && raw.length < 2_000_000) {
+          resolve(raw)
+          return
+        }
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(raw); return }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.src = raw
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+// Data-driven quick actions. "create" actions produce board items via the
+// structured generator; "analyze" actions return plain-text answers.
+interface QuickAction {
+  icon: React.ElementType
+  label: string
+  prompt: string
+}
+const CREATE_ACTIONS: QuickAction[] = [
+  {
+    icon: Sparkles, label: 'Suggest new tasks',
+    prompt: 'Suggest a few actionable NEW tasks based on my current workspace items and goals. Only propose genuinely missing, high-value work, never duplicate existing cards. Give each a priority and topical tags.'
+  },
+  {
+    icon: LayoutGrid, label: 'Set up a board',
+    prompt: 'Design a Kanban board for this project: propose the workflow COLUMNS (each with a fitting color) and seed each column with a few well-scoped starter cards (with tags and priorities).'
+  },
+  {
+    icon: ListTree, label: 'Break down a task',
+    prompt: 'Break the most important item on my board down into 3–6 concrete, independently-completable subtask cards, each with a priority and topical tags.'
+  }
+]
+const ANALYZE_ACTIONS: QuickAction[] = [
+  {
+    icon: FileText, label: 'Summarize progress',
+    prompt: 'Summarize all my tasks and current board progress in detail. Do NOT output any JSON blocks, return a plain markdown summary.'
+  },
+  {
+    icon: ArrowUpDown, label: 'Prioritize backlog',
+    prompt: 'Review my current board and tell me what to work on next and why. Do NOT output JSON, give a prioritized, reasoned plain-text list.'
+  },
+  {
+    icon: ShieldAlert, label: 'Find risks & gaps',
+    prompt: 'Audit my board for risks, blockers, and missing work (testing, edge cases, docs, polish). Do NOT output JSON, return a plain-text findings list grouped by theme.'
+  },
+  {
+    icon: Sparkles, label: 'Explain workspace',
+    prompt: 'Explain the current state of my project and active tasks. Do NOT output JSON, return a plain markdown description.'
+  }
+]
 
 interface CheatsheetFile {
   name: string
@@ -25,21 +110,34 @@ export default function ChatInput({
   onSubmit,
   onAbort,
   isStreaming,
-  contextItem,
   onTriggerPrompt,
   activeSkill,
-  onClearSkill
+  onClearSkill,
+  workspaceFiles = [],
+  customActions = [],
+  onManageCustomActions,
+  visionCapable = false
 }: ChatInputProps) {
+  const { toast } = useToast()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const [showPlusMenu, setShowPlusMenu] = useState(false)
   const [isEmailDraftMode, setIsEmailDraftMode] = useState(false)
   const [availableCheatsheets, setAvailableCheatsheets] = useState<CheatsheetFile[]>([])
   const [attachedCheatsheets, setAttachedCheatsheets] = useState<string[]>([])
+  const [availableNotes, setAvailableNotes] = useState<string[]>([])
+  const [attachedNotes, setAttachedNotes] = useState<string[]>([])
+  const [attachedFiles, setAttachedFiles] = useState<string[]>([])
+  const [attachedImages, setAttachedImages] = useState<string[]>([])
   const [showCheatsheetSubmenu, setShowCheatsheetSubmenu] = useState(false)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [slashQuery, setSlashQuery] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
+
+  const hasAnyAttachment =
+    attachedCheatsheets.length > 0 || attachedNotes.length > 0 ||
+    attachedFiles.length > 0 || attachedImages.length > 0
 
   const SLASH_COMMANDS = [
     { name: '/clear', desc: 'Clear the current chat thread' },
@@ -83,18 +181,61 @@ export default function ChatInput({
     }
   }
 
-  // Load cheatsheets on mount & menu toggle
+  // Load cheatsheets + note titles on mount & menu toggle
   useEffect(() => {
-    const fetchCheatsheets = async () => {
+    const fetchSources = async () => {
       try {
         const list = await window.electronAPI.cheatsheets.list()
         setAvailableCheatsheets(list)
       } catch (err) {
         console.warn('Failed to fetch cheatsheets for AI input:', err)
       }
+      try {
+        const notes = await window.electronAPI.notes.listNotes()
+        setAvailableNotes((notes || []).map(n => n.title))
+      } catch (err) {
+        console.warn('Failed to fetch notes for AI input:', err)
+      }
     }
-    fetchCheatsheets()
+    fetchSources()
   }, [showPlusMenu])
+
+  // External attach requests (e.g. the Cheatsheets page's "Ask AI" button)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const name = (e as CustomEvent).detail?.name
+      if (typeof name === 'string' && name) {
+        setAttachedCheatsheets(prev => prev.includes(name) ? prev : [...prev, name])
+        textareaRef.current?.focus()
+      }
+    }
+    window.addEventListener('checkpoint-ai-attach-cheatsheet', handler)
+    return () => window.removeEventListener('checkpoint-ai-attach-cheatsheet', handler)
+  }, [])
+
+  // Image attachment (picker + paste)
+  const addImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) return
+    const dataUrl = await fileToDataUrl(file)
+    if (dataUrl) setAttachedImages(prev => prev.length >= 4 ? prev : [...prev, dataUrl])
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData?.items || [])
+    const imageItem = items.find(i => i.type.startsWith('image/'))
+    if (imageItem) {
+      if (!visionCapable) {
+        e.preventDefault()
+        toast('The selected model does not support image input. Switch to a vision model (e.g. llava, gpt-4o, gemini).', { type: 'warning' })
+        return
+      }
+      const file = imageItem.getAsFile()
+      if (file) {
+        e.preventDefault()
+        addImageFile(file)
+      }
+    }
+  }
 
   // Auto-resize textarea height as user types
   useEffect(() => {
@@ -151,21 +292,38 @@ export default function ChatInput({
     }
   }
 
-  const handleSelectMention = (csName: string) => {
-    if (!attachedCheatsheets.includes(csName)) {
-      setAttachedCheatsheets([...attachedCheatsheets, csName])
-    }
-    // Remove @query from textarea
+  // Remove the @query fragment from the textarea after a mention is picked
+  const stripMentionQuery = () => {
     const textarea = textareaRef.current
     const cursor = textarea?.selectionStart || value.length
     const textBeforeCursor = value.slice(0, cursor)
     const lastAtIdx = textBeforeCursor.lastIndexOf('@')
     if (lastAtIdx !== -1) {
-      const newVal = value.slice(0, lastAtIdx) + value.slice(cursor)
-      onChange(newVal)
+      onChange(value.slice(0, lastAtIdx) + value.slice(cursor))
     }
     setMentionQuery(null)
     textareaRef.current?.focus()
+  }
+
+  const handleSelectMention = (csName: string) => {
+    if (!attachedCheatsheets.includes(csName)) {
+      setAttachedCheatsheets([...attachedCheatsheets, csName])
+    }
+    stripMentionQuery()
+  }
+
+  const handleSelectNoteMention = (title: string) => {
+    if (!attachedNotes.includes(title)) {
+      setAttachedNotes([...attachedNotes, title])
+    }
+    stripMentionQuery()
+  }
+
+  const handleSelectFileMention = (relativePath: string) => {
+    if (!attachedFiles.includes(relativePath)) {
+      setAttachedFiles([...attachedFiles, relativePath])
+    }
+    stripMentionQuery()
   }
 
   const handleSelectSlash = (cmd: string) => {
@@ -187,10 +345,16 @@ export default function ChatInput({
   const [savedInputBeforeHistory, setSavedInputBeforeHistory] = useState<string>('')
 
   const handleFormSubmit = () => {
-    // FIX: Allow submission when cheatsheets are attached even with no text
-    if ((!value.trim() && attachedCheatsheets.length === 0) || isStreaming) return
+    // Allow submission with any attachment (docs, notes, files, images) even with no text
+    if ((!value.trim() && !hasAnyAttachment) || isStreaming) return
     const mode = isEmailDraftMode ? 'email_draft' : undefined
-    onSubmit({ mode, cheatsheets: attachedCheatsheets.length > 0 ? attachedCheatsheets : undefined })
+    onSubmit({
+      mode,
+      cheatsheets: attachedCheatsheets.length > 0 ? attachedCheatsheets : undefined,
+      notes: attachedNotes.length > 0 ? attachedNotes : undefined,
+      files: attachedFiles.length > 0 ? attachedFiles : undefined,
+      images: attachedImages.length > 0 ? attachedImages : undefined
+    })
     // Save to prompt history
     if (value.trim()) {
       setPromptHistory(prev => [value.trim(), ...prev.slice(0, 49)])
@@ -199,6 +363,9 @@ export default function ChatInput({
     setSavedInputBeforeHistory('')
     setIsEmailDraftMode(false)
     setAttachedCheatsheets([])
+    setAttachedNotes([])
+    setAttachedFiles([])
+    setAttachedImages([])
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -243,10 +410,23 @@ export default function ChatInput({
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
-      if (mentionQuery !== null && filteredCheatsheets.length > 0) {
-        e.preventDefault()
-        handleSelectMention(filteredCheatsheets[0].name)
-        return
+      if (mentionQuery !== null) {
+        // Pick the first suggestion across all mention groups
+        if (filteredCheatsheets.length > 0) {
+          e.preventDefault()
+          handleSelectMention(filteredCheatsheets[0].name)
+          return
+        }
+        if (filteredNotes.length > 0) {
+          e.preventDefault()
+          handleSelectNoteMention(filteredNotes[0])
+          return
+        }
+        if (filteredFiles.length > 0) {
+          e.preventDefault()
+          handleSelectFileMention(filteredFiles[0].relativePath)
+          return
+        }
       }
       if (slashQuery !== null && filteredSlashCommands.length > 0) {
         e.preventDefault()
@@ -260,7 +440,22 @@ export default function ChatInput({
 
   const filteredCheatsheets = availableCheatsheets.filter(cs =>
     mentionQuery === null ? true : cs.name.toLowerCase().includes(mentionQuery)
-  )
+  ).slice(0, 6)
+
+  const filteredNotes = availableNotes.filter(n =>
+    mentionQuery === null ? true : n.toLowerCase().includes(mentionQuery)
+  ).slice(0, 6)
+
+  // Workspace files only appear once the user starts typing a query, 
+  // an unfiltered list of hundreds of files is pure noise.
+  const filteredFiles = (mentionQuery && mentionQuery.length >= 1)
+    ? workspaceFiles.filter(f =>
+        f.name.toLowerCase().includes(mentionQuery) ||
+        f.relativePath.toLowerCase().includes(mentionQuery)
+      ).slice(0, 6)
+    : []
+
+  const hasMentionResults = filteredCheatsheets.length > 0 || filteredNotes.length > 0 || filteredFiles.length > 0
 
   const filteredSlashCommands = SLASH_COMMANDS.filter(cmd =>
     slashQuery === null ? true : cmd.name.slice(1).toLowerCase().includes(slashQuery)
@@ -325,16 +520,16 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Mentions Auto-complete Popover */}
-      {mentionQuery !== null && filteredCheatsheets.length > 0 && (
+      {/* Mentions Auto-complete Popover, cheatsheets, notes and workspace files */}
+      {mentionQuery !== null && hasMentionResults && (
         <div
           style={{
             position: 'absolute',
             bottom: '100%',
             left: 0,
             marginBottom: '8px',
-            width: '240px',
-            maxHeight: '180px',
+            width: '270px',
+            maxHeight: '260px',
             overflowY: 'auto',
             background: 'var(--color-surface-1)',
             border: '1px solid var(--color-secondary)',
@@ -347,32 +542,83 @@ export default function ChatInput({
             gap: '2px'
           }}
         >
-          <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-secondary)', textTransform: 'uppercase' }}>
-            Mention Cheatsheet (@)
-          </div>
+          {filteredCheatsheets.length > 0 && (
+            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: '#60a5fa', textTransform: 'uppercase' }}>
+              Cheatsheets
+            </div>
+          )}
           {filteredCheatsheets.map(cs => (
             <button
-              key={cs.name}
+              key={`cs-${cs.name}`}
               onClick={() => handleSelectMention(cs.name)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 8px',
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
                 background: attachedCheatsheets.includes(cs.name) ? 'var(--color-surface-offset)' : 'transparent',
-                border: 'none',
-                color: 'var(--color-text-base)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: '11px',
-                cursor: 'pointer',
-                textAlign: 'left'
+                border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
+                fontSize: '11px', cursor: 'pointer', textAlign: 'left'
               }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
               onMouseLeave={e => (e.currentTarget.style.background = attachedCheatsheets.includes(cs.name) ? 'var(--color-surface-offset)' : 'transparent')}
             >
-              <BookOpen size={13} style={{ color: '#60a5fa' }} />
+              <BookOpen size={13} style={{ color: '#60a5fa', flexShrink: 0 }} />
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.name}</span>
               {attachedCheatsheets.includes(cs.name) && (
+                <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
+              )}
+            </button>
+          ))}
+
+          {filteredNotes.length > 0 && (
+            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: '#4ade80', textTransform: 'uppercase' }}>
+              Notes
+            </div>
+          )}
+          {filteredNotes.map(title => (
+            <button
+              key={`n-${title}`}
+              onClick={() => handleSelectNoteMention(title)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                background: attachedNotes.includes(title) ? 'var(--color-surface-offset)' : 'transparent',
+                border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
+                fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = attachedNotes.includes(title) ? 'var(--color-surface-offset)' : 'transparent')}
+            >
+              <FileText size={13} style={{ color: '#4ade80', flexShrink: 0 }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+              {attachedNotes.includes(title) && (
+                <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
+              )}
+            </button>
+          ))}
+
+          {filteredFiles.length > 0 && (
+            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: '#38bdf8', textTransform: 'uppercase' }}>
+              Workspace Files
+            </div>
+          )}
+          {filteredFiles.map(f => (
+            <button
+              key={`f-${f.relativePath}`}
+              onClick={() => handleSelectFileMention(f.relativePath)}
+              title={f.relativePath}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                background: attachedFiles.includes(f.relativePath) ? 'var(--color-surface-offset)' : 'transparent',
+                border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
+                fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = attachedFiles.includes(f.relativePath) ? 'var(--color-surface-offset)' : 'transparent')}
+            >
+              <FileCode size={13} style={{ color: '#38bdf8', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
+              </div>
+              {attachedFiles.includes(f.relativePath) && (
                 <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
               )}
             </button>
@@ -546,91 +792,112 @@ export default function ChatInput({
                 </div>
               )}
 
+              <button
+                onClick={() => {
+                  if (!visionCapable) {
+                    toast('The selected model does not support image input. Switch to a vision model (e.g. llava, gpt-4o, gemini).', { type: 'warning' })
+                    return
+                  }
+                  imageInputRef.current?.click()
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                  background: 'transparent', border: 'none',
+                  color: visionCapable ? 'var(--color-text-base)' : 'var(--color-text-faint)',
+                  borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                title={visionCapable
+                  ? 'Attach an image, you can also paste one directly into the input.'
+                  : 'The selected model does not support images. Switch to a vision model (llava, moondream, gpt-4o, gemini…).'}
+              >
+                <ImageIcon size={13} style={{ color: visionCapable ? '#f472b6' : 'var(--color-text-faint)' }} />
+                <span>
+                  Attach Image…{' '}
+                  <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+                    {visionCapable ? '(vision)' : '(model not vision-capable)'}
+                  </span>
+                </span>
+              </button>
+
+              {(customActions.length > 0 || onManageCustomActions) && (
+                <>
+                  <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 8px 4px' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      My prompts
+                    </span>
+                    {onManageCustomActions && (
+                      <button
+                        onClick={() => { setShowPlusMenu(false); onManageCustomActions() }}
+                        title="Add, edit or delete your saved prompts"
+                        style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9px' }}
+                      >
+                        <Settings2 size={11} />
+                        <span>Manage</span>
+                      </button>
+                    )}
+                  </div>
+                  {customActions.map(a => (
+                    <button
+                      key={a.id}
+                      onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, a.intent) }}
+                      title={a.prompt}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', width: '100%',
+                        background: 'transparent', border: 'none', color: 'var(--color-text-base)',
+                        borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <Sparkles size={13} style={{ color: a.intent === 'create' ? 'var(--color-secondary)' : 'var(--color-text-muted)' }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.label}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+
               <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+              <div style={{ padding: '2px 8px 4px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Create on the board
+              </div>
+              {CREATE_ACTIONS.map(a => {
+                const Icon = a.icon
+                return (
+                  <button
+                    key={a.label}
+                    onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, 'create') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', width: '100%', background: 'transparent', border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <Icon size={13} style={{ color: 'var(--color-secondary)' }} />
+                    <span>{a.label}</span>
+                  </button>
+                )
+              })}
 
-              <button
-                onClick={() => {
-                  setShowPlusMenu(false)
-                  onTriggerPrompt(
-                    'Summarize all my tasks and current board progress in detail. (Note: Do NOT output any JSON blocks. Just return a plain text/markdown summary.)',
-                    'Summarize Tasks'
-                  )
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 8px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  textAlign: 'left'
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <FileText size={13} />
-                <span>Scrape & Summarize Tasks</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowPlusMenu(false)
-                  onTriggerPrompt(
-                    'Suggest 3 actionable new tasks based on my current workspace items. Output them in a JSON block. CRITICAL: The JSON block must ONLY contain the "cards" array with the NEW cards. Do NOT include any "columns" array or any of the existing cards in the JSON, otherwise they will be duplicated on the board.',
-                    'Suggest New Tasks'
-                  )
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 8px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  textAlign: 'left'
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <Sparkles size={13} />
-                <span>Suggest New Tasks</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowPlusMenu(false)
-                  onTriggerPrompt(
-                    'Explain the current state of my project and active tasks. (Note: Do NOT output any JSON blocks. Just return a plain text/markdown description.)',
-                    'Explain Workspace'
-                  )
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 8px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  textAlign: 'left'
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <Sparkles size={13} />
-                <span>Explain Workspace</span>
-              </button>
+              <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+              <div style={{ padding: '2px 8px 4px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Analyze &amp; advise
+              </div>
+              {ANALYZE_ACTIONS.map(a => {
+                const Icon = a.icon
+                return (
+                  <button
+                    key={a.label}
+                    onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, 'analyze') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', width: '100%', background: 'transparent', border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <Icon size={13} style={{ color: 'var(--color-text-muted)' }} />
+                    <span>{a.label}</span>
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -713,6 +980,91 @@ export default function ChatInput({
           </div>
         )}
 
+        {/* Hidden image file input */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={e => {
+            const files = Array.from(e.target.files || [])
+            files.slice(0, 4).forEach(f => addImageFile(f))
+            e.target.value = ''
+          }}
+        />
+
+        {/* Attached Note Pills */}
+        {attachedNotes.map(title => (
+          <div
+            key={`np-${title}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+              background: 'rgba(34, 197, 94, 0.14)', border: '1px solid rgba(34, 197, 94, 0.4)',
+              borderRadius: 'var(--radius-sm)', padding: '2px 8px',
+              fontSize: '11px', fontWeight: 'bold', color: '#4ade80', alignSelf: 'center', flexShrink: 0
+            }}
+          >
+            <FileText size={12} />
+            <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+            <button
+              onClick={() => setAttachedNotes(attachedNotes.filter(n => n !== title))}
+              style={{ background: 'transparent', border: 'none', color: '#4ade80', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', marginLeft: '2px' }}
+              title="Remove note"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+
+        {/* Attached Workspace File Pills */}
+        {attachedFiles.map(relPath => (
+          <div
+            key={`fp-${relPath}`}
+            title={relPath}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+              background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.4)',
+              borderRadius: 'var(--radius-sm)', padding: '2px 8px',
+              fontSize: '11px', fontWeight: 'bold', color: '#38bdf8', alignSelf: 'center', flexShrink: 0
+            }}
+          >
+            <FileCode size={12} />
+            <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{relPath.split(/[\\/]/).pop()}</span>
+            <button
+              onClick={() => setAttachedFiles(attachedFiles.filter(f => f !== relPath))}
+              style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', marginLeft: '2px' }}
+              title="Remove file"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+
+        {/* Attached Image Thumbnails */}
+        {attachedImages.map((src, idx) => (
+          <div key={`img-${idx}`} style={{ position: 'relative', alignSelf: 'center', flexShrink: 0 }}>
+            <img
+              src={src}
+              alt={`attachment ${idx + 1}`}
+              style={{ width: '34px', height: '34px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(244, 114, 182, 0.5)', display: 'block' }}
+            />
+            <button
+              onClick={() => setAttachedImages(attachedImages.filter((_, i) => i !== idx))}
+              title="Remove image"
+              style={{
+                position: 'absolute', top: '-5px', right: '-5px',
+                width: '14px', height: '14px', borderRadius: '50%',
+                background: 'var(--color-surface-elevated)', border: '1px solid var(--color-surface-offset)',
+                color: 'var(--color-text-base)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+              }}
+            >
+              <X size={9} />
+            </button>
+          </div>
+        ))}
+
         {/* Attached Cheatsheets Pills */}
         {attachedCheatsheets.map(csName => (
           <div
@@ -758,14 +1110,15 @@ export default function ChatInput({
           value={value}
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={
             isStreaming
               ? 'Streaming completion...'
               : isEmailDraftMode
               ? 'Describe the email you want to draft...'
               : activeSkill
-              ? `Ask the ${activeSkill.shortLabel}... (type @ to reference cheatsheets)`
-              : 'Ask assistant... (type @ to reference cheatsheets)'
+              ? `Ask the ${activeSkill.shortLabel}... (@ mentions docs, notes & files)`
+              : 'Ask assistant... (@ mentions docs, notes & files · paste images)'
           }
           disabled={isStreaming}
           rows={1}
@@ -831,18 +1184,18 @@ export default function ChatInput({
         ) : (
           <button
             onClick={handleFormSubmit}
-            disabled={(!value.trim() && attachedCheatsheets.length === 0)}
+            disabled={(!value.trim() && !hasAnyAttachment)}
             style={{
-              background: (value.trim() || attachedCheatsheets.length > 0) ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
+              background: (value.trim() || hasAnyAttachment) ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
               border: 'none',
-              color: (value.trim() || attachedCheatsheets.length > 0) ? 'var(--color-text-inverted)' : 'var(--color-text-faint)',
+              color: (value.trim() || hasAnyAttachment) ? 'var(--color-text-inverted)' : 'var(--color-text-faint)',
               borderRadius: 'var(--radius-md)',
               width: '28px',
               height: '28px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: (value.trim() || attachedCheatsheets.length > 0) ? 'pointer' : 'default',
+              cursor: (value.trim() || hasAnyAttachment) ? 'pointer' : 'default',
               flexShrink: 0
             }}
           >

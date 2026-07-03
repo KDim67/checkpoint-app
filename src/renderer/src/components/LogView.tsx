@@ -15,6 +15,7 @@ export default function LogView() {
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(true)
   const [showStandupModal, setShowStandupModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const activeContext = useAppStore(s => s.activeContext)
   const availableContexts = useAppStore(s => s.availableContexts)
@@ -177,8 +178,18 @@ export default function LogView() {
     }
   }
 
-  // Pinned items (priority 3) float to the top, others remain sorted chronologically
-  const displayedItems = useMemo(() => [...items].sort((a, b) => b.priority - a.priority), [items])
+  // Filter by search (title/body/tags) then float pinned items (priority 3) to top.
+  const displayedItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const filtered = q
+      ? items.filter(i =>
+          i.title.toLowerCase().includes(q) ||
+          i.body.toLowerCase().includes(q) ||
+          (i.tags && i.tags.some((t) => t.name.toLowerCase().includes(q)))
+        )
+      : items
+    return [...filtered].sort((a, b) => b.priority - a.priority)
+  }, [items, searchQuery])
 
   // Loading skeleton view
   if (loading) {
@@ -376,30 +387,71 @@ export default function LogView() {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowStandupModal(true)}
-          style={{
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-surface-offset)',
-            color: 'var(--color-text-base)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-1.5) var(--space-3)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--weight-semibold)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            transition: 'background var(--duration-fast)'
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-secondary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-          </svg>
-          AI Standup
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          {/* Search */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '9px', color: 'var(--color-text-faint)', pointerEvents: 'none' }}>
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search this feed…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                width: searchQuery ? '220px' : '180px',
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--color-text-base)',
+                fontSize: 'var(--text-xs)',
+                padding: '6px 26px 6px 28px',
+                outline: 'none',
+                transition: 'width var(--duration-fast) var(--ease-default)'
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+                aria-label="Clear search"
+                style={{ position: 'absolute', right: '7px', background: 'none', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', display: 'flex', padding: 0 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            )}
+          </div>
+
+          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap', minWidth: 'fit-content' }}>
+            {searchQuery ? `${displayedItems.length} of ${items.length}` : `${items.length} log${items.length === 1 ? '' : 's'}`}
+          </span>
+
+          <button
+            onClick={() => setShowStandupModal(true)}
+            style={{
+              background: 'var(--color-secondary-muted)',
+              border: '1px solid var(--color-secondary)',
+              color: 'var(--color-secondary)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-3)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'var(--weight-bold)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              whiteSpace: 'nowrap',
+              transition: 'filter var(--duration-fast)'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
+            onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+            </svg>
+            AI Standup
+          </button>
+        </div>
       </header>
 
       {/* Main feed container */}
@@ -409,6 +461,12 @@ export default function LogView() {
             icon={<FileText size={48} />}
             title="Context Feed is Empty"
             description={`No logs recorded for context "#${activeContext}" yet. Write a quick note below to start capturing context.`}
+          />
+        ) : displayedItems.length === 0 ? (
+          <EmptyState
+            icon={<FileText size={48} />}
+            title="No matching logs"
+            description={`No logs in this feed match “${searchQuery}”. Older entries load as you scroll up.`}
           />
         ) : (
           <LogVirtualList

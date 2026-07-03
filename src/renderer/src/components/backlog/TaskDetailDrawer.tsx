@@ -7,6 +7,7 @@ import { useAppStore } from '../../store/appStore'
 import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
+import ColorPicker from '../ui/ColorPicker'
 
 interface TaskDetailDrawerProps {
   taskId: string

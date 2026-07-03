@@ -24,8 +24,10 @@ interface BacklogTableProps {
 }
 
 type DisplayRow =
-  | { type: 'header'; key: string; label: string; count: number }
+  | { type: 'header'; key: string; label: string; count: number; doneCount: number }
   | { type: 'row'; key: string; item: Item }
+
+const isItemDone = (item: Item) => item.status.toLowerCase() === 'done'
 
 const PRIORITY_LABELS: Record<number, string> = {
   3: 'High Priority',
@@ -160,7 +162,8 @@ export default function BacklogTable({
           type: 'header',
           key: col.id,
           label: col.name,
-          count: list.length
+          count: list.length,
+          doneCount: list.filter(isItemDone).length
         })
         if (!isCollapsed) {
           list.forEach((item) => {
@@ -176,7 +179,8 @@ export default function BacklogTable({
           type: 'header',
           key: 'unassigned',
           label: 'Unassigned',
-          count: unassigned.length
+          count: unassigned.length,
+          doneCount: unassigned.filter(isItemDone).length
         })
         if (!isCollapsed) {
           unassigned.forEach((item) => {
@@ -204,7 +208,8 @@ export default function BacklogTable({
           type: 'header',
           key,
           label: PRIORITY_LABELS[p],
-          count: list.length
+          count: list.length,
+          doneCount: list.filter(isItemDone).length
         })
         if (!isCollapsed) {
           list.forEach((item) => {
@@ -241,7 +246,8 @@ export default function BacklogTable({
           type: 'header',
           key,
           label: t.name,
-          count: list.length
+          count: list.length,
+          doneCount: list.filter(isItemDone).length
         })
         if (!isCollapsed) {
           list.forEach((item) => {
@@ -257,7 +263,8 @@ export default function BacklogTable({
           type: 'header',
           key,
           label: 'No Tags',
-          count: noTagsList.length
+          count: noTagsList.length,
+          doneCount: noTagsList.filter(isItemDone).length
         })
         if (!isCollapsed) {
           noTagsList.forEach((item) => {
@@ -284,17 +291,25 @@ export default function BacklogTable({
     }
   }
 
+  // Visual order of selectable rows as currently rendered (respects grouping/collapse), 
+  // used for shift-click ranges so they select what the user actually sees, not the
+  // underlying unsorted `items` array order.
+  const visibleItemIds = useMemo(
+    () => flatRows.filter((r): r is Extract<DisplayRow, { type: 'row' }> => r.type === 'row').map((r) => r.item.id),
+    [flatRows]
+  )
+
   const handleRowSelectToggle = (id: string, e: React.MouseEvent) => {
     if (e.shiftKey && selectedIds.length > 0) {
-      // Shift-click selection range
+      // Shift-click selection range, based on the visual (possibly grouped) order
       const lastSelectedId = selectedIds[selectedIds.length - 1]
-      const lastIndex = items.findIndex((i) => i.id === lastSelectedId)
-      const currentIndex = items.findIndex((i) => i.id === id)
+      const lastIndex = visibleItemIds.indexOf(lastSelectedId)
+      const currentIndex = visibleItemIds.indexOf(id)
 
       if (lastIndex !== -1 && currentIndex !== -1) {
         const start = Math.min(lastIndex, currentIndex)
         const end = Math.max(lastIndex, currentIndex)
-        const slicedIds = items.slice(start, end + 1).map((i) => i.id)
+        const slicedIds = visibleItemIds.slice(start, end + 1)
 
         setSelectedIds((prev) => {
           const union = new Set([...prev, ...slicedIds])
@@ -319,6 +334,26 @@ export default function BacklogTable({
       [groupKey]: !prev[groupKey]
     }))
   }
+
+  // Ctrl/Cmd+A selects all currently loaded rows, as long as focus is within the table
+  // and not inside a text input/textarea (so it doesn't hijack normal text selection).
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isSelectAll = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a'
+      if (!isSelectAll) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      if (!container.contains(target)) return
+      e.preventDefault()
+      setSelectedIds(items.map((i) => i.id))
+    }
+
+    container.addEventListener('keydown', handleKeyDown)
+    return () => container.removeEventListener('keydown', handleKeyDown)
+  }, [items, setSelectedIds])
 
   // Row virtualization geometry
   const rowHeight = 40
@@ -710,6 +745,39 @@ export default function BacklogTable({
                         }}
                       >
                         {row.count}
+                      </span>
+                      {/* Progress bar: done / total within this group */}
+                      <div
+                        title={`${row.doneCount} of ${row.count} done`}
+                        style={{
+                          width: '72px',
+                          height: '4px',
+                          borderRadius: 'var(--radius-full)',
+                          background: 'var(--color-surface-offset)',
+                          overflow: 'hidden',
+                          flexShrink: 0
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: row.count > 0 ? `${(row.doneCount / row.count) * 100}%` : '0%',
+                            height: '100%',
+                            background: 'var(--color-secondary)',
+                            borderRadius: 'var(--radius-full)',
+                            transition: 'width var(--duration-fast)'
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          color: 'var(--color-text-faint)',
+                          fontWeight: 'var(--weight-normal)',
+                          textTransform: 'none',
+                          letterSpacing: 0
+                        }}
+                      >
+                        {row.doneCount}/{row.count} done
                       </span>
                     </div>
                   )

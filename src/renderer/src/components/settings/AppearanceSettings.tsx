@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 
-type FontSize = 'small' | 'medium' | 'large'
+export type FontSize = 'small' | 'medium' | 'large'
 
 const FONT_SCALES: Record<FontSize, string> = {
   small:  '0.9',
@@ -10,7 +10,9 @@ const FONT_SCALES: Record<FontSize, string> = {
   large:  '1.125'
 }
 
-function applyFontSize(size: FontSize): void {
+// Exported so App.tsx can re-apply the persisted scale on startup, 
+// previously the setting only took effect once this tab was opened.
+export function applyFontSize(size: FontSize): void {
   document.documentElement.style.setProperty('--font-size-scale', FONT_SCALES[size])
   // Scale all text tokens proportionally
   const scale = parseFloat(FONT_SCALES[size])

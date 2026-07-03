@@ -52,6 +52,59 @@ export function getDb(): Database.Database {
 const CURRENT_VERSION = 5
 
 // Prepared statement cache (populated by initDb)
+/**
+ * Databases created by early builds carry a CHECK constraint limiting
+ * items.status to ('open','in_progress','done','archived'). Custom Kanban
+ * columns store the column id in status, so ANY move to a non-default column
+ * (including the built-in "in_review") failed with SQLITE_CONSTRAINT_CHECK on
+ * those databases. SQLite cannot drop a CHECK, so the table is rebuilt once,
+ * detected via sqlite_master (safe on fresh databases, no-op).
+ */
+function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
+  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'items'`).get() as { sql?: string } | undefined
+  const tableSql = row?.sql || ''
+  if (!/status[^,]*CHECK\s*\(/i.test(tableSql)) return
+
+  console.log('[db] Legacy items.status CHECK constraint detected, rebuilding table')
+  // FK enforcement must be off during the rebuild or DROP TABLE would cascade
+  // into item_tags/relations. The pragma is a no-op inside a transaction, so
+  // it is toggled outside and the rebuild wrapped in its own transaction.
+  db.pragma('foreign_keys = OFF')
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE items_rebuild (
+          id          TEXT PRIMARY KEY,
+          type        TEXT NOT NULL CHECK(type IN ('log','card','task')),
+          context     TEXT NOT NULL,
+          title       TEXT NOT NULL DEFAULT '',
+          body        TEXT NOT NULL DEFAULT '',
+          status      TEXT NOT NULL DEFAULT 'open',
+          priority    INTEGER NOT NULL DEFAULT 0 CHECK(priority IN (0,1,2,3)),
+          position    REAL NOT NULL DEFAULT 0,
+          created_at  INTEGER NOT NULL,
+          updated_at  INTEGER NOT NULL,
+          due_at      INTEGER,
+          metadata    TEXT NOT NULL DEFAULT '{}'
+        );
+        INSERT INTO items_rebuild
+          SELECT id, type, context, title, body, status, priority, position, created_at, updated_at, due_at, metadata
+          FROM items;
+        DROP TABLE items;
+        ALTER TABLE items_rebuild RENAME TO items;
+        CREATE INDEX IF NOT EXISTS idx_items_context   ON items(context);
+        CREATE INDEX IF NOT EXISTS idx_items_type      ON items(type);
+        CREATE INDEX IF NOT EXISTS idx_items_status    ON items(status);
+        CREATE INDEX IF NOT EXISTS idx_items_position  ON items(position);
+        CREATE INDEX IF NOT EXISTS idx_items_created   ON items(created_at DESC);
+      `)
+    })()
+    console.log('[db] items table rebuilt, custom column statuses now accepted')
+  } finally {
+    db.pragma('foreign_keys = ON')
+  }
+}
+
 function runMigrations(db: Database.Database): void {
   const userVersion = (db.pragma('user_version', { simple: true }) as number) ?? 0
   if (userVersion >= CURRENT_VERSION) return
@@ -126,10 +179,7 @@ let stmtSetSetting: Database.Statement
 let stmtGetRelations: Database.Statement
 let stmtInsertRelation: Database.Statement
 let stmtDeleteRelation: Database.Statement
-let stmtSearchItems: Database.Statement
-let stmtSearchTotal: Database.Statement
 let stmtGetContexts: Database.Statement
-let stmtBulkUpdateStatus: Database.Statement
 let stmtGetItemsForRebalance: Database.Statement
 let stmtUpdateItemPosition: Database.Statement
 let stmtInsertFocusSession: Database.Statement
@@ -239,6 +289,7 @@ export function initDb(dataPath: string): Database.Database {
 
   // Apply schema and migrations
   db.exec(SCHEMA_SQL)
+  rebuildItemsTableIfLegacyCheck(db)
   runMigrations(db)
 
   // Prepare all statements once at init time
@@ -300,28 +351,8 @@ export function initDb(dataPath: string): Database.Database {
   )
   stmtDeleteRelation = db.prepare(`DELETE FROM relations WHERE id = ?`)
 
-  stmtSearchItems = db.prepare(`
-    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
-    FROM items i
-    JOIN items_fts fts ON i.id = fts.id
-    LEFT JOIN item_tags it ON i.id = it.item_id
-    LEFT JOIN tags t ON it.tag_id = t.id
-    WHERE items_fts MATCH ?
-    GROUP BY i.id
-    ORDER BY rank
-    LIMIT ? OFFSET ?
-  `)
-
-  stmtSearchTotal = db.prepare(`
-    SELECT COUNT(*) as count FROM items_fts WHERE items_fts MATCH ?
-  `)
-
   stmtGetContexts = db.prepare(
     `SELECT DISTINCT context as slug FROM items`
-  )
-
-  stmtBulkUpdateStatus = db.prepare(
-    `UPDATE items SET status = @status, updated_at = @updated_at WHERE id = @id`
   )
 
   stmtGetItemsForRebalance = db.prepare(`
@@ -569,19 +600,25 @@ export function searchItems(query: SearchQuery): PaginatedResult<Item> {
   const pageSize = query.pageSize ?? 20
   const pageIndex = page > 0 ? page - 1 : 0
   const offset = pageIndex * pageSize
-  
+
   const rawQuery = (query.query || '').trim()
   if (!rawQuery) {
     return { items: [], total: 0, page, pageSize }
   }
 
-  // If the query is exactly a UUID, return the direct item lookup
+  // If the query is exactly a UUID, return the direct item lookup (still honoring
+  // any context/type/status scoping so callers can't accidentally link across contexts)
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawQuery)
   if (isUuid) {
     const item = getItemById(rawQuery)
+    const matches =
+      !!item &&
+      (query.context === undefined || item.context === query.context) &&
+      (query.type === undefined || item.type === query.type) &&
+      (query.status === undefined || item.status === query.status)
     return {
-      items: item ? [item] : [],
-      total: item ? 1 : 0,
+      items: matches && item ? [item] : [],
+      total: matches ? 1 : 0,
       page,
       pageSize
     }
@@ -591,8 +628,42 @@ export function searchItems(query: SearchQuery): PaginatedResult<Item> {
   const terms = rawQuery.split(/\s+/).filter(Boolean)
   const ftsQuery = terms.map(t => `"${t.replace(/"/g, '""')}*"`).join(' AND ')
 
-  const rows = stmtSearchItems.all(ftsQuery, pageSize, offset) as Record<string, unknown>[]
-  const total = (stmtSearchTotal.get(ftsQuery) as { count: number }).count
+  // Apply optional context/type/status scoping on top of the FTS match so search
+  // (e.g. relation linking from the Backlog task drawer) stays within the intended scope.
+  let sql = `
+    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
+    FROM items i
+    JOIN items_fts fts ON i.id = fts.id
+    LEFT JOIN item_tags it ON i.id = it.item_id
+    LEFT JOIN tags t ON it.tag_id = t.id
+    WHERE items_fts MATCH ?
+  `
+  const args: (string | number)[] = [ftsQuery]
+
+  if (query.context !== undefined) {
+    sql += ` AND i.context = ?`
+    args.push(query.context)
+  }
+  if (query.type !== undefined) {
+    sql += ` AND i.type = ?`
+    args.push(query.type)
+  }
+  if (query.status !== undefined) {
+    sql += ` AND i.status = ?`
+    args.push(query.status)
+  }
+
+  sql += ` GROUP BY i.id ORDER BY rank`
+
+  const countSql = `SELECT COUNT(*) as count FROM (${sql})`
+  const countArgs = [...args]
+
+  sql += ` LIMIT ? OFFSET ?`
+  args.push(pageSize, offset)
+
+  const db = getDb()
+  const rows = db.prepare(sql).all(...args) as Record<string, unknown>[]
+  const total = (db.prepare(countSql).get(...countArgs) as { count: number }).count
   return { items: rows.map(rowToItem), total, page, pageSize }
 }
 
@@ -609,7 +680,7 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
     FROM items i
     LEFT JOIN item_tags it ON i.id = it.item_id
     LEFT JOIN tags t ON it.tag_id = t.id
-    WHERE i.context = ? AND i.type = 'task' AND i.status != 'archived'
+    WHERE i.context = ? AND i.type = 'task' AND i.status ${params.archivedOnly ? '=' : '!='} 'archived'
   `
   const args: (string | number | null)[] = [context]
 
@@ -1018,13 +1089,36 @@ export function registerDbHandlers(db: Database.Database): void {
     return handleSafe(() => {
       const parsedPayload = BulkUpdateSchema.parse(payload)
       const now = Date.now()
-      db.transaction(() => {
-        for (const id of parsedPayload.ids) {
-          if (parsedPayload.patch.status) {
-            stmtBulkUpdateStatus.run({ status: parsedPayload.patch.status, updated_at: now, id })
+
+      // Build the SET clause once from whichever fields were actually provided,
+      // so bulk status/priority/context updates all persist (not just status).
+      const setFields: string[] = []
+      const baseParams: Record<string, unknown> = { updated_at: now }
+      if (parsedPayload.patch.status !== undefined) {
+        setFields.push('status = @status')
+        baseParams.status = parsedPayload.patch.status
+      }
+      if (parsedPayload.patch.priority !== undefined) {
+        setFields.push('priority = @priority')
+        baseParams.priority = parsedPayload.patch.priority
+      }
+      if (parsedPayload.patch.context !== undefined) {
+        setFields.push('context = @context')
+        baseParams.context = parsedPayload.patch.context
+      }
+
+      if (setFields.length > 0) {
+        setFields.push('updated_at = @updated_at')
+        const stmtBulkUpdate = db.prepare(
+          `UPDATE items SET ${setFields.join(', ')} WHERE id = @id`
+        )
+        db.transaction(() => {
+          for (const id of parsedPayload.ids) {
+            stmtBulkUpdate.run({ ...baseParams, id })
           }
-        }
-      })()
+        })()
+      }
+
       return { updated: parsedPayload.ids.length }
     })
   })

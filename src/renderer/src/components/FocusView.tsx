@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Play, Pause, X, Check, Timer, Award, ArrowRight, BookOpen, RotateCcw, SkipForward } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { Play, Pause, X, Check, Timer, Award, ArrowRight, BookOpen, RotateCcw, SkipForward, Plus, Flame, Zap, Coffee } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { useToast } from './ui/Toast'
 import type { Item, FocusSession } from '../../../shared/types'
@@ -17,19 +17,38 @@ export default function FocusView() {
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
 
-  // Component State
-  const [step, setStep] = useState<'setup' | 'active' | 'retro'>('setup')
-  const [dbItems, setDbItems] = useState<Item[]>([])
-  const [selectedTasks, setSelectedTasks] = useState<Item[]>([])
-  const [preset, setPreset] = useState<TimerPreset | 'custom'>('focus')
-  const [customMinutes, setCustomMinutes] = useState(25)
-  const [loading, setLoading] = useState(true)
+  // Timer engine state, lives in the global store (see FocusTimerEngine,
+  // mounted at the app root) so a running session survives navigating away
+  // from this view entirely, instead of silently resetting.
+  const step = useAppStore(s => s.focusStep)
+  const selectedTasks = useAppStore(s => s.focusSelectedTasks)
+  const preset = useAppStore(s => s.focusPreset)
+  const customMinutes = useAppStore(s => s.focusCustomMinutes)
+  const durationMs = useAppStore(s => s.focusDurationMs)
+  const timeLeftMs = useAppStore(s => s.focusRemainingMs)
+  const isRunning = useAppStore(s => s.focusIsRunning)
+  const elapsedTimeMs = useAppStore(s => s.focusElapsedMs)
+  const cyclesCompleted = useAppStore(s => s.focusCyclesCompleted)
+  const distractions = useAppStore(s => s.focusDistractions)
 
-  // Timer Engine State
-  const [timeLeftMs, setTimeLeftMs] = useState(25 * 60 * 1000)
-  const [durationMs, setDurationMs] = useState(25 * 60 * 1000)
-  const [isRunning, setIsRunning] = useState(false)
-  const [elapsedTimeMs, setElapsedTimeMs] = useState(0)
+  const focusSetStep = useAppStore(s => s.focusSetStep)
+  const focusSetSelectedTasks = useAppStore(s => s.focusSetSelectedTasks)
+  const focusSetPreset = useAppStore(s => s.focusSetPreset)
+  const focusSetCustomMinutes = useAppStore(s => s.focusSetCustomMinutes)
+  const focusConfigureDuration = useAppStore(s => s.focusConfigureDuration)
+  const focusStart = useAppStore(s => s.focusStart)
+  const focusPauseResume = useAppStore(s => s.focusPauseResume)
+  const focusReset = useAppStore(s => s.focusReset)
+  const focusFinish = useAppStore(s => s.focusFinish)
+  const focusStop = useAppStore(s => s.focusStop)
+  const focusExitToSetup = useAppStore(s => s.focusExitToSetup)
+  const focusLogDistraction = useAppStore(s => s.focusLogDistraction)
+
+  // Component-local state
+  const [dbItems, setDbItems] = useState<Item[]>([])
+  const [loading, setLoading] = useState(true)
+  const [quickAddText, setQuickAddText] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
 
   // Retrospective State
   const [retroNotes, setRetroNotes] = useState('')
@@ -39,63 +58,6 @@ export default function FocusView() {
   // Confirmation dialog states
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
-
-  // Reuse a single AudioContext across all chime calls (avoids accumulation)
-  const audioCtxRef = useRef<AudioContext | null>(null)
-  useEffect(() => {
-    return () => {
-      // Close AudioContext on unmount to release OS audio resources
-      audioCtxRef.current?.close()
-      audioCtxRef.current = null
-    }
-  }, [])
-
-  // Synthesize beautiful chime tone locally using HTML5 Web Audio API
-  const playChime = useCallback(() => {
-    try {
-      // Reuse existing context, or create one if needed
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new AudioContext()
-      }
-      const audioCtx = audioCtxRef.current
-      const playTone = (freq: number, start: number, duration: number) => {
-        const osc = audioCtx.createOscillator()
-        const gain = audioCtx.createGain()
-        osc.connect(gain)
-        gain.connect(audioCtx.destination)
-
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, start)
-        gain.gain.setValueAtTime(0, start)
-        gain.gain.linearRampToValueAtTime(0.2, start + 0.05)
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
-
-        osc.start(start)
-        osc.stop(start + duration)
-      }
-      const now = audioCtx.currentTime
-      playTone(523.25, now, 0.25) // C5
-      playTone(659.25, now + 0.15, 0.4) // E5
-      playTone(783.99, now + 0.3, 0.6) // G5
-    } catch (err) {
-      console.error('AudioContext chime failed:', err)
-    }
-  }, [])
-
-  const handleTimerComplete = useCallback(() => {
-    setIsRunning(false)
-    playChime()
-    // Setup retro tasks checklist from the selected focus items
-    setRetroTasks(
-      selectedTasks.map(t => ({
-        id: t.id,
-        title: t.title,
-        completed: t.status === 'done'
-      }))
-    )
-    setStep('retro')
-    toast('Focus interval completed! Time for a break.', { type: 'success' })
-  }, [selectedTasks, toast, playChime])
 
   // Load Uncompleted Items & History
   const loadFocusData = useCallback(async () => {
@@ -119,13 +81,9 @@ export default function FocusView() {
       if (preselectedId) {
         const found = merged.find(item => item.id === preselectedId)
         if (found) {
-          setSelectedTasks([found])
-          const ms = TIMER_PRESETS['focus'].durationMs
-          setTimeLeftMs(ms)
-          setDurationMs(ms)
-          setElapsedTimeMs(0)
-          setIsRunning(true)
-          setStep('active')
+          focusSetSelectedTasks([found])
+          focusSetPreset('focus')
+          focusStart(TIMER_PRESETS['focus'].durationMs)
           useAppStore.getState().setPreselectedTaskId(null)
           toast(`Started focus session for: ${found.title}`, { type: 'success' })
         }
@@ -136,13 +94,30 @@ export default function FocusView() {
     } finally {
       setLoading(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeContext, toast])
 
   useEffect(() => {
     loadFocusData()
   }, [loadFocusData])
 
-  // Timer Setup & Control Helpers
+  // Whenever the global timer engine transitions us into the retro screen
+  // (on natural completion or a manual skip), build the checklist from
+  // whichever tasks were selected for the session that just ended.
+  useEffect(() => {
+    if (step === 'retro' && retroTasks.length === 0 && selectedTasks.length > 0) {
+      setRetroTasks(
+        selectedTasks.map(t => ({
+          id: t.id,
+          title: t.title,
+          completed: t.status === 'done'
+        }))
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
+  // Timer Setup Helpers
   const getSelectedDurationMs = useCallback(() => {
     if (preset === 'custom') {
       return customMinutes * 60 * 1000
@@ -150,92 +125,86 @@ export default function FocusView() {
     return TIMER_PRESETS[preset].durationMs
   }, [preset, customMinutes])
 
-  // Reset timer when preset changes
+  // Keep the configured duration in sync with the chosen preset while on setup
   useEffect(() => {
     if (step === 'setup') {
-      const ms = getSelectedDurationMs()
-      setTimeLeftMs(ms)
-      setDurationMs(ms)
+      focusConfigureDuration(getSelectedDurationMs())
     }
-  }, [preset, customMinutes, getSelectedDurationMs, step])
-
-  // Timer countdown engine
-  useEffect(() => {
-    if (step !== 'active' || !isRunning) return
-
-    const interval = setInterval(() => {
-      setTimeLeftMs(prev => {
-        if (prev <= 1000) {
-          clearInterval(interval)
-          handleTimerComplete()
-          return 0
-        }
-        return prev - 1000
-      })
-      setElapsedTimeMs(prev => prev + 1000)
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [step, isRunning, handleTimerComplete])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, customMinutes, step])
 
   const handleStartSession = () => {
     if (selectedTasks.length === 0) {
       toast('Please select at least 1 task to focus on', { type: 'info' })
       return
     }
-    const ms = getSelectedDurationMs()
-    setTimeLeftMs(ms)
-    setDurationMs(ms)
-    setElapsedTimeMs(0)
-    setIsRunning(true)
-    setStep('active')
+    focusStart(getSelectedDurationMs())
   }
 
-  const handleToggleTimer = () => {
-    setIsRunning(!isRunning)
-  }
-
-  const handleResetTimer = () => {
-    setIsRunning(false)
-    setTimeLeftMs(durationMs)
-    setElapsedTimeMs(0)
-  }
+  const handleToggleTimer = () => focusPauseResume()
+  const handleResetTimer = () => focusReset()
 
   const handleSkipTimer = () => {
-    // End session early and proceed to retrospective
-    setIsRunning(false)
-    setRetroTasks(
-      selectedTasks.map(t => ({
-        id: t.id,
-        title: t.title,
-        completed: t.status === 'done'
-      }))
-    )
-    setStep('retro')
+    // End the current interval early and move straight to its natural
+    // next step, a retrospective for focus intervals, or just back to
+    // setup for breaks (mirrors the automatic-completion behavior).
+    const isFocus = preset === 'focus'
+    focusFinish()
+    if (isFocus) {
+      setRetroTasks(
+        selectedTasks.map(t => ({ id: t.id, title: t.title, completed: t.status === 'done' }))
+      )
+      focusSetStep('retro')
+    } else {
+      focusSetStep('setup')
+      focusSetPreset('focus')
+      focusConfigureDuration(TIMER_PRESETS.focus.durationMs)
+    }
   }
 
-  const handleCancelSession = () => {
-    setShowCancelConfirm(true)
-  }
+  const handleCancelSession = () => setShowCancelConfirm(true)
 
   const performCancelSession = () => {
     setShowCancelConfirm(false)
-    setIsRunning(false)
-    setStep('setup')
+    focusStop()
     loadFocusData()
   }
+
+  // Keyboard shortcut: Space to play/pause while a session is active
+  useEffect(() => {
+    if (step !== 'active') return
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const isTyping = target && ['INPUT', 'TEXTAREA'].includes(target.tagName)
+      if (isTyping) return
+      if (e.code === 'Space') {
+        e.preventDefault()
+        handleToggleTimer()
+      } else if ((e.key === 'd' || e.key === 'D') && preset === 'focus') {
+        // Quick-tally an interruption without breaking flow (Pomodoro practice)
+        e.preventDefault()
+        focusLogDistraction()
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        handleResetTimer()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, isRunning, preset])
 
   // Task Selection / Inline Completion
   const handleToggleTaskSelection = (task: Item) => {
     const isSelected = selectedTasks.some(t => t.id === task.id)
     if (isSelected) {
-      setSelectedTasks(prev => prev.filter(t => t.id !== task.id))
+      focusSetSelectedTasks(prev => prev.filter(t => t.id !== task.id))
     } else {
       if (selectedTasks.length >= 3) {
         toast('Focus Mode is optimized for 1-3 tasks at a time.', { type: 'info' })
         return
       }
-      setSelectedTasks(prev => [...prev, task])
+      focusSetSelectedTasks(prev => [...prev, task])
     }
   }
 
@@ -248,7 +217,7 @@ export default function FocusView() {
       await window.electronAPI.db.updateItem(task.id, { status: newStatus })
 
       // 2. Update local state
-      setSelectedTasks(prev =>
+      focusSetSelectedTasks(prev =>
         prev.map(t => (t.id === task.id ? { ...t, status: newStatus } : t))
       )
       setDbItems(prev =>
@@ -268,8 +237,45 @@ export default function FocusView() {
     )
   }
 
+  // Quick-add a task directly from the Focus setup screen
+  // Previously the only way to get a task into Focus Mode was to leave this
+  // view, create it in Backlog/Kanban, then come back, a real friction point
+  // for a "jot it down and get back to focusing" workflow.
+  const handleQuickAddTask = async () => {
+    const title = quickAddText.trim()
+    if (!title) return
+    setAddingTask(true)
+    try {
+      const created = await window.electronAPI.db.createItem({
+        type: 'task',
+        context: activeContext,
+        title,
+        body: '',
+        status: 'open',
+        priority: 0,
+        position: Date.now(),
+        due_at: null,
+        metadata: '{}'
+      })
+      setDbItems(prev => [created, ...prev])
+      if (selectedTasks.length < 3) {
+        focusSetSelectedTasks(prev => [...prev, created])
+      }
+      setQuickAddText('')
+      toast('Task added and selected for this session', { type: 'success' })
+    } catch (err) {
+      console.error('Failed to quick-add task:', err)
+      toast('Failed to add task', { type: 'error' })
+    } finally {
+      setAddingTask(false)
+    }
+  }
+
   // Save Retrospective Row & Log
-  const handleSaveRetrospective = async () => {
+  // Shared persistence step used by both "Save & Log Session" and
+  // "Save & Take a Break", previously the break shortcut skipped saving
+  // entirely, silently losing the retrospective.
+  const persistRetrospective = async (): Promise<boolean> => {
     try {
       const selectedTasksJson = JSON.stringify(
         retroTasks.map(t => ({ id: t.id, title: t.title, completed: t.completed }))
@@ -293,14 +299,17 @@ export default function FocusView() {
       }
 
       // 3. Format beautiful markdown for retrospective log entry
-      const totalMinutes = Math.round(elapsedTimeMs / 60000)
+      const totalMinutes = Math.max(1, Math.round(elapsedTimeMs / 60000))
       const tasksMarkdownList = retroTasks
         .map(t => `- [${t.completed ? 'x' : ' '}] ${t.title}`)
         .join('\n')
 
+      const completedCount = retroTasks.filter(t => t.completed).length
       const logBody = `### Focus Session Retrospective 🧘
 **Duration:** ${totalMinutes} ${totalMinutes === 1 ? 'minute' : 'minutes'}
 **Preset:** ${preset.replace('-', ' ')}
+**Tasks completed:** ${completedCount}/${retroTasks.length}
+**Interruptions:** ${distractions}
 **Focus Task Checklist:**
 ${tasksMarkdownList || '_No specific tasks selected_'}
 
@@ -322,17 +331,34 @@ ${retroNotes.trim() || '_No custom notes written._'}`
         metadata: '{}'
       })
 
-      toast('Session retrospective saved to log feed', { type: 'success' })
-
-      // 5. Clean up state and route back to logs feed
-      setSelectedTasks([])
       setRetroNotes('')
-      setStep('setup')
-      setView('log')
+      setRetroTasks([])
+      return true
     } catch (err) {
       console.error('Failed to save focus session:', err)
       toast('Error saving session details', { type: 'error' })
+      return false
     }
+  }
+
+  const handleSaveRetrospective = async () => {
+    const ok = await persistRetrospective()
+    if (!ok) return
+    toast('Session retrospective saved to log feed', { type: 'success' })
+    // Reset back to setup, stay on Focus so the user can chain straight
+    // into a break or another round without losing their place.
+    focusExitToSetup()
+    loadFocusData()
+  }
+
+  const handleStartBreak = async (breakPreset: Extract<TimerPreset, 'short-break' | 'long-break'>) => {
+    const ok = await persistRetrospective()
+    if (!ok) return
+    toast('Session saved, enjoy your break', { type: 'success' })
+    focusSetSelectedTasks([])
+    focusSetPreset(breakPreset)
+    focusStart(TIMER_PRESETS[breakPreset].durationMs)
+    loadFocusData()
   }
 
   // Rendering Helper Computations
@@ -340,13 +366,29 @@ ${retroNotes.trim() || '_No custom notes written._'}`
     return durationMs > 0 ? (timeLeftMs / durationMs) * 100 : 0
   }, [timeLeftMs, durationMs])
 
-  const circumference = 2 * Math.PI * 90 // radius = 90
-  const strokeDashoffset = useMemo(() => {
-    return circumference * (1 - progressPercent / 100)
-  }, [progressPercent, circumference])
+  // Projected clock time this interval will finish at, helps plan around it.
+  const projectedEnd = useMemo(() => {
+    if (!isRunning) return null
+    return new Date(Date.now() + timeLeftMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }, [isRunning, timeLeftMs])
+
+  // Classic Pomodoro cadence: after every 4th completed focus interval, a
+  // long break is due instead of a short one.
+  const longBreakDue = cyclesCompleted > 0 && cyclesCompleted % 4 === 0
 
   // Context color picker
   const activeColor = preset === 'focus' ? 'var(--color-secondary)' : (preset === 'short-break' ? '#10b981' : '#8b5cf6')
+
+  // Today's focused-minutes stat, derived from recent session history
+  const todayStats = useMemo(() => {
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const todaySessions = pastSessions.filter(s => s.completed_at >= startOfToday.getTime())
+    const totalMs = todaySessions.reduce((sum, s) => sum + s.duration_ms, 0)
+    return { count: todaySessions.length, minutes: Math.round(totalMs / 60000) }
+  }, [pastSessions])
+
+  const cycleDots = cyclesCompleted % 4
 
   return (
     <div
@@ -386,6 +428,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
         .task-row:hover {
           background: var(--color-surface-offset);
           border-color: var(--color-balance);
+          transform: translateX(2px);
         }
         .task-row.selected {
           border-color: var(--color-secondary);
@@ -415,6 +458,26 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           opacity: 0.5;
           cursor: not-allowed;
         }
+        .btn-ghost {
+          background: transparent;
+          border: 1px solid var(--color-surface-offset);
+          color: var(--color-text-muted);
+          border-radius: var(--radius-md);
+          padding: 8px 16px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: var(--space-2);
+          font-size: var(--text-sm);
+          font-weight: var(--weight-medium);
+          transition: all var(--duration-fast) var(--ease-default);
+        }
+        .btn-ghost:hover {
+          border-color: var(--color-balance);
+          color: var(--color-text-base);
+          background: var(--color-surface-2);
+        }
         .priority-badge {
           font-size: var(--text-2xs);
           text-transform: uppercase;
@@ -427,27 +490,6 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           padding: 2px 6px;
           border-radius: var(--radius-sm);
         }
-        .timer-btn {
-          width: 52px;
-          height: 52px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justifyContent: center;
-          background: var(--color-surface-2);
-          border: 1px solid var(--color-surface-offset);
-          color: var(--color-text-base);
-          cursor: pointer;
-          transition: all var(--duration-fast) var(--ease-default);
-        }
-        .timer-btn:hover {
-          background: var(--color-surface-offset);
-          border-color: var(--color-balance);
-          transform: scale(1.05);
-        }
-        .timer-btn:active {
-          transform: scale(0.95);
-        }
         .retro-checkbox {
           width: 20px;
           height: 20px;
@@ -458,11 +500,43 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           justify-content: center;
           cursor: pointer;
           transition: all var(--duration-fast) var(--ease-default);
+          flex-shrink: 0;
         }
         .retro-checkbox.checked {
           background: var(--color-secondary);
           border-color: var(--color-secondary);
           color: var(--color-text-inverted);
+        }
+        .quick-add-input {
+          flex: 1;
+          background: var(--color-surface-2);
+          border: 1px solid var(--color-surface-offset);
+          border-radius: var(--radius-md);
+          color: var(--color-text-base);
+          padding: 8px 12px;
+          font-size: var(--text-sm);
+          outline: none;
+          transition: border-color var(--duration-fast) var(--ease-default);
+        }
+        .quick-add-input:focus {
+          border-color: var(--color-secondary);
+        }
+        .cycle-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: var(--color-surface-offset);
+          transition: background var(--duration-fast) var(--ease-default);
+        }
+        .cycle-dot.filled {
+          background: var(--color-secondary);
+        }
+        @keyframes breathe {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.015); }
+        }
+        .timer-ring-active {
+          animation: breathe 4s ease-in-out infinite;
         }
       `}</style>
 
@@ -489,9 +563,47 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                   {selectedTasks.length}/3 selected
                 </span>
               </h2>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-1)' }}>
-                Select up to 3 tasks to complete during this interval. Quiet your environment and focus.
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-1)' }}>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
+                  Select up to 3 tasks to complete during this interval. Quiet your environment and focus.
+                </p>
+                {todayStats.count > 0 && (
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: 'var(--text-2xs)',
+                    fontWeight: 'var(--weight-bold)',
+                    color: 'var(--color-secondary)',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    <Flame size={12} />
+                    {todayStats.minutes}m focused today ({todayStats.count} {todayStats.count === 1 ? 'session' : 'sessions'})
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Quick-add: jot a task straight into today's focus list without leaving the view */}
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <input
+                className="quick-add-input"
+                type="text"
+                placeholder="Quick-add a task and focus on it..."
+                value={quickAddText}
+                onChange={e => setQuickAddText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !addingTask) handleQuickAddTask()
+                }}
+              />
+              <button
+                className="btn-ghost"
+                onClick={handleQuickAddTask}
+                disabled={addingTask || !quickAddText.trim()}
+                style={{ opacity: addingTask || !quickAddText.trim() ? 0.5 : 1, cursor: addingTask || !quickAddText.trim() ? 'not-allowed' : 'pointer', padding: '8px 12px' }}
+              >
+                <Plus size={16} />
+              </button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', paddingRight: '4px' }}>
@@ -503,7 +615,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                 <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-muted)' }}>
                   <Award style={{ width: '32px', height: '32px', margin: '0 auto var(--space-3)', opacity: 0.5 }} />
                   <p style={{ fontWeight: 'var(--weight-semibold)' }}>All caught up!</p>
-                  <p style={{ fontSize: 'var(--text-xs)', marginTop: '2px' }}>Add cards or tasks in Backlog/Kanban to pull them here.</p>
+                  <p style={{ fontSize: 'var(--text-xs)', marginTop: '2px' }}>Add a task above, or pull cards in from Backlog/Kanban.</p>
                 </div>
               ) : (
                 dbItems.map(item => {
@@ -584,13 +696,21 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {/* Presets Card */}
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>Timer Config</h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', margin: 0 }}>Timer Config</h3>
+                {/* Pomodoro cycle progress, fills every completed focus interval, resets every 4th (long-break cadence) */}
+                <div style={{ display: 'flex', gap: '4px' }} title={`${cyclesCompleted} focus intervals completed this session`}>
+                  {[0, 1, 2, 3].map(i => (
+                    <span key={i} className={`cycle-dot ${i < cycleDots || (cycleDots === 0 && cyclesCompleted > 0 && i < 4) ? 'filled' : ''}`} />
+                  ))}
+                </div>
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {Object.entries(TIMER_PRESETS).map(([key, val]) => (
                   <button
                     key={key}
-                    onClick={() => setPreset(key as TimerPreset)}
+                    onClick={() => focusSetPreset(key as TimerPreset)}
                     style={{
                       width: '100%',
                       padding: 'var(--space-3)',
@@ -616,7 +736,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                 ))}
 
                 <button
-                  onClick={() => setPreset('custom')}
+                  onClick={() => focusSetPreset('custom')}
                   style={{
                     width: '100%',
                     padding: 'var(--space-3)',
@@ -650,7 +770,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                       max="120"
                       value={customMinutes}
                       onClick={e => e.stopPropagation()}
-                      onChange={e => setCustomMinutes(Number(e.target.value))}
+                      onChange={e => focusSetCustomMinutes(Number(e.target.value))}
                       style={{
                         width: '100%',
                         accentColor: 'var(--color-secondary)',
@@ -784,10 +904,13 @@ ${retroNotes.trim() || '_No custom notes written._'}`
               position: 'relative'
             }}
           >
-            {/* Header Row: Preset pills & Cancel button */}
+            {/* Header Row: Preset pills, cycle dots & Cancel button */}
             <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-4)' }}>
-              {/* Preset mode pills */}
-              <div style={{ display: 'flex', gap: '6px', background: 'var(--color-surface-2)', padding: '3px', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-surface-offset)' }}>
+              {/* Preset mode pills, locked while running to avoid accidentally nuking progress */}
+              <div
+                style={{ display: 'flex', gap: '6px', background: 'var(--color-surface-2)', padding: '3px', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-surface-offset)', opacity: isRunning ? 0.5 : 1 }}
+                title={isRunning ? 'Pause the timer to switch modes' : undefined}
+              >
                 {(Object.keys(TIMER_PRESETS) as TimerPreset[]).map(pKey => {
                   const pConfig = TIMER_PRESETS[pKey]
                   const isAct = preset === pKey
@@ -795,12 +918,10 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                   return (
                     <button
                       key={pKey}
+                      disabled={isRunning}
                       onClick={() => {
-                        setPreset(pKey)
-                        const ms = pConfig.durationMs
-                        setTimeLeftMs(ms)
-                        setDurationMs(ms)
-                        setElapsedTimeMs(0)
+                        focusSetPreset(pKey)
+                        focusStart(pConfig.durationMs)
                       }}
                       style={{
                         padding: '4px 12px',
@@ -810,7 +931,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                         border: 'none',
                         background: isAct ? pColor : 'transparent',
                         color: isAct ? (pKey === 'focus' ? '#0f172a' : '#ffffff') : 'var(--color-text-muted)',
-                        cursor: 'pointer',
+                        cursor: isRunning ? 'not-allowed' : 'pointer',
                         transition: 'all 150ms ease'
                       }}
                     >
@@ -852,7 +973,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
             </div>
 
             {/* Clock Dial & Progress Ring */}
-            <div style={{ position: 'relative', width: '250px', height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '10px 0' }}>
+            <div className={isRunning ? 'timer-ring-active' : undefined} style={{ position: 'relative', width: '250px', height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '10px 0' }}>
               <svg width="250" height="250" style={{ transform: 'rotate(-90deg)', position: 'absolute', top: 0, left: 0 }}>
                 {/* Background ring */}
                 <circle
@@ -905,7 +1026,9 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                   {formatTime(timeLeftMs)}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-medium)' }}>
-                  {isRunning ? 'timer active' : 'paused'}
+                  {isRunning
+                    ? (projectedEnd ? `ends ~${projectedEnd} · Space to pause` : 'Space to pause')
+                    : 'paused · Space to resume'}
                 </span>
               </div>
             </div>
@@ -993,58 +1116,95 @@ ${retroNotes.trim() || '_No custom notes written._'}`
               </button>
             </div>
 
-            {/* Focus Targets checklist */}
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <h4 style={{
-                  fontSize: '10px',
-                  fontWeight: 'var(--weight-bold)',
-                  color: 'var(--color-text-muted)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 'var(--tracking-wide)',
-                  margin: 0
-                }}>
-                  Current Focus Targets
-                </h4>
-                <span style={{ fontSize: '10px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)' }}>
-                  {selectedTasks.filter(t => t.status === 'done').length} / {selectedTasks.length} Done
-                </span>
-              </div>
+            {/* Distraction tally, a Pomodoro staple: acknowledge the interruption,
+                keep working, review the count in the retro. Focus intervals only. */}
+            {preset === 'focus' && (
+              <button
+                onClick={focusLogDistraction}
+                title="Log an interruption without breaking focus (press D)"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  background: distractions > 0 ? 'rgba(245, 158, 11, 0.12)' : 'var(--color-surface-2)',
+                  border: `1px solid ${distractions > 0 ? 'rgba(245, 158, 11, 0.4)' : 'var(--color-surface-offset)'}`,
+                  color: distractions > 0 ? '#f59e0b' : 'var(--color-text-muted)',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 'var(--weight-semibold)',
+                  cursor: 'pointer',
+                  marginTop: 'calc(-1 * var(--space-2))',
+                  transition: 'all var(--duration-fast) var(--ease-default)'
+                }}
+              >
+                <Zap size={13} fill={distractions > 0 ? 'currentColor' : 'none'} />
+                {distractions === 0
+                  ? 'Log a distraction'
+                  : `${distractions} distraction${distractions === 1 ? '' : 's'} logged`}
+              </button>
+            )}
 
-              {selectedTasks.map(task => {
-                const isCompleted = task.status === 'done'
-                return (
-                  <div
-                    key={task.id}
-                    onClick={() => handleToggleTaskDoneActive(task)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-3)',
-                      padding: 'var(--space-3)',
-                      borderRadius: 'var(--radius-md)',
-                      background: isCompleted ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
-                      cursor: 'pointer',
-                      opacity: isCompleted ? 0.6 : 1,
-                      transition: 'all var(--duration-fast)'
-                    }}
-                  >
-                    <div className={`retro-checkbox ${isCompleted ? 'checked' : ''}`}>
-                      {isCompleted && <Check size={12} strokeWidth={3} />}
-                    </div>
-                    <span style={{
-                      fontSize: 'var(--text-sm)',
-                      fontWeight: 'var(--weight-medium)',
-                      color: isCompleted ? 'var(--color-text-muted)' : 'var(--color-text-base)',
-                      textDecoration: isCompleted ? 'line-through' : 'none'
-                    }}>
-                      {task.title}
-                    </span>
+            {/* Focus Targets checklist, hidden for breaks, since there are no tasks to work a break */}
+            {preset === 'focus' && (
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <h4 style={{
+                    fontSize: '10px',
+                    fontWeight: 'var(--weight-bold)',
+                    color: 'var(--color-text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-wide)',
+                    margin: 0
+                  }}>
+                    Current Focus Targets
+                  </h4>
+                  <span style={{ fontSize: '10px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)' }}>
+                    {selectedTasks.filter(t => t.status === 'done').length} / {selectedTasks.length} Done
+                  </span>
+                </div>
+
+                {selectedTasks.length === 0 ? (
+                  <div style={{ fontStyle: 'italic', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)' }}>
+                    No tasks selected for this session.
                   </div>
-                )
-              })}
-            </div>
+                ) : (
+                  selectedTasks.map(task => {
+                    const isCompleted = task.status === 'done'
+                    return (
+                      <div
+                        key={task.id}
+                        onClick={() => handleToggleTaskDoneActive(task)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-3)',
+                          padding: 'var(--space-3)',
+                          borderRadius: 'var(--radius-md)',
+                          background: isCompleted ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
+                          border: '1px solid var(--color-surface-offset)',
+                          cursor: 'pointer',
+                          opacity: isCompleted ? 0.6 : 1,
+                          transition: 'all var(--duration-fast)'
+                        }}
+                      >
+                        <div className={`retro-checkbox ${isCompleted ? 'checked' : ''}`}>
+                          {isCompleted && <Check size={12} strokeWidth={3} />}
+                        </div>
+                        <span style={{
+                          fontSize: 'var(--text-sm)',
+                          fontWeight: 'var(--weight-medium)',
+                          color: isCompleted ? 'var(--color-text-muted)' : 'var(--color-text-base)',
+                          textDecoration: isCompleted ? 'line-through' : 'none'
+                        }}>
+                          {task.title}
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1072,6 +1232,52 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                 Verify completed tasks and record any notes about this session.
               </p>
             </div>
+
+            {/* At-a-glance session stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+              {[
+                { label: 'Focused', value: `${Math.max(1, Math.round(elapsedTimeMs / 60000))}m`, color: 'var(--color-secondary)' },
+                { label: 'Tasks done', value: `${retroTasks.filter(t => t.completed).length}/${retroTasks.length}`, color: 'var(--color-text-base)' },
+                { label: 'Interruptions', value: `${distractions}`, color: distractions > 0 ? '#f59e0b' : 'var(--color-text-base)' }
+              ].map(stat => (
+                <div
+                  key={stat.label}
+                  style={{
+                    background: 'var(--color-surface-2)',
+                    border: '1px solid var(--color-surface-offset)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: 'var(--space-3)',
+                    textAlign: 'center'
+                  }}
+                >
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: stat.color, lineHeight: 1 }}>
+                    {stat.value}
+                  </div>
+                  <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginTop: '4px' }}>
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Long-break cadence nudge, surfaces the classic 4-interval rule */}
+            {longBreakDue && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(139, 92, 246, 0.12)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+                color: '#a78bfa',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 'var(--weight-medium)'
+              }}>
+                <Coffee size={15} />
+                Nice streak, you&rsquo;ve completed {cyclesCompleted} focus intervals. A long break is recommended.
+              </div>
+            )}
 
             {/* Check completed checklist */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -1146,39 +1352,66 @@ ${retroNotes.trim() || '_No custom notes written._'}`
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
-              <button
-                onClick={() => {
-                  setShowDiscardConfirm(true)
-                }}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-muted)',
-                  padding: '8px 16px',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--text-sm)'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'var(--color-surface-offset)'
-                  e.currentTarget.style.color = 'var(--color-error)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color = 'var(--color-text-muted)'
-                }}
-              >
-                Discard
-              </button>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <button
+                  className="btn-ghost"
+                  onClick={() => handleStartBreak('short-break')}
+                  title="Save this session and start a 5-minute break"
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    borderColor: longBreakDue ? 'var(--color-surface-offset)' : '#10b981',
+                    color: longBreakDue ? 'var(--color-text-muted)' : '#10b981'
+                  }}
+                >
+                  <Coffee size={14} /> Short Break · 5m
+                </button>
+                <button
+                  className="btn-ghost"
+                  onClick={() => handleStartBreak('long-break')}
+                  title="Save this session and start a 15-minute break"
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    borderColor: longBreakDue ? '#8b5cf6' : 'var(--color-surface-offset)',
+                    color: longBreakDue ? '#a78bfa' : 'var(--color-text-muted)'
+                  }}
+                >
+                  <Coffee size={14} /> Long Break · 15m
+                </button>
+              </div>
 
-              <button
-                onClick={handleSaveRetrospective}
-                className="btn-volt"
-              >
-                <Check size={16} />
-                Save & Log Session
-              </button>
+              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                <button
+                  onClick={() => setShowDiscardConfirm(true)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--color-surface-offset)',
+                    color: 'var(--color-text-muted)',
+                    padding: '8px 16px',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    fontSize: 'var(--text-sm)'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'var(--color-surface-offset)'
+                    e.currentTarget.style.color = 'var(--color-error)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = 'var(--color-text-muted)'
+                  }}
+                >
+                  Discard
+                </button>
+
+                <button
+                  onClick={handleSaveRetrospective}
+                  className="btn-volt"
+                >
+                  <Check size={16} />
+                  Save &amp; Log Session
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1201,9 +1434,9 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           isDestructive
           onConfirm={() => {
             setShowDiscardConfirm(false)
-            setSelectedTasks([])
             setRetroNotes('')
-            setStep('setup')
+            setRetroTasks([])
+            focusExitToSetup()
             loadFocusData()
           }}
           onCancel={() => setShowDiscardConfirm(false)}

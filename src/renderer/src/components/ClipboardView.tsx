@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Search,
   Trash2,
@@ -9,11 +9,63 @@ import {
   Check,
   Clipboard,
   Info,
-  Send
+  Send,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react'
 import type { ClipboardItem } from '../../../shared/types'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { useToast } from './ui/Toast'
+
+// Keep in sync with the DELETE ... LIMIT in db.ts (stmtDeleteClipboardHistoryOverflow).
+const HISTORY_LIMIT = 200
+
+// Content-type detection
+// Best-practice clipboard managers classify each entry so the list is scannable
+// at a glance and can offer type-specific actions (e.g. open a link).
+type ContentKind = 'link' | 'email' | 'color' | 'number' | 'code' | 'text'
+
+interface ContentMeta {
+  kind: ContentKind
+  label: string
+  accent: string // badge/strip accent, for colors this is the colour itself
+}
+
+function looksLikeCode(text: string): boolean {
+  if (/\n/.test(text) && /[{}();=]|=>|:\s|<\/?[a-z]/i.test(text)) return true
+  if (/^\s*(function|const|let|var|import|export|class|def|public|private|return|#include|SELECT |<[a-z!/])/m.test(text)) return true
+  const lines = text.split('\n')
+  return lines.length > 2 && lines.some(l => /^\s{2,}\S/.test(l))
+}
+
+function analyzeContent(raw: string): ContentMeta {
+  const text = raw.trim()
+  if (/^(https?:\/\/|www\.)\S+$/i.test(text) && !/\s/.test(text)) {
+    return { kind: 'link', label: 'Link', accent: '#3b82f6' }
+  }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+    return { kind: 'email', label: 'Email', accent: '#8b5cf6' }
+  }
+  if (/^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(text)) {
+    return { kind: 'color', label: 'Color', accent: text }
+  }
+  if (text.length <= 24 && /^[-+]?\$?\d[\d,\s]*(\.\d+)?%?$/.test(text)) {
+    return { kind: 'number', label: 'Number', accent: '#f59e0b' }
+  }
+  if (looksLikeCode(text)) {
+    return { kind: 'code', label: 'Code', accent: '#22c55e' }
+  }
+  return { kind: 'text', label: 'Text', accent: 'var(--color-text-faint)' }
+}
+
+function normalizeUrl(text: string): string {
+  const t = text.trim()
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`
+}
+
+const countLines = (text: string): number => text.split('\n').length
 
 export default function ClipboardView() {
   const { toast } = useToast()
@@ -31,8 +83,11 @@ export default function ClipboardView() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editLabelText, setEditLabelText] = useState('')
 
-  // Copied state (for transient checkmark feedback)
+  // Transient "copied" checkmark feedback
   const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  // Which long items are expanded to full height
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   // Clear unpinned history confirm state
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
@@ -51,12 +106,17 @@ export default function ClipboardView() {
 
   useEffect(() => {
     loadHistory()
-    // Poll updates every 2 seconds to reflect background watcher captures
-    const interval = setInterval(loadHistory, 2000)
-    return () => clearInterval(interval)
+    // Instant refresh the moment the background watcher captures something new…
+    const unsubscribe = window.electronAPI.clipboard.onHistoryChanged(loadHistory)
+    // …plus a relaxed fallback poll in case an event is ever missed.
+    const interval = setInterval(loadHistory, 5000)
+    return () => {
+      unsubscribe()
+      clearInterval(interval)
+    }
   }, [loadHistory])
 
-  // Toggle pin
+  // Actions
   const handleTogglePin = async (id: string, isPinned: boolean) => {
     try {
       await window.electronAPI.clipboard.togglePin(id, !isPinned)
@@ -66,7 +126,6 @@ export default function ClipboardView() {
     }
   }
 
-  // Edit label
   const handleStartEditLabel = (id: string, currentLabel: string | null, content: string) => {
     setEditingId(id)
     setEditLabelText(currentLabel || content.slice(0, 20))
@@ -82,7 +141,6 @@ export default function ClipboardView() {
     }
   }
 
-  // Delete item
   const handleDeleteItem = async (id: string) => {
     try {
       const targetItem = history.find(item => item.id === id)
@@ -114,10 +172,7 @@ export default function ClipboardView() {
     }
   }
 
-  // Clear unpinned history
-  const handleClearHistory = async () => {
-    setIsClearConfirmOpen(true)
-  }
+  const handleClearHistory = () => setIsClearConfirmOpen(true)
 
   const performClearHistory = async () => {
     setIsClearConfirmOpen(false)
@@ -129,19 +184,18 @@ export default function ClipboardView() {
     }
   }
 
-  // Copy-only action
+  // Copy to OS clipboard with transient checkmark feedback
   const handleCopyOnly = async (id: string, content: string) => {
     try {
-      // Just copy to system paste-register (calls navigator.clipboard.writeText)
       await navigator.clipboard.writeText(content)
       setCopiedId(id)
-      setTimeout(() => setCopiedId(null), 1500)
+      setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), 1500)
     } catch (err) {
       console.error('Failed to copy item:', err)
     }
   }
 
-  // Copy & Close (Paste register trigger)
+  // Copy & hide the window (quick-paste flow via the global hotkey panel)
   const handleCopyAndClose = async (content: string) => {
     try {
       await window.electronAPI.clipboard.paste(content)
@@ -150,29 +204,40 @@ export default function ClipboardView() {
     }
   }
 
-  // Create new pinned snippet directly
+  const handleOpenLink = async (content: string) => {
+    try {
+      await window.electronAPI.app.openExternal(normalizeUrl(content))
+    } catch (err) {
+      console.error('Failed to open link:', err)
+    }
+  }
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // Create a new pinned snippet. Unlike copying, saving a snippet should NOT
+  // clobber whatever is currently on the OS clipboard, it's saved for later.
   const handleCreateSnippet = async (e: React.FormEvent) => {
     e.preventDefault()
     const contentTrimmed = newContent.trim()
     if (!contentTrimmed) return
 
     try {
-      // Write to OS clipboard so it's ready to paste
-      try {
-        await navigator.clipboard.writeText(contentTrimmed)
-      } catch (err) {
-        console.warn('Failed to write to OS clipboard:', err)
-      }
-      
-      // Directly insert to DB to avoidwatcher poll race condition
       await window.electronAPI.clipboard.createSnippet(contentTrimmed, newLabel.trim() || null)
-
       setNewLabel('')
       setNewContent('')
       setIsAdding(false)
       loadHistory()
+      toast('Snippet saved.', { type: 'success' })
     } catch (err) {
       console.error('Failed to create snippet:', err)
+      toast('Failed to save snippet.', { type: 'error' })
     }
   }
 
@@ -187,24 +252,254 @@ export default function ClipboardView() {
     return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   }
 
-  // Split history into pinned (snippets) and unpinned (history) lists
-  const pinnedItems = history.filter(item => item.is_pinned === 1)
-  const unpinnedItems = history.filter(item => item.is_pinned === 0)
+  const pinnedItems = useMemo(() => history.filter(item => item.is_pinned === 1), [history])
+  const unpinnedItems = useMemo(() => history.filter(item => item.is_pinned === 0), [history])
 
-  // Filtered lists
-  const filteredHistory = unpinnedItems.filter(item =>
-    item.content.toLowerCase().includes(searchHistory.toLowerCase())
-  )
+  const filteredHistory = useMemo(() => {
+    const q = searchHistory.toLowerCase()
+    return unpinnedItems.filter(item => item.content.toLowerCase().includes(q))
+  }, [unpinnedItems, searchHistory])
 
-  const filteredSnippets = pinnedItems.filter(item => {
-    const labelMatch = item.label?.toLowerCase().includes(searchSnippets.toLowerCase()) ?? false
-    const contentMatch = item.content.toLowerCase().includes(searchSnippets.toLowerCase())
-    return labelMatch || contentMatch
-  })
+  const filteredSnippets = useMemo(() => {
+    const q = searchSnippets.toLowerCase()
+    return pinnedItems.filter(item =>
+      (item.label?.toLowerCase().includes(q) ?? false) || item.content.toLowerCase().includes(q)
+    )
+  }, [pinnedItems, searchSnippets])
 
-  // Check if content looks like code block (multiple lines or brackets)
-  const isLikelyCode = (text: string) => {
-    return text.includes('\n') || text.includes('{') || text.includes('}') || text.includes('function ')
+  // Shared card renderer
+  const renderCard = (item: ClipboardItem, variant: 'history' | 'snippet') => {
+    const isCopied = copiedId === item.id
+    const isEditing = editingId === item.id
+    const isExpanded = expandedIds.has(item.id)
+    const meta = analyzeContent(item.content)
+    const codeMode = meta.kind === 'code'
+    const lineCount = countLines(item.content)
+    const isLong = lineCount > 6 || item.content.length > 400
+    const isSnippet = variant === 'snippet'
+    const accentIsColor = meta.kind === 'color'
+
+    return (
+      <div
+        key={item.id}
+        style={{
+          position: 'relative',
+          flexShrink: 0,
+          background: 'var(--color-surface-1)',
+          border: '1px solid var(--color-surface-offset)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          transition: 'border-color var(--duration-fast), box-shadow var(--duration-fast)'
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.borderColor = 'rgba(30, 69, 252, 0.35)'
+          e.currentTarget.style.boxShadow = '0 2px 10px -6px rgba(0,0,0,0.4)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}
+      >
+        {/* Content-kind accent strip */}
+        <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '3px', background: meta.accent }} />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + 3px)' }}>
+          {/* Header row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
+            {/* Left: label (snippet) or type badge + timestamp (history) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+              {isSnippet && isEditing ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                  <input
+                    autoFocus
+                    value={editLabelText}
+                    onChange={e => setEditLabelText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveLabel(item.id)
+                      if (e.key === 'Escape') setEditingId(null)
+                    }}
+                    style={{
+                      background: 'var(--color-surface-1)',
+                      border: '1px solid var(--color-secondary)',
+                      color: 'var(--color-text-base)',
+                      fontSize: '11px',
+                      borderRadius: '4px',
+                      padding: '2px 6px',
+                      outline: 'none',
+                      flex: 1,
+                      minWidth: 0
+                    }}
+                  />
+                  <button onClick={() => handleSaveLabel(item.id)} className="btn-icon" style={{ width: '20px', height: '20px' }} title="Save label">
+                    <Check size={11} color="var(--color-success)" />
+                  </button>
+                </div>
+              ) : isSnippet ? (
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'text', minWidth: 0, flex: 1 }}
+                  onDoubleClick={() => handleStartEditLabel(item.id, item.label, item.content)}
+                  title="Double-click to rename"
+                >
+                  <span style={{
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'var(--weight-semibold)',
+                    color: 'var(--color-text-base)',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {item.label || <em style={{ color: 'var(--color-text-faint)', fontWeight: 'var(--weight-regular)' }}>Untitled snippet</em>}
+                  </span>
+                  <button
+                    onClick={() => handleStartEditLabel(item.id, item.label, item.content)}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}
+                    title="Rename"
+                  >
+                    <Edit2 size={10} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {accentIsColor && (
+                    <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: meta.accent, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
+                  )}
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 'var(--weight-bold)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    color: accentIsColor ? 'var(--color-text-muted)' : meta.accent,
+                    background: accentIsColor ? 'var(--color-surface-offset)' : `${meta.accent}1a`,
+                    padding: '1px 6px',
+                    borderRadius: 'var(--radius-full)',
+                    flexShrink: 0
+                  }}>
+                    {meta.label}
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                    {formatTime(item.created_at)}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Right: action buttons */}
+            <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+              {meta.kind === 'link' && (
+                <button
+                  onClick={() => handleOpenLink(item.content)}
+                  className="btn-icon"
+                  style={{ width: '24px', height: '24px', color: '#3b82f6' }}
+                  title="Open link in browser"
+                >
+                  <ExternalLink size={12} />
+                </button>
+              )}
+              <button
+                onClick={() => handleTogglePin(item.id, isSnippet)}
+                className="btn-icon"
+                style={{ width: '24px', height: '24px', color: isSnippet ? 'var(--color-secondary)' : 'var(--color-text-faint)' }}
+                title={isSnippet ? 'Unpin snippet' : 'Pin as snippet'}
+              >
+                <Star size={12} fill={isSnippet ? 'var(--color-secondary)' : 'none'} />
+              </button>
+              <button
+                onClick={() => handleCopyOnly(item.id, item.content)}
+                className="btn-icon"
+                style={{ width: '24px', height: '24px', color: isCopied ? 'var(--color-success)' : 'var(--color-text-muted)' }}
+                title={isCopied ? 'Copied!' : 'Copy to clipboard'}
+              >
+                {isCopied ? <Check size={12} /> : <Copy size={12} />}
+              </button>
+              <button
+                onClick={() => handleCopyAndClose(item.content)}
+                className="btn-icon"
+                style={{ width: '24px', height: '24px', color: 'var(--color-primary)' }}
+                title="Paste & hide window"
+              >
+                <Send size={12} />
+              </button>
+              <button
+                onClick={() => handleDeleteItem(item.id)}
+                className="btn-icon"
+                style={{ width: '24px', height: '24px', color: 'var(--color-error)' }}
+                title={isSnippet ? 'Delete snippet' : 'Delete entry'}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </div>
+
+          {/* Content, click to copy */}
+          <pre
+            onClick={() => {
+              if ((window.getSelection()?.toString() ?? '').length > 0) return
+              handleCopyOnly(item.id, item.content)
+            }}
+            title="Click to copy"
+            style={{
+              margin: 0,
+              padding: codeMode ? 'var(--space-2)' : '2px 0',
+              background: codeMode ? 'var(--color-surface-2)' : 'transparent',
+              border: codeMode ? '1px solid var(--color-surface-offset)' : 'none',
+              borderRadius: codeMode ? 'var(--radius-sm)' : 0,
+              fontSize: 'var(--text-xs)',
+              fontFamily: codeMode ? 'var(--font-mono)' : 'inherit',
+              color: isSnippet ? 'var(--color-text-muted)' : 'var(--color-text-base)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              overflow: isExpanded ? 'auto' : 'hidden',
+              maxHeight: isExpanded ? '340px' : '130px',
+              display: isExpanded ? 'block' : '-webkit-box',
+              WebkitLineClamp: isExpanded ? 'unset' : 6,
+              WebkitBoxOrient: 'vertical',
+              lineHeight: 1.45,
+              cursor: 'pointer'
+            }}
+          >
+            {item.content}
+          </pre>
+
+          {/* Footer meta */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+              {item.content.length.toLocaleString()} chars{lineCount > 1 ? ` · ${lineCount} lines` : ''}
+            </span>
+            {isLong && (
+              <button
+                onClick={() => toggleExpand(item.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-primary)',
+                  fontSize: '10px',
+                  fontWeight: 'var(--weight-semibold)',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                {isExpanded ? <>Show less <ChevronUp size={11} /></> : <>Show more <ChevronDown size={11} /></>}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const searchInputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--color-surface-2)',
+    border: '1px solid var(--color-surface-offset)',
+    color: 'var(--color-text-base)',
+    borderRadius: 'var(--radius-md)',
+    padding: 'var(--space-2) var(--space-3) var(--space-2) var(--space-8)',
+    fontSize: 'var(--text-sm)',
+    outline: 'none',
+    boxSizing: 'border-box'
   }
 
   return (
@@ -217,7 +512,7 @@ export default function ClipboardView() {
       color: 'var(--color-text-base)',
       fontFamily: 'var(--font-sans)'
     }}>
-      
+
       {/* LEFT COLUMN: Clipboard History (Unpinned) */}
       <div style={{
         flex: 1.5,
@@ -241,7 +536,7 @@ export default function ClipboardView() {
               <Clipboard size={18} color="var(--color-primary)" />
               Clipboard History
               <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 6px', borderRadius: 'var(--radius-full)' }}>
-                {unpinnedItems.length}/200
+                {unpinnedItems.length}/{HISTORY_LIMIT}
               </span>
             </h2>
             {unpinnedItems.length > 0 && (
@@ -273,21 +568,22 @@ export default function ClipboardView() {
             <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--color-text-faint)' }} />
             <input
               type="text"
-              placeholder="Search history content..."
+              placeholder="Search history…"
               value={searchHistory}
               onChange={e => setSearchHistory(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-base)',
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-2) var(--space-3) var(--space-2) var(--space-8)',
-                fontSize: 'var(--text-sm)',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
+              onKeyDown={e => { if (e.key === 'Escape') setSearchHistory('') }}
+              style={searchInputStyle}
             />
+            {searchHistory && (
+              <button
+                onClick={() => setSearchHistory('')}
+                className="btn-icon"
+                style={{ position: 'absolute', right: '6px', width: '22px', height: '22px', color: 'var(--color-text-faint)' }}
+                title="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -295,7 +591,7 @@ export default function ClipboardView() {
         <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {loading ? (
             <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', textAlign: 'center', padding: 'var(--space-6)' }}>
-              Loading history...
+              Loading history…
             </div>
           ) : filteredHistory.length === 0 ? (
             <div style={{
@@ -310,100 +606,21 @@ export default function ClipboardView() {
             }}>
               <Clipboard size={32} />
               <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>No history items</p>
+                <p style={{ margin: '0 0 4px 0', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>
+                  {searchHistory ? 'No matches' : 'No history yet'}
+                </p>
                 <p style={{ margin: 0, fontSize: 'var(--text-xs)', maxWidth: '240px' }}>
-                  {searchHistory ? 'Try adjusting your search criteria.' : 'Text copied to your system clipboard will automatically appear here.'}
+                  {searchHistory ? 'Try a different search term.' : 'Anything you copy will appear here automatically.'}
                 </p>
               </div>
             </div>
           ) : (
-            filteredHistory.map(item => {
-              const isCopied = copiedId === item.id
-              const codeMode = isLikelyCode(item.content)
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    background: 'var(--color-surface-1)',
-                    border: '1px solid var(--color-surface-offset)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: 'var(--space-3-5)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'var(--space-2)',
-                    transition: 'border-color var(--duration-fast)',
-                    position: 'relative'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(30, 69, 252, 0.3)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-surface-offset)'}
-                >
-                  {/* Timestamp and controls */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                    <span>{formatTime(item.created_at)}</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button
-                        onClick={() => handleTogglePin(item.id, false)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: 'var(--color-text-faint)' }}
-                        title="Pin snippet"
-                      >
-                        <Star size={11} />
-                      </button>
-                      <button
-                        onClick={() => handleCopyOnly(item.id, item.content)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: isCopied ? 'var(--color-success)' : 'var(--color-text-muted)' }}
-                        title={isCopied ? 'Copied!' : 'Copy to clipboard'}
-                      >
-                        {isCopied ? <Check size={11} /> : <Copy size={11} />}
-                      </button>
-                      <button
-                        onClick={() => handleCopyAndClose(item.content)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: 'var(--color-secondary)' }}
-                        title="Copy & Close Checkpoint"
-                      >
-                        <Send size={11} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: 'var(--color-error)' }}
-                        title="Delete entry"
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Content block */}
-                  <pre style={{
-                    margin: 0,
-                    padding: codeMode ? 'var(--space-2)' : 0,
-                    background: codeMode ? 'var(--color-surface-2)' : 'transparent',
-                    border: codeMode ? '1px solid var(--color-surface-offset)' : 'none',
-                    borderRadius: codeMode ? 'var(--radius-sm)' : 0,
-                    fontSize: 'var(--text-xs)',
-                    fontFamily: codeMode ? 'var(--font-mono)' : 'inherit',
-                    color: 'var(--color-text-base)',
-                    whiteSpace: 'pre-wrap',
-                    overflow: 'hidden',
-                    maxHeight: '120px',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 6,
-                    WebkitBoxOrient: 'vertical',
-                    lineHeight: '1.4'
-                  }}>
-                    {item.content}
-                  </pre>
-                </div>
-              )
-            })
+            filteredHistory.map(item => renderCard(item, 'history'))
           )}
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Pinned Snippets (Star Icons) */}
+      {/* RIGHT COLUMN: Pinned Snippets */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -412,7 +629,7 @@ export default function ClipboardView() {
         overflow: 'hidden',
         background: 'var(--color-surface-1)'
       }}>
-        
+
         {/* Snippets header */}
         <div style={{
           padding: 'var(--space-4)',
@@ -425,24 +642,27 @@ export default function ClipboardView() {
             <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: 0 }}>
               <Star size={16} color="var(--color-secondary)" fill="var(--color-secondary)" />
               Pinned Snippets
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 6px', borderRadius: 'var(--radius-full)' }}>
+                {pinnedItems.length}
+              </span>
             </h2>
             <button
               onClick={() => setIsAdding(!isAdding)}
               className="btn-icon"
               style={{
-                width: '26px',
-                height: '26px',
+                width: '28px',
+                height: '28px',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--color-surface-offset)',
                 background: isAdding ? 'var(--color-surface-offset)' : 'transparent'
               }}
-              title="Add Snippet manually"
+              title={isAdding ? 'Close' : 'Add snippet manually'}
             >
-              <Plus size={14} />
+              {isAdding ? <X size={15} /> : <Plus size={15} />}
             </button>
           </div>
 
-          {/* Add form overlay */}
+          {/* Add form */}
           {isAdding && (
             <form onSubmit={handleCreateSnippet} style={{
               display: 'flex',
@@ -455,8 +675,9 @@ export default function ClipboardView() {
               animation: 'slide-down 150ms var(--ease-enter)'
             }}>
               <input
+                autoFocus
                 type="text"
-                placeholder="Snippet Label (e.g. Unity API URL)"
+                placeholder="Label (optional, e.g. Unity API URL)"
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
                 style={{
@@ -464,17 +685,21 @@ export default function ClipboardView() {
                   border: '1px solid var(--color-surface-offset)',
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-sm)',
-                  padding: '4px 8px',
+                  padding: '6px 8px',
                   fontSize: 'var(--text-xs)',
                   outline: 'none'
                 }}
               />
               <textarea
-                placeholder="Snippet Content..."
+                placeholder="Snippet content…"
                 required
                 rows={4}
                 value={newContent}
                 onChange={e => setNewContent(e.target.value)}
+                onKeyDown={e => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleCreateSnippet(e)
+                  if (e.key === 'Escape') setIsAdding(false)
+                }}
                 style={{
                   background: 'var(--color-surface-1)',
                   border: '1px solid var(--color-surface-offset)',
@@ -483,25 +708,27 @@ export default function ClipboardView() {
                   padding: '6px 8px',
                   fontSize: 'var(--text-xs)',
                   outline: 'none',
-                  resize: 'none',
+                  resize: 'vertical',
                   fontFamily: 'var(--font-mono)'
                 }}
               />
-              <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  style={{ fontSize: '10px', padding: '4px 10px', height: '24px' }}
-                >
-                  Save Pinned
-                </button>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <span style={{ marginRight: 'auto', fontSize: '9px', color: 'var(--color-text-faint)' }}>⌘/Ctrl+Enter to save</span>
                 <button
                   type="button"
                   onClick={() => setIsAdding(false)}
                   className="btn-secondary"
-                  style={{ fontSize: '10px', padding: '4px 10px', height: '24px' }}
+                  style={{ fontSize: '11px', padding: '5px 12px', height: '28px' }}
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={!newContent.trim()}
+                  style={{ fontSize: '11px', padding: '5px 12px', height: '28px', opacity: newContent.trim() ? 1 : 0.5, cursor: newContent.trim() ? 'pointer' : 'not-allowed' }}
+                >
+                  Save Snippet
                 </button>
               </div>
             </form>
@@ -509,24 +736,25 @@ export default function ClipboardView() {
 
           {/* Snippets search bar */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={12} style={{ position: 'absolute', left: '10px', color: 'var(--color-text-faint)' }} />
+            <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--color-text-faint)' }} />
             <input
               type="text"
-              placeholder="Search pinned snippets..."
+              placeholder="Search snippets…"
               value={searchSnippets}
               onChange={e => setSearchSnippets(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-base)',
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-1-5) var(--space-3) var(--space-1-5) var(--space-8)',
-                fontSize: 'var(--text-xs)',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
+              onKeyDown={e => { if (e.key === 'Escape') setSearchSnippets('') }}
+              style={searchInputStyle}
             />
+            {searchSnippets && (
+              <button
+                onClick={() => setSearchSnippets('')}
+                className="btn-icon"
+                style={{ position: 'absolute', right: '6px', width: '22px', height: '22px', color: 'var(--color-text-faint)' }}
+                title="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -546,153 +774,16 @@ export default function ClipboardView() {
             }}>
               <Star size={24} />
               <div>
-                <p style={{ margin: '0 0 2px 0', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)' }}>No pinned snippets</p>
-                <p style={{ margin: 0, fontSize: '10px', maxWidth: '200px' }}>
-                  Click the star icon on clipboard history items to pin them here for easy access.
+                <p style={{ margin: '0 0 2px 0', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)' }}>
+                  {searchSnippets ? 'No matches' : 'No pinned snippets'}
+                </p>
+                <p style={{ margin: 0, fontSize: '10px', maxWidth: '210px' }}>
+                  {searchSnippets ? 'Try a different search term.' : 'Star a history item, or add one manually with the + button.'}
                 </p>
               </div>
             </div>
           ) : (
-            filteredSnippets.map(item => {
-              const isCopied = copiedId === item.id
-              const isEditing = editingId === item.id
-              const codeMode = isLikelyCode(item.content)
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: 'var(--space-3)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'var(--space-2)'
-                  }}
-                >
-                  {/* Label / edit controls */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {isEditing ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
-                        <input
-                          autoFocus
-                          value={editLabelText}
-                          onChange={e => setEditLabelText(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') handleSaveLabel(item.id)
-                            if (e.key === 'Escape') setEditingId(null)
-                          }}
-                          style={{
-                            background: 'var(--color-surface-1)',
-                            border: '1px solid var(--color-secondary)',
-                            color: 'var(--color-text-base)',
-                            fontSize: '11px',
-                            borderRadius: '3px',
-                            padding: '1px 6px',
-                            outline: 'none',
-                            flex: 1
-                          }}
-                        />
-                        <button
-                          onClick={() => handleSaveLabel(item.id)}
-                          className="btn-icon"
-                          style={{ width: '18px', height: '18px' }}
-                        >
-                          <Check size={10} color="var(--color-success)" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          fontSize: 'var(--text-xs)',
-                          fontWeight: 'var(--weight-semibold)',
-                          color: 'var(--color-text-base)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          cursor: 'pointer',
-                          minWidth: 0,
-                          flex: 1
-                        }}
-                        onDoubleClick={() => handleStartEditLabel(item.id, item.label, item.content)}
-                        title="Double-click to edit label"
-                      >
-                        <span style={{
-                          textOverflow: 'ellipsis',
-                          overflow: 'hidden',
-                          whiteSpace: 'nowrap',
-                          maxWidth: '90%'
-                        }}>
-                          {item.label || <em style={{ color: 'var(--color-text-faint)', fontWeight: 'var(--weight-normal)' }}>Untitled Snippet</em>}
-                        </span>
-                        <button
-                          onClick={() => handleStartEditLabel(item.id, item.label, item.content)}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', padding: 0 }}
-                        >
-                          <Edit2 size={9} />
-                        </button>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', gap: '2px', marginLeft: 'var(--space-2)' }}>
-                      <button
-                        onClick={() => handleTogglePin(item.id, true)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: 'var(--color-secondary)' }}
-                        title="Unpin snippet"
-                      >
-                        <Star size={11} fill="var(--color-secondary)" />
-                      </button>
-                      <button
-                        onClick={() => handleCopyOnly(item.id, item.content)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: isCopied ? 'var(--color-success)' : 'var(--color-text-muted)' }}
-                        title={isCopied ? 'Copied!' : 'Copy snippet'}
-                      >
-                        {isCopied ? <Check size={11} /> : <Copy size={11} />}
-                      </button>
-                      <button
-                        onClick={() => handleCopyAndClose(item.content)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: 'var(--color-primary)' }}
-                        title="Copy & Close"
-                      >
-                        <Send size={11} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="btn-icon"
-                        style={{ width: '22px', height: '22px', color: 'var(--color-error)' }}
-                        title="Delete snippet"
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Snippet Content */}
-                  <pre style={{
-                    margin: 0,
-                    padding: codeMode ? 'var(--space-2)' : 0,
-                    background: codeMode ? 'var(--color-surface-1)' : 'transparent',
-                    border: codeMode ? '1px solid var(--color-surface-offset)' : 'none',
-                    borderRadius: codeMode ? 'var(--radius-sm)' : 0,
-                    fontSize: 'var(--text-xs)',
-                    fontFamily: codeMode ? 'var(--font-mono)' : 'inherit',
-                    color: 'var(--color-text-muted)',
-                    whiteSpace: 'pre-wrap',
-                    overflow: 'hidden',
-                    maxHeight: '100px',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 5,
-                    WebkitBoxOrient: 'vertical',
-                    lineHeight: '1.4'
-                  }}>
-                    {item.content}
-                  </pre>
-                </div>
-              )
-            })
+            filteredSnippets.map(item => renderCard(item, 'snippet'))
           )}
         </div>
 
@@ -708,13 +799,13 @@ export default function ClipboardView() {
           background: 'var(--color-surface-2)'
         }}>
           <Info size={12} color="var(--color-primary)" style={{ flexShrink: 0 }} />
-          <span>Double-click a snippet's title to rename.</span>
+          <span>Click any entry's text to copy it. Double-click a snippet title to rename.</span>
         </div>
 
         <ConfirmDialog
           isOpen={isClearConfirmOpen}
           title="Clear History"
-          message="Are you sure you want to clear all unpinned clipboard history items?"
+          message="Clear all unpinned clipboard history? Pinned snippets are kept."
           confirmText="Clear History"
           isDestructive
           onConfirm={performClearHistory}

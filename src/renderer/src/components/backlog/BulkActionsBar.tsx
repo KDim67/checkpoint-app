@@ -10,7 +10,7 @@ interface BulkActionsBarProps {
   onBulkUpdateStatus: (status: string) => Promise<void>
   onBulkUpdatePriority: (priority: number) => Promise<void>
   onBulkAddTag: (tagId: string) => Promise<void>
-  onBulkDelete: () => Promise<void>
+  onBulkDelete: () => void
   onExportMarkdown: () => void
 }
 

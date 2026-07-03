@@ -571,3 +571,20 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   vertical-align: text-bottom;
   animation: blink-cursor 0.85s step-end infinite;
 }
+/* AI chat: hover-reveal metadata (pure CSS, no re-renders) */
+.chat-msg-row .msg-hover-reveal {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.chat-msg-row:hover .msg-hover-reveal,
+.chat-msg-row .msg-hover-reveal.force-visible {
+  opacity: 1;
+}
+.chat-msg-row .msg-meta-row {
+  border-top: 1px solid transparent;
+  transition: border-color 150ms ease;
+}
+.chat-msg-row:hover .msg-meta-row,
+.chat-msg-row .msg-meta-row.force-visible {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}

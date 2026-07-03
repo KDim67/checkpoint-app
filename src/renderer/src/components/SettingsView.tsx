@@ -18,7 +18,10 @@ import {
   Boxes,
   Plus,
   Trash2,
-  Mail
+  Mail,
+  ChevronDown,
+  Cloud,
+  Server
 } from 'lucide-react'
 import SettingsSection, {
   FieldRow,
@@ -36,36 +39,66 @@ import HotkeyBinder from './settings/HotkeyBinder'
 import ExtensionsTab from './settings/ExtensionsTab'
 import { useToast } from './ui/Toast'
 import { useAppStore } from '../store/appStore'
+import {
+  loadProviders, persistProviders, activateProvider, providerFromPreset,
+  isLocalUrl, PROVIDER_PRESETS, type AiProvider, type ProviderPreset
+} from './ai/aiProviders'
 
 // Tab definition
+// Merged layout: Widget lives inside General, Kanban inside Workspaces & Board,
+// Theme Builder inside Appearance, Extensions inside Features & Plugins.
 type SettingsTab =
   | 'general'
   | 'contexts'
-  | 'kanban'
   | 'ai'
   | 'appearance'
-  | 'themeCustomizer'
   | 'hotkeyBinder'
-  | 'extensions'
-  | 'widget'
   | 'features'
   | 'backup'
   | 'about'
 
-const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-  { id: 'general',          label: 'General',             icon: <Settings size={14} /> },
-  { id: 'contexts',         label: 'Contexts',            icon: <Layers size={14} /> },
-  { id: 'kanban',           label: 'Kanban',              icon: <Layout size={14} /> },
-  { id: 'ai',               label: 'AI',                  icon: <Sparkles size={14} /> },
-  { id: 'appearance',       label: 'Appearance',          icon: <Palette size={14} /> },
-  { id: 'themeCustomizer',  label: 'Theme Builder',       icon: <Paintbrush size={14} /> },
-  { id: 'hotkeyBinder',     label: 'Keyboard Shortcuts',  icon: <Keyboard size={14} /> },
-  { id: 'extensions',       label: 'Extensions & Plugins',icon: <Boxes size={14} /> },
-  { id: 'widget',           label: 'Widget',              icon: <Monitor size={14} /> },
-  { id: 'features',         label: 'Feature Toggles',     icon: <Zap size={14} /> },
-  { id: 'backup',           label: 'Database Backup',     icon: <Archive size={14} /> },
-  { id: 'about',            label: 'About',               icon: <Info size={14} /> }
+interface TabInfo {
+  id: SettingsTab
+  label: string
+  icon: React.ReactNode
+  description: string
+}
+
+const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
+  {
+    group: 'Application',
+    tabs: [
+      { id: 'general',    label: 'General',            icon: <Settings size={14} />, description: 'Startup behavior and desktop integration.' },
+      { id: 'appearance', label: 'Appearance & Theme', icon: <Palette size={14} />,  description: 'Interface theme, text scale, density and full color customization.' }
+    ]
+  },
+  {
+    group: 'Workspace',
+    tabs: [
+      { id: 'contexts', label: 'Workspaces & Board', icon: <Layers size={14} />,   description: 'Manage workspaces and the Kanban columns of the active one.' },
+      { id: 'ai',       label: 'AI Assistant',       icon: <Sparkles size={14} />, description: 'Model providers, generation options, email voice and persistent memory.' }
+    ]
+  },
+  {
+    group: 'System',
+    tabs: [
+      { id: 'hotkeyBinder', label: 'Keyboard Shortcuts', icon: <Keyboard size={14} />, description: 'Rebind the global hotkeys registered by Checkpoint.' },
+      { id: 'features',     label: 'Features & Plugins', icon: <Zap size={14} />,      description: 'Toggle background subsystems and manage user plugins.' },
+      { id: 'backup',       label: 'Database Backup',    icon: <Archive size={14} />,  description: 'Automated database snapshots, retention and restore points.' },
+      { id: 'about',        label: 'About',              icon: <Info size={14} />,     description: 'Version, credits and diagnostics.' }
+    ]
+  }
 ]
+
+const ALL_TABS: TabInfo[] = TAB_GROUPS.flatMap(g => g.tabs)
+
+// Old tab ids (pre-merge) still navigable from anywhere in the app
+const LEGACY_TAB_ALIASES: Record<string, SettingsTab> = {
+  kanban: 'contexts',
+  themeCustomizer: 'appearance',
+  extensions: 'features',
+  widget: 'general'
+}
 
 // Kanban per-context column config
 interface ColumnConfig {
@@ -128,8 +161,7 @@ function KanbanSettings({ activeContext }: { activeContext: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', margin: 0 }}>
-        Configure columns for context <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-secondary)' }}>#{activeContext}</code>.
-        Double-click column headers in the Kanban board to rename inline.
+        Set a WIP limit of 0 for unlimited. You can also rename columns by double-clicking their headers on the board itself.
       </p>
       {columns.map(col => (
         <div
@@ -424,6 +456,11 @@ function AiSettings() {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [connectionError, setConnectionError] = useState('')
 
+  // Provider profiles (the active one is mirrored into baseURL/apiKey/model above)
+  const [providers, setProviders] = useState<AiProvider[]>([])
+  const [activeId, setActiveId] = useState<string>('')
+  const [showPresetMenu, setShowPresetMenu] = useState(false)
+
   const [emailSamples, setEmailSamples] = useState<EmailSample[]>(() => {
     try {
       const stored = localStorage.getItem('checkpoint_email_writing_samples')
@@ -439,15 +476,20 @@ function AiSettings() {
   useEffect(() => {
     const load = async () => {
       try {
-        const dbBaseUrl  = await window.electronAPI.db.getSetting('ai_base_url')
-        const dbApiKey   = await window.electronAPI.db.getSetting('ai_api_key')
-        const dbModel    = await window.electronAPI.db.getSetting('ai_model')
+        // Load provider profiles (migrates the old flat settings on first run)
+        const { providers: provs, activeId: active } = await loadProviders()
+        setProviders(provs)
+        setActiveId(active)
+        const activeProv = provs.find(p => p.id === active)
+        if (activeProv) {
+          setBaseURL(activeProv.baseURL)
+          setApiKey(activeProv.apiKey)
+          setModel(activeProv.model)
+        }
+
         const dbTemp     = await window.electronAPI.db.getSetting('ai_temperature')
         const dbMaxToks  = await window.electronAPI.db.getSetting('ai_max_tokens')
         const dbSamples  = await window.electronAPI.db.getSetting('ai_email_writing_samples')
-        if (dbBaseUrl)  setBaseURL(dbBaseUrl as string)
-        if (dbApiKey)   setApiKey(dbApiKey as string)
-        if (dbModel)    setModel(dbModel as string)
         if (dbTemp)     setTemperature(Number(dbTemp))
         if (dbMaxToks)  setMaxTokens(Number(dbMaxToks))
         if (dbSamples) {
@@ -466,6 +508,55 @@ function AiSettings() {
 
   const save = (key: string, val: string | number) =>
     window.electronAPI.db.setSetting(key, val)
+
+  // Provider profile management
+  const activeProvider = providers.find(p => p.id === activeId) || null
+
+  // Notify the AI panel so it reloads the active provider's model/endpoint.
+  const notifyProviderChanged = (): void => {
+    window.dispatchEvent(new CustomEvent('checkpoint-ai-provider-changed'))
+  }
+
+  const updateActiveProvider = (patch: Partial<AiProvider>) => {
+    if (!activeId) return
+    const next = providers.map(p => (p.id === activeId ? { ...p, ...patch } : p))
+    setProviders(next)
+    persistProviders(next, activeId).then(notifyProviderChanged)
+  }
+
+  const handleSwitchProvider = async (id: string) => {
+    const p = providers.find(x => x.id === id)
+    if (!p) return
+    setActiveId(id)
+    setBaseURL(p.baseURL); setApiKey(p.apiKey); setModel(p.model)
+    setConnectionStatus('idle'); setConnectionError('')
+    await activateProvider(providers, id)
+    notifyProviderChanged()
+  }
+
+  const handleAddPreset = async (preset: ProviderPreset) => {
+    const p = providerFromPreset(preset)
+    const next = [...providers, p]
+    setProviders(next)
+    setActiveId(p.id)
+    setBaseURL(p.baseURL); setApiKey(p.apiKey); setModel(p.model)
+    setShowPresetMenu(false)
+    setConnectionStatus('idle'); setConnectionError('')
+    await persistProviders(next, p.id)
+    notifyProviderChanged()
+  }
+
+  const handleDeleteProvider = async () => {
+    if (providers.length <= 1) return
+    const next = providers.filter(p => p.id !== activeId)
+    const newActive = next[0].id
+    setProviders(next)
+    setActiveId(newActive)
+    setBaseURL(next[0].baseURL); setApiKey(next[0].apiKey); setModel(next[0].model)
+    setConnectionStatus('idle'); setConnectionError('')
+    await persistProviders(next, newActive)
+    notifyProviderChanged()
+  }
 
   const handleUpdateSamples = (updated: EmailSample[]) => {
     const capped = updated.slice(0, 5)
@@ -508,29 +599,94 @@ function AiSettings() {
   const handleTest = async () => {
     setConnectionStatus('testing'); setConnectionError('')
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      const trimmedKey = apiKey.trim()
-      if (trimmedKey && trimmedKey !== 'ollama') headers['Authorization'] = `Bearer ${trimmedKey}`
-      const res = await fetch(`${baseURL.replace(/\/+$/, '')}/models`, { method: 'GET', headers })
-      if (res.ok) { setConnectionStatus('success') }
-      else {
-        const text = await res.text().catch(() => '')
+      const res = await window.electronAPI.ai.testConnection(baseURL, apiKey)
+      if (res.success) {
+        setConnectionStatus('success')
+      } else {
         setConnectionStatus('error')
-        setConnectionError(`HTTP ${res.status}: ${text || res.statusText}`)
+        setConnectionError(res.error || 'Connection check failed')
       }
     } catch (err) {
       setConnectionStatus('error')
-      setConnectionError((err as Error).message || 'Network request failed')
+      setConnectionError((err as Error).message || 'IPC request failed')
     }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      {/* Provider profiles: keep several connections (local + cloud) and switch */}
+      <FieldRow label="Provider">
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative', width: '100%' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <select
+              value={activeId}
+              onChange={e => handleSwitchProvider(e.target.value)}
+              style={{
+                width: '100%', appearance: 'none',
+                background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)', color: 'var(--color-text-base)',
+                fontSize: 'var(--text-xs)', padding: '7px 28px 7px 10px', outline: 'none', cursor: 'pointer'
+              }}
+            >
+              {providers.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{isLocalUrl(p.baseURL) ? ', local' : ', cloud'}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={13} style={{ position: 'absolute', right: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-faint)', pointerEvents: 'none' }} />
+          </div>
+          <button
+            onClick={() => setShowPresetMenu(v => !v)}
+            title="Add a provider"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--color-surface-offset)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-secondary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            <Plus size={13} /> Add
+          </button>
+          <button
+            onClick={handleDeleteProvider}
+            disabled={providers.length <= 1}
+            title={providers.length <= 1 ? 'Keep at least one provider' : 'Delete this provider'}
+            style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--color-surface-offset)', color: providers.length <= 1 ? 'var(--color-text-faint)' : 'var(--color-text-muted)', borderRadius: 'var(--radius-md)', padding: '6px 8px', cursor: providers.length <= 1 ? 'default' : 'pointer' }}
+          >
+            <Trash2 size={13} />
+          </button>
+
+          {showPresetMenu && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 30, background: 'var(--color-surface-elevated)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', overflow: 'hidden', minWidth: '260px' }}>
+              {PROVIDER_PRESETS.map(preset => (
+                <button
+                  key={preset.id}
+                  onClick={() => handleAddPreset(preset)}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-surface-offset)', padding: '8px 12px', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>
+                    {preset.local ? <Server size={12} /> : <Cloud size={12} />}
+                    {preset.name}
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.4 }}>{preset.hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </FieldRow>
+
+      <FieldRow label="Name">
+        <SettingsInput
+          value={activeProvider?.name || ''}
+          onChange={v => setProviders(prev => prev.map(p => (p.id === activeId ? { ...p, name: v } : p)))}
+          onBlur={() => persistProviders(providers, activeId)}
+          placeholder="e.g. Ollama, Gemini, Work OpenAI"
+        />
+      </FieldRow>
       <FieldRow label="Base URL">
         <SettingsInput
           value={baseURL}
           onChange={setBaseURL}
-          onBlur={() => save('ai_base_url', baseURL.trim())}
+          onBlur={() => updateActiveProvider({ baseURL: baseURL.trim() })}
           placeholder="e.g. http://localhost:11434/v1"
         />
       </FieldRow>
@@ -539,16 +695,16 @@ function AiSettings() {
           type="password"
           value={apiKey}
           onChange={setApiKey}
-          onBlur={() => save('ai_api_key', apiKey.trim())}
-          placeholder="ollama or cloud API key"
+          onBlur={() => updateActiveProvider({ apiKey: apiKey.trim() })}
+          placeholder={isLocalUrl(baseURL) ? 'ollama' : 'cloud API key'}
         />
       </FieldRow>
-      <FieldRow label="Default Model">
+      <FieldRow label="Model">
         <SettingsInput
           value={model}
           onChange={setModel}
-          onBlur={() => save('ai_model', model.trim())}
-          placeholder="e.g. llama3"
+          onBlur={() => updateActiveProvider({ model: model.trim() })}
+          placeholder={isLocalUrl(baseURL) ? 'e.g. gemma2:2b-instruct-fp16' : 'e.g. gemini-2.0-flash'}
         />
       </FieldRow>
 
@@ -733,22 +889,14 @@ function AiSettings() {
   )
 }
 
-// General Settings
-function GeneralSettings() {
-  const activeContext = useAppStore(s => s.activeContext)
-  const availableContexts = useAppStore(s => s.availableContexts)
-  const setContext = useAppStore(s => s.setContext)
-
+// Theme mode (dark / light / system), rendered in Appearance & Theme
+function ThemeModeSettings() {
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark')
-  const [defaultContext, setDefaultContext] = useState<string>('default')
 
   useEffect(() => {
     const load = async () => {
       const t = await window.electronAPI.db.getSetting('app_theme')
       if (t) setTheme(t as typeof theme)
-
-      const dc = await window.electronAPI.db.getSetting('default_context')
-      if (dc) setDefaultContext(dc)
     }
     load()
   }, [])
@@ -775,40 +923,58 @@ function GeneralSettings() {
   ]
 
   return (
+    <FieldRow label="Interface Theme" hint="Applied instantly and restored on the next launch. The titlebar toggle uses the same setting.">
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        {THEME_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => handleTheme(opt.value)}
+            style={{
+              flex: 1,
+              padding: 'var(--space-2) var(--space-3)',
+              background: theme === opt.value ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
+              border: `1px solid ${theme === opt.value ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+              borderRadius: 'var(--radius-md)',
+              color: theme === opt.value ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '2px',
+              fontSize: 'var(--text-sm)',
+              fontWeight: 'var(--weight-medium)',
+              transition: 'all 100ms ease'
+            }}
+          >
+            <span>{opt.label}</span>
+            <span style={{ fontSize: '10px', opacity: 0.6 }}>{opt.desc}</span>
+          </button>
+        ))}
+      </div>
+    </FieldRow>
+  )
+}
+
+// General Settings
+function GeneralSettings() {
+  const availableContexts = useAppStore(s => s.availableContexts)
+
+  const [defaultContext, setDefaultContext] = useState<string>('')
+
+  useEffect(() => {
+    const load = async () => {
+      const dc = await window.electronAPI.db.getSetting('default_context')
+      if (typeof dc === 'string') setDefaultContext(dc)
+    }
+    load()
+  }, [])
+
+  return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-      <FieldRow label="App Theme">
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          {THEME_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => handleTheme(opt.value)}
-              style={{
-                flex: 1,
-                padding: 'var(--space-2) var(--space-3)',
-                background: theme === opt.value ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
-                border: `1px solid ${theme === opt.value ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-                borderRadius: 'var(--radius-md)',
-                color: theme === opt.value ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '2px',
-                fontSize: 'var(--text-sm)',
-                fontWeight: 'var(--weight-medium)',
-                transition: 'all 100ms ease'
-              }}
-            >
-              <span>{opt.label}</span>
-              <span style={{ fontSize: '10px', opacity: 0.6 }}>{opt.desc}</span>
-            </button>
-          ))}
-        </div>
-      </FieldRow>
-
-      <Divider />
-
-      <FieldRow label="Default Context" hint="The context loaded when the app starts.">
+      <FieldRow
+        label="Startup Workspace"
+        hint="The workspace loaded when the app starts. Choose “Last used” to always resume where you left off."
+      >
         <select
           value={defaultContext}
           onChange={e => {
@@ -827,6 +993,7 @@ function GeneralSettings() {
             width: '100%'
           }}
         >
+          <option value="">Last used (default)</option>
           {availableContexts.map(ctx => (
             <option key={ctx} value={ctx}>{ctx}</option>
           ))}
@@ -838,35 +1005,97 @@ function GeneralSettings() {
 
 // Main SettingsView
 export default function SettingsView() {
-  const activeTab = useAppStore(s => s.settingsTab)
+  const rawTab = useAppStore(s => s.settingsTab)
   const setActiveTab = useAppStore(s => s.setSettingsTab)
   const activeContext = useAppStore(s => s.activeContext)
   const isWindows = window.electronAPI.app.platform === 'win32'
 
-  const visibleTabs = TABS.filter(t => {
-    if (t.id === 'widget' && !isWindows) return false
-    return true
-  })
+  // Resolve any pre-merge tab id that might still arrive from old navigation paths
+  const activeTab: SettingsTab = (LEGACY_TAB_ALIASES[rawTab as string] ?? rawTab) as SettingsTab
 
+  // Each tab renders one or more titled section cards
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'general':    return <GeneralSettings />
-      case 'contexts':   return <ContextManager />
-      case 'kanban':     return <KanbanSettings activeContext={activeContext} />
-      case 'ai':         return <AiSettings />
-      case 'appearance': return <AppearanceSettings />
-      case 'themeCustomizer': return <ThemeCustomizer />
-      case 'hotkeyBinder': return <HotkeyBinder />
-      case 'extensions': return <ExtensionsTab />
-      case 'widget':     return <WidgetSettings />
-      case 'features':   return <FeatureToggleCenter />
-      case 'backup':     return <BackupSettings />
-      case 'about':      return <AboutPanel />
-      default:           return null
+      case 'general':
+        return (
+          <>
+            <SettingsSection icon={<Settings size={14} />} title="Startup" description="What Checkpoint opens with.">
+              <GeneralSettings />
+            </SettingsSection>
+            {isWindows && (
+              <SettingsSection icon={<Monitor size={14} />} title="Desktop Widget" description="Always-on-top overlay for glanceable tasks (Windows only).">
+                <WidgetSettings />
+              </SettingsSection>
+            )}
+          </>
+        )
+      case 'contexts':
+        return (
+          <>
+            <SettingsSection icon={<Layers size={14} />} title="Workspaces" description="Isolated contexts with their own boards, logs and notes.">
+              <ContextManager />
+            </SettingsSection>
+            <SettingsSection icon={<Layout size={14} />} title="Kanban Columns" description={`Column names and WIP limits for #${activeContext}.`}>
+              <KanbanSettings activeContext={activeContext} />
+            </SettingsSection>
+          </>
+        )
+      case 'ai':
+        return (
+          <SettingsSection icon={<Sparkles size={14} />} title="AI Assistant" description="Connection, generation options, email voice and persistent memory.">
+            <AiSettings />
+          </SettingsSection>
+        )
+      case 'appearance':
+        return (
+          <>
+            <SettingsSection icon={<Palette size={14} />} title="Interface" description="Theme mode, text scale and density.">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+                <ThemeModeSettings />
+                <Divider />
+                <AppearanceSettings />
+              </div>
+            </SettingsSection>
+            <SettingsSection icon={<Paintbrush size={14} />} title="Theme Builder" description="Override individual colors and fonts via the customization engine.">
+              <ThemeCustomizer />
+            </SettingsSection>
+          </>
+        )
+      case 'hotkeyBinder':
+        return (
+          <SettingsSection icon={<Keyboard size={14} />} title="Keyboard Shortcuts" description="Global hotkeys registered with the operating system.">
+            <HotkeyBinder />
+          </SettingsSection>
+        )
+      case 'features':
+        return (
+          <>
+            <SettingsSection icon={<Zap size={14} />} title="Feature Toggles" description="Enable or disable background subsystems.">
+              <FeatureToggleCenter />
+            </SettingsSection>
+            <SettingsSection icon={<Boxes size={14} />} title="Extensions & Plugins" description="Hot-loaded user plugins from the plugins folder.">
+              <ExtensionsTab />
+            </SettingsSection>
+          </>
+        )
+      case 'backup':
+        return (
+          <SettingsSection icon={<Archive size={14} />} title="Database Backup" description="Automated snapshots, retention and restore points.">
+            <BackupSettings />
+          </SettingsSection>
+        )
+      case 'about':
+        return (
+          <SettingsSection icon={<Info size={14} />} title="About" description="Version, credits and diagnostics.">
+            <AboutPanel />
+          </SettingsSection>
+        )
+      default:
+        return null
     }
   }
 
-  const activeTabInfo = visibleTabs.find(t => t.id === activeTab)
+  const activeTabInfo = ALL_TABS.find(t => t.id === activeTab)
 
   return (
     <div style={{
@@ -875,9 +1104,9 @@ export default function SettingsView() {
       background: 'var(--color-background)',
       overflow: 'hidden'
     }}>
-      {/* Sidebar nav */}
+      {/* Sidebar nav (grouped) */}
       <nav style={{
-        width: '200px',
+        width: '210px',
         flexShrink: 0,
         borderRight: '1px solid var(--color-surface-offset)',
         background: 'var(--color-surface-1)',
@@ -894,46 +1123,60 @@ export default function SettingsView() {
           textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wide)',
           padding: 'var(--space-2) var(--space-2)',
-          marginBottom: 'var(--space-2)'
+          marginBottom: 'var(--space-1)'
         }}>
           Settings
         </div>
-        {visibleTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 'var(--radius-md)',
-              border: 'none',
-              background: activeTab === tab.id ? 'var(--color-secondary-muted)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-sm)',
-              fontWeight: activeTab === tab.id ? 'var(--weight-semibold)' : 'var(--weight-regular)',
-              textAlign: 'left',
-              width: '100%',
-              transition: 'background 100ms ease, color 100ms ease'
-            }}
-            onMouseEnter={e => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.background = 'var(--color-surface-offset)'
-                e.currentTarget.style.color = 'var(--color-text-base)'
-              }
-            }}
-            onMouseLeave={e => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = 'var(--color-text-muted)'
-              }
-            }}
-          >
-            <span style={{ flexShrink: 0, opacity: 0.8 }}>{tab.icon}</span>
-            {tab.label}
-          </button>
+        {TAB_GROUPS.map(group => (
+          <div key={group.group} style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: 'var(--space-3)' }}>
+            <div style={{
+              fontSize: '10px',
+              fontWeight: 'var(--weight-bold)',
+              color: 'var(--color-text-faint)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              padding: '0 var(--space-3) var(--space-1)'
+            }}>
+              {group.group}
+            </div>
+            {group.tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-2) var(--space-3)',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: activeTab === tab.id ? 'var(--color-secondary-muted)' : 'transparent',
+                  color: activeTab === tab.id ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: activeTab === tab.id ? 'var(--weight-semibold)' : 'var(--weight-regular)',
+                  textAlign: 'left',
+                  width: '100%',
+                  transition: 'background 100ms ease, color 100ms ease'
+                }}
+                onMouseEnter={e => {
+                  if (activeTab !== tab.id) {
+                    e.currentTarget.style.background = 'var(--color-surface-offset)'
+                    e.currentTarget.style.color = 'var(--color-text-base)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (activeTab !== tab.id) {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = 'var(--color-text-muted)'
+                  }
+                }}
+              >
+                <span style={{ flexShrink: 0, opacity: 0.8 }}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         ))}
       </nav>
 
@@ -943,31 +1186,37 @@ export default function SettingsView() {
         minHeight: 0,
         overflowY: 'auto',
         padding: 'var(--space-6)',
-        paddingBottom: 'var(--space-10)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-6)'
+        paddingBottom: 'var(--space-10)'
       }}>
-        {/* Page title */}
-        <div>
-          <h1 style={{
-            margin: 0,
-            fontSize: 'var(--text-xl)',
-            fontWeight: 'var(--weight-semibold)',
-            color: 'var(--color-text-base)',
-            letterSpacing: 'var(--tracking-tight)'
-          }}>
-            {activeTabInfo?.label}
-          </h1>
-        </div>
+        <div style={{
+          maxWidth: '860px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-5)'
+        }}>
+          {/* Page title + description */}
+          <div>
+            <h1 style={{
+              margin: 0,
+              fontSize: 'var(--text-xl)',
+              fontWeight: 'var(--weight-semibold)',
+              color: 'var(--color-text-base)',
+              letterSpacing: 'var(--tracking-tight)'
+            }}>
+              {activeTabInfo?.label}
+            </h1>
+            <p style={{
+              margin: 'var(--space-1) 0 0',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-muted)'
+            }}>
+              {activeTabInfo?.description}
+            </p>
+          </div>
 
-        {/* Tab content */}
-        <SettingsSection
-          icon={activeTabInfo?.icon}
-          title={activeTabInfo?.label ?? ''}
-        >
+          {/* Tab content, one or more section cards */}
           {renderTabContent()}
-        </SettingsSection>
+        </div>
       </div>
     </div>
   )

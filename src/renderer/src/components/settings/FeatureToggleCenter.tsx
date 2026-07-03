@@ -77,7 +77,7 @@ const TOGGLE_CONFIGS: ToggleConfig[] = [
     key: 'gamedev_helpers',
     icon: <Gamepad size={16} />,
     title: 'Game Development Helpers',
-    description: 'Unlocks a specialized tab with batch asset renamer, frame budget calculator, dialogue editor, and shader color palette code exporters.',
+    description: 'Unlocks a specialized workspace with PBR/seamless texture generators, pixel-art upscaler, sprite atlas tools, batch renamer and dialogue editor.',
     warning: 'Disabling hides the sidebar workspace and resets active sub-views.',
     getState: async () => {
       const v = await window.electronAPI.db.getSetting('feature_gamedev_helpers')

@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
+import { loadProviders, isLocalUrl } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
 
 // Zero-dependency SVG Icons
@@ -50,6 +51,9 @@ const FeedIcon = () => (
   </svg>
 )
 
+// Dedicated stream channel, isolates this modal's stream from the AI panel's.
+const STANDUP_STREAM_ID = 'standup'
+
 const SYSTEM_PROMPT = `You are a professional Agile Scrum Master and an Executive AI Summarizer.
 Your goal is to take informal, rough developer log entries and translate them into a structured daily standup report.
 
@@ -65,6 +69,22 @@ CRITICAL INSTRUCTIONS:
   - "High-Level Executive Summary": A concise 2-3 sentence overview paragraph for leadership, followed by 3-4 top-level key accomplishments.
 
 Provide ONLY the markdown output. Do not output any preamble, introduction, or conversational filler like "Here is your report". Start immediately with the markdown content.`
+
+// Colour-code the three standup sections so the report is scannable at a glance.
+function sectionAccent(text: string): string | null {
+  const t = text.toLowerCase()
+  if (/achiev|complet|done|shipped|resolved|accomplish/.test(t)) return '#22c55e'
+  if (/progress|ongoing|current|focus|working|next/.test(t)) return '#3b82f6'
+  if (/impediment|blocker|issue|risk|delay|depend|challeng/.test(t)) return '#f59e0b'
+  return null
+}
+
+const flatten = (node: React.ReactNode): string => {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(flatten).join('')
+  if (React.isValidElement(node)) return flatten((node.props as { children?: React.ReactNode }).children)
+  return ''
+}
 
 interface StandupTranslatorViewProps {
   isOpen: boolean
@@ -138,26 +158,38 @@ export default function StandupTranslatorView({
     }
   }, [isOpen, timeRange, activeContext])
 
-  // 2. Load Configuration and Local Models on mount
+  // 2. Load the active AI provider + models whenever the modal opens, so the
+  //    standup uses the same endpoint/model as the assistant. For a local
+  //    provider we auto-heal the model to one that's actually installed (the
+  //    old code could get stuck on an uninstalled default like "llama3", which
+  //    made generation silently fail).
   useEffect(() => {
+    if (!isOpen) return
     const loadAiConfig = async () => {
       try {
-        const dbModel = await window.electronAPI.db.getSetting('ai_model')
+        const { providers, activeId } = await loadProviders()
+        const active = providers.find(p => p.id === activeId)
+        const model = active?.model || ''
+        const baseUrl = active?.baseURL || ''
+        if (model) setSelectedModel(model)
+
         const dbTemp = await window.electronAPI.db.getSetting('ai_temperature')
         const dbMaxTokens = await window.electronAPI.db.getSetting('ai_max_tokens')
-
-        if (dbModel) setSelectedModel(dbModel as string)
         if (dbTemp !== null) setTemperature(Number(dbTemp))
         if (dbMaxTokens !== null) setMaxTokens(Number(dbMaxTokens))
 
-        const list = await window.electronAPI.ollama.listLocal()
-        if (list && list.length > 0) {
-          setLocalModels(list)
-          setUseOllamaSelector(true)
-          if (!dbModel) {
-            setSelectedModel(list[0])
+        if (isLocalUrl(baseUrl)) {
+          const list = await window.electronAPI.ollama.listLocal().catch(() => [] as string[])
+          if (list && list.length > 0) {
+            setLocalModels(list)
+            setUseOllamaSelector(true)
+            if (!model || !list.includes(model)) setSelectedModel(list[0])
+          } else {
+            setUseOllamaSelector(false)
           }
         } else {
+          // Cloud provider: use its typed model, no Ollama dropdown.
+          setLocalModels([])
           setUseOllamaSelector(false)
         }
       } catch {
@@ -165,11 +197,15 @@ export default function StandupTranslatorView({
       }
     }
     loadAiConfig()
-  }, [])
+  }, [isOpen])
 
-  // 3. Register IPC Streaming listeners
+  // 3. Register IPC Streaming listeners, scoped to the dedicated 'standup'
+  //    stream channel, so this modal and the AI Assistant panel can stream at
+  //    the same time without intercepting each other's chunks.
   useEffect(() => {
-    const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk) => {
+    if (!isOpen) return
+    const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk, streamId) => {
+      if (streamId !== STANDUP_STREAM_ID) return
       chunkBufferRef.current += chunk
 
       const now = Date.now()
@@ -184,7 +220,8 @@ export default function StandupTranslatorView({
       }
     })
 
-    const unsubscribeDone = window.electronAPI.ai.onDone(() => {
+    const unsubscribeDone = window.electronAPI.ai.onDone((streamId) => {
+      if (streamId !== STANDUP_STREAM_ID) return
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
@@ -193,7 +230,8 @@ export default function StandupTranslatorView({
       setIsStreaming(false)
     })
 
-    const unsubscribeError = window.electronAPI.ai.onError((errMessage) => {
+    const unsubscribeError = window.electronAPI.ai.onError((errMessage, streamId) => {
+      if (streamId !== STANDUP_STREAM_ID) return
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
@@ -210,7 +248,7 @@ export default function StandupTranslatorView({
         cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [])
+  }, [isOpen])
 
   // Auto-scroll streaming output
   useEffect(() => {
@@ -223,7 +261,7 @@ export default function StandupTranslatorView({
   const handleClose = useCallback(() => {
     if (isStreaming) {
       // handleAbort is called inline here to avoid circular dependency
-      window.electronAPI.ai.abortStream().catch(() => {})
+      window.electronAPI.ai.abortStream(STANDUP_STREAM_ID).catch(() => {})
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
         animationFrameRef.current = null
@@ -279,7 +317,7 @@ export default function StandupTranslatorView({
 
   const handleAbort = async () => {
     try {
-      await window.electronAPI.ai.abortStream()
+      await window.electronAPI.ai.abortStream(STANDUP_STREAM_ID)
     } catch (err) {
       console.error('Failed to abort stream:', err)
     }
@@ -327,7 +365,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
         messages,
         temperature,
         maxTokens
-      })
+      }, STANDUP_STREAM_ID)
     } catch (err) {
       setIsStreaming(false)
       const error = err as Error
@@ -535,25 +573,27 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 <label style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 'var(--space-2)' }}>
                   Timeframe
                 </label>
-                <div style={{ display: 'flex', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: '2px', width: 'fit-content', gap: '2px' }}>
+                <div style={{ display: 'flex', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: '2px', width: '100%', gap: '2px' }}>
                   {[
-                    { value: 24, label: 'Past 24h' },
-                    { value: 48, label: 'Past 48h' },
-                    { value: 72, label: 'Past 72h' },
-                    { value: 168, label: 'Past 7d' }
+                    { value: 24, label: '24h' },
+                    { value: 48, label: '48h' },
+                    { value: 72, label: '72h' },
+                    { value: 168, label: '7d' }
                   ].map(opt => (
                     <button
                       key={opt.value}
                       onClick={() => { if (!isStreaming) setTimeRange(opt.value) }}
                       disabled={isStreaming}
                       style={{
+                        flex: 1,
                         background: timeRange === opt.value ? 'var(--color-surface-offset)' : 'transparent',
                         border: 'none',
                         color: timeRange === opt.value ? 'var(--color-text-base)' : 'var(--color-text-muted)',
                         fontSize: '11px',
                         fontWeight: 'var(--weight-medium)',
-                        padding: '4px 12px',
+                        padding: '5px 0',
                         borderRadius: 'var(--radius-sm)',
+                        textAlign: 'center',
                         cursor: isStreaming ? 'default' : 'pointer',
                         transition: 'all var(--duration-fast)'
                       }}
@@ -592,20 +632,23 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               </div>
 
               {/* Model status selector */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--text-2xs)' }}>
-                <span style={{ color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 'var(--weight-bold)' }}>AI Model</span>
+              <div>
+                <label style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 'var(--space-2)' }}>
+                  AI Model
+                </label>
                 {useOllamaSelector ? (
                   <select
                     value={selectedModel}
                     onChange={e => handleModelChange(e.target.value)}
                     disabled={isStreaming}
                     style={{
+                      width: '100%',
                       background: 'var(--color-surface-2)',
                       border: '1px solid var(--color-surface-offset)',
                       color: 'var(--color-text-base)',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '2px 6px',
-                      fontSize: '10px',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      fontSize: 'var(--text-xs)',
                       outline: 'none',
                       cursor: isStreaming ? 'default' : 'pointer'
                     }}
@@ -615,7 +658,23 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                     ))}
                   </select>
                 ) : (
-                  <span style={{ color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)' }}>{selectedModel}</span>
+                  <div
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                      background: 'var(--color-surface-2)',
+                      border: '1px solid var(--color-surface-offset)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      fontSize: 'var(--text-xs)',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-secondary)', flexShrink: 0 }} />
+                    <span style={{ color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedModel}</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -679,35 +738,47 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                           display: 'flex',
                           alignItems: 'flex-start',
                           gap: 'var(--space-3)',
-                          padding: 'var(--space-2.5) var(--space-3)',
-                          background: isSelected ? 'rgba(30, 69, 252, 0.05)' : 'transparent',
-                          border: isSelected ? '1px solid rgba(30, 69, 252, 0.3)' : '1px solid var(--color-surface-offset)',
+                          padding: 'var(--space-3)',
+                          background: isSelected ? 'rgba(30, 69, 252, 0.06)' : 'transparent',
+                          border: isSelected ? '1px solid rgba(30, 69, 252, 0.35)' : '1px solid var(--color-surface-offset)',
                           borderRadius: 'var(--radius-md)',
                           cursor: isStreaming ? 'default' : 'pointer',
                           transition: 'all var(--duration-fast)'
                         }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => {}} // Controlled by wrapper div click
-                          disabled={isStreaming}
+                        <div
+                          aria-hidden
                           style={{
-                            marginTop: '2px',
-                            cursor: isStreaming ? 'default' : 'pointer',
-                            accentColor: 'var(--color-primary)'
+                            width: '16px',
+                            height: '16px',
+                            marginTop: '1px',
+                            flexShrink: 0,
+                            borderRadius: 'var(--radius-sm)',
+                            border: isSelected ? '1px solid var(--color-primary)' : '1.5px solid var(--color-surface-offset)',
+                            background: isSelected ? 'var(--color-primary)' : 'transparent',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all var(--duration-fast)'
                           }}
-                        />
+                        >
+                          {isSelected && (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-3)', marginBottom: '3px' }}>
+                            <span style={{ fontSize: '11px', lineHeight: '16px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {log.title}
                             </span>
-                            <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '9px', lineHeight: '16px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                               {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <p style={{ fontSize: '10px', color: 'var(--color-text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <p style={{ fontSize: '10px', lineHeight: 1.4, color: 'var(--color-text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {log.body}
                           </p>
                         </div>
@@ -729,8 +800,8 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                     color: 'white',
                     border: 'none',
                     borderRadius: 'var(--radius-md)',
-                    padding: 'var(--space-2.5) 0',
-                    fontSize: 'var(--text-xs)',
+                    padding: 'var(--space-3) 0',
+                    fontSize: 'var(--text-sm)',
                     fontWeight: 'var(--weight-bold)',
                     cursor: 'pointer'
                   }}
@@ -747,14 +818,16 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                     color: logs.length === 0 || selectedLogIds.length === 0 ? 'var(--color-text-faint)' : 'var(--color-text-inverted)',
                     border: 'none',
                     borderRadius: 'var(--radius-md)',
-                    padding: 'var(--space-2.5) 0',
-                    fontSize: 'var(--text-xs)',
+                    padding: 'var(--space-3) 0',
+                    fontSize: 'var(--text-sm)',
                     fontWeight: 'var(--weight-bold)',
                     cursor: logs.length === 0 || selectedLogIds.length === 0 ? 'default' : 'pointer',
+                    boxShadow: logs.length === 0 || selectedLogIds.length === 0 ? 'none' : '0 4px 14px -4px rgba(205, 241, 43, 0.4)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 'var(--space-2)'
+                    gap: 'var(--space-2)',
+                    transition: 'all var(--duration-fast)'
                   }}
                 >
                   <SparklesIcon />
@@ -780,8 +853,19 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 flexShrink: 0
               }}
             >
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 Report Output
+                {streamingText && !isStreaming && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '9px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#22c55e' }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }} />
+                    Ready
+                  </span>
+                )}
+                {isStreaming && streamingText && (
+                  <span style={{ fontSize: '9px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-secondary)' }}>
+                    Streaming…
+                  </span>
+                )}
               </span>
 
               {streamingText && !isStreaming && (
@@ -848,24 +932,82 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
             {/* Markdown rendering viewport */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-6)' }}>
               {isStreaming && !streamingText ? (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', textAlign: 'center', gap: 'var(--space-2)' }}>
-                  <div className="skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>Initiating AI stream...</span>
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>Connecting to {selectedModel}</span>
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', textAlign: 'center', gap: 'var(--space-3)' }}>
+                  <div style={{ position: 'relative', width: '44px', height: '44px' }}>
+                    <div className="spin" style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid var(--color-surface-offset)', borderTopColor: 'var(--color-primary)' }} />
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
+                      <SparklesIcon />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>Generating your standup…</span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-secondary)' }} />
+                    {selectedModel}
+                  </span>
                 </div>
               ) : !streamingText && !isStreaming ? (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-6)' }}>
-                  <SparklesIcon />
-                  <p style={{ fontSize: 'var(--text-xs)', marginTop: 'var(--space-3)', color: 'var(--color-text-muted)' }}>
-                    No report generated yet.
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-6)', gap: 'var(--space-2)' }}>
+                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-offset)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
+                    <SparklesIcon />
+                  </div>
+                  <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', margin: 0 }}>
+                    No report yet
                   </p>
-                  <span style={{ fontSize: '10px', maxWidth: '300px', lineHeight: 1.5 }}>
-                    Select raw log entries in the checklist on the left, then click "Generate Standup Report" to stream the AI summary here.
+                  <span style={{ fontSize: '11px', maxWidth: '280px', lineHeight: 1.6, color: 'var(--color-text-muted)' }}>
+                    Pick the log entries you want summarised on the left, then hit <strong style={{ color: 'var(--color-text-base)' }}>Generate</strong> to stream your standup here.
                   </span>
                 </div>
               ) : (
-                <div className={`markdown-body ${isStreaming ? 'pulse-caret' : ''}`} style={{ fontSize: 'var(--text-xs)', lineHeight: 1.6, color: 'var(--color-text-base)' }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <div
+                  className={`markdown-body standup-report ${isStreaming ? 'pulse-caret' : ''}`}
+                  style={{ fontSize: 'var(--text-xs)', lineHeight: 1.65, color: 'var(--color-text-base)' }}
+                >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => (
+                        <h1 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: '0 0 var(--space-4)', paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)' }}>
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => {
+                        const accent = sectionAccent(flatten(children)) || 'var(--color-text-muted)'
+                        return (
+                          <h2 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 'var(--weight-bold)', color: accent, margin: 'var(--space-5) 0 var(--space-2)' }}>
+                            <span style={{ width: '3px', height: '13px', borderRadius: '2px', background: accent }} />
+                            {children}
+                          </h2>
+                        )
+                      },
+                      h3: ({ children }) => {
+                        const accent = sectionAccent(flatten(children)) || 'var(--color-text-muted)'
+                        return (
+                          <h3 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: accent, margin: 'var(--space-4) 0 var(--space-1)' }}>
+                            {children}
+                          </h3>
+                        )
+                      },
+                      ul: ({ children }) => (
+                        <ul style={{ margin: '0 0 var(--space-3)', paddingLeft: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: '4px' }}>{children}</ul>
+                      ),
+                      li: ({ children }) => (
+                        <li style={{ lineHeight: 1.6 }}>{children}</li>
+                      ),
+                      p: ({ children }) => (
+                        <p style={{ margin: '0 0 var(--space-3)', lineHeight: 1.65 }}>{children}</p>
+                      ),
+                      strong: ({ children }) => {
+                        const accent = sectionAccent(flatten(children))
+                        return <strong style={{ fontWeight: 'var(--weight-semibold)', color: accent || 'var(--color-text-base)' }}>{children}</strong>
+                      },
+                      a: ({ children, href }) => (
+                        <a href={href} style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{children}</a>
+                      ),
+                      code: ({ children }) => (
+                        <code style={{ background: 'var(--color-surface-offset)', borderRadius: 'var(--radius-sm)', padding: '1px 5px', fontSize: '11px' }}>{children}</code>
+                      )
+                    }}
+                  >
                     {streamingText}
                   </ReactMarkdown>
                   <div ref={reportEndRef} />

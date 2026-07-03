@@ -5,15 +5,17 @@ interface ToastAction {
   onClick: () => void
 }
 
+type ToastType = 'info' | 'success' | 'error' | 'warning'
+
 interface ToastMessage {
   id: string
   text: string
   action?: ToastAction
-  type?: 'info' | 'success' | 'error'
+  type?: ToastType
 }
 
 interface ToastContextType {
-  toast: (text: string, options?: { action?: ToastAction; type?: 'info' | 'success' | 'error'; duration?: number }) => void
+  toast: (text: string, options?: { action?: ToastAction; type?: ToastType; duration?: number }) => void
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
@@ -32,7 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const toast = useCallback((
     text: string,
-    options?: { action?: ToastAction; type?: 'info' | 'success' | 'error'; duration?: number }
+    options?: { action?: ToastAction; type?: ToastType; duration?: number }
   ) => {
     const id = Math.random().toString(36).substring(2, 9)
     const newToast: ToastMessage = {
@@ -83,6 +85,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           let typeColor = 'var(--color-text-base, #ffffff)'
           if (t.type === 'success') typeColor = 'var(--color-success, #10b981)'
           if (t.type === 'error') typeColor = 'var(--color-error, #ef4444)'
+          if (t.type === 'warning') typeColor = 'var(--color-warning, #f59e0b)'
 
           return (
             <div

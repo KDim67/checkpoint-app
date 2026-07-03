@@ -161,6 +161,24 @@ export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Pr
 }
 
 /**
+ * Deletes a locally-installed Ollama model. Returns true on success.
+ */
+export async function deleteModel(modelTag: string): Promise<boolean> {
+  try {
+    const response = await fetch('http://localhost:11434/api/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelTag, name: modelTag }),
+      signal: AbortSignal.timeout(10000)
+    })
+    return response.ok
+  } catch (err) {
+    console.error('Ollama Manager: Failed to delete model:', err)
+    return false
+  }
+}
+
+/**
  * Aborts the active pull operation if running.
  */
 export function stopPull(): void {
