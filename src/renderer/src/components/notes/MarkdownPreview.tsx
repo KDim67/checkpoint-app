@@ -117,6 +117,7 @@ export default function MarkdownPreview({ content, onOpenWikiLink, noteExists }:
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
+      urlTransform={url => url}
       components={{
         a: ({ href, children, ...props }) => {
           if (href && href.startsWith('#wiki-link-')) {

@@ -4,6 +4,7 @@ import {
   Quote, List, ListChecks, Link, Link2, Table, GitBranch, Minus
 } from 'lucide-react'
 import { applyFormat, countWords, readingTime, type FormatAction } from './notesUtils'
+import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 
 interface NoteEditorProps {
   content: string
@@ -267,6 +268,14 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
         onKeyDown={handleKeyDown}
         onClick={() => textareaRef.current && detectAutocomplete(textareaRef.current)}
         onBlur={() => setTimeout(() => setAutocomplete(null), 150)}
+        onPaste={async (e) => {
+          const isImage = await handleImagePaste(e, content, onChange)
+          if (isImage) return
+        }}
+        onDrop={async (e) => {
+          await handleImageDrop(e, content, onChange)
+        }}
+        onDragOver={e => e.preventDefault()}
         placeholder="Type in markdown…  Use #tags to organize or [[Wiki Links]] to connect notes."
         spellCheck={false}
       />

@@ -964,6 +964,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 >
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
+                    urlTransform={url => url}
                     components={{
                       h1: ({ children }) => (
                         <h1 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: '0 0 var(--space-4)', paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)' }}>

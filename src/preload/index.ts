@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: (): void => ipcRenderer.send(IpcChannels.APP_CLOSE),
     saveFile: (defaultName: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.APP_SAVE_FILE, defaultName, content),
+    showItemInFolder: (filePath: string): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, filePath),
     // Electron ≥32 removed File.path from renderer File objects, this is the
     // only sanctioned way to resolve the absolute path of a dropped file.
     getPathForFile: (file: File): string => {
@@ -92,6 +94,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ): Promise<Item> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_CREATE_ITEM, payload, tagIds)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'createItem', item: res.data, tagIds } }))
       return res.data
     },
 
@@ -102,12 +105,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ): Promise<Item> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_UPDATE_ITEM, id, patch, tagIds)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'updateItem', item: res.data, tagIds } }))
       return res.data
     },
 
     deleteItem: async (id: string): Promise<void> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_DELETE_ITEM, id)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'deleteItem', id } }))
     },
 
     getTags: async (): Promise<Tag[]> => {
@@ -119,18 +124,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createTag: async (payload: CreateTagPayload): Promise<Tag> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_CREATE_TAG, payload)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'createTag', tag: res.data } }))
       return res.data
     },
 
     updateTag: async (id: string, payload: Partial<CreateTagPayload>): Promise<Tag> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_UPDATE_TAG, id, payload)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'updateTag', tag: res.data } }))
       return res.data
     },
 
     deleteTag: async (id: string): Promise<void> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_DELETE_TAG, id)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'deleteTag', id } }))
     },
 
     getSetting: async (key: string): Promise<unknown> => {
@@ -153,12 +161,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createRelation: async (fromId: string, toId: string, type: RelationType): Promise<Relation> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_CREATE_RELATION, fromId, toId, type)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'createRelation', relation: res.data } }))
       return res.data
     },
 
     deleteRelation: async (id: string): Promise<void> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_DELETE_RELATION, id)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'deleteRelation', id } }))
     },
 
     searchItems: async (query: SearchQuery): Promise<PaginatedResult<Item>> => {
@@ -176,18 +186,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     bulkUpdateItems: async (payload: BulkUpdatePayload): Promise<{ updated: number }> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_BULK_UPDATE_ITEMS, payload)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'bulkUpdateItems', payload } }))
       return res.data
     },
 
     bulkDeleteItems: async (ids: string[]): Promise<{ deleted: number }> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_BULK_DELETE_ITEMS, ids)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'bulkDeleteItems', ids } }))
       return res.data
     },
 
     rebalancePositions: async (context: string, status: string): Promise<void> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_REBALANCE_POSITIONS, context, status)
       if (!res.success) throw new Error(res.error)
+      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'rebalancePositions', context, status } }))
     },
 
     queryTasks: async (context: string, params: TaskQueryParams): Promise<PaginatedResult<Item>> => {
@@ -206,6 +219,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const res = await ipcRenderer.invoke(IpcChannels.DB_GET_FOCUS_SESSIONS, context)
       if (!res.success) throw new Error(res.error)
       return res.data
+    },
+
+    exportContext: async (context: string, contextName: string): Promise<{ success: boolean; filePath?: string; cancelled?: boolean; error?: string }> => {
+      return ipcRenderer.invoke(IpcChannels.DB_EXPORT_CONTEXT, context, contextName)
+    },
+
+    importContext: async (): Promise<{ success: boolean; payload?: any; cancelled?: boolean; error?: string }> => {
+      return ipcRenderer.invoke(IpcChannels.DB_IMPORT_CONTEXT)
+    },
+
+    importContextData: async (newContextSlug: string, data: any): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke(IpcChannels.DB_IMPORT_CONTEXT_DATA, newContextSlug, data)
     }
   },
 
@@ -578,5 +603,58 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke(IpcChannels.WORKSPACE_GET_STRUCTURE, folderPath),
     readFile: (folderPath: string, relativePath: string): Promise<string> =>
       ipcRenderer.invoke(IpcChannels.WORKSPACE_READ_FILE, folderPath, relativePath)
+  },
+  media: {
+    saveFromBuffer: (arrayBuffer: ArrayBuffer, extension: string): Promise<string> =>
+      ipcRenderer.invoke(IpcChannels.MEDIA_SAVE_FROM_BUFFER, arrayBuffer, extension),
+    saveFilePaths: (filePaths: string[]): Promise<Array<{ originalPath: string; filename: string }>> =>
+      ipcRenderer.invoke(IpcChannels.MEDIA_SAVE_FILE_PATHS, filePaths),
+    scanAndPrune: (): Promise<{
+      scannedCount: number
+      prunedCount: number
+      spaceSavedBytes: number
+      prunedFiles: string[]
+    }> => ipcRenderer.invoke(IpcChannels.MEDIA_SCAN_AND_PRUNE),
+    getStorageInfo: (): Promise<{ fileCount: number; totalSize: number; path: string }> =>
+      ipcRenderer.invoke(IpcChannels.MEDIA_GET_STORAGE_INFO)
+  },
+  sync: {
+    startHost: (port?: number): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_START_HOST, port),
+    stopHost: (): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_STOP_HOST),
+    connectAndSync: (hostIp: string, port: number, pairingCode: string): Promise<{ dbUpdates: number; filesSynced: number }> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_CONNECT_AND_SYNC, hostIp, port, pairingCode),
+    getStatus: (): Promise<{
+      active: boolean
+      port: number
+      pairingCode: string
+      progress: string
+      isSyncing: boolean
+    }> => ipcRenderer.invoke(IpcChannels.SYNC_GET_STATUS),
+    getDiscoveredPeers: (): Promise<Array<{ name: string; ip: string; port: number; lastSeen: number }>> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_GET_DISCOVERED_PEERS),
+    getDbPayload: (): Promise<any> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_GET_DB_PAYLOAD),
+    applyDbPayload: (payload: any): Promise<{ pulledNewerCount: number }> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_APPLY_DB_PAYLOAD, payload),
+    getFileIndex: (subDir: 'notes' | 'media'): Promise<any[]> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_GET_FILE_INDEX, subDir),
+    readFileChunk: (subDir: 'notes' | 'media', relPath: string): Promise<Uint8Array | null> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_READ_FILE_CHUNK, subDir, relPath),
+    writeFileChunk: (subDir: 'notes' | 'media', relPath: string, buffer: ArrayBuffer, mtime?: number): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_WRITE_FILE_CHUNK, subDir, relPath, buffer, mtime),
+    deleteFile: (subDir: 'notes' | 'media', relPath: string): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_DELETE_FILE, subDir, relPath),
+    applyBoardBaseline: (
+      context: string,
+      items: any[],
+      tags: any[],
+      itemTags: any[],
+      relations: any[]
+    ): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_APPLY_BOARD_BASELINE, context, items, tags, itemTags, relations),
+    applyRemoteMutation: (mutation: any): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_APPLY_REMOTE_MUTATION, mutation)
   }
 })

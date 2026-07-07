@@ -1,6 +1,6 @@
 import { app, BrowserWindow, nativeImage, ipcMain, Menu, shell, globalShortcut, dialog, clipboard, protocol, net } from 'electron'
-import { join, relative, isAbsolute } from 'path'
-import { writeFileSync, existsSync } from 'fs'
+import path, { join, relative, isAbsolute } from 'path'
+import fs, { writeFileSync, existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { ShortcutMap } from '../shared/types'
@@ -18,11 +18,24 @@ import {
   getCheatsheetText
 } from './cheatsheetService'
 import { batchRenameFiles, selectTextureFile, loadTextureFile, savePbrMaps, saveSeamlessTexture, selectFolder, saveSpriteAtlas, saveSlicedSprites, saveLutTexture, saveUpscaledTexture } from './gamedevService'
+import { SyncService } from './syncService'
 
-// Register cheatsheet protocol as privileged before app.whenReady()
+const syncService = new SyncService()
+
+// Register protocols as privileged before app.whenReady()
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'cheatsheet',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  },
+  {
+    scheme: 'checkpoint-media',
     privileges: {
       standard: true,
       secure: true,
@@ -54,14 +67,14 @@ export function registerAppShortcuts(): void {
   }
 
   // Load customizer status
-  const customizerEnabled = getSetting('customizer_enabled', 'false') === 'true'
+  const customizerEnabled = getSetting<string>('customizer_enabled', 'false') === 'true'
 
   let hudKey = 'CommandOrControl+Shift+Space'
   let clipboardKey = 'CommandOrControl+Shift+V'
 
   if (customizerEnabled) {
     try {
-      const rawShortcuts = getSetting('customizer_shortcuts', '{}')
+      const rawShortcuts = getSetting<string>('customizer_shortcuts', '{}')
       const shortcuts = JSON.parse(rawShortcuts)
       if (shortcuts.hud_toggle) hudKey = shortcuts.hud_toggle
       if (shortcuts.clipboard_toggle) clipboardKey = shortcuts.clipboard_toggle
@@ -72,7 +85,7 @@ export function registerAppShortcuts(): void {
 
   // 1. HUD Toggle shortcut (via hud module)
   try {
-    const featureHud = getSetting('feature_hud', 'true')
+    const featureHud = getSetting<string>('feature_hud', 'true')
     if (featureHud !== 'false') {
       enableHud(hudKey)
     } else {
@@ -224,6 +237,14 @@ function registerIpcHandlers(): void {
     } catch (err) {
       console.error('Failed to write exported backlog file:', err)
       return false
+    }
+  })
+
+  ipcMain.handle(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, (_event, filePath: string) => {
+    try {
+      shell.showItemInFolder(filePath)
+    } catch (err) {
+      console.error('Failed to show item in folder:', err)
     }
   })
 
@@ -624,6 +645,80 @@ function registerIpcHandlers(): void {
     return getCheatsheetText(name)
   })
 
+  // P2P Network Sync Handlers
+  ipcMain.handle(IpcChannels.SYNC_START_HOST, (_event, port?: number) => {
+    syncService.startHost(port)
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_STOP_HOST, () => {
+    syncService.stopHost()
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_CONNECT_AND_SYNC, async (_event, hostIp: string, port: number, pairingCode: string) => {
+    const dataPath = app.getPath('userData')
+    return syncService.connectAndSync(hostIp, port, pairingCode, dataPath)
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_GET_STATUS, () => {
+    return syncService.getStatus()
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_GET_DISCOVERED_PEERS, () => {
+    return syncService.getDiscoveredPeers()
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_GET_DB_PAYLOAD, () => {
+    return syncService.getDatabasePayload()
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_APPLY_DB_PAYLOAD, (_event, payload: any) => {
+    return syncService.applyDatabasePayload(payload)
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_GET_FILE_INDEX, (_event, subDir: 'notes' | 'media') => {
+    const dataPath = app.getPath('userData')
+    return syncService.getFileIndex(subDir, dataPath)
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_READ_FILE_CHUNK, async (_event, subDir: 'notes' | 'media', relPath: string) => {
+    const dataPath = app.getPath('userData')
+    const filePath = path.join(dataPath, subDir, relPath)
+    if (!fs.existsSync(filePath)) return null
+    return fs.readFileSync(filePath)
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_WRITE_FILE_CHUNK, async (_event, subDir: 'notes' | 'media', relPath: string, buffer: ArrayBuffer, mtime?: number) => {
+    const dataPath = app.getPath('userData')
+    const destDir = path.join(dataPath, subDir)
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true })
+    }
+    const destPath = path.join(destDir, relPath)
+    fs.writeFileSync(destPath, Buffer.from(buffer))
+    if (mtime) {
+      const timeSecs = mtime / 1000
+      fs.utimesSync(destPath, timeSecs, timeSecs)
+    }
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_DELETE_FILE, async (_event, subDir: 'notes' | 'media', relPath: string) => {
+    const dataPath = app.getPath('userData')
+    const filePath = path.join(dataPath, subDir, relPath)
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath)
+    }
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_APPLY_BOARD_BASELINE, async (_event, context: string, items: any[], tags: any[], itemTags: any[], relations: any[]) => {
+    const { applyBoardBaselineTx } = await import('./db')
+    return applyBoardBaselineTx(context, items, tags, itemTags, relations)
+  })
+
+  ipcMain.handle(IpcChannels.SYNC_APPLY_REMOTE_MUTATION, async (_event, mutation: any) => {
+    const { applyRemoteMutationTx } = await import('./db')
+    return applyRemoteMutationTx(mutation)
+  })
+
   ipcMain.handle(IpcChannels.CHEATSHEETS_GET_RELEVANT, async (_event, name: string, query: string, maxChars?: number) => {
     const { getCheatsheetRelevant } = await import('./cheatsheetService')
     return getCheatsheetRelevant(name, query, maxChars)
@@ -723,6 +818,48 @@ function registerIpcHandlers(): void {
       return { success: false, error: err.message || String(err) }
     }
   })
+
+  // Local Media Handlers
+  ipcMain.handle(IpcChannels.MEDIA_SAVE_FROM_BUFFER, async (_event, arrayBuffer: ArrayBuffer, extension: string) => {
+    try {
+      const { saveBufferToMedia } = await import('./mediaService')
+      const buffer = Buffer.from(arrayBuffer)
+      return saveBufferToMedia(buffer, extension)
+    } catch (err) {
+      console.error('IPC media:saveFromBuffer failed:', err)
+      throw err
+    }
+  })
+
+  ipcMain.handle(IpcChannels.MEDIA_SAVE_FILE_PATHS, async (_event, filePaths: string[]) => {
+    try {
+      const { saveFilesToMedia } = await import('./mediaService')
+      return saveFilesToMedia(filePaths)
+    } catch (err) {
+      console.error('IPC media:saveFilePaths failed:', err)
+      throw err
+    }
+  })
+
+  ipcMain.handle(IpcChannels.MEDIA_SCAN_AND_PRUNE, async () => {
+    try {
+      const { scanAndPruneOrphanedMedia } = await import('./mediaService')
+      return scanAndPruneOrphanedMedia()
+    } catch (err) {
+      console.error('IPC media:scanAndPrune failed:', err)
+      throw err
+    }
+  })
+
+  ipcMain.handle(IpcChannels.MEDIA_GET_STORAGE_INFO, async () => {
+    try {
+      const { getStorageInfo } = await import('./mediaService')
+      return getStorageInfo()
+    } catch (err) {
+      console.error('IPC media:getStorageInfo failed:', err)
+      throw err
+    }
+  })
 }
 
 // App Lifecycle
@@ -737,7 +874,8 @@ app.whenReady().then(async () => {
     protocol.handle('cheatsheet', async (request) => {
       try {
         const url = new URL(request.url)
-        const filename = decodeURIComponent(url.pathname.replace(/^\//, ''))
+        const rawPath = url.host ? (url.host + url.pathname) : url.pathname
+        const filename = decodeURIComponent(rawPath.replace(/^\//, '')).replace(/\/$/, '')
         const dir = getCheatsheetsDir()
         const filePath = join(dir, filename)
 
@@ -761,6 +899,38 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize cheatsheets folder/protocol:', err)
   }
 
+  // Register checkpoint-media protocol handler and ensure its directory exists
+  try {
+    const { ensureMediaDir, getMediaDir } = await import('./mediaService')
+    ensureMediaDir()
+    protocol.handle('checkpoint-media', async (request) => {
+      try {
+        const url = new URL(request.url)
+        const rawPath = url.host ? (url.host + url.pathname) : url.pathname
+        const filename = decodeURIComponent(rawPath.replace(/^\//, '')).replace(/\/$/, '')
+        const dir = getMediaDir()
+        const filePath = join(dir, filename)
+
+        // Prevent directory traversal
+        const relativePath = relative(dir, filePath)
+        if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+          return new Response('Access Denied', { status: 403 })
+        }
+
+        if (!existsSync(filePath)) {
+          return new Response('File Not Found', { status: 404 })
+        }
+
+        return net.fetch(pathToFileURL(filePath).toString())
+      } catch (err) {
+        console.error('Failed to serve media file:', err)
+        return new Response('Error loading file', { status: 500 })
+      }
+    })
+  } catch (err) {
+    console.error('Failed to initialize checkpoint-media folder/protocol:', err)
+  }
+
   // Lazy-load the database after window is created
   const { initDb } = await import('./db')
   const dataPath = app.getPath('userData')
@@ -769,6 +939,72 @@ app.whenReady().then(async () => {
   // Register DB IPC handlers (Phase 2, db.ts must be created first)
   const { registerDbHandlers } = await import('./db')
   registerDbHandlers(db)
+
+  // Context Export
+  ipcMain.handle(IpcChannels.DB_EXPORT_CONTEXT, async (_event, context: string, contextName: string) => {
+    try {
+      const window = BrowserWindow.getFocusedWindow()
+      if (!window) return { success: false, error: 'No active window' }
+
+      const { filePath } = await dialog.showSaveDialog(window, {
+        title: `Export Workspace Context: ${contextName}`,
+        defaultPath: `${contextName.toLowerCase()}-workspace.json`,
+        filters: [{ name: 'JSON Workspace', extensions: ['json'] }]
+      })
+
+      if (!filePath) return { success: false, cancelled: true }
+
+      const { exportContextData } = await import('./db')
+      const payload = exportContextData(db, context)
+      
+      fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8')
+      return { success: true, filePath }
+    } catch (err: any) {
+      console.error('Failed to export workspace context:', err)
+      return { success: false, error: err.message || String(err) }
+    }
+  })
+
+  // Context Import File Selector
+  ipcMain.handle(IpcChannels.DB_IMPORT_CONTEXT, async () => {
+    try {
+      const window = BrowserWindow.getFocusedWindow()
+      if (!window) return { success: false, error: 'No active window' }
+
+      const { filePaths } = await dialog.showOpenDialog(window, {
+        title: 'Import Workspace Context',
+        filters: [{ name: 'JSON Workspace', extensions: ['json'] }],
+        properties: ['openFile']
+      })
+
+      if (!filePaths || filePaths.length === 0) return { success: false, cancelled: true }
+
+      const filePath = filePaths[0]
+      const raw = fs.readFileSync(filePath, 'utf8')
+      const parsed = JSON.parse(raw)
+
+      if (!parsed.context || !Array.isArray(parsed.items)) {
+        return { success: false, error: 'Invalid workspace context file format.' }
+      }
+
+      return { success: true, payload: parsed }
+    } catch (err: any) {
+      console.error('Failed to import workspace context:', err)
+      return { success: false, error: err.message || String(err) }
+    }
+  })
+
+  // Context Import Data Insertion
+  ipcMain.handle(IpcChannels.DB_IMPORT_CONTEXT_DATA, async (_event, newContextSlug: string, data: any) => {
+    try {
+      const { importContextData } = await import('./db')
+      importContextData(db, newContextSlug, data)
+      return { success: true }
+    } catch (err: any) {
+      console.error('Failed to save imported workspace data:', err)
+      return { success: false, error: err.message || String(err) }
+    }
+  })
 
   // Initialize AI Memory & Workspace IPC Services
   try {

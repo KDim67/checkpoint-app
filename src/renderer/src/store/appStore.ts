@@ -15,6 +15,8 @@ export type SettingsTab =
   | 'hotkeyBinder'
   | 'features'
   | 'backup'
+  | 'storage'
+  | 'sync'
   | 'about'
 
 interface AppState {

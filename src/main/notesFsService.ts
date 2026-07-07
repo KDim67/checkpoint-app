@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import type { NoteMetadata, NoteSearchResult } from '../shared/types'
+import { recordTombstone } from './db'
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'checkpoint')
 const NOTES_DIR = path.join(CONFIG_DIR, 'notes')
@@ -183,6 +184,8 @@ export async function writeNote(title: string, content: string, oldTitle?: strin
 export async function deleteNote(title: string): Promise<void> {
   initNotesFs()
   try {
+    const filename = title.endsWith('.md') ? title : `${title}.md`
+    recordTombstone(filename, 'notes')
     const filePath = resolveSafePath(title)
     if (fs.existsSync(filePath)) {
       await fs.promises.unlink(filePath)

@@ -4,10 +4,10 @@ import { Sidebar } from './components/Sidebar'
 import AiStreamPanel from './components/AiStreamPanel'
 import GitPanel from './components/GitPanel'
 import ItemDetailPanel from './components/ItemDetailPanel'
-import Logo from './components/ui/Logo'
 import { ToastProvider } from './components/ui/Toast'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './components/settings/AppearanceSettings'
+import Lightbox from './components/ui/Lightbox'
 
 // Lazy-loaded views (code split per view)
 const LogView      = lazy(() => import('./components/LogView'))
@@ -332,134 +332,6 @@ function RightPanel() {
   )
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// SQLite Database Debug Panel (Dev Only)
-function DebugDbPanel() {
-  const [createdId, setCreatedId] = React.useState<string | null>(null)
-  const [log, setLog] = React.useState<string>('')
-
-  const handleCreate = async () => {
-    try {
-      const item = await window.electronAPI.db.createItem({
-        type: 'card',
-        context: 'default',
-        title: 'Verify Phase 2',
-        body: 'A temporary card to test database operations.',
-        status: 'open',
-        priority: 1,
-        position: 100.0,
-        due_at: null,
-        metadata: '{}'
-      }) as any
-      setCreatedId(item.id)
-      setLog(`[CREATE SUCCESS] Created item ID: ${item.id}\n${JSON.stringify(item, null, 2)}`)
-    } catch (err: any) {
-      setLog(`[CREATE ERROR] ${err.message}`)
-    }
-  }
-
-  const handleRead = async () => {
-    try {
-      const result = await window.electronAPI.db.getItems('default', 'card', 0, 10) as any
-      setLog(`[READ SUCCESS] Total items: ${result.total}\n${JSON.stringify(result, null, 2)}`)
-    } catch (err: any) {
-      setLog(`[READ ERROR] ${err.message}`)
-    }
-  }
-
-  const handleUpdate = async () => {
-    if (!createdId) {
-      setLog('[UPDATE ERROR] Click CREATE first to generate a card!')
-      return
-    }
-    try {
-      const item = await window.electronAPI.db.updateItem(createdId, {
-        status: 'done',
-        title: 'Verify Phase 2 (Updated)'
-      }) as any
-      setLog(`[UPDATE SUCCESS] Updated item:\n${JSON.stringify(item, null, 2)}`)
-    } catch (err: any) {
-      setLog(`[UPDATE ERROR] ${err.message}`)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!createdId) {
-      setLog('[DELETE ERROR] Click CREATE first to generate a card!')
-      return
-    }
-    try {
-      await window.electronAPI.db.deleteItem(createdId)
-      setCreatedId(null)
-      setLog('[DELETE SUCCESS] Deleted item ID: ' + createdId)
-    } catch (err: any) {
-      setLog(`[DELETE ERROR] ${err.message}`)
-    }
-  }
-
-  const handleSearch = async () => {
-    try {
-      const result = await window.electronAPI.db.searchItems({ query: 'Verify', page: 0, pageSize: 10 }) as any
-      setLog(`[SEARCH SUCCESS] Found:\n${JSON.stringify(result, null, 2)}`)
-    } catch (err: any) {
-      setLog(`[SEARCH ERROR] ${err.message}`)
-    }
-  }
-
-  const handleErrorTest = async () => {
-    try {
-      await window.electronAPI.db.createItem({
-        type: 'invalid-type-to-trigger-zod',
-        context: '',
-        title: 123
-      } as any)
-      setLog('[ERROR TEST] FAILED: Malformed payload was unexpectedly accepted!')
-    } catch (err: any) {
-      setLog(`[ERROR TEST SUCCESS] Zod rejected malformed payload:\n${err.message}`)
-    }
-  }
-
-  return (
-    <div style={{
-      margin: 'var(--space-6)',
-      padding: 'var(--space-4)',
-      background: 'var(--color-surface-2)',
-      border: '1px dashed var(--color-balance)',
-      borderRadius: 'var(--radius-lg)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 'var(--space-3)',
-      color: 'var(--color-text-base)'
-    }}>
-      <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)', margin: 0 }}>
-        SQLite Database Debug Panel (Dev Only)
-      </h3>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-        <button className="btn-ghost" style={{ border: '1px solid var(--color-balance)' }} onClick={handleCreate}>CREATE</button>
-        <button className="btn-ghost" style={{ border: '1px solid var(--color-balance)' }} onClick={handleRead}>READ</button>
-        <button className="btn-ghost" style={{ border: '1px solid var(--color-balance)' }} onClick={handleUpdate}>UPDATE</button>
-        <button className="btn-ghost" style={{ border: '1px solid var(--color-balance)' }} onClick={handleDelete}>DELETE</button>
-        <button className="btn-ghost" style={{ border: '1px solid var(--color-balance)' }} onClick={handleSearch}>SEARCH</button>
-        <button className="btn-ghost" style={{ border: '1px solid var(--color-balance)', color: 'var(--color-error)' }} onClick={handleErrorTest}>TEST ERROR</button>
-      </div>
-      <pre style={{
-        margin: 0,
-        padding: 'var(--space-2)',
-        background: 'var(--color-background)',
-        borderRadius: 'var(--radius-md)',
-        fontSize: 'var(--text-xs)',
-        fontFamily: 'var(--font-mono)',
-        color: 'var(--color-text-base)',
-        maxHeight: '180px',
-        overflow: 'auto',
-        whiteSpace: 'pre-wrap'
-      }}>
-        {log || 'Click any button above to test SQLite CRUD operations.'}
-      </pre>
-    </div>
-  )
-}
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // Google Fonts Downloader
 const GOOGLE_FONTS_URLS: Record<string, string> = {
@@ -509,6 +381,28 @@ export default function App() {
   const setAvailableContexts = useAppStore(s => s.setAvailableContexts)
   const setContext = useAppStore(s => s.setContext)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
+  // Global Image Click Listener for Lightbox Preview
+  useEffect(() => {
+    const handleImageClick = (e: MouseEvent) => {
+      const target = e.target as HTMLImageElement
+      if (target.tagName === 'IMG') {
+        const src = target.src || target.getAttribute('src')
+        if (src) {
+          const isAttachedMedia = src.startsWith('checkpoint-media://') || src.startsWith('file://') || src.startsWith('blob:')
+          const isMarkdownImg = target.closest('.markdown-body') !== null
+          if (isAttachedMedia || isMarkdownImg) {
+            e.preventDefault()
+            e.stopPropagation()
+            setLightboxSrc(src)
+          }
+        }
+      }
+    }
+    document.addEventListener('click', handleImageClick, true)
+    return () => document.removeEventListener('click', handleImageClick, true)
+  }, [])
 
   // Bootstrap: load available contexts from DB on mount.
   // An explicitly-set "default context" (Settings → General) wins over the
@@ -631,6 +525,53 @@ export default function App() {
     }
   }, [loadContexts, setView, toggleRightPanel])
 
+  // Safeguard: Redirect if the current view gets disabled in settings
+  const checkEnabledViews = useCallback(async () => {
+    try {
+      const [
+        kanban, log, backlog, focus, notes, clipboard, analytics, cookbook, cheatsheets, gamedev
+      ] = await Promise.all([
+        window.electronAPI.db.getSetting('feature_view_kanban'),
+        window.electronAPI.db.getSetting('feature_view_log'),
+        window.electronAPI.db.getSetting('feature_view_backlog'),
+        window.electronAPI.db.getSetting('feature_view_focus'),
+        window.electronAPI.db.getSetting('feature_view_notes'),
+        window.electronAPI.db.getSetting('feature_view_clipboard'),
+        window.electronAPI.db.getSetting('feature_view_analytics'),
+        window.electronAPI.db.getSetting('feature_view_cookbook'),
+        window.electronAPI.db.getSetting('feature_view_cheatsheets'),
+        window.electronAPI.db.getSetting('feature_gamedev_helpers')
+      ])
+
+      const state = {
+        kanban: kanban !== 'false',
+        log: log !== 'false',
+        backlog: backlog !== 'false',
+        focus: focus !== 'false',
+        notes: notes !== 'false',
+        clipboard: clipboard !== 'false',
+        analytics: analytics !== 'false',
+        cookbook: cookbook !== 'false',
+        cheatsheets: cheatsheets !== 'false',
+        gamedev: gamedev === 'true'
+      }
+
+      if (activeView !== 'settings' && !state[activeView]) {
+        const order = ['kanban', 'log', 'backlog', 'focus', 'notes', 'clipboard', 'analytics', 'cookbook', 'cheatsheets', 'gamedev']
+        const fallback = order.find(v => state[v]) || 'kanban'
+        setView(fallback as any)
+      }
+    } catch (err) {
+      console.error('Failed checking enabled views in App:', err)
+    }
+  }, [activeView, setView])
+
+  useEffect(() => {
+    checkEnabledViews()
+    window.addEventListener('settings-update-features', checkEnabledViews)
+    return () => window.removeEventListener('settings-update-features', checkEnabledViews)
+  }, [checkEnabledViews])
+
   function renderView() {
     switch (activeView) {
       case 'log':       return <LogView />
@@ -668,6 +609,7 @@ export default function App() {
           <RightPanel />
         </div>
       </div>
+      <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </ToastProvider>
   )
 }

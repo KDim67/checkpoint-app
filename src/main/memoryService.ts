@@ -357,7 +357,6 @@ export async function consolidateFromExchange(params: {
   if (!params.model) return []
 
   const existingMems = getMemories(context)
-  const existingKeys = existingMems.map(m => m.memory_key).slice(0, 60).join(', ')
 
   const consolidationPrompt = `You are an AI memory extraction and optimization specialist. Analyze this conversation exchange and determine how to update your long-term memories.
 

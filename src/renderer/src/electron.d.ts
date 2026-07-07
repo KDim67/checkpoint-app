@@ -1,3 +1,4 @@
+/* eslint-disable */
 import type {
   Item,
   Tag,
@@ -42,6 +43,7 @@ export interface ElectronAPI {
     maximize: () => void
     close: () => void
     saveFile: (defaultName: string, content: string) => Promise<boolean>
+    showItemInFolder: (filePath: string) => Promise<void>
     getPathForFile: (file: File) => string
     onNavigateToView: (callback: (view: string) => void) => () => void
   }
@@ -67,6 +69,9 @@ export interface ElectronAPI {
     queryTasks: (context: string, params: TaskQueryParams) => Promise<PaginatedResult<Item>>
     createFocusSession: (payload: CreateFocusSessionPayload) => Promise<FocusSession>
     getFocusSessions: (context: string) => Promise<FocusSession[]>
+    exportContext: (context: string, contextName: string) => Promise<{ success: boolean; filePath?: string; cancelled?: boolean; error?: string }>
+    importContext: () => Promise<{ success: boolean; payload?: any; cancelled?: boolean; error?: string }>
+    importContextData: (newContextSlug: string, data: any) => Promise<{ success: boolean; error?: string }>
   }
   ai: {
     startStream: (params: AiStreamParams, streamId?: string) => Promise<void>
@@ -222,6 +227,62 @@ export interface ElectronAPI {
     selectFolder: () => Promise<string | null>
     getStructure: (folderPath: string) => Promise<any[]>
     readFile: (folderPath: string, relativePath: string) => Promise<string>
+  }
+  media: {
+    saveFromBuffer: (arrayBuffer: ArrayBuffer, extension: string) => Promise<string>
+    saveFilePaths: (filePaths: string[]) => Promise<Array<{ originalPath: string; filename: string }>>
+    scanAndPrune: () => Promise<{
+      scannedCount: number
+      prunedCount: number
+      spaceSavedBytes: number
+      prunedFiles: string[]
+    }>
+    getStorageInfo: () => Promise<{ fileCount: number; totalSize: number; path: string }>
+  }
+  sync: {
+    startHost: (port?: number) => Promise<void>
+    stopHost: () => Promise<void>
+    connectAndSync: (hostIp: string, port: number, pairingCode: string) => Promise<{ dbUpdates: number; filesSynced: number }>
+    getStatus: () => Promise<{
+      active: boolean
+      port: number
+      pairingCode: string
+      progress: string
+      isSyncing: boolean
+    }>
+    getDiscoveredPeers: () => Promise<Array<{ name: string; ip: string; port: number; lastSeen: number }>>
+    getDbPayload: () => Promise<{
+      items: any[]
+      tags: any[]
+      item_tags: any[]
+      relations: any[]
+      app_settings: any[]
+      focus_sessions: any[]
+      clipboard_items: any[]
+      tombstones: Array<{ id: string; table_name: string; deleted_at: number }>
+    }>
+    applyDbPayload: (payload: {
+      items: any[]
+      tags: any[]
+      item_tags: any[]
+      relations: any[]
+      app_settings: any[]
+      focus_sessions: any[]
+      clipboard_items: any[]
+      tombstones: Array<{ id: string; table_name: string; deleted_at: number }>
+    }) => Promise<{ pulledNewerCount: number }>
+    getFileIndex: (subDir: 'notes' | 'media') => Promise<Array<{ relPath: string; mtime: number; size: number; sha256: string }>>
+    readFileChunk: (subDir: 'notes' | 'media', relPath: string) => Promise<Uint8Array | null>
+    writeFileChunk: (subDir: 'notes' | 'media', relPath: string, buffer: ArrayBuffer, mtime?: number) => Promise<void>
+    deleteFile: (subDir: 'notes' | 'media', relPath: string) => Promise<void>
+    applyBoardBaseline: (
+      context: string,
+      items: any[],
+      tags: any[],
+      itemTags: any[],
+      relations: any[]
+    ) => Promise<void>
+    applyRemoteMutation: (mutation: any) => Promise<void>
   }
 }
 

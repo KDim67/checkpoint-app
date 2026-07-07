@@ -256,6 +256,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
       }} className="markdown-body">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
+          urlTransform={url => url}
           components={{
             code({ className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '')

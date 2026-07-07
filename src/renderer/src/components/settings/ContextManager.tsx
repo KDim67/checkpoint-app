@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Edit2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Edit2, ChevronUp, ChevronDown, AlertTriangle, Download, Upload } from 'lucide-react'
 import { Divider, RowBetween } from './SettingsSection'
 import { useAppStore } from '../../store/appStore'
 import ColorPicker from '../ui/ColorPicker'
+import { useToast } from '../ui/Toast'
 
 interface ContextEntry {
   slug: string
@@ -28,6 +29,8 @@ export default function ContextManager() {
   const availableContexts = useAppStore(s => s.availableContexts)
   const setAvailableContexts = useAppStore(s => s.setAvailableContexts)
 
+  const { toast } = useToast()
+
   const [contexts, setContexts] = useState<ContextEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [editingSlug, setEditingSlug] = useState<string | null>(null)
@@ -39,6 +42,70 @@ export default function ContextManager() {
   const [addGitPath, setAddGitPath] = useState('')
   const [addColor, setAddColor] = useState(PRESET_COLORS[0])
   const [showAddForm, setShowAddForm] = useState(false)
+
+  // State for Import Modal
+  const [importPayload, setImportPayload] = useState<any | null>(null)
+  const [importName, setImportName] = useState('')
+  const [importSlug, setImportSlug] = useState('')
+
+  const handleExport = async (slug: string, name: string) => {
+    try {
+      const res = await window.electronAPI.db.exportContext(slug, name)
+      if (res.success && res.filePath) {
+        toast(`Exported context successfully to ${res.filePath.split(/[\\/]/).pop()}`)
+      } else if (res.error) {
+        toast(`Export failed: ${res.error}`)
+      }
+    } catch (err: any) {
+      toast(`Export failed: ${err.message || String(err)}`)
+    }
+  }
+
+  const handleImportStart = async () => {
+    try {
+      const res = await window.electronAPI.db.importContext()
+      if (res.success && res.payload) {
+        setImportPayload(res.payload)
+        const initialName = res.payload.context
+        const baseName = initialName.charAt(0).toUpperCase() + initialName.slice(1)
+        setImportName(baseName)
+        setImportSlug(slugify(baseName))
+      } else if (res.error) {
+        toast(`Import failed: ${res.error}`)
+      }
+    } catch (err: any) {
+      toast(`Import failed: ${err.message || String(err)}`)
+    }
+  }
+
+  const handleImportConfirm = async () => {
+    if (!importPayload || !importName.trim()) return
+    const slug = slugify(importName)
+    if (!slug) return
+
+    try {
+      const exists = contexts.some(c => c.slug === slug)
+      
+      const res = await window.electronAPI.db.importContextData(slug, importPayload)
+      if (res.success) {
+        if (!exists) {
+          const newEntry: ContextEntry = {
+            slug,
+            name: importName.trim(),
+            color: PRESET_COLORS[contexts.length % PRESET_COLORS.length]
+          }
+          await persist([...contexts, newEntry])
+        }
+        setContext(slug)
+        toast(`Imported context "${importName}" successfully!`)
+        setImportPayload(null)
+      } else {
+        toast(`Import failed: ${res.error}`)
+      }
+    } catch (err: any) {
+      toast(`Import failed: ${err.message || String(err)}`)
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -313,6 +380,14 @@ export default function ContextManager() {
                 >
                   <ChevronDown size={14} />
                 </button>
+                 <button
+                  className="btn-icon"
+                  style={{ width: '24px', height: '24px' }}
+                  onClick={() => handleExport(ctx.slug, ctx.name)}
+                  title="Export Context Workspace"
+                >
+                  <Download size={12} />
+                </button>
                 <button
                   className="btn-icon"
                   style={{ width: '24px', height: '24px' }}
@@ -435,24 +510,45 @@ export default function ContextManager() {
           </div>
         </div>
       ) : (
-        <button
-          className="btn-ghost"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            fontSize: 'var(--text-sm)',
-            border: '1px dashed var(--color-surface-offset)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-3)',
-            width: '100%',
-            justifyContent: 'center'
-          }}
-          onClick={() => setShowAddForm(true)}
-        >
-          <Plus size={14} />
-          Add Context
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <button
+            className="btn-ghost"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              fontSize: 'var(--text-sm)',
+              border: '1px dashed var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-3)',
+              width: '100%',
+              justifyContent: 'center'
+            }}
+            onClick={() => setShowAddForm(true)}
+          >
+            <Plus size={14} />
+            Add Context
+          </button>
+          
+          <button
+            className="btn-ghost"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              fontSize: 'var(--text-sm)',
+              border: '1px dashed var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-3)',
+              width: '100%',
+              justifyContent: 'center'
+            }}
+            onClick={handleImportStart}
+          >
+            <Upload size={14} />
+            Import Context / Workspace
+          </button>
+        </div>
       )}
 
       {/* Delete confirmation modal */}
@@ -513,6 +609,101 @@ export default function ContextManager() {
                 Delete Context
               </button>
             </RowBetween>
+          </div>
+        </div>
+      )}
+
+      {/* Import confirmation modal */}
+      {importPayload && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999
+        }}>
+          <div style={{
+            background: 'var(--color-surface-elevated)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-lg)',
+            padding: 'var(--space-6)',
+            width: '400px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-4)',
+            boxShadow: 'var(--shadow-lg)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <Plus size={20} color="var(--color-secondary)" />
+              <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
+                Import Workspace Context
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                <label htmlFor="import-context-name" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+                  Workspace Context Name
+                </label>
+                <input
+                  id="import-context-name"
+                  autoFocus
+                  value={importName}
+                  onChange={e => {
+                    setImportName(e.target.value)
+                    setImportSlug(slugify(e.target.value))
+                  }}
+                  placeholder="e.g. My Imported Project"
+                  style={{
+                    background: 'var(--color-surface-3)',
+                    border: '1px solid var(--color-surface-offset)',
+                    color: 'var(--color-text-base)',
+                    fontSize: 'var(--text-xs)',
+                    padding: '8px var(--space-3)',
+                    borderRadius: 'var(--radius-sm)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+                Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{importSlug}</code>
+              </div>
+
+              {contexts.some(c => c.slug === importSlug) && (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '8px', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)' }}>
+                  <AlertTriangle size={14} />
+                  <span>Warning: Context #{importSlug} already exists. This will merge/overwrite items!</span>
+                </div>
+              )}
+
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
+                Contains: <strong>{importPayload.items?.length || 0}</strong> items, <strong>{importPayload.tags?.length || 0}</strong> tags, and <strong>{importPayload.relations?.length || 0}</strong> relations.
+              </div>
+            </div>
+
+            <div style={{ marginTop: 'var(--space-2)' }}>
+              <RowBetween>
+                <button className="btn-secondary" style={{ fontSize: 'var(--text-sm)' }}
+                  onClick={() => setImportPayload(null)}>
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImportConfirm}
+                  disabled={!importName.trim() || !importSlug}
+                  className="btn-primary"
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--weight-semibold)',
+                    opacity: (!importName.trim() || !importSlug) ? 0.5 : 1
+                  }}
+                >
+                  Import Workspace
+                </button>
+              </RowBetween>
+            </div>
           </div>
         </div>
       )}

@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react'
 
 export default function useFocusTrap(isOpen: boolean, defaultFocusRef?: React.RefObject<HTMLElement | null>) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const containerRef = useRef<any>(null)
 
   useEffect(() => {
     if (!isOpen) return
+    const container = containerRef.current as HTMLElement | null
+    if (!container) return
 
     // Focus default element on open
     if (defaultFocusRef && defaultFocusRef.current) {
@@ -12,10 +15,10 @@ export default function useFocusTrap(isOpen: boolean, defaultFocusRef?: React.Re
         defaultFocusRef.current?.focus()
       }, 50)
       return () => clearTimeout(timer)
-    } else if (containerRef.current) {
+    } else {
       // Fallback: focus first focusable element
       const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      const focusableElements = containerRef.current.querySelectorAll<HTMLElement>(focusableSelector)
+      const focusableElements = container.querySelectorAll<HTMLElement>(focusableSelector)
       const activeElements = Array.from(focusableElements).filter(el => {
         return !el.hasAttribute('disabled') && (el as HTMLElement).tabIndex !== -1
       })
@@ -34,11 +37,12 @@ export default function useFocusTrap(isOpen: boolean, defaultFocusRef?: React.Re
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
-      if (!containerRef.current) return
+      const container = containerRef.current as HTMLElement | null
+      if (!container) return
 
       const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       const focusableElements = Array.from(
-        containerRef.current.querySelectorAll<HTMLElement>(focusableSelector)
+        container.querySelectorAll<HTMLElement>(focusableSelector)
       ).filter(el => {
         // Filter out disabled elements and those with display: none or offsetParent === null
         // offsetParent is null when the element or its parent is display: none.

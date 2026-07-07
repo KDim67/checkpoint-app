@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Send, Hash } from 'lucide-react'
+import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 
 interface LogInputProps {
   context: string
@@ -39,7 +40,10 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
     }
   }
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const isImage = await handleImagePaste(e, value, setValue)
+    if (isImage) return
+
     const text = e.clipboardData.getData('text')
     // If user pastes block starting with ``` and it doesn't end with ```, auto wrap/close it
     if (text.trim().startsWith('```') && !text.trim().endsWith('```')) {
@@ -50,6 +54,10 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
       const newValue = value.substring(0, start) + wrappedText + value.substring(end)
       setValue(newValue)
     }
+  }
+
+  const handleDrop = async (e: React.DragEvent<HTMLTextAreaElement>) => {
+    await handleImageDrop(e, value, setValue)
   }
 
   const handleSubmit = async () => {
@@ -108,7 +116,8 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
       borderTop: '1px solid var(--color-surface-offset)',
       display: 'flex',
       flexDirection: 'column',
-      gap: 'var(--space-2)'
+      gap: 'var(--space-2)',
+      flexShrink: 0
     }}>
       <div style={{
         display: 'flex',
@@ -129,6 +138,8 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onDrop={handleDrop}
+          onDragOver={e => e.preventDefault()}
           placeholder={`Type a log for context "${context}"... (Use #tags, Markdown, or Shift+Enter for newlines)`}
           rows={1}
           style={{

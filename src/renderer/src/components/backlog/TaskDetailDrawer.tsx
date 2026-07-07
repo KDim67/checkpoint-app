@@ -914,6 +914,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                 }} className="markdown-body">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
+                    urlTransform={url => url}
                     components={{
                       code({ className, children, ...props }) {
                         const match = /language-(\w+)/.exec(className || '')

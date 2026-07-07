@@ -85,7 +85,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
       `}</style>
 
       <form
-        ref={containerRef}
+        ref={containerRef as React.RefObject<HTMLFormElement>}
         className="modal-form"
         onSubmit={handleFormSubmit}
         onClick={e => e.stopPropagation()}

@@ -163,6 +163,7 @@ function runMigrations(db: Database.Database): void {
   })()
 }
 let stmtGetItemsPaginated: Database.Statement
+let stmtGetLogsPaginated: Database.Statement
 let stmtGetItemsTotal: Database.Statement
 let stmtGetItemById: Database.Statement
 let stmtInsertItem: Database.Statement
@@ -238,6 +239,12 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sync_tombstones (
+  id          TEXT PRIMARY KEY,
+  table_name  TEXT NOT NULL,
+  deleted_at  INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS activity_tracking_logs (
   id           TEXT PRIMARY KEY,
   context      TEXT NOT NULL,
@@ -286,6 +293,7 @@ export function initDb(dataPath: string): Database.Database {
   db.pragma('foreign_keys = ON')
   db.pragma('synchronous = NORMAL')
   db.pragma('cache_size = -32000')    // 32MB page cache
+  db.pragma('busy_timeout = 5000')    // wait up to 5s if locked
 
   // Apply schema and migrations
   db.exec(SCHEMA_SQL)
@@ -301,6 +309,17 @@ export function initDb(dataPath: string): Database.Database {
     WHERE i.context = ? AND i.type = ?
     GROUP BY i.id
     ORDER BY i.position ASC, i.created_at DESC
+    LIMIT ? OFFSET ?
+  `)
+
+  stmtGetLogsPaginated = db.prepare(`
+    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
+    FROM items i
+    LEFT JOIN item_tags it ON i.id = it.item_id
+    LEFT JOIN tags t ON it.tag_id = t.id
+    WHERE i.context = ? AND i.type = ?
+    GROUP BY i.id
+    ORDER BY i.position DESC, i.created_at DESC
     LIMIT ? OFFSET ?
   `)
 
@@ -453,7 +472,8 @@ export function getItemsPaginated(
 ): PaginatedResult<Item> {
   const pageIndex = page > 0 ? page - 1 : 0
   const offset = pageIndex * pageSize
-  const rows = stmtGetItemsPaginated.all(context, type, pageSize, offset) as Record<string, unknown>[]
+  const stmt = type === 'log' ? stmtGetLogsPaginated : stmtGetItemsPaginated
+  const rows = stmt.all(context, type, pageSize, offset) as Record<string, unknown>[]
   const total = (stmtGetItemsTotal.get(context, type) as { count: number }).count
   return { items: rows.map(rowToItem), total, page, pageSize }
 }
@@ -534,7 +554,149 @@ export function updateItem(
   return rowToItem(row)
 }
 
+export function recordTombstone(id: string, tableName: string): void {
+  try {
+    getDb().prepare('INSERT OR REPLACE INTO sync_tombstones (id, table_name, deleted_at) VALUES (?, ?, ?)')
+      .run(id, tableName, Date.now())
+  } catch (err) {
+    console.error('[db] Failed to record tombstone:', err)
+  }
+}
+
+export function applyBoardBaselineTx(
+  context: string,
+  items: any[],
+  tags: any[],
+  itemTags: any[],
+  relations: any[]
+): void {
+  const db = getDb()
+  db.transaction(() => {
+    // 1. Delete all items in context of type 'card' or 'task'
+    db.prepare("DELETE FROM items WHERE context = ? AND type IN ('card', 'task')").run(context)
+
+    // 2. Insert tags
+    const stmtTag = db.prepare('INSERT OR IGNORE INTO tags (id, name, color) VALUES (?, ?, ?)')
+    for (const t of tags) {
+      stmtTag.run(t.id, t.name, t.color)
+    }
+
+    // 3. Insert items
+    const stmtItem = db.prepare(`
+      INSERT OR REPLACE INTO items (id, type, context, title, body, status, priority, position, created_at, updated_at, due_at, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    for (const item of items) {
+      stmtItem.run(
+        item.id,
+        item.type,
+        item.context,
+        item.title,
+        item.body,
+        item.status,
+        item.priority,
+        item.position,
+        item.created_at,
+        item.updated_at,
+        item.due_at || null,
+        item.metadata || '{}'
+      )
+    }
+
+    // 4. Insert item_tags
+    const stmtItemTag = db.prepare('INSERT OR REPLACE INTO item_tags (item_id, tag_id) VALUES (?, ?)')
+    for (const it of itemTags) {
+      stmtItemTag.run(it.item_id, it.tag_id)
+    }
+
+    // 5. Insert relations
+    const stmtRelation = db.prepare('INSERT OR REPLACE INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)')
+    for (const r of relations) {
+      stmtRelation.run(r.id, r.from_id, r.to_id, r.type)
+    }
+  })()
+}
+
+export function applyRemoteMutationTx(mutation: any): void {
+  const db = getDb()
+  const { type } = mutation
+
+  if (type === 'createItem' || type === 'updateItem') {
+    const { item, tagIds } = mutation
+    db.transaction(() => {
+      db.prepare(`
+        INSERT OR REPLACE INTO items (id, type, context, title, body, status, priority, position, created_at, updated_at, due_at, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        item.id,
+        item.type,
+        item.context,
+        item.title,
+        item.body,
+        item.status,
+        item.priority,
+        item.position,
+        item.created_at,
+        item.updated_at,
+        item.due_at || null,
+        item.metadata || '{}'
+      )
+
+      if (tagIds) {
+        db.prepare('DELETE FROM item_tags WHERE item_id = ?').run(item.id)
+        const stmtTag = db.prepare('INSERT OR REPLACE INTO item_tags (item_id, tag_id) VALUES (?, ?)')
+        for (const tagId of tagIds) {
+          stmtTag.run(item.id, tagId)
+        }
+      }
+    })()
+  } else if (type === 'deleteItem') {
+    const { id } = mutation
+    db.prepare('DELETE FROM items WHERE id = ?').run(id)
+  } else if (type === 'createTag') {
+    const { tag } = mutation
+    db.prepare('INSERT OR IGNORE INTO tags (id, name, color) VALUES (?, ?, ?)')
+      .run(tag.id, tag.name, tag.color)
+  } else if (type === 'updateTag') {
+    const { tag } = mutation
+    db.prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?')
+      .run(tag.name, tag.color, tag.id)
+  } else if (type === 'deleteTag') {
+    const { id } = mutation
+    db.prepare('DELETE FROM tags WHERE id = ?').run(id)
+  } else if (type === 'createRelation') {
+    const { relation } = mutation
+    db.prepare('INSERT OR REPLACE INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)')
+      .run(relation.id, relation.from_id, relation.to_id, relation.type)
+  } else if (type === 'deleteRelation') {
+    const { id } = mutation
+    db.prepare('DELETE FROM relations WHERE id = ?').run(id)
+  } else if (type === 'bulkUpdateItems') {
+    const { payload } = mutation
+    db.transaction(() => {
+      const stmt = db.prepare('UPDATE items SET position = ?, status = ?, updated_at = ? WHERE id = ?')
+      for (const u of payload.updates) {
+        stmt.run(u.position, u.status, Date.now(), u.id)
+      }
+    })()
+  } else if (type === 'bulkDeleteItems') {
+    const { ids } = mutation
+    db.transaction(() => {
+      const stmt = db.prepare('DELETE FROM items WHERE id = ?')
+      for (const id of ids) {
+        stmt.run(id)
+      }
+    })()
+  } else if (type === 'rebalancePositions') {
+    const { context, status } = mutation
+    // Simply run the local rebalance logic!
+    const { rebalancePositions } = require('./db')
+    rebalancePositions(context, status)
+  }
+}
+
 export function deleteItem(id: string): void {
+  recordTombstone(id, 'items')
   stmtDeleteItem.run(id)
 }
 
@@ -557,6 +719,7 @@ export function updateTag(id: string, payload: Partial<CreateTagPayload>): Tag {
 }
 
 export function deleteTag(id: string): void {
+  recordTombstone(id, 'tags')
   stmtDeleteTag.run(id)
 }
 
@@ -592,6 +755,7 @@ export function createRelation(fromId: string, toId: string, type: RelationType)
 }
 
 export function deleteRelation(id: string): void {
+  recordTombstone(id, 'relations')
   stmtDeleteRelation.run(id)
 }
 
@@ -960,6 +1124,87 @@ export function getActivityStats(
     byContext: byContextRows,
     byTitle: byTitleRows
   }
+}
+
+export function exportContextData(db: Database.Database, context: string): any {
+  const items = db.prepare(`SELECT * FROM items WHERE context = ?`).all(context) as any[]
+  const itemIds = items.map(i => i.id)
+
+  let tags: any[] = []
+  let item_tags: any[] = []
+  let relations: any[] = []
+
+  if (itemIds.length > 0) {
+    const placeholders = itemIds.map(() => '?').join(',')
+    
+    tags = db.prepare(`
+      SELECT DISTINCT t.* FROM tags t
+      INNER JOIN item_tags it ON t.id = it.tag_id
+      WHERE it.item_id IN (${placeholders})
+    `).all(...itemIds) as any[]
+
+    item_tags = db.prepare(`
+      SELECT * FROM item_tags
+      WHERE item_id IN (${placeholders})
+    `).all(...itemIds) as any[]
+
+    relations = db.prepare(`
+      SELECT * FROM relations
+      WHERE from_id IN (${placeholders}) OR to_id IN (${placeholders})
+    `).all(...itemIds, ...itemIds) as any[]
+  }
+
+  return {
+    version: 1,
+    context,
+    items,
+    tags,
+    item_tags,
+    relations
+  }
+}
+
+export function importContextData(db: Database.Database, newContextSlug: string, data: any): void {
+  db.transaction(() => {
+    // 1. Insert tags
+    const stmtTag = db.prepare(`INSERT OR IGNORE INTO tags (id, name, color) VALUES (@id, @name, @color)`)
+    if (Array.isArray(data.tags)) {
+      for (const t of data.tags) {
+        stmtTag.run(t)
+      }
+    }
+
+    // 2. Insert items
+    const stmtItem = db.prepare(`
+      INSERT OR REPLACE INTO items (id, type, context, title, body, status, priority, position, created_at, updated_at, due_at, metadata)
+      VALUES (@id, @type, @context, @title, @body, @status, @priority, @position, @created_at, @updated_at, @due_at, @metadata)
+    `)
+    if (Array.isArray(data.items)) {
+      for (const item of data.items) {
+        const copy = { ...item, context: newContextSlug }
+        stmtItem.run(copy)
+      }
+    }
+
+    // 3. Insert item_tags
+    const stmtItemTag = db.prepare(`INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?, ?)`)
+    if (Array.isArray(data.item_tags)) {
+      for (const it of data.item_tags) {
+        stmtItemTag.run(it.item_id, it.tag_id)
+      }
+    }
+
+    // 4. Insert relations
+    const stmtRelation = db.prepare(`
+      INSERT OR REPLACE INTO relations (id, from_id, to_id, type)
+      VALUES (@id, @from_id, @to_id, @type)
+    `)
+    if (Array.isArray(data.relations)) {
+      for (const rel of data.relations) {
+        stmtRelation.run(rel)
+      }
+    }
+  })()
 }
 
 // IPC Handler Registration

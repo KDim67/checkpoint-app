@@ -1867,7 +1867,10 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
                     </div>
 
                     <div className="plan-markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        urlTransform={url => url}
+                      >
                         {steps[activeStepIndex].details || '*No details provided for this step.*'}
                       </ReactMarkdown>
                     </div>
@@ -2552,6 +2555,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
             )}
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
+              urlTransform={url => url}
               components={{
                 a({ href, children }) {
                   // Internal card reference, open the card's detail panel

@@ -132,6 +132,14 @@ function IconGamepad(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+function IconSync(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+    </svg>
+  )
+}
+
 // Nav Item Data
 
 const NAV_ITEMS: Array<{
@@ -253,26 +261,92 @@ export function Sidebar() {
   const activeView = useAppStore(s => s.activeView)
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
+  const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const focusIsRunning = useAppStore(s => s.focusIsRunning)
 
   const [contextOpen, setContextOpen] = useState(false)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
-  const [gamedevEnabled, setGamedevEnabled] = useState(false)
+  const [enabledViews, setEnabledViews] = useState<Record<string, boolean>>({
+    kanban: true,
+    log: true,
+    backlog: true,
+    focus: true,
+    notes: true,
+    clipboard: true,
+    analytics: true,
+    cookbook: true,
+    cheatsheets: true,
+    gamedev: false
+  })
+  const [syncEnabled, setSyncEnabled] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncProgress, setSyncProgress] = useState('Idle')
   const sidebarRef = useRef<HTMLDivElement>(null)
 
-  const checkGamedev = async () => {
+  const checkFeatures = async () => {
     try {
-      const v = await window.electronAPI.db.getSetting('feature_gamedev_helpers')
-      setGamedevEnabled(v === 'true')
+      const [
+        kanban, log, backlog, focus, notes, clipboard, analytics, cookbook, cheatsheets, gamedev
+      ] = await Promise.all([
+        window.electronAPI.db.getSetting('feature_view_kanban'),
+        window.electronAPI.db.getSetting('feature_view_log'),
+        window.electronAPI.db.getSetting('feature_view_backlog'),
+        window.electronAPI.db.getSetting('feature_view_focus'),
+        window.electronAPI.db.getSetting('feature_view_notes'),
+        window.electronAPI.db.getSetting('feature_view_clipboard'),
+        window.electronAPI.db.getSetting('feature_view_analytics'),
+        window.electronAPI.db.getSetting('feature_view_cookbook'),
+        window.electronAPI.db.getSetting('feature_view_cheatsheets'),
+        window.electronAPI.db.getSetting('feature_gamedev_helpers')
+      ])
+
+      setEnabledViews({
+        kanban: kanban !== 'false',
+        log: log !== 'false',
+        backlog: backlog !== 'false',
+        focus: focus !== 'false',
+        notes: notes !== 'false',
+        clipboard: clipboard !== 'false',
+        analytics: analytics !== 'false',
+        cookbook: cookbook !== 'false',
+        cheatsheets: cheatsheets !== 'false',
+        gamedev: gamedev === 'true'
+      })
     } catch (err) {
-      console.error('Failed to read gamedev setting in Sidebar:', err)
+      console.error('Failed to read settings in Sidebar:', err)
     }
   }
 
+  const checkSyncStatus = async () => {
+    try {
+      const rawEnabled = await window.electronAPI.db.getSetting('sync_enabled')
+      const isEnabled = rawEnabled === 'true' || rawEnabled === true
+      setSyncEnabled(isEnabled)
+      if (isEnabled) {
+        const status = await window.electronAPI.sync.getStatus()
+        setIsSyncing(status.isSyncing)
+        setSyncProgress(status.progress || 'Idle')
+      } else {
+        setIsSyncing(false)
+        setSyncProgress('Disabled')
+      }
+    } catch {}
+  }
+
   useEffect(() => {
-    checkGamedev()
-    window.addEventListener('settings-update-gamedev', checkGamedev)
-    return () => window.removeEventListener('settings-update-gamedev', checkGamedev)
+    checkFeatures()
+    window.addEventListener('settings-update-features', checkFeatures)
+    return () => window.removeEventListener('settings-update-features', checkFeatures)
+  }, [])
+
+  useEffect(() => {
+    checkSyncStatus()
+    const interval = setInterval(checkSyncStatus, 5000)
+    window.addEventListener('settings-update-sync', checkSyncStatus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('settings-update-sync', checkSyncStatus)
+    }
   }, [])
 
   // Close context popover on outside click
@@ -387,21 +461,87 @@ export function Sidebar() {
           flex: 1
         }}
       >
-        {(gamedevEnabled 
-          ? [...NAV_ITEMS, { view: 'gamedev' as ActiveView, label: 'Game Dev', Icon: IconGamepad }]
-          : NAV_ITEMS
-        ).map(({ view, label, Icon }) => {
-          const isActive = activeView === view
-          return (
+        {[...NAV_ITEMS, { view: 'gamedev' as ActiveView, label: 'Game Dev', Icon: IconGamepad }]
+          .filter(item => enabledViews[item.view])
+          .map(({ view, label, Icon }) => {
+            const isActive = activeView === view
+            return (
+              <button
+                key={view}
+                id={`nav-${view}`}
+                aria-label={label}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => handleNavClick(view)}
+                onMouseEnter={e => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setTooltip({ label, y: rect.top + rect.height / 2 })
+                }}
+                onMouseLeave={() => setTooltip(null)}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: isActive ? 'var(--color-secondary-muted)' : 'transparent',
+                  color: isActive ? 'var(--color-secondary)' : 'var(--color-balance)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
+                }}
+              >
+                {/* Active indicator, left border dot */}
+                {isActive && (
+                  <span style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '2px',
+                    height: '20px',
+                    background: 'var(--color-secondary)',
+                    borderRadius: '0 2px 2px 0'
+                  }} />
+                )}
+                <Icon />
+
+                {/* Running-timer indicator, visible from any view, so a session
+                    never silently ticks away unnoticed while you work elsewhere */}
+                {view === 'focus' && focusIsRunning && !isActive && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      right: '4px',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--color-secondary)',
+                      boxShadow: '0 0 0 2px var(--color-surface-1)',
+                      animation: 'focus-pulse 1.6s ease-in-out infinite'
+                    }}
+                  />
+                )}
+              </button>
+            )
+          })}
+
+        {/* Bottom actions container */}
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', alignItems: 'center', width: '100%' }}>
+          {syncEnabled && (
             <button
-              key={view}
-              id={`nav-${view}`}
-              aria-label={label}
-              aria-current={isActive ? 'page' : undefined}
-              onClick={() => handleNavClick(view)}
+              id="nav-sync-indicator"
+              aria-label="P2P Network Sync Status"
+              onClick={() => {
+                setView('settings')
+                setSettingsTab('sync')
+              }}
               onMouseEnter={e => {
                 const rect = e.currentTarget.getBoundingClientRect()
-                setTooltip({ label, y: rect.top + rect.height / 2 })
+                setTooltip({ label: `Sync engine active: ${syncProgress}`, y: rect.top + rect.height / 2 })
               }}
               onMouseLeave={() => setTooltip(null)}
               style={{
@@ -412,78 +552,43 @@ export function Sidebar() {
                 justifyContent: 'center',
                 borderRadius: 'var(--radius-md)',
                 border: 'none',
-                background: isActive ? 'var(--color-secondary-muted)' : 'transparent',
-                color: isActive ? 'var(--color-secondary)' : 'var(--color-balance)',
+                background: 'transparent',
+                color: isSyncing ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                 cursor: 'pointer',
-                position: 'relative',
-                transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
+                transition: 'all var(--duration-fast) var(--ease-default)'
               }}
             >
-              {/* Active indicator, left border dot */}
-              {isActive && (
-                <span style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '2px',
-                  height: '20px',
-                  background: 'var(--color-secondary)',
-                  borderRadius: '0 2px 2px 0'
-                }} />
-              )}
-              <Icon />
-
-              {/* Running-timer indicator, visible from any view, so a session
-                  never silently ticks away unnoticed while you work elsewhere */}
-              {view === 'focus' && focusIsRunning && !isActive && (
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    top: '4px',
-                    right: '4px',
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: 'var(--color-secondary)',
-                    boxShadow: '0 0 0 2px var(--color-surface-1)',
-                    animation: 'focus-pulse 1.6s ease-in-out infinite'
-                  }}
-                />
-              )}
+              <IconSync className={isSyncing ? 'animate-spin' : ''} style={{ width: '18px', height: '18px' }} />
             </button>
-          )
-        })}
+          )}
 
-        {/* Settings, pinned to bottom, inside <nav> for accessibility */}
-        <button
-          id="nav-settings"
-          aria-label="Settings"
-          aria-current={activeView === 'settings' ? 'page' : undefined}
-          onClick={() => handleNavClick('settings')}
-          onMouseEnter={e => {
-            const rect = e.currentTarget.getBoundingClientRect()
-            setTooltip({ label: 'Settings', y: rect.top + rect.height / 2 })
-          }}
-          onMouseLeave={() => setTooltip(null)}
-          style={{
-            marginTop: 'auto',
-            width: '40px',
-            height: '40px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 'var(--radius-md)',
-            border: 'none',
-            background: activeView === 'settings' ? 'var(--color-secondary-muted)' : 'transparent',
-            color: activeView === 'settings' ? 'var(--color-secondary)' : 'var(--color-balance)',
-            cursor: 'pointer',
-            transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
-          }}
-        >
-          <IconSettings />
-        </button>
+          <button
+            id="nav-settings"
+            aria-label="Settings"
+            aria-current={activeView === 'settings' ? 'page' : undefined}
+            onClick={() => handleNavClick('settings')}
+            onMouseEnter={e => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              setTooltip({ label: 'Settings', y: rect.top + rect.height / 2 })
+            }}
+            onMouseLeave={() => setTooltip(null)}
+            style={{
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              background: activeView === 'settings' ? 'var(--color-secondary-muted)' : 'transparent',
+              color: activeView === 'settings' ? 'var(--color-secondary)' : 'var(--color-balance)',
+              cursor: 'pointer',
+              transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
+            }}
+          >
+            <IconSettings />
+          </button>
+        </div>
       </nav>
 
       {/* Tooltip */}

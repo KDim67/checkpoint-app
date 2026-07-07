@@ -35,6 +35,7 @@ interface KanbanColumnProps {
   onSortCards?: (columnId: string, criteria: 'due_at' | 'priority') => void
   onClearColumn?: (columnId: string) => void
   onArchiveColumn?: (columnId: string) => void
+  isReadOnly?: boolean
 }
 
 function MenuItem({ label, onClick, danger = false }: { label: string; onClick: () => void; danger?: boolean }) {
@@ -80,7 +81,8 @@ function KanbanColumn({
   onCardUpdate,
   onSortCards,
   onClearColumn,
-  onArchiveColumn
+  onArchiveColumn,
+  isReadOnly = false
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id })
 
@@ -501,7 +503,7 @@ function KanbanColumn({
         </div>
 
         {/* Column action buttons (visible on header hover) */}
-        {!isEditing && (
+        {!isEditing && !isReadOnly && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -634,7 +636,7 @@ function KanbanColumn({
       </div>
 
       {/* Add Card Footer */}
-      {onAddCard && (
+      {onAddCard && !isReadOnly && (
         <AddCardFooter onAdd={() => onAddCard(id)} accentColor={accentColor} colTextColor={isFullCol ? colTextColor : undefined} isFullCol={isFullCol} />
       )}
     </div>
@@ -718,7 +720,8 @@ function AddCardFooter({ onAdd, accentColor, colTextColor, isFullCol }: { onAdd:
   )
 }
 
-function areKanbanColumnPropsEqual(prev: any, next: any) {
+function areKanbanColumnPropsEqual(prev: KanbanColumnProps, next: KanbanColumnProps) {
+  if (prev.isReadOnly !== next.isReadOnly) return false
   if (prev.id !== next.id || prev.name !== next.name || prev.wipLimit !== next.wipLimit) return false
   if (prev.cards.length !== next.cards.length) return false
   for (let i = 0; i < prev.cards.length; i++) {

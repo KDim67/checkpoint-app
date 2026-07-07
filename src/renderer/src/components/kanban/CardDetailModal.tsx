@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
-import { X, Tag, Link2, Sparkles, Check, CheckSquare, Plus, Trash2, Calendar, FilePlus, Paperclip, Clock, Layers } from 'lucide-react'
+import { X, Tag, Link2, Sparkles, Check, CheckSquare, Trash2, FilePlus, Paperclip, Clock, Layers } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import ColorPicker from '../ui/ColorPicker'
+import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 
 interface CardDetailModalProps {
   cardId: string
@@ -15,11 +16,12 @@ interface CardDetailModalProps {
   columns: Array<{ id: string; name: string }>
   onClose: () => void
   onUpdate: (id: string, patch: Partial<Item>, tagIds?: string[]) => Promise<void>
+  isReadOnly?: boolean
 }
 
 type EditorMode = 'edit' | 'preview' | 'split'
 
-export default function CardDetailModal({ cardId, initialCard, columns, onClose, onUpdate }: CardDetailModalProps) {
+export default function CardDetailModal({ cardId, initialCard, columns, onClose, onUpdate, isReadOnly = false }: CardDetailModalProps) {
   const selectItem = useAppStore(s => s.selectItem)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const activeContext = useAppStore(s => s.activeContext)
@@ -96,7 +98,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           setBody(found.body)
           setSelectedTagIds(found.tags?.map(t => t.id) || [])
           
-          let meta = {}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let meta: any = {}
           try {
             meta = JSON.parse(found.metadata || '{}')
           } catch {}
@@ -161,7 +164,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   }
 
   // Track latest metadata synchronously in memory to avoid race conditions with sequential updates
-  const latestMetaRef = useRef<Record<string, any>>({})
+  const latestMetaRef = useRef<Record<string, unknown>>({})
   useEffect(() => {
     if (card?.metadata) {
       try {
@@ -171,7 +174,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   }, [card?.metadata])
 
   // Meta Updates helpers
-  const updateMetadata = async (newMetaPatch: Record<string, any>) => {
+  const updateMetadata = async (newMetaPatch: Record<string, unknown>) => {
     if (!card) return
     const mergedMeta = { ...latestMetaRef.current, ...newMetaPatch }
     latestMetaRef.current = mergedMeta
@@ -504,8 +507,28 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           padding: 'var(--space-6)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 'var(--space-6)'
+          gap: 'var(--space-6)',
+          pointerEvents: isReadOnly ? 'none' : 'auto',
+          opacity: isReadOnly ? 0.95 : 1
         }}>
+          {isReadOnly && (
+            <div style={{
+              background: 'var(--color-surface-offset)',
+              color: 'var(--color-text-muted)',
+              fontSize: 'var(--text-xs)',
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px dashed var(--color-surface-offset)',
+              marginBottom: '2px',
+              userSelect: 'none'
+            }}>
+              <span>👁️</span>
+              <span>You are viewing a shared board in spectate mode. Changes cannot be made.</span>
+            </div>
+          )}
           {/* Card Title Editable */}
           <div>
             <input
@@ -1043,6 +1066,14 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                   value={body}
                   onChange={e => setBody(e.target.value)}
                   onBlur={handleBodyBlur}
+                  onPaste={async (e) => {
+                    const isImage = await handleImagePaste(e, body, setBody)
+                    if (isImage) return
+                  }}
+                  onDrop={async (e) => {
+                    await handleImageDrop(e, body, setBody)
+                  }}
+                  onDragOver={e => e.preventDefault()}
                   placeholder="Enter details..."
                   style={{
                     flex: 1,
@@ -1077,6 +1108,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 }} className="markdown-body">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
+                    urlTransform={url => url}
                     components={{
                       code({ className, children, ...props }) {
                         const match = /language-(\w+)/.exec(className || '')
@@ -1676,6 +1708,14 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                   placeholder="Write a comment..."
                   value={commentInput}
                   onChange={e => setCommentInput(e.target.value)}
+                  onPaste={async (e) => {
+                    const isImage = await handleImagePaste(e, commentInput, setCommentInput)
+                    if (isImage) return
+                  }}
+                  onDrop={async (e) => {
+                    await handleImageDrop(e, commentInput, setCommentInput)
+                  }}
+                  onDragOver={e => e.preventDefault()}
                   rows={2}
                   style={{
                     background: 'var(--color-surface-2)',

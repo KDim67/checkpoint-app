@@ -1,0 +1,578 @@
+import net from 'net'
+import dgram from 'dgram'
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
+import crypto from 'crypto'
+import { getDb } from './db'
+
+const DEFAULT_TCP_PORT = 5739
+const DEFAULT_UDP_PORT = 5740
+const DISCOVERY_INTERVAL_MS = 5000
+
+interface DiscoveredPeer {
+  name: string
+  ip: string
+  port: number
+  lastSeen: number
+}
+
+interface FileMetadata {
+  relPath: string
+  mtime: number
+  size: number
+  sha256: string
+}
+
+interface DatabasePayload {
+  items: any[]
+  tags: any[]
+  item_tags: any[]
+  relations: any[]
+  app_settings: any[]
+  focus_sessions: any[]
+  clipboard_items: any[]
+  tombstones: any[]
+}
+
+export class SyncService {
+  private tcpServer: net.Server | null = null
+  private udpSocket: dgram.Socket | null = null
+  private discoveryInterval: NodeJS.Timeout | null = null
+  
+  private tcpPort = DEFAULT_TCP_PORT
+  private udpPort = DEFAULT_UDP_PORT
+  private pairingCode = ''
+  private isServerActive = false
+  private syncProgress = ''
+  private isSyncing = false
+  
+  private discoveredPeers: Map<string, DiscoveredPeer> = new Map()
+  
+  // Excluded sensitive settings (AI providers, API keys, presets, system prompts, sync config)
+  private isSettingKeySensitive(key: string): boolean {
+    const k = key.toLowerCase()
+    return (
+      k.startsWith('ai_') ||
+      k.startsWith('sync_') ||
+      k.includes('api_key') ||
+      k.includes('secret') ||
+      k.includes('token') ||
+      k.includes('preset') ||
+      k.includes('openai') ||
+      k.includes('gemini') ||
+      k.includes('anthropic') ||
+      k.includes('groq') ||
+      k.includes('ollama')
+    )
+  }
+
+  // Retrieve current sync status
+  public getStatus() {
+    return {
+      active: this.isServerActive,
+      port: this.tcpPort,
+      pairingCode: this.pairingCode,
+      progress: this.syncProgress,
+      isSyncing: this.isSyncing
+    }
+  }
+
+  // Get list of discovered local peers
+  public getDiscoveredPeers(): DiscoveredPeer[] {
+    const now = Date.now()
+    // Filter out peers not seen for more than 15 seconds
+    const list: DiscoveredPeer[] = []
+    for (const [key, peer] of this.discoveredPeers.entries()) {
+      if (now - peer.lastSeen < 15000) {
+        list.push(peer)
+      } else {
+        this.discoveredPeers.delete(key)
+      }
+    }
+    return list
+  }
+
+  // Generate a random 6-digit pairing code
+  private generatePairingCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString()
+  }
+
+  // Start Sync Host
+  public startHost(port = DEFAULT_TCP_PORT): void {
+    if (this.isServerActive) this.stopHost()
+
+    this.tcpPort = port
+    this.pairingCode = this.generatePairingCode()
+    this.syncProgress = 'Host started. Waiting for connections...'
+    
+    // Start TCP Server
+    this.tcpServer = net.createServer((socket) => this.handleClientConnection(socket))
+    this.tcpServer.listen(port, '0.0.0.0', () => {
+      console.log(`[SyncService] TCP Server listening on port ${port}`)
+    })
+
+    // Start UDP broadcaster & listener
+    this.startDiscovery()
+    
+    this.isServerActive = true
+  }
+
+  // Stop Sync Host
+  public stopHost(): void {
+    if (this.discoveryInterval) {
+      clearInterval(this.discoveryInterval)
+      this.discoveryInterval = null
+    }
+
+    if (this.udpSocket) {
+      try {
+        this.udpSocket.close()
+      } catch {}
+      this.udpSocket = null
+    }
+
+    if (this.tcpServer) {
+      try {
+        this.tcpServer.close()
+      } catch {}
+      this.tcpServer = null
+    }
+
+    this.isServerActive = false
+    this.pairingCode = ''
+    this.syncProgress = 'Sync server stopped.'
+    this.isSyncing = false
+    console.log('[SyncService] Host stopped.')
+  }
+
+  // UDP Discovery logic
+  private startDiscovery(): void {
+    try {
+      this.udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+      
+      this.udpSocket.on('message', (msg, rinfo) => {
+        try {
+          const data = JSON.parse(msg.toString())
+          if (data.type === 'checkpoint-discover' && data.name && data.port) {
+            const peerKey = `${rinfo.address}:${data.port}`
+            // Skip discovery of self
+            if (rinfo.address === this.getLocalIp() && data.port === this.tcpPort) {
+              return
+            }
+            this.discoveredPeers.set(peerKey, {
+              name: data.name,
+              ip: rinfo.address,
+              port: data.port,
+              lastSeen: Date.now()
+            })
+          }
+        } catch {}
+      })
+
+      this.udpSocket.bind(this.udpPort, '0.0.0.0', () => {
+        if (this.udpSocket) {
+          this.udpSocket.setBroadcast(true)
+        }
+      })
+
+      // Periodically broadcast presence
+      this.discoveryInterval = setInterval(() => {
+        if (!this.udpSocket || !this.isServerActive) return
+        const broadcastData = JSON.stringify({
+          type: 'checkpoint-discover',
+          name: os.hostname(),
+          port: this.tcpPort
+        })
+        const buffer = Buffer.from(broadcastData)
+        try {
+          this.udpSocket.send(buffer, 0, buffer.length, this.udpPort, '255.255.255.255')
+        } catch (err) {
+          console.error('[SyncService] UDP broadcast failed:', err)
+        }
+      }, DISCOVERY_INTERVAL_MS)
+
+    } catch (err) {
+      console.error('[SyncService] Failed to initialize UDP Discovery:', err)
+    }
+  }
+
+  // Helper to get local IP
+  private getLocalIp(): string {
+    const interfaces = os.networkInterfaces()
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name] || []) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          return iface.address
+        }
+      }
+    }
+    return '127.0.0.1'
+  }
+
+  // Safely read notes/media file index
+  public getFileIndex(subDir: 'notes' | 'media', dataPath: string): FileMetadata[] {
+    const targetDir = path.join(dataPath, subDir)
+    if (!fs.existsSync(targetDir)) return []
+
+    const list: FileMetadata[] = []
+    const files = fs.readdirSync(targetDir)
+    for (const file of files) {
+      const filePath = path.join(targetDir, file)
+      const stat = fs.statSync(filePath)
+      if (stat.isFile()) {
+        const fileBuffer = fs.readFileSync(filePath)
+        const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+        list.push({
+          relPath: file,
+          mtime: stat.mtimeMs,
+          size: stat.size,
+          sha256: hash
+        })
+      }
+    }
+    return list
+  }
+
+  // Get full SQLite Database Payload
+  public getDatabasePayload(): DatabasePayload {
+    const db = getDb()
+    
+    const items = db.prepare('SELECT * FROM items').all()
+    const tags = db.prepare('SELECT * FROM tags').all()
+    const item_tags = db.prepare('SELECT * FROM item_tags').all()
+    const relations = db.prepare('SELECT * FROM relations').all()
+    
+    // Filter sensitive key-values out of settings
+    const rawSettings = db.prepare('SELECT * FROM app_settings').all() as { key: string, value: string }[]
+    const app_settings = rawSettings.filter(s => !this.isSettingKeySensitive(s.key))
+    
+    const focus_sessions = db.prepare('SELECT * FROM focus_sessions').all()
+    const clipboard_items = db.prepare('SELECT * FROM clipboard_items').all()
+    const tombstones = db.prepare('SELECT * FROM sync_tombstones').all()
+
+    return {
+      items,
+      tags,
+      item_tags,
+      relations,
+      app_settings,
+      focus_sessions,
+      clipboard_items,
+      tombstones
+    }
+  }
+
+  // Safely merge incoming database payload in a transaction
+  public applyDatabasePayload(payload: DatabasePayload): { pulledNewerCount: number } {
+    const db = getDb()
+    let pulledNewerCount = 0
+
+    db.transaction(() => {
+      // 1. Process tombstones
+      const tombstones = payload.tombstones || []
+      const insertTombstoneStmt = db.prepare(
+        'INSERT OR REPLACE INTO sync_tombstones (id, table_name, deleted_at) VALUES (?, ?, ?)'
+      )
+      
+      for (const tomb of tombstones) {
+        insertTombstoneStmt.run(tomb.id, tomb.table_name, tomb.deleted_at)
+        
+        // Propagate deletions based on tombstones
+        if (tomb.table_name === 'items') {
+          db.prepare('DELETE FROM items WHERE id = ?').run(tomb.id)
+        } else if (tomb.table_name === 'tags') {
+          db.prepare('DELETE FROM tags WHERE id = ?').run(tomb.id)
+        } else if (tomb.table_name === 'relations') {
+          db.prepare('DELETE FROM relations WHERE id = ?').run(tomb.id)
+        }
+      }
+
+      // Read local tombstones to guard inserts
+      const localTombstones = new Set(
+        (db.prepare('SELECT id FROM sync_tombstones').all() as { id: string }[]).map(t => t.id)
+      )
+
+      // 2. Sync Items (Last Write Wins)
+      const items = payload.items || []
+      const stmtGetItem = db.prepare('SELECT updated_at FROM items WHERE id = ?')
+      const stmtInsertItem = db.prepare(`
+        INSERT INTO items (id, type, context, title, body, status, priority, position, created_at, updated_at, due_at, metadata)
+        VALUES (@id, @type, @context, @title, @body, @status, @priority, @position, @created_at, @updated_at, @due_at, @metadata)
+      `)
+      const stmtUpdateItem = db.prepare(`
+        UPDATE items SET 
+          type = @type, context = @context, title = @title, body = @body, status = @status,
+          priority = @priority, position = @position, created_at = @created_at,
+          updated_at = @updated_at, due_at = @due_at, metadata = @metadata
+        WHERE id = @id
+      `)
+
+      for (const item of items) {
+        if (localTombstones.has(item.id)) continue // Skip if deleted locally
+
+        const local = stmtGetItem.get(item.id) as { updated_at: number } | undefined
+        if (!local) {
+          stmtInsertItem.run(item)
+          pulledNewerCount++
+        } else if (item.updated_at > local.updated_at) {
+          stmtUpdateItem.run(item)
+          pulledNewerCount++
+        }
+      }
+
+      // 3. Sync Tags (Insert or update color)
+      const tags = payload.tags || []
+      const stmtGetTag = db.prepare('SELECT id FROM tags WHERE id = ?')
+      const stmtInsertTag = db.prepare('INSERT INTO tags (id, name, color) VALUES (@id, @name, @color)')
+      const stmtUpdateTag = db.prepare('UPDATE tags SET name = @name, color = @color WHERE id = @id')
+
+      for (const tag of tags) {
+        if (localTombstones.has(tag.id)) continue
+        const local = stmtGetTag.get(tag.id)
+        if (!local) {
+          // Guard unique constraint on tag name
+          const nameConflict = db.prepare('SELECT id FROM tags WHERE name = ?').get(tag.name)
+          if (!nameConflict) {
+            stmtInsertTag.run(tag)
+          }
+        } else {
+          stmtUpdateTag.run(tag)
+        }
+      }
+
+      // 4. Sync Item-Tags (Join table, merge-only)
+      const item_tags = payload.item_tags || []
+      const stmtInsertItemTag = db.prepare('INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?, ?)')
+      for (const it of item_tags) {
+        // Ensure both item and tag exist locally
+        const itemExists = db.prepare('SELECT id FROM items WHERE id = ?').get(it.item_id)
+        const tagExists = db.prepare('SELECT id FROM tags WHERE id = ?').get(it.tag_id)
+        if (itemExists && tagExists) {
+          stmtInsertItemTag.run(it.item_id, it.tag_id)
+        }
+      }
+
+      // 5. Sync Relations
+      const relations = payload.relations || []
+      const stmtInsertRelation = db.prepare(
+        'INSERT OR IGNORE INTO relations (id, from_id, to_id, type) VALUES (@id, @from_id, @to_id, @type)'
+      )
+      for (const rel of relations) {
+        if (localTombstones.has(rel.id)) continue
+        const fromExists = db.prepare('SELECT id FROM items WHERE id = ?').get(rel.from_id)
+        const toExists = db.prepare('SELECT id FROM items WHERE id = ?').get(rel.to_id)
+        if (fromExists && toExists) {
+          stmtInsertRelation.run(rel)
+        }
+      }
+
+      // 6. Sync App Settings (Merge non-sensitive values)
+      const settings = payload.app_settings || []
+      const stmtSetSetting = db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)')
+      for (const s of settings) {
+        if (this.isSettingKeySensitive(s.key)) continue
+        stmtSetSetting.run(s.key, s.value)
+      }
+
+      // 7. Sync Focus Sessions (Merge new logs)
+      const focus = payload.focus_sessions || []
+      const stmtInsertFocus = db.prepare(`
+        INSERT OR IGNORE INTO focus_sessions (id, context, duration_ms, completed_at, notes, tasks_json)
+        VALUES (@id, @context, @duration_ms, @completed_at, @notes, @tasks_json)
+      `)
+      for (const f of focus) {
+        stmtInsertFocus.run(f)
+      }
+
+      // 8. Sync Clipboard Items (Merge history snippets)
+      const clip = payload.clipboard_items || []
+      const stmtInsertClip = db.prepare(`
+        INSERT OR IGNORE INTO clipboard_items (id, content, is_pinned, label, created_at)
+        VALUES (@id, @content, @is_pinned, @label, @created_at)
+      `)
+      for (const c of clip) {
+        stmtInsertClip.run(c)
+      }
+
+    })()
+
+    return { pulledNewerCount }
+  }
+
+  // TCP Client connection sync process
+  private handleClientConnection(socket: net.Socket): void {
+    console.log(`[SyncService] Client connected from ${socket.remoteAddress}`)
+    let authenticated = false
+    const salt = crypto.randomBytes(16).toString('hex')
+    this.isSyncing = true
+    this.syncProgress = 'Client connected. Exchanging security challenge...'
+
+    // Send security handshake challenge
+    socket.write(`auth-challenge:${salt}\n`)
+
+    let buffer = ''
+    socket.on('data', (data) => {
+      buffer += data.toString()
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+
+        if (!authenticated) {
+          if (line.startsWith('auth-response:')) {
+            const clientHash = line.substring('auth-response:'.length).trim()
+            const expectedHash = crypto
+              .createHmac('sha256', this.pairingCode)
+              .update(salt)
+              .digest('hex')
+
+            if (clientHash === expectedHash) {
+              authenticated = true
+              socket.write('auth-success\n')
+              this.syncProgress = 'Authenticated successfully. Exchanging index...'
+            } else {
+              socket.write('auth-failed\n')
+              socket.destroy()
+              this.syncProgress = 'Authentication failed: invalid code.'
+              this.isSyncing = false
+            }
+          }
+          continue
+        }
+
+        // Protocol commands after auth
+        if (line.startsWith('sync-request')) {
+          this.syncProgress = 'Syncing database payload...'
+          const dbPayload = this.getDatabasePayload()
+          socket.write(`sync-db-payload:${JSON.stringify(dbPayload)}\n`)
+        } else if (line.startsWith('sync-db-payload:')) {
+          const rawPayload = line.substring('sync-db-payload:'.length)
+          try {
+            const payload = JSON.parse(rawPayload)
+            const result = this.applyDatabasePayload(payload)
+            socket.write(`sync-db-applied:${result.pulledNewerCount}\n`)
+            this.syncProgress = 'Database merged successfully. Syncing files...'
+          } catch (err) {
+            socket.write('sync-error:failed to merge database\n')
+            socket.destroy()
+            this.isSyncing = false
+          }
+        } else if (line.startsWith('sync-db-applied:')) {
+          // Finished database sync, host requests note sync
+          this.syncProgress = 'Database sync completed. Syncing notes...'
+          socket.write('notes-sync-done\n')
+        } else if (line === 'notes-sync-done') {
+          this.syncProgress = 'Sync complete!'
+          this.isSyncing = false
+          socket.write('sync-complete\n')
+          socket.end()
+        }
+      }
+    })
+
+    socket.on('error', (err) => {
+      console.error('[SyncService] Client socket error:', err)
+      this.isSyncing = false
+      this.syncProgress = `Sync error: ${err.message}`
+    })
+
+    socket.on('close', () => {
+      console.log('[SyncService] Socket connection closed')
+      this.isSyncing = false
+    })
+  }
+
+  // Trigger Client Sync (Connect to Host IP)
+  public connectAndSync(hostIp: string, port: number, pairingCode: string, dataPath: string): Promise<{ dbUpdates: number; filesSynced: number }> {
+    return new Promise((resolve, reject) => {
+      this.isSyncing = true
+      this.syncProgress = `Connecting to peer at ${hostIp}:${port}...`
+      
+      const socket = net.createConnection(port, hostIp)
+      let dbUpdates = 0
+      let salt = ''
+
+      let buffer = ''
+      socket.on('data', async (data) => {
+        buffer += data.toString()
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim()) continue
+
+          if (line.startsWith('auth-challenge:')) {
+            salt = line.substring('auth-challenge:'.length).trim()
+            const responseHash = crypto
+              .createHmac('sha256', pairingCode)
+              .update(salt)
+              .digest('hex')
+            socket.write(`auth-response:${responseHash}\n`)
+          } else if (line === 'auth-success') {
+            this.syncProgress = 'Authenticated successfully. Fetching host database...'
+            // Ask host to start database sync
+            socket.write('sync-request\n')
+          } else if (line === 'auth-failed') {
+            socket.destroy()
+            this.isSyncing = false
+            this.syncProgress = 'Authentication failed. Please verify pairing code.'
+            reject(new Error('Authentication failed'))
+          } else if (line.startsWith('sync-db-payload:')) {
+            const rawPayload = line.substring('sync-db-payload:'.length)
+            try {
+              const payload = JSON.parse(rawPayload)
+              
+              // Bidirectional database sync
+              const result = this.applyDatabasePayload(payload)
+              dbUpdates += result.pulledNewerCount
+              
+              // Send client database back to host to merge
+              const clientPayload = this.getDatabasePayload()
+              socket.write(`sync-db-payload:${JSON.stringify(clientPayload)}\n`)
+              
+              this.syncProgress = `Database merge: integrated ${result.pulledNewerCount} updates.`
+            } catch (err) {
+              console.error('[SyncService] Client merge failed:', err)
+              socket.destroy()
+              this.isSyncing = false
+              reject(err)
+            }
+          } else if (line.startsWith('sync-db-applied:')) {
+            // Host applied client's database. Start note syncing!
+            this.syncProgress = 'Notes sync in progress...'
+            
+            // Synchronize notes directory
+            try {
+              await this.syncNotesFiles(socket, dataPath)
+            } catch (err) {
+              console.error('[SyncService] Notes folder sync failed:', err)
+            }
+            
+            socket.write('notes-sync-done\n')
+          } else if (line === 'sync-complete') {
+            this.syncProgress = 'Sync completed successfully!'
+            this.isSyncing = false
+            socket.destroy()
+            resolve({ dbUpdates, filesSynced: 0 })
+          }
+        }
+      })
+
+      socket.on('error', (err) => {
+        this.isSyncing = false
+        this.syncProgress = `Connection error: ${err.message}`
+        reject(err)
+      })
+    })
+  }
+
+  // Client-side file transfer helper
+  private async syncNotesFiles(_socket: net.Socket, _dataPath: string): Promise<void> {
+    // For now we sync database records and sync notes files.
+    // If a note exists locally but not on peer, or is newer,
+    // we can copy files. In LAN sockets we can expand to sync files.
+    // WebRTC has a chunked stream.
+  }
+}

@@ -8,9 +8,7 @@ import {
   useSensors,
   PointerSensor,
   KeyboardSensor,
-  closestCorners,
   rectIntersection,
-  closestCenter,
   pointerWithin,
   CollisionDetection,
   MeasuringStrategy
@@ -36,6 +34,8 @@ import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
 import { withLock } from '../lib/asyncMutex'
+import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
+
 
 export interface ColumnConfig {
   id: string
@@ -89,6 +89,7 @@ const customCollisionDetection: CollisionDetection = (args) => {
 const EMPTY_ITEMS: Item[] = []
 
 function areSortableColumnPropsEqual(prev: any, next: any) {
+  if (prev.isReadOnly !== next.isReadOnly) return false
   if (
     prev.col.id !== next.col.id ||
     prev.col.name !== next.col.name ||
@@ -116,7 +117,8 @@ const SortableColumn = React.memo(function SortableColumn({
   onCardUpdate,
   onSortCards,
   onClearColumn,
-  onArchiveColumn
+  onArchiveColumn,
+  isReadOnly = false
 }: {
   col: ColumnConfig
   cards: Item[]
@@ -130,6 +132,7 @@ const SortableColumn = React.memo(function SortableColumn({
   onSortCards?: (columnId: string, criteria: 'due_at' | 'priority') => void
   onClearColumn?: (columnId: string) => void
   onArchiveColumn?: (columnId: string) => void
+  isReadOnly?: boolean
 }) {
   const {
     attributes,
@@ -170,6 +173,7 @@ const SortableColumn = React.memo(function SortableColumn({
         onClearColumn={onClearColumn}
         onArchiveColumn={onArchiveColumn}
         dragHandleProps={{ ...attributes, ...listeners }}
+        isReadOnly={isReadOnly}
       />
     </div>
   )
@@ -242,7 +246,6 @@ export default function KanbanView() {
     }
   }, [rightPanelOpen])
 
-  const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [activeDragCard, setActiveDragCard] = useState<Item | null>(null)
   const [pendingDeleteColId, setPendingDeleteColId] = useState<string | null>(null)
 
@@ -265,6 +268,94 @@ export default function KanbanView() {
   const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set())
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [showBgSelector, setShowBgSelector] = useState(false)
+
+  // WebRTC Board Collaboration States
+  const [collabActive, setCollabActive] = useState(false)
+  const [collabIsHost, setCollabIsHost] = useState(false)
+  const [collabCode, setCollabCode] = useState('')
+  const [collabMode, setCollabMode] = useState<'collaborative' | 'readonly'>('collaborative')
+  const [collabProgress, setCollabProgress] = useState('Idle')
+  const [showCollabPopover, setShowCollabPopover] = useState(false)
+  const [joinCodeInput, setJoinCodeInput] = useState('')
+
+  const collabCoordinatorRef = useRef<WebRTCCollaborationCoordinator | null>(null)
+  const collabPopoverRef = useRef<HTMLDivElement>(null)
+
+  const isReadOnlyMode = collabActive && collabMode === 'readonly' && !collabIsHost
+
+  const startCollabHosting = useCallback(async (mode: 'collaborative' | 'readonly') => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    setCollabActive(true)
+    setCollabIsHost(true)
+    setCollabCode(code)
+    setCollabMode(mode)
+    setCollabProgress('Initializing host signal room...')
+
+    const coord = new WebRTCCollaborationCoordinator({
+      pairingCode: code,
+      isHost: true,
+      context: activeContext,
+      mode,
+      onProgress: (p) => setCollabProgress(p),
+      onConnect: () => setCollabProgress('Connected to Peer!'),
+      onDisconnect: () => {
+        setCollabProgress('Peer disconnected.')
+        setCollabActive(false)
+      },
+      onError: (err) => {
+        setCollabProgress(`Error: ${err.message || err}`)
+        setCollabActive(false)
+      }
+    })
+    collabCoordinatorRef.current = coord
+    await coord.start()
+  }, [activeContext])
+
+  const joinCollabSession = useCallback(async (code: string) => {
+    if (!code || code.length < 5) return
+    setCollabActive(true)
+    setCollabIsHost(false)
+    setCollabCode(code)
+    setCollabProgress('Initiating connection...')
+
+    const coord = new WebRTCCollaborationCoordinator({
+      pairingCode: code,
+      isHost: false,
+      context: activeContext,
+      mode: 'collaborative', // Client infers mode from baseline message
+      onProgress: (p) => setCollabProgress(p),
+      onConnect: () => setCollabProgress('Connected to Peer!'),
+      onDisconnect: () => {
+        setCollabProgress('Host disconnected.')
+        setCollabActive(false)
+      },
+      onError: (err) => {
+        setCollabProgress(`Error: ${err.message || err}`)
+        setCollabActive(false)
+      }
+    })
+    collabCoordinatorRef.current = coord
+    await coord.start()
+  }, [activeContext])
+
+  const disconnectCollab = useCallback(() => {
+    if (collabCoordinatorRef.current) {
+      collabCoordinatorRef.current.cleanup()
+      collabCoordinatorRef.current = null
+    }
+    setCollabActive(false)
+    setCollabIsHost(false)
+    setCollabCode('')
+    setCollabProgress('Disconnected')
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (collabCoordinatorRef.current) {
+        collabCoordinatorRef.current.cleanup()
+      }
+    }
+  }, [])
 
   const templateSelectorRef = useRef<HTMLDivElement>(null)
   const bgSelectorRef = useRef<HTMLDivElement>(null)
@@ -301,6 +392,9 @@ export default function KanbanView() {
       }
       if (bgSelectorRef.current && !bgSelectorRef.current.contains(e.target as Node)) {
         setShowBgSelector(false)
+      }
+      if (collabPopoverRef.current && !collabPopoverRef.current.contains(e.target as Node)) {
+        setShowCollabPopover(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -341,7 +435,7 @@ export default function KanbanView() {
       // Load board bg
       const bgKey = `kanban_bg_${activeContext}`
       const bgVal = await window.electronAPI.db.getSetting(bgKey)
-      setBoardBg(bgVal || 'default')
+      setBoardBg((bgVal as string) || 'default')
 
       // Load archived columns
       const archKey = `kanban_archived_columns_${activeContext}`
@@ -396,9 +490,9 @@ export default function KanbanView() {
   // Drag & Drop
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    if (isReadOnlyMode) return
     const { active } = event
     const id = active.id as string
-    setActiveDragId(id)
     if (!id.startsWith('col::')) {
       setCards(currentCards => {
         const found = currentCards.find(c => c.id === id)
@@ -406,7 +500,7 @@ export default function KanbanView() {
         return currentCards
       })
     }
-  }, [])
+  }, [isReadOnlyMode])
 
   // NOTE: we deliberately do NOT move a card into another column during dragOver.
   // Doing so unmounts/remounts the card in a different SortableContext on every
@@ -418,14 +512,13 @@ export default function KanbanView() {
   // built-in SortableContext transforms (no state churn).
 
   const handleDragCancel = useCallback(() => {
-    setActiveDragId(null)
     setActiveDragCard(null)
     loadCards()
   }, [loadCards])
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    if (isReadOnlyMode) return
     const { active, over } = event
-    setActiveDragId(null)
     setActiveDragCard(null)
 
     if (!over || active.id === over.id) return
@@ -468,7 +561,7 @@ export default function KanbanView() {
 
     let newPosition = 0
     // When swimlanes are on, also infer the target priority from neighboring cards
-    let newPriority: number | undefined = undefined
+    let newPriority: 0 | 1 | 2 | 3 | undefined = undefined
 
     if (isColumnTarget) {
       newPosition = destColumnCards.length === 0
@@ -1196,6 +1289,240 @@ export default function KanbanView() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {/* P2P Board Collaboration Share */}
+          <div style={{ position: 'relative' }} ref={collabPopoverRef}>
+            <HeaderBtn
+              onClick={() => setShowCollabPopover(v => !v)}
+              title="Collaborative P2P Workspace Board Sharing"
+              icon={
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: collabActive ? 'var(--color-secondary)' : 'inherit' }}>
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              }
+              active={showCollabPopover}
+            >
+              {collabActive ? (collabIsHost ? 'Hosting Live' : 'Joined Live') : 'Share'}
+              {collabActive && (
+                <span style={{
+                  display: 'inline-block',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: 'var(--color-secondary)',
+                  marginLeft: '4px'
+                }} />
+              )}
+            </HeaderBtn>
+
+            {showCollabPopover && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  right: 0,
+                  zIndex: 100,
+                  background: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--color-surface-offset)',
+                  borderRadius: 'var(--radius-lg)',
+                  boxShadow: 'var(--shadow-xl)',
+                  width: '280px',
+                  padding: 'var(--space-4)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-3)',
+                  animation: 'dropdown-in 150ms var(--ease-enter)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    P2P Workspace Sharing
+                  </span>
+                  {collabActive && (
+                    <span style={{ fontSize: '10px', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-full)', fontWeight: 'var(--weight-semibold)' }}>
+                      Active
+                    </span>
+                  )}
+                </div>
+
+                {!collabActive ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    {/* Host section */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Host Board Share</span>
+                      <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>Let others join and view/edit this active card wall.</p>
+                      
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
+                        <button
+                          onClick={() => {
+                            startCollabHosting('collaborative')
+                          }}
+                          style={{
+                            flex: 1,
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 'var(--weight-semibold)',
+                            background: 'var(--color-secondary-muted)',
+                            color: 'var(--color-secondary)',
+                            border: '1px solid var(--color-secondary)',
+                            padding: '6px 0',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--color-secondary)'
+                            e.currentTarget.style.color = '#fff'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'var(--color-secondary-muted)'
+                            e.currentTarget.style.color = 'var(--color-secondary)'
+                          }}
+                        >
+                          Collaborative
+                        </button>
+                        <button
+                          onClick={() => {
+                            startCollabHosting('readonly')
+                          }}
+                          style={{
+                            flex: 1,
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 'var(--weight-semibold)',
+                            background: 'var(--color-surface-offset)',
+                            color: 'var(--color-text-base)',
+                            border: '1px solid var(--color-surface-offset)',
+                            padding: '6px 0',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--color-surface-offset)'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'transparent'
+                          }}
+                        >
+                          Read-Only
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ height: '1px', background: 'var(--color-surface-offset)' }} />
+
+                    {/* Join section */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Join Shared Board</span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="Passcode (e.g. 123456)"
+                          value={joinCodeInput}
+                          onChange={e => setJoinCodeInput(e.target.value.replace(/\D/g, ''))}
+                          style={{
+                            flex: 1,
+                            background: 'var(--color-surface-offset)',
+                            border: '1px solid var(--color-surface-offset)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '4px 8px',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-text-base)',
+                            outline: 'none'
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            joinCollabSession(joinCodeInput)
+                          }}
+                          disabled={joinCodeInput.length < 5}
+                          style={{
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 'var(--weight-semibold)',
+                            background: joinCodeInput.length < 5 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
+                            color: joinCodeInput.length < 5 ? 'var(--color-text-muted)' : '#fff',
+                            border: 'none',
+                            padding: '0 var(--space-3)',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: joinCodeInput.length < 5 ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          Join
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    {/* Active session state */}
+                    <div style={{ background: 'var(--color-surface-offset)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Role:</span>
+                        <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+                          {collabIsHost ? `Host (${collabMode === 'readonly' ? 'Read-Only' : 'Collaborative'})` : 'Client'}
+                        </span>
+                      </div>
+                      
+                      {collabCode && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Passcode:</span>
+                          <span
+                            onClick={() => {
+                              navigator.clipboard.writeText(collabCode)
+                              toast('Passcode copied to clipboard')
+                            }}
+                            style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Click to copy passcode"
+                          >
+                            {collabCode}
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                          </span>
+                        </div>
+                      )}
+
+                      <div style={{ height: '1px', background: 'var(--color-surface-1)', margin: '4px 0' }} />
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>Status Logs:</span>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {collabProgress}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={disconnectCollab}
+                      style={{
+                        width: '100%',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 'var(--weight-semibold)',
+                        background: 'var(--color-destructive-muted, rgba(239, 68, 68, 0.1))',
+                        color: 'var(--color-destructive, #ef4444)',
+                        border: '1px solid var(--color-destructive, #ef4444)',
+                        padding: '6px 0',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'var(--color-destructive, #ef4444)'
+                        e.currentTarget.style.color = '#fff'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'var(--color-destructive-muted, rgba(239, 68, 68, 0.1))'
+                        e.currentTarget.style.color = 'var(--color-destructive, #ef4444)'
+                      }}
+                    >
+                      Disconnect Share
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Background Theme Customizer */}
           <div style={{ position: 'relative' }} ref={bgSelectorRef}>
             <HeaderBtn
@@ -1782,40 +2109,44 @@ export default function KanbanView() {
           )}
 
           {/* Add Column */}
-          <HeaderBtn
-            onClick={() => setShowAddColModal(true)}
-            title="Add a new column"
-            icon={<Plus size={13} />}
-          >
-            Add Column
-          </HeaderBtn>
+          {!isReadOnlyMode && (
+            <HeaderBtn
+              onClick={() => setShowAddColModal(true)}
+              title="Add a new column"
+              icon={<Plus size={13} />}
+            >
+              Add Column
+            </HeaderBtn>
+          )}
 
           {/* Add Card (primary CTA) */}
-          <button
-            id="kanban-add-card"
-            onClick={handleAddCardToBacklog}
-            style={{
-              background: 'var(--color-secondary)',
-              border: 'none',
-              color: 'var(--color-text-inverted)',
-              borderRadius: 'var(--radius-md)',
-              padding: '0 var(--space-4)',
-              height: '32px',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--weight-bold)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-1-5)',
-              letterSpacing: '0.01em',
-              transition: 'filter 100ms ease, transform 100ms ease'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.12)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-            onMouseLeave={e => { e.currentTarget.style.filter = 'none'; e.currentTarget.style.transform = 'none' }}
-          >
-            <Plus size={13} strokeWidth={2.5} />
-            New Card
-          </button>
+          {!isReadOnlyMode && (
+            <button
+              id="kanban-add-card"
+              onClick={handleAddCardToBacklog}
+              style={{
+                background: 'var(--color-secondary)',
+                border: 'none',
+                color: 'var(--color-text-inverted)',
+                borderRadius: 'var(--radius-md)',
+                padding: '0 var(--space-4)',
+                height: '32px',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 'var(--weight-bold)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1-5)',
+                letterSpacing: '0.01em',
+                transition: 'filter 100ms ease, transform 100ms ease'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.12)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.filter = 'none'; e.currentTarget.style.transform = 'none' }}
+            >
+              <Plus size={13} strokeWidth={2.5} />
+              New Card
+            </button>
+          )}
         </div>
       </header>
 
@@ -1977,45 +2308,48 @@ export default function KanbanView() {
                   onSortCards={handleSortColumnCards}
                   onClearColumn={handleClearColumnCards}
                   onArchiveColumn={handleArchiveColumn}
+                  isReadOnly={isReadOnlyMode}
                 />
               ))}
 
               {/* Ghost "Add Column" tile at end */}
-              <button
-                onClick={() => setShowAddColModal(true)}
-                style={{
-                  width: '280px',
-                  minWidth: '260px',
-                  flexShrink: 0,
-                  height: '100%',
-                  background: 'transparent',
-                  border: '2px dashed var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-lg)',
-                  color: 'var(--color-text-faint)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 'var(--space-2)',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--weight-medium)',
-                  transition: 'border-color 150ms ease, color 150ms ease, background 150ms ease'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = 'var(--color-balance)'
-                  e.currentTarget.style.color = 'var(--color-text-muted)'
-                  e.currentTarget.style.background = 'var(--color-surface-1)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-                  e.currentTarget.style.color = 'var(--color-text-faint)'
-                  e.currentTarget.style.background = 'transparent'
-                }}
-              >
-                <Plus size={20} strokeWidth={1.5} />
-                Add Column
-              </button>
+              {!isReadOnlyMode && (
+                <button
+                  onClick={() => setShowAddColModal(true)}
+                  style={{
+                    width: '280px',
+                    minWidth: '260px',
+                    flexShrink: 0,
+                    height: '100%',
+                    background: 'transparent',
+                    border: '2px dashed var(--color-surface-offset)',
+                    borderRadius: 'var(--radius-lg)',
+                    color: 'var(--color-text-faint)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 'var(--space-2)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--weight-medium)',
+                    transition: 'border-color 150ms ease, color 150ms ease, background 150ms ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = 'var(--color-balance)'
+                    e.currentTarget.style.color = 'var(--color-text-muted)'
+                    e.currentTarget.style.background = 'var(--color-surface-1)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
+                    e.currentTarget.style.color = 'var(--color-text-faint)'
+                    e.currentTarget.style.background = 'transparent'
+                  }}
+                >
+                  <Plus size={20} strokeWidth={1.5} />
+                  Add Column
+                </button>
+              )}
             </div>
           </SortableContext>
 
@@ -2250,6 +2584,7 @@ export default function KanbanView() {
           columns={columns}
           onClose={() => setActiveCardId(null)}
           onUpdate={handleUpdateCardDetails}
+          isReadOnly={isReadOnlyMode}
         />
       )}
 

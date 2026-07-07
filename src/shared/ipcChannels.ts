@@ -26,6 +26,9 @@ export const enum IpcChannels {
   DB_QUERY_TASKS         = 'db:queryTasks',
   DB_CREATE_FOCUS_SESSION = 'db:createFocusSession',
   DB_GET_FOCUS_SESSIONS   = 'db:getFocusSessions',
+  DB_EXPORT_CONTEXT       = 'db:exportContext',
+  DB_IMPORT_CONTEXT       = 'db:importContext',
+  DB_IMPORT_CONTEXT_DATA  = 'db:importContextData',
 
   // Markdown Notes
   NOTES_LIST             = 'notes:list',
@@ -110,6 +113,7 @@ export const enum IpcChannels {
   APP_MAXIMIZE           = 'app:maximize',
   APP_CLOSE              = 'app:close',
   APP_SAVE_FILE          = 'app:saveFile',
+  APP_SHOW_ITEM_IN_FOLDER = 'app:showItemInFolder',
 
   // Phase 22 Customizer & Extensions
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
@@ -151,5 +155,27 @@ export const enum IpcChannels {
   AI_CONSOLIDATE_MEMORY         = 'ai:consolidateMemory',
   WORKSPACE_SELECT_FOLDER       = 'workspace:selectFolder',
   WORKSPACE_GET_STRUCTURE        = 'workspace:getStructure',
-  WORKSPACE_READ_FILE           = 'workspace:readFile'
+  WORKSPACE_READ_FILE           = 'workspace:readFile',
+
+  // Local Media
+  MEDIA_SAVE_FROM_BUFFER        = 'media:saveFromBuffer',
+  MEDIA_SAVE_FILE_PATHS         = 'media:saveFilePaths',
+  MEDIA_SCAN_AND_PRUNE          = 'media:scanAndPrune',
+  MEDIA_GET_STORAGE_INFO        = 'media:getStorageInfo',
+
+  // P2P Network Sync
+  SYNC_START_HOST               = 'sync:startHost',
+  SYNC_STOP_HOST                = 'sync:stopHost',
+  SYNC_CONNECT_AND_SYNC         = 'sync:connectAndSync',
+  SYNC_GET_STATUS               = 'sync:getStatus',
+  SYNC_GET_DISCOVERED_PEERS     = 'sync:getDiscoveredPeers',
+  SYNC_GET_DB_PAYLOAD           = 'sync:getDbPayload',
+  SYNC_APPLY_DB_PAYLOAD         = 'sync:applyDbPayload',
+  SYNC_GET_FILE_INDEX           = 'sync:getFileIndex',
+  SYNC_READ_FILE_CHUNK          = 'sync:readFileChunk',
+  SYNC_WRITE_FILE_CHUNK         = 'sync:writeFileChunk',
+  SYNC_DELETE_FILE              = 'sync:deleteFile',
+  SYNC_APPLY_BOARD_BASELINE     = 'sync:applyBoardBaseline',
+  SYNC_APPLY_REMOTE_MUTATION    = 'sync:applyRemoteMutation'
 }
+

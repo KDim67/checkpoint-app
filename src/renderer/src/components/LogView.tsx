@@ -252,7 +252,8 @@ export default function LogView() {
       flexDirection: 'column',
       height: '100%',
       position: 'relative',
-      background: 'var(--color-background)'
+      background: 'var(--color-background)',
+      overflow: 'hidden'
     }}>
       {/* Header Bar */}
       <header style={{

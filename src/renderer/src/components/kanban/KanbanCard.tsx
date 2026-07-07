@@ -77,17 +77,30 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
   const priority = PRIORITY_COLORS[card.priority] ?? PRIORITY_COLORS[0]
 
   // Parse Trello Metadata properties
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let meta: any = {}
   try {
     meta = JSON.parse(card.metadata || '{}')
   } catch {}
 
-  const cover = meta.cover || null
+  const rawCover = meta.cover || null
+  let cover = rawCover
+  if (!cover && card.body) {
+    const imgMatch = card.body.match(/!\[.*?\]\((.*?)\)/)
+    if (imgMatch) {
+      cover = {
+        type: 'image',
+        value: imgMatch[1]
+      }
+    }
+  }
+
   const checklist = meta.checklist || []
   const isTemplate = meta.isTemplate === true
   const dueDateCompleted = meta.dueDateCompleted === true
 
   const totalChecklist = checklist.length
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const completedChecklist = checklist.filter((i: any) => i.done).length
   const isFullCover = cover && cover.type === 'color' && cover.size === 'full'
   const isHeaderCover = cover && cover.type === 'color' && cover.size !== 'full'

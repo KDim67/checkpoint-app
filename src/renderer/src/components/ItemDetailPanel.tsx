@@ -22,7 +22,6 @@ import ColorPicker from './ui/ColorPicker'
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
   const activeContext = useAppStore(s => s.activeContext)
-  const selectItem = useAppStore(s => s.selectItem)
   const { toast } = useToast()
 
   const [item, setItem] = useState<Item | null>(null)
@@ -63,7 +62,7 @@ export default function ItemDetailPanel() {
         // Load Kanban columns
         const colsRaw = await window.electronAPI.db.getSetting('kanban_columns')
         if (colsRaw) {
-          const cols = JSON.parse(colsRaw) as Array<{ id: string; name: string }>
+          const cols = JSON.parse(colsRaw as string) as Array<{ id: string; name: string }>
           setColumns(cols)
         } else {
           setColumns([
@@ -164,7 +163,7 @@ export default function ItemDetailPanel() {
   const handleUpdateField = async (patch: Partial<Item>, updatedTagIds?: string[]) => {
     try {
       const tagsToSave = updatedTagIds ?? selectedTagIds
-      const updated = await window.electronAPI.db.updateItem(item.id, patch, tagsToSave)
+      await window.electronAPI.db.updateItem(item.id, patch, tagsToSave)
       
       // Update local state
       setItem(prev => prev ? { ...prev, ...patch, tags: allTags.filter(t => tagsToSave.includes(t.id)) } : null)
@@ -627,7 +626,10 @@ export default function ItemDetailPanel() {
               >
                 {body ? (
                   <div className="markdown-body" onClick={e => e.stopPropagation()}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      urlTransform={url => url}
+                    >
                       {body}
                     </ReactMarkdown>
                   </div>
