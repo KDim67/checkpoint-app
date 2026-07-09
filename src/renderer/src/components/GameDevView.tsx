@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useId, useRef } from 'react'
-import { Download, Layers, RefreshCw, Trash2, Plus, Copy, AlertTriangle, CheckCircle, GitFork, Palette, Info, Sparkles, Box, Settings, Loader, Repeat, Grid, Scissors, Sliders, Maximize2 } from 'lucide-react'
+import { Download, Layers, RefreshCw, Trash2, Plus, Copy, AlertTriangle, CheckCircle, GitFork, Palette, Info, Sparkles, Box, Settings, Loader, Repeat, Grid, Scissors, Sliders, Maximize2, Map } from 'lucide-react'
+import MapMakerView from './MapMakerView'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
 import mermaid from 'mermaid'
@@ -379,7 +380,7 @@ function MermaidChart({ code }: { code: string }) {
 
 export default function GameDevView() {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<'renamer' | 'dialogue' | 'palette' | 'pbr' | 'seamless' | 'atlas' | 'slicer' | 'lut' | 'upscaler'>('pbr')
+  const [activeTab, setActiveTab] = useState<'renamer' | 'dialogue' | 'palette' | 'pbr' | 'seamless' | 'atlas' | 'slicer' | 'lut' | 'upscaler' | 'mapmaker'>('pbr')
 
   // Tab 1: Batch Asset Renamer State
   const [files, setFiles] = useState<AssetFile[]>([])
@@ -2515,6 +2516,12 @@ export default function GameDevView() {
               { id: 'renamer' as const,  label: 'Batch Renamer',  icon: <Layers size={14} /> },
               { id: 'dialogue' as const, label: 'Dialogue Flow',  icon: <GitFork size={14} /> },
               { id: 'palette' as const,  label: 'Shader Palette', icon: <Palette size={14} /> }
+            ]
+          },
+          {
+            group: 'Level Design',
+            tools: [
+              { id: 'mapmaker' as const, label: 'Map Maker', icon: <Map size={14} /> }
             ]
           }
         ]).map(section => (
@@ -5427,6 +5434,13 @@ export default function GameDevView() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB: MAP MAKER */}
+        {activeTab === 'mapmaker' && (
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <MapMakerView />
           </div>
         )}
 
