@@ -18,6 +18,7 @@ import { calculateFitResult } from '../../../shared/scoreEngine'
 import type { CatalogModel, HardwareSpecs, OllamaStatus, PullProgressEvent } from '../../../shared/cookbookTypes'
 import Skeleton from './ui/Skeleton'
 import { useToast } from './ui/Toast'
+import { useConfirm } from './ui/ConfirmDialog'
 
 // Capability filters + display metadata for badges.
 const CAP_FILTERS: { id: string; label: string }[] = [
@@ -48,6 +49,7 @@ function formatContext(tokens?: number): string {
 
 export default function CookbookView() {
   const { toast } = useToast()
+  const confirm = useConfirm()
   const [searchQuery, setSearchQuery] = useState('')
   const [capFilter, setCapFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'fit' | 'params_asc' | 'params_desc'>('fit')
@@ -198,7 +200,13 @@ export default function CookbookView() {
   }
 
   const handleDeleteModel = async (modelTag: string) => {
-    if (!confirm(`Delete "${modelTag}" from your machine? You can always reinstall it later.`)) return
+    const ok = await confirm({
+      title: 'Delete model',
+      message: `Delete "${modelTag}" from your machine? You can always reinstall it later.`,
+      confirmText: 'Delete',
+      isDestructive: true
+    })
+    if (!ok) return
     setDeletingTag(modelTag)
     try {
       const ok = await window.electronAPI.cookbook.deleteModel(modelTag)

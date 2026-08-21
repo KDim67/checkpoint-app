@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 
 interface ToastAction {
   label: string
@@ -29,6 +29,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     if (timersRef.current[id]) {
       clearTimeout(timersRef.current[id])
       delete timersRef.current[id]
+    }
+  }, [])
+
+  // Timers outlive the toasts they dismiss if the provider unmounts mid-flight.
+  useEffect(() => {
+    const timers = timersRef.current
+    return () => {
+      Object.values(timers).forEach(clearTimeout)
     }
   }, [])
 

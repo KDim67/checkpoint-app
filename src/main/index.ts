@@ -125,6 +125,31 @@ export function registerAppShortcuts(): void {
   }
 }
 
+/**
+ * shell.openExternal hands the URL to the OS, which will happily run a
+ * file:// path or a registered protocol handler. Links reach us from note
+ * markdown, cheatsheets and AI responses, so the scheme is checked before
+ * anything leaves the app.
+ */
+const EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+
+function openExternalSafely(url: string): void {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    console.warn('[index.ts] Refusing to open unparseable URL:', url)
+    return
+  }
+  if (!EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+    console.warn('[index.ts] Refusing to open non-web URL:', parsed.protocol)
+    return
+  }
+  shell.openExternal(parsed.href).catch(err => {
+    console.error('Failed to open external URL:', err)
+  })
+}
+
 function createWindow(): void {
   const preloadPath = join(__dirname, '../preload/index.mjs')
   const iconPath = join(__dirname, '../../resources/icon.ico')
@@ -183,7 +208,7 @@ function createWindow(): void {
 
   // Open external links in the system browser, not a new Electron window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    openExternalSafely(url)
     return { action: 'deny' }
   })
 
@@ -233,8 +258,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.APP_GET_DATA_PATH, () => app.getPath('userData'))
 
-  ipcMain.handle(IpcChannels.APP_OPEN_EXTERNAL, (_event, url: string) => {
-    shell.openExternal(url)
+  ipcMain.handle(IpcChannels.APP_OPEN_EXTERNAL, (_event, url: unknown) => {
+    if (typeof url === 'string') openExternalSafely(url)
   })
 
   ipcMain.on(IpcChannels.APP_MINIMIZE, () => mainWindow?.minimize())
@@ -1098,14 +1123,16 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize Backup Vaulting:', err)
   }
 
-  // Start Clipboard Watcher, record the capture, then push a change event so
-  // the renderer refreshes instantly instead of waiting on a slow poll.
-  const { startClipboardWatcher } = await import('./clipboardWatcher')
+  // Clipboard Watcher, record the capture, then push a change event so the
+  // renderer refreshes instantly instead of waiting on a slow poll. Only starts
+  // when the Clipboard feature is on; setSetting flips it live after that.
+  const { configureClipboardWatcher, setClipboardCaptureEnabled } = await import('./clipboardWatcher')
   const { recordClipboardCopy } = await import('./db')
-  startClipboardWatcher((text) => {
+  configureClipboardWatcher((text) => {
     recordClipboardCopy(text)
     mainWindow?.webContents.send(IpcChannels.CLIPBOARD_HISTORY_CHANGED)
   })
+  setClipboardCaptureEnabled(getSetting<string>('feature_view_clipboard', 'true') !== 'false')
 
   // Load customization engine if enabled
   try {

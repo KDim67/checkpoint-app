@@ -1,13 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { TIMER_PRESETS, formatTime, type TimerPreset } from './pomodoroTimer'
-
-const MODE_TITLE: Record<TimerPreset, string> = {
-  focus: 'Focus',
-  'short-break': 'Short Break',
-  'long-break': 'Long Break'
-}
+import { TIMER_PRESETS, MODE_TITLES, formatTime, isFocusInterval } from './pomodoroTimer'
 
 /**
  * Mounted once at the app root (outside FocusView) so a running focus/break
@@ -21,7 +15,6 @@ export default function FocusTimerEngine(): null {
   const { toast } = useToast()
 
   const audioCtxRef = useRef<AudioContext | null>(null)
-  const completingRef = useRef(false)
   // Remember the app's real title so we can restore it once a session ends,
   // and track whether we're currently overriding it (only touch document.title
   // when it actually changes, to avoid thrashing it every 250ms tick).
@@ -104,7 +97,7 @@ export default function FocusTimerEngine(): null {
         const remainMs = state.focusIsRunning && state.focusEndAt !== null
           ? Math.max(0, state.focusEndAt - Date.now())
           : state.focusRemainingMs
-        const nextTitle = `${state.focusIsRunning ? '' : '⏸ '}${formatTime(remainMs)} · ${MODE_TITLE[state.focusPreset]}`
+        const nextTitle = `${state.focusIsRunning ? '' : '⏸ '}${formatTime(remainMs)} · ${MODE_TITLES[state.focusPreset]}`
         if (nextTitle !== titleShownRef.current) {
           document.title = nextTitle
           titleShownRef.current = nextTitle
@@ -122,11 +115,9 @@ export default function FocusTimerEngine(): null {
         return
       }
 
-      // Timer just hit zero, guard against double-firing across ticks
-      if (completingRef.current) return
-      completingRef.current = true
-
-      const isFocus = state.focusPreset === 'focus'
+      // Timer hit zero. focusFinish() nulls focusEndAt, so the guard above
+      // short-circuits every later tick, no re-entry flag needed.
+      const isFocus = isFocusInterval(state.focusPreset)
       state.focusFinish()
       playChime()
       notifyCompletion(isFocus)
@@ -145,8 +136,6 @@ export default function FocusTimerEngine(): null {
           type: 'info'
         })
       }
-
-      completingRef.current = false
     }, 250)
 
     return () => clearInterval(interval)

@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
+import React, { useState, useEffect, lazy, Suspense, useCallback } from 'react'
 import { useAppStore, type ActiveView } from './store/appStore'
 import { Sidebar } from './components/Sidebar'
 import AiStreamPanel from './components/AiStreamPanel'
 import GitPanel from './components/GitPanel'
 import ItemDetailPanel from './components/ItemDetailPanel'
 import { ToastProvider } from './components/ui/Toast'
+import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './components/settings/AppearanceSettings'
 import Lightbox from './components/ui/Lightbox'
@@ -178,31 +179,42 @@ function TitlebarButton({
 }
 
 // Right Panel
+const MIN_PANEL_WIDTH = 280
+const MAX_PANEL_WIDTH = 800
+const DEFAULT_PANEL_WIDTH = 380
+// The sidebar rail plus a usable strip of main content; below this the panel
+// would cover the view it is meant to annotate.
+const MIN_CONTENT_WIDTH = 360
+
+function clampPanelWidth(width: number): number {
+  const ceiling = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, window.innerWidth - MIN_CONTENT_WIDTH))
+  return Math.max(MIN_PANEL_WIDTH, Math.min(ceiling, width))
+}
+
 function RightPanel() {
   const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
   const rightPanelContent = useAppStore(s => s.rightPanelContent)
   const setRightPanelContent = useAppStore(s => s.setRightPanelContent)
   const selectedItemId = useAppStore(s => s.selectedItemId)
 
-  const [panelWidth, setPanelWidth] = useState(380)
-  const isResizingRef = useRef(false)
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
+  // State, not a ref: the width transition has to be switched off during a drag,
+  // and a ref mutation does not re-render, so the animated value stayed live and
+  // the panel lerped a frame behind the cursor.
+  const [isResizing, setIsResizing] = useState(false)
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
-    isResizingRef.current = true
+    setIsResizing(true)
     document.body.style.userSelect = 'none'
     document.body.style.cursor = 'col-resize'
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isResizingRef.current) return
-      const newWidth = window.innerWidth - moveEvent.clientX
-      if (newWidth >= 280 && newWidth <= 800) {
-        setPanelWidth(newWidth)
-      }
+      setPanelWidth(clampPanelWidth(window.innerWidth - moveEvent.clientX))
     }
 
     const handleMouseUp = () => {
-      isResizingRef.current = false
+      setIsResizing(false)
       document.body.style.userSelect = ''
       document.body.style.cursor = ''
       window.removeEventListener('mousemove', handleMouseMove)
@@ -213,12 +225,19 @@ function RightPanel() {
     window.addEventListener('mouseup', handleMouseUp)
   }
 
+  // Shrinking the window must not leave the panel wider than the viewport.
+  useEffect(() => {
+    const onResize = () => setPanelWidth(w => clampPanelWidth(w))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   return (
     <div
       style={{
         width: rightPanelOpen ? `${panelWidth}px` : '0',
         overflow: 'hidden',
-        transition: isResizingRef.current ? 'none' : 'width var(--duration-fast) cubic-bezier(0.32, 0.72, 0, 1)',
+        transition: isResizing ? 'none' : 'width var(--duration-fast) cubic-bezier(0.32, 0.72, 0, 1)',
         borderLeft: rightPanelOpen ? '1px solid var(--color-surface-offset)' : 'none',
         background: 'var(--color-surface-1)',
         display: 'flex',
@@ -385,25 +404,29 @@ export default function App() {
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
-  // Global Image Click Listener for Lightbox Preview
+  // Opens the lightbox when an image is clicked directly. Runs in the capture
+  // phase and swallows the event, so it has to bow out whenever the image is
+  // standing in for a control, a card, button or link, otherwise clicking a
+  // card's thumbnail zooms the image instead of opening the card.
   useEffect(() => {
     const handleImageClick = (e: MouseEvent) => {
-      const target = e.target as HTMLImageElement
-      if (target.tagName === 'IMG') {
-        // Exclude application logos / UI icons from triggering the lightbox preview
-        if (target.alt === 'Checkpoint Logo' || target.closest('#context-switcher')) {
-          return
-        }
-        const src = target.src || target.getAttribute('src')
-        if (src) {
-          const isAttachedMedia = src.startsWith('checkpoint-media://') || src.startsWith('blob:')
-          const isMarkdownImg = target.closest('.markdown-body') !== null
-          if (isAttachedMedia || isMarkdownImg) {
-            e.preventDefault()
-            e.stopPropagation()
-            setLightboxSrc(src)
-          }
-        }
+      const target = e.target as HTMLElement
+      if (target.tagName !== 'IMG') return
+
+      const img = target as HTMLImageElement
+      // Chrome and logos are decoration, not content.
+      if (img.alt === 'Checkpoint Logo' || img.closest('#context-switcher')) return
+      if (img.closest('button, a, [role="button"], [data-no-lightbox]')) return
+
+      const src = img.src || img.getAttribute('src')
+      if (!src) return
+
+      const isAttachedMedia = src.startsWith('checkpoint-media://') || src.startsWith('blob:')
+      const isMarkdownImg = img.closest('.markdown-body') !== null
+      if (isAttachedMedia || isMarkdownImg) {
+        e.preventDefault()
+        e.stopPropagation()
+        setLightboxSrc(src)
       }
     }
     document.addEventListener('click', handleImageClick, true)
@@ -586,25 +609,27 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <FocusTimerEngine />
-      <div className="app-shell">
-        <Titlebar />
-        <div className="app-body">
-          <Sidebar />
-          <main
-            id="main-content"
-            className="app-content"
-            role="main"
-            aria-label={`${activeView} view`}
-          >
-            <Suspense fallback={<ViewSkeleton />}>
-              {renderView()}
-            </Suspense>
-          </main>
-          <RightPanel />
+      <ConfirmProvider>
+        <FocusTimerEngine />
+        <div className="app-shell">
+          <Titlebar />
+          <div className="app-body">
+            <Sidebar />
+            <main
+              id="main-content"
+              className="app-content"
+              role="main"
+              aria-label={`${activeView} view`}
+            >
+              <Suspense fallback={<ViewSkeleton />}>
+                {renderView()}
+              </Suspense>
+            </main>
+            <RightPanel />
+          </div>
         </div>
-      </div>
-      <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      </ConfirmProvider>
     </ToastProvider>
   )
 }

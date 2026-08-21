@@ -29,7 +29,7 @@ import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
 import { Plus, Layers, LayoutGrid, KanbanSquare, Upload } from 'lucide-react'
 import Skeleton from './ui/Skeleton'
-import ConfirmDialog from './ui/ConfirmDialog'
+import ConfirmDialog, { useConfirm } from './ui/ConfirmDialog'
 import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
@@ -202,6 +202,7 @@ export default function KanbanView() {
   }, [dropdownOpen])
 
   const { toast } = useToast()
+  const confirm = useConfirm()
 
   const [cards, setCards] = useState<Item[]>([])
   const [columns, setColumns] = useState<ColumnConfig[]>([])
@@ -916,7 +917,13 @@ export default function KanbanView() {
 
   const handleDeleteColumnPermanently = async (colId: string) => {
     const colName = archivedColumns.find(c => c.id === colId)?.name || 'Column'
-    if (confirm(`Permanently delete list "${colName}"? Any cards that belong to this list will remain archived.`)) {
+    const confirmed = await confirm({
+      title: 'Delete list permanently',
+      message: `Permanently delete list "${colName}"? Any cards that belong to this list will remain archived.`,
+      confirmText: 'Delete List',
+      isDestructive: true
+    })
+    if (confirmed) {
       try {
         const updatedArchived = archivedColumns.filter(c => c.id !== colId)
         const archKey = `kanban_archived_columns_${activeContext}`
@@ -965,7 +972,13 @@ export default function KanbanView() {
   const handleBulkDeleteArchived = async (): Promise<void> => {
     const ids = Array.from(selectedArchived)
     if (ids.length === 0) return
-    if (!confirm(`Permanently delete ${ids.length} archived card${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return
+    const confirmed = await confirm({
+      title: 'Delete archived cards',
+      message: `Permanently delete ${ids.length} archived card${ids.length > 1 ? 's' : ''}? This cannot be undone.`,
+      confirmText: 'Delete',
+      isDestructive: true
+    })
+    if (!confirmed) return
     try {
       await Promise.all(ids.map(id => window.electronAPI.db.deleteItem(id)))
       setCards(prev => prev.filter(c => !selectedArchived.has(c.id)))
@@ -2550,7 +2563,13 @@ export default function KanbanView() {
                             <button
                               onClick={async e => {
                                 e.stopPropagation()
-                                if (confirm(`Permanently delete card "${card.title}"? This cannot be undone.`)) {
+                                const confirmed = await confirm({
+                                  title: 'Delete card permanently',
+                                  message: `Permanently delete card "${card.title}"? This cannot be undone.`,
+                                  confirmText: 'Delete',
+                                  isDestructive: true
+                                })
+                                if (confirmed) {
                                   try {
                                     await window.electronAPI.db.deleteItem(card.id)
                                     setCards(prev => prev.filter(c => c.id !== card.id))

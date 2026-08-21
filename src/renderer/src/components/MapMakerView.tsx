@@ -12,6 +12,8 @@ import {
   Maximize, Crosshair, Move, GitFork, Star, Home, Package, Swords, Shield,
   BookOpen, Droplets, Flag, RefreshCw, Camera, MessageSquare
 } from 'lucide-react'
+import { useToast } from './ui/Toast'
+import { useConfirm } from './ui/ConfirmDialog'
 
 // Types
 
@@ -1180,6 +1182,9 @@ function distPointToSegment(px: number, py: number, ax: number, ay: number, bx: 
 // Main Component
 
 export default function MapMakerView() {
+  const { toast } = useToast()
+  const confirm = useConfirm()
+
   // Maps & pages
   const [maps, setMaps] = useState<MapState[]>([])
   const [activeMapIdx, setActiveMapIdx] = useState(0)
@@ -1315,7 +1320,7 @@ export default function MapMakerView() {
     setRenameMapIdx(null)
     if (!nextName || nextName === maps[idx].settings.name) return
     if (maps.some((x, i) => i !== idx && x.settings.name.toLowerCase() === nextName.toLowerCase())) {
-      alert('A map with that name already exists!')
+      toast('A map with that name already exists', { type: 'warning' })
       return
     }
     pushUndo()
@@ -2972,7 +2977,13 @@ export default function MapMakerView() {
               title="Delete map from disk"
               onClick={async (e) => {
                 e.stopPropagation()
-                if (!confirm(`Are you sure you want to permanently delete the map "${m.settings.name}" from disk?`)) return
+                const confirmed = await confirm({
+                  title: 'Delete map',
+                  message: `Are you sure you want to permanently delete the map "${m.settings.name}" from disk?`,
+                  confirmText: 'Delete Map',
+                  isDestructive: true
+                })
+                if (!confirmed) return
                 try {
                   await window.electronAPI.maps.deleteMap(m.settings.name)
                   setMaps(prev => {
@@ -3167,9 +3178,15 @@ export default function MapMakerView() {
                         <button
                           title="Delete custom terrain"
                           style={{ background: 'none', border: 'none', color: '#E63946', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation()
-                            if (!confirm(`Delete custom terrain type "${ct.name}"?`)) return
+                            const confirmed = await confirm({
+                              title: 'Delete terrain type',
+                              message: `Delete custom terrain type "${ct.name}"?`,
+                              confirmText: 'Delete',
+                              isDestructive: true
+                            })
+                            if (!confirmed) return
                             if (activeTerrainType === ct.id) setActiveTerrainType('grass')
                             setActiveMap(s => ({
                               ...s,
@@ -3452,7 +3469,7 @@ export default function MapMakerView() {
                   setActiveMap(s => {
                     const list = s.settings.customTerrains || []
                     if (list.some(c => c.name.toLowerCase() === name.toLowerCase()) || TERRAIN_TYPES.includes(name.toLowerCase())) {
-                      alert('Terrain type already exists!')
+                      toast('Terrain type already exists', { type: 'warning' })
                       return s
                     }
                     const updatedSettings = {

@@ -153,7 +153,7 @@ export default function ChatInput({
   const handleToggleListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('Speech recognition is not supported in this environment.')
+      toast('Speech recognition is not supported in this environment.', { type: 'warning' })
       return
     }
     if (isListening) {

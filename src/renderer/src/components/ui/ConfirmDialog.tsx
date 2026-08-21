@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useRef, createContext, useContext, useState, useCallback } from 'react'
 import useEscapeKey from './useEscapeKey'
 import useFocusTrap from './useFocusTrap'
 
@@ -23,18 +23,6 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
-  // Lock body scroll when open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
-
   const cancelBtnRef = useRef<HTMLButtonElement | null>(null)
   const containerRef = useFocusTrap(isOpen, cancelBtnRef)
   useEscapeKey(onCancel, isOpen)
@@ -61,8 +49,10 @@ export default function ConfirmDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
+      onClick={onCancel}
     >
       <div
+        onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-surface-offset)',
@@ -163,4 +153,72 @@ export default function ConfirmDialog({
       </div>
     </div>
   )
+}
+
+interface ConfirmOptions {
+  title: string
+  message: string
+  confirmText?: string
+  cancelText?: string
+  isDestructive?: boolean
+}
+
+type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
+
+const ConfirmContext = createContext<ConfirmFn | undefined>(undefined)
+
+/**
+ * Promise-based wrapper around ConfirmDialog, so a call site reads the same
+ * shape as the native confirm() it replaces:
+ *
+ *   if (!(await confirm({ title, message }))) return
+ *
+ * Native confirm() blocks the renderer process and draws an OS chrome dialog
+ * that ignores the app's theme, which is why none of these are left.
+ */
+export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const [pending, setPending] = useState<{
+    options: ConfirmOptions
+    resolve: (value: boolean) => void
+  } | null>(null)
+
+  const confirm = useCallback<ConfirmFn>(options => {
+    return new Promise<boolean>(resolve => {
+      setPending(prev => {
+        // A second request while one is open would strand the first promise
+        // forever; treat being displaced as a cancel.
+        prev?.resolve(false)
+        return { options, resolve }
+      })
+    })
+  }, [])
+
+  const settle = (value: boolean) => {
+    pending?.resolve(value)
+    setPending(null)
+  }
+
+  return (
+    <ConfirmContext.Provider value={confirm}>
+      {children}
+      <ConfirmDialog
+        isOpen={pending !== null}
+        title={pending?.options.title ?? ''}
+        message={pending?.options.message ?? ''}
+        confirmText={pending?.options.confirmText}
+        cancelText={pending?.options.cancelText}
+        isDestructive={pending?.options.isDestructive}
+        onConfirm={() => settle(true)}
+        onCancel={() => settle(false)}
+      />
+    </ConfirmContext.Provider>
+  )
+}
+
+export function useConfirm(): ConfirmFn {
+  const context = useContext(ConfirmContext)
+  if (!context) {
+    throw new Error('useConfirm must be used within a ConfirmProvider')
+  }
+  return context
 }

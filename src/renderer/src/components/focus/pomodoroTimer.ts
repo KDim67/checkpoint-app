@@ -1,5 +1,24 @@
 export type TimerPreset = 'focus' | 'short-break' | 'long-break'
 
+/** What the setup screen can have selected, a preset, or a hand-typed length. */
+export type TimerMode = TimerPreset | 'custom'
+
+/**
+ * A custom length is still a focus interval; only the two break presets are
+ * breaks. Cycle counting keys off this, so treating 'custom' as non-focus meant
+ * hand-timed intervals never advanced the four-interval long-break cadence.
+ */
+export function isFocusInterval(mode: TimerMode): boolean {
+  return mode === 'focus' || mode === 'custom'
+}
+
+export const MODE_TITLES: Record<TimerMode, string> = {
+  focus: 'Focus',
+  custom: 'Focus',
+  'short-break': 'Short Break',
+  'long-break': 'Long Break'
+}
+
 export interface TimerPresetConfig {
   label: string
   durationMs: number

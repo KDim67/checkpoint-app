@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { readViewFeatures, defaultViewEnabledMap, type ViewEnabledMap } from '../lib/features'
+import { getBoolSetting } from '../lib/settings'
 import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
 
@@ -290,10 +291,9 @@ export function Sidebar() {
     }
   }
 
-  const checkSyncStatus = async () => {
+  const checkSyncStatus = useCallback(async () => {
     try {
-      const rawEnabled = await window.electronAPI.db.getSetting('sync_enabled')
-      const isEnabled = rawEnabled === 'true' || rawEnabled === true
+      const isEnabled = await getBoolSetting('sync_enabled', false)
       setSyncEnabled(isEnabled)
       if (isEnabled) {
         const status = await window.electronAPI.sync.getStatus()
@@ -303,8 +303,10 @@ export function Sidebar() {
         setIsSyncing(false)
         setSyncProgress('Disabled')
       }
-    } catch {}
-  }
+    } catch (err) {
+      console.error('Failed to read sync status in Sidebar:', err)
+    }
+  }, [])
 
   useEffect(() => {
     checkFeatures()
@@ -314,13 +316,17 @@ export function Sidebar() {
 
   useEffect(() => {
     checkSyncStatus()
-    const interval = setInterval(checkSyncStatus, 5000)
     window.addEventListener('settings-update-sync', checkSyncStatus)
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('settings-update-sync', checkSyncStatus)
-    }
-  }, [])
+    return () => window.removeEventListener('settings-update-sync', checkSyncStatus)
+  }, [checkSyncStatus])
+
+  // Poll only while sync is on. The interval used to run for the whole session
+  // regardless, doing an IPC round-trip every 5s just to re-learn it was off.
+  useEffect(() => {
+    if (!syncEnabled) return
+    const interval = setInterval(checkSyncStatus, 5000)
+    return () => clearInterval(interval)
+  }, [syncEnabled, checkSyncStatus])
 
   // Close context popover on outside click
   useEffect(() => {

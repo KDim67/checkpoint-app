@@ -6,6 +6,7 @@ import ColorPicker from '../ui/ColorPicker'
 import { Trash2, Edit2, Check, Plus, X, GripVertical, MoreHorizontal } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
 import { getTextColorForBackground } from '../../lib/contrast'
+import { useConfirm } from '../ui/ConfirmDialog'
 
 interface KanbanColumnProps {
   id: string
@@ -75,6 +76,7 @@ function KanbanColumn({
   isReadOnly = false
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id })
+  const confirm = useConfirm()
 
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(name)
@@ -422,8 +424,14 @@ function KanbanColumn({
                 <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--color-surface-offset)', display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm(`Are you sure you want to delete the column "${name}"?`)) {
+                    onClick={async () => {
+                      const confirmed = await confirm({
+                        title: 'Delete column',
+                        message: `Are you sure you want to delete the column "${name}"?`,
+                        confirmText: 'Delete Column',
+                        isDestructive: true
+                      })
+                      if (confirmed) {
                         onDelete(id)
                         setIsEditing(false)
                       }
@@ -539,7 +547,17 @@ function KanbanColumn({
                   <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
                   <MenuItem
                     label="Archive All Cards"
-                    onClick={() => { if (confirm("Archive all cards in this column?")) { onClearColumn?.(id); setShowMenu(false) } }}
+                    onClick={async () => {
+                      const confirmed = await confirm({
+                        title: 'Archive column',
+                        message: 'Archive all cards in this column?',
+                        confirmText: 'Archive'
+                      })
+                      if (confirmed) {
+                        onClearColumn?.(id)
+                        setShowMenu(false)
+                      }
+                    }}
                   />
                   <MenuItem
                     label="Archive List"

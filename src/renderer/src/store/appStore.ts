@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { Item } from '../../../shared/types'
-import type { TimerPreset } from '../components/focus/pomodoroTimer'
+import { isFocusInterval, type TimerMode } from '../components/focus/pomodoroTimer'
 
 export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
@@ -53,7 +53,7 @@ interface AppState {
   // Focus Timer Engine (lives here, not in FocusView, so it survives navigation)
   focusStep: 'setup' | 'active' | 'retro'
   focusSelectedTasks: Item[]
-  focusPreset: TimerPreset | 'custom'
+  focusPreset: TimerMode
   focusCustomMinutes: number
   focusDurationMs: number
   focusEndAt: number | null       // timestamp the timer will hit 0 at, while running
@@ -80,7 +80,7 @@ interface AppState {
   // Focus Timer Actions
   focusSetStep: (step: 'setup' | 'active' | 'retro') => void
   focusSetSelectedTasks: (tasks: Item[] | ((prev: Item[]) => Item[])) => void
-  focusSetPreset: (preset: TimerPreset | 'custom') => void
+  focusSetPreset: (preset: TimerMode) => void
   focusSetCustomMinutes: (minutes: number) => void
   focusConfigureDuration: (ms: number) => void
   focusStart: (durationMs: number) => void
@@ -127,13 +127,14 @@ export const useAppStore = create<AppState>()(
         state.activeView = view
       }),
 
-    setContext: (context: string) =>
+    setContext: (context: string) => {
       set(state => {
         state.activeContext = context
-        window.electronAPI.db.setSetting('active_context', context).catch((err) => {
-          console.error('Failed to save active_context setting:', err)
-        })
-      }),
+      })
+      window.electronAPI.db.setSetting('active_context', context).catch((err) => {
+        console.error('Failed to save active_context setting:', err)
+      })
+    },
 
     setSettingsTab: (tab: SettingsTab) =>
       set(state => {
@@ -294,7 +295,7 @@ export const useAppStore = create<AppState>()(
         state.focusEndAt = null
         state.focusRemainingMs = 0
         state.focusElapsedMs = state.focusDurationMs
-        if (state.focusPreset === 'focus') {
+        if (isFocusInterval(state.focusPreset)) {
           state.focusCyclesCompleted += 1
         }
       }),

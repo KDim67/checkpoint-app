@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Copy, Download, Check } from 'lucide-react'
 import { useToast } from './Toast'
+import useEscapeKey from './useEscapeKey'
 
 interface LightboxProps {
   src: string | null
@@ -13,30 +14,10 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
   const { toast } = useToast()
 
   useEffect(() => {
-    if (src) {
-      setIsOpen(true)
-      // Lock body scroll when open
-      document.body.style.overflow = 'hidden'
-    } else {
-      setIsOpen(false)
-      document.body.style.overflow = ''
-    }
-    return () => {
-      document.body.style.overflow = ''
-    }
+    setIsOpen(src !== null)
   }, [src])
 
-  // Handle Escape key to close
-  useEffect(() => {
-    if (!src) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [src, onClose])
+  useEscapeKey(onClose, src !== null)
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation()

@@ -777,6 +777,13 @@ export function setSetting(key: string, value: unknown): void {
       console.error('[db] Failed to sync titlebar overlay:', err)
     }
   }
+  if (key === 'feature_view_clipboard') {
+    // Imported lazily: clipboardWatcher's sink is recordClipboardCopy from this
+    // module, so a static import would close the cycle.
+    import('./clipboardWatcher')
+      .then(({ setClipboardCaptureEnabled }) => setClipboardCaptureEnabled(value !== 'false'))
+      .catch(err => console.error('[db] Failed to apply clipboard capture setting:', err))
+  }
 }
 
 export function getRelations(itemId: string): Relation[] {
