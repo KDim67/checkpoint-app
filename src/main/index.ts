@@ -1018,6 +1018,13 @@ function registerIpcHandlers(): void {
 // App Lifecycle
 
 app.whenReady().then(async () => {
+  // The database opens before the window because createWindow restores the
+  // saved bounds through getSetting. initDb is synchronous, and the window is
+  // created hidden regardless, it is not revealed until ready-to-show, which
+  // waits on the renderer bundle and dwarfs the cost of opening SQLite.
+  const { initDb, registerDbHandlers } = await import('./db')
+  const db = initDb(app.getPath('userData'))
+
   createWindow()
   registerIpcHandlers()
 
@@ -1089,13 +1096,6 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize checkpoint-media folder/protocol:', err)
   }
 
-  // Lazy-load the database after window is created
-  const { initDb } = await import('./db')
-  const dataPath = app.getPath('userData')
-  const db = initDb(dataPath)
-
-  // Register DB IPC handlers (Phase 2, db.ts must be created first)
-  const { registerDbHandlers } = await import('./db')
   registerDbHandlers(db)
 
   // Context Export

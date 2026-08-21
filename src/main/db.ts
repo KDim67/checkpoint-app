@@ -759,6 +759,9 @@ export function deleteTag(id: string): void {
 }
 
 export function getSetting<T>(key: string, defaultValue: T): T {
+  // The prepared statements only exist after initDb. Anything reading a setting
+  // during startup gets the default rather than a crash on an undefined stmt.
+  if (!stmtGetSetting) return defaultValue
   const row = stmtGetSetting.get(key) as { value: string } | undefined
   if (!row) return defaultValue
   try {
@@ -769,6 +772,10 @@ export function getSetting<T>(key: string, defaultValue: T): T {
 }
 
 export function setSetting(key: string, value: unknown): void {
+  if (!stmtSetSetting) {
+    console.error('[db] Dropped setting write before initDb:', key)
+    return
+  }
   stmtSetSetting.run(key, JSON.stringify(value))
   if (key === 'app_theme') {
     try {
