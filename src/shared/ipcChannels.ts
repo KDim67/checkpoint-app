@@ -62,6 +62,8 @@ export const enum IpcChannels {
   AI_TEST_CONNECTION     = 'ai:testConnection',
   AI_GENERATE_STRUCTURED = 'ai:generateStructured',
   AI_GENERATE_ABORT      = 'ai:generateAbort',
+  AI_GET_CAPABILITIES    = 'ai:getCapabilities',
+  AI_LIST_MODELS         = 'ai:listModels',
   AI_CHUNK               = 'ai:chunk',
   AI_DONE                = 'ai:done',
   AI_ERROR               = 'ai:error',

@@ -1,4 +1,5 @@
 /* eslint-disable */
+import type { ModelCapabilities } from '../../shared/modelCapabilities'
 import type {
   Item,
   Tag,
@@ -83,6 +84,8 @@ export interface ElectronAPI {
     startStream: (params: AiStreamParams, streamId?: string) => Promise<void>
     generateStructured: (params: AiStructuredParams) => Promise<AiStructuredResult>
     abortStructured: () => Promise<void>
+    getCapabilities: (model: string, force?: boolean) => Promise<ModelCapabilities>
+    listModels: () => Promise<{ ok: boolean; models: string[]; error?: string }>
     abortStream: (streamId?: string) => Promise<void>
     testConnection: (baseURL: string, apiKey: string) => Promise<{ success: boolean; error?: string }>
     onChunk: (callback: (chunk: string, streamId?: string) => void) => () => void

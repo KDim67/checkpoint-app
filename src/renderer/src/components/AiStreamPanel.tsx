@@ -10,6 +10,9 @@ import { AI_SKILLS, getSkillById } from './ai/skills'
 import { buildAssistantMessage, PALETTE_HINT } from './ai/boardEnrich'
 import { loadProviders, persistProviders, activateProvider, isLocalUrl, type AiProvider } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
+import { useModelCapabilities } from '../lib/useModelCapabilities'
+import ModelCapabilityBar from './ai/ModelCapabilityBar'
+import { TIER_BUDGETS, detectVisionFromName } from '../../../shared/modelCapabilities'
 
 interface Message {
   role: 'system' | 'user' | 'assistant'
@@ -43,23 +46,14 @@ const STORAGE_KEY_WORKSPACE_FOLDER = 'checkpoint_ai_workspace_folder'
 // consumers (e.g. the Standup Translator) so both can run concurrently.
 const ASSISTANT_STREAM_ID = 'assistant'
 
-// Vision-capable model heuristic, used to gate image attachments so users
-// don't paste screenshots into text-only models that silently ignore them.
-const VISION_MODEL_RE = /llava|moondream|bakllava|minicpm|qwen[\w.-]*vl|internvl|vision|pixtral|gpt-4o|gpt-4\.\d|gpt-4-turbo|gemini|claude|grok/i
+/**
+ * Name-only fallback, for the model dropdown where a per-entry IPC probe would
+ * be wasteful. The live model uses discovered capabilities via
+ * useModelCapabilities; this is only a hint for models the user has not
+ * selected yet.
+ */
 export function supportsVision(modelName: string): boolean {
-  return VISION_MODEL_RE.test(modelName || '')
-}
-
-export function getModelProfile(modelName: string) {
-  const m = (modelName || '').toLowerCase()
-  const isSmall = m.includes('2b') || m.includes('3b') || m.includes('7b') || m.includes('8b') || m.includes('phi') || m.includes('gemma') || m.includes('llama3:8b') || (m.includes('qwen') && (m.includes('0.5b') || m.includes('1.5b') || m.includes('7b')))
-  return {
-    isSmall,
-    memoryRecallLimit: isSmall ? 4 : 10,
-    memoryStoreLimit: isSmall ? 40 : 120,
-    workspaceFileCap: isSmall ? 250 : 1000,
-    contextTokens: isSmall ? 16384 : 65536
-  }
+  return detectVisionFromName(modelName)
 }
 
 export function parseThinkingAndContent(text: string) {
@@ -301,6 +295,13 @@ export default function AiStreamPanel() {
 
   // Configuration settings loaded from DB
   const [selectedModel, setSelectedModel] = useState('llama3')
+  const { caps: modelCaps, budget: modelBudget, refresh: refreshModelCaps } = useModelCapabilities(selectedModel)
+  // Mirrored into a ref because the submit path is a long async function; it
+  // must read the capabilities current at send time, not at closure creation.
+  const modelCapsRef = useRef(modelCaps)
+  useEffect(() => {
+    modelCapsRef.current = modelCaps
+  }, [modelCaps])
   const [localModels, setLocalModels] = useState<string[]>([])
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(2048)
@@ -1067,11 +1068,16 @@ export default function AiStreamPanel() {
         const lastUserMsg = [...nextMessages].reverse().find(m => m.role === 'user')
         const text = lastUserMsg?.content || ''
 
-        const profile = getModelProfile(selectedModel)
-        const isSmallModel = profile.isSmall
-        const memoryRecallLimit = profile.memoryRecallLimit
-        const workspaceFileCap = profile.workspaceFileCap
-        const contextWindowTokens = profile.contextTokens
+        // Discovered from the endpoint rather than guessed from the model
+        // name, the old check read '72b'.includes('2b') as true and drove a
+        // 72B model with a 2B model's budgets.
+        const caps = modelCapsRef.current
+        const budget = TIER_BUDGETS[caps.tier]
+        const isSmallModel = budget.tersePrompt
+        const memoryRecallLimit = budget.memoryRecallLimit
+        const workspaceFileCap = budget.workspaceFileCap
+        // Reserve the model's real output ceiling instead of a flat guess.
+        const contextWindowTokens = Math.max(2048, caps.contextTokens - caps.maxOutputTokens)
 
         const baseSystemPromptContent = isSmallModel
           ? `You are Checkpoint AI, a helpful project assistant with DIRECT WRITE ACCESS to the user's Kanban board. Anything you create is added to the board automatically.
@@ -1806,12 +1812,11 @@ Output a \`\`\`json:update_board block of this shape:
 
   // Rough context-window usage estimate for the Token Budget Indicator.
   const tokenUsage = (() => {
-    const profile = getModelProfile(selectedModel)
-    const contextWindowTokens = profile.contextTokens
+    const contextWindowTokens = modelCaps.contextTokens
     const historyChars = messages.reduce((sum, m) => sum + m.content.length, 0)
     const baseOverheadTokens = 900 // base system prompt + live board state scaffolding
     const skillTokens = activeSkillId ? estimateTokens(getSkillById(activeSkillId)?.systemPrompt || '') : 0
-    const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, profile.workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
+    const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, modelBudget.workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
     const used = Math.ceil(historyChars / 4) + estimateTokens(inputValue) + baseOverheadTokens + skillTokens + workspaceTokens
     const ratio = Math.min(1, used / contextWindowTokens)
     return { used, ratio }
@@ -1899,6 +1904,8 @@ Output a \`\`\`json:update_board block of this shape:
             )
           })()}
         </div>
+
+        <ModelCapabilityBar caps={modelCaps} onRefresh={refreshModelCaps} />
 
         {/* Row 1b: Workspace / Context Selection, the board the AI reads & writes */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
@@ -2423,7 +2430,7 @@ Output a \`\`\`json:update_board block of this shape:
 
           {/* Token Budget Indicator */}
           <div
-            title={`~${tokenUsage.used.toLocaleString()} / ${getModelProfile(selectedModel).contextTokens.toLocaleString()} tokens of context window estimated in use`}
+            title={`~${tokenUsage.used.toLocaleString()} / ${modelCaps.contextTokens.toLocaleString()} tokens of context window in use`}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               marginLeft: 'auto', flexShrink: 0
@@ -2457,7 +2464,7 @@ Output a \`\`\`json:update_board block of this shape:
           workspaceFiles={workspaceFiles.map(f => ({ name: f.name, relativePath: f.relativePath }))}
           customActions={customActions}
           onManageCustomActions={() => setShowCustomActionsModal(true)}
-          visionCapable={supportsVision(selectedModel)}
+          visionCapable={modelCaps.supportsVision}
         />
       </div>
 

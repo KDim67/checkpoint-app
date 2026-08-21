@@ -1,5 +1,8 @@
 import type OpenAI from 'openai'
-import { createOpenAiClient, getAiConfig, humanizeAiError } from './aiService'
+import { createOpenAiClient, getAiConfig, humanizeAiError, tokenLimitParam, temperatureParam } from './aiService'
+import { getModelCapabilities } from './modelCapabilityService'
+import { validateStructured } from './aiSchemas'
+import { methodOrderForTier, TIER_BUDGETS, type ModelCapabilities } from '../shared/modelCapabilities'
 import type { AiStructuredParams, AiStructuredResult, AiStructuredKind } from '../shared/types'
 
 // Reliable structured generation.
@@ -223,24 +226,6 @@ function extractJson(raw: string): unknown {
   return null
 }
 
-/** Heuristic: does this error mean "the endpoint doesn't support this method"? */
-function looksUnsupported(err: unknown): boolean {
-  const e = err as { status?: number; message?: string }
-  const status = e?.status
-  const msg = String(e?.message || err || '').toLowerCase()
-  if (status === 400 || status === 404 || status === 422 || status === 501) return true
-  return (
-    msg.includes('tool') ||
-    msg.includes('function call') ||
-    msg.includes('response_format') ||
-    msg.includes('json_schema') ||
-    msg.includes('not support') ||
-    msg.includes('does not support') ||
-    msg.includes('unsupported') ||
-    msg.includes('unknown parameter')
-  )
-}
-
 function isAbortError(err: unknown): boolean {
   const e = err as { name?: string; message?: string; status?: number }
   return (
@@ -260,17 +245,28 @@ function isFatalError(err: unknown): boolean {
   return status === 401 || status === 403 || status === 404
 }
 
+/**
+ * Names the defect and restates the contract. Kept short on purpose: a long
+ * correction competes for attention with the original request on the models
+ * that need correcting most.
+ */
+function buildRepairPrompt(kind: AiStructuredKind, problem: string): string {
+  return `Your previous reply could not be used: ${problem}.
+Reply again with ONLY the corrected JSON object, no prose, no markdown fences, no apology.
+${SCHEMA_HINTS[kind]}`
+}
+
 // Per-method attempts (each returns a parsed object, or null on parse fail)
 
 async function attemptTools(
   client: OpenAI, model: string, messages: OpenAI.Chat.ChatCompletionMessageParam[],
-  kind: AiStructuredKind, temperature: number, signal: AbortSignal
+  kind: AiStructuredKind, temperature: number, signal: AbortSignal, caps: ModelCapabilities
 ): Promise<unknown> {
   const body = {
     model,
     messages,
-    temperature,
-    max_tokens: 3072,
+    ...temperatureParam(caps, temperature),
+    ...tokenLimitParam(caps, 3072),
     tools: [{
       type: 'function',
       function: {
@@ -294,13 +290,13 @@ async function attemptTools(
 
 async function attemptJsonSchema(
   client: OpenAI, model: string, messages: OpenAI.Chat.ChatCompletionMessageParam[],
-  kind: AiStructuredKind, temperature: number, signal: AbortSignal
+  kind: AiStructuredKind, temperature: number, signal: AbortSignal, caps: ModelCapabilities
 ): Promise<unknown> {
   const resp = await client.chat.completions.create({
     model,
     messages,
-    temperature,
-    max_tokens: 3072,
+    ...temperatureParam(caps, temperature),
+    ...tokenLimitParam(caps, 3072),
     response_format: {
       type: 'json_schema',
       json_schema: { name: `${kind}_result`, schema: SCHEMAS[kind] as Record<string, unknown> }
@@ -312,7 +308,7 @@ async function attemptJsonSchema(
 
 async function attemptJsonObject(
   client: OpenAI, model: string, messages: OpenAI.Chat.ChatCompletionMessageParam[],
-  kind: AiStructuredKind, temperature: number, signal: AbortSignal
+  kind: AiStructuredKind, temperature: number, signal: AbortSignal, caps: ModelCapabilities
 ): Promise<unknown> {
   const withHint: OpenAI.Chat.ChatCompletionMessageParam[] = [
     ...messages,
@@ -321,8 +317,8 @@ async function attemptJsonObject(
   const resp = await client.chat.completions.create({
     model,
     messages: withHint,
-    temperature,
-    max_tokens: 3072,
+    ...temperatureParam(caps, temperature),
+    ...tokenLimitParam(caps, 3072),
     response_format: { type: 'json_object' }
   }, { signal }) as OpenAI.Chat.ChatCompletion
 
@@ -331,7 +327,7 @@ async function attemptJsonObject(
 
 async function attemptText(
   client: OpenAI, model: string, messages: OpenAI.Chat.ChatCompletionMessageParam[],
-  kind: AiStructuredKind, temperature: number, signal: AbortSignal
+  kind: AiStructuredKind, temperature: number, signal: AbortSignal, caps: ModelCapabilities
 ): Promise<unknown> {
   const withHint: OpenAI.Chat.ChatCompletionMessageParam[] = [
     ...messages,
@@ -340,9 +336,9 @@ async function attemptText(
   const resp = await client.chat.completions.create({
     model,
     messages: withHint,
-    temperature,
-    max_tokens: 3072
-  }, { signal }) as OpenAI.Chat.ChatCompletion
+    ...temperatureParam(caps, temperature),
+    ...tokenLimitParam(caps, 3072)
+  } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming, { signal }) as OpenAI.Chat.ChatCompletion
 
   return extractJson(resp.choices[0]?.message?.content || '')
 }
@@ -353,8 +349,6 @@ const ATTEMPTS: Record<Method, typeof attemptTools> = {
   json_object: attemptJsonObject,
   text: attemptText
 }
-
-const DEFAULT_ORDER: Method[] = ['tools', 'json_schema', 'json_object', 'text']
 
 /**
  * Generates a structured result for the given kind, using the strongest method
@@ -370,33 +364,54 @@ export async function generateStructured(
   const cacheKey = `${baseURL}::${model}`
   const temp = typeof temperature === 'number' ? temperature : 0.5
 
-  // Prefer the previously-successful method for this endpoint/model.
+  const caps = await getModelCapabilities(model)
+  const budget = TIER_BUDGETS[caps.tier]
+
+  // Start from what the model is known to support rather than always probing
+  // tool calling first, a tiny model fails that twice before reaching prose,
+  // and each failure is a full round-trip on the slowest hardware in the range.
+  const supported = methodOrderForTier(caps.tier, caps) as Method[]
   const cached = capabilityCache.get(cacheKey)
-  const order: Method[] = cached
-    ? [cached, ...DEFAULT_ORDER.filter(m => m !== cached)]
-    : DEFAULT_ORDER
+  const order: Method[] = cached && supported.includes(cached)
+    ? [cached, ...supported.filter(m => m !== cached)]
+    : supported
 
   let lastError: string | undefined
   for (const method of order) {
-    try {
-      const data = await ATTEMPTS[method](
-        client, model, messages as OpenAI.Chat.ChatCompletionMessageParam[], kind, temp, signal
-      )
-      if (data && typeof data === 'object') {
-        capabilityCache.set(cacheKey, method)
-        return { ok: true, data, method }
-      }
-      // Parsed nothing usable, try the next method.
-      lastError = `Model returned no usable ${kind} JSON via ${method}.`
-    } catch (err) {
-      if (isAbortError(err)) return { ok: false, error: 'aborted' }
-      lastError = humanizeAiError(err, { model, baseURL })
-      // Auth / not-found errors won't change across methods, stop and fall back.
-      if (isFatalError(err)) break
-      if (!looksUnsupported(err)) {
-        // A genuine error (network, bad model). Keep trying the remaining methods
-        // (a different one may work), remembering the message for diagnostics.
-        continue
+    let attemptMessages = messages as OpenAI.Chat.ChatCompletionMessageParam[]
+
+    for (let attempt = 0; attempt <= budget.repairAttempts; attempt++) {
+      try {
+        const data = await ATTEMPTS[method](
+          client, model, attemptMessages, kind, temp, signal, caps
+        )
+
+        const validation = data && typeof data === 'object'
+          ? validateStructured(kind, data)
+          : { ok: false, error: `no JSON object returned via ${method}` }
+
+        if (validation.ok) {
+          capabilityCache.set(cacheKey, method)
+          return { ok: true, data: validation.data, method }
+        }
+
+        lastError = `Model returned invalid ${kind} output via ${method}, ${validation.error}`
+        if (attempt === budget.repairAttempts) break
+
+        // Re-prompt with the specific defect. Small models overwhelmingly fail
+        // on shape rather than on understanding, and one corrective turn is far
+        // cheaper than dropping to a weaker method.
+        attemptMessages = [
+          ...attemptMessages,
+          { role: 'system', content: buildRepairPrompt(kind, validation.error || 'invalid output') }
+        ]
+      } catch (err) {
+        if (isAbortError(err)) return { ok: false, error: 'aborted' }
+        lastError = humanizeAiError(err, { model, baseURL })
+        // Auth / not-found errors won't change across methods, stop and fall back.
+        if (isFatalError(err)) return { ok: false, error: lastError }
+        // Anything else: stop repairing this method and let the ladder continue.
+        break
       }
     }
   }

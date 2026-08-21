@@ -1,5 +1,6 @@
 import type OpenAI from 'openai'
 import type { AiStreamParams } from '../shared/types'
+import type { ModelCapabilities } from '../shared/modelCapabilities'
 import { getSetting } from './db'
 
 /**
@@ -61,6 +62,30 @@ export async function createOpenAiClient(): Promise<{ client: OpenAI; isOllama: 
 }
 
 /**
+ * o-series models reject `max_tokens` outright and require the newer name.
+ * Sending the wrong one fails the whole request rather than degrading.
+ */
+export function tokenLimitParam(caps: ModelCapabilities, requested: number): Record<string, number> {
+  const capped = Math.max(256, Math.min(requested, caps.maxOutputTokens))
+  return { [caps.tokenParamName]: capped }
+}
+
+/** o-series also rejects any temperature but its default. */
+export function temperatureParam(caps: ModelCapabilities, requested: number): Record<string, number> {
+  return caps.fixedTemperature !== null ? {} : { temperature: requested }
+}
+
+/**
+ * Ollama allocates a KV cache the size of num_ctx, so a flat 32768 made a 2B
+ * model reserve four times its trained window while capping a 128k model at a
+ * quarter of its own. Ask for what the model actually has.
+ */
+export function ollamaContextParam(caps: ModelCapabilities, isOllama: boolean): object {
+  if (!isOllama) return {}
+  return { extra_body: { num_ctx: caps.contextTokens } }
+}
+
+/**
  * Initiates an AI completion stream from the configured OpenAI-compatible endpoint.
  * Lazily loads the 'openai' npm package and checks database configuration at run-time.
  */
@@ -71,11 +96,18 @@ export function startAiStream(
   onError: (err: Error) => void
 ): AbortController {
   const controller = new AbortController()
+  // Reasoning arrives before content, so the <think> wrapper is opened on the
+  // first reasoning delta and closed on the first content delta.
+  let emittedThinkOpen = false
+  let closedThink = false
 
   // Run the async streaming logic in the background
   ;(async () => {
     try {
       const { client: openai, isOllama } = await createOpenAiClient()
+
+      const { getModelCapabilities } = await import('./modelCapabilityService')
+      const caps = await getModelCapabilities(params.model)
 
       const body: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
         model: params.model,
@@ -83,22 +115,47 @@ export function startAiStream(
         // in practice only user messages carry image parts, which matches the
         // OpenAI wire format, hence the narrowing cast.
         messages: params.messages as OpenAI.Chat.ChatCompletionMessageParam[],
-        temperature: params.temperature ?? 0.7,
-        max_tokens: params.maxTokens ?? 2048,
         stream: true,
-        ...(isOllama ? ({ extra_body: { num_ctx: 32768 } } as object) : {})
-      }
+        // Ask for real token counts. Endpoints that do not know the option
+        // ignore it, and the renderer keeps its estimate as a fallback.
+        stream_options: { include_usage: true },
+        ...tokenLimitParam(caps, params.maxTokens ?? 2048),
+        ...temperatureParam(caps, params.temperature ?? 0.7),
+        ...ollamaContextParam(caps, isOllama)
+      } as OpenAI.Chat.ChatCompletionCreateParamsStreaming
 
       const stream = await openai.chat.completions.create(body, {
         signal: controller.signal
       })
 
       for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content ?? ''
+        const delta = chunk.choices[0]?.delta as
+          | { content?: string; reasoning_content?: string; reasoning?: string }
+          | undefined
+
+        // Reasoning models over the API stream their chain-of-thought in a
+        // separate field rather than inside <think> tags. Wrapping it in the
+        // tags the renderer already parses keeps both shapes on one path.
+        const reasoning = delta?.reasoning_content ?? delta?.reasoning
+        if (reasoning) {
+          if (!emittedThinkOpen) {
+            emittedThinkOpen = true
+            onChunk('<think>')
+          }
+          onChunk(reasoning)
+        }
+
+        const text = delta?.content ?? ''
         if (text) {
+          if (emittedThinkOpen && !closedThink) {
+            closedThink = true
+            onChunk('</think>')
+          }
           onChunk(text)
         }
       }
+
+      if (emittedThinkOpen && !closedThink) onChunk('</think>')
 
       onDone()
     } catch (err) {
@@ -139,12 +196,15 @@ export async function runCompletion(params: {
 }): Promise<string> {
   const { client: openai } = await createOpenAiClient()
 
+  const { getModelCapabilities } = await import('./modelCapabilityService')
+  const caps = await getModelCapabilities(params.model)
+
   const response = await openai.chat.completions.create({
     model: params.model,
     messages: params.messages,
-    temperature: params.temperature ?? 0.2,
-    max_tokens: params.maxTokens ?? 600
-  })
+    ...tokenLimitParam(caps, params.maxTokens ?? 600),
+    ...temperatureParam(caps, params.temperature ?? 0.2)
+  } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming)
 
   return response.choices[0]?.message?.content?.trim() || ''
 }

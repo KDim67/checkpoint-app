@@ -458,6 +458,28 @@ function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle(IpcChannels.AI_GET_CAPABILITIES, async (_event, model: unknown, force?: unknown) => {
+    const { getModelCapabilities } = await import('./modelCapabilityService')
+    return getModelCapabilities(typeof model === 'string' ? model : '', force === true)
+  })
+
+  // Model listing for whichever endpoint is configured. Ollama answers from
+  // /api/tags, everything else from the OpenAI-compatible /models.
+  ipcMain.handle(IpcChannels.AI_LIST_MODELS, async () => {
+    const { getAiConfig } = await import('./aiService')
+    const { listOllamaModels, listCloudModels } = await import('./modelCapabilityService')
+    const { baseURL, apiKey, isOllama } = getAiConfig()
+    try {
+      if (isOllama) {
+        const models = await listOllamaModels(baseURL)
+        return { ok: true, models: models.map(m => m.name) }
+      }
+      return { ok: true, models: await listCloudModels(baseURL, apiKey) }
+    } catch (err) {
+      return { ok: false, models: [], error: (err as Error).message }
+    }
+  })
+
   ipcMain.handle(IpcChannels.AI_GENERATE_ABORT, () => {
     if (structuredAbortController) {
       structuredAbortController.abort()

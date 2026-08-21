@@ -1,10 +1,23 @@
 import { execFileQuiet } from './exec'
+import { getAiConfig } from './aiService'
 import { BrowserWindow } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { OllamaStatus, PullProgressEvent } from '../shared/cookbookTypes'
 
 let activeAbortController: AbortController | null = null
 let lastOfflineLogged = false
+
+/**
+ * Ollama's REST root for the configured endpoint. isLocalUrl deliberately
+ * accepts LAN addresses, so an Ollama on another machine is a supported setup, 
+ * but these calls used to hardcode localhost, leaving that user with an empty
+ * model list. Falls back to localhost when the endpoint is a cloud provider.
+ */
+function ollamaHost(): string {
+  const { baseURL, isOllama } = getAiConfig()
+  if (!isOllama || !baseURL) return 'http://localhost:11434'
+  return baseURL.replace(/\/+$/, '').replace(/\/v1$/, '')
+}
 
 /**
  * Checks if Ollama is running, installed, and gets currently available local models.
@@ -15,7 +28,7 @@ export async function checkOllama(): Promise<OllamaStatus> {
 
   // Tier 1: check if Ollama server is running (API is reachable)
   try {
-    const response = await fetch('http://localhost:11434/api/tags', {
+    const response = await fetch(`${ollamaHost()}/api/tags`, {
       signal: AbortSignal.timeout(2000)
     })
     if (response.ok) {
@@ -68,7 +81,7 @@ export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Pr
   activeAbortController = new AbortController()
 
   try {
-    const response = await fetch('http://localhost:11434/api/pull', {
+    const response = await fetch(`${ollamaHost()}/api/pull`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: modelTag, stream: true }),
@@ -143,7 +156,7 @@ export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Pr
  */
 export async function deleteModel(modelTag: string): Promise<boolean> {
   try {
-    const response = await fetch('http://localhost:11434/api/delete', {
+    const response = await fetch(`${ollamaHost()}/api/delete`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: modelTag, name: modelTag }),
@@ -171,7 +184,7 @@ export function stopPull(): void {
  */
 export async function listLocalModels(): Promise<string[]> {
   try {
-    const response = await fetch('http://localhost:11434/api/tags', {
+    const response = await fetch(`${ollamaHost()}/api/tags`, {
       signal: AbortSignal.timeout(2000)
     })
     if (response.ok) {
@@ -186,7 +199,7 @@ export async function listLocalModels(): Promise<string[]> {
       errorObj.message?.toLowerCase().includes('fetch failed')
     if (isOffline) {
       if (!lastOfflineLogged) {
-        console.warn('Ollama Manager: Ollama server is offline or unreachable at http://localhost:11434')
+        console.warn(`Ollama Manager: server offline or unreachable at ${ollamaHost()}`)
         lastOfflineLogged = true
       }
     } else {

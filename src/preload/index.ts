@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
+import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type {
   Item,
   Tag,
@@ -257,6 +258,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     abortStructured: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.AI_GENERATE_ABORT),
+
+    getCapabilities: (model: string, force?: boolean): Promise<ModelCapabilities> =>
+      ipcRenderer.invoke(IpcChannels.AI_GET_CAPABILITIES, model, force),
+
+    listModels: (): Promise<{ ok: boolean; models: string[]; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.AI_LIST_MODELS),
 
     // Returns an unsubscribe function, MUST be called on component unmount
     onChunk: (callback: (chunk: string, streamId?: string) => void): (() => void) => {
