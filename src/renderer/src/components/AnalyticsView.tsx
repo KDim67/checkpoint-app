@@ -252,7 +252,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* KPI Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           {[1, 2, 3].map(i => (
             <div key={i} className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
               <div className="skeleton" style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />
@@ -312,7 +312,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* Two-Column Mid Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           {/* Line Chart Card */}
           <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
             <div className="row">
@@ -357,7 +357,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* Bottom Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           {/* Tag Distribution */}
           <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
             <div className="skeleton" style={{ width: '110px', height: '16px' }} />
@@ -592,7 +592,7 @@ export default function AnalyticsView() {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
             {/* Left Column: Summary & Process Share */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               {/* Total Hours Card */}
@@ -821,7 +821,7 @@ export default function AnalyticsView() {
         <>
 
       {/* KPI Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         <div className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)' }}>
             <IconFocus />
@@ -994,7 +994,7 @@ export default function AnalyticsView() {
       </div>
 
       {/* Two-Column Middle Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-4)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         {/* Weekly Completed Tasks Graph */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
           <div className="row">
@@ -1202,7 +1202,7 @@ export default function AnalyticsView() {
       </div>
 
       {/* Bottom Grid Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-4)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         {/* Context Focus Allocation (Passive Tracker) */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div className="row">

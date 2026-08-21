@@ -31,7 +31,7 @@ export default function PalettePanel({
       </div>
     </div>
 
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-4)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 'var(--space-4)' }}>
     
     {/* Color picker list */}
     <div style={{
@@ -75,7 +75,7 @@ export default function PalettePanel({
       </div>
 
       {/* Grid of colors */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(70px, 100%), 1fr))', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         {paletteColors.map((col) => (
           <div
             key={col}

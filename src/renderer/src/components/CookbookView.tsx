@@ -11,12 +11,14 @@ import {
   ExternalLink,
   Info,
   Search,
-  Trash2
+  Trash2,
+  Sparkles
 } from 'lucide-react'
 import catalogData from '../../../shared/catalog.json'
 import { calculateFitResult } from '../../../shared/scoreEngine'
 import type { CatalogModel, HardwareSpecs, OllamaStatus, PullProgressEvent } from '../../../shared/cookbookTypes'
 import Skeleton from './ui/Skeleton'
+import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
 
@@ -290,7 +292,7 @@ export default function CookbookView() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))',
           gap: 'var(--space-4)'
         }}
       >
@@ -792,15 +794,23 @@ export default function CookbookView() {
         </div>
 
         {filteredModels.length === 0 ? (
-          <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--color-text-muted)', border: '1px dashed var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-1)' }}>
-            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', marginBottom: 'var(--space-1)', color: 'var(--color-text-base)' }}>No models match your search</p>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Try searching for a different name, family (e.g. Llama, Mistral) or use case.</span>
-          </div>
+          <EmptyState
+            icon={<Sparkles size={28} />}
+            title="No models match your search"
+            description="Try a different name, family (e.g. Llama, Mistral) or use case."
+            style={{
+              height: 'auto',
+              border: '1px dashed var(--color-surface-offset)',
+              borderRadius: 'var(--radius-lg)',
+              background: 'var(--color-surface-1)',
+              maxWidth: 'none'
+            }}
+          />
         ) : (
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',
               gap: 'var(--space-4)'
             }}
           >

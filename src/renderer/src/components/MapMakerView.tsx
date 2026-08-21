@@ -1189,6 +1189,7 @@ export default function MapMakerView() {
 
   // Maps & pages
   const [maps, setMaps] = useState<MapState[]>([])
+  const [mapsLoading, setMapsLoading] = useState(true)
   const [activeMapIdx, setActiveMapIdx] = useState(0)
   const [showNewMapWizard, setShowNewMapWizard] = useState(false)
   const [showUnityModal, setShowUnityModal] = useState(false)
@@ -1449,10 +1450,14 @@ export default function MapMakerView() {
         }
       } catch (err) {
         console.error('Failed to load maps from folder:', err)
+        toast('Could not read saved maps from disk.', { type: 'error' })
+      } finally {
+        setMapsLoading(false)
       }
     }
     loadAllMaps()
-  }, [])
+    // toast is stable for the provider's lifetime, so this still runs once.
+  }, [toast])
 
   // Auto-save active map to disk
   const lastSavedName = useRef<string|null>(null)
@@ -2784,6 +2789,18 @@ export default function MapMakerView() {
   }
 
   // If no maps, show a landing screen
+  // Maps arrive asynchronously, so the empty state has to wait for the read to
+  // finish, otherwise a user with saved maps sees "no maps" flash first.
+  if (mapsLoading) {
+    return (
+      <div style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div className="skeleton" style={{ height: '24px', width: '180px' }} />
+        <div className="skeleton" style={{ height: '14px', width: '260px', opacity: 0.6 }} />
+        <div className="skeleton" style={{ height: '320px', borderRadius: 'var(--radius-lg)', marginTop: 'var(--space-4)' }} />
+      </div>
+    )
+  }
+
   if (maps.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 'var(--space-6)', color: 'var(--color-text-muted)' }}>

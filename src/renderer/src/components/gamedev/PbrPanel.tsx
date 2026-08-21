@@ -357,7 +357,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
               <div style={{
                 flex: 1,
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
                 gap: 'var(--space-3)',
                 overflowY: 'auto'
               }}>

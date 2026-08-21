@@ -1070,6 +1070,7 @@ export default function BacklogView() {
           <div
             style={{
               width: '420px',
+              maxWidth: '100vw',
               height: '100%',
               background: 'var(--color-surface-1)',
               borderLeft: '1px solid var(--color-surface-offset)',
