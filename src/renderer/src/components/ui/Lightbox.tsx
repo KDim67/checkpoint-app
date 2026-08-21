@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Copy, Download, Check } from 'lucide-react'
 import { useToast } from './Toast'
 import useEscapeKey from './useEscapeKey'
+import useFocusTrap from './useFocusTrap'
 
 interface LightboxProps {
   src: string | null
@@ -18,6 +19,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
   }, [src])
 
   useEscapeKey(onClose, src !== null)
+  const containerRef = useFocusTrap(src !== null)
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -69,6 +71,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
 
   return (
     <div
+      ref={containerRef}
       role="dialog"
       aria-modal="true"
       aria-label="Image preview"

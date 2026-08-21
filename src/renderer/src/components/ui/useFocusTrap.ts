@@ -1,5 +1,14 @@
 import { useEffect, useRef } from 'react'
 
+const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
+function focusableWithin(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    // offsetParent is null when the element or an ancestor is display:none.
+    el => !el.hasAttribute('disabled') && el.offsetParent !== null && el.tabIndex !== -1
+  )
+}
+
 export default function useFocusTrap(isOpen: boolean, defaultFocusRef?: React.RefObject<HTMLElement | null>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const containerRef = useRef<any>(null)
@@ -9,73 +18,53 @@ export default function useFocusTrap(isOpen: boolean, defaultFocusRef?: React.Re
     const container = containerRef.current as HTMLElement | null
     if (!container) return
 
-    // Focus default element on open
-    if (defaultFocusRef && defaultFocusRef.current) {
-      const timer = setTimeout(() => {
-        defaultFocusRef.current?.focus()
-      }, 50)
-      return () => clearTimeout(timer)
-    } else {
-      // Fallback: focus first focusable element
-      const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      const focusableElements = container.querySelectorAll<HTMLElement>(focusableSelector)
-      const activeElements = Array.from(focusableElements).filter(el => {
-        return !el.hasAttribute('disabled') && (el as HTMLElement).tabIndex !== -1
-      })
-      if (activeElements.length > 0) {
-        const timer = setTimeout(() => {
-          (activeElements[0] as HTMLElement).focus()
-        }, 50)
-        return () => clearTimeout(timer)
-      }
+    // Whatever opened the overlay gets focus back when it closes, otherwise the
+    // tab order restarts from the top of the document.
+    const previouslyFocused = document.activeElement as HTMLElement | null
+
+    // Deferred: on the opening frame the container may still be mid-layout, so
+    // offsetParent reads null and every candidate is filtered out.
+    const timer = setTimeout(() => {
+      const target = defaultFocusRef?.current ?? focusableWithin(container)[0]
+      target?.focus()
+    }, 50)
+
+    return () => {
+      clearTimeout(timer)
+      previouslyFocused?.focus?.()
     }
-    return undefined
   }, [isOpen, defaultFocusRef])
 
   useEffect(() => {
     if (!isOpen) return
+    const container = containerRef.current as HTMLElement | null
+    if (!container) return
 
+    // Bound to the container rather than the window: with the listener on the
+    // window, a nested overlay and its parent both trap and fight over Tab.
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
-      const container = containerRef.current as HTMLElement | null
-      if (!container) return
 
-      const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      const focusableElements = Array.from(
-        container.querySelectorAll<HTMLElement>(focusableSelector)
-      ).filter(el => {
-        // Filter out disabled elements and those with display: none or offsetParent === null
-        // offsetParent is null when the element or its parent is display: none.
-        return !el.hasAttribute('disabled') && el.offsetParent !== null && el.tabIndex !== -1
-      })
-
-      if (focusableElements.length === 0) {
+      const focusable = focusableWithin(container)
+      if (focusable.length === 0) {
         e.preventDefault()
         return
       }
 
-      const firstElement = focusableElements[0]
-      const lastElement = focusableElements[focusableElements.length - 1]
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
 
-      if (e.shiftKey) {
-        // Shift + Tab
-        if (document.activeElement === firstElement) {
-          lastElement.focus()
-          e.preventDefault()
-        }
-      } else {
-        // Tab
-        if (document.activeElement === lastElement) {
-          firstElement.focus()
-          e.preventDefault()
-        }
+      if (e.shiftKey && document.activeElement === first) {
+        last.focus()
+        e.preventDefault()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        first.focus()
+        e.preventDefault()
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
+    container.addEventListener('keydown', handleKeyDown)
+    return () => container.removeEventListener('keydown', handleKeyDown)
   }, [isOpen])
 
   return containerRef

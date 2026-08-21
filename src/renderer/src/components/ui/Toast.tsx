@@ -40,6 +40,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const holdToast = useCallback((id: string) => {
+    const timer = timersRef.current[id]
+    if (timer) {
+      clearTimeout(timer)
+      delete timersRef.current[id]
+    }
+  }, [])
+
+  const resumeToast = useCallback((id: string) => {
+    if (timersRef.current[id]) return
+    timersRef.current[id] = setTimeout(() => removeToast(id), 2000)
+  }, [removeToast])
+
   const toast = useCallback((
     text: string,
     options?: { action?: ToastAction; type?: ToastType; duration?: number }
@@ -90,6 +103,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div
               key={t.id}
               className="toast-item"
+              onMouseEnter={() => holdToast(t.id)}
+              onMouseLeave={() => resumeToast(t.id)}
+              onFocusCapture={() => holdToast(t.id)}
+              onBlurCapture={() => resumeToast(t.id)}
               style={{
                 background: 'var(--color-surface-elevated)',
                 border: '1px solid var(--color-surface-offset)',

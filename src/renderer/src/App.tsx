@@ -200,6 +200,45 @@ function clampPanelWidth(width: number): number {
   return Math.max(MIN_PANEL_WIDTH, Math.min(ceiling, width))
 }
 
+type PanelTabId = 'ai-chat' | 'git' | 'item-detail'
+
+function PanelTab({
+  id,
+  label,
+  isSelected,
+  onSelect
+}: {
+  id: PanelTabId
+  label: string
+  isSelected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      role="tab"
+      id={`panel-tab-${id}`}
+      aria-selected={isSelected}
+      aria-controls="right-panel-body"
+      // Roving tabindex: one stop for the whole tablist, arrows move within it.
+      tabIndex={isSelected ? 0 : -1}
+      onClick={onSelect}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        color: isSelected ? 'var(--color-secondary)' : 'var(--color-text-faint)',
+        fontSize: 'var(--text-xs)',
+        fontWeight: isSelected ? 'var(--weight-semibold)' : 'var(--weight-normal)',
+        padding: 'var(--space-1) var(--space-2)',
+        borderRadius: 'var(--radius-sm)',
+        cursor: 'pointer',
+        transition: 'color var(--duration-fast) var(--ease-default)'
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
 function RightPanel() {
   const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
   const rightPanelContent = useAppStore(s => s.rightPanelContent)
@@ -217,6 +256,22 @@ function RightPanel() {
   // and a ref mutation does not re-render, so the animated value stayed live and
   // the panel lerped a frame behind the cursor.
   const [isResizing, setIsResizing] = useState(false)
+
+  const panelTabs: { id: PanelTabId; label: string }[] = [
+    { id: 'ai-chat', label: 'AI Assistant' },
+    { id: 'git', label: 'Git' },
+    ...(selectedItemId ? [{ id: 'item-detail' as PanelTabId, label: 'Detail' }] : [])
+  ]
+
+  const handleTabKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const current = panelTabs.findIndex(t => t.id === rightPanelContent)
+    const delta = e.key === 'ArrowRight' ? 1 : -1
+    const next = panelTabs[(current + delta + panelTabs.length) % panelTabs.length]
+    setRightPanelContent(next.id)
+    document.getElementById(`panel-tab-${next.id}`)?.focus()
+  }
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -300,63 +355,21 @@ function RightPanel() {
             padding: '0 var(--space-2) 0 var(--space-4)',
             flexShrink: 0
           }}>
-            <div role="tablist" style={{ display: 'flex', gap: 'var(--space-1)' }}>
-              <button
-                role="tab"
-                aria-selected={rightPanelContent === 'ai-chat'}
-                onClick={() => setRightPanelContent('ai-chat')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: rightPanelContent === 'ai-chat' ? 'var(--color-secondary)' : 'var(--color-text-faint)',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: rightPanelContent === 'ai-chat' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
-                  padding: 'var(--space-1) var(--space-2)',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer',
-                  transition: 'color var(--duration-fast) var(--ease-default)'
-                }}
-              >
-                AI Assistant
-              </button>
-              <button
-                role="tab"
-                aria-selected={rightPanelContent === 'git'}
-                onClick={() => setRightPanelContent('git')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: rightPanelContent === 'git' ? 'var(--color-secondary)' : 'var(--color-text-faint)',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: rightPanelContent === 'git' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
-                  padding: 'var(--space-1) var(--space-2)',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer',
-                  transition: 'color var(--duration-fast) var(--ease-default)'
-                }}
-              >
-                Git
-              </button>
-              {selectedItemId && (
-                <button
-                  role="tab"
-                  aria-selected={rightPanelContent === 'item-detail'}
-                  onClick={() => setRightPanelContent('item-detail')}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: rightPanelContent === 'item-detail' ? 'var(--color-secondary)' : 'var(--color-text-faint)',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: rightPanelContent === 'item-detail' ? 'var(--weight-semibold)' : 'var(--weight-normal)',
-                    padding: 'var(--space-1) var(--space-2)',
-                    borderRadius: 'var(--radius-sm)',
-                    cursor: 'pointer',
-                    transition: 'color var(--duration-fast) var(--ease-default)'
-                  }}
-                >
-                  Detail
-                </button>
-              )}
+            <div
+              role="tablist"
+              aria-label="Right panel"
+              onKeyDown={handleTabKeyDown}
+              style={{ display: 'flex', gap: 'var(--space-1)' }}
+            >
+              {panelTabs.map(tab => (
+                <PanelTab
+                  key={tab.id}
+                  id={tab.id}
+                  label={tab.label}
+                  isSelected={rightPanelContent === tab.id}
+                  onSelect={() => setRightPanelContent(tab.id)}
+                />
+              ))}
             </div>
             <button
               className="btn-icon"
@@ -366,9 +379,16 @@ function RightPanel() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          {rightPanelContent === 'ai-chat' && <AiStreamPanel />}
-          {rightPanelContent === 'git' && <GitPanel />}
-          {rightPanelContent === 'item-detail' && <ItemDetailPanel />}
+          <div
+            id="right-panel-body"
+            role="tabpanel"
+            aria-labelledby={rightPanelContent ? `panel-tab-${rightPanelContent}` : undefined}
+            style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+          >
+            {rightPanelContent === 'ai-chat' && <AiStreamPanel />}
+            {rightPanelContent === 'git' && <GitPanel />}
+            {rightPanelContent === 'item-detail' && <ItemDetailPanel />}
+          </div>
         </div>
       )}
     </div>
