@@ -306,9 +306,11 @@ export default function AiStreamPanel() {
   const { caps: modelCaps, budget: modelBudget, refresh: refreshModelCaps } = useModelCapabilities(selectedModel)
   // Mirrored into a ref because the submit path is a long async function; it
   // must read the capabilities current at send time, not at closure creation.
+  const [reportedPromptTokens, setReportedPromptTokens] = useState<number | null>(null)
   const modelCapsRef = useRef(modelCaps)
   useEffect(() => {
     modelCapsRef.current = modelCaps
+    setReportedPromptTokens(null)
   }, [modelCaps])
   const [localModels, setLocalModels] = useState<string[]>([])
   const [temperature, setTemperature] = useState(0.7)
@@ -695,8 +697,11 @@ export default function AiStreamPanel() {
       }
     })
 
-    const unsubscribeDone = window.electronAPI.ai.onDone((streamId) => {
+    const unsubscribeDone = window.electronAPI.ai.onDone((streamId, usage) => {
       if (streamId && streamId !== ASSISTANT_STREAM_ID) return
+      // Endpoints honouring stream_options report what the prompt actually
+      // cost; that replaces the estimate until the next turn changes it.
+      if (usage?.promptTokens) setReportedPromptTokens(usage.promptTokens)
       if (isAbortedRef.current) {
         isAbortedRef.current = false
         return
@@ -1825,9 +1830,14 @@ Output a \`\`\`json:update_board block of this shape:
     const baseOverheadTokens = 900 // base system prompt + live board state scaffolding
     const skillTokens = activeSkillId ? estimateTokens(getSkillById(activeSkillId)?.systemPrompt || '') : 0
     const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, modelBudget.workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
-    const used = historyTokens + estimateTokens(inputValue) + baseOverheadTokens + skillTokens + workspaceTokens
+    const estimated = historyTokens + estimateTokens(inputValue) + baseOverheadTokens + skillTokens + workspaceTokens
+    // The reported figure covers the last completed turn, so anything typed
+    // since is added on top of it.
+    const used = reportedPromptTokens !== null
+      ? reportedPromptTokens + estimateTokens(inputValue)
+      : estimated
     const ratio = Math.min(1, used / contextWindowTokens)
-    return { used, ratio }
+    return { used, ratio, measured: reportedPromptTokens !== null }
   })()
 
   return (
@@ -2438,7 +2448,7 @@ Output a \`\`\`json:update_board block of this shape:
 
           {/* Token Budget Indicator */}
           <div
-            title={`~${tokenUsage.used.toLocaleString()} / ${modelCaps.contextTokens.toLocaleString()} tokens of context window in use`}
+            title={`${tokenUsage.measured ? '' : '~'}${tokenUsage.used.toLocaleString()} / ${modelCaps.contextTokens.toLocaleString()} tokens of context window in use${tokenUsage.measured ? ' (reported by the endpoint)' : ' (estimated)'}`}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               marginLeft: 'auto', flexShrink: 0

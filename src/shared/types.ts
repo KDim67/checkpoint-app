@@ -93,6 +93,13 @@ export interface AiStreamParams {
   maxTokens?: number
 }
 
+/** Real token counts, when the endpoint reports them via stream_options. */
+export interface AiUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
 export interface AiSettings {
   baseURL: string        // e.g. 'http://localhost:11434/v1' for Ollama
   apiKey: string         // 'ollama' for local, real key for OpenAI

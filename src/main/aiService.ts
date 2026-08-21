@@ -1,5 +1,5 @@
 import type OpenAI from 'openai'
-import type { AiStreamParams } from '../shared/types'
+import type { AiStreamParams, AiUsage } from '../shared/types'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import { getSetting } from './db'
 
@@ -92,7 +92,7 @@ export function ollamaContextParam(caps: ModelCapabilities, isOllama: boolean): 
 export function startAiStream(
   params: AiStreamParams,
   onChunk: (chunk: string) => void,
-  onDone: () => void,
+  onDone: (usage?: AiUsage) => void,
   onError: (err: Error) => void
 ): AbortController {
   const controller = new AbortController()
@@ -100,6 +100,9 @@ export function startAiStream(
   // first reasoning delta and closed on the first content delta.
   let emittedThinkOpen = false
   let closedThink = false
+  // Endpoints that honour stream_options put usage on a final chunk whose
+  // choices array is empty; ones that ignore it never send this at all.
+  let usage: AiUsage | undefined
 
   // Run the async streaming logic in the background
   ;(async () => {
@@ -129,6 +132,13 @@ export function startAiStream(
       })
 
       for await (const chunk of stream) {
+        if (chunk.usage) {
+          usage = {
+            promptTokens: chunk.usage.prompt_tokens ?? 0,
+            completionTokens: chunk.usage.completion_tokens ?? 0,
+            totalTokens: chunk.usage.total_tokens ?? 0
+          }
+        }
         const delta = chunk.choices[0]?.delta as
           | { content?: string; reasoning_content?: string; reasoning?: string }
           | undefined
@@ -157,7 +167,7 @@ export function startAiStream(
 
       if (emittedThinkOpen && !closedThink) onChunk('</think>')
 
-      onDone()
+      onDone(usage)
     } catch (err) {
       const error = err as Error & { code?: string; status?: number }
       // Silently ignore user-requested aborts

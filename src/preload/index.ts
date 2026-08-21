@@ -10,6 +10,7 @@ import type {
   Relation,
   RelationType,
   AiStreamParams,
+  AiUsage,
   AiStructuredParams,
   AiStructuredResult,
   BulkUpdatePayload,
@@ -272,8 +273,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener(IpcChannels.AI_CHUNK, handler)
     },
 
-    onDone: (callback: (streamId?: string) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, streamId?: string) => callback(streamId)
+    onDone: (callback: (streamId?: string, usage?: AiUsage) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, streamId?: string, usage?: AiUsage) => callback(streamId, usage)
       ipcRenderer.on(IpcChannels.AI_DONE, handler)
       return () => ipcRenderer.removeListener(IpcChannels.AI_DONE, handler)
     },

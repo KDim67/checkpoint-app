@@ -407,8 +407,8 @@ function registerIpcHandlers(): void {
       const controller = startAiStream(
         parsedParams,
         (chunk) => send(IpcChannels.AI_CHUNK, chunk, id),
-        () => {
-          send(IpcChannels.AI_DONE, id)
+        (usage) => {
+          send(IpcChannels.AI_DONE, id, usage)
           aiStreamControllers.delete(id)
         },
         (err) => {

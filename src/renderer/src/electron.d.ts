@@ -9,6 +9,7 @@ import type {
   Relation,
   RelationType,
   AiStreamParams,
+  AiUsage,
   AiStructuredParams,
   AiStructuredResult,
   BulkUpdatePayload,
@@ -89,7 +90,7 @@ export interface ElectronAPI {
     abortStream: (streamId?: string) => Promise<void>
     testConnection: (baseURL: string, apiKey: string) => Promise<{ success: boolean; error?: string }>
     onChunk: (callback: (chunk: string, streamId?: string) => void) => () => void
-    onDone: (callback: (streamId?: string) => void) => () => void
+    onDone: (callback: (streamId?: string, usage?: AiUsage) => void) => () => void
     onError: (callback: (errMessage: string, streamId?: string) => void) => () => void
   }
   widget: {
