@@ -8,6 +8,7 @@ import { ToastProvider } from './components/ui/Toast'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './components/settings/AppearanceSettings'
 import Lightbox from './components/ui/Lightbox'
+import { readViewFeatures, firstEnabledView } from './lib/features'
 
 // Lazy-loaded views (code split per view)
 const LogView      = lazy(() => import('./components/LogView'))
@@ -548,41 +549,12 @@ export default function App() {
     }
   }, [loadContexts, setView, toggleRightPanel])
 
-  // Safeguard: Redirect if the current view gets disabled in settings
+  // Safeguard: redirect if the view we are on gets disabled in settings.
   const checkEnabledViews = useCallback(async () => {
     try {
-      const [
-        kanban, log, backlog, focus, notes, clipboard, analytics, cookbook, cheatsheets, gamedev
-      ] = await Promise.all([
-        window.electronAPI.db.getSetting('feature_view_kanban'),
-        window.electronAPI.db.getSetting('feature_view_log'),
-        window.electronAPI.db.getSetting('feature_view_backlog'),
-        window.electronAPI.db.getSetting('feature_view_focus'),
-        window.electronAPI.db.getSetting('feature_view_notes'),
-        window.electronAPI.db.getSetting('feature_view_clipboard'),
-        window.electronAPI.db.getSetting('feature_view_analytics'),
-        window.electronAPI.db.getSetting('feature_view_cookbook'),
-        window.electronAPI.db.getSetting('feature_view_cheatsheets'),
-        window.electronAPI.db.getSetting('feature_gamedev_helpers')
-      ])
-
-      const state = {
-        kanban: kanban !== 'false',
-        log: log !== 'false',
-        backlog: backlog !== 'false',
-        focus: focus !== 'false',
-        notes: notes !== 'false',
-        clipboard: clipboard !== 'false',
-        analytics: analytics !== 'false',
-        cookbook: cookbook !== 'false',
-        cheatsheets: cheatsheets !== 'false',
-        gamedev: gamedev === 'true'
-      }
-
-      if (activeView !== 'settings' && !state[activeView]) {
-        const order = ['kanban', 'log', 'backlog', 'focus', 'notes', 'clipboard', 'analytics', 'cookbook', 'cheatsheets', 'gamedev']
-        const fallback = order.find(v => state[v]) || 'kanban'
-        setView(fallback as any)
+      const enabled = await readViewFeatures()
+      if (!enabled[activeView]) {
+        setView(firstEnabledView(enabled))
       }
     } catch (err) {
       console.error('Failed checking enabled views in App:', err)

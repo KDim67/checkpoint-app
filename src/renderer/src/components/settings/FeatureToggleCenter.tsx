@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book } from 'lucide-react'
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
+import { VIEW_FEATURES, setViewFeature } from '../../lib/features'
+import { getBoolSetting } from '../../lib/settings'
 
 interface ToggleConfig {
   key: string
@@ -94,159 +96,90 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
   }
 ]
 
-const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = [
-  {
+/**
+ * Per-view copy. The setting key, label and default live in lib/features so
+ * this panel, the Sidebar and App's redirect guard cannot disagree about them.
+ */
+/**
+ * Per-view copy, keyed by settings key. The key, label and default live in
+ * lib/features so this panel, the Sidebar and App's redirect guard cannot
+ * disagree about them.
+ */
+const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; description: string; warning: string }> = {
+  'feature_view_kanban': {
     key: 'view_kanban',
     icon: <Columns size={16} />,
-    title: 'Kanban Board View',
     description: 'Visual status wall to track and organize workspace cards.',
-    warning: 'Disabling hides the Kanban tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_kanban')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_kanban', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Kanban tab on the left navigation bar.'
   },
-  {
+  'feature_view_log': {
     key: 'view_log',
     icon: <FileText size={16} />,
-    title: 'Daily Log View',
     description: 'Chronological activity stream for logging progress, screenshots, and daily context.',
-    warning: 'Disabling hides the Log tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_log')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_log', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Log tab on the left navigation bar.'
   },
-  {
+  'feature_view_backlog': {
     key: 'view_backlog',
     icon: <ListTodo size={16} />,
-    title: 'Structured Backlog View',
     description: 'Detailed, sortable grid for tracking and prioritizing project tasks.',
-    warning: 'Disabling hides the Backlog tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_backlog')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_backlog', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Backlog tab on the left navigation bar.'
   },
-  {
+  'feature_view_focus': {
     key: 'view_focus',
     icon: <Timer size={16} />,
-    title: 'Focus Timer & Pomodoro',
     description: 'Interactive clock and interruption tracker to maintain high productivity.',
-    warning: 'Disabling hides the Focus tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_focus')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_focus', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Focus tab on the left navigation bar.'
   },
-  {
+  'feature_view_notes': {
     key: 'view_notes',
     icon: <BookOpen size={16} />,
-    title: 'Obsidian-Style Notes',
     description: 'Local file-based Markdown notes with wiki-link navigation and search.',
-    warning: 'Disabling hides the Notes tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_notes')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_notes', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Notes tab on the left navigation bar.'
   },
-  {
+  'feature_view_clipboard': {
     key: 'view_clipboard',
     icon: <Clipboard size={16} />,
-    title: 'Clipboard History Vault',
     description: 'Monitors, saves, and lets you query clipboard copy-paste events.',
-    warning: 'Disabling hides the Clipboard tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_clipboard')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_clipboard', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Clipboard tab on the left navigation bar.'
   },
-  {
+  'feature_view_analytics': {
     key: 'view_analytics',
     icon: <BarChart2 size={16} />,
-    title: 'Time & App Analytics',
     description: 'Interactive graphs showing active window usage, session durations, and categories.',
-    warning: 'Disabling hides the Analytics tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_analytics')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_analytics', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Analytics tab on the left navigation bar.'
   },
-  {
+  'feature_view_cookbook': {
     key: 'view_cookbook',
     icon: <Sparkles size={16} />,
-    title: 'AI Assistant Cookbook',
     description: 'Interact with local Ollama models and context configurations.',
-    warning: 'Disabling hides the Cookbook tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_cookbook')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_cookbook', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Cookbook tab on the left navigation bar.'
   },
-  {
+  'feature_view_cheatsheets': {
     key: 'view_cheatsheets',
     icon: <Book size={16} />,
-    title: 'Quick Cheatsheets & PDFs',
     description: 'Store, view, and read reference documentation/cheatsheets inside Checkpoint.',
-    warning: 'Disabling hides the Cheatsheets tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_view_cheatsheets')
-      return v !== 'false'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_view_cheatsheets', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-    }
+    warning: 'Disabling hides the Cheatsheets tab on the left navigation bar.'
   },
-  {
+  'feature_gamedev_helpers': {
     key: 'gamedev_helpers',
     icon: <Gamepad size={16} />,
-    title: 'Game Development Helpers',
     description: 'Unlocks PBR/seamless generators, pixel-art upscaler, sprite atlas tools, batch renamer and dialogue editor.',
-    warning: 'Disabling hides the Game Dev tab on the left navigation bar.',
-    getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_gamedev_helpers')
-      return v === 'true'
-    },
-    toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_gamedev_helpers', String(active))
-      window.dispatchEvent(new CustomEvent('settings-update-features'))
-      window.dispatchEvent(new CustomEvent('settings-update-gamedev'))
-    }
+    warning: 'Disabling hides the Game Dev tab on the left navigation bar.'
   }
-]
+}
+
+const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = VIEW_FEATURES.map(feature => {
+  const copy = VIEW_COPY[feature.key]
+  return {
+    key: copy.key,
+    icon: copy.icon,
+    title: feature.label,
+    description: copy.description,
+    warning: copy.warning,
+    getState: () => getBoolSetting(feature.key, feature.defaultOn),
+    toggle: (active: boolean) => setViewFeature(feature.key, active)
+  }
+})
 
 const TOGGLE_CONFIGS = [...BACKGROUND_CONFIGS, ...SIDEBAR_VIEW_CONFIGS]
 

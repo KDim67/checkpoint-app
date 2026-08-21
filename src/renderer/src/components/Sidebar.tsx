@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { readViewFeatures, defaultViewEnabledMap, type ViewEnabledMap } from '../lib/features'
 import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
 
@@ -275,18 +276,7 @@ export function Sidebar() {
 
   const [contextOpen, setContextOpen] = useState(false)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
-  const [enabledViews, setEnabledViews] = useState<Record<string, boolean>>({
-    kanban: true,
-    log: true,
-    backlog: true,
-    focus: true,
-    notes: true,
-    clipboard: true,
-    analytics: true,
-    cookbook: true,
-    cheatsheets: true,
-    gamedev: false
-  })
+  const [enabledViews, setEnabledViews] = useState<ViewEnabledMap>(defaultViewEnabledMap)
   const [syncEnabled, setSyncEnabled] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState('Idle')
@@ -294,33 +284,7 @@ export function Sidebar() {
 
   const checkFeatures = async () => {
     try {
-      const [
-        kanban, log, backlog, focus, notes, clipboard, analytics, cookbook, cheatsheets, gamedev
-      ] = await Promise.all([
-        window.electronAPI.db.getSetting('feature_view_kanban'),
-        window.electronAPI.db.getSetting('feature_view_log'),
-        window.electronAPI.db.getSetting('feature_view_backlog'),
-        window.electronAPI.db.getSetting('feature_view_focus'),
-        window.electronAPI.db.getSetting('feature_view_notes'),
-        window.electronAPI.db.getSetting('feature_view_clipboard'),
-        window.electronAPI.db.getSetting('feature_view_analytics'),
-        window.electronAPI.db.getSetting('feature_view_cookbook'),
-        window.electronAPI.db.getSetting('feature_view_cheatsheets'),
-        window.electronAPI.db.getSetting('feature_gamedev_helpers')
-      ])
-
-      setEnabledViews({
-        kanban: kanban !== 'false',
-        log: log !== 'false',
-        backlog: backlog !== 'false',
-        focus: focus !== 'false',
-        notes: notes !== 'false',
-        clipboard: clipboard !== 'false',
-        analytics: analytics !== 'false',
-        cookbook: cookbook !== 'false',
-        cheatsheets: cheatsheets !== 'false',
-        gamedev: gamedev === 'true'
-      })
+      setEnabledViews(await readViewFeatures())
     } catch (err) {
       console.error('Failed to read settings in Sidebar:', err)
     }
