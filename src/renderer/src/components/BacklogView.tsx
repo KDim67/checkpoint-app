@@ -571,7 +571,7 @@ export default function BacklogView() {
           >
             Backlog Registry
           </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -589,7 +589,7 @@ export default function BacklogView() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div className="row">
           <button
             onClick={() => setShowStandupModal(true)}
             style={{
@@ -1112,7 +1112,7 @@ export default function BacklogView() {
             {/* Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {archiveLoading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="col">
                   {[1, 2, 3].map(i => (
                     <Skeleton key={i} width="100%" height={52} borderRadius="var(--radius-md)" />
                   ))}

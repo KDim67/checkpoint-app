@@ -396,7 +396,7 @@ function MemoryVaultManager() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="row-between">
         <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
           AI Persistent Memory Vault ({memories.length})
         </div>
@@ -1439,7 +1439,7 @@ function BackupSettings() {
 
           {/* Max kept backups */}
           <FieldRow label="Rolling Retention Limit">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="row">
               <input
                 type="number"
                 min={1}
@@ -1467,7 +1467,7 @@ function BackupSettings() {
           <Divider />
 
           {/* Trigger & List */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="row-between">
             <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
               Backup Archives
             </div>

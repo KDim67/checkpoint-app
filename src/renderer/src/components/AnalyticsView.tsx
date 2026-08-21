@@ -266,7 +266,7 @@ export default function AnalyticsView() {
 
         {/* Activity Heatmap Calendar */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="row-between">
             <div className="skeleton" style={{ width: '150px', height: '16px' }} />
             <div className="skeleton" style={{ width: '80px', height: '14px', opacity: 0.6 }} />
           </div>
@@ -315,7 +315,7 @@ export default function AnalyticsView() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-4)' }}>
           {/* Line Chart Card */}
           <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="row">
               <div className="skeleton" style={{ width: '16px', height: '16px', borderRadius: '50%' }} />
               <div className="skeleton" style={{ width: '130px', height: '16px' }} />
             </div>
@@ -341,7 +341,7 @@ export default function AnalyticsView() {
 
           {/* Bar Chart Card */}
           <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="row">
               <div className="skeleton" style={{ width: '16px', height: '16px', borderRadius: '50%' }} />
               <div className="skeleton" style={{ width: '150px', height: '16px' }} />
             </div>
@@ -377,7 +377,7 @@ export default function AnalyticsView() {
           {/* Recent Sessions */}
           <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
             <div className="skeleton" style={{ width: '150px', height: '16px' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div className="col">
               {[1, 2, 3].map(i => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-surface-offset)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -997,7 +997,7 @@ export default function AnalyticsView() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-4)' }}>
         {/* Weekly Completed Tasks Graph */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <IconChart style={{ color: 'var(--color-primary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Weekly Finished Items</span>
           </div>
@@ -1107,7 +1107,7 @@ export default function AnalyticsView() {
 
         {/* Kanban Cycle Time Duration Chart */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <IconClock style={{ color: 'var(--color-secondary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Average Column Duration (Cycle Time)</span>
           </div>
@@ -1205,7 +1205,7 @@ export default function AnalyticsView() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-4)' }}>
         {/* Context Focus Allocation (Passive Tracker) */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <IconChart style={{ color: 'var(--color-secondary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Context Focus Allocation (Past 7 Days)</span>
           </div>
@@ -1247,7 +1247,7 @@ export default function AnalyticsView() {
 
         {/* Most Used Tags */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <IconTag style={{ color: 'var(--color-secondary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Tag Usage Share</span>
           </div>
@@ -1282,7 +1282,7 @@ export default function AnalyticsView() {
 
         {/* Focus Retrospective Logs */}
         <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <IconFocus style={{ color: 'var(--color-primary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Focus Retrospective Log</span>
           </div>

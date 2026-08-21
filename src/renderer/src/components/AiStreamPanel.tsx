@@ -2064,10 +2064,10 @@ Output a \`\`\`json:update_board block of this shape:
           gap: 'var(--space-2)',
           flexShrink: 0
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <div className="col">
             {/* Temperature Slider */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="row-between">
                 <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Temperature
                 </span>
@@ -2092,7 +2092,7 @@ Output a \`\`\`json:update_board block of this shape:
 
             {/* Max Tokens Slider */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="row-between">
                 <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Max Response Tokens
                 </span>
@@ -2477,7 +2477,7 @@ Output a \`\`\`json:update_board block of this shape:
               padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)',
               background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <Sparkles size={14} style={{ color: 'var(--color-secondary)' }} />
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
                   My Quick Actions ({customActions.length})
@@ -2628,7 +2628,7 @@ Output a \`\`\`json:update_board block of this shape:
                 flexShrink: 0
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <BookOpen size={14} style={{ color: 'var(--color-secondary)' }} />
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
                   Model Cookbook
@@ -2729,7 +2729,7 @@ Output a \`\`\`json:update_board block of this shape:
                           gap: '4px'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="row-between">
                           <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{cat.name}</span>
                           {isInstalled ? (
                             <button
@@ -2808,13 +2808,13 @@ Output a \`\`\`json:update_board block of this shape:
                 flexShrink: 0
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <MessageSquare size={14} style={{ color: 'var(--color-secondary)' }} />
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
                   Saved Chats ({savedChats.length}/50)
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <button
                   onClick={handleNewChat}
                   style={{
@@ -3008,14 +3008,6 @@ Output a \`\`\`json:update_board block of this shape:
               }
               .memory-vault-card {
                 animation: memory-scale-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
-              }
-              @keyframes memory-fade-in {
-                from { opacity: 0; }
-                to { opacity: 1; }
-              }
-              @keyframes memory-scale-in {
-                from { transform: scale(0.96); opacity: 0; }
-                to { transform: scale(1); opacity: 1; }
               }
             `}</style>
             <div className="memory-vault-card" style={{
@@ -3472,14 +3464,6 @@ Output a \`\`\`json:update_board block of this shape:
               gap: var(--space-4);
               box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
               animation: modal-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
-            }
-            @keyframes modal-fade-in {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            @keyframes modal-scale-in {
-              from { transform: scale(0.95); opacity: 0; }
-              to { transform: scale(1); opacity: 1; }
             }
           `}</style>
           <div className="revert-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">

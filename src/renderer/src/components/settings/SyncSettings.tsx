@@ -373,7 +373,7 @@ export default function SyncSettings() {
                   Searching local subnet... Open Checkpoint on your other machine.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="col">
                   {discoveredPeers.map((peer, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2) var(--space-3)' }}>
                       <div>
@@ -476,7 +476,7 @@ export default function SyncSettings() {
 
               {isWebrtcActive ? (
                 <div style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="row-between">
                     <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)' }}>
                       Active WebRTC Room: {webrtcCode}
                     </span>

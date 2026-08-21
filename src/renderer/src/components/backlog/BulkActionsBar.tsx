@@ -57,7 +57,7 @@ export default function BulkActionsBar({
       }}
     >
       {/* Selection count & clear */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+      <div className="row">
         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
           {selectedItems.length} selected
         </span>
@@ -322,7 +322,7 @@ export default function BulkActionsBar({
       <div style={{ width: '1px', height: '20px', background: 'var(--color-surface-offset)' }} />
 
       {/* Export & Delete */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+      <div className="row">
         <button
           onClick={onExportMarkdown}
           style={{
@@ -349,9 +349,9 @@ export default function BulkActionsBar({
         <button
           onClick={onBulkDelete}
           style={{
-            background: 'var(--color-error-muted, rgba(239, 68, 68, 0.15))',
-            border: '1px solid var(--color-error, #ef4444)',
-            color: 'var(--color-error, #ef4444)',
+            background: 'var(--color-error-muted)',
+            border: '1px solid var(--color-error)',
+            color: 'var(--color-error)',
             borderRadius: 'var(--radius-md)',
             padding: 'var(--space-1.5) var(--space-3)',
             fontSize: 'var(--text-xs)',

@@ -701,10 +701,6 @@ export default function CheatsheetsView() {
           animation: fade-in 0.15s ease-out;
           pointer-events: none;
         }
-        @keyframes fade-in {
-          from { opacity: 0; transform: scale(0.98); }
-          to { opacity: 1; transform: scale(1); }
-        }
         .modal-overlay {
           position: fixed;
           inset: 0;
@@ -762,7 +758,7 @@ export default function CheatsheetsView() {
       {/* Left Sidebar List */}
       <div className="cheatsheets-sidebar">
         <div className="search-container">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <div className="search-input-wrapper">
               <Search size={16} className="search-icon" />
               <input
@@ -785,7 +781,7 @@ export default function CheatsheetsView() {
           </div>
 
           {/* Sort row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="row-between">
             <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
               {cheatsheets.length} sheet{cheatsheets.length !== 1 ? 's' : ''}
               {searching && ' · searching…'}
@@ -1074,7 +1070,7 @@ export default function CheatsheetsView() {
       {renamePdf && (
         <div className="modal-overlay" onClick={() => setRenamePdf(null)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="row-between">
               <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
                 Rename Cheatsheet
               </h3>
@@ -1082,7 +1078,7 @@ export default function CheatsheetsView() {
                 <X size={16} />
               </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div className="col">
               <label style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 'var(--weight-bold)' }}>
                 New Name
               </label>

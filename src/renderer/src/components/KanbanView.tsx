@@ -1294,7 +1294,7 @@ export default function KanbanView() {
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div className="row">
           {/* P2P Board Collaboration Share */}
           <div style={{ position: 'relative' }} ref={collabPopoverRef}>
             <HeaderBtn
@@ -1356,7 +1356,7 @@ export default function KanbanView() {
                 {!collabActive ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     {/* Host section */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    <div className="col">
                       <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Host Board Share</span>
                       <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>Let others join and view/edit this active card wall.</p>
                       
@@ -1419,7 +1419,7 @@ export default function KanbanView() {
                     <div style={{ height: '1px', background: 'var(--color-surface-offset)' }} />
 
                     {/* Join section */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    <div className="col">
                       <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Join Shared Board</span>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input
@@ -1464,7 +1464,7 @@ export default function KanbanView() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                     {/* Active session state */}
                     <div style={{ background: 'var(--color-surface-offset)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div className="row-between">
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Role:</span>
                         <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
                           {collabIsHost ? `Host (${collabMode === 'readonly' ? 'Read-Only' : 'Collaborative'})` : 'Client'}
@@ -1472,7 +1472,7 @@ export default function KanbanView() {
                       </div>
                       
                       {collabCode && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="row-between">
                           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Passcode:</span>
                           <span
                             onClick={() => {
@@ -1504,21 +1504,21 @@ export default function KanbanView() {
                         width: '100%',
                         fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-semibold)',
-                        background: 'var(--color-destructive-muted, rgba(239, 68, 68, 0.1))',
-                        color: 'var(--color-destructive, #ef4444)',
-                        border: '1px solid var(--color-destructive, #ef4444)',
+                        background: 'var(--color-destructive-muted)',
+                        color: 'var(--color-destructive)',
+                        border: '1px solid var(--color-destructive)',
                         padding: '6px 0',
                         borderRadius: 'var(--radius-md)',
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.background = 'var(--color-destructive, #ef4444)'
+                        e.currentTarget.style.background = 'var(--color-destructive)'
                         e.currentTarget.style.color = '#fff'
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = 'var(--color-destructive-muted, rgba(239, 68, 68, 0.1))'
-                        e.currentTarget.style.color = 'var(--color-destructive, #ef4444)'
+                        e.currentTarget.style.background = 'var(--color-destructive-muted)'
+                        e.currentTarget.style.color = 'var(--color-destructive)'
                       }}
                     >
                       Disconnect Share
@@ -2422,7 +2422,7 @@ export default function KanbanView() {
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
               
               {/* Archived Columns List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div className="col">
                 <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                   Archived Columns ({archivedColumns.length})
                 </span>
@@ -2469,7 +2469,7 @@ export default function KanbanView() {
                 const allSelected = archivedCards.length > 0 && archivedCards.every(c => selectedArchived.has(c.id))
                 const selCount = archivedCards.reduce((n, c) => n + (selectedArchived.has(c.id) ? 1 : 0), 0)
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <div className="col">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         Archived Cards ({archivedCards.length})

@@ -266,7 +266,7 @@ export default function LogView() {
         background: 'var(--color-surface-1)',
         flexShrink: 0
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div className="row">
           <h1 style={{
             fontSize: 'var(--text-md)',
             fontWeight: 'var(--weight-semibold)',

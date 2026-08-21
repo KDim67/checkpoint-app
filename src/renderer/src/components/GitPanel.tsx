@@ -317,7 +317,7 @@ export default function GitPanel() {
       <div style={{ flex: 1, padding: 'var(--space-4)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         
         {/* Header summary info */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="row-between">
           <div style={{ minWidth: 0 }}>
             <h3 style={{
               fontSize: 'var(--text-sm)',
@@ -416,7 +416,7 @@ export default function GitPanel() {
         </div>
 
         {/* Commit Log list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <div style={{
             fontSize: '10px',
             textTransform: 'uppercase',
@@ -441,7 +441,7 @@ export default function GitPanel() {
               No commits found.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div className="col">
               {commits.map(commit => {
                 const isCopied = copiedHash === commit.hash
                 return (
@@ -461,7 +461,7 @@ export default function GitPanel() {
                     onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
                   >
                     {/* Hash & Copy Button */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="row-between">
                       <span style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: '10px',

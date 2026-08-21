@@ -1054,8 +1054,8 @@ export default function CookbookView() {
                   {/* Actions Area */}
                   {isPullingThis ? (
                     /* Active Pull Status */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div className="col">
+                      <div className="row-between">
                         <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>
                           {pullStatusText || 'Downloading...'}
                         </span>

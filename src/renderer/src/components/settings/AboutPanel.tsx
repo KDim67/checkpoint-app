@@ -60,7 +60,7 @@ export default function AboutPanel() {
       <Divider />
 
       {/* Version table */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <div className="col">
         {versions.map(v => (
           <div
             key={v.label}

@@ -266,7 +266,7 @@ export default function ContextManager() {
           {/* Name or edit input */}
           {editingSlug === ctx.slug ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Name:</span>
                 <input
                   autoFocus
@@ -288,7 +288,7 @@ export default function ContextManager() {
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Slug (#):</span>
                 <input
                   value={editSlugVal}
@@ -309,7 +309,7 @@ export default function ContextManager() {
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Git Path:</span>
                 <input
                   value={editGitPath}
@@ -563,7 +563,7 @@ export default function ContextManager() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <button
             className="btn-ghost"
             style={{

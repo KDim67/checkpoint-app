@@ -3538,7 +3538,7 @@ function Modal({ title, children, onClose, wide }: { title: string; children: Re
         width: wide ? 720 : 400, maxWidth: '90vw', maxHeight: '80vh', overflow: 'auto',
         display: 'flex', flexDirection: 'column', gap: 12
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="row-between">
           <h3 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 4 }}><X size={16}/></button>
         </div>

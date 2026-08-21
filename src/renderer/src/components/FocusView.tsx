@@ -531,10 +531,6 @@ ${retroNotes.trim() || '_No custom notes written._'}`
         .cycle-dot.filled {
           background: var(--color-secondary);
         }
-        @keyframes breathe {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.015); }
-        }
         .timer-ring-active {
           animation: breathe 4s ease-in-out infinite;
         }
@@ -547,7 +543,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
             <div>
               <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <div className="row">
                   <Timer style={{ color: 'var(--color-secondary)' }} />
                   <span>Daily Focus Session</span>
                 </div>
@@ -696,7 +692,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {/* Presets Card */}
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="row-between">
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', margin: 0 }}>Timer Config</h3>
                 {/* Pomodoro cycle progress, fills every completed focus interval, resets every 4th (long-break cadence) */}
                 <div style={{ display: 'flex', gap: '4px' }} title={`${cyclesCompleted} focus intervals completed this session`}>
@@ -706,7 +702,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div className="col">
                 {Object.entries(TIMER_PRESETS).map(([key, val]) => (
                   <button
                     key={key}
@@ -1280,7 +1276,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
             )}
 
             {/* Check completed checklist */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div className="col">
               <h3 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                 Verify Completed Tasks
               </h3>
@@ -1320,7 +1316,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
             </div>
 
             {/* Retrospective Text Input */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div className="col">
               <label
                 htmlFor="retro-notes-area"
                 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}

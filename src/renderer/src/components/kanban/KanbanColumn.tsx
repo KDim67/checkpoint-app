@@ -327,7 +327,7 @@ function KanbanColumn({
 
               {/* Row 2: Display Mode & Color Swatches */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-surface-2)', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-surface-offset)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="row-between">
                   <span style={{ fontSize: '9px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Theme & Display Mode
                   </span>
@@ -459,7 +459,7 @@ function KanbanColumn({
               )}
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="row">
               <h3
                 onDoubleClick={() => setIsEditing(true)}
                 title="Double-click to rename"

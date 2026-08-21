@@ -627,14 +627,6 @@ export function Sidebar() {
       )}
 
       <style>{`
-        @keyframes tooltip-in {
-          from { opacity: 0; transform: translateX(-4px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes focus-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.55; transform: scale(0.8); }
-        }
         #nav-log:not([aria-current]):hover,
         #nav-kanban:not([aria-current]):hover,
         #nav-backlog:not([aria-current]):hover,

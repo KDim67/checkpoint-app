@@ -11,7 +11,7 @@ interface SkeletonProps {
 export default function Skeleton({
   width = '100%',
   height = '16px',
-  borderRadius = 'var(--radius-md, 6px)',
+  borderRadius = 'var(--radius-md)',
   style,
   className
 }: SkeletonProps) {

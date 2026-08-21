@@ -483,7 +483,7 @@ export default function NotesView(): React.JSX.Element {
       {/* COLUMN 3: INFO PANEL */}
       {showInfo && (
         <div className="notes-right-panel">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="row-between">
             <span className="notes-panel-label">Connections</span>
           </div>
 
@@ -501,7 +501,7 @@ export default function NotesView(): React.JSX.Element {
               </div>
 
               {/* Outgoing links */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div className="col">
                 <div className="notes-panel-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <ArrowRight size={11} /> Outgoing links
                 </div>
@@ -522,7 +522,7 @@ export default function NotesView(): React.JSX.Element {
               </div>
 
               {/* Backlinks */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div className="col">
                 <div className="notes-panel-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <ArrowLeft size={11} /> Backlinks
                 </div>
@@ -759,8 +759,7 @@ const NOTES_CSS = `
     color: var(--color-text-faint);
     font-style: italic;
   }
-  .notes-spin { animation: notes-spin 0.8s linear infinite; }
-  @keyframes notes-spin { to { transform: rotate(360deg); } }
+  .notes-spin { animation: spin 0.8s linear infinite; }
   .markdown-preview {
     flex: 1;
     height: 100%;

@@ -67,7 +67,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
     <div className="notes-sidebar">
       {/* Header */}
       <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderBottom: '1px solid var(--color-surface-offset)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="row-between">
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             Notes
             <span style={{ fontSize: '10px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-faint)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)', padding: '1px 7px' }}>
@@ -304,7 +304,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
       {/* Tag filter */}
       {allTags.length > 0 && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--color-surface-offset)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '180px', overflowY: 'auto', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="row-between">
             <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
               Filter by tag
             </span>

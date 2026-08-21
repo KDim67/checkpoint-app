@@ -2819,7 +2819,7 @@ export default function GameDevView() {
                 minHeight: '200px'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <div className="row">
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Renaming Preview ({files.length} items)</span>
                     <button
                       onClick={() => setFiles([])}
@@ -3020,7 +3020,7 @@ export default function GameDevView() {
                     flexDirection: 'column',
                     gap: '4px'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <strong style={{ fontSize: 'var(--text-xs)', color: 'var(--color-secondary)' }}>
                         {node.id} ({node.speaker})
                       </strong>
@@ -3143,7 +3143,7 @@ export default function GameDevView() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Dialogue Graph</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <div className="row">
                   <div style={{ display: 'flex', gap: '2px', background: 'var(--color-surface-2)', padding: '2px', borderRadius: '6px', border: '1px solid var(--color-surface-offset)' }}>
                     <button
                       onClick={() => setDialogueViewMode('visual')}
@@ -3343,7 +3343,7 @@ export default function GameDevView() {
               
               {/* Unity Code Block */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="row-between">
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>Unity C# Color Array</span>
                   <button
                     onClick={() => copyToClipboard(`public Color[] palette = new Color[] {\n  ${generatedUnityColor}\n};`, 'Unity C#')}
@@ -3359,7 +3359,7 @@ export default function GameDevView() {
 
               {/* Unreal Code Block */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="row-between">
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>Unreal Engine C++ FLinearColor</span>
                   <button
                     onClick={() => copyToClipboard(`TArray<FLinearColor> Palette = {\n  ${generatedUnrealColor}\n};`, 'Unreal C++')}
@@ -3375,7 +3375,7 @@ export default function GameDevView() {
 
               {/* HLSL Code Block */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="row-between">
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>HLSL float4 Shader Array</span>
                   <button
                     onClick={() => copyToClipboard(generatedHlslColor, 'HLSL float4')}
@@ -3529,7 +3529,7 @@ export default function GameDevView() {
                   {/* Sliders Title */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
                     <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-                    <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                    <span className="label-caps">
                       Map Generation Tweak Settings
                     </span>
                   </div>
@@ -3766,7 +3766,7 @@ export default function GameDevView() {
                     flexDirection: 'column',
                     gap: 'var(--space-3)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export PBR Textures</span>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -3817,7 +3817,7 @@ export default function GameDevView() {
                         gap: 'var(--space-2)',
                         marginTop: 'var(--space-2)',
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <div className="row">
                           <CheckCircle size={14} style={{ color: 'var(--color-secondary)' }} />
                           <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
                             Maps Saved next to original texture!
@@ -3959,7 +3959,7 @@ export default function GameDevView() {
                   {/* Settings Title */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
                     <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-                    <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                    <span className="label-caps">
                       Stitching Configuration
                     </span>
                   </div>
@@ -4228,7 +4228,7 @@ export default function GameDevView() {
                     flexDirection: 'column',
                     gap: 'var(--space-3)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export Seamless Texture</span>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -4279,7 +4279,7 @@ export default function GameDevView() {
                         gap: 'var(--space-2)',
                         marginTop: 'var(--space-2)',
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <div className="row">
                           <CheckCircle size={14} style={{ color: 'var(--color-secondary)' }} />
                           <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
                             Seamless texture saved next to original!
@@ -4359,7 +4359,7 @@ export default function GameDevView() {
                 {/* Title */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
                   <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  <span className="label-caps">
                     Packer Settings
                   </span>
                 </div>
@@ -4571,7 +4571,7 @@ export default function GameDevView() {
                     flexDirection: 'column',
                     gap: 'var(--space-3)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export Atlas & Metadata</span>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -4662,7 +4662,7 @@ export default function GameDevView() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
                   <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  <span className="label-caps">
                     Slicing Settings
                   </span>
                 </div>
@@ -4860,7 +4860,7 @@ export default function GameDevView() {
                     flexDirection: 'column',
                     gap: 'var(--space-3)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export Slices</span>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -4946,7 +4946,7 @@ export default function GameDevView() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
                   <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  <span className="label-caps">
                     Color Adjustments
                   </span>
                 </div>
@@ -5105,7 +5105,7 @@ export default function GameDevView() {
                   flexDirection: 'column',
                   gap: 'var(--space-3)'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="row-between">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export LUT Strip</span>
                       <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -5193,7 +5193,7 @@ export default function GameDevView() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
                   <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  <span className="label-caps">
                     Upscale Settings
                   </span>
                 </div>
@@ -5372,7 +5372,7 @@ export default function GameDevView() {
                     flexDirection: 'column',
                     gap: 'var(--space-3)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export Upscaled</span>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>

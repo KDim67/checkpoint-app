@@ -56,7 +56,7 @@ export default function ConfirmDialog({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 'var(--space-4, 16px)'
+        padding: 'var(--space-4)'
       }}
       role="dialog"
       aria-modal="true"
@@ -64,9 +64,9 @@ export default function ConfirmDialog({
     >
       <div
         style={{
-          background: 'var(--color-surface-1, #121625)',
-          border: '1px solid var(--color-surface-offset, #2c324c)',
-          borderRadius: 'var(--radius-lg, 8px)',
+          background: 'var(--color-surface-1)',
+          border: '1px solid var(--color-surface-offset)',
+          borderRadius: 'var(--radius-lg)',
           width: '100%',
           maxWidth: '400px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5)',
@@ -80,14 +80,14 @@ export default function ConfirmDialog({
         
         {/* Header */}
         <div style={{
-          padding: 'var(--space-5, 20px) var(--space-6, 24px) var(--space-2, 8px)'
+          padding: 'var(--space-5) var(--space-6) var(--space-2)'
         }}>
           <h2
             id="confirm-dialog-title"
             style={{
-              fontSize: 'var(--text-lg, 18px)',
-              fontWeight: 'var(--weight-semibold, 600)',
-              color: 'var(--color-text-base, #ffffff)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--weight-semibold)',
+              color: 'var(--color-text-base)',
               margin: 0
             }}
           >
@@ -97,12 +97,12 @@ export default function ConfirmDialog({
 
         {/* Content */}
         <div style={{
-          padding: '0 var(--space-6, 24px) var(--space-6, 24px)',
+          padding: '0 var(--space-6) var(--space-6)',
           flex: 1
         }}>
           <p style={{
-            fontSize: 'var(--text-sm, 14px)',
-            color: 'var(--color-text-muted, #94a3b8)',
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-text-muted)',
             lineHeight: 1.5,
             margin: 0
           }}>
@@ -112,12 +112,12 @@ export default function ConfirmDialog({
 
         {/* Actions */}
         <div style={{
-          background: 'var(--color-surface-2, #1b2035)',
-          padding: 'var(--space-4, 16px) var(--space-6, 24px)',
+          background: 'var(--color-surface-2)',
+          padding: 'var(--space-4) var(--space-6)',
           display: 'flex',
           justifyContent: 'flex-end',
-          gap: 'var(--space-3, 12px)',
-          borderTop: '1px solid var(--color-surface-offset, #2c324c)'
+          gap: 'var(--space-3)',
+          borderTop: '1px solid var(--color-surface-offset)'
         }}>
           <button
             ref={cancelBtnRef}
@@ -125,16 +125,16 @@ export default function ConfirmDialog({
             onClick={onCancel}
             style={{
               background: 'transparent',
-              border: '1px solid var(--color-surface-offset, #2c324c)',
-              color: 'var(--color-text-base, #ffffff)',
-              borderRadius: 'var(--radius-md, 6px)',
-              padding: 'var(--space-2, 8px) var(--space-4, 16px)',
-              fontSize: 'var(--text-sm, 14px)',
-              fontWeight: 'var(--weight-medium, 500)',
+              border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-4)',
+              fontSize: 'var(--text-sm)',
+              fontWeight: 'var(--weight-medium)',
               cursor: 'pointer',
-              transition: 'background var(--duration-fast, 150ms) var(--ease-default)'
+              transition: 'background var(--duration-fast) var(--ease-default)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset, #2c324c)')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             {cancelText}
@@ -144,15 +144,15 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             style={{
-              background: isDestructive ? 'var(--color-error, #ef4444)' : 'var(--color-secondary, #3b82f6)',
+              background: isDestructive ? 'var(--color-error)' : 'var(--color-secondary)',
               border: 'none',
-              color: isDestructive ? 'white' : 'var(--color-text-inverted, #ffffff)',
-              borderRadius: 'var(--radius-md, 6px)',
-              padding: 'var(--space-2, 8px) var(--space-4, 16px)',
-              fontSize: 'var(--text-sm, 14px)',
-              fontWeight: 'var(--weight-semibold, 700)',
+              color: isDestructive ? 'white' : 'var(--color-text-inverted)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2) var(--space-4)',
+              fontSize: 'var(--text-sm)',
+              fontWeight: 'var(--weight-semibold)',
               cursor: 'pointer',
-              transition: 'filter var(--duration-fast, 150ms) var(--ease-default)'
+              transition: 'filter var(--duration-fast) var(--ease-default)'
             }}
             onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.1)')}
             onMouseLeave={e => (e.currentTarget.style.filter = 'none')}

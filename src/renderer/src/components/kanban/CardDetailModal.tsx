@@ -438,7 +438,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           justifyContent: 'space-between',
           flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <span style={{
               fontSize: '10px',
               fontWeight: 'var(--weight-bold)',
@@ -452,7 +452,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <button
               onClick={handleAiAssist}
               style={{
@@ -568,7 +568,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           }}>
             {/* Status (Column) Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Status
               </span>
               <select
@@ -592,7 +592,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
             {/* Priority Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Priority
               </span>
               <select
@@ -617,7 +617,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
             {/* Due Date Picker & Done Checkbox */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Due Date
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -656,7 +656,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
             {/* Tag Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)', position: 'relative' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Tags
               </span>
               <button
@@ -859,7 +859,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             {/* Cover Color Selector */}
             {/* Cover Color & Display Mode Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Cover Color & Mode
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -993,7 +993,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
             {/* Template Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Is Template?
               </span>
               <div style={{ display: 'flex', alignItems: 'center', height: '100%', minHeight: '36px' }}>
@@ -1024,7 +1024,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               borderBottom: '1px solid var(--color-surface-offset)',
               paddingBottom: 'var(--space-2)'
             }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Description (Markdown)
               </span>
               
@@ -1169,7 +1169,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 gap: 'var(--space-3)',
                 marginTop: 'var(--space-2)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <div className="row">
                   <Sparkles size={14} style={{ color: 'var(--color-secondary)' }} />
                   <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Game Dev: Texture Tooling Detected
@@ -1178,7 +1178,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
                   This ticket references local texture files. You can generate Normal/Height/Roughness/AO maps, or blend them into seamless tiling textures.
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="col">
                   {paths.map((path, idx) => {
                     const fileName = path.split('/').pop() || path;
                     return (
@@ -1271,13 +1271,13 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
           {/* Relations Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            <span className="label-caps">
               Linked Relations
             </span>
 
             {/* Relations list */}
             {relations.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div className="col">
                 {relations.map(rel => {
                   const isFromCurrent = rel.from_id === cardId
                   const peerId = isFromCurrent ? rel.to_id : rel.from_id
@@ -1302,7 +1302,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                         fontSize: 'var(--text-xs)'
                       }}
                     >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <span className="row">
                         <Link2 size={12} style={{ color: 'var(--color-text-muted)' }} />
                         <span style={{ color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>{label}</span>
                         <span style={{ color: 'var(--color-text-base)' }}>Item #{peerId.substring(0, 8)}</span>
@@ -1413,7 +1413,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
           {/* Sub-Task Checklist Segment */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="row-between">
               <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <CheckSquare size={13} style={{ color: 'var(--color-secondary)' }} />
                 Sub-Task Checklist
@@ -1698,7 +1698,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             
             {/* Comments Thread */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Discussion
               </span>
 
@@ -1764,7 +1764,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                       gap: '4px'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="row-between">
                       <strong style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>{c.user}</strong>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>

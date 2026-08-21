@@ -62,45 +62,36 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         aria-live="polite"
         style={{
           position: 'fixed',
-          bottom: 'var(--space-6, 24px)',
+          bottom: 'var(--space-6)',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 9999,
           display: 'flex',
           flexDirection: 'column',
-          gap: 'var(--space-2, 8px)',
+          gap: 'var(--space-2)',
           pointerEvents: 'none'
         }}
       >
-        <style>{`
-          @keyframes toast-in {
-            from { opacity: 0; transform: translateY(12px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-          }
-          .toast-item {
-            animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-        `}</style>
         {toasts.map(t => {
-          let typeColor = 'var(--color-text-base, #ffffff)'
-          if (t.type === 'success') typeColor = 'var(--color-success, #10b981)'
-          if (t.type === 'error') typeColor = 'var(--color-error, #ef4444)'
-          if (t.type === 'warning') typeColor = 'var(--color-warning, #f59e0b)'
+          let typeColor = 'var(--color-text-base)'
+          if (t.type === 'success') typeColor = 'var(--color-success)'
+          if (t.type === 'error') typeColor = 'var(--color-error)'
+          if (t.type === 'warning') typeColor = 'var(--color-warning)'
 
           return (
             <div
               key={t.id}
               className="toast-item"
               style={{
-                background: 'var(--color-surface-elevated, #1b2035)',
-                border: '1px solid var(--color-surface-offset, #2c324c)',
-                borderRadius: 'var(--radius-md, 6px)',
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)',
                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)',
-                padding: 'var(--space-3, 12px) var(--space-4, 16px)',
+                padding: 'var(--space-3) var(--space-4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: 'var(--space-6, 24px)',
+                gap: 'var(--space-6)',
                 pointerEvents: 'auto',
                 minWidth: '280px',
                 maxWidth: '420px'
@@ -108,8 +99,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             >
               <span style={{
                 color: typeColor,
-                fontSize: 'var(--text-sm, 14px)',
-                fontWeight: 'var(--weight-normal, 400)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--weight-normal)',
                 lineHeight: 1.4,
                 wordBreak: 'break-word'
               }}>
@@ -125,10 +116,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: 'var(--color-secondary, #3b82f6)',
+                    color: 'var(--color-secondary)',
                     cursor: 'pointer',
-                    fontSize: 'var(--text-sm, 14px)',
-                    fontWeight: 'var(--weight-bold, 700)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 'var(--weight-bold)',
                     padding: 0,
                     whiteSpace: 'nowrap'
                   }}

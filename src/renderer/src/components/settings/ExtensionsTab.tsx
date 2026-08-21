@@ -98,7 +98,7 @@ export default function ExtensionsTab() {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="row-between">
         <div>
           <h3 style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)' }}>
             User Plugins
@@ -213,7 +213,7 @@ export default function ExtensionsTab() {
                 }}
               >
                 <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <div className="row">
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
                       {p.name}
                     </span>

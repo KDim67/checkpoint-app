@@ -1165,7 +1165,7 @@ export default function ChatInput({
           <button
             onClick={onAbort}
             style={{
-              background: 'var(--color-error, #ef4444)',
+              background: 'var(--color-error)',
               border: 'none',
               color: 'var(--color-text-inverted)',
               borderRadius: 'var(--radius-md)',

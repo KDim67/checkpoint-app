@@ -74,14 +74,6 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
           animation: modal-scale-in 250ms var(--ease-spring);
         }
-        @keyframes modal-fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes modal-scale-in {
-          from { transform: scale(0.93); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
       `}</style>
 
       <form
@@ -93,7 +85,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
         aria-modal="true"
         aria-labelledby="col-modal-title"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div className="row">
           <Plus style={{ color: 'var(--color-secondary)' }} size={20} />
           <h2 id="col-modal-title" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>
             Create Custom Column
@@ -169,7 +161,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
         </div>
 
         {/* Column Theme & Mode */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
             Column Theme & Display Mode
           </label>

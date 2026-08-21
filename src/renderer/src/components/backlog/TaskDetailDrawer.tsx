@@ -359,7 +359,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             <button
               onClick={handleAiAssist}
               style={{
@@ -455,7 +455,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           }}>
             {/* Status (Column) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Status
               </span>
               <select
@@ -479,7 +479,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
             {/* Priority */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Priority
               </span>
               <select
@@ -504,7 +504,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
             {/* Due Date */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Due Date
               </span>
               <input
@@ -525,7 +525,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
             {/* Time Estimate */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Time Estimate (Hours)
               </span>
               <input
@@ -549,7 +549,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
             {/* Tag Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)', position: 'relative', gridColumn: 'span 2' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Tags
               </span>
               <button
@@ -750,8 +750,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           </div>
 
           {/* Sub-tasks Checklist */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+          <div className="col">
+            <span className="label-caps">
               Sub-Tasks Checklist
             </span>
 
@@ -840,7 +840,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               borderBottom: '1px solid var(--color-surface-offset)',
               paddingBottom: 'var(--space-2)'
             }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <span className="label-caps">
                 Description (Markdown)
               </span>
 
@@ -952,12 +952,12 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
           {/* Relations Section */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            <span className="label-caps">
               Linked Relations
             </span>
 
             {relations.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div className="col">
                 {relations.map(rel => {
                   const isFromCurrent = rel.from_id === taskId
                   const peerId = isFromCurrent ? rel.to_id : rel.from_id
@@ -981,7 +981,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                         fontSize: 'var(--text-xs)'
                       }}
                     >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <span className="row">
                         <Link2 size={12} style={{ color: 'var(--color-text-muted)' }} />
                         <span style={{ color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>{label}</span>
                         <span style={{ color: 'var(--color-text-base)' }}>Item #{peerId.substring(0, 8)}</span>

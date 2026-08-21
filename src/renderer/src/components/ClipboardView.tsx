@@ -531,7 +531,7 @@ export default function ClipboardView() {
           gap: 'var(--space-3)',
           background: 'var(--color-surface-1)'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="row-between">
             <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: 0 }}>
               <Clipboard size={18} color="var(--color-primary)" />
               Clipboard History
@@ -638,7 +638,7 @@ export default function ClipboardView() {
           flexDirection: 'column',
           gap: 'var(--space-3)'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="row-between">
             <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: 0 }}>
               <Star size={16} color="var(--color-secondary)" fill="var(--color-secondary)" />
               Pinned Snippets

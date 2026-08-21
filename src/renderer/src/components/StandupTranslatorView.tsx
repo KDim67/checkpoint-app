@@ -450,19 +450,11 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
       aria-labelledby="standup-modal-title"
     >
       <style>{`
-        @keyframes modal-fade-in {
-          from { opacity: 0; transform: scale(0.97); }
-          to { opacity: 1; transform: scale(1); }
-        }
         .pulse-caret::after {
           content: '▊';
           color: var(--color-secondary);
           animation: caret-blink 0.8s infinite;
           margin-left: 2px;
-        }
-        @keyframes caret-blink {
-          0%, 100% { opacity: 0; }
-          50% { opacity: 1; }
         }
       `}</style>
 
@@ -475,7 +467,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
           maxWidth: '950px',
           height: '85vh',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
-          animation: 'modal-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          animation: 'modal-pop-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
@@ -727,7 +719,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                   <span style={{ fontSize: '10px', opacity: 0.6 }}>Add scratchpad logs to populate the list.</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="col">
                   {logs.map(log => {
                     const isSelected = selectedLogIds.includes(log.id)
                     return (

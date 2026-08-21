@@ -143,7 +143,7 @@ export default function ThemeCustomizer() {
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-4)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="row-between">
           <div>
             <h3 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
               Enable Customizer Engine
@@ -193,7 +193,7 @@ export default function ThemeCustomizer() {
                   {info.desc}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 <ColorPicker
                   value={themeVars[name]}
                   onCommit={val => handleColorChange(name, val)}

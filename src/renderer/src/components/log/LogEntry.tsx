@@ -120,7 +120,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
     >
       {/* Header Info */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div className="row">
           {isPinned && (
             <span style={{
               display: 'flex',
@@ -372,7 +372,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="row">
               <ArrowRightLeft style={{ color: 'var(--color-secondary)' }} size={20} />
               <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>
                 Promote to Kanban Card

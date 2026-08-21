@@ -186,7 +186,7 @@ export default function HotkeyBinder() {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <div className="row">
                 {isRecording ? (
                   <input
                     type="text"

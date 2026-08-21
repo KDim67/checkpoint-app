@@ -324,16 +324,8 @@ export default function HudView() {
           color: var(--color-text-muted);
           animation: slide-down 150ms var(--ease-enter);
         }
-        @keyframes slide-down {
-          from { transform: translateY(-8px); opacity: 0; }
-          to   { transform: translateY(0); opacity: 1; }
-        }
         .animate-spin {
           animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
         }
       `}</style>
 

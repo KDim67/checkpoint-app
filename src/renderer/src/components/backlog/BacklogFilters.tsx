@@ -74,7 +74,7 @@ export default function BacklogFilters({
       marginBottom: 'var(--space-4)'
     }}>
       {/* Title / Action Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="row-between">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-text-base)' }}>
           <Filter size={14} />
           <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>
@@ -109,7 +109,7 @@ export default function BacklogFilters({
         gap: 'var(--space-4)'
       }}>
         {/* Status Multi-Select */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Workflow Stages
           </span>
@@ -146,7 +146,7 @@ export default function BacklogFilters({
         </div>
 
         {/* Priority Multi-Select */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Priority
           </span>
@@ -181,7 +181,7 @@ export default function BacklogFilters({
         </div>
 
         {/* Tags Multi-Select */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Tags
           </span>
@@ -226,7 +226,7 @@ export default function BacklogFilters({
         </div>
 
         {/* Due Date Range */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Due Date Range
           </span>
@@ -276,7 +276,7 @@ export default function BacklogFilters({
         </div>
 
         {/* Links / Relations Filter */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Link Relations
           </span>
