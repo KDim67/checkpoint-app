@@ -99,11 +99,19 @@ interface WorkspaceFileInfo {
   size: number
 }
 
-// Rough, fast token estimate (no tokenizer dependency): ~4 chars/token is a
-// reasonable approximation for English + code text across most BPE vocabularies.
+// Rough, fast token estimate, no tokenizer dependency.
+//
+// A flat 4 chars/token holds for Latin prose but understates CJK badly: those
+// codepoints cost roughly a token each, so a Chinese conversation was reported
+// at a quarter of its real size and blew the context window without warning.
+// Counted separately, then combined.
+const CJK_RE = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/g
+
 function estimateTokens(text: string): number {
   if (!text) return 0
-  return Math.ceil(text.length / 4)
+  const cjkCount = text.match(CJK_RE)?.length ?? 0
+  const rest = text.length - cjkCount
+  return Math.ceil(cjkCount + rest / 4)
 }
 
 /**
@@ -1813,11 +1821,11 @@ Output a \`\`\`json:update_board block of this shape:
   // Rough context-window usage estimate for the Token Budget Indicator.
   const tokenUsage = (() => {
     const contextWindowTokens = modelCaps.contextTokens
-    const historyChars = messages.reduce((sum, m) => sum + m.content.length, 0)
+    const historyTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0)
     const baseOverheadTokens = 900 // base system prompt + live board state scaffolding
     const skillTokens = activeSkillId ? estimateTokens(getSkillById(activeSkillId)?.systemPrompt || '') : 0
     const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, modelBudget.workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
-    const used = Math.ceil(historyChars / 4) + estimateTokens(inputValue) + baseOverheadTokens + skillTokens + workspaceTokens
+    const used = historyTokens + estimateTokens(inputValue) + baseOverheadTokens + skillTokens + workspaceTokens
     const ratio = Math.min(1, used / contextWindowTokens)
     return { used, ratio }
   })()

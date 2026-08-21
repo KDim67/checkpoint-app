@@ -350,6 +350,133 @@ const ATTEMPTS: Record<Method, typeof attemptTools> = {
   text: attemptText
 }
 
+// Batched generation for the smallest models
+//
+// A 2B model can reliably emit one small object. It cannot reliably emit a
+// board of a dozen cards, each with a status, a priority and coloured tags, in
+// a single response, it truncates, drops required keys, or abandons JSON
+// partway. Splitting the work into an outline pass plus one small pass per item
+// trades several cheap round-trips for an answer that actually validates.
+
+/** Hard ceiling on items requested from a tiny model, to bound the round-trips. */
+const BATCH_ITEM_CAP = 8
+
+const OUTLINE_HINT = `Respond with ONLY this JSON object and nothing else:
+{ "message": "one short sentence", "titles": ["First item", "Second item"] }
+Titles only, no descriptions, no nested objects.`
+
+interface BatchContext {
+  client: OpenAI
+  model: string
+  messages: OpenAI.Chat.ChatCompletionMessageParam[]
+  temperature: number
+  signal: AbortSignal
+  caps: ModelCapabilities
+}
+
+/** One small request, parsed and returned raw; null when it produced nothing usable. */
+async function askSmall(
+  ctx: BatchContext,
+  instruction: string,
+  hint: string
+): Promise<Record<string, unknown> | null> {
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    ...ctx.messages,
+    { role: 'system', content: `${instruction}
+
+${hint}` }
+  ]
+  try {
+    const resp = await ctx.client.chat.completions.create({
+      model: ctx.model,
+      messages,
+      ...temperatureParam(ctx.caps, ctx.temperature),
+      ...tokenLimitParam(ctx.caps, 700),
+      response_format: { type: 'json_object' }
+    } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming, { signal: ctx.signal }) as OpenAI.Chat.ChatCompletion
+    const parsed = extractJson(resp.choices[0]?.message?.content || '')
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
+  } catch (err) {
+    if (isAbortError(err)) throw err
+    // A schema-constrained retry without response_format, for endpoints that
+    // reject the parameter outright rather than ignoring it.
+    try {
+      const resp = await ctx.client.chat.completions.create({
+        model: ctx.model,
+        messages,
+        ...temperatureParam(ctx.caps, ctx.temperature),
+        ...tokenLimitParam(ctx.caps, 700)
+      } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming, { signal: ctx.signal }) as OpenAI.Chat.ChatCompletion
+      const parsed = extractJson(resp.choices[0]?.message?.content || '')
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
+    } catch (inner) {
+      if (isAbortError(inner)) throw inner
+      return null
+    }
+  }
+}
+
+
+/**
+ * Board and plan in outline-then-detail passes. Dialogue is deliberately absent:
+ * its nodes reference each other by id, so generating them independently would
+ * produce dangling targets, exactly the failure the schema exists to prevent.
+ */
+async function generateBatched(
+  ctx: BatchContext,
+  kind: AiStructuredKind
+): Promise<AiStructuredResult> {
+  if (kind !== 'board' && kind !== 'plan') return { ok: false, error: 'not batchable' }
+
+  const noun = kind === 'board' ? 'cards' : 'steps'
+  const outline = await askSmall(
+    ctx,
+    `List the ${noun} to create, as short titles only. At most ${BATCH_ITEM_CAP}.`,
+    OUTLINE_HINT
+  )
+
+  const titles = Array.isArray(outline?.titles)
+    ? (outline.titles as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+    : []
+  if (titles.length === 0) return { ok: false, error: `Model produced no ${noun} outline.` }
+
+  const capped = titles.slice(0, BATCH_ITEM_CAP)
+  const items: Record<string, unknown>[] = []
+
+  for (const title of capped) {
+    const detail = kind === 'board'
+      ? await askSmall(
+          ctx,
+          `Describe ONLY this one card: "${title}". Pick its column from the board state above.`,
+          `Respond with ONLY this JSON object:
+{ "title": "${title}", "body": "one concrete sentence", "status": "<column name>", "priority": 2, "tags": [ { "name": "topic", "color": "#3b82f6" } ] }`
+        )
+      : await askSmall(
+          ctx,
+          `Describe ONLY this one step: "${title}".`,
+          `Respond with ONLY this JSON object:
+{ "title": "${title}", "details": "specific enough to start immediately" }`
+        )
+
+    // A model that fumbles one item should not lose the whole board, so the
+    // title is kept with a placeholder body rather than dropped.
+    items.push(detail && typeof detail.title === 'string'
+      ? detail
+      : kind === 'board'
+        ? { title, body: '', status: '', priority: 2, tags: [] }
+        : { title, details: '' })
+  }
+
+  const message = typeof outline?.message === 'string' ? outline.message : undefined
+  const assembled = kind === 'board'
+    ? { message, cards: items }
+    : { message, title: message || 'Implementation Plan', overview: '', steps: items }
+
+  const validation = validateStructured(kind, assembled)
+  if (!validation.ok) return { ok: false, error: `Batched generation still invalid, ${validation.error}` }
+  return { ok: true, data: validation.data, method: 'batched' }
+}
+
 /**
  * Generates a structured result for the given kind, using the strongest method
  * the endpoint supports. Returns the parsed object plus which method worked.
@@ -370,6 +497,20 @@ export async function generateStructured(
   // Start from what the model is known to support rather than always probing
   // tool calling first, a tiny model fails that twice before reaching prose,
   // and each failure is a full round-trip on the slowest hardware in the range.
+  if (budget.batchStructured && (kind === 'board' || kind === 'plan')) {
+    try {
+      const batched = await generateBatched(
+        { client, model, messages: messages as OpenAI.Chat.ChatCompletionMessageParam[], temperature: temp, signal, caps },
+        kind
+      )
+      if (batched.ok) return batched
+      console.warn('Batched generation unusable, falling back to single-shot:', batched.error)
+    } catch (err) {
+      if (isAbortError(err)) return { ok: false, error: 'aborted' }
+      console.warn('Batched generation threw, falling back to single-shot:', err)
+    }
+  }
+
   const supported = methodOrderForTier(caps.tier, caps) as Method[]
   const cached = capabilityCache.get(cacheKey)
   const order: Method[] = cached && supported.includes(cached)
