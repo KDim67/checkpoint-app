@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense, useCallback } from 'react'
+import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
 import { useAppStore, type ActiveView } from './store/appStore'
 import { Sidebar } from './components/Sidebar'
 import AiStreamPanel from './components/AiStreamPanel'
@@ -9,7 +9,8 @@ import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './components/settings/AppearanceSettings'
 import Lightbox from './components/ui/Lightbox'
-import { readViewFeatures, firstEnabledView } from './lib/features'
+import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
+import { getNumberSetting, setNumberSetting } from './lib/settings'
 
 // Lazy-loaded views (code split per view)
 const LogView      = lazy(() => import('./components/LogView'))
@@ -198,6 +199,12 @@ function RightPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
 
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
+
+  useEffect(() => {
+    getNumberSetting('right_panel_width', DEFAULT_PANEL_WIDTH)
+      .then(w => setPanelWidth(clampPanelWidth(w)))
+      .catch(err => console.error('Failed to read right panel width:', err))
+  }, [])
   // State, not a ref: the width transition has to be switched off during a drag,
   // and a ref mutation does not re-render, so the animated value stayed live and
   // the panel lerped a frame behind the cursor.
@@ -219,6 +226,14 @@ function RightPanel() {
       document.body.style.cursor = ''
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
+      // Persisted on release rather than per-frame, to keep the drag off the
+      // IPC channel entirely.
+      setPanelWidth(w => {
+        setNumberSetting('right_panel_width', w).catch(err => {
+          console.error('Failed to save right panel width:', err)
+        })
+        return w
+      })
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -474,6 +489,20 @@ export default function App() {
     }
   }, [setAvailableContexts, setContextsList, setContext])
 
+  // Land on the configured start view before the redirect guard runs, so a
+  // restored view is not immediately bounced by checkEnabledViews.
+  const startViewAppliedRef = useRef(false)
+  useEffect(() => {
+    resolveStartView()
+      .then(view => {
+        if (view) setView(view)
+      })
+      .catch(err => console.error('Failed to resolve start view:', err))
+      .finally(() => {
+        startViewAppliedRef.current = true
+      })
+  }, [setView])
+
   useEffect(() => {
     loadContexts()
 
@@ -574,6 +603,7 @@ export default function App() {
 
   // Safeguard: redirect if the view we are on gets disabled in settings.
   const checkEnabledViews = useCallback(async () => {
+    if (!startViewAppliedRef.current) return
     try {
       const enabled = await readViewFeatures()
       if (!enabled[activeView]) {

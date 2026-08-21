@@ -1,10 +1,10 @@
-import { app, BrowserWindow, nativeImage, ipcMain, Menu, shell, globalShortcut, dialog, clipboard, protocol, net } from 'electron'
+import { app, BrowserWindow, nativeImage, ipcMain, Menu, shell, globalShortcut, dialog, clipboard, protocol, net, screen } from 'electron'
 import path, { join, relative, isAbsolute } from 'path'
 import fs, { writeFileSync, existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { ShortcutMap } from '../shared/types'
-import { getSetting, closeDb } from './db'
+import { getSetting, setSetting, closeDb } from './db'
 import { enableHud, disableHud } from './hud'
 import { initTitleBarSync, updateNativeTitleBarFromSettings } from './titleBarSync'
 import {
@@ -150,15 +150,91 @@ function openExternalSafely(url: string): void {
   })
 }
 
+interface WindowBounds {
+  width: number
+  height: number
+  x?: number
+  y?: number
+  maximized?: boolean
+}
+
+const DEFAULT_BOUNDS: WindowBounds = { width: 1280, height: 800 }
+
+/**
+ * Restores the saved bounds, but only if the window would still land on a
+ * connected display, otherwise unplugging a second monitor strands the app
+ * off-screen with no way to drag it back (the titlebar is custom).
+ */
+function loadWindowBounds(): WindowBounds {
+  try {
+    const raw = getSetting<string | null>('window_bounds', null)
+    if (!raw) return DEFAULT_BOUNDS
+    const saved = (typeof raw === 'string' ? JSON.parse(raw) : raw) as WindowBounds
+    if (!Number.isFinite(saved.width) || !Number.isFinite(saved.height)) return DEFAULT_BOUNDS
+
+    const bounds: WindowBounds = {
+      width: Math.max(800, Math.round(saved.width)),
+      height: Math.max(600, Math.round(saved.height)),
+      maximized: !!saved.maximized
+    }
+    const x = saved.x
+    const y = saved.y
+    if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
+      const visible = screen.getAllDisplays().some(d => {
+        const a = d.workArea
+        return x < a.x + a.width && x + bounds.width > a.x
+          && y < a.y + a.height && y + bounds.height > a.y
+      })
+      if (visible) {
+        bounds.x = Math.round(x)
+        bounds.y = Math.round(y)
+      }
+    }
+    return bounds
+  } catch (err) {
+    console.error('[index.ts] Failed to read window bounds:', err)
+    return DEFAULT_BOUNDS
+  }
+}
+
+let saveBoundsTimer: NodeJS.Timeout | null = null
+
+function saveWindowBoundsNow(): void {
+  if (saveBoundsTimer) {
+    clearTimeout(saveBoundsTimer)
+    saveBoundsTimer = null
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  try {
+    const maximized = mainWindow.isMaximized()
+    // getBounds() reports the maximized frame; persist the restore size so
+    // un-maximizing returns to the size the user actually chose.
+    const { width, height, x, y } = maximized ? mainWindow.getNormalBounds() : mainWindow.getBounds()
+    setSetting('window_bounds', JSON.stringify({ width, height, x, y, maximized }))
+  } catch (err) {
+    console.error('[index.ts] Failed to save window bounds:', err)
+  }
+}
+
+/** Debounced: resize and move fire continuously while dragging. */
+function scheduleSaveWindowBounds(): void {
+  if (saveBoundsTimer) clearTimeout(saveBoundsTimer)
+  saveBoundsTimer = setTimeout(saveWindowBoundsNow, 400)
+}
+
 function createWindow(): void {
   const preloadPath = join(__dirname, '../preload/index.mjs')
   const iconPath = join(__dirname, '../../resources/icon.ico')
   const appIcon = nativeImage.createFromPath(iconPath)
 
+  const bounds = loadWindowBounds()
+
   mainWindow = new BrowserWindow({
     icon: appIcon,
-    width: 1280,
-    height: 800,
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
     minWidth: 800,
     minHeight: 600,
     show: false,                    // show: false prevents white flash on startup
@@ -189,6 +265,7 @@ function createWindow(): void {
     if (hasShown || !mainWindow || mainWindow.isDestroyed()) return
     hasShown = true
     clearTimeout(revealTimeout)    // cancel safety fallback if an event fires first
+    if (bounds.maximized) mainWindow.maximize()
     mainWindow.show()
     mainWindow.focus()
   }
@@ -196,6 +273,13 @@ function createWindow(): void {
   const revealTimeout = setTimeout(revealWindow, 8000)
   mainWindow.on('ready-to-show', revealWindow)
   mainWindow.webContents.on('did-finish-load', revealWindow)
+
+  mainWindow.on('resize', scheduleSaveWindowBounds)
+  mainWindow.on('move', scheduleSaveWindowBounds)
+  mainWindow.on('maximize', scheduleSaveWindowBounds)
+  mainWindow.on('unmaximize', scheduleSaveWindowBounds)
+  // Flush before teardown, or a resize inside the debounce window is lost.
+  mainWindow.on('close', saveWindowBoundsNow)
 
   // Null reference on close, allows V8 garbage collection of the window
   mainWindow.on('closed', () => {

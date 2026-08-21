@@ -40,6 +40,14 @@ import ThemeCustomizer from './settings/ThemeCustomizer'
 import HotkeyBinder from './settings/HotkeyBinder'
 import ExtensionsTab from './settings/ExtensionsTab'
 import { useToast } from './ui/Toast'
+import {
+  VIEW_FEATURES,
+  readViewFeatures,
+  defaultViewEnabledMap,
+  START_VIEW_LAST_USED,
+  type ViewEnabledMap
+} from '../lib/features'
+import { getStringSetting, setStringSetting } from '../lib/settings'
 import { useAppStore } from '../store/appStore'
 import {
   loadProviders, persistProviders, activateProvider, providerFromPreset,
@@ -966,13 +974,17 @@ function GeneralSettings() {
   const availableContexts = useAppStore(s => s.availableContexts)
 
   const [defaultContext, setDefaultContext] = useState<string>('')
+  const [startView, setStartView] = useState<string>(START_VIEW_LAST_USED)
+  const [enabledViews, setEnabledViews] = useState<ViewEnabledMap>(defaultViewEnabledMap)
 
   useEffect(() => {
     const load = async () => {
       const dc = await window.electronAPI.db.getSetting('default_context')
       if (typeof dc === 'string') setDefaultContext(dc)
+      setStartView(await getStringSetting('start_view', START_VIEW_LAST_USED))
+      setEnabledViews(await readViewFeatures())
     }
-    load()
+    load().catch(err => console.error('Failed to load general settings:', err))
   }, [])
 
   return (
@@ -1002,6 +1014,37 @@ function GeneralSettings() {
           <option value="">Last used (default)</option>
           {availableContexts.map(ctx => (
             <option key={ctx} value={ctx}>{ctx}</option>
+          ))}
+        </select>
+      </FieldRow>
+
+      <FieldRow
+        label="Startup View"
+        hint="The screen shown when the app opens. Disabled views are not listed, and a view turned off later falls back to the first one still enabled."
+      >
+        <select
+          value={startView}
+          onChange={e => {
+            setStartView(e.target.value)
+            setStringSetting('start_view', e.target.value).catch(err => {
+              console.error('Failed to save start_view setting:', err)
+            })
+          }}
+          style={{
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-surface-offset)',
+            color: 'var(--color-text-base)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-2) var(--space-3)',
+            fontSize: 'var(--text-sm)',
+            outline: 'none',
+            cursor: 'pointer',
+            width: '100%'
+          }}
+        >
+          <option value={START_VIEW_LAST_USED}>Last used (default)</option>
+          {VIEW_FEATURES.filter(f => enabledViews[f.view]).map(f => (
+            <option key={f.view} value={f.view}>{f.label}</option>
           ))}
         </select>
       </FieldRow>

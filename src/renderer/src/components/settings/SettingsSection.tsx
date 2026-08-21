@@ -143,16 +143,20 @@ export function SettingsInput({
 export function ToggleSwitch({
   checked,
   onChange,
-  disabled = false
+  disabled = false,
+  label
 }: {
   checked: boolean
   onChange: (v: boolean) => void
   disabled?: boolean
+  /** Accessible name. The switch renders no text, so without it screen readers announce nothing. */
+  label?: string
 }) {
   return (
     <button
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}
       style={{

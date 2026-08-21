@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { TIMER_PRESETS, MODE_TITLES, formatTime, isFocusInterval } from './pomodoroTimer'
+import { MODE_TITLES, formatTime, isFocusInterval, durationMsFor } from './pomodoroTimer'
+import { loadFocusSettings } from '../../lib/focusSettings'
 
 /**
  * Mounted once at the app root (outside FocusView) so a running focus/break
@@ -22,6 +23,17 @@ export default function FocusTimerEngine(): null {
   const titleShownRef = useRef<string | null>(null)
 
   useEffect(() => {
+    const apply = () => {
+      loadFocusSettings()
+        .then(useAppStore.getState().focusApplySettings)
+        .catch(err => console.error('Failed to load focus settings:', err))
+    }
+    apply()
+    window.addEventListener('settings-update-focus', apply)
+    return () => window.removeEventListener('settings-update-focus', apply)
+  }, [])
+
+  useEffect(() => {
     baseTitleRef.current = document.title
     return () => {
       audioCtxRef.current?.close()
@@ -33,7 +45,7 @@ export default function FocusTimerEngine(): null {
     }
   }, [])
 
-  const playChime = () => {
+  const playChime = (volume: number) => {
     try {
       if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
         audioCtxRef.current = new AudioContext()
@@ -47,7 +59,7 @@ export default function FocusTimerEngine(): null {
         osc.type = 'sine'
         osc.frequency.setValueAtTime(freq, start)
         gain.gain.setValueAtTime(0, start)
-        gain.gain.linearRampToValueAtTime(0.2, start + 0.05)
+        gain.gain.linearRampToValueAtTime(volume, start + 0.05)
         gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
         osc.start(start)
         osc.stop(start + duration)
@@ -85,26 +97,28 @@ export default function FocusTimerEngine(): null {
     }
   }
 
+  // Only ticks while a session is on screen. Subscribing to focusStep rather
+  // than reading it inside the tick keeps the interval off the event loop
+  // entirely for the rest of the app's lifetime.
+  const focusStep = useAppStore(s => s.focusStep)
+
   useEffect(() => {
+    if (focusStep !== 'active') return
+
     const interval = setInterval(() => {
       const state = useAppStore.getState()
 
       // Glanceable window/taskbar title
       // Mirror the live countdown into document.title so a backgrounded
-      // session is still visible at a glance (e.g. "24:31 · Focus"). Restore
-      // the original title the moment the session leaves the active screen.
-      if (state.focusStep === 'active') {
-        const remainMs = state.focusIsRunning && state.focusEndAt !== null
-          ? Math.max(0, state.focusEndAt - Date.now())
-          : state.focusRemainingMs
-        const nextTitle = `${state.focusIsRunning ? '' : '⏸ '}${formatTime(remainMs)} · ${MODE_TITLES[state.focusPreset]}`
-        if (nextTitle !== titleShownRef.current) {
-          document.title = nextTitle
-          titleShownRef.current = nextTitle
-        }
-      } else if (titleShownRef.current !== null) {
-        document.title = baseTitleRef.current
-        titleShownRef.current = null
+      // session is still visible at a glance (e.g. "24:31 · Focus"). The
+      // effect cleanup restores it when the session leaves the active step.
+      const remainMs = state.focusIsRunning && state.focusEndAt !== null
+        ? Math.max(0, state.focusEndAt - Date.now())
+        : state.focusRemainingMs
+      const nextTitle = `${state.focusIsRunning ? '' : '⏸ '}${formatTime(remainMs)} · ${MODE_TITLES[state.focusPreset]}`
+      if (nextTitle !== titleShownRef.current) {
+        document.title = nextTitle
+        titleShownRef.current = nextTitle
       }
 
       if (!state.focusIsRunning || state.focusEndAt === null) return
@@ -117,10 +131,11 @@ export default function FocusTimerEngine(): null {
 
       // Timer hit zero. focusFinish() nulls focusEndAt, so the guard above
       // short-circuits every later tick, no re-entry flag needed.
+      const settings = state.focusSettings
       const isFocus = isFocusInterval(state.focusPreset)
       state.focusFinish()
-      playChime()
-      notifyCompletion(isFocus)
+      if (settings.chimeEnabled) playChime(settings.chimeVolume)
+      if (settings.notificationsEnabled) notifyCompletion(isFocus)
 
       if (isFocus) {
         // Focus intervals route to the retrospective so progress gets logged
@@ -131,15 +146,29 @@ export default function FocusTimerEngine(): null {
         // with the mode reset to Focus so the next round is one click away.
         state.focusSetStep('setup')
         state.focusSetPreset('focus')
-        state.focusConfigureDuration(TIMER_PRESETS.focus.durationMs)
-        toast('Break complete! Ready for another focus interval whenever you are.', {
-          type: 'info'
-        })
+        state.focusConfigureDuration(durationMsFor(settings, 'focus'))
+        // Auto-start applies only to the break→focus edge. Doing it after a
+        // focus interval would skip straight past the retrospective, which is
+        // the point of routing there.
+        if (settings.autoStartNext) {
+          state.focusStart(durationMsFor(settings, 'focus'))
+          toast('Break complete, next focus interval started.', { type: 'info' })
+        } else {
+          toast('Break complete! Ready for another focus interval whenever you are.', {
+            type: 'info'
+          })
+        }
       }
     }, 250)
 
-    return () => clearInterval(interval)
-  }, [toast])
+    return () => {
+      clearInterval(interval)
+      if (titleShownRef.current !== null) {
+        document.title = baseTitleRef.current
+        titleShownRef.current = null
+      }
+    }
+  }, [focusStep, toast])
 
   return null
 }

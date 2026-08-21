@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { Item } from '../../../shared/types'
-import { isFocusInterval, type TimerMode } from '../components/focus/pomodoroTimer'
+import {
+  isFocusInterval,
+  DEFAULT_FOCUS_SETTINGS,
+  type TimerMode,
+  type FocusSettings
+} from '../components/focus/pomodoroTimer'
 
 export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
@@ -62,6 +67,7 @@ interface AppState {
   focusElapsedMs: number          // total time actually spent running, for stats/log
   focusCyclesCompleted: number    // completed focus intervals since app open (for pomodoro dots)
   focusDistractions: number       // interruptions tallied during the current focus interval
+  focusSettings: FocusSettings    // user-configured lengths, cadence, chime and notifications
 
   // Actions
   setView: (view: ActiveView) => void
@@ -91,6 +97,7 @@ interface AppState {
   focusLogDistraction: () => void
   focusStop: () => void
   focusExitToSetup: () => void
+  focusApplySettings: (settings: FocusSettings) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -121,11 +128,20 @@ export const useAppStore = create<AppState>()(
     focusElapsedMs: 0,
     focusCyclesCompleted: 0,
     focusDistractions: 0,
+    focusSettings: DEFAULT_FOCUS_SETTINGS,
 
-    setView: (view: ActiveView) =>
+    setView: (view: ActiveView) => {
       set(state => {
         state.activeView = view
-      }),
+      })
+      // Remembered so "Start on: Last used" can restore it next launch.
+      // Settings is deliberately not recorded, nobody wants to boot into it.
+      if (view !== 'settings') {
+        window.electronAPI.db.setSetting('last_active_view', view).catch(err => {
+          console.error('Failed to save last_active_view setting:', err)
+        })
+      }
+    },
 
     setContext: (context: string) => {
       set(state => {
@@ -317,6 +333,19 @@ export const useAppStore = create<AppState>()(
         state.focusEndAt = null
         state.focusRemainingMs = state.focusDurationMs
         state.focusElapsedMs = 0
+      }),
+
+    // Applied once at boot and again whenever the Focus settings are edited.
+    // A running session keeps its current length; the new one takes effect on
+    // the next interval, so changing a duration mid-session is not disruptive.
+    focusApplySettings: (settings: FocusSettings) =>
+      set(state => {
+        state.focusSettings = settings
+        if (!state.focusIsRunning && state.focusStep === 'setup' && state.focusPreset !== 'custom') {
+          const ms = settings.durations[state.focusPreset] * 60 * 1000
+          state.focusDurationMs = ms
+          state.focusRemainingMs = ms
+        }
       }),
 
     // Full reset: used after discarding/saving a retrospective, clears the

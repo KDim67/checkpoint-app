@@ -3,13 +3,39 @@ import { Play, Pause, X, Check, Timer, Award, ArrowRight, BookOpen, RotateCcw, S
 import { useAppStore } from '../store/appStore'
 import { useToast } from './ui/Toast'
 import type { Item, FocusSession } from '../../../shared/types'
-import { TIMER_PRESETS, formatTime, type TimerPreset } from './focus/pomodoroTimer'
+import { TIMER_PRESETS, formatTime, durationMsFor, type TimerPreset, type FocusSettings } from './focus/pomodoroTimer'
+import {
+  saveFocusDuration,
+  saveLongBreakInterval,
+  saveAutoStartNext,
+  saveChimeEnabled,
+  saveChimeVolume,
+  saveNotificationsEnabled
+} from '../lib/focusSettings'
+import { ToggleSwitch } from './settings/SettingsSection'
 import ConfirmDialog from './ui/ConfirmDialog'
 
 interface SelectedTask {
   id: string
   title: string
   completed: boolean
+}
+
+function FocusOptionToggle({
+  label,
+  checked,
+  onChange
+}: {
+  label: string
+  checked: boolean
+  onChange: (value: boolean) => void
+}) {
+  return (
+    <div className="row-between">
+      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{label}</span>
+      <ToggleSwitch checked={checked} onChange={onChange} label={label} />
+    </div>
+  )
 }
 
 export default function FocusView() {
@@ -29,6 +55,8 @@ export default function FocusView() {
   const isRunning = useAppStore(s => s.focusIsRunning)
   const elapsedTimeMs = useAppStore(s => s.focusElapsedMs)
   const cyclesCompleted = useAppStore(s => s.focusCyclesCompleted)
+  const focusSettings = useAppStore(s => s.focusSettings)
+  const focusApplySettings = useAppStore(s => s.focusApplySettings)
   const distractions = useAppStore(s => s.focusDistractions)
 
   const focusSetStep = useAppStore(s => s.focusSetStep)
@@ -83,7 +111,7 @@ export default function FocusView() {
         if (found) {
           focusSetSelectedTasks([found])
           focusSetPreset('focus')
-          focusStart(TIMER_PRESETS['focus'].durationMs)
+          focusStart(durationMsFor(useAppStore.getState().focusSettings, 'focus'))
           useAppStore.getState().setPreselectedTaskId(null)
           toast(`Started focus session for: ${found.title}`, { type: 'success' })
         }
@@ -122,8 +150,8 @@ export default function FocusView() {
     if (preset === 'custom') {
       return customMinutes * 60 * 1000
     }
-    return TIMER_PRESETS[preset].durationMs
-  }, [preset, customMinutes])
+    return durationMsFor(focusSettings, preset)
+  }, [preset, customMinutes, focusSettings])
 
   // Keep the configured duration in sync with the chosen preset while on setup
   useEffect(() => {
@@ -158,7 +186,7 @@ export default function FocusView() {
     } else {
       focusSetStep('setup')
       focusSetPreset('focus')
-      focusConfigureDuration(TIMER_PRESETS.focus.durationMs)
+      focusConfigureDuration(durationMsFor(focusSettings, 'focus'))
     }
   }
 
@@ -351,13 +379,35 @@ ${retroNotes.trim() || '_No custom notes written._'}`
     loadFocusData()
   }
 
+  const applyFocusOption = (patch: Partial<FocusSettings>, save: Promise<void>) => {
+    focusApplySettings({ ...focusSettings, ...patch })
+    save.catch(err => console.error('Failed to save focus setting:', err))
+  }
+
+  const handleCadenceChange = (value: number) => {
+    if (!Number.isFinite(value)) return
+    const clamped = Math.min(12, Math.max(2, Math.round(value)))
+    applyFocusOption({ longBreakInterval: clamped }, saveLongBreakInterval(clamped))
+  }
+
+  const handleDurationChange = (target: TimerPreset, minutes: number) => {
+    const next = {
+      ...focusSettings,
+      durations: { ...focusSettings.durations, [target]: minutes }
+    }
+    focusApplySettings(next)
+    saveFocusDuration(target, minutes).catch(err => {
+      console.error('Failed to save focus duration:', err)
+    })
+  }
+
   const handleStartBreak = async (breakPreset: Extract<TimerPreset, 'short-break' | 'long-break'>) => {
     const ok = await persistRetrospective()
     if (!ok) return
     toast('Session saved, enjoy your break', { type: 'success' })
     focusSetSelectedTasks([])
     focusSetPreset(breakPreset)
-    focusStart(TIMER_PRESETS[breakPreset].durationMs)
+    focusStart(durationMsFor(focusSettings, breakPreset))
     loadFocusData()
   }
 
@@ -374,7 +424,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
 
   // Classic Pomodoro cadence: after every 4th completed focus interval, a
   // long break is due instead of a short one.
-  const longBreakDue = cyclesCompleted > 0 && cyclesCompleted % 4 === 0
+  const longBreakDue = cyclesCompleted > 0 && cyclesCompleted % focusSettings.longBreakInterval === 0
 
   // Context color picker
   const activeColor = preset === 'focus' ? 'var(--color-secondary)' : (preset === 'short-break' ? '#10b981' : '#8b5cf6')
@@ -388,7 +438,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
     return { count: todaySessions.length, minutes: Math.round(totalMs / 60000) }
   }, [pastSessions])
 
-  const cycleDots = cyclesCompleted % 4
+  const cycleDots = cyclesCompleted % focusSettings.longBreakInterval
 
   return (
     <div
@@ -694,19 +744,19 @@ ${retroNotes.trim() || '_No custom notes written._'}`
             <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="row-between">
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', margin: 0 }}>Timer Config</h3>
-                {/* Pomodoro cycle progress, fills every completed focus interval, resets every 4th (long-break cadence) */}
+                {/* Fills one dot per completed focus interval, resetting each time a long break comes due */}
                 <div style={{ display: 'flex', gap: '4px' }} title={`${cyclesCompleted} focus intervals completed this session`}>
-                  {[0, 1, 2, 3].map(i => (
-                    <span key={i} className={`cycle-dot ${i < cycleDots || (cycleDots === 0 && cyclesCompleted > 0 && i < 4) ? 'filled' : ''}`} />
+                  {Array.from({ length: focusSettings.longBreakInterval }, (_, i) => i).map(i => (
+                    <span key={i} className={`cycle-dot ${i < cycleDots || (cycleDots === 0 && cyclesCompleted > 0 && i < focusSettings.longBreakInterval) ? 'filled' : ''}`} />
                   ))}
                 </div>
               </div>
 
               <div className="col">
-                {Object.entries(TIMER_PRESETS).map(([key, val]) => (
+                {(Object.keys(TIMER_PRESETS) as TimerPreset[]).map(key => (
                   <button
                     key={key}
-                    onClick={() => focusSetPreset(key as TimerPreset)}
+                    onClick={() => focusSetPreset(key)}
                     style={{
                       width: '100%',
                       padding: 'var(--space-3)',
@@ -719,15 +769,38 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                       textAlign: 'left',
                       cursor: 'pointer',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
+                      flexDirection: 'column',
+                      gap: 'var(--space-2)',
                       transition: 'all var(--duration-fast) var(--ease-default)'
                     }}
                   >
-                    <span>{val.label}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>
-                      {Math.round(val.durationMs / 60000)}m
-                    </span>
+                    <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{TIMER_PRESETS[key].label}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>
+                        {focusSettings.durations[key]}m
+                      </span>
+                    </div>
+
+                    {preset === key && (
+                      <input
+                        type="range"
+                        min="1"
+                        max="120"
+                        aria-label={`${TIMER_PRESETS[key].label} length in minutes`}
+                        value={focusSettings.durations[key]}
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => handleDurationChange(key, Number(e.target.value))}
+                        style={{
+                          width: '100%',
+                          accentColor: 'var(--color-secondary)',
+                          background: 'var(--color-surface-2)',
+                          height: '4px',
+                          borderRadius: '2px',
+                          cursor: 'pointer',
+                          marginTop: '4px'
+                        }}
+                      />
+                    )}
                   </button>
                 ))}
 
@@ -779,6 +852,71 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                     />
                   )}
                 </button>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <div className="row-between">
+                  <label htmlFor="focus-cadence" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    Long break every
+                  </label>
+                  <div className="row" style={{ gap: 'var(--space-2)' }}>
+                    <input
+                      id="focus-cadence"
+                      type="number"
+                      min="2"
+                      max="12"
+                      value={focusSettings.longBreakInterval}
+                      onChange={e => handleCadenceChange(Number(e.target.value))}
+                      style={{
+                        width: '52px',
+                        background: 'var(--color-surface-2)',
+                        border: '1px solid var(--color-surface-offset)',
+                        color: 'var(--color-text-base)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '2px var(--space-2)',
+                        fontSize: 'var(--text-xs)',
+                        fontFamily: 'var(--font-mono)',
+                        textAlign: 'right'
+                      }}
+                    />
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>intervals</span>
+                  </div>
+                </div>
+
+                <FocusOptionToggle
+                  label="Auto-start next interval"
+                  checked={focusSettings.autoStartNext}
+                  onChange={value => applyFocusOption({ autoStartNext: value }, saveAutoStartNext(value))}
+                />
+                <FocusOptionToggle
+                  label="Chime on completion"
+                  checked={focusSettings.chimeEnabled}
+                  onChange={value => applyFocusOption({ chimeEnabled: value }, saveChimeEnabled(value))}
+                />
+                {focusSettings.chimeEnabled && (
+                  <div className="row-between">
+                    <label htmlFor="focus-volume" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                      Chime volume
+                    </label>
+                    <input
+                      id="focus-volume"
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={Math.round(focusSettings.chimeVolume * 100)}
+                      onChange={e => {
+                        const volume = Number(e.target.value) / 100
+                        applyFocusOption({ chimeVolume: volume }, saveChimeVolume(volume))
+                      }}
+                      style={{ width: '120px', accentColor: 'var(--color-secondary)', cursor: 'pointer' }}
+                    />
+                  </div>
+                )}
+                <FocusOptionToggle
+                  label="Desktop notification"
+                  checked={focusSettings.notificationsEnabled}
+                  onChange={value => applyFocusOption({ notificationsEnabled: value }, saveNotificationsEnabled(value))}
+                />
               </div>
 
               <button
@@ -917,7 +1055,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                       disabled={isRunning}
                       onClick={() => {
                         focusSetPreset(pKey)
-                        focusStart(pConfig.durationMs)
+                        focusStart(durationMsFor(focusSettings, pKey))
                       }}
                       style={{
                         padding: '4px 12px',

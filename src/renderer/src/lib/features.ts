@@ -1,5 +1,5 @@
 import type { ActiveView } from '../store/appStore'
-import { getBoolSetting, setBoolSetting } from './settings'
+import { getBoolSetting, setBoolSetting, getStringSetting } from './settings'
 
 /**
  * The per-view feature flags, in sidebar order.
@@ -57,4 +57,24 @@ export async function setViewFeature(key: string, enabled: boolean): Promise<voi
 /** First enabled view in sidebar order, where to land when the current one is disabled. */
 export function firstEnabledView(enabled: ViewEnabledMap): ActiveView {
   return VIEW_FEATURES.find(f => enabled[f.view])?.view ?? 'settings'
+}
+
+export const START_VIEW_LAST_USED = 'last'
+
+/**
+ * Which view to land on at launch. 'last' replays the last view the user was
+ * on; anything else is a pinned choice. Either way the result is checked
+ * against the feature flags, so a disabled view can never be the landing spot.
+ */
+export async function resolveStartView(): Promise<ActiveView | null> {
+  const [preference, lastView, enabled] = await Promise.all([
+    getStringSetting('start_view', START_VIEW_LAST_USED),
+    getStringSetting('last_active_view', ''),
+    readViewFeatures()
+  ])
+
+  const wanted = preference === START_VIEW_LAST_USED ? lastView : preference
+  const known = VIEW_FEATURES.find(f => f.view === wanted)
+  if (known && enabled[known.view]) return known.view
+  return firstEnabledView(enabled)
 }
