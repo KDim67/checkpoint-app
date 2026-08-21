@@ -7,6 +7,7 @@ import Database from 'better-sqlite3'
 import { getDb, getSetting, setSetting, initDb } from './db'
 
 let backupTimer: NodeJS.Timeout | null = null
+let initialCheckTimer: NodeJS.Timeout | null = null
 let isBackingUp = false
 
 async function compressFile(sourcePath: string, destinationPath: string): Promise<void> {
@@ -242,8 +243,9 @@ export function initializeBackupScheduler(): void {
     checkAndRunTimedBackup()
   }, checkInterval)
 
-  // Run initial check after a brief delay
-  setTimeout(() => {
+  // Run initial check after a brief delay, stored so it can be cancelled on early quit
+  initialCheckTimer = setTimeout(() => {
+    initialCheckTimer = null
     checkAndRunTimedBackup()
   }, 5000)
 }
@@ -280,6 +282,10 @@ async function checkAndRunTimedBackup() {
 }
 
 export function shutdownBackupScheduler(): void {
+  if (initialCheckTimer) {
+    clearTimeout(initialCheckTimer)
+    initialCheckTimer = null
+  }
   if (backupTimer) {
     clearInterval(backupTimer)
     backupTimer = null

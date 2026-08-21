@@ -8,15 +8,18 @@ const CONFIG_DIR = path.join(os.homedir(), '.config', 'checkpoint')
 const NOTES_DIR = path.join(CONFIG_DIR, 'notes')
 
 /**
- * Initializes the notes directory.
+ * Initializes the notes directory, idempotent and fast after first call.
  */
+let _notesFsReady = false
 export function initNotesFs(): void {
+  if (_notesFsReady) return
   if (!fs.existsSync(CONFIG_DIR)) {
     fs.mkdirSync(CONFIG_DIR, { recursive: true })
   }
   if (!fs.existsSync(NOTES_DIR)) {
     fs.mkdirSync(NOTES_DIR, { recursive: true })
   }
+  _notesFsReady = true
 }
 
 /**

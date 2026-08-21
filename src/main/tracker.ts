@@ -157,6 +157,11 @@ while ($true) {
       let stdoutBuffer = ''
       trackerProcess.stdout?.on('data', (chunk: string) => {
         stdoutBuffer += chunk
+        // Safety cap: if buffer grows past 64KB without a newline, discard it
+        if (stdoutBuffer.length > 65536) {
+          console.warn('[Tracker] stdout buffer overflow, discarding')
+          stdoutBuffer = ''
+        }
         let newlineIndex: number
         while ((newlineIndex = stdoutBuffer.indexOf('\n')) !== -1) {
           const line = stdoutBuffer.substring(0, newlineIndex).trim()

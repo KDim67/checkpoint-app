@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb } from './db'
+import type Database from 'better-sqlite3'
 import { IpcChannels } from '../shared/ipcChannels'
 
 export interface AiMemory {
@@ -15,16 +16,63 @@ export interface AiMemory {
   updated_at: number
 }
 
-export function getMemories(context: string = 'default'): AiMemory[] {
+// Module-level prepared statement singletons
+// All initialized once in initMemoryStatements(), never inside a per-call function.
+let stmtGetMemories: Database.Statement
+let stmtGetExistingByKey: Database.Statement
+let stmtUpdateMemory: Database.Statement
+let stmtInsertMemory: Database.Statement
+let stmtGetPinState: Database.Statement
+let stmtTogglePin: Database.Statement
+let stmtUpdateContent: Database.Statement
+let stmtDeleteMemory: Database.Statement
+let stmtIncrementAccess: Database.Statement
+let stmtPruneCount: Database.Statement
+let stmtPruneSelect: Database.Statement
+let stmtPruneDelete: Database.Statement
+let stmtActionDelete: Database.Statement
+let stmtActionUpdate: Database.Statement
+
+function initMemoryStatements(): void {
   const db = getDb()
-  const stmt = db.prepare(`
+  stmtGetMemories = db.prepare(`
     SELECT id, context, category, memory_key, content, is_pinned, access_count, created_at, updated_at
     FROM ai_memories
     WHERE context = ? OR context = 'global'
     ORDER BY is_pinned DESC, updated_at DESC
     LIMIT 200
   `)
-  const rows = stmt.all(context) as any[]
+  stmtGetExistingByKey = db.prepare(
+    `SELECT id, access_count, created_at FROM ai_memories WHERE context = ? AND memory_key = ?`
+  )
+  stmtUpdateMemory = db.prepare(
+    `UPDATE ai_memories SET category = ?, content = ?, is_pinned = ?, updated_at = ? WHERE id = ?`
+  )
+  stmtInsertMemory = db.prepare(
+    `INSERT INTO ai_memories (id, context, category, memory_key, content, is_pinned, access_count, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`
+  )
+  stmtGetPinState = db.prepare(`SELECT is_pinned FROM ai_memories WHERE id = ?`)
+  stmtTogglePin = db.prepare(`UPDATE ai_memories SET is_pinned = ?, updated_at = ? WHERE id = ?`)
+  stmtUpdateContent = db.prepare(`UPDATE ai_memories SET content = ?, updated_at = ? WHERE id = ?`)
+  stmtDeleteMemory = db.prepare(`DELETE FROM ai_memories WHERE id = ?`)
+  stmtIncrementAccess = db.prepare(`UPDATE ai_memories SET access_count = access_count + 1 WHERE id = ?`)
+  stmtPruneCount = db.prepare(`SELECT COUNT(*) as cnt FROM ai_memories WHERE context = ?`)
+  stmtPruneSelect = db.prepare(`
+    SELECT id FROM ai_memories
+    WHERE context = ? AND is_pinned = 0
+    ORDER BY access_count ASC, updated_at ASC
+    LIMIT ?
+  `)
+  stmtPruneDelete = db.prepare(`DELETE FROM ai_memories WHERE id = ?`)
+  stmtActionDelete = db.prepare(`DELETE FROM ai_memories WHERE context = ? AND memory_key = ?`)
+  stmtActionUpdate = db.prepare(
+    `UPDATE ai_memories SET content = ?, updated_at = ? WHERE context = ? AND memory_key = ?`
+  )
+}
+
+export function getMemories(context: string = 'default'): AiMemory[] {
+  const rows = stmtGetMemories.all(context) as any[]
   return rows.map(r => ({
     ...r,
     is_pinned: Boolean(r.is_pinned)
@@ -39,24 +87,17 @@ export function saveMemory(payload: {
   content: string
   is_pinned?: boolean
 }): AiMemory {
-  const db = getDb()
   const now = Date.now()
   const context = payload.context || 'default'
   const category = payload.category || 'semantic'
   const is_pinned = payload.is_pinned ? 1 : 0
   const key = payload.memory_key.trim().toLowerCase().slice(0, 120)
 
-  const existingStmt = db.prepare(`SELECT id, access_count, created_at FROM ai_memories WHERE context = ? AND memory_key = ?`)
-  const existing = existingStmt.get(context, key) as { id: string; access_count: number; created_at: number } | undefined
+  const existing = stmtGetExistingByKey.get(context, key) as { id: string; access_count: number; created_at: number } | undefined
 
   if (payload.id || existing) {
     const id = payload.id || existing!.id
-    const updateStmt = db.prepare(`
-      UPDATE ai_memories
-      SET category = ?, content = ?, is_pinned = ?, updated_at = ?
-      WHERE id = ?
-    `)
-    updateStmt.run(category, payload.content, is_pinned, now, id)
+    stmtUpdateMemory.run(category, payload.content, is_pinned, now, id)
     return {
       id,
       context,
@@ -70,11 +111,7 @@ export function saveMemory(payload: {
     }
   } else {
     const id = uuidv4()
-    const insertStmt = db.prepare(`
-      INSERT INTO ai_memories (id, context, category, memory_key, content, is_pinned, access_count, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
-    `)
-    insertStmt.run(id, context, category, key, payload.content, is_pinned, now, now)
+    stmtInsertMemory.run(id, context, category, key, payload.content, is_pinned, now, now)
     return {
       id,
       context,
@@ -90,24 +127,20 @@ export function saveMemory(payload: {
 }
 
 export function togglePinMemory(id: string): boolean {
-  const db = getDb()
-  const row = db.prepare(`SELECT is_pinned FROM ai_memories WHERE id = ?`).get(id) as { is_pinned: number } | undefined
+  const row = stmtGetPinState.get(id) as { is_pinned: number } | undefined
   if (!row) return false
   const newPin = row.is_pinned ? 0 : 1
-  db.prepare(`UPDATE ai_memories SET is_pinned = ?, updated_at = ? WHERE id = ?`).run(newPin, Date.now(), id)
+  stmtTogglePin.run(newPin, Date.now(), id)
   return Boolean(newPin)
 }
 
 export function updateMemoryContent(id: string, content: string): boolean {
-  const db = getDb()
-  const res = db.prepare(`UPDATE ai_memories SET content = ?, updated_at = ? WHERE id = ?`).run(content, Date.now(), id)
+  const res = stmtUpdateContent.run(content, Date.now(), id)
   return res.changes > 0
 }
 
 export function deleteMemory(id: string): boolean {
-  const db = getDb()
-  const stmt = db.prepare(`DELETE FROM ai_memories WHERE id = ?`)
-  const res = stmt.run(id)
+  const res = stmtDeleteMemory.run(id)
   return res.changes > 0
 }
 
@@ -189,11 +222,9 @@ export function searchMemories(query: string, context: string = 'default', limit
   scored.sort((a, b) => b.score - a.score)
 
   // Increment access_count for retrieved memories
-  const db = getDb()
-  const incStmt = db.prepare(`UPDATE ai_memories SET access_count = access_count + 1 WHERE id = ?`)
   const topResults = scored.filter(s => s.score > 0.01).map(s => s.mem).slice(0, limit)
   for (const item of topResults) {
-    try { incStmt.run(item.id) } catch (e) {}
+    try { stmtIncrementAccess.run(item.id) } catch (e) {}
   }
 
   return topResults.length > 0 ? topResults : recallable.slice(0, Math.min(limit, 3))
@@ -228,14 +259,13 @@ export function processMemoryActions(
   actions: Array<{ action: 'save' | 'update' | 'delete'; category?: 'semantic' | 'episodic' | 'working'; memory_key: string; content?: string }>,
   context: string
 ): void {
-  const db = getDb()
   for (const item of actions) {
     try {
       const key = item.memory_key.trim().toLowerCase().slice(0, 120)
       if (item.action === 'delete') {
-        db.prepare(`DELETE FROM ai_memories WHERE context = ? AND memory_key = ?`).run(context, key)
+        stmtActionDelete.run(context, key)
       } else if (item.action === 'update' && item.content) {
-        db.prepare(`UPDATE ai_memories SET content = ?, updated_at = ? WHERE context = ? AND memory_key = ?`).run(
+        stmtActionUpdate.run(
           item.content.slice(0, 2000),
           Date.now(),
           context,
@@ -260,24 +290,17 @@ export function processMemoryActions(
  * Evicts oldest unpinned memories first.
  */
 export function pruneMemories(context: string = 'default', limit: number = 40): void {
-  const db = getDb()
-  const countRow = db.prepare(`SELECT COUNT(*) as cnt FROM ai_memories WHERE context = ?`).get(context) as { cnt: number }
+  const countRow = stmtPruneCount.get(context) as { cnt: number }
   if (countRow.cnt <= limit) return
 
   const excess = countRow.cnt - limit
-  const selectStmt = db.prepare(`
-    SELECT id FROM ai_memories
-    WHERE context = ? AND is_pinned = 0
-    ORDER BY access_count ASC, updated_at ASC
-    LIMIT ?
-  `)
-  const toDelete = selectStmt.all(context, excess) as Array<{ id: string }>
+  const toDelete = stmtPruneSelect.all(context, excess) as Array<{ id: string }>
   if (toDelete.length === 0) return
 
-  const deleteStmt = db.prepare(`DELETE FROM ai_memories WHERE id = ?`)
+  const db = getDb()
   const transaction = db.transaction((ids: Array<{ id: string }>) => {
     for (const item of ids) {
-      deleteStmt.run(item.id)
+      stmtPruneDelete.run(item.id)
     }
   })
   transaction(toDelete)
@@ -433,6 +456,9 @@ Keep keys concise (under 60 chars), content brief (under 300 chars). Return [] i
 }
 
 export function initMemoryIpc(): void {
+  // Initialize all prepared statements once at startup
+  initMemoryStatements()
+
   ipcMain.handle(IpcChannels.AI_GET_MEMORIES, (_event, context?: string) => {
     return getMemories(context)
   })

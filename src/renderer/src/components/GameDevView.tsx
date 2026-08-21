@@ -2424,7 +2424,7 @@ export default function GameDevView() {
       display: 'flex',
       flexDirection: 'column',
       gap: 'var(--space-4)',
-      overflowY: 'auto',
+      overflowY: activeTab === 'mapmaker' ? 'hidden' : 'auto',
       height: '100%',
       backgroundColor: 'var(--color-background)',
       color: 'var(--color-text-base)',
@@ -2521,7 +2521,7 @@ export default function GameDevView() {
           {
             group: 'Level Design',
             tools: [
-              { id: 'mapmaker' as const, label: 'Map Maker', icon: <Map size={14} /> }
+              { id: 'mapmaker' as const, label: 'Concept Map Designer', icon: <Map size={14} /> }
             ]
           }
         ]).map(section => (

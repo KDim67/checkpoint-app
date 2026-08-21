@@ -182,6 +182,7 @@ const SortableColumn = React.memo(function SortableColumn({
 export default function KanbanView() {
   const activeContext = useAppStore(s => s.activeContext)
   const availableContexts = useAppStore(s => s.availableContexts)
+  const contextsList = useAppStore(s => s.contextsList)
   const setContext = useAppStore(s => s.setContext)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
@@ -1193,7 +1194,7 @@ export default function KanbanView() {
                 e.currentTarget.style.background = 'var(--color-surface-2)'
               }}
             >
-              #{activeContext}
+              #{contextsList.find(c => c.slug === activeContext)?.name || activeContext}
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}>
                 <path d="m6 9 6 6 6-6"/>
               </svg>
@@ -1215,40 +1216,45 @@ export default function KanbanView() {
                   animation: 'dropdown-in 150ms var(--ease-enter)'
                 }}
               >
-                {availableContexts.map(ctx => (
-                  <button
-                    key={ctx}
-                    onClick={() => {
-                      setContext(ctx)
-                      setDropdownOpen(false)
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-2)',
-                      width: '100%',
-                      padding: '6px 12px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 'var(--text-sm)',
-                      color: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-text-base)',
-                      textAlign: 'left',
-                      transition: 'background var(--duration-fast) var(--ease-default)'
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                  >
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-balance)',
-                      flexShrink: 0
-                    }} />
-                    {ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </button>
-                ))}
+                {availableContexts.map(ctx => {
+                  const entry = contextsList.find(c => c.slug === ctx)
+                  const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                  const color = entry ? entry.color : 'var(--color-balance)'
+                  return (
+                    <button
+                      key={ctx}
+                      onClick={() => {
+                        setContext(ctx)
+                        setDropdownOpen(false)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-2)',
+                        width: '100%',
+                        padding: '6px 12px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 'var(--text-sm)',
+                        color: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-text-base)',
+                        textAlign: 'left',
+                        transition: 'background var(--duration-fast) var(--ease-default)'
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <span style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: ctx === activeContext ? 'var(--color-secondary)' : color,
+                        flexShrink: 0
+                      }} />
+                      {name}
+                    </button>
+                  )
+                })}
                 <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
                 <button
                   style={{

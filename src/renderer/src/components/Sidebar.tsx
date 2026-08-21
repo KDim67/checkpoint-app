@@ -167,6 +167,7 @@ interface ContextPopoverProps {
 function ContextPopover({ onClose }: ContextPopoverProps) {
   const activeContext = useAppStore(s => s.activeContext)
   const availableContexts = useAppStore(s => s.availableContexts)
+  const contextsList = useAppStore(s => s.contextsList)
   const setContext = useAppStore(s => s.setContext)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
@@ -191,39 +192,46 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
         Workspaces / Contexts
       </div>
       <div style={{ maxHeight: '240px', overflowY: 'auto' }} className="custom-scrollbar">
-        {availableContexts.map(ctx => (
-          <button
-            key={ctx}
-            onClick={() => { setContext(ctx); onClose() }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              width: '100%',
-              padding: '6px 12px',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 'var(--text-sm)',
-              color: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-text-base)',
-              textAlign: 'left',
-              transition: 'background var(--duration-fast) var(--ease-default)'
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-          >
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-balance)',
-              flexShrink: 0
-            }} />
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </span>
-          </button>
-        ))}
+        {availableContexts.map(ctx => {
+          const entry = contextsList.find(c => c.slug === ctx)
+          const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          const color = entry ? entry.color : 'var(--color-balance)'
+          const isCurrent = ctx === activeContext
+
+          return (
+            <button
+              key={ctx}
+              onClick={() => { setContext(ctx); onClose() }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                width: '100%',
+                padding: '6px 12px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                color: isCurrent ? 'var(--color-secondary)' : 'var(--color-text-base)',
+                textAlign: 'left',
+                transition: 'background var(--duration-fast) var(--ease-default)'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: isCurrent ? 'var(--color-secondary)' : color,
+                flexShrink: 0
+              }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {name}
+              </span>
+            </button>
+          )
+        })}
       </div>
       <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
       <button
@@ -260,6 +268,7 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
 export function Sidebar() {
   const activeView = useAppStore(s => s.activeView)
   const activeContext = useAppStore(s => s.activeContext)
+  const contextsList = useAppStore(s => s.contextsList)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const focusIsRunning = useAppStore(s => s.focusIsRunning)
@@ -361,7 +370,8 @@ export function Sidebar() {
     return () => document.removeEventListener('mousedown', handler)
   }, [contextOpen])
 
-  const ctxLabel = activeContext.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const activeContextEntry = contextsList.find(c => c.slug === activeContext)
+  const ctxLabel = activeContextEntry ? activeContextEntry.name : activeContext.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   const ctxInitial = ctxLabel[0]?.toUpperCase() ?? 'D'
 
   function handleNavClick(view: ActiveView) {
@@ -430,8 +440,8 @@ export function Sidebar() {
             height: '14px',
             borderRadius: '50%',
             background: 'var(--color-surface-1)',
-            border: '1.5px solid var(--color-secondary)',
-            color: 'var(--color-secondary)',
+            border: `1.5px solid ${activeContextEntry?.color || 'var(--color-secondary)'}`,
+            color: activeContextEntry?.color || 'var(--color-secondary)',
             fontSize: '8.5px',
             fontWeight: 'var(--weight-extrabold)',
             display: 'flex',

@@ -29,6 +29,7 @@ export const enum IpcChannels {
   DB_EXPORT_CONTEXT       = 'db:exportContext',
   DB_IMPORT_CONTEXT       = 'db:importContext',
   DB_IMPORT_CONTEXT_DATA  = 'db:importContextData',
+  DB_RENAME_CONTEXT       = 'db:renameContext',
 
   // Markdown Notes
   NOTES_LIST             = 'notes:list',

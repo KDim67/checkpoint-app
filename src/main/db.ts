@@ -43,6 +43,37 @@ import type {
 
 export let dbInstance: Database.Database | null = null
 
+// Statement cache, reuse compiled SQL across calls
+// Keyed by the exact SQL string. Avoids re-parsing the same SQL on hot paths
+// (updateItem, searchItems, queryTasks, analytics, applyRemoteMutationTx, etc.)
+const _stmtCache = new Map<string, Database.Statement>()
+function prepareOnce(db: Database.Database, sql: string): Database.Statement {
+  let stmt = _stmtCache.get(sql)
+  if (!stmt) {
+    stmt = db.prepare(sql)
+    _stmtCache.set(sql, stmt)
+  }
+  return stmt
+}
+
+/**
+ * Cleanly close the database: checkpoint the WAL back into the main DB file,
+ * then close. Must be called during app shutdown (will-quit handler).
+ */
+export function closeDb(): void {
+  if (dbInstance) {
+    try {
+      dbInstance.pragma('wal_checkpoint(TRUNCATE)') // flush WAL → main db file
+      dbInstance.close()
+    } catch (err) {
+      console.error('[db] Error closing database:', err)
+    } finally {
+      dbInstance = null
+      _stmtCache.clear()
+    }
+  }
+}
+
 export function getDb(): Database.Database {
   if (!dbInstance) throw new Error('Database not initialized')
   return dbInstance
@@ -186,6 +217,7 @@ let stmtUpdateItemPosition: Database.Statement
 let stmtInsertFocusSession: Database.Statement
 let stmtGetFocusSessions: Database.Statement
 let stmtInsertActivityLog: Database.Statement
+let stmtInsertTombstone: Database.Statement
 
 let stmtGetClipboardHistory: Database.Statement
 let stmtInsertClipboardItem: Database.Statement
@@ -294,6 +326,8 @@ export function initDb(dataPath: string): Database.Database {
   db.pragma('synchronous = NORMAL')
   db.pragma('cache_size = -32000')    // 32MB page cache
   db.pragma('busy_timeout = 5000')    // wait up to 5s if locked
+  db.pragma('temp_store = MEMORY')    // temp tables in RAM, not disk
+  db.pragma('mmap_size = 67108864')   // 64MB memory-mapped I/O for reads
 
   // Apply schema and migrations
   db.exec(SCHEMA_SQL)
@@ -429,6 +463,10 @@ export function initDb(dataPath: string): Database.Database {
     VALUES (?, ?, ?, ?, ?, ?)
   `)
 
+  stmtInsertTombstone = db.prepare(
+    `INSERT OR REPLACE INTO sync_tombstones (id, table_name, deleted_at) VALUES (?, ?, ?)`
+  )
+
   return db
 }
 
@@ -538,8 +576,7 @@ export function updateItem(
   if (setClauses.replace('updated_at = @updated_at', '').trim().length > 0 || tagIds !== undefined) {
     db.transaction(() => {
       if (setClauses) {
-        const stmt = db.prepare(`UPDATE items SET ${setClauses} WHERE id = @id`)
-        stmt.run({ ...patch, updated_at, id })
+        prepareOnce(db, `UPDATE items SET ${setClauses} WHERE id = @id`).run({ ...patch, updated_at, id })
       }
       if (tagIds !== undefined) {
         stmtDeleteItemTags.run(id)
@@ -556,8 +593,7 @@ export function updateItem(
 
 export function recordTombstone(id: string, tableName: string): void {
   try {
-    getDb().prepare('INSERT OR REPLACE INTO sync_tombstones (id, table_name, deleted_at) VALUES (?, ?, ?)')
-      .run(id, tableName, Date.now())
+    stmtInsertTombstone.run(id, tableName, Date.now())
   } catch (err) {
     console.error('[db] Failed to record tombstone:', err)
   }
@@ -689,9 +725,8 @@ export function applyRemoteMutationTx(mutation: any): void {
     })()
   } else if (type === 'rebalancePositions') {
     const { context, status } = mutation
-    // Simply run the local rebalance logic!
-    const { rebalancePositions } = require('./db')
-    rebalancePositions(context, status)
+    // Call directly, we are already inside db.ts so no import needed
+    rebalancePositions(db, context, status)
   }
 }
 
@@ -826,8 +861,8 @@ export function searchItems(query: SearchQuery): PaginatedResult<Item> {
   args.push(pageSize, offset)
 
   const db = getDb()
-  const rows = db.prepare(sql).all(...args) as Record<string, unknown>[]
-  const total = (db.prepare(countSql).get(...countArgs) as { count: number }).count
+  const rows = prepareOnce(db, sql).all(...args) as Record<string, unknown>[]
+  const total = (prepareOnce(db, countSql).get(...countArgs) as { count: number }).count
   return { items: rows.map(rowToItem), total, page, pageSize }
 }
 
@@ -914,8 +949,8 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
   sql += ` LIMIT ? OFFSET ?`
   args.push(pageSize, offset)
 
-  const rows = db.prepare(sql).all(...args) as Record<string, unknown>[]
-  const countRow = db.prepare(countSql).get(...countArgs) as { count: number }
+  const rows = prepareOnce(db, sql).all(...args) as Record<string, unknown>[]
+  const countRow = prepareOnce(db, countSql).get(...countArgs) as { count: number }
   const total = countRow ? countRow.count : 0
 
   return {
@@ -1081,8 +1116,9 @@ export function getActivityStats(
   const params: any[] = [timeStart, timeEnd]
   if (isContextFilter) params.push(context)
 
+  const db = getDb()
   // 1. Total duration
-  const totalRow = getDb().prepare(`
+  const totalRow = prepareOnce(db, `
     SELECT SUM(duration_ms) as total 
     FROM activity_tracking_logs 
     WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}
@@ -1090,7 +1126,7 @@ export function getActivityStats(
   const totalDurationMs = totalRow?.total || 0
 
   // 2. By Process
-  const byProcessRows = getDb().prepare(`
+  const byProcessRows = prepareOnce(db, `
     SELECT process_name as processName, SUM(duration_ms) as durationMs 
     FROM activity_tracking_logs 
     WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}
@@ -1100,7 +1136,7 @@ export function getActivityStats(
   `).all(...params) as Array<{ processName: string; durationMs: number }>
 
   // 3. By Context
-  const byContextRows = getDb().prepare(`
+  const byContextRows = prepareOnce(db, `
     SELECT context, SUM(duration_ms) as durationMs 
     FROM activity_tracking_logs 
     WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}
@@ -1109,7 +1145,7 @@ export function getActivityStats(
   `).all(...params) as Array<{ context: string; durationMs: number }>
 
   // 4. By Title
-  const byTitleRows = getDb().prepare(`
+  const byTitleRows = prepareOnce(db, `
     SELECT window_title as windowTitle, process_name as processName, SUM(duration_ms) as durationMs 
     FROM activity_tracking_logs 
     WHERE captured_at >= ? AND captured_at <= ? ${contextFilter}

@@ -47,6 +47,12 @@ export interface ElectronAPI {
     getPathForFile: (file: File) => string
     onNavigateToView: (callback: (view: string) => void) => () => void
   }
+  maps: {
+    listMaps: () => Promise<string[]>
+    readMap: (name: string) => Promise<string>
+    writeMap: (name: string, content: string) => Promise<void>
+    deleteMap: (name: string) => Promise<void>
+  }
   db: {
     getItems: (context: string, type: string, page: number, pageSize: number) => Promise<PaginatedResult<Item>>
     createItem: (payload: CreateItemPayload, tagIds?: string[]) => Promise<Item>

@@ -5,6 +5,13 @@ import type { TimerPreset } from '../components/focus/pomodoroTimer'
 
 export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
+export interface ContextEntry {
+  slug: string
+  name: string
+  color: string
+  gitPath?: string
+}
+
 // Merged tab set: Widget lives in General, Kanban in Workspaces & Board,
 // Theme Builder in Appearance, Extensions in Features & Plugins.
 export type SettingsTab =
@@ -25,6 +32,7 @@ interface AppState {
   // Context
   activeContext: string
   availableContexts: string[]
+  contextsList: ContextEntry[]
   // Settings Tab
   settingsTab: SettingsTab
   // Right panel
@@ -63,6 +71,7 @@ interface AppState {
   setRightPanelContent: (content: 'item-detail' | 'ai-chat' | 'git' | null) => void
   selectItem: (id: string | null) => void
   setAvailableContexts: (contexts: string[]) => void
+  setContextsList: (list: ContextEntry[]) => void
   setLoading: (loading: boolean) => void
   setPreselectedTaskId: (id: string | null) => void
   setGamedevPreloadTexture: (path: string | null, cardId?: string | null) => void
@@ -89,6 +98,7 @@ export const useAppStore = create<AppState>()(
     activeView: 'kanban',
     activeContext: 'default',
     availableContexts: ['default'],
+    contextsList: [],
     settingsTab: 'general',
     rightPanelOpen: false,
     rightPanelContent: null,
@@ -172,6 +182,11 @@ export const useAppStore = create<AppState>()(
     setAvailableContexts: (contexts: string[]) =>
       set(state => {
         state.availableContexts = contexts
+      }),
+
+    setContextsList: (list: ContextEntry[]) =>
+      set(state => {
+        state.contextsList = list
       }),
 
     setLoading: (loading: boolean) =>

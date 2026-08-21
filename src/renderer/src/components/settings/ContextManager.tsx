@@ -28,6 +28,7 @@ export default function ContextManager() {
   const setContext = useAppStore(s => s.setContext)
   const availableContexts = useAppStore(s => s.availableContexts)
   const setAvailableContexts = useAppStore(s => s.setAvailableContexts)
+  const setContextsList = useAppStore(s => s.setContextsList)
 
   const { toast } = useToast()
 
@@ -35,6 +36,7 @@ export default function ContextManager() {
   const [loading, setLoading] = useState(true)
   const [editingSlug, setEditingSlug] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [editSlugVal, setEditSlugVal] = useState('')
   const [editGitPath, setEditGitPath] = useState('')
   const [editColor, setEditColor] = useState(PRESET_COLORS[0])
   const [deleteWarning, setDeleteWarning] = useState<{ slug: string; count: number } | null>(null)
@@ -136,6 +138,7 @@ export default function ContextManager() {
     await window.electronAPI.db.setSetting(STORAGE_KEY, JSON.stringify(updated))
     setContexts(updated)
     setAvailableContexts(updated.map(c => c.slug))
+    setContextsList(updated)
   }
 
   const handleAdd = async () => {
@@ -160,11 +163,39 @@ export default function ContextManager() {
   const handleSaveEdit = async (slug: string) => {
     const trimmed = editName.trim()
     if (!trimmed) { setEditingSlug(null); return }
-    const updated = contexts.map(c =>
-      c.slug === slug ? { ...c, name: trimmed, color: editColor, gitPath: editGitPath.trim() || undefined } : c
-    )
-    await persist(updated)
-    setEditingSlug(null)
+
+    const newSlug = slugify(editSlugVal) || slugify(trimmed)
+    if (!newSlug) { toast('Invalid workspace slug'); return }
+
+    // If slug changed, ensure it's unique
+    if (newSlug !== slug && contexts.some(c => c.slug === newSlug)) {
+      toast(`Workspace slug "${newSlug}" already exists. Please choose a different name or slug.`);
+      return
+    }
+
+    try {
+      if (newSlug !== slug) {
+        // Run DB update/migration
+        const res = await window.electronAPI.db.renameContext(slug, newSlug)
+        if (res && res.error) {
+          toast(`Failed to rename workspace: ${res.error}`)
+          return
+        }
+        // Update active context if it was active
+        if (activeContext === slug) {
+          setContext(newSlug)
+        }
+      }
+
+      const updated = contexts.map(c =>
+        c.slug === slug ? { ...c, slug: newSlug, name: trimmed, color: editColor, gitPath: editGitPath.trim() || undefined } : c
+      )
+      await persist(updated)
+      setEditingSlug(null)
+      toast('Workspace updated successfully!')
+    } catch (err: any) {
+      toast(`Failed to save: ${err.message || String(err)}`)
+    }
   }
 
   const handleDeleteRequest = async (slug: string) => {
@@ -249,6 +280,27 @@ export default function ContextManager() {
                     flex: 1,
                     background: 'var(--color-surface-1)',
                     border: `1px solid ${ctx.color}`,
+                    color: 'var(--color-text-base)',
+                    borderRadius: '4px',
+                    padding: '3px 8px',
+                    fontSize: 'var(--text-sm)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Slug (#):</span>
+                <input
+                  value={editSlugVal}
+                  onChange={e => setEditSlugVal(slugify(e.target.value))}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEdit(ctx.slug)
+                    if (e.key === 'Escape') setEditingSlug(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    background: 'var(--color-surface-1)',
+                    border: `1px solid ${ctx.color}50`,
                     color: 'var(--color-text-base)',
                     borderRadius: '4px',
                     padding: '3px 8px',
@@ -394,6 +446,7 @@ export default function ContextManager() {
                   onClick={() => {
                     setEditingSlug(ctx.slug)
                     setEditName(ctx.name)
+                    setEditSlugVal(ctx.slug)
                     setEditColor(ctx.color)
                     setEditGitPath(ctx.gitPath || '')
                   }}

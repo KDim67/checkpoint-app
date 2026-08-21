@@ -1,29 +1,107 @@
+# Application Identity
 appId: com.checkpoint.app
 productName: Checkpoint
+copyright: "Copyright © 2025 Checkpoint"
+
+# Output & Resources
 directories:
   output: dist
   buildResources: resources
+
+# File Inclusion (exclude dev artifacts & sources)
 files:
   - out/**/*
   - resources/**/*
-win:
-  target:
-    - target: nsis
-      arch: x64
-  icon: resources/icon.ico
-mac:
-  target:
-    - target: dmg
-      arch: x64
-  icon: resources/icon.png
-linux:
-  target:
-    - target: AppImage
-      arch: x64
-  icon: resources/icon.png
-nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
+  - "!**/*.map"               # strip source maps
+  - "!**/*.d.ts"              # strip type declaration files
+  - "!**/test{s,}/**"        # strip any test directories
+  - "!**/__tests__/**"
+  - "!**/*.{spec,test}.{js,ts}"
+  - "!**/node_modules/.cache"
+
+# ASAR Archive
+# Pack all JS into a single ASAR for performance and to obscure source code.
+# Unpack native .node binaries so they can still be loaded by the OS.
 asar: true
 asarUnpack:
   - "**/*.node"
+
+# Compression
+# LZMA (level 9) gives the smallest possible installer. Slower to build
+# but dramatically smaller download size for end users.
+compression: maximum
+
+# Windows Installer
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+  # Uncomment and fill in when you have a code-signing certificate:
+  # certificateFile: certs/cert.p12
+  # certificatePassword: ${env.WIN_CERT_PASSWORD}
+  requestedExecutionLevel: asInvoker  # do NOT request admin unless truly needed
+
+nsis:
+  # Install UX
+  oneClick: false                         # show the full setup wizard
+  allowToChangeInstallationDirectory: true # let users pick their install path
+  allowElevation: true                    # request elevation only during install/uninstall
+
+  # Shortcuts
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Checkpoint"             # label shown on desktop & start menu
+
+  # Branding
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
+
+  # Uninstall
+  deleteAppDataOnUninstall: false         # preserve user data by default
+
+  # Multi-language
+  installerLanguages:
+    - en_US
+
+# macOS DMG
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64              # Apple Silicon support
+  icon: resources/icon.png
+  category: public.app-category.developer-tools
+  # Uncomment to enable code signing & notarisation:
+  # identity: "Developer ID Application: Your Name (TEAM_ID)"
+  # hardenedRuntime: true
+  # gatekeeperAssess: false
+  # entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  background: null
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 130
+      y: 220
+      type: file
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+# Linux AppImage
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: resources/icon.png
+  category: Development
+  synopsis: "Checkpoint Developer Scratchpad"
+  description: "A local-first developer dashboard for notes, projects, and game assets."

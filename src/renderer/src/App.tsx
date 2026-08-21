@@ -379,6 +379,7 @@ export default function App() {
   const activeView = useAppStore(s => s.activeView)
   const setView = useAppStore(s => s.setView)
   const setAvailableContexts = useAppStore(s => s.setAvailableContexts)
+  const setContextsList = useAppStore(s => s.setContextsList)
   const setContext = useAppStore(s => s.setContext)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
@@ -388,9 +389,13 @@ export default function App() {
     const handleImageClick = (e: MouseEvent) => {
       const target = e.target as HTMLImageElement
       if (target.tagName === 'IMG') {
+        // Exclude application logos / UI icons from triggering the lightbox preview
+        if (target.alt === 'Checkpoint Logo' || target.closest('#context-switcher')) {
+          return
+        }
         const src = target.src || target.getAttribute('src')
         if (src) {
-          const isAttachedMedia = src.startsWith('checkpoint-media://') || src.startsWith('file://') || src.startsWith('blob:')
+          const isAttachedMedia = src.startsWith('checkpoint-media://') || src.startsWith('blob:')
           const isMarkdownImg = target.closest('.markdown-body') !== null
           if (isAttachedMedia || isMarkdownImg) {
             e.preventDefault()
@@ -412,12 +417,30 @@ export default function App() {
       const contexts = await window.electronAPI.db.getContexts()
       if (contexts.length > 0) {
         setAvailableContexts(contexts)
+
+        const rawList = await window.electronAPI.db.getSetting('contexts_list') as string | null
+        let list: any[] = []
+        if (rawList) {
+          try {
+            list = JSON.parse(rawList)
+          } catch {}
+        }
+        if (list.length === 0) {
+          list = contexts.map((slug, i) => ({
+            slug,
+            name: slug.charAt(0).toUpperCase() + slug.slice(1),
+            color: ['#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'][i % 8]
+          }))
+          window.electronAPI.db.setSetting('contexts_list', JSON.stringify(list)).catch(() => {})
+        }
+        setContextsList(list)
+
         const defaultContext = await window.electronAPI.db.getSetting('default_context') as string | null
         const savedContext = await window.electronAPI.db.getSetting('active_context') as string | null
         const startContext =
           defaultContext && contexts.includes(defaultContext) ? defaultContext
           : savedContext && contexts.includes(savedContext) ? savedContext
-          : null
+          : contexts[0] // Fallback to first available context
         if (startContext) {
           setContext(startContext)
         }
@@ -425,7 +448,7 @@ export default function App() {
     } catch {
       // DB not yet initialized, use defaults
     }
-  }, [setAvailableContexts, setContext])
+  }, [setAvailableContexts, setContextsList, setContext])
 
   useEffect(() => {
     loadContexts()

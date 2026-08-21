@@ -231,6 +231,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     importContextData: async (newContextSlug: string, data: any): Promise<{ success: boolean; error?: string }> => {
       return ipcRenderer.invoke(IpcChannels.DB_IMPORT_CONTEXT_DATA, newContextSlug, data)
+    },
+
+    renameContext: async (oldSlug: string, newSlug: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke(IpcChannels.DB_RENAME_CONTEXT, oldSlug, newSlug)
     }
   },
 
@@ -451,6 +455,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke(IpcChannels.NOTES_DELETE, title),
     searchNotes: (query: string): Promise<NoteSearchResult[]> =>
       ipcRenderer.invoke(IpcChannels.NOTES_SEARCH, query)
+  },
+
+  maps: {
+    listMaps: (): Promise<string[]> =>
+      ipcRenderer.invoke('maps:list'),
+    readMap: (name: string): Promise<string> =>
+      ipcRenderer.invoke('maps:read', name),
+    writeMap: (name: string, content: string): Promise<void> =>
+      ipcRenderer.invoke('maps:write', name, content),
+    deleteMap: (name: string): Promise<void> =>
+      ipcRenderer.invoke('maps:delete', name)
   },
 
   git: {

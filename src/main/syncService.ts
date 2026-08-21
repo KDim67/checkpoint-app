@@ -39,6 +39,7 @@ export class SyncService {
   private tcpServer: net.Server | null = null
   private udpSocket: dgram.Socket | null = null
   private discoveryInterval: NodeJS.Timeout | null = null
+  private clientSockets = new Set<net.Socket>()
   
   private tcpPort = DEFAULT_TCP_PORT
   private udpPort = DEFAULT_UDP_PORT
@@ -125,6 +126,12 @@ export class SyncService {
       this.discoveryInterval = null
     }
 
+    // Force-close all active client connections so tcpServer.close() resolves immediately
+    for (const socket of this.clientSockets) {
+      try { socket.destroy() } catch {}
+    }
+    this.clientSockets.clear()
+
     if (this.udpSocket) {
       try {
         this.udpSocket.close()
@@ -176,9 +183,16 @@ export class SyncService {
         }
       })
 
-      // Periodically broadcast presence
+      // Periodically broadcast presence and prune stale peers
       this.discoveryInterval = setInterval(() => {
         if (!this.udpSocket || !this.isServerActive) return
+
+        // Prune peers not seen for more than 15 seconds
+        const now = Date.now()
+        for (const [key, peer] of this.discoveredPeers.entries()) {
+          if (now - peer.lastSeen >= 15000) this.discoveredPeers.delete(key)
+        }
+
         const broadcastData = JSON.stringify({
           type: 'checkpoint-discover',
           name: os.hostname(),
@@ -403,6 +417,10 @@ export class SyncService {
   // TCP Client connection sync process
   private handleClientConnection(socket: net.Socket): void {
     console.log(`[SyncService] Client connected from ${socket.remoteAddress}`)
+    // Track socket so stopHost() can force-close it immediately
+    this.clientSockets.add(socket)
+    socket.once('close', () => this.clientSockets.delete(socket))
+
     let authenticated = false
     const salt = crypto.randomBytes(16).toString('hex')
     this.isSyncing = true
@@ -563,7 +581,22 @@ export class SyncService {
       socket.on('error', (err) => {
         this.isSyncing = false
         this.syncProgress = `Connection error: ${err.message}`
+        socket.destroy()   // release OS file descriptor immediately
         reject(err)
+      })
+
+      socket.on('close', () => {
+        // Guard: if we closed due to error/timeout before resolving, mark done
+        this.isSyncing = false
+      })
+
+      // Safety: reject and destroy if the peer goes silent for 30s
+      socket.setTimeout(30000)
+      socket.on('timeout', () => {
+        console.warn('[SyncService] Sync socket timed out after 30s')
+        socket.destroy()
+        this.isSyncing = false
+        reject(new Error('Sync connection timed out'))
       })
     })
   }

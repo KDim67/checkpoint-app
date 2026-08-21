@@ -4,7 +4,7 @@ import fs, { writeFileSync, existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { ShortcutMap } from '../shared/types'
-import { getSetting } from './db'
+import { getSetting, closeDb } from './db'
 import { enableHud, disableHud } from './hud'
 import { initTitleBarSync, updateNativeTitleBarFromSettings } from './titleBarSync'
 import {
@@ -58,6 +58,19 @@ Menu.setApplicationMenu(null)
 
 let mainWindow: BrowserWindow | null = null
 let activeClipboardHotkey = ''
+
+// Single Instance Lock
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+}
 
 export function registerAppShortcuts(): void {
   // Unregister existing custom shortcut if any
@@ -150,17 +163,22 @@ function createWindow(): void {
   const revealWindow = (): void => {
     if (hasShown || !mainWindow || mainWindow.isDestroyed()) return
     hasShown = true
+    clearTimeout(revealTimeout)    // cancel safety fallback if an event fires first
     mainWindow.show()
     mainWindow.focus()
   }
+  // Absolute fallback: if neither event fires (hard load-failure loop), show anyway.
+  const revealTimeout = setTimeout(revealWindow, 8000)
   mainWindow.on('ready-to-show', revealWindow)
   mainWindow.webContents.on('did-finish-load', revealWindow)
-  // Absolute fallback: if neither event fires (hard load-failure loop), show anyway.
-  setTimeout(revealWindow, 8000)
 
   // Null reference on close, allows V8 garbage collection of the window
   mainWindow.on('closed', () => {
     mainWindow = null
+    // Quit the app when the main window is closed on non-macOS platforms
+    if (process.platform !== 'darwin') {
+      app.quit()
+    }
   })
 
   // Open external links in the system browser, not a new Electron window
@@ -182,11 +200,16 @@ function createWindow(): void {
       }
     })
 
-    // Retry loading if the dev server is not warm yet
+    // Retry loading if the dev server is not warm yet, stored handle cancels on success.
+    let failRetryTimeout: NodeJS.Timeout | null = null
+    mainWindow.webContents.on('did-finish-load', () => {
+      if (failRetryTimeout) { clearTimeout(failRetryTimeout); failRetryTimeout = null }
+    })
     mainWindow.webContents.on('did-fail-load', (_event, errorCode, _errorDescription, validatedURL) => {
       if (validatedURL.startsWith(devUrl)) {
         console.log(`[Dev Server] Port not ready yet (error code: ${errorCode}). Retrying load in 1s...`)
-        setTimeout(() => {
+        failRetryTimeout = setTimeout(() => {
+          failRetryTimeout = null
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.loadURL(devUrl)
           }
@@ -429,6 +452,27 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.NOTES_SEARCH, async (_event, query: string) => {
     const { searchNotes } = await import('./notesFsService')
     return searchNotes(query)
+  })
+
+  // Maps Handlers
+  ipcMain.handle('maps:list', async () => {
+    const { listMaps } = await import('./mapsFsService')
+    return listMaps()
+  })
+
+  ipcMain.handle('maps:read', async (_event, name: string) => {
+    const { readMap } = await import('./mapsFsService')
+    return readMap(name)
+  })
+
+  ipcMain.handle('maps:write', async (_event, name: string, content: string) => {
+    const { writeMap } = await import('./mapsFsService')
+    return writeMap(name, content)
+  })
+
+  ipcMain.handle('maps:delete', async (_event, name: string) => {
+    const { deleteMap } = await import('./mapsFsService')
+    return deleteMap(name)
   })
 
   // Git Integration Handlers
@@ -874,7 +918,11 @@ app.whenReady().then(async () => {
     protocol.handle('cheatsheet', async (request) => {
       try {
         const url = new URL(request.url)
-        const rawPath = url.host ? (url.host + url.pathname) : url.pathname
+        let rawPath = url.host ? (url.host + url.pathname) : url.pathname
+        // Strip the dummy 'show/' host/prefix if present
+        if (rawPath.toLowerCase().startsWith('show/')) {
+          rawPath = rawPath.substring(5)
+        }
         const filename = decodeURIComponent(rawPath.replace(/^\//, '')).replace(/\/$/, '')
         const dir = getCheatsheetsDir()
         const filePath = join(dir, filename)
@@ -1006,6 +1054,22 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Context Rename
+  ipcMain.handle(IpcChannels.DB_RENAME_CONTEXT, async (_event, oldSlug: string, newSlug: string) => {
+    try {
+      db.transaction(() => {
+        db.prepare('UPDATE items SET context = ? WHERE context = ?').run(newSlug, oldSlug)
+        db.prepare('UPDATE focus_sessions SET context = ? WHERE context = ?').run(newSlug, oldSlug)
+        db.prepare('UPDATE ai_memories SET context = ? WHERE context = ?').run(newSlug, oldSlug)
+        db.prepare('UPDATE activity_tracking_logs SET context = ? WHERE context = ?').run(newSlug, oldSlug)
+      })()
+      return { success: true }
+    } catch (err: any) {
+      console.error('Failed to rename context:', err)
+      return { success: false, error: err.message || String(err) }
+    }
+  })
+
   // Initialize AI Memory & Workspace IPC Services
   try {
     const { initMemoryIpc } = await import('./memoryService')
@@ -1080,8 +1144,8 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    // macOS: re-create window on dock click if no windows exist
-    if (BrowserWindow.getAllWindows().length === 0) {
+    // macOS: re-create window on dock click if no main window exists
+    if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow()
     }
   })
@@ -1090,39 +1154,34 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   // Quit on non-macOS platforms
   if (process.platform !== 'darwin') {
-    globalShortcut.unregisterAll()
     app.quit()
   }
 })
 
-app.on('quit', () => {
+app.on('will-quit', (e) => {
+  // Prevent immediate termination so we can perform async cleanup
+  e.preventDefault()
+
   globalShortcut.unregisterAll()
-  // Stop Clipboard Watcher
-  import('./clipboardWatcher').then(({ stopClipboardWatcher }) => {
-    stopClipboardWatcher()
-  }).catch(console.error)
-  // Phase 22, Stop Customizer Engine
-  import('./customizer').then(({ disableCustomizer }) => {
-    disableCustomizer()
-  }).catch(console.error)
-  // Phase 17, Stop Webhook Gateway
-  import('./webhookGateway').then(({ stopWebhookServer }) => {
-    stopWebhookServer()
-  }).catch(console.error)
-  // Phase 18, Stop Global Quick-Capture HUD
-  import('./hud').then(({ disableHud }) => {
-    disableHud()
-  }).catch(console.error)
 
-  // Phase 20, Stop Backup Scheduler & Exit Backup
-  import('./backupVault').then(({ shutdownBackupScheduler }) => {
-    shutdownBackupScheduler()
-  }).catch(console.error)
+  // Clean up all background services in parallel
+  Promise.all([
+    import('./clipboardWatcher').then(({ stopClipboardWatcher }) => stopClipboardWatcher()).catch(() => {}),
+    import('./customizer').then(({ disableCustomizer }) => disableCustomizer()).catch(() => {}),
+    import('./webhookGateway').then(({ stopWebhookServer }) => stopWebhookServer()).catch(() => {}),
+    import('./hud').then(({ disableHud }) => disableHud()).catch(() => {}),
+    import('./backupVault').then(({ shutdownBackupScheduler }) => shutdownBackupScheduler()).catch(() => {}),
+    import('./tracker').then(({ shutdownActivityTracker }) => shutdownActivityTracker()).catch(() => {}),
+    Promise.resolve().then(() => { try { syncService.stopHost() } catch {} })
+  ]).catch(() => {}).finally(() => {
+    closeDb()  // checkpoint WAL and close SQLite cleanly before exit
+    app.exit(0)
+  })
 
-  // Phase 21, Stop Passive Activity Tracker
-  import('./tracker').then(({ shutdownActivityTracker }) => {
-    shutdownActivityTracker()
-  }).catch(console.error)
+  // Safety timeout: force exit if cleanup takes longer than 800ms
+  setTimeout(() => {
+    app.exit(0)
+  }, 800)
 })
 
 export { mainWindow }
