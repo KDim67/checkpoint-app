@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { useToast } from '../ui/Toast'
 import { AlertTriangle, Keyboard } from 'lucide-react'
+import {
+  APP_SHORTCUTS,
+  loadBindings,
+  saveBindings,
+  defaultBindings,
+  comboFromEvent,
+  type ShortcutBindings
+} from '../../lib/shortcuts'
 
-type ShortcutAction = 'hud_toggle' | 'clipboard_toggle'
+type GlobalAction = 'hud_toggle' | 'clipboard_toggle'
 
-const ACTION_LABELS: Record<ShortcutAction, { label: string; desc: string; defaultKey: string }> = {
+const ACTION_LABELS: Record<GlobalAction, { label: string; desc: string; defaultKey: string }> = {
   hud_toggle: {
     label: 'Toggle Spotlight HUD overlay',
     desc: 'Summons the borderless input bar centered on screen.',
@@ -23,6 +31,152 @@ const FORBIDDEN_SHORTCUTS = [
   'Alt+F4', 'Ctrl+Alt+Delete'
 ]
 
+/** Which list a recording is for, the two are bound and stored separately. */
+type RecordingTarget = { scope: 'global' | 'app'; id: string }
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+      {children}
+    </h4>
+  )
+}
+
+function ShortcutRow({
+  label,
+  desc,
+  combo,
+  isRecording,
+  onStartRecording,
+  onKeyDown
+}: {
+  label: string
+  desc?: string
+  combo: string
+  isRecording: boolean
+  onStartRecording: () => void
+  onKeyDown: (e: React.KeyboardEvent) => void
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 'var(--space-3)',
+        background: 'var(--color-surface-1)',
+        border: `1px solid ${isRecording ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+        borderRadius: 'var(--radius-md)',
+        transition: 'border-color 100ms ease'
+      }}
+    >
+      <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
+        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+          {label}
+        </span>
+        {desc && (
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            {desc}
+          </span>
+        )}
+      </div>
+
+      <div className="row">
+        {isRecording ? (
+          <input
+            type="text"
+            placeholder="Press key combination…"
+            aria-label={`Recording shortcut for ${label}`}
+            onKeyDown={onKeyDown}
+            autoFocus
+            style={{
+              background: 'var(--color-surface-offset)',
+              border: '1px solid var(--color-secondary)',
+              color: 'var(--color-secondary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-xs)',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              width: '160px',
+              outline: 'none',
+              textAlign: 'center'
+            }}
+          />
+        ) : (
+          <button
+            onClick={onStartRecording}
+            aria-label={`Change shortcut for ${label}. Currently ${combo || 'unassigned'}`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1)',
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-surface-offset)',
+              color: combo ? 'var(--color-text-base)' : 'var(--color-text-faint)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-xs)',
+              borderRadius: '4px',
+              padding: '4px 10px',
+              cursor: 'pointer',
+              minWidth: '110px',
+              justifyContent: 'center',
+              transition: 'all 100ms ease'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'var(--color-primary)'
+              e.currentTarget.style.color = 'var(--color-primary)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
+              e.currentTarget.style.color = combo ? 'var(--color-text-base)' : 'var(--color-text-faint)'
+            }}
+          >
+            <Keyboard size={12} />
+            {combo || 'Unassigned'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ActionButton({
+  children,
+  onClick,
+  disabled,
+  variant
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  disabled: boolean
+  variant: 'primary' | 'secondary'
+}) {
+  const base = variant === 'primary' ? 'var(--color-primary)' : 'var(--color-surface-offset)'
+  const hover = variant === 'primary' ? 'var(--color-primary-hover)' : 'var(--color-surface-elevated)'
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: 'var(--space-2) var(--space-4)',
+        background: base,
+        border: `1px solid ${base}`,
+        color: variant === 'primary' ? '#ffffff' : 'var(--color-text-base)',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 'var(--text-xs)',
+        fontWeight: 'var(--weight-semibold)',
+        cursor: disabled ? 'default' : 'pointer',
+        transition: 'all 100ms ease',
+        opacity: disabled ? 0.5 : 1
+      }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = hover }}
+      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = base }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export default function HotkeyBinder() {
   const { toast } = useToast()
   const [engineEnabled, setEngineEnabled] = useState(false)
@@ -30,7 +184,8 @@ export default function HotkeyBinder() {
     hud_toggle: 'Ctrl+Shift+Space',
     clipboard_toggle: 'Ctrl+Shift+V'
   })
-  const [recording, setRecording] = useState<ShortcutAction | null>(null)
+  const [appBindings, setAppBindings] = useState<ShortcutBindings>(defaultBindings)
+  const [recording, setRecording] = useState<RecordingTarget | null>(null)
   const [collisionWarning, setCollisionWarning] = useState<string | null>(null)
 
   useEffect(() => {
@@ -46,12 +201,13 @@ export default function HotkeyBinder() {
       } catch (err) {
         console.error('Failed to load shortcuts:', err)
       }
+      setAppBindings(await loadBindings())
     }
-    load()
+    load().catch(err => console.error('Failed to load shortcuts:', err))
   }, [])
 
-  const startRecording = (action: ShortcutAction) => {
-    setRecording(action)
+  const startRecording = (target: RecordingTarget) => {
+    setRecording(target)
     setCollisionWarning(null)
     toast('Recording... Press your keyboard combination')
   }
@@ -62,43 +218,41 @@ export default function HotkeyBinder() {
     e.preventDefault()
     e.stopPropagation()
 
-    // Ignore pure modifier presses
-    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+    // Escape abandons the recording rather than binding itself.
+    if (e.key === 'Escape') {
+      setRecording(null)
+      setCollisionWarning(null)
       return
     }
 
-    const modifiers: string[] = []
-    if (e.ctrlKey) modifiers.push('Ctrl')
-    if (e.altKey) modifiers.push('Alt')
-    if (e.shiftKey) modifiers.push('Shift')
-    if (e.metaKey) modifiers.push('Cmd')
+    const combo = comboFromEvent(e)
+    if (!combo) return
 
-    let key = e.key
-    if (key === ' ') {
-      key = 'Space'
-    } else if (key.length === 1) {
-      key = key.toUpperCase()
-    } else if (key.startsWith('Arrow')) {
-      key = key.replace('Arrow', '')
-    }
-
-    const combo = [...modifiers, key].join('+')
-
-    // Collision checks
     if (FORBIDDEN_SHORTCUTS.includes(combo)) {
       setCollisionWarning(`"${combo}" is a reserved system shortcut and cannot be bound.`)
       return
     }
 
-    // Check if duplicate of other action
-    const otherAction = recording === 'hud_toggle' ? 'clipboard_toggle' : 'hud_toggle'
-    if (bindings[otherAction] === combo) {
-      setCollisionWarning(`"${combo}" is already bound to another action.`)
-      return
+    if (recording.scope === 'global') {
+      const otherAction: GlobalAction = recording.id === 'hud_toggle' ? 'clipboard_toggle' : 'hud_toggle'
+      if (bindings[otherAction] === combo) {
+        setCollisionWarning(`"${combo}" is already bound to another action.`)
+        return
+      }
+      setBindings(prev => ({ ...prev, [recording.id]: combo }))
+    } else {
+      const clash = APP_SHORTCUTS.find(s => s.id !== recording.id && appBindings[s.id] === combo)
+      if (clash) {
+        setCollisionWarning(`"${combo}" is already bound to "${clash.label}".`)
+        return
+      }
+      const next = { ...appBindings, [recording.id]: combo }
+      setAppBindings(next)
+      // Applied immediately, these are in-window listeners, so unlike the
+      // global hotkeys there is nothing to register with the OS.
+      saveBindings(next).catch(err => console.error('Failed to save shortcuts:', err))
     }
 
-    // Normal successful capture
-    setBindings(prev => ({ ...prev, [recording]: combo }))
     setRecording(null)
     setCollisionWarning(null)
     toast(`Captured shortcut: ${combo}`)
@@ -116,8 +270,8 @@ export default function HotkeyBinder() {
 
   const handleResetDefaults = async () => {
     const defaults = {
-      hud_toggle: 'Ctrl+Shift+Space',
-      clipboard_toggle: 'Ctrl+Shift+V'
+      hud_toggle: ACTION_LABELS.hud_toggle.defaultKey,
+      clipboard_toggle: ACTION_LABELS.clipboard_toggle.defaultKey
     }
     setBindings(defaults)
     setCollisionWarning(null)
@@ -127,6 +281,15 @@ export default function HotkeyBinder() {
     } catch (err) {
       console.error(err)
     }
+  }
+
+  const handleResetAppDefaults = () => {
+    const defaults = defaultBindings()
+    setAppBindings(defaults)
+    setCollisionWarning(null)
+    saveBindings(defaults)
+      .then(() => toast('In-app shortcuts reset to defaults'))
+      .catch(err => console.error('Failed to reset shortcuts:', err))
   }
 
   return (
@@ -143,8 +306,25 @@ export default function HotkeyBinder() {
         }}>
           <AlertTriangle size={18} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
-            Customization Engine is disabled. Enable it in the <strong>Theme Builder</strong> settings tab first to register customized global shortcut triggers.
+            Customization Engine is disabled. Enable it in the <strong>Theme Builder</strong> settings tab first to register customized global shortcut triggers. In-app shortcuts below work regardless.
           </div>
+        </div>
+      )}
+
+      {collisionWarning && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.08)',
+          border: '1px solid var(--color-error)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-2) var(--space-3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)'
+        }}>
+          <AlertTriangle size={14} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>
+            {collisionWarning}
+          </span>
         </div>
       )}
 
@@ -156,149 +336,51 @@ export default function HotkeyBinder() {
         pointerEvents: engineEnabled ? 'auto' : 'none',
         transition: 'opacity 200ms ease'
       }}>
-        <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
-          Shortcut Bindings
-        </h4>
+        <SectionHeading>Global Shortcuts</SectionHeading>
 
-        {(Object.keys(ACTION_LABELS) as ShortcutAction[]).map(action => {
-          const info = ACTION_LABELS[action]
-          const isRecording = recording === action
-          return (
-            <div
-              key={action}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: 'var(--space-3)',
-                background: 'var(--color-surface-1)',
-                border: `1px solid ${isRecording ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-                borderRadius: 'var(--radius-md)',
-                transition: 'border-color 100ms ease'
-              }}
-            >
-              <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
-                  {info.label}
-                </span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                  {info.desc}
-                </span>
-              </div>
-
-              <div className="row">
-                {isRecording ? (
-                  <input
-                    type="text"
-                    placeholder="Press key combination…"
-                    onKeyDown={handleKeyDown}
-                    autoFocus
-                    style={{
-                      background: 'var(--color-surface-offset)',
-                      border: '1px solid var(--color-secondary)',
-                      color: 'var(--color-secondary)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-xs)',
-                      borderRadius: '4px',
-                      padding: '4px 8px',
-                      width: '160px',
-                      outline: 'none',
-                      textAlign: 'center'
-                    }}
-                  />
-                ) : (
-                  <button
-                    onClick={() => startRecording(action)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-1)',
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
-                      color: 'var(--color-text-base)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--text-xs)',
-                      borderRadius: '4px',
-                      padding: '4px 10px',
-                      cursor: 'pointer',
-                      transition: 'all 100ms ease'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = 'var(--color-primary)'
-                      e.currentTarget.style.color = 'var(--color-primary)'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-                      e.currentTarget.style.color = 'var(--color-text-base)'
-                    }}
-                  >
-                    <Keyboard size={12} />
-                    {bindings[action]}
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })}
-
-        {collisionWarning && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid var(--color-error)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-2) var(--space-3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)'
-          }}>
-            <AlertTriangle size={14} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>
-              {collisionWarning}
-            </span>
-          </div>
-        )}
+        {(Object.keys(ACTION_LABELS) as GlobalAction[]).map(action => (
+          <ShortcutRow
+            key={action}
+            label={ACTION_LABELS[action].label}
+            desc={ACTION_LABELS[action].desc}
+            combo={bindings[action]}
+            isRecording={recording?.scope === 'global' && recording.id === action}
+            onStartRecording={() => startRecording({ scope: 'global', id: action })}
+            onKeyDown={handleKeyDown}
+          />
+        ))}
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-          <button
-            onClick={handleSave}
-            disabled={recording !== null}
-            style={{
-              padding: 'var(--space-2) var(--space-4)',
-              background: 'var(--color-primary)',
-              border: '1px solid var(--color-primary)',
-              color: '#ffffff',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--weight-semibold)',
-              cursor: recording !== null ? 'default' : 'pointer',
-              transition: 'all 100ms ease',
-              opacity: recording !== null ? 0.5 : 1
-            }}
-            onMouseEnter={e => { if (recording === null) e.currentTarget.style.background = 'var(--color-primary-hover)' }}
-            onMouseLeave={e => { if (recording === null) e.currentTarget.style.background = 'var(--color-primary)' }}
-          >
+          <ActionButton onClick={handleSave} disabled={recording !== null} variant="primary">
             Apply Bindings
-          </button>
-          <button
-            onClick={handleResetDefaults}
-            disabled={recording !== null}
-            style={{
-              padding: 'var(--space-2) var(--space-4)',
-              background: 'var(--color-surface-offset)',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-base)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--weight-semibold)',
-              cursor: recording !== null ? 'default' : 'pointer',
-              transition: 'all 100ms ease',
-              opacity: recording !== null ? 0.5 : 1
-            }}
-            onMouseEnter={e => { if (recording === null) e.currentTarget.style.background = 'var(--color-surface-elevated)' }}
-            onMouseLeave={e => { if (recording === null) e.currentTarget.style.background = 'var(--color-surface-offset)' }}
-          >
+          </ActionButton>
+          <ActionButton onClick={handleResetDefaults} disabled={recording !== null} variant="secondary">
             Restore Default Hotkeys
-          </button>
+          </ActionButton>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <SectionHeading>In-App Shortcuts</SectionHeading>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+          Fire only while the Checkpoint window has focus, and are ignored while typing. Changes apply immediately.
+        </span>
+
+        {APP_SHORTCUTS.map(shortcut => (
+          <ShortcutRow
+            key={shortcut.id}
+            label={shortcut.label}
+            combo={appBindings[shortcut.id]}
+            isRecording={recording?.scope === 'app' && recording.id === shortcut.id}
+            onStartRecording={() => startRecording({ scope: 'app', id: shortcut.id })}
+            onKeyDown={handleKeyDown}
+          />
+        ))}
+
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+          <ActionButton onClick={handleResetAppDefaults} disabled={recording !== null} variant="secondary">
+            Restore Default Shortcuts
+          </ActionButton>
         </div>
       </div>
     </div>

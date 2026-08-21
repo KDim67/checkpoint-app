@@ -11,6 +11,14 @@ import { applyFontSize } from './components/settings/AppearanceSettings'
 import Lightbox from './components/ui/Lightbox'
 import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
 import { getNumberSetting, setNumberSetting } from './lib/settings'
+import {
+  APP_SHORTCUTS,
+  loadBindings,
+  defaultBindings,
+  comboFromEvent,
+  isTypingTarget,
+  type ShortcutBindings
+} from './lib/shortcuts'
 
 // Lazy-loaded views (code split per view)
 const LogView      = lazy(() => import('./components/LogView'))
@@ -492,6 +500,19 @@ export default function App() {
   // Land on the configured start view before the redirect guard runs, so a
   // restored view is not immediately bounced by checkEnabledViews.
   const startViewAppliedRef = useRef(false)
+  const shortcutBindingsRef = useRef<ShortcutBindings>(defaultBindings())
+
+  useEffect(() => {
+    const load = () => {
+      loadBindings()
+        .then(b => { shortcutBindingsRef.current = b })
+        .catch(err => console.error('Failed to load shortcuts:', err))
+    }
+    load()
+    window.addEventListener('settings-update-shortcuts', load)
+    return () => window.removeEventListener('settings-update-shortcuts', load)
+  }, [])
+
   useEffect(() => {
     resolveStartView()
       .then(view => {
@@ -559,36 +580,27 @@ export default function App() {
       setView(view as ActiveView)
     })
 
-    // Global keyboard navigation shortcuts
+    // Global keyboard navigation shortcuts, matched against the user's bindings.
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'l' || e.key === 'L') {
-          e.preventDefault()
+      if (isTypingTarget(e.target)) return
+      const combo = comboFromEvent(e)
+      if (!combo) return
+
+      const bindings = shortcutBindingsRef.current
+      const shortcut = APP_SHORTCUTS.find(s => bindings[s.id] && bindings[s.id] === combo)
+      if (!shortcut) return
+
+      e.preventDefault()
+      switch (shortcut.action.kind) {
+        case 'view':
+          setView(shortcut.action.view)
+          break
+        case 'toggleAiPanel':
           toggleRightPanel('ai-chat')
-          return
-        }
-
-        if (e.key === ',') {
-          e.preventDefault()
+          break
+        case 'openSettings':
           setView('settings')
-          return
-        }
-
-        const keyNum = parseInt(e.key)
-        if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 8) {
-          const views: ActiveView[] = [
-            'log',
-            'kanban',
-            'backlog',
-            'focus',
-            'notes',
-            'clipboard',
-            'cookbook',
-            'analytics'
-          ]
-          e.preventDefault()
-          setView(views[keyNum - 1])
-        }
+          break
       }
     }
 

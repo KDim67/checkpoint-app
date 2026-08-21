@@ -166,6 +166,11 @@ interface ContextPopoverProps {
   onClose: () => void
 }
 
+/**
+ * A real listbox: the options are the contexts, and the "Manage" action sits
+ * outside it as a footer, because an action row is not a selectable option and
+ * would make the listbox semantics a lie.
+ */
 function ContextPopover({ onClose }: ContextPopoverProps) {
   const activeContext = useAppStore(s => s.activeContext)
   const availableContexts = useAppStore(s => s.availableContexts)
@@ -173,6 +178,60 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
   const setContext = useAppStore(s => s.setContext)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
+
+  const listRef = useRef<HTMLDivElement>(null)
+  const [activeIndex, setActiveIndex] = useState(() => {
+    const i = availableContexts.indexOf(activeContext)
+    return i === -1 ? 0 : i
+  })
+
+  useEffect(() => {
+    listRef.current?.focus()
+  }, [])
+
+  // Keep the highlighted option in view when arrowing past the scroll edge.
+  useEffect(() => {
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex])
+
+  const commit = (index: number) => {
+    const ctx = availableContexts[index]
+    if (ctx) setContext(ctx)
+    onClose()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const last = availableContexts.length - 1
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setActiveIndex(i => (i >= last ? 0 : i + 1))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setActiveIndex(i => (i <= 0 ? last : i - 1))
+        break
+      case 'Home':
+        e.preventDefault()
+        setActiveIndex(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setActiveIndex(last)
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        commit(activeIndex)
+        break
+      case 'Escape':
+        e.preventDefault()
+        onClose()
+        break
+    }
+  }
 
   return (
     <div
@@ -190,36 +249,47 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
         animation: 'dropdown-in 150ms var(--ease-enter)'
       }}
     >
-      <div style={{ padding: '6px 12px 4px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)' }}>
+      <div id="context-popover-label" className="label-caps" style={{ padding: '6px 12px 4px', letterSpacing: '0.05em' }}>
         Workspaces / Contexts
       </div>
-      <div style={{ maxHeight: '240px', overflowY: 'auto' }} className="custom-scrollbar">
-        {availableContexts.map(ctx => {
+      <div
+        ref={listRef}
+        role="listbox"
+        tabIndex={0}
+        aria-labelledby="context-popover-label"
+        aria-activedescendant={`context-option-${activeIndex}`}
+        onKeyDown={handleKeyDown}
+        style={{ maxHeight: '240px', overflowY: 'auto', outline: 'none' }}
+        className="custom-scrollbar"
+      >
+        {availableContexts.map((ctx, index) => {
           const entry = contextsList.find(c => c.slug === ctx)
-          const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\w/g, l => l.toUpperCase())
           const color = entry ? entry.color : 'var(--color-balance)'
           const isCurrent = ctx === activeContext
+          const isActive = index === activeIndex
 
           return (
-            <button
+            <div
               key={ctx}
-              onClick={() => { setContext(ctx); onClose() }}
+              id={`context-option-${index}`}
+              data-index={index}
+              role="option"
+              aria-selected={isCurrent}
+              onClick={() => commit(index)}
+              onMouseEnter={() => setActiveIndex(index)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 'var(--space-2)',
                 width: '100%',
                 padding: '6px 12px',
-                background: 'none',
-                border: 'none',
                 cursor: 'pointer',
                 fontSize: 'var(--text-sm)',
                 color: isCurrent ? 'var(--color-secondary)' : 'var(--color-text-base)',
-                textAlign: 'left',
+                background: isActive ? 'var(--color-surface-offset)' : 'none',
                 transition: 'background var(--duration-fast) var(--ease-default)'
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
             >
               <span style={{
                 width: '8px',
@@ -231,7 +301,7 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {name}
               </span>
-            </button>
+            </div>
           )
         })}
       </div>
@@ -276,6 +346,14 @@ export function Sidebar() {
   const focusIsRunning = useAppStore(s => s.focusIsRunning)
 
   const [contextOpen, setContextOpen] = useState(false)
+  const contextTriggerRef = useRef<HTMLButtonElement>(null)
+
+  // Focus moves into the popover on open, so it has to come back on close or
+  // the tab order restarts from the top of the document.
+  const closeContextPopover = useCallback(() => {
+    setContextOpen(false)
+    contextTriggerRef.current?.focus()
+  }, [])
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
   const [enabledViews, setEnabledViews] = useState<ViewEnabledMap>(defaultViewEnabledMap)
   const [syncEnabled, setSyncEnabled] = useState(false)
@@ -371,6 +449,7 @@ export function Sidebar() {
     >
       {/* Interactive Logo Context Switcher */}
       <button
+        ref={contextTriggerRef}
         id="context-switcher"
         title={`Active Context: ${ctxLabel}. Click to view all contexts.`}
         aria-label={`Active context: ${ctxLabel}. Click to view contexts list.`}
@@ -425,7 +504,7 @@ export function Sidebar() {
         </span>
       </button>
 
-      {contextOpen && <ContextPopover onClose={() => setContextOpen(false)} />}
+      {contextOpen && <ContextPopover onClose={closeContextPopover} />}
 
       <div style={{ height: '1px', width: '32px', background: 'var(--color-surface-offset)', margin: '2px 0 4px' }} />
 
