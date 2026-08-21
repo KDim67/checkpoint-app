@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
+import useFocusTrap from './ui/useFocusTrap'
+import useEscapeKey from './ui/useEscapeKey'
 
 // Types
 
@@ -3546,9 +3548,19 @@ export default function MapMakerView() {
 // Sub-components
 
 function Modal({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+  const titleId = useId()
+  const containerRef = useFocusTrap(true)
+  useEscapeKey(onClose, true)
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
       <div style={{
         background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
         borderRadius: 'var(--radius-lg)', padding: 20,
@@ -3556,8 +3568,8 @@ function Modal({ title, children, onClose, wide }: { title: string; children: Re
         display: 'flex', flexDirection: 'column', gap: 12
       }}>
         <div className="row-between">
-          <h3 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 4 }}><X size={16}/></button>
+          <h3 id={titleId} style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>{title}</h3>
+          <button onClick={onClose} aria-label="Close dialog" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 4 }}><X size={16}/></button>
         </div>
         {children}
       </div>

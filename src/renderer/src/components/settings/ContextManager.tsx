@@ -4,6 +4,7 @@ import { Divider, RowBetween } from './SettingsSection'
 import { useAppStore } from '../../store/appStore'
 import ColorPicker from '../ui/ColorPicker'
 import { useToast } from '../ui/Toast'
+import ModalShell from '../ui/ModalShell'
 
 interface ContextEntry {
   slug: string
@@ -606,159 +607,119 @@ export default function ContextManager() {
 
       {/* Delete confirmation modal */}
       {deleteWarning && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999
-        }}>
-          <div style={{
-            background: 'var(--color-surface-elevated)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-6)',
-            width: '380px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-            boxShadow: 'var(--shadow-lg)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-              <AlertTriangle size={20} color="var(--color-warning)" />
-              <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
-                Delete context?
-              </span>
-            </div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-              This will hide all{' '}
-              <strong style={{ color: 'var(--color-text-base)' }}>
-                {deleteWarning.count} item{deleteWarning.count !== 1 ? 's' : ''}
-              </strong>{' '}
-              in <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-secondary)' }}>
-                #{deleteWarning.slug}
-              </code>. Items are <em>not</em> deleted from the database and can be recovered.
-            </p>
-            <RowBetween>
-              <button className="btn-secondary" style={{ fontSize: 'var(--text-sm)' }}
-                onClick={() => setDeleteWarning(null)}>
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                style={{
-                  background: 'var(--color-error)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-4)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--weight-semibold)'
-                }}
-              >
-                Delete Context
-              </button>
-            </RowBetween>
+        <ModalShell label="Delete context" onClose={() => setDeleteWarning(null)} width="380px" closeOnBackdrop={false}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <AlertTriangle size={20} color="var(--color-warning)" />
+            <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
+              Delete context?
+            </span>
           </div>
-        </div>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+            This will hide all{' '}
+            <strong style={{ color: 'var(--color-text-base)' }}>
+              {deleteWarning.count} item{deleteWarning.count !== 1 ? 's' : ''}
+            </strong>{' '}
+            in <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-secondary)' }}>
+              #{deleteWarning.slug}
+            </code>. Items are <em>not</em> deleted from the database and can be recovered.
+          </p>
+          <RowBetween>
+            <button className="btn-secondary" style={{ fontSize: 'var(--text-sm)' }}
+              onClick={() => setDeleteWarning(null)}>
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteConfirm}
+              style={{
+                background: 'var(--color-error)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-2) var(--space-4)',
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--weight-semibold)'
+              }}
+            >
+              Delete Context
+            </button>
+          </RowBetween>
+        </ModalShell>
       )}
 
       {/* Import confirmation modal */}
       {importPayload && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999
-        }}>
-          <div style={{
-            background: 'var(--color-surface-elevated)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-6)',
-            width: '400px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-            boxShadow: 'var(--shadow-lg)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-              <Plus size={20} color="var(--color-secondary)" />
-              <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
-                Import Workspace Context
-              </span>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-                <label htmlFor="import-context-name" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
-                  Workspace Context Name
-                </label>
-                <input
-                  id="import-context-name"
-                  autoFocus
-                  value={importName}
-                  onChange={e => {
-                    setImportName(e.target.value)
-                    setImportSlug(slugify(e.target.value))
-                  }}
-                  placeholder="e.g. My Imported Project"
-                  style={{
-                    background: 'var(--color-surface-3)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    fontSize: 'var(--text-xs)',
-                    padding: '8px var(--space-3)',
-                    borderRadius: 'var(--radius-sm)',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
-                Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{importSlug}</code>
-              </div>
-
-              {contexts.some(c => c.slug === importSlug) && (
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '8px', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)' }}>
-                  <AlertTriangle size={14} />
-                  <span>Warning: Context #{importSlug} already exists. This will merge/overwrite items!</span>
-                </div>
-              )}
-
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
-                Contains: <strong>{importPayload.items?.length || 0}</strong> items, <strong>{importPayload.tags?.length || 0}</strong> tags, and <strong>{importPayload.relations?.length || 0}</strong> relations.
-              </div>
+        <ModalShell label="Import workspace" onClose={() => setImportPayload(null)} closeOnBackdrop={false}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <Plus size={20} color="var(--color-secondary)" />
+            <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
+              Import Workspace Context
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+              <label htmlFor="import-context-name" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+                Workspace Context Name
+              </label>
+              <input
+                id="import-context-name"
+                autoFocus
+                value={importName}
+                onChange={e => {
+                  setImportName(e.target.value)
+                  setImportSlug(slugify(e.target.value))
+                }}
+                placeholder="e.g. My Imported Project"
+                style={{
+                  background: 'var(--color-surface-3)',
+                  border: '1px solid var(--color-surface-offset)',
+                  color: 'var(--color-text-base)',
+                  fontSize: 'var(--text-xs)',
+                  padding: '8px var(--space-3)',
+                  borderRadius: 'var(--radius-sm)',
+                  outline: 'none'
+                }}
+              />
             </div>
 
-            <div style={{ marginTop: 'var(--space-2)' }}>
-              <RowBetween>
-                <button className="btn-secondary" style={{ fontSize: 'var(--text-sm)' }}
-                  onClick={() => setImportPayload(null)}>
-                  Cancel
-                </button>
-                <button
-                  onClick={handleImportConfirm}
-                  disabled={!importName.trim() || !importSlug}
-                  className="btn-primary"
-                  style={{
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: 'var(--weight-semibold)',
-                    opacity: (!importName.trim() || !importSlug) ? 0.5 : 1
-                  }}
-                >
-                  Import Workspace
-                </button>
-              </RowBetween>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+              Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{importSlug}</code>
+            </div>
+
+            {contexts.some(c => c.slug === importSlug) && (
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '8px', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)' }}>
+                <AlertTriangle size={14} />
+                <span>Warning: Context #{importSlug} already exists. This will merge/overwrite items!</span>
+              </div>
+            )}
+
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
+              Contains: <strong>{importPayload.items?.length || 0}</strong> items, <strong>{importPayload.tags?.length || 0}</strong> tags, and <strong>{importPayload.relations?.length || 0}</strong> relations.
             </div>
           </div>
-        </div>
+
+          <div style={{ marginTop: 'var(--space-2)' }}>
+            <RowBetween>
+              <button className="btn-secondary" style={{ fontSize: 'var(--text-sm)' }}
+                onClick={() => setImportPayload(null)}>
+                Cancel
+              </button>
+              <button
+                onClick={handleImportConfirm}
+                disabled={!importName.trim() || !importSlug}
+                className="btn-primary"
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--weight-semibold)',
+                  opacity: (!importName.trim() || !importSlug) ? 0.5 : 1
+                }}
+              >
+                Import Workspace
+              </button>
+            </RowBetween>
+          </div>
+        </ModalShell>
       )}
     </div>
   )

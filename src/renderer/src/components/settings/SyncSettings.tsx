@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { Wifi, Globe, Play, Loader2, RefreshCw, Terminal } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import { WebRTCSyncCoordinator } from '../../lib/webrtcSync'
+import ModalShell from '../ui/ModalShell'
 
 interface Peer {
   name: string
@@ -581,100 +582,74 @@ export default function SyncSettings() {
       )}
 
       {peerToPair && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1000,
-          background: 'rgba(11, 12, 16, 0.8)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          animation: 'fade-in 150ms var(--ease-enter)'
-        }}>
-          <div style={{
-            background: 'var(--color-surface-elevated)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            width: '320px',
-            padding: 'var(--space-5)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-            boxShadow: 'var(--shadow-2xl)',
-            animation: 'modal-in 200ms var(--ease-enter)'
-          }}>
-            <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
-              Enter Pairing Passcode
-            </h3>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-              Please type the 6-digit passcode displayed on <strong>{peerToPair.name}</strong> to authorize connection.
-            </p>
-            <input
-              type="text"
-              maxLength={6}
-              placeholder="Passcode (e.g. 123456)"
-              value={passcodeVal}
-              onChange={e => setPasscodeVal(e.target.value.replace(/\D/g, ''))}
+        <ModalShell label="Enter pairing passcode" onClose={() => setPeerToPair(null)} width="320px">
+          <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
+            Enter Pairing Passcode
+          </h3>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+            Please type the 6-digit passcode displayed on <strong>{peerToPair.name}</strong> to authorize connection.
+          </p>
+          <input
+            type="text"
+            maxLength={6}
+            placeholder="Passcode (e.g. 123456)"
+            value={passcodeVal}
+            onChange={e => setPasscodeVal(e.target.value.replace(/\D/g, ''))}
+            style={{
+              width: '100%',
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)',
+              padding: '8px 12px',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-base)',
+              outline: 'none',
+              textAlign: 'center',
+              letterSpacing: '0.1em'
+            }}
+            autoFocus
+            onKeyDown={e => {
+              if (e.key === 'Enter' && passcodeVal.length >= 5) {
+                submitPeerPairing(passcodeVal)
+              }
+            }}
+          />
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
+            <button
+              onClick={() => setPeerToPair(null)}
               style={{
-                width: '100%',
-                background: 'var(--color-surface-2)',
+                flex: 1,
+                fontSize: 'var(--text-xs)',
+                fontWeight: 'var(--weight-semibold)',
+                background: 'transparent',
+                color: 'var(--color-text-muted)',
                 border: '1px solid var(--color-surface-offset)',
+                padding: '8px 0',
                 borderRadius: 'var(--radius-md)',
-                padding: '8px 12px',
-                fontSize: 'var(--text-sm)',
-                color: 'var(--color-text-base)',
-                outline: 'none',
-                textAlign: 'center',
-                letterSpacing: '0.1em'
+                cursor: 'pointer'
               }}
-              autoFocus
-              onKeyDown={e => {
-                if (e.key === 'Enter' && passcodeVal.length >= 5) {
-                  submitPeerPairing(passcodeVal)
-                }
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => submitPeerPairing(passcodeVal)}
+              disabled={passcodeVal.length < 5}
+              style={{
+                flex: 1,
+                fontSize: 'var(--text-xs)',
+                fontWeight: 'var(--weight-semibold)',
+                background: passcodeVal.length < 5 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
+                color: passcodeVal.length < 5 ? 'var(--color-text-faint)' : 'var(--color-text-inverted)',
+                border: 'none',
+                padding: '8px 0',
+                borderRadius: 'var(--radius-md)',
+                cursor: passcodeVal.length < 5 ? 'not-allowed' : 'pointer'
               }}
-            />
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
-              <button
-                onClick={() => setPeerToPair(null)}
-                style={{
-                  flex: 1,
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 'var(--weight-semibold)',
-                  background: 'transparent',
-                  color: 'var(--color-text-muted)',
-                  border: '1px solid var(--color-surface-offset)',
-                  padding: '8px 0',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => submitPeerPairing(passcodeVal)}
-                disabled={passcodeVal.length < 5}
-                style={{
-                  flex: 1,
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 'var(--weight-semibold)',
-                  background: passcodeVal.length < 5 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
-                  color: passcodeVal.length < 5 ? 'var(--color-text-faint)' : 'var(--color-text-inverted)',
-                  border: 'none',
-                  padding: '8px 0',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: passcodeVal.length < 5 ? 'not-allowed' : 'pointer'
-                }}
-              >
-                Connect & Sync
-              </button>
-            </div>
+            >
+              Connect & Sync
+            </button>
           </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )

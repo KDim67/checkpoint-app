@@ -9,6 +9,8 @@ interface ConfirmDialogProps {
   confirmText?: string
   cancelText?: string
   isDestructive?: boolean
+  /** Extra emphasis for irreversible actions, shown below the message. */
+  warning?: string
   onConfirm: () => void
   onCancel: () => void
 }
@@ -20,6 +22,7 @@ export default function ConfirmDialog({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   isDestructive = false,
+  warning,
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
@@ -98,6 +101,21 @@ export default function ConfirmDialog({
           }}>
             {message}
           </p>
+
+          {warning && (
+            <div style={{
+              marginTop: 'var(--space-3)',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-warning)',
+              background: 'var(--color-warning-muted)',
+              border: '1px solid var(--color-warning)',
+              padding: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+              lineHeight: 1.4
+            }}>
+              {warning}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -161,6 +179,7 @@ interface ConfirmOptions {
   confirmText?: string
   cancelText?: string
   isDestructive?: boolean
+  warning?: string
 }
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
@@ -208,6 +227,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         confirmText={pending?.options.confirmText}
         cancelText={pending?.options.cancelText}
         isDestructive={pending?.options.isDestructive}
+        warning={pending?.options.warning}
         onConfirm={() => settle(true)}
         onCancel={() => settle(false)}
       />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { useConfirm } from './ui/ConfirmDialog'
 import {
   Settings,
   Layers,
@@ -1285,6 +1285,7 @@ export default function SettingsView() {
 
 // Database Backup Settings Section
 function BackupSettings() {
+  const confirm = useConfirm()
   const { toast } = useToast()
   const [enabled, setEnabled] = useState(true)
   const [interval, setIntervalVal] = useState('daily')
@@ -1296,7 +1297,6 @@ function BackupSettings() {
   const [running, setRunning] = useState(false)
   const [restoring, setRestoring] = useState<string | null>(null)
 
-  const [confirmRestoreFile, setConfirmRestoreFile] = useState<string | null>(null)
 
   const loadStatus = async () => {
     try {
@@ -1393,7 +1393,15 @@ function BackupSettings() {
   }
 
   const handleRestore = async (filename: string) => {
-    setConfirmRestoreFile(null)
+    const ok = await confirm({
+      title: 'Confirm Database Restore',
+      message: `Are you sure you want to restore ${filename}?`,
+      warning: 'This will overwrite your current active database. To prevent data loss, a safety backup of your current database is created first.',
+      confirmText: 'Yes, Restore Database',
+      isDestructive: true
+    })
+    if (!ok) return
+
     setRestoring(filename)
     toast('Restoring database, please wait...')
     try {
@@ -1574,7 +1582,7 @@ function BackupSettings() {
                       </td>
                       <td style={{ padding: 'var(--space-2.5) var(--space-4)', display: 'flex', gap: 'var(--space-2)', justifyContent: 'center' }}>
                         <button
-                          onClick={() => setConfirmRestoreFile(b.filename)}
+                          onClick={() => handleRestore(b.filename)}
                           disabled={restoring !== null}
                           style={{
                             background: 'var(--color-primary-muted)',
@@ -1613,91 +1621,6 @@ function BackupSettings() {
         </>
       )}
 
-      {confirmRestoreFile && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 11000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 'var(--space-4)'
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              width: '100%',
-              maxWidth: '420px',
-              padding: 'var(--space-6)',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-4)'
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
-              Confirm Database Restore
-            </h3>
-            <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
-              Are you sure you want to restore <strong style={{ color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)' }}>{confirmRestoreFile}</strong>?
-            </p>
-            <div
-              style={{
-                fontSize: '11px',
-                color: 'var(--color-warning)',
-                background: 'var(--color-warning-muted)',
-                border: '1px solid var(--color-warning)',
-                padding: 'var(--space-3)',
-                borderRadius: 'var(--radius-md)',
-                lineHeight: 1.4
-              }}
-            >
-              ⚠️ <strong>Warning:</strong> This will overwrite your current active database! To prevent data loss, a safety backup of your current database will be automatically created first.
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-              <button
-                onClick={() => setConfirmRestoreFile(null)}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '6px 12px',
-                  fontSize: 'var(--text-xs)',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRestore(confirmRestoreFile)}
-                style={{
-                  background: 'var(--color-error)',
-                  border: 'none',
-                  color: 'white',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '6px 12px',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 'var(--weight-bold)',
-                  cursor: 'pointer'
-                }}
-              >
-                Yes, Restore Database
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   )
 }

@@ -30,6 +30,8 @@ import type { Item } from '../../../shared/types'
 import { Plus, Layers, LayoutGrid, KanbanSquare, Upload } from 'lucide-react'
 import Skeleton from './ui/Skeleton'
 import ConfirmDialog, { useConfirm } from './ui/ConfirmDialog'
+import useFocusTrap from './ui/useFocusTrap'
+import useEscapeKey from './ui/useEscapeKey'
 import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
@@ -267,6 +269,9 @@ export default function KanbanView() {
 
   const [archivedColumns, setArchivedColumns] = useState<ColumnConfig[]>([])
   const [showArchiveBin, setShowArchiveBin] = useState(false)
+  const closeArchiveBin = useCallback(() => setShowArchiveBin(false), [])
+  const archiveBinRef = useFocusTrap(showArchiveBin)
+  useEscapeKey(closeArchiveBin, showArchiveBin)
   const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set())
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [showBgSelector, setShowBgSelector] = useState(false)
@@ -2391,6 +2396,10 @@ export default function KanbanView() {
       {/* Archive Bin Drawer */}
       {showArchiveBin && (
         <div
+          ref={archiveBinRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Archive bin"
           onClick={() => setShowArchiveBin(false)}
           style={{
             position: 'fixed',
