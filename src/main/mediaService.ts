@@ -1,22 +1,11 @@
-import { app } from 'electron'
 import { join, extname } from 'path'
-import { existsSync, readdirSync, writeFileSync, copyFileSync, statSync, unlinkSync, readFileSync, mkdirSync } from 'fs'
+import { existsSync, readdirSync, writeFileSync, copyFileSync, statSync, unlinkSync, readFileSync } from 'fs'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb } from './db'
-
-export function getConfigDir(): string {
-  return join(app.getPath('home'), '.config', 'checkpoint')
-}
-
-export function getMediaDir(): string {
-  return join(getConfigDir(), 'media')
-}
+import { getMediaDir, getNotesDir, ensureDir } from './paths'
 
 export function ensureMediaDir(): void {
-  const dir = getMediaDir()
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
+  ensureDir(getMediaDir())
 }
 
 /**
@@ -120,7 +109,7 @@ export function scanAndPruneOrphanedMedia(): PruneResult {
   }
 
   // 2. Scan Markdown Notes Folder
-  const notesDir = join(getConfigDir(), 'notes')
+  const notesDir = getNotesDir()
   const noteTexts: string[] = []
   if (existsSync(notesDir)) {
     try {

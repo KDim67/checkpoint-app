@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { Check, Calendar, Link2, ChevronUp, ChevronDown, Minus } from 'lucide-react'
+import { Check, Calendar, Link2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item } from '../../../../shared/types'
+import { PRIORITY_ICONS, PRIORITY_LABELS } from '../../lib/priority'
 
 interface BacklogRowProps {
   item: Item
@@ -13,20 +14,6 @@ interface BacklogRowProps {
   onSelectToggle: (id: string, e: React.MouseEvent) => void
   onRowDoubleClick: (id: string) => void
   onUpdateField: (id: string, patch: Partial<Item>) => void
-}
-
-const PRIORITY_ICONS: Record<number, React.ReactNode> = {
-  3: <ChevronUp size={14} style={{ color: 'var(--color-priority-high)' }} />,
-  2: <ChevronUp size={14} style={{ color: 'var(--color-priority-med)' }} />,
-  1: <ChevronDown size={14} style={{ color: 'var(--color-priority-low)' }} />,
-  0: <Minus size={14} style={{ color: 'var(--color-text-faint)' }} />
-}
-
-const PRIORITY_LABELS: Record<number, string> = {
-  3: 'High',
-  2: 'Medium',
-  1: 'Low',
-  0: 'None'
 }
 
 export default function BacklogRow({

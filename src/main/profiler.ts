@@ -1,32 +1,8 @@
-import { execFile } from 'child_process'
+import { execFileAsync } from './exec'
 import os from 'os'
 import si from 'systeminformation'
 import type { HardwareSpecs, GpuVendor } from '../shared/cookbookTypes'
 
-/**
- * Runs an executable command with arguments and returns stdout,
- * guarded by an AbortController timeout to prevent hang.
- */
-function execFileAsync(file: string, args: string[], timeoutMs: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const controller = new AbortController()
-    const { signal } = controller
-
-    const timeout = setTimeout(() => {
-      controller.abort()
-      reject(new Error(`Exec timeout after ${timeoutMs}ms`))
-    }, timeoutMs)
-
-    execFile(file, args, { signal }, (error, stdout) => {
-      clearTimeout(timeout)
-      if (error) {
-        reject(error)
-      } else {
-        resolve(stdout.trim())
-      }
-    })
-  })
-}
 
 export async function getHardwareSpecs(): Promise<HardwareSpecs> {
   // Safe default values

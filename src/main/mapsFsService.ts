@@ -1,34 +1,17 @@
 import fs from 'fs'
 import path from 'path'
-import os from 'os'
-
-const CONFIG_DIR = path.join(os.homedir(), '.config', 'checkpoint')
-const MAPS_DIR = path.join(CONFIG_DIR, 'maps')
+import { getConfigDir, getMapsDir, ensureDir, resolveSafePath as resolveInDir } from './paths'
 
 /**
  * Initializes the maps directory inside the app's user profile config directory.
  */
 export function initMapsFs(): void {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true })
-  }
-  if (!fs.existsSync(MAPS_DIR)) {
-    fs.mkdirSync(MAPS_DIR, { recursive: true })
-  }
+  ensureDir(getConfigDir())
+  ensureDir(getMapsDir())
 }
 
-/**
- * Safely resolves a map filename to a file path within the maps directory,
- * preventing path traversal attacks.
- */
 function resolveSafePath(name: string): string {
-  const safeName = name.replace(/[\\/:*?"<>|]/g, '_')
-  const resolvedPath = path.resolve(MAPS_DIR, `${safeName}.json`)
-  const rel = path.relative(MAPS_DIR, resolvedPath)
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error('Path traversal detected')
-  }
-  return resolvedPath
+  return resolveInDir(getMapsDir(), name, '.json')
 }
 
 /**
@@ -37,7 +20,7 @@ function resolveSafePath(name: string): string {
 export function listMaps(): string[] {
   initMapsFs()
   try {
-    const files = fs.readdirSync(MAPS_DIR)
+    const files = fs.readdirSync(getMapsDir())
     return files
       .filter(f => f.endsWith('.json'))
       .map(f => path.basename(f, '.json'))

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Eye } from 'lucide-react'
 import type { Item, Tag as TagType } from '../../../../shared/types'
 import BacklogRow from './BacklogRow'
+import { PRIORITY_LABELS_LONG as PRIORITY_LABELS } from '../../lib/priority'
 
 interface BacklogTableProps {
   items: Item[]
@@ -28,13 +29,6 @@ type DisplayRow =
   | { type: 'row'; key: string; item: Item }
 
 const isItemDone = (item: Item) => item.status.toLowerCase() === 'done'
-
-const PRIORITY_LABELS: Record<number, string> = {
-  3: 'High Priority',
-  2: 'Medium Priority',
-  1: 'Low Priority',
-  0: 'No Priority'
-}
 
 export default function BacklogTable({
   items,

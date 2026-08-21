@@ -4,6 +4,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { Edit2, Trash2, ArrowRightLeft, Calendar, GripVertical, Play, Check, CheckSquare } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item } from '../../../../shared/types'
+import { getTextColorForBackground } from '../../lib/contrast'
+import { PRIORITY_COLORS } from '../../lib/priority'
 
 interface KanbanCardProps {
   card: Item
@@ -12,13 +14,6 @@ interface KanbanCardProps {
   onConvertToTask: (id: string) => void
   onUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
   isOverlay?: boolean
-}
-
-const PRIORITY_COLORS: Record<number, { bar: string; label: string; bg: string }> = {
-  3: { bar: '#ef4444', label: 'High',   bg: 'rgba(239,68,68,0.08)' },
-  2: { bar: '#eab308', label: 'Med',    bg: 'rgba(234,179,8,0.12)' },
-  1: { bar: '#3b82f6', label: 'Low',    bg: 'rgba(59,130,246,0.08)' },
-  0: { bar: 'transparent', label: '', bg: 'transparent' }
 }
 
 function stripMarkdown(md: string): string {
@@ -46,17 +41,6 @@ function stripMarkdown(md: string): string {
     // Clean up multiple spaces/newlines
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-function getTextColorForBackground(bgColor?: string): string {
-  if (!bgColor) return 'var(--color-text-base)'
-  const hex = bgColor.replace('#', '')
-  if (hex.length !== 6) return '#ffffff'
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000
-  return yiq >= 115 ? '#0f172a' : '#ffffff'
 }
 
 function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOverlay = false }: KanbanCardProps) {

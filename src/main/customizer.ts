@@ -6,10 +6,9 @@ import {
   unloadAllPlugins,
   unloadPlugin,
   loadPlugin,
-  getPluginsDir,
-  getConfigDir,
   ensurePluginsDir
 } from './pluginRegistry'
+import { getConfigDir, getPluginsDir } from './paths'
 import { getSetting } from './db'
 import { updateNativeTitleBarFromSettings } from './titleBarSync'
 

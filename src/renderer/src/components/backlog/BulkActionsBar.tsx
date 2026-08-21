@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { X, Trash2, Download, Tag as TagIcon, ChevronUp, ChevronDown, Minus } from 'lucide-react'
 import type { Item, Tag as TagType } from '../../../../shared/types'
+import { PRIORITY_LABELS } from '../../lib/priority'
 
 interface BulkActionsBarProps {
   selectedItems: Item[]
@@ -12,13 +13,6 @@ interface BulkActionsBarProps {
   onBulkAddTag: (tagId: string) => Promise<void>
   onBulkDelete: () => void
   onExportMarkdown: () => void
-}
-
-const PRIORITY_LABELS: Record<number, string> = {
-  3: 'High',
-  2: 'Medium',
-  1: 'Low',
-  0: 'None'
 }
 
 export default function BulkActionsBar({

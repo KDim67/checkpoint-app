@@ -4,64 +4,13 @@
  * and exchanges SQLite database records & note files over direct RTCDataChannels.
  */
 
+import { deriveKey, encryptData, decryptData, SYNC_SALT } from './webrtcCrypto'
+
 interface FileMetadata {
   relPath: string
   mtime: number
   size: number
   sha256: string
-}
-
-// Encryption utilities using Web Crypto API
-async function deriveKey(passcode: string): Promise<CryptoKey> {
-  const enc = new TextEncoder()
-  const salt = enc.encode('checkpoint-sync-salt-v1')
-  const baseKey = await window.crypto.subtle.importKey(
-    'raw',
-    enc.encode(passcode),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  )
-  return window.crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 1000,
-      hash: 'SHA-256'
-    },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  )
-}
-
-async function encryptData(data: string, key: CryptoKey): Promise<string> {
-  const enc = new TextEncoder()
-  const iv = window.crypto.getRandomValues(new Uint8Array(12))
-  const encrypted = await window.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv },
-    key,
-    enc.encode(data)
-  )
-  const combined = new Uint8Array(iv.length + encrypted.byteLength)
-  combined.set(iv, 0)
-  combined.set(new Uint8Array(encrypted), iv.length)
-  return btoa(String.fromCharCode(...combined))
-}
-
-async function decryptData(base64Data: string, key: CryptoKey): Promise<string> {
-  const combined = new Uint8Array(
-    atob(base64Data).split('').map(c => c.charCodeAt(0))
-  )
-  const iv = combined.slice(0, 12)
-  const ciphertext = combined.slice(12)
-  const decrypted = await window.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: iv },
-    key,
-    ciphertext
-  )
-  return new TextDecoder().decode(decrypted)
 }
 
 interface WebRTCSyncOptions {
@@ -93,7 +42,7 @@ export class WebRTCSyncCoordinator {
   public async start(): Promise<void> {
     try {
       this.cleanup()
-      this.key = await deriveKey(this.options.pairingCode)
+      this.key = await deriveKey(this.options.pairingCode, SYNC_SALT)
       this.options.onProgress('Security key derived. Connecting signaling lobby...')
 
       const signalingRoom = `checkpoint-sync-${this.options.pairingCode}`

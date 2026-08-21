@@ -1,22 +1,11 @@
 import { app, ipcMain, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, readdirSync, mkdirSync } from 'fs'
+import { existsSync, readdirSync } from 'fs'
 import { PluginInfo } from '../shared/types'
-
-// Resolve config paths
-export function getConfigDir(): string {
-  return join(app.getPath('home'), '.config', 'checkpoint')
-}
-
-export function getPluginsDir(): string {
-  return join(getConfigDir(), 'plugins')
-}
+import { getPluginsDir, ensureDir } from './paths'
 
 export function ensurePluginsDir(): void {
-  const dir = getPluginsDir()
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
+  ensureDir(getPluginsDir())
 }
 
 // Keep track of loaded plugin runtimes and sandboxes

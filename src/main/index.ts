@@ -643,7 +643,7 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER, async () => {
-    const { getPluginsDir } = await import('./pluginRegistry')
+    const { getPluginsDir } = await import('./paths')
     const dir = getPluginsDir()
     await shell.openPath(dir)
   })
@@ -949,7 +949,8 @@ app.whenReady().then(async () => {
 
   // Register checkpoint-media protocol handler and ensure its directory exists
   try {
-    const { ensureMediaDir, getMediaDir } = await import('./mediaService')
+    const { ensureMediaDir } = await import('./mediaService')
+    const { getMediaDir } = await import('./paths')
     ensureMediaDir()
     protocol.handle('checkpoint-media', async (request) => {
       try {

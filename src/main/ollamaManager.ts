@@ -1,32 +1,10 @@
-import { execFile } from 'child_process'
+import { execFileQuiet } from './exec'
 import { BrowserWindow } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { OllamaStatus, PullProgressEvent } from '../shared/cookbookTypes'
 
 let activeAbortController: AbortController | null = null
 let lastOfflineLogged = false
-
-/**
- * Runs a command with arguments and a timeout.
- * Returns empty string if it fails or times out.
- */
-function execFileAsync(file: string, args: string[], timeoutMs: number): Promise<string> {
-  return new Promise((resolve) => {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => {
-      controller.abort()
-    }, timeoutMs)
-
-    execFile(file, args, { signal: controller.signal }, (error, stdout) => {
-      clearTimeout(timeout)
-      if (error) {
-        resolve('')
-      } else {
-        resolve(stdout.trim())
-      }
-    })
-  })
-}
 
 /**
  * Checks if Ollama is running, installed, and gets currently available local models.
@@ -56,7 +34,7 @@ export async function checkOllama(): Promise<OllamaStatus> {
 
   // Tier 2: check if Ollama CLI is installed in PATH
   try {
-    const versionOutput = await execFileAsync('ollama', ['--version'], 2000)
+    const versionOutput = await execFileQuiet('ollama', ['--version'], 2000)
     if (versionOutput) {
       return {
         installed: true,

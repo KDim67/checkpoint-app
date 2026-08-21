@@ -1,11 +1,8 @@
 import fs from 'fs'
 import path from 'path'
-import os from 'os'
 import type { NoteMetadata, NoteSearchResult } from '../shared/types'
 import { recordTombstone } from './db'
-
-const CONFIG_DIR = path.join(os.homedir(), '.config', 'checkpoint')
-const NOTES_DIR = path.join(CONFIG_DIR, 'notes')
+import { getConfigDir, getNotesDir, ensureDir, resolveSafePath as resolveInDir } from './paths'
 
 /**
  * Initializes the notes directory, idempotent and fast after first call.
@@ -13,29 +10,13 @@ const NOTES_DIR = path.join(CONFIG_DIR, 'notes')
 let _notesFsReady = false
 export function initNotesFs(): void {
   if (_notesFsReady) return
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true })
-  }
-  if (!fs.existsSync(NOTES_DIR)) {
-    fs.mkdirSync(NOTES_DIR, { recursive: true })
-  }
+  ensureDir(getConfigDir())
+  ensureDir(getNotesDir())
   _notesFsReady = true
 }
 
-/**
- * Safely resolves a title to a file path within the notes directory,
- * preventing path traversal attacks.
- */
 function resolveSafePath(title: string): string {
-  // Replace characters that are illegal or problematic in filenames
-  const safeTitle = title.replace(/[\\/:*?"<>|]/g, '_')
-  const resolvedPath = path.resolve(NOTES_DIR, `${safeTitle}.md`)
-  // Use path.relative to robustly ensure the target stays inside NOTES_DIR
-  const rel = path.relative(NOTES_DIR, resolvedPath)
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error('Path traversal detected')
-  }
-  return resolvedPath
+  return resolveInDir(getNotesDir(), title, '.md')
 }
 
 /**
@@ -98,13 +79,13 @@ function extractLinks(content: string): string[] {
 export async function listNotes(): Promise<NoteMetadata[]> {
   initNotesFs()
   try {
-    const files = await fs.promises.readdir(NOTES_DIR)
+    const files = await fs.promises.readdir(getNotesDir())
     const mdFiles = files.filter(f => f.toLowerCase().endsWith('.md'))
 
     const results: NoteMetadata[] = []
 
     for (const file of mdFiles) {
-      const filePath = path.join(NOTES_DIR, file)
+      const filePath = path.join(getNotesDir(), file)
       const stats = await fs.promises.stat(filePath)
       const content = await fs.promises.readFile(filePath, 'utf-8')
       const title = path.basename(file, '.md')
@@ -209,13 +190,13 @@ export async function searchNotes(query: string): Promise<NoteSearchResult[]> {
   if (!trimmed) return []
 
   try {
-    const files = await fs.promises.readdir(NOTES_DIR)
+    const files = await fs.promises.readdir(getNotesDir())
     const mdFiles = files.filter(f => f.toLowerCase().endsWith('.md'))
 
     const results: NoteSearchResult[] = []
 
     for (const file of mdFiles) {
-      const filePath = path.join(NOTES_DIR, file)
+      const filePath = path.join(getNotesDir(), file)
       const content = await fs.promises.readFile(filePath, 'utf-8')
       const title = path.basename(file, '.md')
 
