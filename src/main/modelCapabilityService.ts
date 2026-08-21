@@ -23,6 +23,14 @@ const PROBE_TIMEOUT_MS = 4000
  */
 const CACHE_SETTING_KEY = 'ai_model_capabilities'
 
+/**
+ * Fallbacks from a failed probe are held here for the session only. Persisting
+ * them would let one blip, Ollama not up yet at launch, freeze a guessed
+ * profile forever, while re-probing on every message would pay the timeout
+ * repeatedly against an endpoint that is genuinely down.
+ */
+const sessionFallbacks = new Map<string, ModelCapabilities>()
+
 type CapabilityCache = Record<string, ModelCapabilities>
 
 function cacheKey(baseURL: string, model: string): string {
@@ -200,7 +208,11 @@ export async function getModelCapabilities(
 
   const key = cacheKey(baseURL, model)
   const cache = readCache()
-  if (!force && cache[key]) return cache[key]
+  if (!force) {
+    if (cache[key]) return cache[key]
+    const fallback = sessionFallbacks.get(key)
+    if (fallback) return fallback
+  }
 
   const base = defaultCapabilities(model)
   const probed = isOllama
@@ -227,12 +239,18 @@ export async function getModelCapabilities(
     merged.fixedTemperature = 1
   }
 
-  cache[key] = merged
-  writeCache(cache)
+  if (merged.source === 'endpoint') {
+    cache[key] = merged
+    writeCache(cache)
+    sessionFallbacks.delete(key)
+  } else {
+    sessionFallbacks.set(key, merged)
+  }
   return merged
 }
 
 /** Clears cached capabilities so the next lookup re-probes. */
 export function clearCapabilityCache(): void {
+  sessionFallbacks.clear()
   setSetting(CACHE_SETTING_KEY, JSON.stringify({}))
 }
