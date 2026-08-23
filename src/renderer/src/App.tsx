@@ -1,10 +1,8 @@
 import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
 import { useAppStore, type ActiveView } from './store/appStore'
 import { Sidebar } from './components/Sidebar'
-import AiStreamPanel from './components/AiStreamPanel'
-import GitPanel from './components/GitPanel'
-import ItemDetailPanel from './components/ItemDetailPanel'
 import { ToastProvider } from './components/ui/Toast'
+import ErrorBoundary from './components/ui/ErrorBoundary'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './components/settings/AppearanceSettings'
@@ -34,6 +32,14 @@ const AnalyticsView = lazy(() => import('./components/AnalyticsView'))
 const HudView       = lazy(() => import('./components/HudView'))
 const CheatsheetsView = lazy(() => import('./components/CheatsheetsView'))
 const GameDevView = lazy(() => import('./components/GameDevView'))
+
+// Lazy-loaded right panel
+// These only render when the right panel is open, but importing them eagerly
+// pulled ~7,000 lines (AiStreamPanel + ChatMessage alone) into the startup
+// chunk for every launch, including launches that never open the panel.
+const AiStreamPanel   = lazy(() => import('./components/AiStreamPanel'))
+const GitPanel        = lazy(() => import('./components/GitPanel'))
+const ItemDetailPanel = lazy(() => import('./components/ItemDetailPanel'))
 
 // View-level skeleton (shown while lazy chunks load)
 function ViewSkeleton() {
@@ -385,9 +391,13 @@ function RightPanel() {
             aria-labelledby={rightPanelContent ? `panel-tab-${rightPanelContent}` : undefined}
             style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
           >
-            {rightPanelContent === 'ai-chat' && <AiStreamPanel />}
-            {rightPanelContent === 'git' && <GitPanel />}
-            {rightPanelContent === 'item-detail' && <ItemDetailPanel />}
+            <ErrorBoundary label="This panel" resetKey={rightPanelContent ?? ''}>
+              <Suspense fallback={<div className="skeleton" style={{ margin: 'var(--space-4)', height: '64px', borderRadius: 'var(--radius-md)' }} />}>
+                {rightPanelContent === 'ai-chat' && <AiStreamPanel />}
+                {rightPanelContent === 'git' && <GitPanel />}
+                {rightPanelContent === 'item-detail' && <ItemDetailPanel />}
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       )}
@@ -425,14 +435,18 @@ function applyGoogleFont(fontValue: string) {
 function WidgetShell() {
   return (
     <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Suspense fallback={null}><WidgetView /></Suspense>
+      <ErrorBoundary label="The widget">
+        <Suspense fallback={null}><WidgetView /></Suspense>
+      </ErrorBoundary>
     </div>
   )
 }
 function HudShell() {
   return (
     <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Suspense fallback={null}><HudView /></Suspense>
+      <ErrorBoundary label="Quick capture">
+        <Suspense fallback={null}><HudView /></Suspense>
+      </ErrorBoundary>
     </div>
   )
 }
@@ -673,6 +687,10 @@ export default function App() {
     <ToastProvider>
       <ConfirmProvider>
         <FocusTimerEngine />
+        {/* Outermost net: the per-view and per-panel boundaries below handle
+            almost everything, but a throw in the shell chrome itself (Titlebar,
+            Sidebar) would otherwise still take the window to white. */}
+        <ErrorBoundary label="Checkpoint">
         <div className="app-shell">
           <Titlebar />
           <div className="app-body">
@@ -683,13 +701,16 @@ export default function App() {
               role="main"
               aria-label={`${activeView} view`}
             >
-              <Suspense fallback={<ViewSkeleton />}>
-                {renderView()}
-              </Suspense>
+              <ErrorBoundary label="This view" resetKey={activeView}>
+                <Suspense fallback={<ViewSkeleton />}>
+                  {renderView()}
+                </Suspense>
+              </ErrorBoundary>
             </main>
             <RightPanel />
           </div>
         </div>
+        </ErrorBoundary>
         <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       </ConfirmProvider>
     </ToastProvider>
