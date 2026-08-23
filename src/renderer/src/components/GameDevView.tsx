@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { GitFork, Grid, Layers, Map, Maximize2, Palette, Repeat, Scissors, Sliders, Sparkles } from 'lucide-react'
-import MapMakerView from './MapMakerView'
+import { GitFork, Grid, Layers, Maximize2, Palette, Repeat, Scissors, Sliders, Sparkles } from 'lucide-react'
 import { useToast } from './ui/Toast'
 import { useAppStore } from '../store/appStore'
 import PalettePanel from './gamedev/PalettePanel'
@@ -78,7 +77,7 @@ export default function GameDevView() {
       display: 'flex',
       flexDirection: 'column',
       gap: 'var(--space-4)',
-      overflowY: activeTab === 'mapmaker' ? 'hidden' : 'auto',
+      overflowY: 'auto',
       height: '100%',
       backgroundColor: 'var(--color-background)',
       color: 'var(--color-text-base)',
@@ -171,12 +170,6 @@ export default function GameDevView() {
               { id: 'dialogue' as const, label: 'Dialogue Flow',  icon: <GitFork size={14} /> },
               { id: 'palette' as const,  label: 'Shader Palette', icon: <Palette size={14} /> }
             ]
-          },
-          {
-            group: 'Level Design',
-            tools: [
-              { id: 'mapmaker' as const, label: 'Concept Map Designer', icon: <Map size={14} /> }
-            ]
           }
         ]).map(section => (
           <div
@@ -263,13 +256,6 @@ export default function GameDevView() {
         {/* TAB 10: PIXEL ART UPSCALER */}
         {activeTab === 'upscaler' && (
           <UpscalerPanel tool={upscalerTool} />
-        )}
-
-        {/* TAB: MAP MAKER */}
-        {activeTab === 'mapmaker' && (
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <MapMakerView />
-          </div>
         )}
 
       </div>

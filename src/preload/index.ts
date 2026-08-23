@@ -465,17 +465,6 @@ const api = {
       ipcRenderer.invoke(IpcChannels.NOTES_SEARCH, query)
   },
 
-  maps: {
-    listMaps: (): Promise<string[]> =>
-      ipcRenderer.invoke('maps:list'),
-    readMap: (name: string): Promise<string> =>
-      ipcRenderer.invoke('maps:read', name),
-    writeMap: (name: string, content: string): Promise<void> =>
-      ipcRenderer.invoke('maps:write', name, content),
-    deleteMap: (name: string): Promise<void> =>
-      ipcRenderer.invoke('maps:delete', name)
-  },
-
   git: {
     checkRepo: (path: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.GIT_CHECK, path),

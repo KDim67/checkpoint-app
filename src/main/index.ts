@@ -585,27 +585,6 @@ function registerIpcHandlers(): void {
     return searchNotes(query)
   })
 
-  // Maps Handlers
-  ipcMain.handle('maps:list', async () => {
-    const { listMaps } = await import('./mapsFsService')
-    return listMaps()
-  })
-
-  ipcMain.handle('maps:read', async (_event, name: string) => {
-    const { readMap } = await import('./mapsFsService')
-    return readMap(name)
-  })
-
-  ipcMain.handle('maps:write', async (_event, name: string, content: string) => {
-    const { writeMap } = await import('./mapsFsService')
-    return writeMap(name, content)
-  })
-
-  ipcMain.handle('maps:delete', async (_event, name: string) => {
-    const { deleteMap } = await import('./mapsFsService')
-    return deleteMap(name)
-  })
-
   // Git Integration Handlers
   ipcMain.handle(IpcChannels.GIT_CHECK, async (_event, repoPath: string) => {
     const { checkRepo } = await import('./gitService')
