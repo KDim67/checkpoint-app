@@ -43,3 +43,15 @@ dist/
 # Vite / bundler caches
 .vite
 .eslintcache
+
+# TypeScript incremental build state, regenerated on every typecheck/build
+*.tsbuildinfo
+
+# `tsc --build` on these composite projects emits beside the sources
+src/**/*.js
+src/**/*.jsx
+src/**/*.d.ts
+!src/renderer/src/electron.d.ts
+!src/renderer/src/vite-env.d.ts
+!src/shared/**/*.d.ts
+

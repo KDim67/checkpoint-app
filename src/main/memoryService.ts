@@ -224,7 +224,7 @@ export function searchMemories(query: string, context: string = 'default', limit
   // Increment access_count for retrieved memories
   const topResults = scored.filter(s => s.score > 0.01).map(s => s.mem).slice(0, limit)
   for (const item of topResults) {
-    try { stmtIncrementAccess.run(item.id) } catch (e) {}
+    try { stmtIncrementAccess.run(item.id) } catch {}
   }
 
   return topResults.length > 0 ? topResults : recallable.slice(0, Math.min(limit, 3))

@@ -86,7 +86,7 @@ function faultTolerantParseJSON(jsonStr: string): any {
   const clean = jsonStr.trim()
   try {
     return JSON.parse(clean)
-  } catch (err) {
+  } catch {
     try {
       let repaired = clean
         .replace(/(["\d])\s*[\r\n]+\s*(?="[^"]+"\s*:)/g, '$1,')
@@ -313,7 +313,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
           let colsList: any[] = []
           if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch (e) { colsList = [] }
+            try { colsList = JSON.parse(rawCols) } catch { colsList = [] }
           } else if (Array.isArray(rawCols)) {
             colsList = rawCols
           }
@@ -1075,6 +1075,34 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
     return () => { isMounted = false }
   }, [jsonString, activeContext, signature])
 
+  // Look up the human-readable column name for whatever status ID this card has.
+  // Must stay above the early returns below: this block renders a "generating"
+  // placeholder while `data` is still streaming in, so hooks placed after those
+  // returns would change in count once the card resolves, and React would throw.
+  const [colDisplayName, setColDisplayName] = React.useState<string>('')
+  React.useEffect(() => {
+    if (!data) return
+    const lookup = async () => {
+      try {
+        const ctx = activeContext || 'default'
+        const raw = await window.electronAPI.db.getSetting(`kanban_columns_${ctx}`).catch(() => null)
+        const cols: any[] = raw ? JSON.parse(raw as string) : []
+        const match = cols.find((c: any) =>
+          c.id === data.status || c.name?.toLowerCase() === String(data.status).toLowerCase()
+        )
+        if (match) setColDisplayName(match.name)
+        else {
+          // Friendly label for default column IDs
+          const labels: Record<string, string> = {
+            open: 'To Do', in_progress: 'In Progress', in_review: 'In Review', done: 'Done'
+          }
+          setColDisplayName(labels[data.status] || String(data.status))
+        }
+      } catch { setColDisplayName(String(data.status)) }
+    }
+    lookup()
+  }, [data?.status, activeContext])
+
   if (error) {
     return (
       <div style={{ padding: '8px 10px', color: 'var(--color-error)', fontSize: '11px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1097,30 +1125,6 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
       </div>
     )
   }
-
-  // Look up the human-readable column name for whatever status ID this card has
-  const [colDisplayName, setColDisplayName] = React.useState<string>('')
-  React.useEffect(() => {
-    const lookup = async () => {
-      try {
-        const ctx = activeContext || 'default'
-        const raw = await window.electronAPI.db.getSetting(`kanban_columns_${ctx}`).catch(() => null)
-        const cols: any[] = raw ? JSON.parse(raw as string) : []
-        const match = cols.find((c: any) =>
-          c.id === data.status || c.name?.toLowerCase() === String(data.status).toLowerCase()
-        )
-        if (match) setColDisplayName(match.name)
-        else {
-          // Friendly label for default column IDs
-          const labels: Record<string, string> = {
-            open: 'To Do', in_progress: 'In Progress', in_review: 'In Review', done: 'Done'
-          }
-          setColDisplayName(labels[data.status] || String(data.status))
-        }
-      } catch { setColDisplayName(String(data.status)) }
-    }
-    lookup()
-  }, [data.status, activeContext])
 
   const priorityColor = data.priority === 3 ? '#ef4444' : data.priority === 2 ? '#eab308' : '#94a3b8'
   const priorityLabel = data.priority === 3 ? 'High' : data.priority === 2 ? 'Medium' : 'Low'
@@ -1292,7 +1296,7 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
           const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
           let colsList: any[] = []
           if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch (e) { colsList = [] }
+            try { colsList = JSON.parse(rawCols) } catch { colsList = [] }
           } else if (Array.isArray(rawCols)) {
             colsList = rawCols
           }
@@ -1421,23 +1425,30 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
 
   let parsed: any = faultTolerantParseJSON(jsonString)
 
-  if (!parsed) return <pre>{jsonString}</pre>
-
-  const steps: any[] = Array.isArray(parsed.steps) ? parsed.steps : []
+  // Derived with null-safe defaults so every hook below runs unconditionally.
+  // The `!parsed` bail-out has to sit *after* the hooks: streaming AI output is
+  // routinely unparseable on early renders and only parses once complete, so
+  // returning first would change this component's hook count mid-life and make
+  // React throw "rendered more hooks than during the previous render".
+  const steps: any[] = Array.isArray(parsed?.steps) ? parsed.steps : []
 
   // Stable localStorage key for per-step approval persistence (survives chat reload)
-  const planSignature = `checkpoint_plan::${(parsed.title || '').replace(/\s+/g, '_').slice(0, 40)}::${steps.length}`
+  const planSignature = `checkpoint_plan::${(parsed?.title || '').replace(/\s+/g, '_').slice(0, 40)}::${steps.length}`
 
-  const [stepApprovals, setStepApprovals] = useState<boolean[]>(() => {
+  const readStoredApprovals = (sig: string, count: number): boolean[] => {
     try {
-      const stored = localStorage.getItem(planSignature)
+      const stored = localStorage.getItem(sig)
       if (stored) {
         const arr = JSON.parse(stored)
-        if (Array.isArray(arr) && arr.length === steps.length) return arr
+        if (Array.isArray(arr) && arr.length === count) return arr
       }
     } catch {}
-    return steps.map(() => true) // all approved by default
-  })
+    return Array.from({ length: count }, () => true) // all approved by default
+  }
+
+  const [stepApprovals, setStepApprovals] = useState<boolean[]>(() =>
+    readStoredApprovals(planSignature, steps.length)
+  )
 
   const [phase, setPhase] = useState<'review' | 'committed'>(() => {
     try {
@@ -1449,6 +1460,20 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
   const [exportedCount, setExportedCount] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [activeStepIndex, setActiveStepIndex] = useState(0)
+
+  // Those initializers only run on the very first render, which may land before
+  // the plan JSON is parseable. Re-read persisted state once the real steps
+  // arrive, otherwise the block would stay stuck on the empty-plan defaults.
+  useEffect(() => {
+    setStepApprovals(prev =>
+      prev.length === steps.length ? prev : readStoredApprovals(planSignature, steps.length)
+    )
+    try {
+      setPhase(localStorage.getItem(planSignature + '_committed') === '1' ? 'committed' : 'review')
+    } catch {}
+  }, [planSignature, steps.length])
+
+  if (!parsed) return <pre>{jsonString}</pre>
 
   const toggleStep = (idx: number) => {
     if (phase !== 'review') return

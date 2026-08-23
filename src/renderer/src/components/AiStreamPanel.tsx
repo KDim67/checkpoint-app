@@ -269,7 +269,7 @@ function getAIEntitiesFromMessage(content: string): { cardTitles: string[]; colu
           columnNames.push(parsed.name.trim())
         }
       }
-    } catch (e) {
+    } catch {
       // Skip invalid JSON
     }
   }
@@ -1154,7 +1154,7 @@ Otherwise, answer the user's question in friendly plain text.`
           const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
           let colsList: any[] = []
           if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch (e) { colsList = [] }
+            try { colsList = JSON.parse(rawCols) } catch { colsList = [] }
           } else if (Array.isArray(rawCols)) {
             colsList = rawCols
           }

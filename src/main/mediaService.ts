@@ -168,7 +168,7 @@ export function getStorageInfo(): { fileCount: number; totalSize: number; path: 
       try {
         const stat = statSync(join(dir, file))
         totalSize += stat.size
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

@@ -66,7 +66,7 @@ export function indexWorkspaceFiles(dirPath: string): WorkspaceFileInfo[] {
                 extension: ext,
                 size: stats.size
               })
-            } catch (e) {}
+            } catch {}
           }
         }
       }

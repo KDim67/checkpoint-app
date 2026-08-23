@@ -472,7 +472,7 @@ export class SyncService {
             const result = this.applyDatabasePayload(payload)
             socket.write(`sync-db-applied:${result.pulledNewerCount}\n`)
             this.syncProgress = 'Database merged successfully. Syncing files...'
-          } catch (err) {
+          } catch {
             socket.write('sync-error:failed to merge database\n')
             socket.destroy()
             this.isSyncing = false

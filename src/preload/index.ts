@@ -39,7 +39,7 @@ import type {
  * useEffect return to prevent zombie listeners and memory leaks after unmount.
  */
 
-contextBridge.exposeInMainWorld('electronAPI', {
+const api = {
   // App
   app: {
     platform: process.platform,
@@ -680,4 +680,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     applyRemoteMutation: (mutation: any): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.SYNC_APPLY_REMOTE_MUTATION, mutation)
   }
-})
+}
+
+contextBridge.exposeInMainWorld('electronAPI', api)
+
+/**
+ * The renderer's view of the bridge is derived from the bridge itself, so the
+ * two can never disagree. Adding a method here is all it takes for the
+ * renderer to see it, there is no second declaration to keep in sync.
+ */
+export type ElectronAPI = typeof api

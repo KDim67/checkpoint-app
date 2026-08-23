@@ -2,15 +2,17 @@
 //  Zones, Terrain, Objects, Paths, Annotations, and JSON/PNG export.
 
 import React, {
-  useState, useCallback, useEffect, useRef, useMemo, useId
+  useState, useCallback, useEffect, useRef, useId
 } from 'react'
 import {
-  Map, Layers, Eye, EyeOff, Lock, Unlock, Copy, Trash2, Plus, Download,
-  Upload, ChevronDown, ChevronRight, Pencil, Square, Circle, Triangle,
-  MousePointer, Pipette, PaintBucket, Eraser, Minus, Settings, X, Check,
+  // Aliased: an unaliased `Map` import shadows the global Map constructor for
+  // the whole module, which silently breaks every `new Map()` in this file.
+  Map as MapIcon, Eye, EyeOff, Lock, Unlock, Copy, Trash2, Plus,
+  Upload, Pencil, Square, Circle, Triangle,
+  MousePointer, Pipette, PaintBucket, Eraser, Minus, X, Check,
   AlertTriangle, FileJson, Image, Code, RotateCcw, RotateCw, ZoomIn, ZoomOut,
-  Maximize, Crosshair, Move, GitFork, Star, Home, Package, Swords, Shield,
-  BookOpen, Droplets, Flag, RefreshCw, Camera, MessageSquare
+  Maximize, Crosshair, Move, GitFork, Star, Package,
+  RefreshCw, MessageSquare
 } from 'lucide-react'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
@@ -138,46 +140,11 @@ const DEFAULT_ZONE_PALETTE: ZonePaletteEntry[] = [
   { id: 'zp_custom',    type: 'custom',    name: 'Custom',         color: '#8338EC', defaultProperties: {} },
 ]
 
-// Simplex Noise (self-contained, no dependencies)
-
-function createNoise() {
-  const perm = new Uint8Array(512)
-  const base = new Uint8Array(256)
-  for (let i = 0; i < 256; i++) base[i] = i
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [base[i], base[j]] = [base[j], base[i]]
-  }
-  for (let i = 0; i < 512; i++) perm[i] = base[i & 255]
-
-  const G2 = (3 - Math.sqrt(3)) / 6
-  const grad2 = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]]
-  const dot2 = (g:[number,number], x:number, y:number) => g[0]*x + g[1]*y
-
-  return (x: number, y: number): number => {
-    const F2 = 0.5*(Math.sqrt(3)-1)
-    const s = (x+y)*F2
-    const i = Math.floor(x+s), j = Math.floor(y+s)
-    const t = (i+j)*G2
-    const X0=i-t, Y0=j-t
-    const x0=x-X0, y0=y-Y0
-    const i1=x0>y0?1:0, j1=x0>y0?0:1
-    const x1=x0-i1+G2, y1=y0-j1+G2
-    const x2=x0-1+2*G2, y2=y0-1+2*G2
-    const ii=i&255, jj=j&255
-    const gi0=perm[ii+perm[jj]]%8
-    const gi1=perm[ii+i1+perm[jj+j1]]%8
-    const gi2=perm[ii+1+perm[jj+1]]%8
-    const t0=0.5-x0*x0-y0*y0, n0=t0<0?0:t0*t0*t0*t0*dot2(grad2[gi0],x0,y0)
-    const t1=0.5-x1*x1-y1*y1, n1=t1<0?0:t1*t1*t1*t1*dot2(grad2[gi1],x1,y1)
-    const t2=0.5-x2*x2-y2*y2, n2=t2<0?0:t2*t2*t2*t2*dot2(grad2[gi2],x2,y2)
-    return 70*(n0+n1+n2)
-  }
-}
-
 // Realistic Terrain Biomes
 
-const REALISTIC_TERRAIN_TYPES = [
+// Consumed only by drawRealisticTerrain, which is currently unwired (see note
+// there). Exported rather than suppressed so the unused-code checks stay honest.
+export const REALISTIC_TERRAIN_TYPES = [
   { id: 'rt_deep_ocean',    name: 'Deep Ocean',    color: '#0d3b6e' },
   { id: 'rt_ocean',         name: 'Ocean',         color: '#1a78c2' },
   { id: 'rt_shallow_water', name: 'Shallow Water', color: '#4ab0e0' },
@@ -247,8 +214,11 @@ function lerpRgb(a:[number,number,number], b:[number,number,number], t:number): 
 }
 
 // Pixel-level realistic terrain renderer
-
-function drawRealisticTerrain(
+// NOTE: nothing currently calls this. `paintRealisticBrush` handles painting,
+// but no caller draws the generated base terrain, so a realistic-mode map
+// appears to start blank. Kept rather than deleted because this looks like a
+// wiring regression to fix, not dead code to remove.
+export function drawRealisticTerrain(
   ctx: CanvasRenderingContext2D,
   settings: MapSettings,
   opacity: number
@@ -413,12 +383,6 @@ function drawRealisticTerrain(
 }
 
 // Legacy grid-based terrain generator (used when NOT in realistic mode)
-
-function generateRealisticTerrain(settings: MapSettings, biome: string, octaves: number, roughness: number): { terrain: TerrainCell[]; customTerrains: {id: string; name: string; color: string}[] } {
-  // This path is no longer used for rendering in realisticMode, kept for
-  // backwards compat (e.g. export / zone snapping to terrain type)
-  return { terrain: [], customTerrains: REALISTIC_TERRAIN_TYPES.map(t => ({ ...t })) }
-}
 
 
 const TERRAIN_TYPES = ['grass', 'water', 'sand', 'rock', 'dirt', 'snow', 'lava', 'void']
@@ -813,7 +777,7 @@ function snapToGrid(wx: number, wy: number, settings: MapSettings): [number, num
     // flat-topped hex: convert world → axial, round, convert back
     const q = (2 / 3 * wx) / cellSize
     const r = (-1 / 3 * wx + Math.sqrt(3) / 3 * wy) / cellSize
-    const [rq, rr, rs] = hexRound(q, r)
+    const [rq, rr] = hexRound(q, r)
     const sx = cellSize * 3 / 2 * rq
     const sy = cellSize * Math.sqrt(3) * (rr + rq / 2)
     return [sx, sy]
@@ -884,7 +848,8 @@ function drawGrid(ctx: CanvasRenderingContext2D, settings: MapSettings, W: numbe
           const angle = Math.PI / 180 * (60 * i)
           const vx = cx + r * Math.cos(angle)
           const vy = cy + r * Math.sin(angle)
-          i === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy)
+          if (i === 0) ctx.moveTo(vx, vy)
+          else ctx.lineTo(vx, vy)
         }
         ctx.closePath(); ctx.stroke()
       }
@@ -934,7 +899,8 @@ function drawTerrainCell(
       const angle = Math.PI / 180 * (60 * i)
       const vx = cx + r * Math.cos(angle)
       const vy = cy + r * Math.sin(angle)
-      i === 0 ? ctx.moveTo(vx, vy) : ctx.lineTo(vx, vy)
+      if (i === 0) ctx.moveTo(vx, vy)
+      else ctx.lineTo(vx, vy)
     }
     ctx.closePath(); ctx.fill()
   } else if (gridType === 'isometric') {
@@ -1030,7 +996,7 @@ function drawObject(
   ctx: CanvasRenderingContext2D,
   obj: MapObject,
   selected: boolean,
-  scale: number
+  _scale: number
 ) {
   const typeDef = OBJECT_TYPES.find(t => t.id === obj.type) || OBJECT_TYPES[7]
   const size = 20
@@ -1244,10 +1210,7 @@ export default function MapMakerView() {
   useEffect(() => { realisticBrushSizeRef.current = realisticBrushSize }, [realisticBrushSize])
   useEffect(() => { realisticEraserRef.current = realisticEraser }, [realisticEraser])
   const [activeObjectType, setActiveObjectType] = useState(OBJECT_TYPES[0].id)
-  const [brushSize, setBrushSize] = useState(32)
   const [snapEnabled, setSnapEnabled] = useState(true)
-  const [symmetryH, setSymmetryH] = useState(false)
-  const [symmetryV, setSymmetryV] = useState(false)
 
   // Selection
   const [selectedZoneId, setSelectedZoneId]    = useState<string|null>(null)
@@ -1728,7 +1691,7 @@ export default function MapMakerView() {
           return cx >= 0 && cx <= canvasW && cy >= 0 && cy <= canvasH
         }
 
-        const getNeighbors = (cCol: number, cRow: number) => {
+        const getNeighbors = (cCol: number, cRow: number): [number, number][] => {
           if (settings.gridType === 'hex') {
             return [
               [cCol + 1, cRow],
@@ -1777,7 +1740,7 @@ export default function MapMakerView() {
         const queue: [number, number][] = [[startCol, startRow]]
         const connected: TerrainCell[] = []
 
-        const getNeighbors = (cCol: number, cRow: number) => {
+        const getNeighbors = (cCol: number, cRow: number): [number, number][] => {
           if (settings.gridType === 'hex') {
             return [
               [cCol + 1, cRow],
@@ -1852,7 +1815,7 @@ export default function MapMakerView() {
         })
 
         const boundaryEdges: [ [number, number], [number, number] ][] = []
-        edgeMap.forEach(([p1, p2], ek) => {
+        edgeMap.forEach(([p1, p2]) => {
           const revKey = edgeKey(p2, p1)
           if (!edgeMap.has(revKey)) {
             boundaryEdges.push([p1, p2])
@@ -2839,7 +2802,7 @@ export default function MapMakerView() {
           .mm-kv-input:focus { outline: none; border-color: var(--color-primary); }
         `}</style>
         <div style={{ textAlign: 'center' }}>
-          <Map size={48} style={{ color: 'var(--color-primary)', marginBottom: 16 }} />
+          <MapIcon size={48} style={{ color: 'var(--color-primary)', marginBottom: 16 }} />
           <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: '0 0 8px' }}>Concept Map Designer</h2>
           <p style={{ fontSize: 'var(--text-sm)', maxWidth: 400 }}>2D pre-production level design canvas. Paint zones, sketch layouts, and export structured JSON for Unity, Godot, or Unreal.</p>
         </div>
@@ -3293,7 +3256,7 @@ export default function MapMakerView() {
               zIndex: 10,
               fontFamily: 'monospace'
             }}>
-              <span>SIZE: {activeMap.settings.w}x{activeMap.settings.h}px</span>
+              <span>SIZE: {activeMap.settings.width}x{activeMap.settings.height}px</span>
               <span style={{ width: 1, height: 10, background: 'var(--color-surface-offset)' }} />
               <span>MODE: {activeMap.settings.realisticMode ? 'Realistic' : 'Grid'}</span>
               <span style={{ width: 1, height: 10, background: 'var(--color-surface-offset)' }} />
@@ -3594,7 +3557,10 @@ function Modal({ title, children, onClose, wide }: { title: string; children: Re
   )
 }
 
-function NewMapWizard({ name, setName, grid, setGrid, cellSize, setCellSize, w, setW, h, setH, scale, setScale, realistic, setRealistic, biome, setBiome, octaves, setOctaves, roughness, setRoughness, onCreate, onClose }:
+// The biome/octaves/roughness props are accepted (callers pass them) but this
+// wizard renders no controls for them, so a realistic map is always created
+// with default terrain parameters. Same unwired feature as drawRealisticTerrain.
+function NewMapWizard({ name, setName, grid, setGrid, cellSize, setCellSize, w, setW, h, setH, scale, setScale, realistic, setRealistic, onCreate, onClose }:
   { name:string; setName:(v:string)=>void; grid:GridType; setGrid:(v:GridType)=>void; cellSize:number; setCellSize:(v:number)=>void; w:number; setW:(v:number)=>void; h:number; setH:(v:number)=>void; scale:string; setScale:(v:string)=>void; realistic:boolean; setRealistic:(v:boolean)=>void; biome:string; setBiome:(v:string)=>void; octaves:number; setOctaves:(v:number)=>void; roughness:number; setRoughness:(v:number)=>void; onCreate:()=>void; onClose:()=>void }) {
   return (
     <Modal title="New Map" onClose={onClose}>
