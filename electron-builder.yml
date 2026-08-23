@@ -38,7 +38,11 @@ win:
       arch:
         - x64
   icon: resources/icon.ico
-  # Uncomment and fill in when you have a code-signing certificate:
+  # Unsigned builds trip SmartScreen on every install. When you have a
+  # certificate you do NOT need to edit this file: electron-builder reads
+  # CSC_LINK (path or base64 of the .p12) and CSC_KEY_PASSWORD from the
+  # environment. Prefer that over the keys below so the certificate never
+  # ends up committed.
   # certificateFile: certs/cert.p12
   # certificatePassword: ${env.WIN_CERT_PASSWORD}
   requestedExecutionLevel: asInvoker  # do NOT request admin unless truly needed

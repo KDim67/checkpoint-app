@@ -55,3 +55,7 @@ src/**/*.d.ts
 !src/renderer/src/vite-env.d.ts
 !src/shared/**/*.d.ts
 
+# Stale self-snapshots and binary twins of documents.
+# Untracked rather than deleted, they remain in git history if ever needed.
+checkpoint-app*.zip
+*.docx
