@@ -312,7 +312,9 @@ export default function KanbanView() {
       onError: (err) => {
         setCollabProgress(`Error: ${err.message || err}`)
         setCollabActive(false)
-      }
+      },
+      // The host keeps its own board; only a joining peer is ever asked.
+      onConfirmBaseline: async () => true
     })
     collabCoordinatorRef.current = coord
     await coord.start()
@@ -339,11 +341,19 @@ export default function KanbanView() {
       onError: (err) => {
         setCollabProgress(`Error: ${err.message || err}`)
         setCollabActive(false)
-      }
+      },
+      onConfirmBaseline: async ({ context, incomingItems }) =>
+        confirm({
+          title: 'Replace this board?',
+          message:
+            `Joining will delete every card and task in "${context}" on this computer ` +
+            `and replace them with the host's ${incomingItems} item(s). This cannot be undone.`,
+          confirmText: 'Replace my board'
+        })
     })
     collabCoordinatorRef.current = coord
     await coord.start()
-  }, [activeContext])
+  }, [activeContext, confirm])
 
   const disconnectCollab = useCallback(() => {
     if (collabCoordinatorRef.current) {

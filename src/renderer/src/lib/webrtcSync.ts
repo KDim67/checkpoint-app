@@ -4,7 +4,15 @@
  * and exchanges SQLite database records & note files over direct RTCDataChannels.
  */
 
-import { deriveKey, encryptData, decryptData, SYNC_SALT } from './webrtcCrypto'
+import { deriveKey, deriveTopic, encryptData, decryptData, base64ToBytes, bytesToBase64, SYNC_SALT } from './webrtcCrypto'
+import {
+  sendFramed,
+  FrameAssembler,
+  flushChannel,
+  waitForIceGathering,
+  onConnectionFailed,
+  ICE_SERVERS
+} from './webrtcTransport'
 
 interface FileMetadata {
   relPath: string
@@ -31,9 +39,9 @@ export class WebRTCSyncCoordinator {
   
   private dbUpdatesCount = 0
   private filesSyncedCount = 0
-  
-  // File chunking accumulator
-  private fileChunksBuffer: Map<string, { chunks: string[]; received: number; total: number }> = new Map()
+
+  private assembler = new FrameAssembler()
+  private finished = false
 
   constructor(options: WebRTCSyncOptions) {
     this.options = options
@@ -42,11 +50,14 @@ export class WebRTCSyncCoordinator {
   public async start(): Promise<void> {
     try {
       this.cleanup()
+      this.finished = false
+      this.options.onProgress('Deriving security key...')
       this.key = await deriveKey(this.options.pairingCode, SYNC_SALT)
+
+      // Hashed, so the pairing code never appears in the public topic name.
+      const signalingRoom = `checkpoint-sync-${await deriveTopic(this.options.pairingCode, SYNC_SALT)}`
       this.options.onProgress('Security key derived. Connecting signaling lobby...')
 
-      const signalingRoom = `checkpoint-sync-${this.options.pairingCode}`
-      
       if (this.options.isHost) {
         this.setupHostSignaling(signalingRoom)
       } else {
@@ -55,6 +66,15 @@ export class WebRTCSyncCoordinator {
     } catch (err) {
       this.options.onError(err)
     }
+  }
+
+  /** Wires the failure paths every peer connection needs. */
+  private newPeerConnection(): RTCPeerConnection {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    onConnectionFailed(pc, reason => {
+      if (!this.finished) this.options.onError(new Error(reason))
+    })
+    return pc
   }
 
   // HOST: Listen for incoming client offer, decrypt it, and reply with answer
@@ -68,17 +88,32 @@ export class WebRTCSyncCoordinator {
       try {
         if (!this.key) return
         const payload = JSON.parse(e.data)
-        // Skip messages we published or invalid ones
+        // Skip our own replies, ntfy's keepalive/open events, and anything
+        // without a body.
         if (!payload.text || payload.title === 'host-reply') return
 
-        this.options.onProgress('Received connection offer. Establishing tunnel...')
-        const decryptedOffer = await decryptData(payload.text, this.key)
-        const { sdp } = JSON.parse(decryptedOffer)
+        // A second offer arriving while one is already being answered used to
+        // overwrite this.pc, orphaning the half-built connection and leaving
+        // the client waiting on an answer that would never come.
+        if (this.pc) return
 
-        // Setup RTCPeerConnection
-        this.pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        })
+        this.options.onProgress('Received connection offer. Establishing tunnel...')
+
+        let sdp: string
+        try {
+          const decryptedOffer = await decryptData(payload.text, this.key)
+          sdp = JSON.parse(decryptedOffer).sdp
+        } catch {
+          // Almost always a mismatched passcode. Previously this was logged to
+          // the console and swallowed, so the host sat on "Host active..."
+          // forever while the user assumed it was still connecting.
+          this.options.onError(
+            new Error('Could not read the incoming offer, the peer entered a different passcode.')
+          )
+          return
+        }
+
+        this.pc = this.newPeerConnection()
 
         // Capture data channel when client connects
         this.pc.ondatachannel = (event) => {
@@ -86,20 +121,16 @@ export class WebRTCSyncCoordinator {
           this.setupDataChannelHandlers()
         }
 
-        // Gather ICE Candidates
-        this.pc.onicecandidate = (event) => {
-          if (!event.candidate) {
-            // Once all candidates gathered, send response answer
-            this.sendHostAnswer(room)
-          }
-        }
-
         await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }))
         const answer = await this.pc.createAnswer()
         await this.pc.setLocalDescription(answer)
 
+        // Bounded wait rather than relying on a null-candidate event that may
+        // never arrive; proceed with whatever was gathered.
+        await waitForIceGathering(this.pc)
+        await this.sendHostAnswer(room)
       } catch (err) {
-        console.error('[WebRTC Host] Signaling error:', err)
+        this.options.onError(err)
       }
     }
   }
@@ -129,37 +160,39 @@ export class WebRTCSyncCoordinator {
 
   // CLIENT: Create offer, publish it, and listen for answer reply
   private async setupClientConnection(room: string): Promise<void> {
-    this.pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    })
+    this.pc = this.newPeerConnection()
 
     this.dataChannel = this.pc.createDataChannel('sync-channel', { ordered: true })
     this.setupDataChannelHandlers()
 
-    // Create SDP Offer
-    const offer = await this.pc.createOffer()
-    await this.pc.setLocalDescription(offer)
-
-    // Wait for ICE gathering
-    this.pc.onicecandidate = (event) => {
-      if (!event.candidate) {
-        this.publishClientOffer(room)
-      }
-    }
-
-    // Subscribe to host's response
+    // Subscribe BEFORE publishing the offer. The host answers as soon as it
+    // sees the offer, and ntfy's SSE stream only carries messages published
+    // after subscription, so publishing first risks missing the reply
+    // entirely and waiting forever.
     this.sse = new EventSource(`https://ntfy.sh/${room}/sse`)
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
         const payload = JSON.parse(e.data)
-        if (payload.title !== 'host-reply') return
+        if (payload.title !== 'host-reply' || !payload.text) return
+        // Ignore a duplicate answer once negotiation is done; setting a remote
+        // description twice throws in the middle of an active connection.
+        if (!this.pc || this.pc.signalingState === 'stable') return
 
         this.options.onProgress('Response answer received. Securing direct connection...')
-        const decryptedAnswer = await decryptData(payload.text, this.key)
-        const { sdp } = JSON.parse(decryptedAnswer)
 
-        await this.pc?.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
+        let sdp: string
+        try {
+          const decryptedAnswer = await decryptData(payload.text, this.key)
+          sdp = JSON.parse(decryptedAnswer).sdp
+        } catch {
+          this.options.onError(
+            new Error('Could not read the host reply, check that both sides use the same passcode.')
+          )
+          return
+        }
+
+        await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
 
         if (this.sse) {
           this.sse.close()
@@ -169,6 +202,11 @@ export class WebRTCSyncCoordinator {
         this.options.onError(err)
       }
     }
+
+    const offer = await this.pc.createOffer()
+    await this.pc.setLocalDescription(offer)
+    await waitForIceGathering(this.pc)
+    await this.publishClientOffer(room)
   }
 
   private async publishClientOffer(room: string): Promise<void> {
@@ -197,13 +235,21 @@ export class WebRTCSyncCoordinator {
       this.isHostSync()
     }
 
-    this.dataChannel.onmessage = async (event) => {
-      try {
-        const message = JSON.parse(event.data)
-        await this.handleIncomingMessage(message)
-      } catch (err) {
-        console.error('[WebRTC Sync] Error parsing P2P message:', err)
-      }
+    // Messages arrive faster than they can be applied (each handler awaits IPC
+    // into the main process), and the handlers mutate shared counters and the
+    // database. Serializing them on a promise chain keeps ordering intact and
+    // stops two merges from interleaving.
+    let queue: Promise<void> = Promise.resolve()
+    this.dataChannel.onmessage = (event) => {
+      queue = queue.then(async () => {
+        try {
+          const message = this.assembler.accept(event.data)
+          if (message !== null) await this.handleIncomingMessage(message)
+        } catch (err) {
+          console.error('[WebRTC Sync] Error handling P2P message:', err)
+          this.options.onError(err)
+        }
+      })
     }
 
     this.dataChannel.onerror = (err) => {
@@ -225,7 +271,7 @@ export class WebRTCSyncCoordinator {
     const notesIndex = await window.electronAPI.sync.getFileIndex('notes')
     const mediaIndex = await window.electronAPI.sync.getFileIndex('media')
 
-    this.send({
+    await this.send({
       type: 'db-payload-offer',
       dbPayload,
       notesIndex,
@@ -256,7 +302,7 @@ export class WebRTCSyncCoordinator {
         const clientNotesIndex = await window.electronAPI.sync.getFileIndex('notes')
         const clientMediaIndex = await window.electronAPI.sync.getFileIndex('media')
 
-        this.send({
+        await this.send({
           type: 'db-payload-reply',
           dbPayload: clientDbPayload,
           notesIndex: clientNotesIndex,
@@ -269,58 +315,40 @@ export class WebRTCSyncCoordinator {
         this.options.onProgress('Merging client database updates...')
         const result = await window.electronAPI.sync.applyDbPayload(msg.dbPayload)
         this.dbUpdatesCount += result.pulledNewerCount
-        
+
         // Align host files
         await this.alignFilesAndSync('notes', msg.notesIndex)
         await this.alignFilesAndSync('media', msg.mediaIndex)
 
         this.options.onProgress('Sync completed successfully!')
-        this.send({ type: 'sync-finished' })
-        this.cleanup()
-        this.options.onComplete({ dbUpdates: this.dbUpdatesCount, filesSynced: this.filesSyncedCount })
+        await this.send({ type: 'sync-finished' })
+        await this.finish()
         break
       }
 
       case 'sync-finished': {
         this.options.onProgress('Sync completed successfully!')
-        this.cleanup()
-        this.options.onComplete({ dbUpdates: this.dbUpdatesCount, filesSynced: this.filesSyncedCount })
+        await this.finish()
         break
       }
 
-      case 'file-chunk': {
-        const fileKey = `${msg.subDir}:${msg.relPath}`
-        let fileObj = this.fileChunksBuffer.get(fileKey)
-        if (!fileObj) {
-          fileObj = { chunks: new Array(msg.totalChunks), received: 0, total: msg.totalChunks }
-          this.fileChunksBuffer.set(fileKey, fileObj)
-        }
-
-        fileObj.chunks[msg.chunkIndex] = msg.data
-        fileObj.received++
-
-        this.options.onProgress(`Transferring file ${msg.relPath} (${Math.round((fileObj.received / fileObj.total) * 100)}%)`)
-
-        if (fileObj.received === fileObj.total) {
-          // Reassemble buffer
-          const combinedBase64 = fileObj.chunks.join('')
-          const binaryString = atob(combinedBase64)
-          const bytes = new Uint8Array(binaryString.length)
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i)
-          }
-
-          // Write file to filesystem via Electron main process
-          await window.electronAPI.sync.writeFileChunk(msg.subDir, msg.relPath, bytes.buffer, msg.mtime)
-          this.filesSyncedCount++
-          this.fileChunksBuffer.delete(fileKey)
-        }
+      case 'file': {
+        // The transport reassembles the frames, so a file arrives here whole.
+        this.options.onProgress(`Writing ${msg.relPath}...`)
+        const bytes = base64ToBytes(msg.data)
+        await window.electronAPI.sync.writeFileChunk(
+          msg.subDir,
+          msg.relPath,
+          bytes.buffer as ArrayBuffer,
+          msg.mtime
+        )
+        this.filesSyncedCount++
         break
       }
 
       case 'request-file': {
-        // Peer requested a file. Read it and send in chunks.
-        await this.sendFileInChunks(msg.subDir, msg.relPath)
+        // Peer requested a file. Read it and send it.
+        await this.sendFile(msg.subDir, msg.relPath)
         break
       }
 
@@ -344,74 +372,86 @@ export class WebRTCSyncCoordinator {
       const localFile = localMap.get(peerFile.relPath)
       if (!localFile) {
         // Missing file. Request it from peer
-        this.send({ type: 'request-file', subDir, relPath: peerFile.relPath })
+        await this.send({ type: 'request-file', subDir, relPath: peerFile.relPath })
       } else if (peerFile.mtime > localFile.mtime && peerFile.sha256 !== localFile.sha256) {
         // Peer has a newer version. Request it
-        this.send({ type: 'request-file', subDir, relPath: peerFile.relPath })
+        await this.send({ type: 'request-file', subDir, relPath: peerFile.relPath })
       }
     }
+
+    // Tombstones are needed only to tell "deleted locally" from "new on this
+    // side", and they do not change during the pass. This used to be fetched
+    // inside the loop below, so a peer missing 100 files triggered 100 full
+    // dumps of every table in the database across IPC.
+    const deletedRelPaths = new Set(
+      (await window.electronAPI.sync.getDbPayload()).tombstones
+        .filter((t: { table_name: string }) => t.table_name === 'notes')
+        .map((t: { id: string }) => t.id)
+    )
 
     // 2. Scan local index. Check if we need to delete or push file
     for (const localFile of localIndex) {
       const peerFile = peerMap.get(localFile.relPath)
       if (!peerFile) {
-        // Host has the note, but client deleted it. Keep or delete?
-        // SQLite sync_tombstones table handles database deletes. If note delete tombstone exists:
-        const dbPayload = await window.electronAPI.sync.getDbPayload()
-        const isDeleted = dbPayload.tombstones.some(
-          (t: { id: string; table_name: string }) => t.id === localFile.relPath && t.table_name === 'notes'
-        )
-        
-        if (isDeleted) {
-          this.send({ type: 'delete-file', subDir, relPath: localFile.relPath })
+        // Absent on the peer: either we deleted it (tell them) or it is new
+        // here (send it).
+        if (deletedRelPaths.has(localFile.relPath)) {
+          await this.send({ type: 'delete-file', subDir, relPath: localFile.relPath })
         } else {
-          // Push new file to peer
-          await this.sendFileInChunks(subDir, localFile.relPath)
+          await this.sendFile(subDir, localFile.relPath)
         }
       } else if (localFile.mtime > peerFile.mtime && localFile.sha256 !== peerFile.sha256) {
         // Local has a newer version. Push to peer.
-        await this.sendFileInChunks(subDir, localFile.relPath)
+        await this.sendFile(subDir, localFile.relPath)
       }
     }
   }
 
-  // Read file and send over DataChannel in 32KB chunks
-  private async sendFileInChunks(subDir: 'notes' | 'media', relPath: string): Promise<void> {
+  /**
+   * Reads a file and hands it to the transport as one logical message.
+   *
+   * Chunking used to live here: it computed a chunk count from the raw byte
+   * length, then sliced the (33% larger) base64 string that many ways, and
+   * pushed every piece in a tight loop with no regard for the send queue.
+   * That overran the 16 MB buffer and lost frames outright. Framing now
+   * belongs to the transport, which also applies backpressure.
+   */
+  private async sendFile(subDir: 'notes' | 'media', relPath: string): Promise<void> {
     const fileBytes = await window.electronAPI.sync.readFileChunk(subDir, relPath)
     if (!fileBytes) return
 
-    const CHUNK_SIZE = 32768 // 32KB
-    const totalChunks = Math.ceil(fileBytes.length / CHUNK_SIZE)
-
-    // Convert Uint8Array to string base64 for reliable JSON packaging
-    const binary = Array.from(fileBytes).map(b => String.fromCharCode(b)).join('')
-    const base64Content = btoa(binary)
-
-    const totalLength = base64Content.length
-    const base64ChunkSize = Math.ceil(totalLength / totalChunks)
-
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * base64ChunkSize
-      const end = Math.min(start + base64ChunkSize, totalLength)
-      const chunkData = base64Content.substring(start, end)
-
-      this.send({
-        type: 'file-chunk',
-        subDir,
-        relPath,
-        chunkIndex: i,
-        totalChunks,
-        data: chunkData
-      })
-    }
+    this.options.onProgress(`Sending ${relPath}...`)
+    await this.send({
+      type: 'file',
+      subDir,
+      relPath,
+      data: bytesToBase64(fileBytes)
+    })
   }
 
-  // Safe packaging & sending via DataChannel
+  /**
+   * All outbound traffic goes through here. sendFramed splits anything past
+   * the 256 KB SCTP message ceiling and waits on the send queue, so callers
+   * never have to think about either limit.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private send(msg: any): void {
-    if (this.dataChannel && this.dataChannel.readyState === 'open') {
-      this.dataChannel.send(JSON.stringify(msg))
-    }
+  private async send(msg: any): Promise<void> {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') return
+    await sendFramed(this.dataChannel, msg)
+  }
+
+  /**
+   * Ends the session cleanly. The final message has to reach the wire before
+   * the connection closes, close() discards whatever is still buffered, so
+   * signalling completion and tearing down in the same breath meant the peer
+   * frequently never learned the sync had finished.
+   */
+  private async finish(): Promise<void> {
+    if (this.finished) return
+    this.finished = true
+    if (this.dataChannel) await flushChannel(this.dataChannel)
+    this.cleanup()
+    this.options.onComplete({ dbUpdates: this.dbUpdatesCount, filesSynced: this.filesSyncedCount })
   }
 
   public cleanup(): void {

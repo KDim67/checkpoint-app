@@ -9,23 +9,35 @@
  * decrypt the other. Changing a salt invalidates every existing pairing code
  * for that channel, which is why they carry a version suffix.
  */
-export const SYNC_SALT = 'checkpoint-sync-salt-v1'
-export const COLLAB_SALT = 'checkpoint-collab-salt-v1'
+export const SYNC_SALT = 'checkpoint-sync-salt-v2'
+export const COLLAB_SALT = 'checkpoint-collab-salt-v2'
 
-export async function deriveKey(passcode: string, salt: string): Promise<CryptoKey> {
-  const enc = new TextEncoder()
-  const baseKey = await window.crypto.subtle.importKey(
+/**
+ * A 6-digit pairing code is only ~900k possibilities, so the KDF is the only
+ * thing making an intercepted signaling blob expensive to crack. 1000 rounds
+ * (the previous value) put the whole keyspace within seconds of a laptop;
+ * 600k is the current OWASP figure for PBKDF2-SHA256 and costs a few hundred
+ * milliseconds once per pairing, which nobody notices.
+ */
+const PBKDF2_ITERATIONS = 600_000
+
+async function importPasscode(passcode: string): Promise<CryptoKey> {
+  return window.crypto.subtle.importKey(
     'raw',
-    enc.encode(passcode),
+    new TextEncoder().encode(passcode),
     'PBKDF2',
     false,
     ['deriveKey']
   )
+}
+
+export async function deriveKey(passcode: string, salt: string): Promise<CryptoKey> {
+  const baseKey = await importPasscode(passcode)
   return window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: enc.encode(salt),
-      iterations: 1000,
+      salt: new TextEncoder().encode(salt),
+      iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256'
     },
     baseKey,
@@ -33,6 +45,32 @@ export async function deriveKey(passcode: string, salt: string): Promise<CryptoK
     false,
     ['encrypt', 'decrypt']
   )
+}
+
+/**
+ * Derives the public signaling topic from the pairing code.
+ *
+ * ntfy.sh topics are public and unauthenticated: anyone who knows the topic
+ * name can read everything posted to it. The previous scheme used the pairing
+ * code *as* the topic (`checkpoint-sync-123456`), which published the very
+ * secret the payload encryption depended on, the ciphertext and its key
+ * material travelled together, so the encryption bought nothing at all, and
+ * the entire 6-digit space could simply be subscribed to.
+ *
+ * Hashing means the topic still identifies the rendezvous point for both
+ * peers, but observing it no longer reveals the code, so an eavesdropper is
+ * left having to break the KDF above.
+ */
+export async function deriveTopic(passcode: string, salt: string): Promise<string> {
+  const digest = await window.crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${salt}:topic:${passcode}`)
+  )
+  // 128 bits of the digest is far beyond collision risk for a rendezvous name
+  // and keeps the URL short.
+  return Array.from(new Uint8Array(digest).subarray(0, 16))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 // Converted in blocks rather than one spread call: String.fromCharCode(...bytes)
@@ -60,10 +98,20 @@ export async function encryptData(data: string, key: CryptoKey): Promise<string>
   return bytesToBase64(combined)
 }
 
+export function base64ToBytes(base64: string): Uint8Array {
+  // Indexed fill rather than split('').map(): the latter allocates one string
+  // per byte, which is ruinous for the multi-megabyte payloads file transfer
+  // pushes through here.
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+export { bytesToBase64 }
+
 export async function decryptData(base64Data: string, key: CryptoKey): Promise<string> {
-  const combined = new Uint8Array(
-    atob(base64Data).split('').map(c => c.charCodeAt(0))
-  )
+  const combined = base64ToBytes(base64Data)
   const iv = combined.slice(0, 12)
   const ciphertext = combined.slice(12)
   const decrypted = await window.crypto.subtle.decrypt(

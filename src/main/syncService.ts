@@ -94,9 +94,17 @@ export class SyncService {
     return list
   }
 
-  // Generate a random 6-digit pairing code
+  /**
+   * Generates the 6-digit pairing code.
+   *
+   * Uses the CSPRNG, not Math.random(): this code is the sole input to the
+   * key derivation protecting the signaling exchange and the HMAC guarding the
+   * LAN socket, and Math.random()'s output is predictable from a handful of
+   * prior values. randomInt is also rejection-sampled, so the digits stay
+   * uniform rather than slightly biased by a modulo.
+   */
   private generatePairingCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString()
+    return crypto.randomInt(100000, 1000000).toString()
   }
 
   // Start Sync Host

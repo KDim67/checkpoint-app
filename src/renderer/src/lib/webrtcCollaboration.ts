@@ -5,7 +5,14 @@
  */
 
 import { useAppStore } from '../store/appStore'
-import { deriveKey, encryptData, decryptData, COLLAB_SALT } from './webrtcCrypto'
+import { deriveKey, deriveTopic, encryptData, decryptData, COLLAB_SALT } from './webrtcCrypto'
+import {
+  sendFramed,
+  FrameAssembler,
+  waitForIceGathering,
+  onConnectionFailed,
+  ICE_SERVERS
+} from './webrtcTransport'
 
 interface CollabOptions {
   pairingCode: string
@@ -17,6 +24,12 @@ interface CollabOptions {
   onDisconnect: () => void
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onError: (err: any) => void
+  /**
+   * Asked before the host's board replaces the local one. Joining wipes every
+   * card and task in the target context, so this is the user's only chance to
+   * stop it, returning false aborts the join with the local board intact.
+   */
+  onConfirmBaseline: (info: { context: string; incomingItems: number }) => Promise<boolean>
 }
 
 export class WebRTCCollaborationCoordinator {
@@ -28,6 +41,7 @@ export class WebRTCCollaborationCoordinator {
   
   private isApplyingRemote = false
   private connectionActive = false
+  private assembler = new FrameAssembler()
 
   constructor(options: CollabOptions) {
     this.options = options
@@ -39,8 +53,9 @@ export class WebRTCCollaborationCoordinator {
       this.key = await deriveKey(this.options.pairingCode, COLLAB_SALT)
       this.options.onProgress('Deriving security key...')
 
-      const signalingRoom = `checkpoint-collab-${this.options.pairingCode}`
-      
+      // Hashed, so the pairing code never appears in the public topic name.
+      const signalingRoom = `checkpoint-collab-${await deriveTopic(this.options.pairingCode, COLLAB_SALT)}`
+
       if (this.options.isHost) {
         this.setupHostSignaling(signalingRoom)
       } else {
@@ -49,6 +64,13 @@ export class WebRTCCollaborationCoordinator {
     } catch (err) {
       this.options.onError(err)
     }
+  }
+
+  /** Wires the failure paths every peer connection needs. */
+  private newPeerConnection(): RTCPeerConnection {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    onConnectionFailed(pc, reason => this.options.onError(new Error(reason)))
+    return pc
   }
 
   // Host: Listen for client offer
@@ -61,31 +83,36 @@ export class WebRTCCollaborationCoordinator {
         if (!this.key) return
         const payload = JSON.parse(e.data)
         if (!payload.text || payload.title === 'host-reply') return
+        // A second offer would otherwise overwrite the connection being built.
+        if (this.pc) return
 
         this.options.onProgress('Connecting with client...')
-        const decryptedOffer = await decryptData(payload.text, this.key)
-        const { sdp } = JSON.parse(decryptedOffer)
 
-        this.pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        })
+        let sdp: string
+        try {
+          const decryptedOffer = await decryptData(payload.text, this.key)
+          sdp = JSON.parse(decryptedOffer).sdp
+        } catch {
+          this.options.onError(
+            new Error('Could not read the incoming offer, the peer entered a different passcode.')
+          )
+          return
+        }
+
+        this.pc = this.newPeerConnection()
 
         this.pc.ondatachannel = (event) => {
           this.dataChannel = event.channel
           this.setupDataChannelHandlers()
         }
 
-        this.pc.onicecandidate = (event) => {
-          if (!event.candidate) {
-            this.sendHostAnswer(room)
-          }
-        }
-
         await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }))
         const answer = await this.pc.createAnswer()
         await this.pc.setLocalDescription(answer)
+        await waitForIceGathering(this.pc)
+        await this.sendHostAnswer(room)
       } catch (err) {
-        console.error('[Collab Host] signaling error:', err)
+        this.options.onError(err)
       }
     }
   }
@@ -113,34 +140,35 @@ export class WebRTCCollaborationCoordinator {
 
   // Client: Create offer
   private async setupClientConnection(room: string): Promise<void> {
-    this.pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    })
+    this.pc = this.newPeerConnection()
 
     this.dataChannel = this.pc.createDataChannel('collab-channel', { ordered: true })
     this.setupDataChannelHandlers()
 
-    const offer = await this.pc.createOffer()
-    await this.pc.setLocalDescription(offer)
-
-    this.pc.onicecandidate = (event) => {
-      if (!event.candidate) {
-        this.publishClientOffer(room)
-      }
-    }
-
+    // Subscribe before publishing: ntfy's SSE stream only carries messages
+    // posted after subscription, so publishing first can miss the host's reply.
     this.sse = new EventSource(`https://ntfy.sh/${room}/sse`)
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
         const payload = JSON.parse(e.data)
-        if (payload.title !== 'host-reply') return
+        if (payload.title !== 'host-reply' || !payload.text) return
+        if (!this.pc || this.pc.signalingState === 'stable') return
 
         this.options.onProgress('Securing collab link...')
-        const decryptedAnswer = await decryptData(payload.text, this.key)
-        const { sdp } = JSON.parse(decryptedAnswer)
 
-        await this.pc?.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
+        let sdp: string
+        try {
+          const decryptedAnswer = await decryptData(payload.text, this.key)
+          sdp = JSON.parse(decryptedAnswer).sdp
+        } catch {
+          this.options.onError(
+            new Error('Could not read the host reply, check that both sides use the same passcode.')
+          )
+          return
+        }
+
+        await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
 
         if (this.sse) {
           this.sse.close()
@@ -150,6 +178,11 @@ export class WebRTCCollaborationCoordinator {
         this.options.onError(err)
       }
     }
+
+    const offer = await this.pc.createOffer()
+    await this.pc.setLocalDescription(offer)
+    await waitForIceGathering(this.pc)
+    await this.publishClientOffer(room)
   }
 
   private async publishClientOffer(room: string): Promise<void> {
@@ -179,13 +212,19 @@ export class WebRTCCollaborationCoordinator {
       this.sendBaselineIfHost()
     }
 
-    this.dataChannel.onmessage = async (event) => {
-      try {
-        const msg = JSON.parse(event.data)
-        await this.handleIncomingMessage(msg)
-      } catch (err) {
-        console.error('[Collab Coordinator] error parsing message:', err)
-      }
+    // Serialized: mutations must apply in the order they were sent, and each
+    // handler awaits IPC into the main process.
+    let queue: Promise<void> = Promise.resolve()
+    this.dataChannel.onmessage = (event) => {
+      queue = queue.then(async () => {
+        try {
+          const msg = this.assembler.accept(event.data)
+          if (msg !== null) await this.handleIncomingMessage(msg)
+        } catch (err) {
+          console.error('[Collab Coordinator] error handling message:', err)
+          this.options.onError(err)
+        }
+      })
     }
 
     this.dataChannel.onclose = () => {
@@ -215,7 +254,7 @@ export class WebRTCCollaborationCoordinator {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const relations = (fullDb as any).relations.filter((r: any) => items.some((item: any) => item.id === r.from_id || item.id === r.to_id))
 
-      this.send({
+      await this.send({
         type: 'board-baseline',
         context: this.options.context,
         items,
@@ -242,9 +281,10 @@ export class WebRTCCollaborationCoordinator {
     // Filter mutations. If it's item-related, check if context is correct.
     if (detail.item && detail.item.context !== this.options.context) return
     
-    this.send({
-      type: 'db-mutation-event',
-      mutation: detail
+    // Event handlers cannot await; a failed broadcast must not become an
+    // unhandled rejection.
+    void this.send({ type: 'db-mutation-event', mutation: detail }).catch(err => {
+      console.error('[Collab Coordinator] Failed to broadcast local change:', err)
     })
   }
 
@@ -255,9 +295,24 @@ export class WebRTCCollaborationCoordinator {
 
     switch (msg.type) {
       case 'board-baseline': {
+        // applyBoardBaseline deletes every card and task in the target context
+        // before seeding the host's. That is unrecoverable, and it used to run
+        // the instant the channel opened, a user joining a session while
+        // holding their own board of the same name simply lost it. Ask first.
+        const accepted = await this.options.onConfirmBaseline({
+          context: msg.context,
+          incomingItems: Array.isArray(msg.items) ? msg.items.length : 0
+        })
+        if (!accepted) {
+          this.options.onProgress('Join cancelled, your local board was left untouched.')
+          this.cleanup()
+          this.options.onDisconnect()
+          break
+        }
+
         this.options.onProgress('Applying board baseline...')
         this.isApplyingRemote = true
-        
+
         try {
           // Switch local workspace context and view to match shared board!
           const store = useAppStore.getState()
@@ -297,11 +352,14 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
+  /**
+   * A board baseline exceeds the 256 KB single-message ceiling on any board of
+   * real size, so everything goes through the framing transport.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private send(msg: any): void {
-    if (this.dataChannel && this.dataChannel.readyState === 'open') {
-      this.dataChannel.send(JSON.stringify(msg))
-    }
+  private async send(msg: any): Promise<void> {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') return
+    await sendFramed(this.dataChannel, msg)
   }
 
   public cleanup(): void {
