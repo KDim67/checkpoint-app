@@ -26,6 +26,13 @@ import {
 } from './validation'
 import { IpcChannels } from '../shared/ipcChannels'
 import { updateNativeTitleBarFromSettings } from './titleBarSync'
+import {
+  isSecretSetting,
+  isEncrypted,
+  encryptSecret,
+  decryptSecret,
+  secretSettingKeys
+} from './secureSettings'
 import type {
   Item,
   Tag,
@@ -467,7 +474,36 @@ export function initDb(dataPath: string): Database.Database {
     `INSERT OR REPLACE INTO sync_tombstones (id, table_name, deleted_at) VALUES (?, ?, ?)`
   )
 
+  encryptLegacyPlaintextSecrets(db)
+
   return db
+}
+
+/**
+ * Re-writes credential settings that predate at-rest encryption.
+ *
+ * Without this, an existing install keeps its provider keys in plaintext
+ * forever unless the user happens to re-save them in AI Settings. Runs on every
+ * boot but is a no-op once the rows carry an envelope. Deliberately does not
+ * use setSetting(): the prepared statements are in place by now, but the
+ * side-effects that function fires (titlebar sync, clipboard watcher) have no
+ * business running during init.
+ */
+function encryptLegacyPlaintextSecrets(db: Database.Database): void {
+  try {
+    const read = db.prepare(`SELECT value FROM app_settings WHERE key = ?`)
+    const write = db.prepare(`UPDATE app_settings SET value = ? WHERE key = ?`)
+    for (const key of secretSettingKeys()) {
+      const row = read.get(key) as { value: string } | undefined
+      if (!row || isEncrypted(row.value)) continue
+      const enveloped = encryptSecret(row.value)
+      // encryptSecret falls back to plaintext when no keyring is available;
+      // writing that back would be a pointless no-op UPDATE every boot.
+      if (isEncrypted(enveloped)) write.run(enveloped, key)
+    }
+  } catch (err) {
+    console.error('[db] Could not migrate plaintext credentials:', err)
+  }
 }
 
 // Helper: parse concatenated tag data from JOIN
@@ -764,8 +800,9 @@ export function getSetting<T>(key: string, defaultValue: T): T {
   if (!stmtGetSetting) return defaultValue
   const row = stmtGetSetting.get(key) as { value: string } | undefined
   if (!row) return defaultValue
+  const serialized = isSecretSetting(key) ? decryptSecret(row.value) : row.value
   try {
-    return JSON.parse(row.value) as T
+    return JSON.parse(serialized) as T
   } catch {
     return defaultValue
   }
@@ -776,7 +813,8 @@ export function setSetting(key: string, value: unknown): void {
     console.error('[db] Dropped setting write before initDb:', key)
     return
   }
-  stmtSetSetting.run(key, JSON.stringify(value))
+  const serialized = JSON.stringify(value)
+  stmtSetSetting.run(key, isSecretSetting(key) ? encryptSecret(serialized) : serialized)
   if (key === 'app_theme') {
     try {
       updateNativeTitleBarFromSettings(value as string)
