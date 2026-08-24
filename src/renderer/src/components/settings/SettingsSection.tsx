@@ -43,7 +43,15 @@ export default function SettingsSection({
         display: 'flex',
         alignItems: 'center',
         gap: 'var(--space-3)',
-        background: 'var(--color-surface-2)'
+        background: 'var(--color-surface-2)',
+        // The header paints its own background, so without matching corners it
+        // squared off the card's rounded top, the notch visible at every
+        // section's top-left and top-right. Radii are inset by the parent's 1px
+        // border so the two curves sit concentric instead of leaving a hairline.
+        // `overflow: hidden` on the card would also fix it, but would clip the
+        // provider dropdown and colour pickers that open inside these sections.
+        borderTopLeftRadius: 'calc(var(--radius-lg) - 1px)',
+        borderTopRightRadius: 'calc(var(--radius-lg) - 1px)'
       }}>
         <span aria-hidden="true" style={{ color: 'var(--color-secondary)', display: 'flex', flexShrink: 0 }}>
           {icon}

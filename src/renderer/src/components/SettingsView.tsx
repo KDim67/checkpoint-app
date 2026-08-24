@@ -1282,8 +1282,12 @@ export default function SettingsView() {
         padding: 'var(--space-6)',
         paddingBottom: 'var(--space-10)'
       }}>
+        {/* Centred column, capped so the content never sprawls across a very
+            wide monitor. It used to be a fixed 860px pinned hard to the left,
+            which left most of a maximised window empty. */}
         <div style={{
-          maxWidth: '860px',
+          maxWidth: '1400px',
+          margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
           gap: 'var(--space-5)'
@@ -1308,8 +1312,19 @@ export default function SettingsView() {
             </p>
           </div>
 
-          {/* Tab content, one or more section cards */}
-          {renderTabContent()}
+          {/* Tab content, one or more section cards.
+              The grid holds ONLY the cards: a full-width title inside it would
+              span every track, and `auto-fit` collapses a track only when it is
+              genuinely empty, so a single-card tab was left sitting in the
+              first of two live columns instead of filling the width. */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 520px), 1fr))',
+            gap: 'var(--space-5)',
+            alignItems: 'start'
+          }}>
+            {renderTabContent()}
+          </div>
         </div>
       </div>
     </div>
