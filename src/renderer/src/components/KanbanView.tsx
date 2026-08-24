@@ -27,7 +27,7 @@ import CardDetailModal from './kanban/CardDetailModal'
 import AddColumnModal from './kanban/AddColumnModal'
 import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
-import { Plus, Layers, LayoutGrid, KanbanSquare, Upload } from 'lucide-react'
+import { Plus, Layers, LayoutGrid, KanbanSquare, Upload, Eye } from 'lucide-react'
 import Skeleton from './ui/Skeleton'
 import ConfirmDialog, { useConfirm } from './ui/ConfirmDialog'
 import useFocusTrap from './ui/useFocusTrap'
@@ -38,8 +38,11 @@ import ColorPicker from './ui/ColorPicker'
 import {
   loadBoardConfig,
   patchBoardConfig,
+  DEFAULT_CARD_DISPLAY,
   type BoardConfig,
-  type ColumnConfig
+  type CardDisplay,
+  type ColumnConfig,
+  type ColumnSort
 } from '../lib/boardConfig'
 import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
 
@@ -48,6 +51,14 @@ import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
 // which owns the whole board document. Kept as an export so existing importers
 // of ColumnConfig from this module keep working.
 export type { ColumnConfig }
+
+/** The card face fields a board can switch on and off. */
+const CARD_DISPLAY_FIELDS: { key: keyof CardDisplay; label: string }[] = [
+  { key: 'priority', label: 'Priority Bar' },
+  { key: 'tags', label: 'Tags' },
+  { key: 'due', label: 'Due Date' },
+  { key: 'bodyPreview', label: 'Body Preview' }
+]
 
 const BG_STYLES: Record<string, string> = {
   default: 'var(--color-background)',
@@ -119,10 +130,12 @@ const SortableColumn = React.memo(function SortableColumn({
   onCardConvertToTask,
   onAddCard,
   onCardUpdate,
-  onSortCards,
   onClearColumn,
   onArchiveColumn,
-  isReadOnly = false
+  isReadOnly = false,
+  onToggleCollapse,
+  onSetSort,
+  cardDisplay
 }: {
   col: ColumnConfig
   cards: Item[]
@@ -133,10 +146,12 @@ const SortableColumn = React.memo(function SortableColumn({
   onCardConvertToTask: (id: string) => void
   onAddCard: (colId: string) => void
   onCardUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
-  onSortCards?: (columnId: string, criteria: 'due_at' | 'priority') => void
   onClearColumn?: (columnId: string) => void
   onArchiveColumn?: (columnId: string) => void
   isReadOnly?: boolean
+  onToggleCollapse?: (columnId: string) => void
+  onSetSort?: (columnId: string, sort: ColumnSort) => void
+  cardDisplay?: CardDisplay
 }) {
   const {
     attributes,
@@ -173,11 +188,16 @@ const SortableColumn = React.memo(function SortableColumn({
         onCardConvertToTask={onCardConvertToTask}
         onAddCard={onAddCard}
         onCardUpdate={onCardUpdate}
-        onSortCards={onSortCards}
         onClearColumn={onClearColumn}
         onArchiveColumn={onArchiveColumn}
         dragHandleProps={{ ...attributes, ...listeners }}
         isReadOnly={isReadOnly}
+        collapsed={col.collapsed}
+        onToggleCollapse={onToggleCollapse}
+        sort={col.sort}
+        onSetSort={onSetSort}
+        description={col.description}
+        cardDisplay={cardDisplay}
       />
     </div>
   )
@@ -211,6 +231,9 @@ export default function KanbanView() {
   const [cards, setCards] = useState<Item[]>([])
   const [columns, setColumns] = useState<ColumnConfig[]>([])
   const [swimlanesEnabled, setSwimlanesEnabled] = useState(false)
+  const [cardDisplay, setCardDisplay] = useState<CardDisplay>(DEFAULT_CARD_DISPLAY)
+  const [showCardDisplayMenu, setShowCardDisplayMenu] = useState(false)
+  const cardDisplayRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
 
   // Always-latest columns snapshot. Column mutations read/write through this so
@@ -239,6 +262,21 @@ export default function KanbanView() {
       console.error('Failed to persist board config:', err)
     }
   }, [activeContext])
+
+  /** Applies a change to one column and persists the whole list. */
+  const updateColumn = useCallback((colId: string, patch: Partial<ColumnConfig>): void => {
+    const next = columnsRef.current.map(c => (c.id === colId ? { ...c, ...patch } : c))
+    persistColumns(next)
+  }, [persistColumns])
+
+  const handleToggleCollapse = useCallback((colId: string): void => {
+    const col = columnsRef.current.find(c => c.id === colId)
+    updateColumn(colId, { collapsed: !col?.collapsed })
+  }, [updateColumn])
+
+  const handleSetColumnSort = useCallback((colId: string, sort: ColumnSort): void => {
+    updateColumn(colId, { sort })
+  }, [updateColumn])
 
   const [showAddColModal, setShowAddColModal] = useState(false)
   const [activeCardId, setActiveCardId] = useState<string | null>(null)
@@ -421,6 +459,9 @@ export default function KanbanView() {
       if (bgSelectorRef.current && !bgSelectorRef.current.contains(e.target as Node)) {
         setShowBgSelector(false)
       }
+      if (cardDisplayRef.current && !cardDisplayRef.current.contains(e.target as Node)) {
+        setShowCardDisplayMenu(false)
+      }
       if (collabPopoverRef.current && !collabPopoverRef.current.contains(e.target as Node)) {
         setShowCollabPopover(false)
       }
@@ -443,6 +484,7 @@ export default function KanbanView() {
       setSwimlanesEnabled(config.swimlanes)
       setBoardBg(config.background)
       setArchivedColumns(config.archivedColumns)
+      setCardDisplay(config.cardDisplay)
     } catch (err) {
       console.error('Failed to load Kanban column settings:', err)
     }
@@ -621,9 +663,9 @@ export default function KanbanView() {
 
   // Column Management
 
-  const handleCreateColumnSubmit = async (name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full') => {
+  const handleCreateColumnSubmit = async (name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full', description?: string) => {
     const id = `col-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`
-    const updatedCols = [...columnsRef.current, { id, name, wipLimit, color, colorMode }]
+    const updatedCols = [...columnsRef.current, { id, name, wipLimit, color, colorMode, description }]
     try {
       await persistColumns(updatedCols)
       setShowAddColModal(false)
@@ -673,35 +715,6 @@ export default function KanbanView() {
   }, [cards, performDeleteColumn])
 
   // Column sorting & bulk actions
-
-  const handleSortColumnCards = useCallback(async (columnId: string, criteria: 'due_at' | 'priority') => {
-    const colCards = cards.filter(c => c.status === columnId)
-    if (colCards.length === 0) return
-
-    let sorted: Item[] = []
-    if (criteria === 'due_at') {
-      sorted = [...colCards].sort((a, b) => {
-        if (!a.due_at) return 1
-        if (!b.due_at) return -1
-        return a.due_at - b.due_at
-      })
-    } else {
-      sorted = [...colCards].sort((a, b) => b.priority - a.priority)
-    }
-
-    const updates = sorted.map((card, idx) => ({
-      id: card.id,
-      patch: { position: (idx + 1) * 1000.0 }
-    }))
-
-    try {
-      await Promise.all(updates.map(up => window.electronAPI.db.updateItem(up.id, up.patch)))
-      loadCards()
-      toast(`Sorted cards in column by ${criteria === 'due_at' ? 'due date' : 'priority'}`)
-    } catch (err) {
-      console.error(err)
-    }
-  }, [cards, loadCards, toast])
 
   const handleClearColumnCards = useCallback(async (columnId: string) => {
     const colCards = cards.filter(c => c.status === columnId)
@@ -1040,12 +1053,30 @@ export default function KanbanView() {
       if (!arr) { arr = []; map.set(c.status, arr) }
       arr.push(c)
     }
-    const sortFn = swimlanesEnabled
-      ? (a: Item, b: Item) => (b.priority !== a.priority ? b.priority - a.priority : a.position - b.position)
-      : (a: Item, b: Item) => a.position - b.position
-    for (const arr of map.values()) arr.sort(sortFn)
+    // Sorting stays inside this single pass. Applying a per-column order as a
+    // second pass over the map would reintroduce the per-frame work this memo
+    // exists to avoid during a drag.
+    const byPosition = (a: Item, b: Item): number => a.position - b.position
+    const byPriority = (a: Item, b: Item): number =>
+      b.priority !== a.priority ? b.priority - a.priority : a.position - b.position
+    // Cards with no due date sort last rather than reading as "due first".
+    const byDue = (a: Item, b: Item): number => {
+      if (!a.due_at && !b.due_at) return a.position - b.position
+      if (!a.due_at) return 1
+      if (!b.due_at) return -1
+      return a.due_at - b.due_at || a.position - b.position
+    }
+
+    const sortModes = new Map(columns.map(c => [c.id, c.sort ?? 'manual']))
+    for (const [colId, arr] of map) {
+      // Swimlanes are a board-wide priority grouping and outrank a column's own
+      // order; without that the two settings would visibly contradict.
+      if (swimlanesEnabled) { arr.sort(byPriority); continue }
+      const mode = sortModes.get(colId) ?? 'manual'
+      arr.sort(mode === 'priority' ? byPriority : mode === 'due' ? byDue : byPosition)
+    }
     return map
-  }, [cards, searchQuery, filterPriority, filterTagId, swimlanesEnabled])
+  }, [cards, searchQuery, filterPriority, filterTagId, swimlanesEnabled, columns])
 
   const getCardsForColumn = useCallback(
     (columnId: string): Item[] => cardsByColumn.get(columnId) || EMPTY_ITEMS,
@@ -2062,6 +2093,63 @@ export default function KanbanView() {
             {swimlanesEnabled ? 'Priority View' : 'Flat Board'}
           </HeaderBtn>
 
+          {/* Card face toggles, what each card shows */}
+          <div style={{ position: 'relative' }} ref={cardDisplayRef}>
+            <HeaderBtn
+              active={showCardDisplayMenu}
+              onClick={() => setShowCardDisplayMenu(v => !v)}
+              title="Choose what appears on each card"
+              icon={<Eye size={13} />}
+            >
+              Card Fields
+            </HeaderBtn>
+            {showCardDisplayMenu && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                zIndex: 60,
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-lg)',
+                padding: 'var(--space-2)',
+                minWidth: '190px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px'
+              }}>
+                {CARD_DISPLAY_FIELDS.map(field => (
+                  <label
+                    key={field.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                      padding: 'var(--space-1-5) var(--space-2)',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-base)',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={cardDisplay[field.key]}
+                      onChange={e => {
+                        const next = { ...cardDisplay, [field.key]: e.target.checked }
+                        setCardDisplay(next)
+                        persistConfig({ cardDisplay: next })
+                      }}
+                      style={{ accentColor: 'var(--color-secondary)', cursor: 'pointer' }}
+                    />
+                    {field.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* From Template Dropdown */}
           {templateCards.length > 0 && (
             <div style={{ position: 'relative' }} ref={templateSelectorRef}>
@@ -2320,10 +2408,12 @@ export default function KanbanView() {
                   onCardConvertToTask={handleCardConvertToTask}
                   onAddCard={handleAddCardToColumn}
                   onCardUpdate={handleUpdateCardDetails}
-                  onSortCards={handleSortColumnCards}
                   onClearColumn={handleClearColumnCards}
                   onArchiveColumn={handleArchiveColumn}
                   isReadOnly={isReadOnlyMode}
+                  onToggleCollapse={handleToggleCollapse}
+                  onSetSort={handleSetColumnSort}
+                  cardDisplay={cardDisplay}
                 />
               ))}
 

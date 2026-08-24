@@ -3,8 +3,9 @@ import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import KanbanCard from './KanbanCard'
 import ColorPicker from '../ui/ColorPicker'
-import { Trash2, Edit2, Check, Plus, X, GripVertical, MoreHorizontal } from 'lucide-react'
+import { Trash2, Edit2, Check, Plus, X, GripVertical, MoreHorizontal, ChevronRight } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
+import type { CardDisplay, ColumnSort } from '../../lib/boardConfig'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { useConfirm } from '../ui/ConfirmDialog'
 
@@ -23,10 +24,19 @@ interface KanbanColumnProps {
   onAddCard?: (columnId: string) => void
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>
   onCardUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
-  onSortCards?: (columnId: string, criteria: 'due_at' | 'priority') => void
   onClearColumn?: (columnId: string) => void
   onArchiveColumn?: (columnId: string) => void
   isReadOnly?: boolean
+  /** Collapsed to a narrow strip; cards stay in place, just hidden. */
+  collapsed?: boolean
+  onToggleCollapse?: (columnId: string) => void
+  /** Persistent display order for this column. */
+  sort?: ColumnSort
+  onSetSort?: (columnId: string, sort: ColumnSort) => void
+  /** Definition of done, shown under the column name. */
+  description?: string
+  /** Board-level card face switches, forwarded to every card. */
+  cardDisplay?: CardDisplay
 }
 
 function MenuItem({ label, onClick, danger = false }: { label: string; onClick: () => void; danger?: boolean }) {
@@ -70,10 +80,15 @@ function KanbanColumn({
   onAddCard,
   dragHandleProps,
   onCardUpdate,
-  onSortCards,
   onClearColumn,
   onArchiveColumn,
-  isReadOnly = false
+  isReadOnly = false,
+  collapsed = false,
+  onToggleCollapse,
+  sort = 'manual',
+  onSetSort,
+  description,
+  cardDisplay
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id })
   const confirm = useConfirm()
@@ -156,6 +171,78 @@ function KanbanColumn({
     ? 'var(--color-warning)'
     : (activeColor || statusAccent[id] || 'var(--color-primary)')
   const colTextColor = isFullCol ? getTextColorForBackground(activeColor) : 'var(--color-text-muted)'
+
+  // Collapsed: a narrow vertical strip carrying only the name and count. The
+  // droppable ref stays attached so a card can still be dragged onto a
+  // collapsed column rather than forcing the user to expand it first.
+  if (collapsed) {
+    return (
+      <div
+        ref={setNodeRef}
+        id={`kanban-col-${id}`}
+        style={{
+          width: '48px',
+          minWidth: '48px',
+          flex: '0 0 48px',
+          backgroundColor: isOver ? 'var(--color-surface-2)' : 'var(--color-surface-1)',
+          borderRadius: 'var(--radius-lg)',
+          border: isOver ? `1px solid ${accentColor}` : '1px solid var(--color-surface-offset)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          height: '100%',
+          overflow: 'hidden',
+          boxShadow: 'var(--shadow-sm)'
+        }}
+      >
+        <div style={{ height: '3px', width: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
+        <button
+          onClick={() => onToggleCollapse?.(id)}
+          aria-label={`Expand ${name} column`}
+          title={`Expand ${name}`}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-text-muted)',
+            cursor: 'pointer',
+            padding: 'var(--space-2) 0',
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center'
+          }}
+        >
+          <ChevronRight size={14} />
+        </button>
+        <div
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--weight-semibold)',
+            color: 'var(--color-text-base)',
+            // Rotated so a long column name still reads in a 48px strip.
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxHeight: '60%',
+            marginTop: 'var(--space-2)'
+          }}
+        >
+          {name}
+        </div>
+        <div style={{
+          marginTop: 'auto',
+          marginBottom: 'var(--space-3)',
+          fontSize: 'var(--text-xs)',
+          fontWeight: 'var(--weight-semibold)',
+          color: 'var(--color-text-muted)',
+          fontVariantNumeric: 'tabular-nums'
+        }}>
+          {cards.length}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -460,7 +547,6 @@ function KanbanColumn({
             <div className="row">
               <h3
                 onDoubleClick={() => setIsEditing(true)}
-                title="Double-click to rename"
                 style={{
                   margin: 0,
                   fontSize: 'var(--text-2xs)',
@@ -474,6 +560,12 @@ function KanbanColumn({
                   cursor: 'pointer',
                   userSelect: 'none'
                 }}
+                // The definition of done rides on the name's tooltip rather
+                // than taking a second header row, which would cost vertical
+                // space on every column to serve an occasional glance. The
+                // rename affordance stays in the tooltip when there is no
+                // description to show instead.
+                title={description ? `${name}, ${description}` : 'Double-click to rename'}
               >
                 {name}
               </h3>
@@ -536,13 +628,26 @@ function KanbanColumn({
                   flexDirection: 'column',
                   padding: '6px 0'
                 }}>
+                  {/* A persistent view order, not a one-off reshuffle. The
+                      previous entries here rewrote every card's position, so
+                      picking a sort permanently destroyed the manual order and
+                      there was no way back to it. */}
                   <MenuItem
-                    label="Sort by Due Date"
-                    onClick={() => { onSortCards?.(id, 'due_at'); setShowMenu(false) }}
+                    label={`${sort === 'manual' ? '✓ ' : ''}Order: Manual`}
+                    onClick={() => { onSetSort?.(id, 'manual'); setShowMenu(false) }}
                   />
                   <MenuItem
-                    label="Sort by Priority"
-                    onClick={() => { onSortCards?.(id, 'priority'); setShowMenu(false) }}
+                    label={`${sort === 'priority' ? '✓ ' : ''}Order: Priority`}
+                    onClick={() => { onSetSort?.(id, 'priority'); setShowMenu(false) }}
+                  />
+                  <MenuItem
+                    label={`${sort === 'due' ? '✓ ' : ''}Order: Due Date`}
+                    onClick={() => { onSetSort?.(id, 'due'); setShowMenu(false) }}
+                  />
+                  <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+                  <MenuItem
+                    label="Collapse Column"
+                    onClick={() => { onToggleCollapse?.(id); setShowMenu(false) }}
                   />
                   <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
                   <MenuItem
@@ -614,6 +719,7 @@ function KanbanColumn({
               onDelete={onCardDelete}
               onConvertToTask={onCardConvertToTask}
               onUpdate={onCardUpdate}
+              display={cardDisplay}
             />
           ))}
         </SortableContext>

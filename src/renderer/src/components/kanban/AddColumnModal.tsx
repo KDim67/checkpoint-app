@@ -6,13 +6,14 @@ import ColorPicker from '../ui/ColorPicker'
 
 interface AddColumnModalProps {
   onClose: () => void
-  onSubmit: (name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full') => void
+  onSubmit: (name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full', description?: string) => void
   existingNames: string[]
 }
 
 export default function AddColumnModal({ onClose, onSubmit, existingNames }: AddColumnModalProps) {
   const [name, setName] = useState('')
   const [wipLimit, setWipLimit] = useState<string>('')
+  const [description, setDescription] = useState('')
   const [color, setColor] = useState<string | undefined>(undefined)
   const [colorMode, setColorMode] = useState<'header' | 'full'>('header')
   const [error, setError] = useState<string | null>(null)
@@ -42,7 +43,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
       return
     }
 
-    onSubmit(trimmedName, parsedWip, color, colorMode)
+    onSubmit(trimmedName, parsedWip, color, colorMode, description.trim() || undefined)
   }
 
   return (
@@ -156,6 +157,30 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
               padding: 'var(--space-2.5) var(--space-3.5)',
               fontSize: 'var(--text-sm)',
               outline: 'none'
+            }}
+          />
+        </div>
+
+        {/* Definition of done, shown on the column name's tooltip, and the
+            field the assistant fills in when it designs a workflow. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+          <label htmlFor="col-desc-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+            Definition of Done (Optional)
+          </label>
+          <input
+            id="col-desc-input"
+            type="text"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="e.g. Reviewed, tested, and merged…"
+            maxLength={200}
+            style={{
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-surface-offset)',
+              color: 'var(--color-text-base)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-2.5) var(--space-3.5)',
+              fontSize: 'var(--text-sm)'
             }}
           />
         </div>

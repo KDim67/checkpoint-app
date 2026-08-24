@@ -6,6 +6,7 @@ import { useAppStore } from '../../store/appStore'
 import type { Item } from '../../../../shared/types'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { PRIORITY_COLORS } from '../../lib/priority'
+import { DEFAULT_CARD_DISPLAY, type CardDisplay } from '../../lib/boardConfig'
 
 interface KanbanCardProps {
   card: Item
@@ -14,6 +15,8 @@ interface KanbanCardProps {
   onConvertToTask: (id: string) => void
   onUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
   isOverlay?: boolean
+  /** Board-level switches for what the card face shows. */
+  display?: CardDisplay
 }
 
 function stripMarkdown(md: string): string {
@@ -43,7 +46,15 @@ function stripMarkdown(md: string): string {
     .trim()
 }
 
-function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOverlay = false }: KanbanCardProps) {
+function KanbanCard({
+  card,
+  onClick,
+  onDelete,
+  onConvertToTask,
+  onUpdate,
+  isOverlay = false,
+  display = DEFAULT_CARD_DISPLAY
+}: KanbanCardProps) {
   const [hovered, setHovered] = useState(false)
 
   const sortable = useSortable({ id: card.id, disabled: isOverlay })
@@ -223,7 +234,7 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
 
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
         {/* Priority accent bar on left edge */}
-        {card.priority > 0 && (
+        {display.priority && card.priority > 0 && (
           <div style={{
             width: '3px',
             flexShrink: 0,
@@ -376,7 +387,7 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
           </div>
 
           {/* Body preview */}
-          {card.body && (
+          {display.bodyPreview && card.body && (
             <p style={{
               margin: 0,
               fontSize: 'var(--text-xs)',
@@ -391,7 +402,7 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
           )}
 
           {/* Tags */}
-          {card.tags && card.tags.length > 0 && (
+          {display.tags && card.tags && card.tags.length > 0 && (
             <div style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -431,7 +442,7 @@ function KanbanCard({ card, onClick, onDelete, onConvertToTask, onUpdate, isOver
               gap: '6px',
               flexWrap: 'wrap'
             }}>
-              {dueDateStr && (
+              {display.due && dueDateStr && (
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
