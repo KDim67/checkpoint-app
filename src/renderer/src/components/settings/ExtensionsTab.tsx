@@ -239,6 +239,7 @@ export default function ExtensionsTab() {
                 <ToggleSwitch
                   checked={p.active}
                   onChange={checked => handleTogglePlugin(p.filename, checked)}
+                  label={`Enable plugin ${p.name || p.filename}`}
                 />
               </div>
             ))}

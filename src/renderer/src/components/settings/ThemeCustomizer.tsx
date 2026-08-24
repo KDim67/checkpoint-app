@@ -152,7 +152,7 @@ export default function ThemeCustomizer() {
               Turns on dynamic theme variable overriding and sandboxed plugins.
             </p>
           </div>
-          <ToggleSwitch checked={engineEnabled} onChange={handleEngineToggle} />
+          <ToggleSwitch checked={engineEnabled} onChange={handleEngineToggle} label="Enable Customizer Engine" />
         </div>
       </div>
 

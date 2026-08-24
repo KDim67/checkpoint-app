@@ -285,6 +285,7 @@ export default function FeatureToggleCenter() {
                   checked={states[cfg.key] ?? false}
                   onChange={v => handleToggle(cfg, v)}
                   disabled={toggling === cfg.key}
+                  label={cfg.title}
                 />
               </RowBetween>
             </React.Fragment>
@@ -354,6 +355,7 @@ export default function FeatureToggleCenter() {
                   checked={states[cfg.key] ?? false}
                   onChange={v => handleToggle(cfg, v)}
                   disabled={toggling === cfg.key}
+                  label={cfg.title}
                 />
               </RowBetween>
             </React.Fragment>

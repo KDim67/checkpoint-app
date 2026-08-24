@@ -311,7 +311,7 @@ function WidgetSettings() {
             Transparent always-on-top overlay, never steals focus from your IDE.
           </div>
         </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} />
+        <ToggleSwitch checked={enabled} onChange={handleToggle} label="Show Desktop Widget" />
       </RowBetween>
 
       {enabled && (
@@ -462,6 +462,7 @@ function MemoryVaultManager() {
 
 // AI Settings
 function AiSettings() {
+  const { toast } = useToast()
   const [baseURL, setBaseURL] = useState('http://localhost:11434/v1')
   const [apiKey, setApiKey] = useState('ollama')
   const [model, setModel] = useState('llama3')
@@ -504,8 +505,11 @@ function AiSettings() {
         const dbTemp     = await window.electronAPI.db.getSetting('ai_temperature')
         const dbMaxToks  = await window.electronAPI.db.getSetting('ai_max_tokens')
         const dbSamples  = await window.electronAPI.db.getSetting('ai_email_writing_samples')
-        if (dbTemp)     setTemperature(Number(dbTemp))
-        if (dbMaxToks)  setMaxTokens(Number(dbMaxToks))
+        // Explicit null check, not truthiness: temperature 0 is a valid and
+        // meaningful setting (fully deterministic output), and `if (dbTemp)`
+        // skipped it, so choosing 0 silently reverted to the default on reopen.
+        if (dbTemp !== null && dbTemp !== undefined) setTemperature(Number(dbTemp))
+        if (dbMaxToks !== null && dbMaxToks !== undefined) setMaxTokens(Number(dbMaxToks))
         if (dbSamples) {
           try {
             const parsed = JSON.parse(dbSamples as string)
@@ -520,8 +524,17 @@ function AiSettings() {
     load()
   }, [])
 
-  const save = (key: string, val: string | number) =>
-    window.electronAPI.db.setSetting(key, val)
+  /**
+   * Persists one setting. The failure path matters: this was fire-and-forget,
+   * so a rejected write left the control showing the new value while the
+   * database kept the old one, and the user had no way to know.
+   */
+  const save = (key: string, val: string | number): void => {
+    window.electronAPI.db.setSetting(key, val).catch(err => {
+      console.error(`Failed to save ${key}:`, err)
+      toast(`Could not save that setting, ${err?.message || 'unknown error'}. Try again.`)
+    })
+  }
 
   // Provider profile management
   const activeProvider = providers.find(p => p.id === activeId) || null
@@ -722,19 +735,35 @@ function AiSettings() {
         />
       </FieldRow>
 
-      <FieldRow label={`Temperature, ${temperature.toFixed(1)}`}>
+      <FieldRow
+        label={`Temperature, ${temperature.toFixed(1)}`}
+        hint="Lower is more focused and repeatable; higher is more varied."
+      >
         <input
           type="range" min={0} max={1} step={0.1} value={temperature}
+          aria-label="Temperature"
+          aria-valuetext={temperature.toFixed(1)}
           onChange={e => { setTemperature(parseFloat(e.target.value)); save('ai_temperature', parseFloat(e.target.value)) }}
           style={{ accentColor: 'var(--color-secondary)', cursor: 'pointer', width: '100%' }}
         />
       </FieldRow>
 
-      <FieldRow label="Max Tokens">
+      <FieldRow label="Max Tokens" hint="Between 1 and 200,000. Applied when the field loses focus.">
         <SettingsInput
           type="number"
+          inputMode="numeric"
+          min={1}
+          max={200000}
           value={maxTokens}
-          onChange={v => { const n = parseInt(v) || 0; setMaxTokens(n); save('ai_max_tokens', n) }}
+          // Typed freely, clamped on blur: validating per keystroke fights the
+          // user mid-edit, and `parseInt(v) || 0` previously let an empty or
+          // malformed field persist 0, which makes generation fail outright.
+          onChange={v => setMaxTokens(parseInt(v, 10) || 0)}
+          onBlur={() => {
+            const clamped = Math.min(200000, Math.max(1, maxTokens || 2048))
+            setMaxTokens(clamped)
+            save('ai_max_tokens', clamped)
+          }}
         />
       </FieldRow>
 
@@ -1166,7 +1195,7 @@ export default function SettingsView() {
       overflow: 'hidden'
     }}>
       {/* Sidebar nav (grouped) */}
-      <nav style={{
+      <nav aria-label="Settings sections" style={{
         width: '210px',
         flexShrink: 0,
         borderRight: '1px solid var(--color-surface-offset)',
@@ -1204,6 +1233,10 @@ export default function SettingsView() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                // Which section is open was signalled by colour alone, so it
+                // was invisible to screen readers and to anyone who cannot
+                // distinguish the accent from the muted foreground.
+                aria-current={activeTab === tab.id ? 'page' : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1438,7 +1471,7 @@ function BackupSettings() {
             Periodically saves transactionally consistent snapshots of your active database.
           </div>
         </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} />
+        <ToggleSwitch checked={enabled} onChange={handleToggle} label="Automated Backups" />
       </RowBetween>
 
       {enabled && (

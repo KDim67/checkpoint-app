@@ -130,7 +130,7 @@ export default function AppearanceSettings() {
             Reduces card padding and row heights for denser information density.
           </div>
         </div>
-        <ToggleSwitch checked={compactMode} onChange={handleCompact} />
+        <ToggleSwitch checked={compactMode} onChange={handleCompact} label="Compact Mode" />
       </RowBetween>
 
       <Divider />
