@@ -145,10 +145,25 @@ function pruneHistory(history: Message[], maxHistoryTokens: number): Message[] {
 // Semantic intent classifier, replaces the fragile keyword-heuristic approach.
 // Returns what action type the model should take, factoring in the active skill.
 // Defaults to 'converse' to prevent hallucination when intent is ambiguous.
-type IntentType = 'create_items' | 'create_plan' | 'create_dialogue' | 'update_items' | 'converse'
+type IntentType = 'create_items' | 'create_plan' | 'create_dialogue' | 'update_items' | 'configure_board' | 'converse'
 
 function classifyIntent(text: string, activeSkillId: string | null): IntentType {
   const lower = text.toLowerCase().trim()
+
+  // Board CONFIGURATION signals (columns, background, swimlanes, card fields).
+  // Checked before card editing because the two share verbs, "set", "change",
+  // "rename", and only the noun distinguishes "rename the card" from "rename
+  // the column". The column/board nouns are therefore required here.
+  if (
+    /\b(wip|work in progress)\b[\s\S]{0,20}\blimit\b/.test(lower) ||
+    /\blimit\b[\s\S]{0,30}\b(column|list|lane)\b/.test(lower) ||
+    /\b(rename|delete|remove|add|create|reorder|move|collapse|expand|colou?r)\b[\s\S]{0,40}\b(column|list|lane)\b/.test(lower) ||
+    /\b(column|list|lane)\b[\s\S]{0,40}\b(colou?r|order|sort|limit|description|definition of done)\b/.test(lower) ||
+    /\b(board|kanban)\b[\s\S]{0,30}\b(background|theme|colou?r)\b/.test(lower) ||
+    /\bswimlane/.test(lower) ||
+    /\b(hide|show)\b[\s\S]{0,30}\b(tags?|due dates?|priorit(y|ies)|body|preview)\b[\s\S]{0,30}\bcards?\b/.test(lower) ||
+    /\bcards?\b[\s\S]{0,20}\b(fields?|face)\b/.test(lower)
+  ) return 'configure_board'
 
   // Board EDITING signals (existing cards), checked before creation so
   // "move X to done" never reads as a create request. High-precision patterns.
@@ -1482,17 +1497,19 @@ Otherwise, answer the user's question in friendly plain text.`
       // output even on tiny local models, then deterministically enriches it with
       // tags + colors. Falls back to the streaming path below on any failure, so
       // this can only improve reliability, never regress it.
-      const structuredKind: 'board' | 'plan' | 'dialogue' | 'update' | null =
+      const structuredKind: 'board' | 'plan' | 'dialogue' | 'update' | 'config' | null =
         intent === 'create_items' ? 'board' :
         intent === 'create_plan' ? 'plan' :
         intent === 'create_dialogue' ? 'dialogue' :
-        intent === 'update_items' ? 'update' : null
+        intent === 'update_items' ? 'update' :
+        intent === 'configure_board' ? 'config' : null
 
       if (structuredKind) {
         setWaitingLabel(
           structuredKind === 'board' ? 'Composing board changes…' :
           structuredKind === 'plan' ? 'Drafting a plan…' :
-          structuredKind === 'update' ? 'Applying board edits…' : 'Writing dialogue…'
+          structuredKind === 'update' ? 'Applying board edits…' :
+          structuredKind === 'config' ? 'Adjusting board settings…' : 'Writing dialogue…'
         )
         const columnGuidance = wantsColumns(lastUserContent)
           ? `The user is asking about BOARD STRUCTURE, include a "columns" array of the workflow stages (each with a name and a hex color), and place the cards into those columns. Design a sensible pipeline (e.g. Backlog → In Progress → Review → Done) if none fits.`
@@ -1602,6 +1619,20 @@ Output a \`\`\`json:update_board block of this shape:
 → "target" MUST be copied EXACTLY from the card titles in the CURRENT LIVE KANBAN BOARD STATE above. Never invent titles.
 → For "move", "toColumn" must be a VALID COLUMN ID or name from above.
 → Only the operations the user asked for. DO NOT create new cards.`
+          break
+        case 'configure_board':
+          enforcementContent = `⚙️ BOARD SETTINGS CHANGE REQUIRED, OUTPUT A configure_board BLOCK NOW ⚙️
+Output a \`\`\`json:configure_board block of this shape:
+{ "operations": [ { "op": "update_column", "target": "Review", "wipLimit": 3, "color": "#f59e0b" } ] }
+→ op is one of: add_column | update_column | delete_column | reorder_columns | set_background | set_swimlanes | set_card_display.
+→ "target" MUST be a column name or id copied EXACTLY from the CURRENT LIVE KANBAN BOARD STATE above. Never invent one.
+→ update_column accepts any of: name (to rename), wipLimit (number, or null for no limit), color (#rrggbb), colorMode ("header"|"full"), collapsed (bool), sort ("manual"|"priority"|"due"), description (the column's definition of done).
+→ add_column needs "name"; optional wipLimit, color, description, position (0-based index).
+→ reorder_columns takes "order": a list of ALL column names in the new order.
+→ set_background takes "background": a #rrggbb colour or a preset name.
+→ set_swimlanes takes "swimlanes": true|false. set_card_display takes "cardDisplay": { "priority": bool, "tags": bool, "due": bool, "bodyPreview": bool }.
+→ These change board SETTINGS only. To move or edit CARDS, use an update_board block instead.
+→ Only the operations the user asked for. Then ONE short sentence confirming what changed.`
           break
         default: // 'converse'
           enforcementContent = `💬 GENERAL CONVERSATION, DO NOT OUTPUT JSON BLOCKS 💬

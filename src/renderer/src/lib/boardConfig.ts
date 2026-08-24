@@ -79,7 +79,6 @@ export const DEFAULT_COLUMNS: ColumnConfig[] = [
   { id: 'done', name: 'Done', wipLimit: null }
 ]
 
-const COLUMN_SORTS: ColumnSort[] = ['manual', 'priority', 'due']
 
 // Storage keys
 
@@ -131,10 +130,15 @@ export function normalizeColumn(raw: unknown, index: number): ColumnConfig | nul
 
   const column: ColumnConfig = { id, name, wipLimit: wip(o.wipLimit) }
 
+  // Canonical form: a field equal to its default is omitted rather than stored.
+  // Two documents that mean the same thing then serialise identically, which is
+  // what lets an undo be checked by comparing against the original instead of
+  // field by field, and stops "collapsed: false" being written where the key
+  // simply never existed.
   if (typeof o.color === 'string' && o.color.trim()) column.color = o.color.trim()
-  if (o.colorMode === 'full' || o.colorMode === 'header') column.colorMode = o.colorMode
-  if (o.collapsed !== undefined) column.collapsed = bool(o.collapsed, false)
-  if (COLUMN_SORTS.includes(o.sort as ColumnSort)) column.sort = o.sort as ColumnSort
+  if (o.colorMode === 'full') column.colorMode = 'full'
+  if (bool(o.collapsed, false)) column.collapsed = true
+  if (o.sort === 'priority' || o.sort === 'due') column.sort = o.sort
   if (typeof o.description === 'string' && o.description.trim()) {
     column.description = o.description.trim()
   }

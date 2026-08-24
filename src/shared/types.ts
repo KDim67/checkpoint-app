@@ -108,7 +108,7 @@ export interface AiSettings {
 
 // Structured AI actions (reliable board/plan/dialogue/update generation)
 
-export type AiStructuredKind = 'board' | 'plan' | 'dialogue' | 'update'
+export type AiStructuredKind = 'board' | 'plan' | 'dialogue' | 'update' | 'config'
 
 export interface AiStructuredParams {
   kind: AiStructuredKind

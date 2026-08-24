@@ -151,11 +151,62 @@ const UPDATE_SCHEMA = {
   required: ['message', 'operations']
 } as const
 
+/**
+ * Board settings, as opposed to card edits. `target` is required only for the
+ * column operations, but the schema asks for `op` alone so a background or
+ * swimlane change is not forced to invent one.
+ */
+const CONFIG_SCHEMA = {
+  type: 'object',
+  properties: {
+    message: { type: 'string', description: 'One friendly sentence summarizing what changed.' },
+    operations: {
+      type: 'array',
+      description: 'Changes to the board CONFIGURATION, columns, background, swimlanes, card fields. Not card contents.',
+      items: {
+        type: 'object',
+        properties: {
+          op: {
+            type: 'string',
+            enum: ['add_column', 'update_column', 'delete_column', 'reorder_columns',
+                   'set_background', 'set_swimlanes', 'set_card_display']
+          },
+          target: { type: 'string', description: 'EXACT name or id of an existing column, from the live board state. Required for update_column and delete_column.' },
+          name: { type: 'string', description: 'For add_column: the new column name. For update_column: the new name when renaming.' },
+          wipLimit: { type: ['integer', 'null'], description: 'Work-in-progress cap; null means no limit.' },
+          color: { type: 'string', description: 'Hex colour such as #f59e0b.' },
+          colorMode: { type: 'string', enum: ['header', 'full'], description: 'Tint just the header, or the whole column.' },
+          collapsed: { type: 'boolean', description: 'Collapse the column to a narrow strip.' },
+          sort: { type: 'string', enum: ['manual', 'priority', 'due'], description: 'Persistent card order within the column.' },
+          description: { type: 'string', description: "The column's definition of done." },
+          position: { type: 'integer', description: 'For add_column: 0-based insertion index.' },
+          order: { type: 'array', items: { type: 'string' }, description: 'For reorder_columns: ALL column names in the new order.' },
+          background: { type: 'string', description: 'For set_background: a hex colour or preset name.' },
+          swimlanes: { type: 'boolean', description: 'For set_swimlanes: group cards by priority.' },
+          cardDisplay: {
+            type: 'object',
+            description: 'For set_card_display: which fields appear on a card face.',
+            properties: {
+              priority: { type: 'boolean' },
+              tags: { type: 'boolean' },
+              due: { type: 'boolean' },
+              bodyPreview: { type: 'boolean' }
+            }
+          }
+        },
+        required: ['op']
+      }
+    }
+  },
+  required: ['message', 'operations']
+} as const
+
 const SCHEMAS: Record<AiStructuredKind, object> = {
   board: BOARD_SCHEMA,
   plan: PLAN_SCHEMA,
   dialogue: DIALOGUE_SCHEMA,
-  update: UPDATE_SCHEMA
+  update: UPDATE_SCHEMA,
+  config: CONFIG_SCHEMA
 }
 
 const SCHEMA_HINTS: Record<AiStructuredKind, string> = {
@@ -173,14 +224,18 @@ Rules: priority is 1|2|3. Omit "columns" (or use []) if the existing columns fit
 Every choice.target MUST be an exact id of another node, or "end".`,
   update: `Respond with ONLY a JSON object of this shape (no prose, no markdown fences):
 { "message": "...", "operations": [ { "op": "move", "target": "Exact Card Title", "toColumn": "Done" }, { "op": "set_priority", "target": "...", "priority": 3 }, { "op": "archive", "target": "..." } ] }
-Rules: op is move|set_priority|retitle|update_body|archive|set_due_date. "target" is ALWAYS a CARD TITLE copied exactly from the board state, NEVER a column name (columns go only in "toColumn"). For set_due_date, "due" is an ISO date YYYY-MM-DD (resolve "Friday"/"next week" against the CURRENT DATE given in context; empty string clears). One operation per card. Never invent titles.`
+Rules: op is move|set_priority|retitle|update_body|archive|set_due_date. "target" is ALWAYS a CARD TITLE copied exactly from the board state, NEVER a column name (columns go only in "toColumn"). For set_due_date, "due" is an ISO date YYYY-MM-DD (resolve "Friday"/"next week" against the CURRENT DATE given in context; empty string clears). One operation per card. Never invent titles.`,
+  config: `Respond with ONLY a JSON object of this shape (no prose, no markdown fences):
+{ "message": "...", "operations": [ { "op": "update_column", "target": "Review", "wipLimit": 3 }, { "op": "set_swimlanes", "swimlanes": true } ] }
+Rules: op is add_column|update_column|delete_column|reorder_columns|set_background|set_swimlanes|set_card_display. For update_column and delete_column, "target" is a COLUMN name or id copied exactly from the board state, never a card title. update_column may set name (rename), wipLimit (number or null), color (#rrggbb), colorMode (header|full), collapsed, sort (manual|priority|due), description. reorder_columns takes "order" listing ALL columns. This changes board SETTINGS only, never card contents.`
 }
 
 const FN_DESCRIPTIONS: Record<AiStructuredKind, string> = {
   board: 'Create Kanban columns and/or cards on the board.',
   plan: 'Produce a structured implementation plan.',
   dialogue: 'Produce a branching dialogue / quest tree.',
-  update: 'Edit existing Kanban cards: move between columns, change priority, retitle, rewrite body, or archive.'
+  update: 'Edit existing Kanban cards: move between columns, change priority, retitle, rewrite body, or archive.',
+  config: 'Change board settings: add, rename, recolour, reorder, limit, collapse or delete columns; set the background, swimlanes, or which fields show on cards.'
 }
 
 // Helpers

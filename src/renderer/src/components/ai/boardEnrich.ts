@@ -7,7 +7,7 @@
 // tags, and package the result into the exact fenced-block format the existing
 // ChatMessage executor understands.
 
-export type StructuredKind = 'board' | 'plan' | 'dialogue' | 'update'
+export type StructuredKind = 'board' | 'plan' | 'dialogue' | 'update' | 'config'
 
 // Palette
 const NAMED_COLORS: Record<string, string> = {

@@ -110,11 +110,54 @@ export const UpdateResult = z.object({
     .min(1, 'no operations produced')
 })
 
+/**
+ * Board *configuration* changes, as distinct from card edits.
+ *
+ * Deliberately loose about which fields accompany which op, the renderer's
+ * normalizer decides what a given op can actually use, and rejecting a whole
+ * generation because the model attached a stray key to one operation would
+ * throw away the other nine.
+ */
+export const ConfigResult = z.object({
+  message: z.string().optional(),
+  operations: z
+    .array(
+      z.object({
+        op: z.enum([
+          'add_column', 'update_column', 'delete_column', 'reorder_columns',
+          'set_background', 'set_swimlanes', 'set_card_display'
+        ]),
+        target: z.string().optional(),
+        name: z.string().optional(),
+        wipLimit: z.union([looseInt, z.null()]).optional(),
+        color: z.string().optional(),
+        colorMode: z.enum(['header', 'full']).optional(),
+        collapsed: z.boolean().optional(),
+        sort: z.enum(['manual', 'priority', 'due']).optional(),
+        description: z.string().optional(),
+        position: looseInt.optional(),
+        order: z.array(z.string()).optional(),
+        background: z.string().optional(),
+        swimlanes: z.boolean().optional(),
+        cardDisplay: z
+          .object({
+            priority: z.boolean().optional(),
+            tags: z.boolean().optional(),
+            due: z.boolean().optional(),
+            bodyPreview: z.boolean().optional()
+          })
+          .optional()
+      })
+    )
+    .min(1, 'no operations produced')
+})
+
 const VALIDATORS: Record<AiStructuredKind, z.ZodTypeAny> = {
   board: BoardResult,
   plan: PlanResult,
   dialogue: DialogueResult,
-  update: UpdateResult
+  update: UpdateResult,
+  config: ConfigResult
 }
 
 export interface ValidationOutcome {
