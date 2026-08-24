@@ -40,6 +40,7 @@ import ThemeCustomizer from './settings/ThemeCustomizer'
 import HotkeyBinder from './settings/HotkeyBinder'
 import ExtensionsTab from './settings/ExtensionsTab'
 import { useToast } from './ui/Toast'
+import { loadBoardConfig, patchBoardConfig, type ColumnConfig } from '../lib/boardConfig'
 import {
   VIEW_FEATURES,
   readViewFeatures,
@@ -115,12 +116,6 @@ const LEGACY_TAB_ALIASES: Record<string, SettingsTab> = {
 }
 
 // Kanban per-context column config
-interface ColumnConfig {
-  id: string
-  name: string
-  wipLimit: number | null
-}
-
 function KanbanSettings({ activeContext }: { activeContext: string }) {
   const [columns, setColumns] = useState<ColumnConfig[]>([])
   const [loading, setLoading] = useState(true)
@@ -131,22 +126,14 @@ function KanbanSettings({ activeContext }: { activeContext: string }) {
     const load = async () => {
       setLoading(true)
       try {
-        const key = `kanban_columns_${activeContext}`
-        const val = await window.electronAPI.db.getSetting(key)
-        if (val) {
-          const parsed = JSON.parse(val as string) as ColumnConfig[]
-          setColumns(parsed)
-          setLocalNames(Object.fromEntries(parsed.map(c => [c.id, c.name])))
-        } else {
-          const defaults: ColumnConfig[] = [
-            { id: 'open',        name: 'Backlog',     wipLimit: null },
-            { id: 'in_progress', name: 'In Progress', wipLimit: null },
-            { id: 'in_review',   name: 'In Review',   wipLimit: null },
-            { id: 'done',        name: 'Done',         wipLimit: null }
-          ]
-          setColumns(defaults)
-          setLocalNames(Object.fromEntries(defaults.map(c => [c.id, c.name])))
-        }
+        // Shares the board document with the Kanban view and the AI action
+        // blocks. This tab used to keep its own ColumnConfig type and read the
+        // raw column key, so it silently dropped colour and colour-mode on
+        // every save, any column styled on the board lost that styling as soon
+        // as its WIP limit was edited here.
+        const config = await loadBoardConfig(activeContext)
+        setColumns(config.columns)
+        setLocalNames(Object.fromEntries(config.columns.map(c => [c.id, c.name])))
       } catch (err) { console.error(err) }
       setLoading(false)
     }
@@ -154,8 +141,7 @@ function KanbanSettings({ activeContext }: { activeContext: string }) {
   }, [activeContext])
 
   const save = async (updated: ColumnConfig[]) => {
-    const key = `kanban_columns_${activeContext}`
-    await window.electronAPI.db.setSetting(key, JSON.stringify(updated))
+    await patchBoardConfig(activeContext, { columns: updated })
     setColumns(updated)
   }
 

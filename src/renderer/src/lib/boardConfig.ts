@@ -307,6 +307,35 @@ export async function patchBoardConfig(
   })
 }
 
+/**
+ * The lock key every board-config mutation serialises on. Exported for callers
+ * that need to hold it across a wider critical section than a single patch, 
+ * for example an AI action block that reads the columns, decides which ones are
+ * new, and writes, all as one atomic step.
+ */
+export const boardConfigLockKey = lockKey
+
+/**
+ * Read half of a caller-managed critical section.
+ *
+ * ONLY for code already inside `withLock(boardConfigLockKey(context), …)`.
+ * Taking the lock again from in there would deadlock, since withLock queues a
+ * caller behind the entry that has not finished yet. Everything else should use
+ * `loadBoardConfig` or `patchBoardConfig`.
+ */
+export async function readBoardConfigUnlocked(context: string): Promise<BoardConfig> {
+  const { config } = await readUnlocked(context)
+  return config
+}
+
+/** Write half of a caller-managed critical section. Same locking caveat. */
+export async function writeBoardConfigUnlocked(
+  context: string,
+  config: BoardConfig
+): Promise<void> {
+  await writeUnlocked(context, normalizeBoardConfig(config))
+}
+
 /** Resolves a column by id first, then by case-insensitive name. */
 export function findColumn(config: BoardConfig, target: string): ColumnConfig | undefined {
   const needle = target.trim().toLowerCase()

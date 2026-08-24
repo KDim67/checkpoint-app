@@ -5,6 +5,11 @@ import { CustomCodeBlock } from '../log/LogEntry'
 import { Sparkles, User, Mail, BookOpen, CheckCircle2, Layout, RefreshCw, Columns, ArrowRight, Pencil, Copy, Check, Trash2, FileText, FileDown, Brain, X } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { withLock } from '../../lib/asyncMutex'
+import {
+  boardConfigLockKey,
+  readBoardConfigUnlocked,
+  writeBoardConfigUnlocked
+} from '../../lib/boardConfig'
 import { useToast } from '../ui/Toast'
 import { normalizeUpdate } from './boardEnrich'
 
@@ -302,29 +307,19 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
         executedActionSignaturesSet.add(signature)
 
         const validContext = activeContext || 'default'
-        const key = `kanban_columns_${validContext}`
 
         // 1. Create Columns (locked: prevents a concurrent column writer, 
         //    e.g. the Kanban view's own "bootstrap default columns" path, or
         //    another action block in the same message, from reading the
         //    same stale column list and clobbering this write or creating a
         //    second column with the same name).
-        const { createdCols, colsList, reusedCols } = await withLock(`kanban-cols:${validContext}`, async () => {
-          const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-          let colsList: any[] = []
-          if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch { colsList = [] }
-          } else if (Array.isArray(rawCols)) {
-            colsList = rawCols
-          }
-          if (colsList.length === 0) {
-            colsList = [
-              { id: 'open', name: 'Backlog' },
-              { id: 'in_progress', name: 'In Progress' },
-              { id: 'in_review', name: 'In Review' },
-              { id: 'done', name: 'Done' }
-            ]
-          }
+        const { createdCols, colsList, reusedCols } = await withLock(boardConfigLockKey(validContext), async () => {
+          // Reads and writes the unified board document rather than the raw
+          // column key. The unlocked primitives are correct here precisely
+          // because this block already holds the lock for the whole
+          // read-decide-write sequence.
+          const config = await readBoardConfigUnlocked(validContext)
+          const colsList: any[] = [...config.columns]
 
           // Track only columns we actually create, reused ones aren't "added".
           const createdCols: any[] = []
@@ -338,7 +333,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
             createdCols.push(newCol)
           }
           if (createdCols.length > 0) {
-            await window.electronAPI.db.setSetting(key, JSON.stringify(colsList))
+            await writeBoardConfigUnlocked(validContext, { ...config, columns: colsList })
           }
           return { createdCols, colsList, reusedCols }
         })
@@ -1290,25 +1285,10 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
         const color = normalized.color
         const colorMode = normalized.colorMode
         const context = activeContext || 'default'
-        const key = `kanban_columns_${context}`
 
-        const newCol = await withLock(`kanban-cols:${context}`, async () => {
-          const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-          let colsList: any[] = []
-          if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch { colsList = [] }
-          } else if (Array.isArray(rawCols)) {
-            colsList = rawCols
-          }
-
-          if (colsList.length === 0) {
-            colsList = [
-              { id: 'open', name: 'To Do' },
-              { id: 'in_progress', name: 'In Progress' },
-              { id: 'in_review', name: 'In Review' },
-              { id: 'done', name: 'Done' }
-            ]
-          }
+        const newCol = await withLock(boardConfigLockKey(context), async () => {
+          const config = await readBoardConfigUnlocked(context)
+          const colsList: any[] = [...config.columns]
 
           // Prevent duplicate column names
           const existing = colsList.find(c => c.name.toLowerCase() === name.toLowerCase())
@@ -1321,7 +1301,7 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
           const created = { id, name, wipLimit, color, colorMode }
           const updatedCols = [...colsList, created]
 
-          await window.electronAPI.db.setSetting(key, JSON.stringify(updatedCols))
+          await writeBoardConfigUnlocked(context, { ...config, columns: updatedCols })
           createdColsCacheMap.set(signature, created)
           return created
         })

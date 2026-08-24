@@ -35,17 +35,19 @@ import useEscapeKey from './ui/useEscapeKey'
 import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
-import { withLock } from '../lib/asyncMutex'
+import {
+  loadBoardConfig,
+  patchBoardConfig,
+  type BoardConfig,
+  type ColumnConfig
+} from '../lib/boardConfig'
 import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
 
 
-export interface ColumnConfig {
-  id: string
-  name: string
-  wipLimit: number | null
-  color?: string
-  colorMode?: 'header' | 'full'
-}
+// Re-exported rather than declared: the shape now belongs to lib/boardConfig,
+// which owns the whole board document. Kept as an export so existing importers
+// of ColumnConfig from this module keep working.
+export type { ColumnConfig }
 
 const BG_STYLES: Record<string, string> = {
   default: 'var(--color-background)',
@@ -223,9 +225,18 @@ export default function KanbanView() {
     columnsRef.current = next
     setColumns(next)
     try {
-      await window.electronAPI.db.setSetting(`kanban_columns_${activeContext}`, JSON.stringify(next))
+      await patchBoardConfig(activeContext, { columns: next })
     } catch (err) {
       console.error('Failed to persist columns:', err)
+    }
+  }, [activeContext])
+
+  /** Writes any other slice of the board document; state is set by the caller. */
+  const persistConfig = useCallback(async (patch: Partial<BoardConfig>): Promise<void> => {
+    try {
+      await patchBoardConfig(activeContext, patch)
+    } catch (err) {
+      console.error('Failed to persist board config:', err)
     }
   }, [activeContext])
 
@@ -422,42 +433,16 @@ export default function KanbanView() {
 
   const loadColumns = useCallback(async () => {
     try {
-      const key = `kanban_columns_${activeContext}`
-      // Locked: an AI action block (CreateColumnActionBlock / BatchBoardActionBlock)
-      // may be writing this exact same settings key around the same time the
-      // board first mounts. Without the lock, both sides can read "empty",
-      // both decide to bootstrap their own default list, and whichever
-      // finishes last silently overwrites the other's columns/cards-by-status.
-      const resolvedCols: ColumnConfig[] = await withLock(`kanban-cols:${activeContext}`, async () => {
-        const val = await window.electronAPI.db.getSetting(key)
-        if (val) {
-          return JSON.parse(val as string)
-        }
-        const defaultCols: ColumnConfig[] = [
-          { id: 'open',        name: 'Backlog',     wipLimit: null },
-          { id: 'in_progress', name: 'In Progress', wipLimit: null },
-          { id: 'in_review',   name: 'In Review',   wipLimit: null },
-          { id: 'done',        name: 'Done',         wipLimit: null }
-        ]
-        await window.electronAPI.db.setSetting(key, JSON.stringify(defaultCols))
-        return defaultCols
-      })
-      setColumns(resolvedCols)
-
-      // Load swimlane preference per context
-      const swimKey = `kanban_swimlanes_${activeContext}`
-      const swimVal = await window.electronAPI.db.getSetting(swimKey)
-      setSwimlanesEnabled(swimVal === 'true')
-
-      // Load board bg
-      const bgKey = `kanban_bg_${activeContext}`
-      const bgVal = await window.electronAPI.db.getSetting(bgKey)
-      setBoardBg((bgVal as string) || 'default')
-
-      // Load archived columns
-      const archKey = `kanban_archived_columns_${activeContext}`
-      const archVal = await window.electronAPI.db.getSetting(archKey)
-      setArchivedColumns(archVal ? JSON.parse(archVal as string) : [])
+      // One document now covers columns, background, swimlanes and the archive
+      // bin, so this is a single read where it used to be four. loadBoardConfig
+      // holds the same `kanban-cols:` lock the AI action blocks take, which is
+      // what stops the board bootstrap and a concurrent AI write from both
+      // seeing "empty" and each installing its own default column set.
+      const config = await loadBoardConfig(activeContext)
+      setColumns(config.columns)
+      setSwimlanesEnabled(config.swimlanes)
+      setBoardBg(config.background)
+      setArchivedColumns(config.archivedColumns)
     } catch (err) {
       console.error('Failed to load Kanban column settings:', err)
     }
@@ -740,14 +725,15 @@ export default function KanbanView() {
     if (!colToArchive) return
 
     try {
-      const key = `kanban_archived_columns_${activeContext}`
-      const val = await window.electronAPI.db.getSetting(key)
-      const archivedList = val ? JSON.parse(val as string) : []
-      const updatedArchived = [...archivedList, colToArchive]
-      await window.electronAPI.db.setSetting(key, JSON.stringify(updatedArchived))
-
+      // Both halves in one patch: archiving moves a column between two lists,
+      // and writing them separately left a window where the column existed in
+      // neither if the second write failed.
+      const updatedArchived = [...archivedColumns, colToArchive]
       const updatedCols = current.filter(c => c.id !== colId)
-      await persistColumns(updatedCols)
+      columnsRef.current = updatedCols
+      setColumns(updatedCols)
+      setArchivedColumns(updatedArchived)
+      await persistConfig({ columns: updatedCols, archivedColumns: updatedArchived })
 
       setArchivedColumns(updatedArchived)
       loadCards()
@@ -914,15 +900,14 @@ export default function KanbanView() {
     if (!colToRestore) return
 
     try {
+      // One patch, for the same reason archiving is: a restore that half-failed
+      // used to leave the column in both lists at once.
       const updatedCols = [...columns, colToRestore]
-      const activeKey = `kanban_columns_${activeContext}`
-      await window.electronAPI.db.setSetting(activeKey, JSON.stringify(updatedCols))
-      setColumns(updatedCols)
-
       const updatedArchived = archivedColumns.filter(c => c.id !== colId)
-      const archKey = `kanban_archived_columns_${activeContext}`
-      await window.electronAPI.db.setSetting(archKey, JSON.stringify(updatedArchived))
+      columnsRef.current = updatedCols
+      setColumns(updatedCols)
       setArchivedColumns(updatedArchived)
+      await persistConfig({ columns: updatedCols, archivedColumns: updatedArchived })
 
       toast(`Column "${colToRestore.name}" restored`)
     } catch (err) {
@@ -941,9 +926,8 @@ export default function KanbanView() {
     if (confirmed) {
       try {
         const updatedArchived = archivedColumns.filter(c => c.id !== colId)
-        const archKey = `kanban_archived_columns_${activeContext}`
-        await window.electronAPI.db.setSetting(archKey, JSON.stringify(updatedArchived))
         setArchivedColumns(updatedArchived)
+        await persistConfig({ archivedColumns: updatedArchived })
         toast(`List "${colName}" deleted permanently`)
       } catch (err) {
         console.error(err)
@@ -1676,7 +1660,7 @@ export default function KanbanView() {
                               setBoardBg(key)
                               setShowBgSelector(false)
                               try {
-                                await window.electronAPI.db.setSetting(`kanban_bg_${activeContext}`, key)
+                                await persistConfig({ background: key })
                               } catch {}
                             }}
                             style={{
@@ -1750,7 +1734,7 @@ export default function KanbanView() {
                         setBoardBg(customSolidColor)
                         setShowBgSelector(false)
                         try {
-                          await window.electronAPI.db.setSetting(`kanban_bg_${activeContext}`, customSolidColor)
+                          await persistConfig({ background: customSolidColor })
                         } catch {}
                       }}
                       style={{
@@ -1919,7 +1903,7 @@ export default function KanbanView() {
                               setBoardBg(gradStr)
                               setShowBgSelector(false)
                               try {
-                                await window.electronAPI.db.setSetting(`kanban_bg_${activeContext}`, gradStr)
+                                await persistConfig({ background: gradStr })
                               } catch {}
                             }}
                             style={{
@@ -2025,7 +2009,7 @@ export default function KanbanView() {
                         setBoardBg(imgVal)
                         setShowBgSelector(false)
                         try {
-                          await window.electronAPI.db.setSetting(`kanban_bg_${activeContext}`, imgVal)
+                          await persistConfig({ background: imgVal })
                         } catch {}
                       }}
                       style={{
@@ -2070,10 +2054,7 @@ export default function KanbanView() {
             onClick={async () => {
               const next = !swimlanesEnabled
               setSwimlanesEnabled(next)
-              try {
-                const swimKey = `kanban_swimlanes_${activeContext}`
-                await window.electronAPI.db.setSetting(swimKey, String(next))
-              } catch { /* non-critical */ }
+              await persistConfig({ swimlanes: next })
             }}
             title="Toggle priority swimlanes"
             icon={swimlanesEnabled ? <Layers size={13} /> : <LayoutGrid size={13} />}
