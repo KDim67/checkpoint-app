@@ -20,13 +20,12 @@ import {
 import { batchRenameFiles, selectTextureFile, loadTextureFile, savePbrMaps, saveSeamlessTexture, selectFolder, saveSpriteAtlas, saveSlicedSprites, saveLutTexture, saveUpscaledTexture } from './gamedevService'
 import { SyncService } from './syncService'
 
-/**
- * Duplicated from mcpServer.ts on purpose. Importing it statically would defeat
- * the dynamic `import('./mcpServer')` calls below and pull the MCP SDK, which
- * is large and drags in express and hono, into the startup chunk for every
- * launch, including the overwhelming majority where the server is switched off.
- */
-const MCP_DEFAULT_PORT = 9990
+// Pure constants with no dependencies of their own, so importing them
+// statically does not defeat the dynamic `import('./mcpServer')` calls below, 
+// those exist to keep the MCP SDK, which drags in express and hono, out of the
+// startup chunk on the majority of launches where the server is switched off.
+import { MCP_DEFAULT_PORT, WEBHOOK_DEFAULT_PORT } from '../shared/ports'
+import type { WidgetPosition } from './widget'
 
 const syncService = new SyncService()
 
@@ -552,14 +551,14 @@ function registerIpcHandlers(): void {
     return deleteModel(modelTag)
   })
   // Widget Handlers
-  ipcMain.handle(IpcChannels.WIDGET_TOGGLE, async () => {
-    const { toggleWidget } = await import('./widget')
-    toggleWidget()
+  ipcMain.handle(IpcChannels.WIDGET_TOGGLE, async (_event, active: boolean) => {
+    const { setWidgetEnabled } = await import('./widget')
+    setWidgetEnabled(active)
   })
 
   ipcMain.handle(IpcChannels.WIDGET_SET_POSITION, async (_event, position: string) => {
     const { setWidgetPosition } = await import('./widget')
-    setWidgetPosition(position as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right')
+    setWidgetPosition(position as WidgetPosition)
   })
 
   ipcMain.handle(IpcChannels.WIDGET_SET_OPACITY, async (_event, opacity: number) => {
@@ -1281,13 +1280,23 @@ app.whenReady().then(async () => {
   // Register application hotkeys (HUD & Clipboard)
   registerAppShortcuts()
 
+  // The widget is a BrowserWindow, so it cannot outlive the process. Without
+  // this the stored widget_enabled flag described a window that no longer
+  // existed, and the settings switch inverted on the next click.
+  try {
+    const { restoreWidget } = await import('./widget')
+    restoreWidget()
+  } catch (err) {
+    console.error('Failed to restore desktop widget:', err)
+  }
+
   // Phase 17, Start Webhook Gateway if enabled
   try {
     const { getSetting } = await import('./db')
     const featureWebhook = getSetting<string>('feature_webhook', 'true')
     if (featureWebhook !== 'false') {
-      const portSetting = getSetting<string>('webhook_port', '9988')
-      const port = parseInt(portSetting, 10) || 9988
+      const portSetting = getSetting<string>('webhook_port', String(WEBHOOK_DEFAULT_PORT))
+      const port = parseInt(portSetting, 10) || WEBHOOK_DEFAULT_PORT
       const { toggleWebhookGateway } = await import('./webhookGateway')
       await toggleWebhookGateway(true, port)
     }

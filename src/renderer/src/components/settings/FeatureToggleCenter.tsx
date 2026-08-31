@@ -3,6 +3,7 @@ import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, Fil
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 import { VIEW_FEATURES, setViewFeature } from '../../lib/features'
 import { getBoolSetting } from '../../lib/settings'
+import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
 
 interface ToggleConfig {
   key: string
@@ -27,7 +28,12 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     },
     toggle: async (active: boolean) => {
       await window.electronAPI.db.setSetting('feature_webhook', String(active))
-      await window.electronAPI.webhook.toggle(active, 9374)
+      // Reuse whichever port the gateway is already listening on. A literal
+      // here moved it off the port main had started it on, so every external
+      // tool posting to the documented port stopped being delivered.
+      const stored = await window.electronAPI.db.getSetting('webhook_port')
+      const port = parseInt(String(stored ?? ''), 10) || WEBHOOK_DEFAULT_PORT
+      await window.electronAPI.webhook.toggle(active, port)
     }
   },
   {
@@ -57,6 +63,10 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     },
     toggle: async (active: boolean) => {
       await window.electronAPI.db.setSetting('feature_backup', String(active))
+      // Persisting the flag alone left the old timers running and armed no new
+      // ones, so the warning above only came true on the next launch.
+      // initializeBackupScheduler clears then re-arms, so it is right either way.
+      await window.electronAPI.backup.run('init')
     }
   },
   {
