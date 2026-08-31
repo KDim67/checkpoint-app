@@ -766,9 +766,20 @@ export function applyRemoteMutationTx(mutation: any): void {
   }
 }
 
-export function deleteItem(id: string): void {
+/**
+ * Deletes an item, returning the workspace it belonged to.
+ *
+ * The context is read before the row goes, because callers need it afterwards
+ * and it is unrecoverable once deleted. Collaboration in particular filters
+ * outgoing mutations by workspace, and a delete that cannot say which workspace
+ * it came from gets broadcast from all of them.
+ */
+export function deleteItem(id: string): string | null {
+  const existing = stmtGetItemById.get(id) as { context?: string } | undefined
+  const context = existing?.context ?? null
   recordTombstone(id, 'items')
   stmtDeleteItem.run(id)
+  return context
 }
 
 export function getAllTags(): Tag[] {
@@ -1340,7 +1351,7 @@ export function registerDbHandlers(db: Database.Database): void {
   ipcMain.handle(IpcChannels.DB_DELETE_ITEM, (_event, id: unknown) => {
     return handleSafe(() => {
       const parsedId = z.string().parse(id)
-      deleteItem(parsedId)
+      return { context: deleteItem(parsedId) }
     })
   })
 

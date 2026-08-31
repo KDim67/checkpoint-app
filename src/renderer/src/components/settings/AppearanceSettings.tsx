@@ -2,33 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 
-export type FontSize = 'small' | 'medium' | 'large'
-
-const FONT_SCALES: Record<FontSize, string> = {
-  small:  '0.9',
-  medium: '1.0',
-  large:  '1.125'
-}
-
-// Exported so App.tsx can re-apply the persisted scale on startup, 
-// previously the setting only took effect once this tab was opened.
-export function applyFontSize(size: FontSize): void {
-  document.documentElement.style.setProperty('--font-size-scale', FONT_SCALES[size])
-  // Scale all text tokens proportionally
-  const scale = parseFloat(FONT_SCALES[size])
-  const tokens: Record<string, string> = {
-    '--text-2xs': `${0.625 * scale}rem`,
-    '--text-xs':  `${0.75  * scale}rem`,
-    '--text-sm':  `${0.875 * scale}rem`,
-    '--text-base':`${1.0   * scale}rem`,
-    '--text-lg':  `${1.125 * scale}rem`,
-    '--text-xl':  `${1.25  * scale}rem`,
-    '--text-2xl': `${1.5   * scale}rem`
-  }
-  Object.entries(tokens).forEach(([k, v]) =>
-    document.documentElement.style.setProperty(k, v)
-  )
-}
+// Not re-exported: this module must export components only, or React Fast
+// Refresh falls back to a full page reload on every edit. Import applyFontSize
+// from lib/fontScale directly.
+import { applyFontSize, type FontSize } from '../../lib/fontScale'
 
 function applyCompactMode(enabled: boolean): void {
   if (enabled) {
