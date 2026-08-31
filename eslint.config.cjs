@@ -46,5 +46,29 @@ module.exports = [
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-non-null-assertion': 'warn'
     }
+  },
+  {
+    // Tests live outside src/, so the block above does not reach them and they
+    // would otherwise hit the default parser and fail on the first annotation.
+    // no-explicit-any stays an error here: test code is new, so there is no
+    // backlog to grandfather in, and a stray any in a test hides a real gap.
+    files: ['tests/**/*.ts'],
+    languageOptions: {
+      parser: parserTypeScript,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        project: ['./tsconfig.test.json']
+      }
+    },
+    plugins: {
+      '@typescript-eslint': eslintPluginTypeScript
+    },
+    rules: {
+      ...eslintPluginTypeScript.configs.recommended.rules,
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'warn'
+    }
   }
 ]
