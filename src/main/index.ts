@@ -19,7 +19,14 @@ import {
 } from './cheatsheetService'
 import { batchRenameFiles, selectTextureFile, loadTextureFile, savePbrMaps, saveSeamlessTexture, selectFolder, saveSpriteAtlas, saveSlicedSprites, saveLutTexture, saveUpscaledTexture } from './gamedevService'
 import { SyncService } from './syncService'
-import { MCP_DEFAULT_PORT } from './mcpServer'
+
+/**
+ * Duplicated from mcpServer.ts on purpose. Importing it statically would defeat
+ * the dynamic `import('./mcpServer')` calls below and pull the MCP SDK, which
+ * is large and drags in express and hono, into the startup chunk for every
+ * launch, including the overwhelming majority where the server is switched off.
+ */
+const MCP_DEFAULT_PORT = 9990
 
 const syncService = new SyncService()
 

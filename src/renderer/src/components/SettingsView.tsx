@@ -22,7 +22,8 @@ import {
   ChevronDown,
   Cloud,
   Server,
-  HardDrive
+  HardDrive,
+  Plug
 } from 'lucide-react'
 import SettingsSection, {
   FieldRow,
@@ -33,6 +34,7 @@ import SettingsSection, {
 } from './settings/SettingsSection'
 import ContextManager from './settings/ContextManager'
 import SyncSettings from './settings/SyncSettings'
+import McpSettings from './settings/McpSettings'
 import AppearanceSettings from './settings/AppearanceSettings'
 import FeatureToggleCenter from './settings/FeatureToggleCenter'
 import AboutPanel from './settings/AboutPanel'
@@ -58,17 +60,11 @@ import {
 // Tab definition
 // Merged layout: Widget lives inside General, Kanban inside Workspaces & Board,
 // Theme Builder inside Appearance, Extensions inside Features & Plugins.
-type SettingsTab =
-  | 'general'
-  | 'contexts'
-  | 'ai'
-  | 'appearance'
-  | 'hotkeyBinder'
-  | 'features'
-  | 'backup'
-  | 'storage'
-  | 'sync'
-  | 'about'
+// Imported rather than redeclared. This file used to keep its own copy of the
+// union, which meant the store and the view could drift, and the store is what
+// actually decides which tab is open, so the copy here was only ever a way to
+// get them out of step.
+import type { SettingsTab } from '../store/appStore'
 
 interface TabInfo {
   id: SettingsTab
@@ -100,6 +96,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
       { id: 'backup',       label: 'Database Backup',    icon: <Archive size={14} />,  description: 'Automated database snapshots, retention and restore points.' },
       { id: 'storage',      label: 'Storage & Media',    icon: <HardDrive size={14} />, description: 'Manage local attachment vaults and clean up orphaned files.' },
       { id: 'sync',         label: 'P2P Network Sync',   icon: <RefreshCw size={14} />, description: 'Sync database and note directories with other machines.' },
+      { id: 'mcp',          label: 'MCP Server',         icon: <Plug size={14} />,      description: 'Let external AI agents read and edit Checkpoint over a local connection.' },
       { id: 'about',        label: 'About',              icon: <Info size={14} />,     description: 'Version, credits and diagnostics.' }
     ]
   }
@@ -1158,6 +1155,12 @@ export default function SettingsView() {
         return (
           <SettingsSection icon={<RefreshCw size={14} />} title="P2P Network Sync" description="Synchronize database and note folders with other machines.">
             <SyncSettings />
+          </SettingsSection>
+        )
+      case 'mcp':
+        return (
+          <SettingsSection icon={<Plug size={14} />} title="MCP Server" description="Let external AI agents read and edit Checkpoint over a local connection.">
+            <McpSettings />
           </SettingsSection>
         )
       case 'about':

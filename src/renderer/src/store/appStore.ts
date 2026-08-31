@@ -29,6 +29,7 @@ export type SettingsTab =
   | 'backup'
   | 'storage'
   | 'sync'
+  | 'mcp'
   | 'about'
 
 interface AppState {
