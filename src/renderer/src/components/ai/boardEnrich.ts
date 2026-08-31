@@ -7,6 +7,10 @@
 // tags, and package the result into the exact fenced-block format the existing
 // ChatMessage executor understands.
 
+import type { AiDialogueBlock, AiPlanBlock } from './aiActionTypes'
+import { asArray, asObject, str } from './aiActionTypes'
+import type { ItemPriority } from '@shared/types'
+
 export type StructuredKind = 'board' | 'plan' | 'dialogue' | 'update' | 'config'
 
 // Palette
@@ -113,20 +117,10 @@ interface Tag { name: string; color: string }
 interface EnrichedCard { title: string; body: string; status: string; priority: number; tags: Tag[]; due?: string }
 interface EnrichedColumn { name: string; wipLimit: number | null; color: string; colorMode: string }
 
-function asObject(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
-}
-function asArray(v: unknown): unknown[] {
-  return Array.isArray(v) ? v : []
-}
-function str(v: unknown, fallback = ''): string {
-  return typeof v === 'string' ? v : v == null ? fallback : String(v)
-}
-
 function normalizeTags(raw: unknown, title: string, body: string): Tag[] {
   const out: Tag[] = []
   const seen = new Set<string>()
-  const add = (name: string, color?: string): void => {
+  const add = (name: string, color?: unknown): void => {
     const clean = name.trim().replace(/^#/, '')
     if (!clean || seen.has(clean.toLowerCase())) return
     seen.add(clean.toLowerCase())
@@ -137,7 +131,7 @@ function normalizeTags(raw: unknown, title: string, body: string): Tag[] {
     if (typeof t === 'string') add(t)
     else {
       const o = asObject(t)
-      if (o) add(str(o.name || o.label || o.tag), o.color as string | undefined)
+      if (o) add(str(o.name || o.label || o.tag), o.color)
     }
   }
 
@@ -211,7 +205,7 @@ export function enrichBoard(raw: unknown): EnrichedBoard | null {
 }
 
 // Public: normalize a plan
-export function normalizePlan(raw: unknown): { message: string; block: object } | null {
+export function normalizePlan(raw: unknown): { message: string; block: AiPlanBlock } | null {
   const obj = asObject(raw)
   if (!obj) return null
   const steps = asArray(obj.steps).map((s, i) => {
@@ -230,7 +224,7 @@ export function normalizePlan(raw: unknown): { message: string; block: object } 
 }
 
 // Public: normalize a dialogue tree (and repair dangling targets)
-export function normalizeDialogue(raw: unknown): { message: string; block: object } | null {
+export function normalizeDialogue(raw: unknown): { message: string; block: AiDialogueBlock } | null {
   const obj = asObject(raw)
   if (!obj) return null
   const nodes = asArray(obj.nodes).map(n => {
@@ -262,18 +256,26 @@ export function normalizeDialogue(raw: unknown): { message: string; block: objec
 // Public: normalize board-edit operations
 export type BoardOp = 'move' | 'set_priority' | 'retitle' | 'update_body' | 'archive' | 'set_due_date'
 
-export interface UpdateOperation {
-  op: BoardOp
-  target: string
-  toColumn?: string
-  priority?: number
-  newTitle?: string
-  newBody?: string
-  /** ISO date string for set_due_date; empty string clears the due date. */
-  due?: string
-}
+/**
+ * A validated board edit. Modelled as a discriminated union so each variant
+ * carries exactly the field it needs, the executor then reads `op.toColumn`
+ * or `op.priority` without re-checking for undefined, which is what the
+ * optional-field version forced it to paper over with casts.
+ */
+export type UpdateOperation =
+  | { op: 'move'; target: string; toColumn: string }
+  | { op: 'set_priority'; target: string; priority: ItemPriority }
+  | { op: 'retitle'; target: string; newTitle: string }
+  | { op: 'update_body'; target: string; newBody: string }
+  | { op: 'archive'; target: string }
+  /** `due` is an ISO date string; empty string clears the due date. */
+  | { op: 'set_due_date'; target: string; due: string }
 
 const VALID_OPS: BoardOp[] = ['move', 'set_priority', 'retitle', 'update_body', 'archive', 'set_due_date']
+
+function isBoardOp(v: string): v is BoardOp {
+  return VALID_OPS.some(o => o === v)
+}
 
 export function normalizeUpdate(raw: unknown): { message: string; operations: UpdateOperation[] } | null {
   const obj = asObject(raw)
@@ -282,33 +284,36 @@ export function normalizeUpdate(raw: unknown): { message: string; operations: Up
   for (const o of asArray(obj.operations ?? obj.ops ?? obj.changes ?? obj.edits)) {
     const e = asObject(o)
     if (!e) continue
-    const op = str(e.op || e.action || e.type).trim().toLowerCase().replace(/[\s-]+/g, '_') as BoardOp
+    const op = str(e.op || e.action || e.type).trim().toLowerCase().replace(/[\s-]+/g, '_')
     const target = str(e.target || e.title || e.card).trim()
-    if (!VALID_OPS.includes(op) || !target) continue
-    const entry: UpdateOperation = { op, target }
+    if (!isBoardOp(op) || !target) continue
     if (op === 'move') {
       const to = str(e.toColumn ?? e.to_column ?? e.to ?? e.column ?? e.destination).trim()
       if (!to) continue
-      entry.toColumn = to
+      operations.push({ op, target, toColumn: to })
     } else if (op === 'set_priority') {
+      // Math.round only ever yields an integer, NaN or ±Infinity, so testing
+      // the three accepted values IS the old finite/1..3 range check, and it
+      // narrows to the literal type the DB column expects.
       const p = Math.round(Number(e.priority ?? e.value))
-      if (!Number.isFinite(p) || p < 1 || p > 3) continue
-      entry.priority = p
+      if (p !== 1 && p !== 2 && p !== 3) continue
+      operations.push({ op, target, priority: p })
     } else if (op === 'retitle') {
       const nt = str(e.newTitle ?? e.new_title ?? e.to ?? e.value).trim()
       if (!nt) continue
-      entry.newTitle = nt
+      operations.push({ op, target, newTitle: nt })
     } else if (op === 'update_body') {
       const nb = str(e.newBody ?? e.new_body ?? e.body ?? e.value).trim()
       if (!nb) continue
-      entry.newBody = nb
+      operations.push({ op, target, newBody: nb })
     } else if (op === 'set_due_date') {
       const due = str(e.due ?? e.dueDate ?? e.due_date ?? e.date ?? e.value).trim()
       // Empty clears the due date; anything else must be a parseable date.
       if (due && Number.isNaN(Date.parse(due))) continue
-      entry.due = due
+      operations.push({ op, target, due })
+    } else {
+      operations.push({ op, target })
     }
-    operations.push(entry)
   }
   if (operations.length === 0) return null
   const message = str(obj.message).trim() || `Applying ${operations.length} change${operations.length === 1 ? '' : 's'} to the board.`
