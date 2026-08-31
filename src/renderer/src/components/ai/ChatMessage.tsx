@@ -8,7 +8,8 @@ import { withLock } from '../../lib/asyncMutex'
 import {
   boardConfigLockKey,
   readBoardConfigUnlocked,
-  writeBoardConfigUnlocked
+  writeBoardConfigUnlocked,
+  loadBoardConfig
 } from '../../lib/boardConfig'
 import { applyConfigOps, normalizeConfigUpdate, type ConfigOperation } from '../../lib/boardConfigOps'
 import { useToast } from '../ui/Toast'
@@ -621,18 +622,11 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
           const cardItems = (cardsRes?.items || []).filter((i: any) => i.status !== 'archived')
           const taskItems = (tasksRes?.items || []).filter((i: any) => i.status !== 'archived')
 
-          const rawCols = await window.electronAPI.db.getSetting(`kanban_columns_${validContext}`).catch(() => null)
-          let colsList: any[] = []
-          if (typeof rawCols === 'string') { try { colsList = JSON.parse(rawCols) } catch { colsList = [] } }
-          else if (Array.isArray(rawCols)) colsList = rawCols
-          if (colsList.length === 0) {
-            colsList = [
-              { id: 'open', name: 'Backlog' },
-              { id: 'in_progress', name: 'In Progress' },
-              { id: 'in_review', name: 'In Review' },
-              { id: 'done', name: 'Done' }
-            ]
-          }
+          // Unified board document, read unlocked because this block already
+          // holds the board lock. The legacy key it used to read stopped being
+          // written when configuration was unified, so column moves resolved
+          // against a frozen snapshot of the board.
+          const { columns: colsList } = await readBoardConfigUnlocked(validContext)
 
           const resolveCol = (nameOrId: string): any => {
             const q = (nameOrId || '').trim().toLowerCase()
@@ -1150,20 +1144,8 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
 
           // Resolve status to match existing board column IDs
           let finalStatus = 'open'
-          const colKey = `kanban_columns_${validContext}`
-          const colVal = await window.electronAPI.db.getSetting(colKey).catch(() => null)
-          let cols: any[] = []
-          if (colVal) {
-            try { cols = JSON.parse(colVal as string) } catch {}
-          }
-          if (!cols || cols.length === 0) {
-            cols = [
-              { id: 'open', name: 'Backlog' },
-              { id: 'in_progress', name: 'In Progress' },
-              { id: 'in_review', name: 'In Review' },
-              { id: 'done', name: 'Done' }
-            ]
-          }
+          // Unified board document; read unlocked inside the existing lock.
+          const { columns: cols } = await readBoardConfigUnlocked(validContext)
 
           const rawStatus = (normalized.status || '').trim().toLowerCase()
           let matchedCol = cols.find(c => c.id.toLowerCase() === rawStatus)
@@ -1252,8 +1234,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
     const lookup = async () => {
       try {
         const ctx = activeContext || 'default'
-        const raw = await window.electronAPI.db.getSetting(`kanban_columns_${ctx}`).catch(() => null)
-        const cols: any[] = raw ? JSON.parse(raw as string) : []
+        const { columns: cols } = await loadBoardConfig(ctx)
         const match = cols.find((c: any) =>
           c.id === data.status || c.name?.toLowerCase() === String(data.status).toLowerCase()
         )

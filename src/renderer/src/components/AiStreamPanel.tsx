@@ -10,6 +10,7 @@ import { AI_SKILLS, getSkillById } from './ai/skills'
 import { buildAssistantMessage, PALETTE_HINT } from './ai/boardEnrich'
 import { loadProviders, persistProviders, activateProvider, isLocalUrl, type AiProvider } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
+import { loadBoardConfig, patchBoardConfig } from '../lib/boardConfig'
 import { useModelCapabilities } from '../lib/useModelCapabilities'
 import ModelCapabilityBar from './ai/ModelCapabilityBar'
 import { TIER_BUDGETS, detectVisionFromName } from '../../../shared/modelCapabilities'
@@ -911,18 +912,14 @@ export default function AiStreamPanel() {
 
     // 2. Delete columns with matching names in this context
     if (columnNames.length > 0) {
-      const key = `kanban_columns_${validContext}`
-      const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-      let columns: any[] = []
-      if (typeof rawCols === 'string') {
-        try { columns = JSON.parse(rawCols) } catch { columns = [] }
-      } else if (Array.isArray(rawCols)) {
-        columns = rawCols
-      }
+      // The unified board document, not the legacy column key, that key stopped
+      // being written when board configuration was unified, so reverting against
+      // it both read and wrote a snapshot the board no longer looks at.
+      const { columns } = await loadBoardConfig(validContext)
 
       if (columns.length > 0) {
         const updatedCols = columns.filter(col => !columnNames.includes(col.name.trim()))
-        await window.electronAPI.db.setSetting(key, JSON.stringify(updatedCols)).catch(() => {})
+        await patchBoardConfig(validContext, { columns: updatedCols }).catch(() => {})
       }
     }
 
@@ -1165,22 +1162,12 @@ Otherwise, answer the user's question in friendly plain text.`
         // Board state comes FIRST so memories have board context when recalled.
         try {
           const validContext = activeContext || 'default'
-          const key = `kanban_columns_${validContext}`
-          const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-          let colsList: any[] = []
-          if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch { colsList = [] }
-          } else if (Array.isArray(rawCols)) {
-            colsList = rawCols
-          }
-          if (colsList.length === 0) {
-            colsList = [
-              { id: 'open', name: 'Backlog' },
-              { id: 'in_progress', name: 'In Progress' },
-              { id: 'in_review', name: 'In Review' },
-              { id: 'done', name: 'Done' }
-            ]
-          }
+          // This list becomes the "VALID COLUMN IDs" the model is told to use,
+          // so reading the stale legacy key meant describing a board that no
+          // longer existed: columns the user had deleted were still offered,
+          // and ones they had added were invisible. loadBoardConfig always
+          // returns a non-empty column set, so no defaults fallback is needed.
+          const { columns: colsList } = await loadBoardConfig(validContext)
 
           const [tasksRes, cardsRes] = await Promise.all([
             window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
