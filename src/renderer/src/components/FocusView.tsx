@@ -129,6 +129,25 @@ export default function FocusView() {
     loadFocusData()
   }, [loadFocusData])
 
+  // The task picker was a one-shot read per workspace, so cards deleted or
+  // completed anywhere else went on being offered here until the context
+  // changed. These are the same events the board itself reloads on.
+  useEffect(() => {
+    const refresh = (): void => { loadFocusData() }
+    // 'db-mutation' is the one that matters: the preload fires it on every
+    // create/update/delete, and archiving a Kanban card is an updateItem, so
+    // listening only for the board's own events would miss the exact case this
+    // fixes. The other two cover AI- and MCP-driven changes.
+    window.addEventListener('db-mutation', refresh)
+    window.addEventListener('item-updated', refresh)
+    window.addEventListener('kanban-refresh', refresh)
+    return () => {
+      window.removeEventListener('db-mutation', refresh)
+      window.removeEventListener('item-updated', refresh)
+      window.removeEventListener('kanban-refresh', refresh)
+    }
+  }, [loadFocusData])
+
   // Whenever the global timer engine transitions us into the retro screen
   // (on natural completion or a manual skip), build the checklist from
   // whichever tasks were selected for the session that just ended.
