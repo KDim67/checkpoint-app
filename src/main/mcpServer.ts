@@ -64,8 +64,10 @@ import {
 } from '../shared/boardModel'
 import { applyConfigOps, normalizeConfigUpdate } from '../shared/boardOps'
 import type { CreateItemPayload, Item } from '../shared/types'
+import { MCP_DEFAULT_PORT } from '../shared/ports'
 
-export const MCP_DEFAULT_PORT = 9990
+// Re-exported so the dynamic importers in index.ts keep resolving it here.
+export { MCP_DEFAULT_PORT }
 const TOKEN_SETTING_KEY = 'mcp_auth_token'
 
 /** Host header values accepted. Anything else is a rebinding attempt. */

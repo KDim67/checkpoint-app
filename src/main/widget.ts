@@ -4,28 +4,67 @@
  * Creates a transparent, frameless, always-on-top BrowserWindow that displays
  * a live summary overlay. Windows-only, returns null on other platforms.
  *
- * Usage:
- *   import { toggleWidget } from './widget'
- *   ipcMain.handle(IpcChannels.WIDGET_TOGGLE, () => toggleWidget())
+ * The three widget_* settings are read here rather than only in the settings
+ * panel that writes them. Previously nothing in main consulted them, so the
+ * window was recreated bottom-right at full opacity every launch, and, because
+ * nothing restored it at startup either, the settings toggle inverted: the
+ * panel painted the switch ON from the stored flag while no window existed, so
+ * the next click, meaning \"off\", ran a blind flip that created one.
  */
 
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
+import { getSetting } from './db'
+
+export type WidgetPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
 let widgetWindow: BrowserWindow | null = null
 
 const WIDGET_WIDTH  = 280
 const WIDGET_HEIGHT = 160
+const WIDGET_MARGIN = 16
+
+// Must match the defaults the settings panel falls back to, or the widget
+// appears somewhere the UI is not showing.
+const DEFAULT_POSITION: WidgetPosition = 'bottom-right'
+const DEFAULT_OPACITY = 0.9
+
+const POSITIONS: readonly WidgetPosition[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+
+function cornerFor(position: WidgetPosition): { x: number; y: number } {
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
+  const right  = sw - WIDGET_WIDTH  - WIDGET_MARGIN
+  const bottom = sh - WIDGET_HEIGHT - WIDGET_MARGIN
+
+  switch (position) {
+    case 'top-left':    return { x: WIDGET_MARGIN, y: WIDGET_MARGIN }
+    case 'top-right':   return { x: right,         y: WIDGET_MARGIN }
+    case 'bottom-left': return { x: WIDGET_MARGIN, y: bottom }
+    default:            return { x: right,         y: bottom }
+  }
+}
+
+function clampOpacity(value: number): number {
+  return Math.max(0.1, Math.min(1.0, value))
+}
+
+function storedPosition(): WidgetPosition {
+  const raw = getSetting<string>('widget_position', DEFAULT_POSITION)
+  // Validated rather than cast: this value reaches an index into the corner
+  // table, and a stale or hand-edited row should not place the window offscreen.
+  return POSITIONS.includes(raw as WidgetPosition) ? (raw as WidgetPosition) : DEFAULT_POSITION
+}
+
+function storedOpacity(): number {
+  const raw = Number(getSetting<string>('widget_opacity', String(DEFAULT_OPACITY)))
+  return Number.isFinite(raw) ? clampOpacity(raw) : DEFAULT_OPACITY
+}
 
 /** Creates the widget window. Returns null on non-Windows platforms. */
 export function createWidget(): BrowserWindow | null {
   if (process.platform !== 'win32') return null
 
-  // Position bottom-right by default, with 16px margin
-  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
-  const x = sw - WIDGET_WIDTH  - 16
-  const y = sh - WIDGET_HEIGHT - 16
-
+  const { x, y } = cornerFor(storedPosition())
   const preloadPath = join(__dirname, '../preload/index.mjs')
 
   widgetWindow = new BrowserWindow({
@@ -33,6 +72,7 @@ export function createWidget(): BrowserWindow | null {
     height:      WIDGET_HEIGHT,
     x,
     y,
+    opacity:     storedOpacity(),
     frame:       false,
     transparent: true,
     skipTaskbar: true,
@@ -68,38 +108,35 @@ export function createWidget(): BrowserWindow | null {
   return widgetWindow
 }
 
-/** Toggles widget visibility: creates it if null, destroys if exists. */
-export function toggleWidget(): void {
-  if (widgetWindow) {
+/**
+ * Applies an explicit desired state. Idempotent, unlike the blind flip this
+ * replaced, the caller knows whether the user asked for the widget, and the
+ * window can be absent for reasons the caller cannot see (a previous launch,
+ * a non-Windows platform), so a flip and the switch drift apart.
+ */
+export function setWidgetEnabled(active: boolean): void {
+  if (active) {
+    if (!widgetWindow) createWidget()
+  } else if (widgetWindow) {
     widgetWindow.destroy()
     widgetWindow = null
-  } else {
-    createWidget()
   }
+}
+
+/** Recreates the widget at launch if it was left on. Safe to call always. */
+export function restoreWidget(): void {
+  if (getSetting<string>('widget_enabled', 'false') === 'true') setWidgetEnabled(true)
 }
 
 /** Sets widget position (called from Settings). */
-export function setWidgetPosition(
-  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-): void {
+export function setWidgetPosition(position: WidgetPosition): void {
   if (!widgetWindow) return
-
-  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
-  const margin = 16
-
-  const positions: Record<typeof position, { x: number; y: number }> = {
-    'top-left':     { x: margin,                      y: margin },
-    'top-right':    { x: sw - WIDGET_WIDTH  - margin, y: margin },
-    'bottom-left':  { x: margin,                      y: sh - WIDGET_HEIGHT - margin },
-    'bottom-right': { x: sw - WIDGET_WIDTH  - margin, y: sh - WIDGET_HEIGHT - margin }
-  }
-
-  const { x, y } = positions[position]
+  const { x, y } = cornerFor(position)
   widgetWindow.setPosition(x, y)
 }
 
-/** Sets widget opacity (0.5–1.0). */
+/** Sets widget opacity (0.3–1.0 from the settings slider). */
 export function setWidgetOpacity(opacity: number): void {
   if (!widgetWindow) return
-  widgetWindow.setOpacity(Math.max(0.1, Math.min(1.0, opacity)))
+  widgetWindow.setOpacity(clampOpacity(opacity))
 }

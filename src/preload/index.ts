@@ -294,8 +294,8 @@ const api = {
 
   // Widget
   widget: {
-    toggle: (): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.WIDGET_TOGGLE),
+    toggle: (active: boolean): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.WIDGET_TOGGLE, active),
     setPosition: (pos: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.WIDGET_SET_POSITION, pos),
     setOpacity: (opacity: number): Promise<void> =>

@@ -261,7 +261,7 @@ function WidgetSettings() {
   const handleToggle = async (v: boolean) => {
     setEnabled(v)
     await window.electronAPI.db.setSetting('widget_enabled', String(v))
-    await window.electronAPI.widget.toggle()
+    await window.electronAPI.widget.toggle(v)
   }
 
   const handlePosition = async (p: typeof position) => {
