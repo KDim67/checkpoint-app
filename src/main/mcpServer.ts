@@ -40,9 +40,18 @@ import {
   updateItem,
   searchItems,
   queryTasks,
-  getAllTags
+  getAllTags,
+  createTag,
+  getRelations,
+  createRelation,
+  getFocusSessions,
+  getClipboardHistory
 } from './db'
 import { listNotes, readNote, writeNote, searchNotes } from './notesFsService'
+import { listCheatsheets, getCheatsheetText, searchCheatsheets } from './cheatsheetService'
+import { checkRepo, getGitStatus, getGitLog } from './gitService'
+import { getMemories, searchMemories } from './memoryService'
+import { getAnalyticsData } from './analyticsService'
 import {
   normalizeBoardConfig,
   migrateLegacy,
@@ -189,6 +198,26 @@ function summarizeItem(item: Item): Record<string, unknown> {
     due_at: item.due_at,
     updated_at: item.updated_at,
     tags: (item.tags ?? []).map(t => t.name)
+  }
+}
+
+/**
+ * Guards the memory tools.
+ *
+ * memoryService prepares its statements in initMemoryIpc() at app boot and
+ * getMemories() dereferences them without checking, so calling it before that
+ * has run throws on an undefined statement. That should never happen in the
+ * packaged app, boot order puts memory init first, but a failed init would
+ * otherwise surface to an agent as an opaque crash rather than a usable answer.
+ */
+function withMemoryStore(fn: () => { content: { type: 'text'; text: string }[] }): {
+  content: { type: 'text'; text: string }[]
+} {
+  try {
+    return fn()
+  } catch (err) {
+    console.error('[mcp] Memory store unavailable:', err)
+    return text('The assistant memory store is not available yet. Try again once Checkpoint has finished starting.')
   }
 }
 
@@ -443,6 +472,218 @@ function buildMcpServer(): McpServer {
       await writeNote(title, content, oldTitle)
       notifyRenderer()
       return text(`Saved note "${title}".`)
+    }
+  )
+
+  // Reference material
+  // Cheatsheets are the user's own imported documentation. Exposing them lets an
+  // agent ground an answer in what this person actually keeps to hand rather
+  // than in whatever it happens to recall.
+
+  mcp.registerTool(
+    'list_cheatsheets',
+    { description: 'List imported cheatsheet documents (PDF and text reference material).' },
+    async () => json({ cheatsheets: await listCheatsheets() })
+  )
+
+  mcp.registerTool(
+    'search_cheatsheets',
+    {
+      description: 'Search across all cheatsheets. Returns matching passages with their source document.',
+      inputSchema: { query: z.string().min(2).describe('At least two characters.') }
+    },
+    async ({ query }) => json({ results: await searchCheatsheets(query) })
+  )
+
+  mcp.registerTool(
+    'read_cheatsheet',
+    {
+      description: 'Read a cheatsheet as plain text. Use list_cheatsheets for valid names.',
+      inputSchema: {
+        name: z.string(),
+        maxChars: z.number().int().positive().max(100000).optional()
+          .describe('Truncate long documents. Defaults to 20000.')
+      }
+    },
+    async ({ name, maxChars }) => {
+      const body = await getCheatsheetText(name)
+      if (!body) {
+        // getCheatsheetText returns '' for a missing file as readily as for an
+        // empty one. Left as-is, an agent cannot tell "this document has no
+        // text" from "you invented that filename", and would keep retrying.
+        const available = (await listCheatsheets()).map(c => c.name)
+        return text(
+          available.includes(name)
+            ? `Cheatsheet "${name}" contains no extractable text.`
+            : `No cheatsheet named "${name}". Available: ${available.join(', ') || '(none imported)'}`
+        )
+      }
+      const cap = maxChars ?? 20000
+      // Truncated by default: a full PDF can be hundreds of thousands of
+      // characters, which would swamp a client's context in one call.
+      return text(body.length > cap ? `${body.slice(0, cap)}\n\n…[truncated at ${cap} characters]` : body)
+    }
+  )
+
+  // Assistant memory
+
+  mcp.registerTool(
+    'search_memories',
+    {
+      description:
+        "Search what Checkpoint's built-in assistant has remembered about this user and their work.",
+      inputSchema: {
+        query: z.string(),
+        context: z.string().optional().describe('Workspace slug. Defaults to "default".'),
+        limit: z.number().int().positive().max(50).optional()
+      }
+    },
+    async ({ query, context: ctx, limit }) =>
+      withMemoryStore(() => json({ memories: searchMemories(query, ctx ?? 'default', limit ?? 8) }))
+  )
+
+  mcp.registerTool(
+    'list_memories',
+    {
+      description: "List everything the built-in assistant has remembered for a workspace.",
+      inputSchema: { context: z.string().optional() }
+    },
+    async ({ context: ctx }) => withMemoryStore(() => json({ memories: getMemories(ctx ?? 'default') }))
+  )
+
+  // Repository state
+  // A workspace can be bound to a git repo, which is what makes "what have I
+  // actually changed since I filed this card" answerable.
+
+  mcp.registerTool(
+    'get_git_status',
+    {
+      description: 'Branch and working-tree status for a git repository path.',
+      inputSchema: { repoPath: z.string().describe('Absolute path to the repository.') }
+    },
+    async ({ repoPath }) => {
+      if (!(await checkRepo(repoPath))) return text(`"${repoPath}" is not a git repository.`)
+      return json(await getGitStatus(repoPath))
+    }
+  )
+
+  mcp.registerTool(
+    'get_git_log',
+    {
+      description: 'Recent commits for a git repository path.',
+      inputSchema: { repoPath: z.string() }
+    },
+    async ({ repoPath }) => {
+      if (!(await checkRepo(repoPath))) return text(`"${repoPath}" is not a git repository.`)
+      return json({ commits: await getGitLog(repoPath) })
+    }
+  )
+
+  // Time and activity
+
+  mcp.registerTool(
+    'get_analytics',
+    {
+      description:
+        'Activity analytics: completions over time, tag distribution, active vs passive time, contribution heatmap.',
+      inputSchema: {
+        context: z.string().optional().describe('Workspace slug, or omit for all workspaces.')
+      }
+    },
+    async ({ context: ctx }) => json(getAnalyticsData(ctx ?? null))
+  )
+
+  mcp.registerTool(
+    'get_focus_sessions',
+    {
+      description: 'Recorded focus-timer sessions for a workspace.',
+      inputSchema: { context }
+    },
+    async ({ context: ctx }) => json({ sessions: getFocusSessions(ctx) })
+  )
+
+  mcp.registerTool(
+    'get_clipboard_history',
+    {
+      description: 'Recent clipboard captures and saved snippets.',
+      inputSchema: {
+        limit: z.number().int().positive().max(200).optional(),
+        pinnedOnly: z.boolean().optional().describe('Only starred snippets.')
+      }
+    },
+    async ({ limit, pinnedOnly }) => {
+      const all = getClipboardHistory()
+      // Stored as SQLite's 0/1 rather than a boolean.
+      const filtered = pinnedOnly ? all.filter(c => c.is_pinned === 1) : all
+      return json({ items: filtered.slice(0, limit ?? 50) })
+    }
+  )
+
+  // Organisation
+
+  mcp.registerTool(
+    'create_tag',
+    {
+      description: 'Create a tag that can then be applied to items.',
+      inputSchema: {
+        name: z.string().min(1),
+        color: z.string().optional().describe('Hex colour like #3b82f6. A default is chosen if omitted.')
+      }
+    },
+    async ({ name, color }) => {
+      // The DB validates the hex shape, so a bad colour would reject the whole
+      // call; falling back keeps a tag from being lost over a formatting slip.
+      const hex = color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#535e85'
+      const tag = createTag({ name, color: hex })
+      notifyRenderer()
+      return json({ created: tag })
+    }
+  )
+
+  mcp.registerTool(
+    'get_relations',
+    {
+      description: 'Relationships (blocks / relates_to / duplicates) for one item.',
+      inputSchema: { itemId: z.string() }
+    },
+    async ({ itemId }) => json({ relations: getRelations(itemId) })
+  )
+
+  mcp.registerTool(
+    'link_items',
+    {
+      description: 'Create a relationship between two items.',
+      inputSchema: {
+        fromId: z.string(),
+        toId: z.string(),
+        type: z.enum(['blocks', 'relates_to', 'duplicates'])
+      }
+    },
+    async ({ fromId, toId, type }) => {
+      if (!getItemById(fromId)) return text(`No item with id "${fromId}".`)
+      if (!getItemById(toId)) return text(`No item with id "${toId}".`)
+      const relation = createRelation(fromId, toId, type)
+      notifyRenderer()
+      return json({ created: relation })
+    }
+  )
+
+  mcp.registerTool(
+    'archive_item',
+    {
+      description:
+        'Archive an item, removing it from the board while keeping it recoverable. ' +
+        'This is the safe alternative to deletion, nothing is destroyed.',
+      inputSchema: { id: z.string() }
+    },
+    async ({ id }) => {
+      if (!getItemById(id)) return text(`No item with id "${id}".`)
+      // Archiving rather than deleting is deliberate: an agent acting on a
+      // misread instruction should not be able to destroy work irreversibly,
+      // and the app already treats 'archived' as its recoverable state.
+      updateItem(getDb(), id, { status: 'archived' })
+      notifyRenderer()
+      return text(`Archived "${id}". It can be restored from the archive bin.`)
     }
   )
 
