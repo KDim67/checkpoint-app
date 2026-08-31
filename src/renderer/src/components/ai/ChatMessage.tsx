@@ -7,6 +7,14 @@ import { useAppStore } from '../../store/appStore'
 import { withLock } from '../../lib/asyncMutex'
 import { useToast } from '../ui/Toast'
 import { normalizeUpdate } from './boardEnrich'
+import type { UpdateOperation } from './boardEnrich'
+import type {
+  AiDialogueChoice, AiDialogueNode, AiPlanStep,
+  BatchBoard, BatchCard, BatchColumn, JsonObject, KanbanColumnConfig,
+  ParsedCardJson, ParsedColumnJson
+} from './aiActionTypes'
+import { asArray, asObject, readColumnsSetting, str, tagColorOf, tagNameOf, toItemPriority } from './aiActionTypes'
+import type { Item, Tag } from '@shared/types'
 
 interface ChatMessageProps {
   message: {
@@ -24,8 +32,8 @@ interface ChatMessageProps {
     images?: string[]
     timestamp?: number
     boardSnapshot?: {
-      columns: any[]
-      cards: any[]
+      columns: KanbanColumnConfig[]
+      cards: Item[]
     }
   }
   messageIndex?: number
@@ -43,8 +51,8 @@ interface ChatMessageProps {
 
 // Global execution & caching locks, prevent duplicate DB calls and React Strict Mode double-fires
 const executedActionSignaturesSet = new Set<string>()
-const createdItemsCacheMap = new Map<string, { item: any; tags: any[] }>()
-const createdColsCacheMap = new Map<string, any>()
+const createdItemsCacheMap = new Map<string, { item: Item; tags: Tag[] }>()
+const createdColsCacheMap = new Map<string, KanbanColumnConfig>()
 // Real outcome of each board-edit execution, so a remount replays the TRUTH
 // (what was actually applied / skipped / not found) instead of the request.
 interface UpdateOutcome {
@@ -53,7 +61,7 @@ interface UpdateOutcome {
   failed: string[]
   noops: number
   /** Inverse patches (in application order) enabling one-click undo. */
-  inverse?: Array<{ id: string; patch: Record<string, unknown> }>
+  inverse?: Array<{ id: string; patch: Partial<Item> }>
   undone?: boolean
 }
 const executedUpdateOutcomesMap = new Map<string, UpdateOutcome>()
@@ -75,20 +83,22 @@ const NAMED_COLORS: Record<string, string> = {
   violet: '#8b5cf6', purple: '#a855f7', fuchsia: '#d946ef', pink: '#ec4899',
   rose: '#f43f5e', gray: '#6b7280', slate: '#64748b', white: '#f8fafc'
 }
-function resolveColor(val?: string): string {
-  if (!val) return '#3b82f6'
+function resolveColor(val?: unknown): string {
+  if (typeof val !== 'string' || !val) return '#3b82f6'
   const v = val.trim()
   if (v.startsWith('#') || v.startsWith('rgb')) return v
   return NAMED_COLORS[v.toLowerCase()] ?? '#3b82f6'
 }
 
-function faultTolerantParseJSON(jsonStr: string): any {
+// Returns `unknown`, not `any`: this is raw model output and every reader below
+// has to narrow it before touching a field.
+function faultTolerantParseJSON(jsonStr: string): unknown {
   const clean = jsonStr.trim()
   try {
     return JSON.parse(clean)
-  } catch (err) {
+  } catch {
     try {
-      let repaired = clean
+      const repaired = clean
         .replace(/(["\d])\s*[\r\n]+\s*(?="[^"]+"\s*:)/g, '$1,')
         .replace(/(true|false|null)\s*[\r\n]+\s*(?="[^"]+"\s*:)/gi, '$1,')
         .replace(/\}\s*[\r\n]+\s*\{/g, '},{')
@@ -104,8 +114,15 @@ function faultTolerantParseJSON(jsonStr: string): any {
   }
 }
 
+/** Message text from a thrown value, `catch` binds `unknown`, and an IPC
+ *  rejection is not always an Error. */
+function errorText(err: unknown): string {
+  const message = asObject(err)?.message
+  return typeof message === 'string' && message ? message : String(err)
+}
+
 // Type detectors
-function looksLikeColumn(obj: any): boolean {
+function looksLikeColumn(obj: JsonObject): boolean {
   return !!(
     obj.create_column || obj.column_name || obj.stage_name ||
     obj.wipLimit !== undefined || obj.wip_limit !== undefined ||
@@ -113,22 +130,23 @@ function looksLikeColumn(obj: any): boolean {
     (obj.color_mode && ['header', 'full', 'none'].includes(String(obj.color_mode).toLowerCase()))
   )
 }
-function looksLikeCard(obj: any): boolean {
+function looksLikeCard(obj: JsonObject): boolean {
   return !!(obj.create_card || obj.create_task || obj.title || obj.card_name || obj.task_name || obj.card_title || obj.header)
 }
 
 // Single-block normalizers (used by CreateTaskActionBlock / CreateColumnActionBlock)
 
-function normalizeCardJson(jsonString: string) {
-  let parsed: any = null
-  parsed = faultTolerantParseJSON(jsonString)
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+function normalizeCardJson(jsonString: string): ParsedCardJson | null {
+  const parsed = asObject(faultTolerantParseJSON(jsonString))
+  if (!parsed) return null
 
   // Hard-reject anything that looks exclusively like a column
   if (looksLikeColumn(parsed) && !looksLikeCard(parsed)) return null
 
-  // Unwrap wrapper keys
-  const obj = parsed.create_card || parsed.create_task || parsed.card || parsed.task || parsed
+  // Unwrap wrapper keys. A wrapper key holding a non-object yields no fields,
+  // which is what indexing into a bare string used to produce.
+  const wrapped = parsed.create_card || parsed.create_task || parsed.card || parsed.task
+  const obj: JsonObject = wrapped ? (asObject(wrapped) ?? {}) : parsed
 
   // Title from any common key
   const title =
@@ -140,48 +158,59 @@ function normalizeCardJson(jsonString: string) {
   if (!title || typeof title !== 'string') return null
   if (looksLikeColumn(obj)) return null   // e.g. { name: "Backlog", wipLimit: 5 }
 
-  const body  = obj.body || obj.description || obj.details || obj.content || ''
-  const status   = obj.status || obj.column || obj.stage || 'open'
-  const priority = obj.priority ?? 2
-  const tags     = Array.isArray(obj.tags) ? obj.tags : []
-
-  return { raw: parsed, title: String(title).trim(), body: String(body).trim(), status, priority, tags }
+  // Coerced here rather than left raw: a small model writing "3" for priority or
+  // a number for status used to flow straight into the DB write untouched.
+  return {
+    title: title.trim(),
+    body: str(obj.body || obj.description || obj.details || obj.content).trim(),
+    status: str(obj.status || obj.column || obj.stage || 'open'),
+    priority: toItemPriority(obj.priority),
+    tags: asArray(obj.tags)
+  }
 }
 
-function normalizeColumnJson(jsonString: string) {
-  let parsed: any = null
-  parsed = faultTolerantParseJSON(jsonString)
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+function normalizeColumnJson(jsonString: string): ParsedColumnJson | null {
+  const parsed = asObject(faultTolerantParseJSON(jsonString))
+  if (!parsed) return null
 
   // Hard-reject anything that looks like a card
   if (looksLikeCard(parsed) && !looksLikeColumn(parsed)) return null
 
-  const obj = parsed.create_column || parsed.column || parsed.stage || parsed
+  const wrapped = parsed.create_column || parsed.column || parsed.stage
+  const obj: JsonObject = wrapped ? (asObject(wrapped) ?? {}) : parsed
 
   const name = obj.name || obj.column_name || obj.title || obj.stage_name
   if (!name || typeof name !== 'string') return null
 
-  const wipLimit  = obj.wipLimit ?? obj.wip_limit ?? null
-  const colorMode = obj.colorMode ?? obj.color_mode ?? 'header'
-  const color     = resolveColor(obj.color)
+  return {
+    name: name.trim(),
+    wipLimit: toWipLimit(obj.wipLimit ?? obj.wip_limit),
+    colorMode: str(obj.colorMode ?? obj.color_mode ?? 'header'),
+    color: resolveColor(obj.color)
+  }
+}
 
-  return { raw: parsed, name: String(name).trim(), wipLimit, colorMode, color }
+/** A WIP limit the model wrote as "5" is a formatting slip, not a missing limit. */
+function toWipLimit(raw: unknown): number | null {
+  if (raw == null) return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
 }
 
 // Batch board parser, handles every format the AI might produce
 
-function parseBatchBoardJson(jsonString: string) {
-  let parsed: any = null
-  parsed = faultTolerantParseJSON(jsonString)
+function parseBatchBoardJson(jsonString: string): BatchBoard | null {
+  const parsed = faultTolerantParseJSON(jsonString)
   if (!parsed) return null
 
-  const columns: any[] = []
-  const cards:   any[] = []
+  const columns: BatchColumn[] = []
+  const cards:   BatchCard[]   = []
   const seenCols  = new Set<string>()
   const seenCards = new Set<string>()
 
-  function pushCol(obj: any) {
-    if (!obj || typeof obj !== 'object') return
+  function pushCol(raw: unknown) {
+    const obj = asObject(raw)
+    if (!obj) return
     const name = obj.name || obj.column_name || obj.title || obj.stage_name
     if (!name || typeof name !== 'string') return
     const key = name.trim().toLowerCase()
@@ -189,14 +218,15 @@ function parseBatchBoardJson(jsonString: string) {
     seenCols.add(key)
     columns.push({
       name:      name.trim(),
-      wipLimit:  obj.wipLimit ?? obj.wip_limit ?? null,
-      colorMode: obj.colorMode ?? obj.color_mode ?? 'header',
+      wipLimit:  toWipLimit(obj.wipLimit ?? obj.wip_limit),
+      colorMode: str(obj.colorMode ?? obj.color_mode ?? 'header'),
       color:     resolveColor(obj.color ?? (typeof obj.colorMode === 'string' && !['header', 'full', 'none'].includes(obj.colorMode) ? obj.colorMode : undefined))
     })
   }
 
-  function pushCard(obj: any, defaultStatus = 'open') {
-    if (!obj || typeof obj !== 'object') return
+  function pushCard(raw: unknown, defaultStatus = 'open') {
+    const obj = asObject(raw)
+    if (!obj) return
     const title =
       obj.title || obj.card_name || obj.task_name || obj.card_title || obj.header ||
       (obj.name && !looksLikeColumn(obj) ? obj.name : null)
@@ -206,62 +236,67 @@ function parseBatchBoardJson(jsonString: string) {
     seenCards.add(key)
     cards.push({
       title:    title.trim(),
-      body:     String(obj.body || obj.description || obj.details || obj.content || '').trim(),
-      status:   String(obj.status || obj.column || obj.stage || defaultStatus),
-      priority: obj.priority ?? 2,
-      tags:     Array.isArray(obj.tags) ? obj.tags : []
+      body:     str(obj.body || obj.description || obj.details || obj.content).trim(),
+      status:   str(obj.status || obj.column || obj.stage || defaultStatus),
+      priority: toItemPriority(obj.priority),
+      tags:     asArray(obj.tags)
     })
   }
 
   // Keys that contain leaf/metadata data, never recurse into them
   const SKIP_RECURSE = new Set(['tags', 'choices', 'steps', 'metadata', 'meta', 'options', 'extra', 'properties'])
 
+  const root = asObject(parsed)
+
   // Strategy 1 (most common): { columns: [...], cards: [...] }
-  if (Array.isArray(parsed.columns) || Array.isArray(parsed.cards)) {
-    for (const c of (parsed.columns || [])) pushCol(c)
-    for (const c of (parsed.cards   || [])) pushCard(c)
+  if (root && (Array.isArray(root.columns) || Array.isArray(root.cards))) {
+    for (const c of asArray(root.columns)) pushCol(c)
+    for (const c of asArray(root.cards))   pushCard(c)
     if (columns.length > 0 || cards.length > 0) return { columns, cards }
   }
 
   // Strategy 2: { stages: [...], tasks: [...] } aliases
-  if (Array.isArray(parsed.stages) || Array.isArray(parsed.tasks) || Array.isArray(parsed.items)) {
-    for (const c of (parsed.stages || [])) pushCol(c)
-    for (const c of [...(parsed.tasks || []), ...(parsed.items || [])]) pushCard(c)
+  if (root && (Array.isArray(root.stages) || Array.isArray(root.tasks) || Array.isArray(root.items))) {
+    for (const c of asArray(root.stages)) pushCol(c)
+    for (const c of [...asArray(root.tasks), ...asArray(root.items)]) pushCard(c)
     if (columns.length > 0 || cards.length > 0) return { columns, cards }
   }
 
   // Strategy 3: root is an array of mixed column/card objects
   if (Array.isArray(parsed)) {
     for (const item of parsed) {
-      if (!item || typeof item !== 'object') continue
-      if (looksLikeColumn(item) && !looksLikeCard(item)) pushCol(item)
-      else if (looksLikeCard(item)) pushCard(item)
+      const o = asObject(item)
+      if (!o) continue
+      if (looksLikeColumn(o) && !looksLikeCard(o)) pushCol(o)
+      else if (looksLikeCard(o)) pushCard(o)
     }
     if (columns.length > 0 || cards.length > 0) return { columns, cards }
   }
 
   // Strategy 4: recursive walk for wrapped / nested formats
-  function walk(node: any, currentStatus = 'open') {
-    if (!node || typeof node !== 'object') return
-    if (Array.isArray(node)) {
-      for (const item of node) walk(item, currentStatus)
+  function walk(rawNode: unknown, currentStatus = 'open') {
+    if (Array.isArray(rawNode)) {
+      for (const item of rawNode) walk(item, currentStatus)
       return
     }
+    const node = asObject(rawNode)
+    if (!node) return
 
     let localStatus = currentStatus
 
     // Column?
     if (node.create_column || node.column_name || node.stage_name ||
         node.wipLimit !== undefined || node.wip_limit !== undefined) {
-      const obj = node.create_column || node.column || node.stage || node
+      const wrapped = node.create_column || node.column || node.stage
+      const obj: JsonObject = wrapped ? (asObject(wrapped) ?? {}) : node
       pushCol(obj)
-      const colName = (obj.name || obj.column_name || obj.title || '').trim()
+      const colName = str(obj.name || obj.column_name || obj.title).trim()
       if (colName) localStatus = colName
     }
 
     // Card (wrapped)?
-    const cardWrap = node.create_card || node.create_task || node.card || node.task
-    if (cardWrap && typeof cardWrap === 'object' && !Array.isArray(cardWrap)) {
+    const cardWrap = asObject(node.create_card || node.create_task || node.card || node.task)
+    if (cardWrap) {
       pushCard(cardWrap, localStatus)
     } else if (!looksLikeColumn(node) && looksLikeCard(node)) {
       pushCard(node, localStatus)
@@ -281,10 +316,14 @@ function parseBatchBoardJson(jsonString: string) {
   return { columns, cards }
 }
 
+// The confirmation row shows either the PROPOSED columns (before execution) or
+// the ones actually written to the setting, this is the overlap it renders.
+type ShownColumn = { name: string; color?: string }
+
 function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
-  const [completedData, setCompletedData] = useState<{ columns: any[]; cards: any[]; skippedCards?: number; reusedCols?: number } | null>(null)
+  const [completedData, setCompletedData] = useState<{ columns: ShownColumn[]; cards: BatchCard[]; skippedCards?: number; reusedCols?: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const batchData = parseBatchBoardJson(jsonString)
@@ -311,12 +350,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
         //    second column with the same name).
         const { createdCols, colsList, reusedCols } = await withLock(`kanban-cols:${validContext}`, async () => {
           const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-          let colsList: any[] = []
-          if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch (e) { colsList = [] }
-          } else if (Array.isArray(rawCols)) {
-            colsList = rawCols
-          }
+          let colsList = readColumnsSetting(rawCols)
           if (colsList.length === 0) {
             colsList = [
               { id: 'open', name: 'Backlog' },
@@ -327,10 +361,10 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           }
 
           // Track only columns we actually create, reused ones aren't "added".
-          const createdCols: any[] = []
+          const createdCols: KanbanColumnConfig[] = []
           let reusedCols = 0
           for (const col of batchData.columns) {
-            const existing = colsList.find((c: any) => c.name.toLowerCase() === col.name.toLowerCase())
+            const existing = colsList.find(c => c.name.toLowerCase() === col.name.toLowerCase())
             if (existing) { reusedCols++; continue }
             const id = `col-${col.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}-${Date.now()}`
             const newCol = { id, name: col.name, wipLimit: col.wipLimit, color: resolveColor(col.color), colorMode: col.colorMode ?? 'header' }
@@ -350,21 +384,21 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           const existingItemsRes = await window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
           // Exclude archived cards: the archive bin is invisible to the AI, so a
           // title that only exists in the archive must NOT block a fresh create.
-          const existingCardsList = [...(existingItemsRes?.items || [])].filter((ci: any) => ci.status !== 'archived')
-          const newCards: any[] = []
+          const existingCardsList = [...(existingItemsRes?.items || [])].filter(ci => ci.status !== 'archived')
+          const newCards: BatchCard[] = []
           let skippedCards = 0
 
           // Load tags once and reuse/extend as we create cards, so colored tags
           // from the AI are actually applied in the batch path (previously dropped).
-          const existingTags: any[] = await window.electronAPI.db.getTags().catch(() => [])
-          const resolveTagIds = async (tags: any[]): Promise<string[]> => {
+          const existingTags: Tag[] = await window.electronAPI.db.getTags().catch(() => [])
+          const resolveTagIds = async (tags: unknown[]): Promise<string[]> => {
             if (!Array.isArray(tags) || tags.length === 0) return []
             const ids: string[] = []
             for (const t of tags) {
-              const tagName = (typeof t === 'string' ? t : t?.name)?.toString().trim()
+              const tagName = tagNameOf(t)
               if (!tagName) continue
-              const tagColor = (typeof t === 'object' && t?.color) ? t.color : '#3b82f6'
-              let found = existingTags.find((et: any) => et.name.toLowerCase() === tagName.toLowerCase())
+              const tagColor = tagColorOf(t, '#3b82f6')
+              let found = existingTags.find(et => et.name.toLowerCase() === tagName.toLowerCase())
               if (!found) {
                 try {
                   found = await window.electronAPI.db.createTag({ name: tagName, color: tagColor })
@@ -385,7 +419,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           const posBase = Date.now()
 
           for (const card of batchData.cards) {
-            const existing = existingCardsList.find((ci: any) => ci.title.trim().toLowerCase() === card.title.trim().toLowerCase())
+            const existing = existingCardsList.find(ci => ci.title.trim().toLowerCase() === card.title.trim().toLowerCase())
             if (existing) {
               // Already on the board (or a duplicate within this batch), don't recreate.
               skippedCards++
@@ -394,19 +428,19 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
 
             // Fuzzy status → column matching
             const rawStatus = (card.status || '').trim().toLowerCase()
-            let matchedCol =
-              colsList.find((c: any) => c.id.toLowerCase() === rawStatus) ||
-              colsList.find((c: any) => c.name.toLowerCase() === rawStatus) ||
-              colsList.find((c: any) => c.name.toLowerCase().replace(/\s+/g, '_') === rawStatus) ||
-              colsList.find((c: any) => c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === rawStatus.replace(/[^a-z0-9]/g, '')) ||
+            const matchedCol =
+              colsList.find(c => c.id.toLowerCase() === rawStatus) ||
+              colsList.find(c => c.name.toLowerCase() === rawStatus) ||
+              colsList.find(c => c.name.toLowerCase().replace(/\s+/g, '_') === rawStatus) ||
+              colsList.find(c => c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === rawStatus.replace(/[^a-z0-9]/g, '')) ||
               (rawStatus.includes('todo') || rawStatus.includes('backlog') || rawStatus.includes('open')
-                ? (colsList.find((c: any) => c.id === 'open') || colsList[0])
+                ? (colsList.find(c => c.id === 'open') || colsList[0])
                 : rawStatus.includes('progress') || rawStatus.includes('doing')
-                ? (colsList.find((c: any) => c.id === 'in_progress') || colsList[1] || colsList[0])
+                ? (colsList.find(c => c.id === 'in_progress') || colsList[1] || colsList[0])
                 : rawStatus.includes('review') || rawStatus.includes('qa') || rawStatus.includes('test')
-                ? (colsList.find((c: any) => c.id === 'in_review') || colsList[2] || colsList[0])
+                ? (colsList.find(c => c.id === 'in_review') || colsList[2] || colsList[0])
                 : rawStatus.includes('done') || rawStatus.includes('complete') || rawStatus.includes('finish')
-                ? (colsList.find((c: any) => c.id === 'done') || colsList[colsList.length - 1] || colsList[0])
+                ? (colsList.find(c => c.id === 'done') || colsList[colsList.length - 1] || colsList[0])
                 : colsList[0])
 
             const finalStatus = matchedCol ? matchedCol.id : (colsList[0]?.id || 'open')
@@ -439,8 +473,8 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
         if (isMounted) {
           setCompletedData({ columns: createdCols, cards: newCards, skippedCards, reusedCols })
         }
-      } catch (err: any) {
-        if (isMounted) setError(err.message || String(err))
+      } catch (err) {
+        if (isMounted) setError(errorText(err))
       }
     }
     processBatch()
@@ -462,8 +496,8 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
   // Before execution: show the proposal (optimistic). After execution: show what
   // was ACTUALLY created, so the counts/rows never overstate what hit the board.
   const applied = !!completedData
-  const showCols: any[] = completedData ? completedData.columns : (batchData?.columns || [])
-  const showCards: any[] = completedData ? completedData.cards : (batchData?.cards || [])
+  const showCols: ShownColumn[] = completedData ? completedData.columns : (batchData?.columns || [])
+  const showCards: BatchCard[] = completedData ? completedData.cards : (batchData?.cards || [])
   const colsCount = showCols.length
   const cardsCount = showCards.length
   const skipped = completedData?.skippedCards || 0
@@ -518,19 +552,19 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
         ))}
         {showCards.map((c, i) => {
           const pc = c.priority === 3 ? '#ef4444' : c.priority === 2 ? '#eab308' : '#3b82f6'
-          const tags: any[] = Array.isArray(c.tags) ? c.tags : []
+          const tags = asArray(c.tags)
           return (
             <div key={`k-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', paddingLeft: '2px', minWidth: 0 }}>
               <span title={`Priority ${c.priority}`} style={{ width: 6, height: 6, borderRadius: '50%', background: pc, flexShrink: 0, marginTop: '5px' }} />
               <div style={{ minWidth: 0, flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 6px' }}>
                 <strong style={{ color: 'var(--color-text-base)', wordBreak: 'break-word' }}>{c.title}</strong>
                 {tags.slice(0, 3).map((t, ti) => {
-                  const tn = typeof t === 'string' ? t : t?.name
+                  const tn = tagNameOf(t)
                   if (!tn) return null
-                  const tcol = (typeof t === 'object' && t?.color) ? t.color : '#64748b'
+                  const tcol = tagColorOf(t, '#64748b')
                   return (
                     <span key={ti} style={{ fontSize: '8px', color: tcol, border: `1px solid ${tcol}55`, background: `${tcol}18`, borderRadius: '6px', padding: '0 5px', whiteSpace: 'nowrap' }}>
-                      {String(tn).replace(/^#/, '')}
+                      {tn.replace(/^#/, '')}
                     </span>
                   )
                 })}
@@ -575,6 +609,16 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
 // Applies move / set_priority / retitle / update_body / archive operations to
 // EXISTING cards. Honest reporting: lists exactly what was applied, what was a
 // no-op, and which targets couldn't be found on the board.
+// The one field that distinguishes two edits of the same op on the same card.
+// Only move/set_priority/retitle carry one; the rest collapse to '', which is
+// what the old `toColumn || priority || newTitle || ''` chain produced.
+function opSignatureValue(o: UpdateOperation): string | number {
+  if (o.op === 'move') return o.toColumn
+  if (o.op === 'set_priority') return o.priority
+  if (o.op === 'retitle') return o.newTitle
+  return ''
+}
+
 function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string; dedupeKey?: string }) {
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
@@ -590,7 +634,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
   // in a NEW message must execute again, repeating a request is the most
   // natural user reaction when something didn't work.
   const signature = operations.length
-    ? `update::${activeContext || 'default'}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target}:${o.toColumn || o.priority || o.newTitle || ''}`).join('|')}`
+    ? `update::${activeContext || 'default'}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target}:${opSignatureValue(o)}`).join('|')}`
     : ''
 
   useEffect(() => {
@@ -622,13 +666,11 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
           // items, so board edits must prefer cards, a Backlog task with the
           // same title must never shadow the visible card (that "moved"
           // something invisible and left the board looking untouched).
-          const cardItems = (cardsRes?.items || []).filter((i: any) => i.status !== 'archived')
-          const taskItems = (tasksRes?.items || []).filter((i: any) => i.status !== 'archived')
+          const cardItems = (cardsRes?.items || []).filter(i => i.status !== 'archived')
+          const taskItems = (tasksRes?.items || []).filter(i => i.status !== 'archived')
 
           const rawCols = await window.electronAPI.db.getSetting(`kanban_columns_${validContext}`).catch(() => null)
-          let colsList: any[] = []
-          if (typeof rawCols === 'string') { try { colsList = JSON.parse(rawCols) } catch { colsList = [] } }
-          else if (Array.isArray(rawCols)) colsList = rawCols
+          let colsList = readColumnsSetting(rawCols)
           if (colsList.length === 0) {
             colsList = [
               { id: 'open', name: 'Backlog' },
@@ -638,17 +680,17 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
             ]
           }
 
-          const resolveCol = (nameOrId: string): any => {
+          const resolveCol = (nameOrId: string): KanbanColumnConfig | null => {
             const q = (nameOrId || '').trim().toLowerCase()
             if (!q) return null
             return (
-              colsList.find((c: any) => c.id.toLowerCase() === q) ||
-              colsList.find((c: any) => c.name.toLowerCase() === q) ||
-              colsList.find((c: any) => c.name.toLowerCase().replace(/\s+/g, '_') === q) ||
-              (q.includes('done') || q.includes('complete') ? colsList.find((c: any) => c.id === 'done') : undefined) ||
-              (q.includes('progress') || q.includes('doing') ? colsList.find((c: any) => c.id === 'in_progress') : undefined) ||
-              (q.includes('review') || q.includes('test') || q.includes('qa') ? colsList.find((c: any) => c.id === 'in_review') : undefined) ||
-              (q.includes('backlog') || q.includes('todo') || q.includes('open') ? colsList.find((c: any) => c.id === 'open') : undefined) ||
+              colsList.find(c => c.id.toLowerCase() === q) ||
+              colsList.find(c => c.name.toLowerCase() === q) ||
+              colsList.find(c => c.name.toLowerCase().replace(/\s+/g, '_') === q) ||
+              (q.includes('done') || q.includes('complete') ? colsList.find(c => c.id === 'done') : undefined) ||
+              (q.includes('progress') || q.includes('doing') ? colsList.find(c => c.id === 'in_progress') : undefined) ||
+              (q.includes('review') || q.includes('test') || q.includes('qa') ? colsList.find(c => c.id === 'in_review') : undefined) ||
+              (q.includes('backlog') || q.includes('todo') || q.includes('open') ? colsList.find(c => c.id === 'open') : undefined) ||
               null
             )
           }
@@ -657,15 +699,15 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
           // match (card title contains the query) so a slightly-shortened title
           // still resolves. The reverse direction (query contains title) is
           // deliberately NOT allowed, it let short junk titles hijack edits.
-          const findIn = (list: any[], q: string): any => {
-            const exact = list.find((i: any) => i.title.trim().toLowerCase() === q)
+          const findIn = (list: Item[], q: string): Item | undefined => {
+            const exact = list.find(i => i.title.trim().toLowerCase() === q)
             if (exact) return exact
             if (q.length < 4) return undefined
-            const loose = list.filter((i: any) => i.title.trim().toLowerCase().includes(q))
+            const loose = list.filter(i => i.title.trim().toLowerCase().includes(q))
             return loose.length === 1 ? loose[0] : undefined
           }
           // Cards always win over tasks; moves are card-only (tasks aren't on the board).
-          const findCard = (title: string, cardsOnly: boolean): any => {
+          const findCard = (title: string, cardsOnly: boolean): Item | undefined => {
             const q = title.trim().toLowerCase()
             return findIn(cardItems, q) ?? (cardsOnly ? undefined : findIn(taskItems, q))
           }
@@ -675,13 +717,13 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
           // instead of hijacking whatever loosely matches.
           const isColumnName = (title: string): boolean => {
             const q = title.trim().toLowerCase()
-            return colsList.some((c: any) => c.id.toLowerCase() === q || c.name.toLowerCase() === q)
+            return colsList.some(c => c.id.toLowerCase() === q || c.name.toLowerCase() === q)
           }
 
           const applied: string[] = []
           const notFound: string[] = []
           const failed: string[] = []
-          const inverse: Array<{ id: string; patch: Record<string, unknown> }> = []
+          const inverse: Array<{ id: string; patch: Partial<Item> }> = []
           let noops = 0
 
           for (const op of operations) {
@@ -717,7 +759,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
                 item.status = col.id
               } else if (op.op === 'set_priority') {
                 if (item.priority === op.priority) { noops++; continue }
-                await window.electronAPI.db.updateItem(item.id, { priority: op.priority as 1 | 2 | 3 })
+                await window.electronAPI.db.updateItem(item.id, { priority: op.priority })
                 inverse.push({ id: item.id, patch: { priority: item.priority } })
                 applied.push(`"${item.title}" priority → ${op.priority === 3 ? 'High' : op.priority === 2 ? 'Medium' : 'Low'}`)
                 item.priority = op.priority
@@ -751,8 +793,8 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
                   if (idx >= 0) list.splice(idx, 1)
                 }
               }
-            } catch (opErr: any) {
-              const reason = String(opErr?.message || opErr)
+            } catch (opErr) {
+              const reason = errorText(opErr)
                 .replace(/^Error invoking remote method '[^']*':\s*/i, '')
                 .replace(/^Error:\s*/i, '')
               failed.push(`${op.op.replace('_', ' ')} "${item.title}", ${reason}`)
@@ -769,11 +811,11 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
         window.dispatchEvent(new CustomEvent('kanban-refresh'))
         window.dispatchEvent(new CustomEvent('item-updated'))
         if (isMounted) setResult(outcome)
-      } catch (err: any) {
+      } catch (err) {
         // A crashed run must not fake "previously applied" on remount, 
         // release the signature so a retry (or remount) re-executes honestly.
         executedActionSignaturesSet.delete(signature)
-        if (isMounted) setError(err.message || String(err))
+        if (isMounted) setError(errorText(err))
       }
     }
     run()
@@ -787,7 +829,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
     setUndoing(true)
     try {
       for (const inv of [...result.inverse].reverse()) {
-        await window.electronAPI.db.updateItem(inv.id, inv.patch as any).catch(() => {})
+        await window.electronAPI.db.updateItem(inv.id, inv.patch).catch(() => {})
       }
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       window.dispatchEvent(new CustomEvent('item-updated'))
@@ -926,8 +968,8 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
   const activeContext = useAppStore(s => s.activeContext)
   const selectItem = useAppStore(s => s.selectItem)
   const setView = useAppStore(s => s.setView)
-  const [createdItem, setCreatedItem] = useState<any>(null)
-  const [itemTags, setItemTags] = useState<any[]>([])
+  const [createdItem, setCreatedItem] = useState<Item | null>(null)
+  const [itemTags, setItemTags] = useState<Tag[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const normalized = normalizeCardJson(jsonString)
@@ -971,7 +1013,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
 
         const created = await withLock(`kanban-cards:${validContext}`, async () => {
           const existingItemsRes = await window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
-          const existingCard = (existingItemsRes?.items || []).find((ci: any) => ci.status !== 'archived' && ci.title.trim().toLowerCase() === title.trim().toLowerCase())
+          const existingCard = (existingItemsRes?.items || []).find(ci => ci.status !== 'archived' && ci.title.trim().toLowerCase() === title.trim().toLowerCase())
 
           if (existingCard) {
             createdItemsCacheMap.set(signature, { item: existingCard, tags: [] })
@@ -985,11 +1027,8 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
           let finalStatus = 'open'
           const colKey = `kanban_columns_${validContext}`
           const colVal = await window.electronAPI.db.getSetting(colKey).catch(() => null)
-          let cols: any[] = []
-          if (colVal) {
-            try { cols = JSON.parse(colVal as string) } catch {}
-          }
-          if (!cols || cols.length === 0) {
+          let cols = readColumnsSetting(colVal)
+          if (cols.length === 0) {
             cols = [
               { id: 'open', name: 'Backlog' },
               { id: 'in_progress', name: 'In Progress' },
@@ -1018,13 +1057,16 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
 
           // Handle Tags if provided
           const tagIds: string[] = []
-          const createdTagsList: any[] = []
+          const createdTagsList: Tag[] = []
           if (Array.isArray(normalized.tags) && normalized.tags.length > 0) {
             const existingTags = await window.electronAPI.db.getTags().catch(() => [])
             for (const t of normalized.tags) {
-              const tagName = typeof t === 'string' ? t : t.name
-              const tagColor = (typeof t === 'object' && t.color) ? t.color : '#3b82f6'
-              let found = existingTags.find((et: any) => et.name.toLowerCase() === tagName.toLowerCase())
+              // Skipping nameless tags matches the batch path. Reading `.name` off
+              // whatever the model sent used to throw here and fail the whole card.
+              const tagName = tagNameOf(t)
+              if (!tagName) continue
+              const tagColor = tagColorOf(t, '#3b82f6')
+              let found = existingTags.find(et => et.name.toLowerCase() === tagName.toLowerCase())
               if (!found) {
                 try {
                   found = await window.electronAPI.db.createTag({ name: tagName, color: tagColor })
@@ -1067,8 +1109,8 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
           setCreatedItem(created.item)
           setItemTags(created.tags)
         }
-      } catch (e: any) {
-        if (isMounted) setError(e.message || String(e))
+      } catch (e) {
+        if (isMounted) setError(errorText(e))
       }
     }
     autoCreate()
@@ -1105,8 +1147,8 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
       try {
         const ctx = activeContext || 'default'
         const raw = await window.electronAPI.db.getSetting(`kanban_columns_${ctx}`).catch(() => null)
-        const cols: any[] = raw ? JSON.parse(raw as string) : []
-        const match = cols.find((c: any) =>
+        const cols = readColumnsSetting(raw)
+        const match = cols.find(c =>
           c.id === data.status || c.name?.toLowerCase() === String(data.status).toLowerCase()
         )
         if (match) setColDisplayName(match.name)
@@ -1196,9 +1238,9 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
       {/* Tags Chips */}
       {((currentTags && currentTags.length > 0) || (data.tags && data.tags.length > 0)) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
-          {(currentTags.length > 0 ? currentTags : data.tags).map((t: any, idx: number) => {
-            const tagName = typeof t === 'string' ? t : t.name
-            const tagColor = (typeof t === 'object' && t.color) ? t.color : '#3b82f6'
+          {(currentTags.length > 0 ? currentTags : asArray(data.tags)).map((t, idx) => {
+            const tagName = tagNameOf(t)
+            const tagColor = tagColorOf(t, '#3b82f6')
             return (
               <span
                 key={idx}
@@ -1256,7 +1298,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
 function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
-  const [createdCol, setCreatedCol] = useState<any>(null)
+  const [createdCol, setCreatedCol] = useState<KanbanColumnConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const normalized = normalizeColumnJson(jsonString)
@@ -1290,12 +1332,7 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
 
         const newCol = await withLock(`kanban-cols:${context}`, async () => {
           const rawCols = await window.electronAPI.db.getSetting(key).catch(() => null)
-          let colsList: any[] = []
-          if (typeof rawCols === 'string') {
-            try { colsList = JSON.parse(rawCols) } catch (e) { colsList = [] }
-          } else if (Array.isArray(rawCols)) {
-            colsList = rawCols
-          }
+          let colsList = readColumnsSetting(rawCols)
 
           if (colsList.length === 0) {
             colsList = [
@@ -1326,8 +1363,8 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
         window.dispatchEvent(new CustomEvent('kanban-refresh'))
 
         if (isMounted) setCreatedCol(newCol)
-      } catch (e: any) {
-        if (isMounted) setError(e.message || String(e))
+      } catch (e) {
+        if (isMounted) setError(errorText(e))
       }
     }
     autoCreateCol()
@@ -1419,14 +1456,24 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
 
-  let parsed: any = faultTolerantParseJSON(jsonString)
+  const parsed = faultTolerantParseJSON(jsonString)
 
   if (!parsed) return <pre>{jsonString}</pre>
 
-  const steps: any[] = Array.isArray(parsed.steps) ? parsed.steps : []
+  // A non-object (the model answered with an array) still renders the plan
+  // shell with zero steps, exactly as before, only `null` falls back to <pre>.
+  const root = asObject(parsed) ?? {}
+  // Field-for-field with what the block declares, no alias widening, so a step
+  // that rendered blank before still renders blank.
+  const planTitle = str(root.title)
+  const planOverview = str(root.overview)
+  const steps: AiPlanStep[] = asArray(root.steps).map(s => {
+    const o = asObject(s) ?? {}
+    return { title: str(o.title), details: str(o.details), status: str(o.status) }
+  })
 
   // Stable localStorage key for per-step approval persistence (survives chat reload)
-  const planSignature = `checkpoint_plan::${(parsed.title || '').replace(/\s+/g, '_').slice(0, 40)}::${steps.length}`
+  const planSignature = `checkpoint_plan::${planTitle.replace(/\s+/g, '_').slice(0, 40)}::${steps.length}`
 
   const [stepApprovals, setStepApprovals] = useState<boolean[]>(() => {
     try {
@@ -1460,7 +1507,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
     })
   }
 
-  const approvedSteps = steps.filter((_: any, i: number) => stepApprovals[i] !== false)
+  const approvedSteps = steps.filter((_, i) => stepApprovals[i] !== false)
   const approvedCount = approvedSteps.length
   const skippedCount = steps.length - approvedCount
 
@@ -1490,8 +1537,8 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
   }
 
   const handleExportMarkdown = async () => {
-    let md = `# ${parsed.title || 'Implementation Plan'}\n\n`
-    if (parsed.overview) md += `## Overview\n\n${parsed.overview}\n\n`
+    let md = `# ${planTitle || 'Implementation Plan'}\n\n`
+    if (planOverview) md += `## Overview\n\n${planOverview}\n\n`
     md += `## Steps\n\n`
     for (let i = 0; i < steps.length; i++) {
       const s = steps[i]
@@ -1575,8 +1622,8 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
       </div>
 
       {/* Plan Title + Overview */}
-      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9', marginBottom: parsed.overview ? '6px' : '10px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{parsed.title}</div>
-      {parsed.overview && (
+      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9', marginBottom: planOverview ? '6px' : '10px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{planTitle}</div>
+      {planOverview && (
         <div style={{
           fontSize: '11px', color: '#94a3b8', marginBottom: '12px', lineHeight: 1.6,
           background: 'rgba(255,255,255,0.03)',
@@ -1585,13 +1632,13 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word'
         }}>
-          {parsed.overview}
+          {planOverview}
         </div>
       )}
 
       {/* Step List, Phase 1: clickable toggles */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
-        {steps.map((s: any, idx: number) => {
+        {steps.map((s, idx) => {
           const isApproved = stepApprovals[idx] !== false
           return (
             <div
@@ -1759,7 +1806,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Sparkles size={16} style={{ color: 'var(--color-secondary)' }} />
                 <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', letterSpacing: '-0.01em' }}>
-                  Plan Review: {parsed.title}
+                  Plan Review: {planTitle}
                 </span>
               </div>
               <button onClick={() => setShowModal(false)}
@@ -1782,7 +1829,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
                 <div style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.08em' }}>
                   Steps Checklist ({approvedCount}/{steps.length} approved)
                 </div>
-                {steps.map((s: any, idx: number) => {
+                {steps.map((s, idx) => {
                   const isApproved = stepApprovals[idx] !== false
                   const isSelected = activeStepIndex === idx
                   return (
@@ -1954,10 +2001,25 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
   const [loaded, setLoaded] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
-  let parsed: any = faultTolerantParseJSON(jsonString)
+  const parsed = faultTolerantParseJSON(jsonString)
   if (!parsed) return <pre>{jsonString}</pre>
 
-  const nodes: any[] = Array.isArray(parsed.nodes) ? parsed.nodes : []
+  // `parsed` stays raw: it is handed verbatim to the Dialogue Builder and to the
+  // JSON export, so it must not be reshaped. Only the preview reads `nodes`.
+  const root = asObject(parsed) ?? {}
+  const startNode = str(root.startNode)
+  const nodes: AiDialogueNode[] = asArray(root.nodes).map(n => {
+    const o = asObject(n) ?? {}
+    return {
+      id: str(o.id),
+      speaker: str(o.speaker),
+      text: str(o.text),
+      choices: asArray(o.choices).map((c): AiDialogueChoice => {
+        const co = asObject(c) ?? {}
+        return { text: str(co.text), target: str(co.target) }
+      })
+    }
+  })
   const PREVIEW_LIMIT = 3
   const visibleNodes = expanded ? nodes : nodes.slice(0, PREVIEW_LIMIT)
 
@@ -1974,13 +2036,13 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
   }
 
   const handleSaveJson = async () => {
-    const fname = `dialogue_${(parsed.startNode || 'tree').toString().replace(/\s+/g, '_')}.json`
+    const fname = `dialogue_${(startNode || 'tree').replace(/\s+/g, '_')}.json`
     const success = await window.electronAPI.app.saveFile(fname, JSON.stringify(parsed, null, 2))
     if (success) toast('Dialogue tree saved as JSON!', { type: 'success' })
   }
 
   const handleSaveMd = async () => {
-    let md = `# Dialogue Tree\n\nStart Node: \`${parsed.startNode || 'start'}\`\n\n---\n\n`
+    let md = `# Dialogue Tree\n\nStart Node: \`${startNode || 'start'}\`\n\n---\n\n`
     for (const n of nodes) {
       md += `## Node: \`${n.id}\`\n\n**${n.speaker || 'NPC'}:** "${n.text}"\n\n`
       if (Array.isArray(n.choices) && n.choices.length > 0) {
@@ -2023,7 +2085,7 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
 
       {/* Node List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-        {visibleNodes.map((n: any, idx: number) => (
+        {visibleNodes.map((n, idx) => (
           <div key={idx} style={{
             background: 'rgba(255,255,255,0.025)',
             border: '1px solid rgba(168,85,247,0.15)',
@@ -2046,7 +2108,7 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
             {/* Choices with target arrows */}
             {Array.isArray(n.choices) && n.choices.length > 0 && (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                {n.choices.map((c: any, ci: number) => (
+                {n.choices.map((c, ci) => (
                   <span key={ci} style={{
                     fontSize: '9px', background: 'rgba(168,85,247,0.1)',
                     color: '#d8b4fe', padding: '2px 7px', borderRadius: '4px',
@@ -2146,9 +2208,9 @@ function fetchBoardTitles(context: string): Promise<Array<{ title: string; id: s
         window.electronAPI.db.getItems(context, 'task', 1, 500).catch(() => ({ items: [] })),
         window.electronAPI.db.getItems(context, 'card', 1, 500).catch(() => ({ items: [] }))
       ])
-      const items = [...(t?.items || []), ...(c?.items || [])].filter((i: any) => i.status !== 'archived')
+      const items = [...(t?.items || []), ...(c?.items || [])].filter(i => i.status !== 'archived')
       const list = items
-        .map((i: any) => ({ title: String(i.title || '').trim(), id: i.id as string }))
+        .map(i => ({ title: str(i.title).trim(), id: i.id }))
         // Short titles false-positive on prose; markdown-special chars break link syntax.
         .filter(e => e.title.length >= 5 && !/[[\]()`*_]/.test(e.title))
         .sort((a, b) => b.title.length - a.title.length)
