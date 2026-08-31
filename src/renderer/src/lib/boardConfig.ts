@@ -19,6 +19,7 @@ import {
   legacyColumnsKey,
   legacyBackgroundKey,
   legacyArchivedKey,
+  legacySwimlanesKey,
   type BoardConfig
 } from '../../../shared/boardModel'
 
@@ -35,12 +36,16 @@ async function readUnlocked(context: string): Promise<{ config: BoardConfig; mig
     return { config: normalizeBoardConfig(stored), migrated: false }
   }
 
-  const [legacyColumns, legacyBackground, legacyArchived] = await Promise.all([
+  const [legacyColumns, legacyBackground, legacyArchived, legacySwimlanes] = await Promise.all([
     window.electronAPI.db.getSetting(legacyColumnsKey(context)),
     window.electronAPI.db.getSetting(legacyBackgroundKey(context)),
-    window.electronAPI.db.getSetting(legacyArchivedKey(context))
+    window.electronAPI.db.getSetting(legacyArchivedKey(context)),
+    window.electronAPI.db.getSetting(legacySwimlanesKey(context))
   ])
-  return { config: migrateLegacy(legacyColumns, legacyBackground, legacyArchived), migrated: true }
+  return {
+    config: migrateLegacy(legacyColumns, legacyBackground, legacyArchived, legacySwimlanes),
+    migrated: true
+  }
 }
 
 async function writeUnlocked(context: string, config: BoardConfig): Promise<void> {

@@ -59,3 +59,4 @@ src/**/*.d.ts
 # Untracked rather than deleted, they remain in git history if ever needed.
 checkpoint-app*.zip
 *.docx
+

@@ -18,6 +18,7 @@ import type { Item, Tag as TagType } from '../../../shared/types'
 import Skeleton from './ui/Skeleton'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
+import { loadBoardConfig } from '../lib/boardConfig'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
@@ -55,23 +56,27 @@ export default function ItemDetailPanel() {
     return () => document.removeEventListener('mousedown', handleOutsideClick)
   }, [])
 
-  // 2. Fetch Columns and Tags list once
+  // 2. Fetch Columns and Tags. Re-runs on workspace change: columns are
+  //    per-workspace, so a list loaded once at mount would describe whichever
+  //    board happened to be open first.
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        // Load Kanban columns
-        const colsRaw = await window.electronAPI.db.getSetting('kanban_columns')
-        if (colsRaw) {
-          const cols = JSON.parse(colsRaw as string) as Array<{ id: string; name: string }>
-          setColumns(cols)
-        } else {
-          setColumns([
-            { id: 'backlog', name: 'Backlog' },
-            { id: 'todo', name: 'To Do' },
-            { id: 'in_progress', name: 'In Progress' },
-            { id: 'done', name: 'Done' }
-          ])
-        }
+        // Load Kanban columns for the active workspace.
+        //
+        // This read used to target a key called 'kanban_columns', with no
+        // workspace suffix, which nothing has ever written, in any commit. So
+        // it always fell through to the hardcoded list below, whose ids
+        // ('backlog', 'todo') do not exist on any real board: the actual
+        // defaults are open / in_progress / in_review / done.
+        //
+        // The damage was not cosmetic. A card with status 'open' matched no
+        // <option>, so the select displayed "Backlog" regardless of its real
+        // status, and choosing an option wrote a status no column owns, 
+        // removing the card from the board with no error and no undo. Custom
+        // columns never appeared here at all.
+        const { columns: boardColumns } = await loadBoardConfig(activeContext)
+        setColumns(boardColumns.map(c => ({ id: c.id, name: c.name })))
 
         // Load all tags
         const tags = await window.electronAPI.db.getTags()
@@ -81,7 +86,7 @@ export default function ItemDetailPanel() {
       }
     }
     fetchMetadata()
-  }, [])
+  }, [activeContext])
 
   // 3. Load item details
   useEffect(() => {

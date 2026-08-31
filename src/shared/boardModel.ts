@@ -87,6 +87,13 @@ export const boardConfigKey = (context: string): string => `kanban_board_${conte
 export const legacyColumnsKey = (context: string): string => `kanban_columns_${context}`
 export const legacyBackgroundKey = (context: string): string => `kanban_bg_${context}`
 export const legacyArchivedKey = (context: string): string => `kanban_archived_columns_${context}`
+/**
+ * The fourth legacy key. It was missed when board configuration was unified, 
+ * migrateLegacy hardcoded `swimlanes: false`, so anyone with priority
+ * swimlanes enabled had the preference silently reset on their first load
+ * after that change, with the old row left orphaned in the settings table.
+ */
+export const legacySwimlanesKey = (context: string): string => `kanban_swimlanes_${context}`
 
 /**
  * Every mutation serialises on the key the board bootstrap and the AI action
@@ -225,13 +232,16 @@ function decodeLegacyList(raw: unknown): unknown {
 export function migrateLegacy(
   rawColumns: unknown,
   rawBackground: unknown,
-  rawArchived?: unknown
+  rawArchived?: unknown,
+  rawSwimlanes?: unknown
 ): BoardConfig {
   return normalizeBoardConfig({
     columns: decodeLegacyList(rawColumns),
     archivedColumns: decodeLegacyList(rawArchived),
     background: typeof rawBackground === 'string' && rawBackground ? rawBackground : 'default',
-    swimlanes: false,
+    // Stored by the old toggle as the string 'true'/'false'; `bool` in
+    // normalizeBoardConfig accepts both that and a real boolean.
+    swimlanes: rawSwimlanes ?? false,
     cardDisplay: DEFAULT_CARD_DISPLAY,
     filters: DEFAULT_FILTERS
   })
