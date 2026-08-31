@@ -9,6 +9,7 @@ import TaskDetailDrawer from './backlog/TaskDetailDrawer'
 import Skeleton from './ui/Skeleton'
 import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
+import { loadBoardConfig } from '../lib/boardConfig'
 import StandupTranslatorView from './StandupTranslatorView'
 import ConfirmDialog from './ui/ConfirmDialog'
 
@@ -135,19 +136,12 @@ export default function BacklogView() {
   // 2. Load Columns Configuration (Workflow Stages)
   const loadWorkflowColumns = useCallback(async () => {
     try {
-      const key = `kanban_columns_${activeContext}`
-      const val = await window.electronAPI.db.getSetting(key)
-      if (val) {
-        setWorkflowColumns(JSON.parse(val as string))
-      } else {
-        const defaultCols = [
-          { id: 'open', name: 'Backlog', wipLimit: null },
-          { id: 'in_progress', name: 'In Progress', wipLimit: null },
-          { id: 'in_review', name: 'In Review', wipLimit: null },
-          { id: 'done', name: 'Done', wipLimit: null }
-        ]
-        setWorkflowColumns(defaultCols)
-      }
+      // Reads the unified board document. This used to read the legacy
+      // kanban_columns_* key directly, which stopped being written once board
+      // configuration was unified, so every column added, renamed or removed
+      // after that migration was invisible here.
+      const config = await loadBoardConfig(activeContext)
+      setWorkflowColumns(config.columns)
     } catch (err) {
       console.error('Failed to load columns:', err)
     }

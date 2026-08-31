@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import { GitFork, Grid, Layers, Maximize2, Palette, Repeat, Scissors, Sliders, Sparkles } from 'lucide-react'
 import { useToast } from './ui/Toast'
+import { loadBoardConfig } from '../lib/boardConfig'
 import { useAppStore } from '../store/appStore'
 import PalettePanel from './gamedev/PalettePanel'
 import DialoguePanel from './gamedev/DialoguePanel'
@@ -47,16 +48,11 @@ export default function GameDevView() {
   const moveCardToDone = useCallback(async (cardId: string) => {
     try {
       const activeContext = useAppStore.getState().activeContext
-      const key = `kanban_columns_${activeContext}`
-      const colsVal = await window.electronAPI.db.getSetting(key)
-      let doneColId = 'done'
-      if (colsVal) {
-        const cols = JSON.parse(colsVal as string)
-        const doneCol = cols.find((c: any) => c.id === 'done' || c.name.toLowerCase().includes('done'))
-        if (doneCol) {
-          doneColId = doneCol.id
-        }
-      }
+      // Reads the unified board document rather than the legacy column key,
+      // which stopped being written once board configuration was unified.
+      const { columns } = await loadBoardConfig(activeContext)
+      const doneCol = columns.find(c => c.id === 'done' || c.name.toLowerCase().includes('done'))
+      const doneColId = doneCol?.id ?? 'done'
       await window.electronAPI.db.updateItem(cardId, { status: doneColId })
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       toast('Success: Ticket moved to Done!', { type: 'success' })
