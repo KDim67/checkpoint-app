@@ -15,7 +15,10 @@ import { safeStorage } from 'electron'
  * list, and every entry in it carries its own `apiKey` field, so the whole blob
  * is a secret even though only part of it is credential material.
  */
-const SECRET_SETTING_KEYS = new Set(['ai_api_key', 'ai_providers'])
+// `mcp_auth_token` grants full read/write over every workspace to whoever holds
+// it, so it is encrypted at rest alongside the provider keys rather than
+// sitting in plaintext next to them.
+const SECRET_SETTING_KEYS = new Set(['ai_api_key', 'ai_providers', 'mcp_auth_token'])
 
 /**
  * Marks an encrypted payload. Deliberately not valid JSON: every plaintext

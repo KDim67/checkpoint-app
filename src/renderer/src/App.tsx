@@ -614,6 +614,15 @@ export default function App() {
       setView(view as ActiveView)
     })
 
+    // An MCP client writes straight to the database from the main process,
+    // bypassing the IPC calls the views normally refresh on. Re-dispatching the
+    // DOM events the views already listen for means no view needs to know that
+    // an external agent exists.
+    const unsubMcp = window.electronAPI.mcp.onDataChanged(() => {
+      window.dispatchEvent(new CustomEvent('kanban-refresh'))
+      window.dispatchEvent(new CustomEvent('item-updated'))
+    })
+
     // Global keyboard navigation shortcuts, matched against the user's bindings.
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return
@@ -643,6 +652,7 @@ export default function App() {
     return () => {
       unsubTheme()
       unsubNavigate()
+      unsubMcp()
       window.removeEventListener('keydown', handleGlobalKeyDown)
     }
   }, [loadContexts, setView, toggleRightPanel])

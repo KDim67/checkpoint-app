@@ -98,6 +98,13 @@ export const enum IpcChannels {
   WEBHOOK_TOGGLE         = 'webhook:toggle',
   WEBHOOK_EVENT          = 'webhook:event',
 
+  // MCP Server
+  MCP_TOGGLE             = 'mcp:toggle',
+  MCP_GET_STATUS         = 'mcp:getStatus',
+  MCP_REGENERATE_TOKEN   = 'mcp:regenerateToken',
+  /** Main → renderer: something outside the UI changed the data. */
+  MCP_DATA_CHANGED       = 'mcp:dataChanged',
+
   // Backup
   BACKUP_RUN             = 'backup:run',
   BACKUP_STATUS          = 'backup:status',

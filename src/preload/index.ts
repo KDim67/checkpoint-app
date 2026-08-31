@@ -337,6 +337,25 @@ const api = {
     }
   },
 
+  mcp: {
+    /** Resolves to the bound port, or null when stopping. Rejects on port clash. */
+    toggle: (active: boolean, port: number): Promise<number | null> =>
+      ipcRenderer.invoke(IpcChannels.MCP_TOGGLE, active, port),
+
+    getStatus: (): Promise<{ running: boolean; port: number; enabled: boolean; token: string }> =>
+      ipcRenderer.invoke(IpcChannels.MCP_GET_STATUS),
+
+    regenerateToken: (): Promise<string> =>
+      ipcRenderer.invoke(IpcChannels.MCP_REGENERATE_TOKEN),
+
+    /** Fires when an MCP client changed data behind the UI's back. */
+    onDataChanged: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on(IpcChannels.MCP_DATA_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IpcChannels.MCP_DATA_CHANGED, handler)
+    }
+  },
+
   // Backup
   backup: {
     run: (action?: 'backup' | 'restore' | 'delete' | 'init', filename?: string): Promise<void> =>

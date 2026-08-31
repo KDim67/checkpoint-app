@@ -19,6 +19,7 @@ import {
 } from './cheatsheetService'
 import { batchRenameFiles, selectTextureFile, loadTextureFile, savePbrMaps, saveSeamlessTexture, selectFolder, saveSpriteAtlas, saveSlicedSprites, saveLutTexture, saveUpscaledTexture } from './gamedevService'
 import { SyncService } from './syncService'
+import { MCP_DEFAULT_PORT } from './mcpServer'
 
 const syncService = new SyncService()
 
@@ -620,6 +621,45 @@ function registerIpcHandlers(): void {
       setSetting('webhook_port', String(actualPort))
     }
     return actualPort
+  })
+
+  ipcMain.handle(IpcChannels.MCP_TOGGLE, async (_event, active: boolean, port: number) => {
+    const { toggleMcpServer, setMcpDataChangedHandler, MCP_DEFAULT_PORT: fallback } = await import('./mcpServer')
+    const { setSetting } = await import('./db')
+
+    setMcpDataChangedHandler(active
+      ? () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
+          }
+        }
+      : null)
+
+    // Errors propagate to the renderer rather than being swallowed: a port
+    // clash must be visible in Settings, not leave the toggle looking enabled
+    // while nothing is listening.
+    const actualPort = await toggleMcpServer(active, port || fallback)
+    setSetting('feature_mcp', active ? 'true' : 'false')
+    if (active && actualPort) setSetting('mcp_port', String(actualPort))
+    return actualPort
+  })
+
+  ipcMain.handle(IpcChannels.MCP_GET_STATUS, async () => {
+    const { getMcpPort, getOrCreateMcpToken, MCP_DEFAULT_PORT: fallback } = await import('./mcpServer')
+    const { getSetting } = await import('./db')
+    return {
+      running: getMcpPort() !== null,
+      port: getMcpPort() ?? (parseInt(getSetting<string>('mcp_port', String(fallback)), 10) || fallback),
+      enabled: getSetting<string>('feature_mcp', 'false') === 'true',
+      token: getOrCreateMcpToken()
+    }
+  })
+
+  ipcMain.handle(IpcChannels.MCP_REGENERATE_TOKEN, async () => {
+    const { regenerateMcpToken } = await import('./mcpServer')
+    // No restart needed: the token is read per request, so existing clients
+    // simply start getting 401s.
+    return regenerateMcpToken()
   })
 
   ipcMain.handle(IpcChannels.HUD_TOGGLE, async (_event, active?: boolean) => {
@@ -1248,6 +1288,26 @@ app.whenReady().then(async () => {
     console.error('Failed to auto-start Webhook Gateway:', err)
   }
 
+  // MCP server, off unless explicitly enabled, since it exposes read/write
+  // access to every workspace.
+  try {
+    const { getSetting } = await import('./db')
+    if (getSetting<string>('feature_mcp', 'false') === 'true') {
+      const port = parseInt(getSetting<string>('mcp_port', String(MCP_DEFAULT_PORT)), 10) || MCP_DEFAULT_PORT
+      const { toggleMcpServer, setMcpDataChangedHandler } = await import('./mcpServer')
+      // Writes arriving over MCP bypass renderer IPC entirely, so the open
+      // window would otherwise show a stale board until the user navigated.
+      setMcpDataChangedHandler(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
+        }
+      })
+      await toggleMcpServer(true, port)
+    }
+  } catch (err) {
+    console.error('Failed to auto-start MCP server:', err)
+  }
+
   // Phase 21, Start Passive Activity Tracker if enabled
   try {
     const { initializeActivityTracker } = await import('./tracker')
@@ -1282,6 +1342,7 @@ app.on('will-quit', (e) => {
     import('./clipboardWatcher').then(({ stopClipboardWatcher }) => stopClipboardWatcher()).catch(() => {}),
     import('./customizer').then(({ disableCustomizer }) => disableCustomizer()).catch(() => {}),
     import('./webhookGateway').then(({ stopWebhookServer }) => stopWebhookServer()).catch(() => {}),
+    import('./mcpServer').then(({ stopMcpServer }) => stopMcpServer()).catch(() => {}),
     import('./hud').then(({ disableHud }) => disableHud()).catch(() => {}),
     import('./backupVault').then(({ shutdownBackupScheduler }) => shutdownBackupScheduler()).catch(() => {}),
     import('./tracker').then(({ shutdownActivityTracker }) => shutdownActivityTracker()).catch(() => {}),
