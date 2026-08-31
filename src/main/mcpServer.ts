@@ -59,6 +59,7 @@ import {
   legacyColumnsKey,
   legacyBackgroundKey,
   legacyArchivedKey,
+  legacySwimlanesKey,
   type BoardConfig
 } from '../shared/boardModel'
 import { applyConfigOps, normalizeConfigUpdate } from '../shared/boardOps'
@@ -167,7 +168,8 @@ function readBoardConfig(context: string): BoardConfig {
   return migrateLegacy(
     getSetting<unknown>(legacyColumnsKey(context), null),
     getSetting<unknown>(legacyBackgroundKey(context), null),
-    getSetting<unknown>(legacyArchivedKey(context), null)
+    getSetting<unknown>(legacyArchivedKey(context), null),
+    getSetting<unknown>(legacySwimlanesKey(context), null)
   )
 }
 
