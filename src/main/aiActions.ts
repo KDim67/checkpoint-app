@@ -240,11 +240,11 @@ const FN_DESCRIPTIONS: Record<AiStructuredKind, string> = {
 
 // Helpers
 
-function stripThink(text: string): string {
+export function stripThink(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<\/?think>/gi, '').trim()
 }
 
-function repairJson(s: string): string {
+export function repairJson(s: string): string {
   return s
     .replace(/(["\d\]}])\s*[\r\n]+\s*(?=")/g, '$1,') // missing commas between lines
     .replace(/,\s*([\]}])/g, '$1')                    // trailing commas
@@ -253,7 +253,7 @@ function repairJson(s: string): string {
 }
 
 /** Robustly pull a JSON object/array out of arbitrary model text. */
-function extractJson(raw: string): unknown {
+export function extractJson(raw: string): unknown {
   if (!raw) return null
   let text = stripThink(raw)
   const fence = text.match(/```(?:json[^\n]*)?\s*([\s\S]*?)```/i)
@@ -281,7 +281,7 @@ function extractJson(raw: string): unknown {
   return null
 }
 
-function isAbortError(err: unknown): boolean {
+export function isAbortError(err: unknown): boolean {
   const e = err as { name?: string; message?: string; status?: number }
   return (
     e?.name === 'AbortError' ||
@@ -295,7 +295,7 @@ function isAbortError(err: unknown): boolean {
  * caller fall back to streaming (which surfaces a humanized message). Auth
  * failures and 404s (missing model / wrong URL) affect every method equally.
  */
-function isFatalError(err: unknown): boolean {
+export function isFatalError(err: unknown): boolean {
   const status = (err as { status?: number })?.status
   return status === 401 || status === 403 || status === 404
 }
