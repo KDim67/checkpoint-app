@@ -7,8 +7,12 @@ import React from 'react'
  */
 const FieldIdContext = React.createContext<string | undefined>(undefined)
 
-/** Controls call this to adopt the id their surrounding FieldRow label targets. */
-export function useFieldId(explicitId?: string): string | undefined {
+/**
+ * Controls call this to adopt the id their surrounding FieldRow label targets.
+ * Intentionally not exported: only the controls in this file consume it, and a
+ * module exporting both components and plain values cannot hot-reload.
+ */
+function useFieldId(explicitId?: string): string | undefined {
   const inherited = React.useContext(FieldIdContext)
   return explicitId ?? inherited
 }

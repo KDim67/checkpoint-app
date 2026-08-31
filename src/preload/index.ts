@@ -114,7 +114,13 @@ const api = {
     deleteItem: async (id: string): Promise<void> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_DELETE_ITEM, id)
       if (!res.success) throw new Error(res.error)
-      window.dispatchEvent(new CustomEvent('db-mutation', { detail: { type: 'deleteItem', id } }))
+      // The context travels with the event because the item is gone by the time
+      // any listener runs. Collaboration filters outgoing mutations by
+      // workspace, and without this a delete had no workspace to be filtered
+      // by, so deletions from every workspace were broadcast to the peer.
+      window.dispatchEvent(
+        new CustomEvent('db-mutation', { detail: { type: 'deleteItem', id, context: res.data?.context ?? null } })
+      )
     },
 
     getTags: async (): Promise<Tag[]> => {

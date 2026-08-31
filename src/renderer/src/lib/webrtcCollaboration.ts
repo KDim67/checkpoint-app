@@ -278,9 +278,18 @@ export class WebRTCCollaborationCoordinator {
     const e = event as CustomEvent
     const { detail } = e
 
-    // Filter mutations. If it's item-related, check if context is correct.
-    if (detail.item && detail.item.context !== this.options.context) return
-    
+    // Only this session's workspace goes over the wire.
+    //
+    // Create and update events carry the whole item, so the workspace is on
+    // `detail.item.context`. A delete has no item, it is gone, so the
+    // preload attaches the context it read just before deleting. Without that
+    // this check simply did not apply to deletes, and deleting anything in any
+    // other workspace was broadcast to the peer.
+    const mutationContext: string | null =
+      detail.item?.context ?? (typeof detail.context === 'string' ? detail.context : null)
+    if (mutationContext !== null && mutationContext !== this.options.context) return
+
+
     // Event handlers cannot await; a failed broadcast must not become an
     // unhandled rejection.
     void this.send({ type: 'db-mutation-event', mutation: detail }).catch(err => {
