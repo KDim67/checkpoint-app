@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import { MODE_TITLES, formatTime, isFocusInterval, durationMsFor } from './pomodoroTimer'
 import { loadFocusSettings } from '../../lib/focusSettings'
+import { reconcileSelectedTasks } from './reconcileTasks'
 
 /**
  * Mounted once at the app root (outside FocusView) so a running focus/break
@@ -42,6 +43,47 @@ export default function FocusTimerEngine(): null {
         document.title = baseTitleRef.current
         titleShownRef.current = null
       }
+    }
+  }, [])
+
+  // Keep the session's task selection in step with the board.
+  //
+  // The selection is a snapshot of whole Item objects living in the store, so
+  // it survives navigating away, which also meant it survived the cards being
+  // deleted. A card removed from Kanban stayed in the session list forever, and
+  // ticking it called updateItem on a dead id, which throws "Item not found":
+  // a task that could be neither completed nor dismissed.
+  //
+  // This lives here rather than in FocusView because FocusView is unmounted
+  // while the user is on the Kanban board doing the deleting.
+  useEffect(() => {
+    const reconcile = async (): Promise<void> => {
+      const { focusSelectedTasks, activeContext, focusSetSelectedTasks } = useAppStore.getState()
+      if (focusSelectedTasks.length === 0) return
+      try {
+        const [cards, tasks] = await Promise.all([
+          window.electronAPI.db.getItems(activeContext, 'card', 1, 500),
+          window.electronAPI.db.getItems(activeContext, 'task', 1, 500)
+        ])
+        const live = [...cards.items, ...tasks.items]
+        const next = reconcileSelectedTasks(focusSelectedTasks, live)
+        // Referentially identical when nothing changed, so this is a no-op
+        // render-wise on the vast majority of board mutations.
+        if (next !== focusSelectedTasks) focusSetSelectedTasks(next)
+      } catch (err) {
+        // A failed reconcile must not disturb a running timer; the stale entry
+        // simply persists until the next board change.
+        console.error('[focus] Could not reconcile selected tasks:', err)
+      }
+    }
+
+    window.addEventListener('db-mutation', reconcile)
+    window.addEventListener('item-updated', reconcile)
+    window.addEventListener('kanban-refresh', reconcile)
+    return () => {
+      window.removeEventListener('db-mutation', reconcile)
+      window.removeEventListener('item-updated', reconcile)
+      window.removeEventListener('kanban-refresh', reconcile)
     }
   }, [])
 
