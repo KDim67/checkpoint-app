@@ -19,6 +19,7 @@ import {
 } from './lib/shortcuts'
 
 // Lazy-loaded views (code split per view)
+const CommandPalette = lazy(() => import('./components/CommandPalette'))
 const LogView      = lazy(() => import('./components/LogView'))
 const KanbanView   = lazy(() => import('./components/KanbanView'))
 const BacklogView  = lazy(() => import('./components/BacklogView'))
@@ -460,6 +461,21 @@ export default function App() {
   const setContext = useAppStore(s => s.setContext)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Ctrl/Cmd+K, bound in the renderer rather than as a global shortcut: a global
+  // one would fire while Checkpoint is in the background and steal the keystroke
+  // from whatever the user is actually typing in.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen(open => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   // Opens the lightbox when an image is clicked directly. Runs in the capture
   // phase and swallows the event, so it has to bow out whenever the image is
@@ -701,6 +717,9 @@ export default function App() {
             almost everything, but a throw in the shell chrome itself (Titlebar,
             Sidebar) would otherwise still take the window to white. */}
         <ErrorBoundary label="Checkpoint">
+        <Suspense fallback={null}>
+          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        </Suspense>
         <div className="app-shell">
           <Titlebar />
           <div className="app-body">
