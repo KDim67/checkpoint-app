@@ -12,6 +12,8 @@
  * Electron process, the same reason boardModel.ts lives here.
  */
 
+import { lighten, readableForegroundOn } from './color'
+
 export const THEME_VAR_NAMES = [
   '--color-background',
   '--color-surface-1',
@@ -20,6 +22,7 @@ export const THEME_VAR_NAMES = [
   '--color-surface-elevated',
   '--color-primary',
   '--color-secondary',
+  '--color-balance',
   '--color-text-base',
   '--color-text-muted',
   '--color-text-faint',
@@ -38,6 +41,7 @@ export const DEFAULT_THEME: ThemeVariables = {
   '--color-surface-elevated': '#2e3450',
   '--color-primary': '#1e45fc',
   '--color-secondary': '#cdf12b',
+  '--color-balance': '#535e85',
   '--color-text-base': '#f1f5f9',
   '--color-text-muted': '#94a3b8',
   '--color-text-faint': '#475569',
@@ -61,12 +65,19 @@ export interface ThemePreset {
 const PRIMARY_TINT_ALPHA = '26'
 const SECONDARY_TINT_ALPHA = '1a'
 
+/** How far a hover state sits above its base, matched to the shipped pair. */
+const HOVER_LIGHTEN = 0.1
+
 /**
- * Expands a variable map with the tints derived from primary and secondary.
+ * Expands a variable map with everything derived from primary and secondary.
  *
  * Callers must apply this before handing variables to the engine. A preset that
- * stored its own tints would be one more thing to keep in sync, and a preset
- * saved before the derivation rule changed would quietly keep the old ones.
+ * stored its own derivatives would be one more thing to keep in sync, and one
+ * saved before the rule changed would quietly keep the old values.
+ *
+ * `--color-primary-hover` and `--color-text-inverted` are here because neither
+ * was ever overridden: a custom primary kept the stock blue hover, and the text
+ * on a secondary-coloured button stayed white however light that colour got.
  */
 export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
   const primary = vars['--color-primary']
@@ -74,7 +85,10 @@ export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
   return {
     ...vars,
     '--color-primary-muted': primary + PRIMARY_TINT_ALPHA,
+    '--color-primary-hover': lighten(primary, HOVER_LIGHTEN),
     '--color-secondary-muted': secondary + SECONDARY_TINT_ALPHA,
+    // Buttons filled with the secondary colour put their label on top of it.
+    '--color-text-inverted': readableForegroundOn(secondary),
     // Legacy alias still referenced by a few call sites.
     '--color-gold': secondary
   }
@@ -101,6 +115,7 @@ export const BUILT_IN_PRESETS: ThemePreset[] = [
       '--color-surface-elevated': '#2d3852',
       '--color-primary': '#60a5fa',
       '--color-secondary': '#38bdf8',
+      '--color-balance': '#647291',
       '--color-text-base': '#e5e9f0',
       '--color-text-muted': '#97a3b6',
       '--color-text-faint': '#6b7688',
@@ -119,6 +134,7 @@ export const BUILT_IN_PRESETS: ThemePreset[] = [
       '--color-surface-elevated': '#fffdf8',
       '--color-primary': '#2f5fd0',
       '--color-secondary': '#5e701b',
+      '--color-balance': '#7e7669',
       '--color-text-base': '#22201b',
       '--color-text-muted': '#57524a',
       '--color-text-faint': '#6d675c',
@@ -137,6 +153,7 @@ export const BUILT_IN_PRESETS: ThemePreset[] = [
       '--color-surface-elevated': '#463832',
       '--color-primary': '#f0955a',
       '--color-secondary': '#e8c468',
+      '--color-balance': '#877368',
       '--color-text-base': '#f5ede6',
       '--color-text-muted': '#b5a396',
       '--color-text-faint': '#8a7a6e',
