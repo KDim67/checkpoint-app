@@ -56,7 +56,7 @@ const SETTINGS_TABS: { tab: SettingsTab; label: string; keywords?: string[] }[] 
   { tab: 'features', label: 'Features & Plugins', keywords: ['toggles', 'extensions'] },
   { tab: 'notifications', label: 'Notifications', keywords: ['alerts', 'quiet hours', 'reminders'] },
   { tab: 'backup', label: 'Database Backup', keywords: ['snapshot', 'restore'] },
-  { tab: 'storage', label: 'Storage & Media', keywords: ['files', 'disk'] },
+  { tab: 'storage', label: 'Storage & Export', keywords: ['files', 'disk', 'export', 'csv', 'markdown', 'backup data'] },
   { tab: 'sync', label: 'P2P Network Sync', keywords: ['peer', 'lan', 'devices'] },
   { tab: 'mcp', label: 'MCP Server', keywords: ['agent', 'tools', 'activity'] },
   { tab: 'about', label: 'About' }

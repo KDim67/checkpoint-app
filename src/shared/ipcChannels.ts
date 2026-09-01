@@ -105,6 +105,9 @@ export const enum IpcChannels {
   /** Main → renderer: something outside the UI changed the data. */
   MCP_DATA_CHANGED       = 'mcp:dataChanged',
   MCP_ACTIVITY_LIST      = 'mcp:activityList',
+  // Export
+  EXPORT_ITEMS           = 'export:items',
+
   // Notifications
   NOTIFY_SEND            = 'notify:send',
   NOTIFY_GET_POLICY      = 'notify:getPolicy',
