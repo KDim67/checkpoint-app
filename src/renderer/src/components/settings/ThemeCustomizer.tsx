@@ -2,34 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { ToggleSwitch, Divider } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import ColorPicker from '../ui/ColorPicker'
-
-interface ThemeVariables {
-  '--color-background': string
-  '--color-surface-1': string
-  '--color-surface-2': string
-  '--color-surface-offset': string
-  '--color-surface-elevated': string
-  '--color-primary': string
-  '--color-secondary': string
-  '--color-text-base': string
-  '--color-text-muted': string
-  '--color-text-faint': string
-  '--font-sans': string
-}
-
-const DEFAULT_THEME: ThemeVariables = {
-  '--color-background': '#0b0c10',
-  '--color-surface-1': '#131622',
-  '--color-surface-2': '#1b1f30',
-  '--color-surface-offset': '#24293f',
-  '--color-surface-elevated': '#2e3450',
-  '--color-primary': '#1e45fc',
-  '--color-secondary': '#cdf12b',
-  '--color-text-base': '#f1f5f9',
-  '--color-text-muted': '#94a3b8',
-  '--color-text-faint': '#475569',
-  '--font-sans': "'Inter', sans-serif"
-}
+import ThemePresets from './ThemePresets'
+import {
+  DEFAULT_THEME,
+  THEME_VAR_NAMES,
+  deriveThemeVars,
+  type ThemeVariables
+} from '../../../../shared/themePresets'
 
 const COLOR_VARIABLE_LABELS: Record<Exclude<keyof ThemeVariables, '--font-sans'>, { label: string; desc: string }> = {
   '--color-background': { label: 'Canvas Background', desc: 'Base color for the entire workspace background.' },
@@ -65,7 +44,14 @@ export default function ThemeCustomizer() {
 
         const stored = await window.electronAPI.customizer.getTheme()
         if (stored && Object.keys(stored).length > 0) {
-          setThemeVars({ ...DEFAULT_THEME, ...stored })
+          // Only the canonical variables are kept in state. Earlier writes also
+          // stored the derived tints, and carrying those around meant a later
+          // save could persist a tint that no longer matched its source colour.
+          const next = { ...DEFAULT_THEME }
+          for (const key of THEME_VAR_NAMES) {
+            if (typeof stored[key] === 'string' && stored[key]) next[key] = stored[key]
+          }
+          setThemeVars(next)
         }
       } catch (err) {
         console.error('Failed to load customizer state:', err)
@@ -85,40 +71,33 @@ export default function ThemeCustomizer() {
     }
   }
 
-  const handleColorChange = async (name: Exclude<keyof ThemeVariables, '--font-sans'>, hex: string) => {
-    const updated = { ...themeVars, [name]: hex }
-    
-    // Auto-calculate helper opacity channels for primary & secondary
-    if (name === '--color-primary') {
-      // 15% opacity primary muted (26 in hex)
-      Object.assign(updated, { '--color-primary-muted': hex + '26' })
-    } else if (name === '--color-secondary') {
-      // 10% opacity secondary muted (1a in hex)
-      Object.assign(updated, { '--color-secondary-muted': hex + '1a', '--color-gold': hex })
-    }
-
-    setThemeVars(updated)
-
-    if (engineEnabled) {
-      try {
-        await window.electronAPI.customizer.updateTheme(updated)
-      } catch (err) {
-        console.error(err)
-      }
+  /**
+   * The single path from a variable change to the engine.
+   *
+   * The derived tints are expanded here rather than folded into state, so the
+   * colour picker, the font select and a preset all produce the same result, 
+   * previously only the picker derived them, which meant applying a saved set
+   * of variables left the old primary and secondary tints in place.
+   */
+  const applyVars = async (next: ThemeVariables) => {
+    setThemeVars(next)
+    if (!engineEnabled) return
+    try {
+      await window.electronAPI.customizer.updateTheme(deriveThemeVars(next))
+    } catch (err) {
+      console.error(err)
     }
   }
 
-  const handleFontChange = async (name: '--font-sans', value: string) => {
-    const updated = { ...themeVars, [name]: value }
-    setThemeVars(updated)
+  const handleColorChange = (name: Exclude<keyof ThemeVariables, '--font-sans'>, hex: string) =>
+    applyVars({ ...themeVars, [name]: hex })
 
-    if (engineEnabled) {
-      try {
-        await window.electronAPI.customizer.updateTheme(updated)
-      } catch (err) {
-        console.error(err)
-      }
-    }
+  const handleFontChange = (name: '--font-sans', value: string) =>
+    applyVars({ ...themeVars, [name]: value })
+
+  const handleApplyPreset = async (vars: ThemeVariables) => {
+    await applyVars(vars)
+    toast(engineEnabled ? 'Preset applied' : 'Preset loaded (enable the engine to apply it)')
   }
 
   const handleReset = async () => {
@@ -166,6 +145,10 @@ export default function ThemeCustomizer() {
         pointerEvents: engineEnabled ? 'auto' : 'none',
         transition: 'opacity 200ms ease'
       }}>
+        <ThemePresets vars={themeVars} onApply={handleApplyPreset} />
+
+        <Divider />
+
         <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
           Color Scheme Overrides
         </h4>
