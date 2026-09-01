@@ -52,11 +52,19 @@ export default function TrayPanel(): React.JSX.Element {
     applyStoredTheme()
     const stopWatching = watchTheme()
     load()
+
     // The window is reused between openings, so a mount-only read would be stale
     // the second time it is shown.
     window.addEventListener('focus', load)
+    // Counts move while the panel is open, a card completed in the main window,
+    // or an agent writing over MCP, and the switches are also shown in Settings.
+    const stopData = window.electronAPI.mcp.onDataChanged(load)
+    const stopStartup = window.electronAPI.tray.onStartupChanged(setStartup)
+
     return () => {
       stopWatching()
+      stopData()
+      stopStartup()
       window.removeEventListener('focus', load)
     }
   }, [load])

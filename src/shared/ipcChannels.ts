@@ -111,6 +111,8 @@ export const enum IpcChannels {
   TRAY_SUMMARY           = 'tray:summary',
   TRAY_ACTION            = 'tray:action',
   TRAY_RESIZE            = 'tray:resize',
+  /** Main → renderer: startup settings changed somewhere, re-read them. */
+  STARTUP_CHANGED        = 'startup:changed',
 
   // Subtasks
   SUBTASK_LIST           = 'subtask:list',

@@ -354,6 +354,12 @@ const api = {
       ipcRenderer.invoke(IpcChannels.TRAY_SUMMARY),
     action: (action: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.TRAY_ACTION, action),
+    /** Fires when the startup settings change in any window. */
+    onStartupChanged: (callback: (settings: StartupSettings) => void): (() => void) => {
+      const listener = (_e: IpcRendererEvent, settings: StartupSettings): void => callback(settings)
+      ipcRenderer.on(IpcChannels.STARTUP_CHANGED, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.STARTUP_CHANGED, listener)
+    },
     /** The panel measures its own content and asks to be sized to it. */
     resize: (height: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.TRAY_RESIZE, height),

@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './lib/fontScale'
+import { applyStoredTheme, watchTheme } from './lib/themeBoot'
 import Lightbox from './components/ui/Lightbox'
 import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
 import { getNumberSetting, setNumberSetting } from './lib/settings'
@@ -435,6 +436,7 @@ function applyGoogleFont(fontValue: string) {
 // These must be top-level components so the hooks inside App() are never
 // called conditionally (Rules of Hooks).
 function WidgetShell() {
+  useSatelliteTheme()
   return (
     <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <ErrorBoundary label="The widget">
@@ -447,6 +449,20 @@ function WidgetShell() {
  * The tray popup. No transparent wrapper: the panel draws its own rounded
  * surface and shadow, and a centring flex parent would letterbox it.
  */
+/**
+ * Applies the user's theme in a window that is not the main one.
+ *
+ * These shells are separate renderer instances that never run App's startup
+ * effect, so without this they render the shipped dark palette however the app
+ * is themed, which is why quick capture stayed dark under a custom theme.
+ */
+function useSatelliteTheme(): void {
+  useEffect(() => {
+    applyStoredTheme()
+    return watchTheme()
+  }, [])
+}
+
 function TrayShell() {
   return (
     <ErrorBoundary label="The tray panel">
@@ -455,6 +471,7 @@ function TrayShell() {
   )
 }
 function HudShell() {
+  useSatelliteTheme()
   return (
     <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <ErrorBoundary label="Quick capture">
