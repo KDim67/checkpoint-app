@@ -102,9 +102,10 @@ export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
  * for a control that exists.
  *
  * The set is chosen to span lighting conditions rather than to collect hues:
- * two light themes (warm Paper and Clay, cool Daylight) and five darks (cool
- * Midnight, warm Ember, green Forest, violet Amethyst, and Ink for OLED panels
- * where a true black costs no backlight).
+ * eight light themes, Paper, Clay, Beige, Sakura and Cherry Cream for warm,
+ * Sage for green, Daylight for cool, Fog for neutral, and eight darks: cool
+ * Midnight, warm Ember, red Cherry, green Forest, violet Amethyst, teal Ocean,
+ * vivid Neon, and Ink for OLED panels where a true black costs no backlight.
  *
  * Every one is held to the same readability bar as the shipped palette, body
  * text above 7:1 on its own surfaces, accents above 4.5:1, and the test in
@@ -261,6 +262,158 @@ export const BUILT_IN_PRESETS: ThemePreset[] = [
       '--color-text-base': '#241d17',
       '--color-text-muted': '#5a4d40',
       '--color-text-faint': '#6d5f50',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-beige',
+    name: 'Beige',
+    builtIn: true,
+    vars: {
+      '--color-background': '#e6dcc8',
+      '--color-surface-1': '#f5efe1',
+      '--color-surface-2': '#dcd0b8',
+      '--color-surface-offset': '#c9bb9e',
+      '--color-surface-elevated': '#f5efe1',
+      '--color-primary': '#6b4423',
+      '--color-secondary': '#575d31',
+      '--color-balance': '#7d735f',
+      '--color-text-base': '#2b2318',
+      '--color-text-muted': '#574c3a',
+      '--color-text-faint': '#6a5e49',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-cherry',
+    name: 'Cherry',
+    builtIn: true,
+    vars: {
+      '--color-background': '#150a0d',
+      '--color-surface-1': '#211116',
+      '--color-surface-2': '#2d171d',
+      '--color-surface-offset': '#3d2028',
+      '--color-surface-elevated': '#4d2934',
+      '--color-primary': '#ff6b81',
+      '--color-secondary': '#f0a868',
+      '--color-balance': '#8f5f6b',
+      '--color-text-base': '#f8e9ec',
+      '--color-text-muted': '#c9a5ad',
+      '--color-text-faint': '#a4838b',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-ocean',
+    name: 'Ocean',
+    builtIn: true,
+    vars: {
+      '--color-background': '#06121a',
+      '--color-surface-1': '#0d1e2a',
+      '--color-surface-2': '#142a38',
+      '--color-surface-offset': '#1e3a4c',
+      '--color-surface-elevated': '#274b61',
+      '--color-primary': '#2dd4bf',
+      '--color-secondary': '#7dd3fc',
+      '--color-balance': '#5f8497',
+      '--color-text-base': '#e2f1f7',
+      '--color-text-muted': '#a0bcc9',
+      '--color-text-faint': '#7f9dab',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-fog',
+    name: 'Fog',
+    builtIn: true,
+    vars: {
+      '--color-background': '#e9eaec',
+      '--color-surface-1': '#f8f9fa',
+      '--color-surface-2': '#dfe1e4',
+      '--color-surface-offset': '#cbced3',
+      '--color-surface-elevated': '#f8f9fa',
+      '--color-primary': '#2b4a9b',
+      '--color-secondary': '#4f6347',
+      '--color-balance': '#7a7f89',
+      '--color-text-base': '#1b1d21',
+      '--color-text-muted': '#4b5058',
+      '--color-text-faint': '#5c626b',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-sakura',
+    name: 'Sakura',
+    builtIn: true,
+    vars: {
+      '--color-background': '#f7edf0',
+      '--color-surface-1': '#fffafb',
+      '--color-surface-2': '#f0e0e5',
+      '--color-surface-offset': '#e2ccd4',
+      '--color-surface-elevated': '#fffafb',
+      '--color-primary': '#a8325c',
+      '--color-secondary': '#4f6280',
+      '--color-balance': '#8f7b84',
+      '--color-text-base': '#2a1d22',
+      '--color-text-muted': '#5c4a51',
+      '--color-text-faint': '#6e5b63',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-cherry-cream',
+    name: 'Cherry Cream',
+    builtIn: true,
+    vars: {
+      '--color-background': '#ece0d2',
+      '--color-surface-1': '#faf3e9',
+      '--color-surface-2': '#e0d2c0',
+      '--color-surface-offset': '#cdbca6',
+      '--color-surface-elevated': '#faf3e9',
+      '--color-primary': '#a3123a',
+      '--color-secondary': '#6f5137',
+      '--color-balance': '#867260',
+      '--color-text-base': '#2c211a',
+      '--color-text-muted': '#59473a',
+      '--color-text-faint': '#6b5747',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-sage',
+    name: 'Sage',
+    builtIn: true,
+    vars: {
+      '--color-background': '#e8eee6',
+      '--color-surface-1': '#f7faf5',
+      '--color-surface-2': '#dde5da',
+      '--color-surface-offset': '#c9d4c5',
+      '--color-surface-elevated': '#f7faf5',
+      '--color-primary': '#2f6b4f',
+      '--color-secondary': '#7a5c1f',
+      '--color-balance': '#75837a',
+      '--color-text-base': '#1c231e',
+      '--color-text-muted': '#4a5850',
+      '--color-text-faint': '#5b6a61',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-neon',
+    name: 'Neon',
+    builtIn: true,
+    vars: {
+      '--color-background': '#0a0713',
+      '--color-surface-1': '#140d24',
+      '--color-surface-2': '#1d1333',
+      '--color-surface-offset': '#2a1c48',
+      '--color-surface-elevated': '#382660',
+      '--color-primary': '#ff4ecd',
+      '--color-secondary': '#4ee2ff',
+      '--color-balance': '#7a68a6',
+      '--color-text-base': '#f2e9ff',
+      '--color-text-muted': '#b8a7d8',
+      '--color-text-faint': '#9788bd',
       '--font-sans': "'Inter', sans-serif"
     }
   }
