@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2 } from 'lucide-react'
+import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2, Repeat } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { Item, Tag as TagType } from '../../../shared/types'
 import BacklogFilters from './backlog/BacklogFilters'
@@ -12,6 +12,7 @@ import { useToast } from './ui/Toast'
 import { loadBoardConfig } from '../lib/boardConfig'
 import StandupTranslatorView from './StandupTranslatorView'
 import ConfirmDialog from './ui/ConfirmDialog'
+import RecurringPanel from './backlog/RecurringPanel'
 
 interface WorkflowColumn {
   id: string
@@ -20,6 +21,7 @@ interface WorkflowColumn {
 
 export default function BacklogView() {
   const activeContext = useAppStore(s => s.activeContext)
+  const [showRecurring, setShowRecurring] = useState(false)
   const { toast } = useToast()
 
   // Items and Schema configurations
@@ -831,6 +833,25 @@ export default function BacklogView() {
           />
         </div>
       )}
+
+      <div style={{ flexShrink: 0, marginBottom: showRecurring ? 'var(--space-3)' : 0 }}>
+        <button
+          onClick={() => setShowRecurring(v => !v)}
+          aria-expanded={showRecurring}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: 'var(--space-1) 0', marginBottom: 'var(--space-1)',
+            fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)'
+          }}
+        >
+          <Repeat size={13} />
+          Repeating tasks
+        </button>
+        {showRecurring && (
+          <RecurringPanel context={activeContext} onChanged={loadTasks} />
+        )}
+      </div>
 
       {/* Main registry Table area */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>

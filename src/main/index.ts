@@ -631,6 +631,46 @@ function registerIpcHandlers(): void {
 
   // Handled here rather than in mcpServer.ts so the log stays readable and
   // reversible while the server itself is switched off.
+  ipcMain.handle(IpcChannels.RECURRENCE_LIST, async (_event, context?: string) => {
+    const { getRecurrences } = await import('./db')
+    const { ruleFromRow } = await import('./recurrenceService')
+    const { describeRule } = await import('../shared/recurrence')
+    return getRecurrences(context).map(row => {
+      const rule = ruleFromRow(row)
+      return {
+        id: row.id,
+        context: row.context,
+        title: row.title,
+        type: row.type,
+        active: row.active === 1,
+        nextDue: row.next_due,
+        description: rule ? describeRule(rule) : 'Unreadable rule'
+      }
+    })
+  })
+
+  ipcMain.handle(IpcChannels.RECURRENCE_CREATE, async (_event, input: unknown) => {
+    const { createRecurrence, materialiseDueRecurrences } = await import('./recurrenceService')
+    const row = createRecurrence(input as Parameters<typeof createRecurrence>[0])
+    if (!row) return { ok: false, reason: 'That repeat rule could not be understood.' }
+    // Swept at once so a rule that is already due produces its first item now
+    // rather than on the next hourly pass.
+    materialiseDueRecurrences()
+    return { ok: true, id: row.id }
+  })
+
+  ipcMain.handle(IpcChannels.RECURRENCE_DELETE, async (_event, id: string) => {
+    const { deleteRecurrence } = await import('./db')
+    deleteRecurrence(id)
+    return { ok: true }
+  })
+
+  ipcMain.handle(IpcChannels.RECURRENCE_SET_ACTIVE, async (_event, id: string, active: boolean) => {
+    const { setRecurrenceActive } = await import('./db')
+    setRecurrenceActive(id, active)
+    return { ok: true }
+  })
+
   ipcMain.handle(IpcChannels.MCP_ACTIVITY_LIST, async (_event, limit?: number) => {
     const { listMcpActivity } = await import('./mcpActivity')
     return listMcpActivity(typeof limit === 'number' ? limit : 50)
@@ -1297,6 +1337,23 @@ app.whenReady().then(async () => {
 
   // Register application hotkeys (HUD & Clipboard)
   registerAppShortcuts()
+
+  // Recurring work: sweep at startup, then hourly. Completing an instance also
+  // advances its rule immediately, wired through the db handler below.
+  try {
+    const { initializeRecurrenceScheduler, setRecurrenceSpawnHandler, onInstanceClosed } =
+      await import('./recurrenceService')
+    const { setRecurrenceInstanceClosedHandler } = await import('./db')
+    setRecurrenceSpawnHandler(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
+      }
+    })
+    setRecurrenceInstanceClosedHandler(onInstanceClosed)
+    initializeRecurrenceScheduler()
+  } catch (err) {
+    console.error('Failed to start the recurrence scheduler:', err)
+  }
 
   // The widget is a BrowserWindow, so it cannot outlive the process. Without
   // this the stored widget_enabled flag described a window that no longer

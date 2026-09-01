@@ -87,7 +87,7 @@ export function getDb(): Database.Database {
 }
 
 // Current schema version
-const CURRENT_VERSION = 7
+const CURRENT_VERSION = 8
 
 // Prepared statement cache (populated by initDb)
 /**
@@ -208,7 +208,26 @@ function runMigrations(db: Database.Database): void {
       // Same DDL as SCHEMA_SQL. Existing databases predate the MCP server
       // keeping any record of what it changed.
       db.exec(`
-        CREATE TABLE IF NOT EXISTS mcp_activity (
+        CREATE TABLE IF NOT EXISTS recurrences (
+  id           TEXT PRIMARY KEY,
+  context      TEXT NOT NULL,
+  type         TEXT NOT NULL DEFAULT 'task',
+  title        TEXT NOT NULL,
+  body         TEXT NOT NULL DEFAULT '',
+  status       TEXT NOT NULL DEFAULT 'open',
+  priority     INTEGER NOT NULL DEFAULT 2,
+  freq         TEXT NOT NULL,
+  interval     INTEGER NOT NULL DEFAULT 1,
+  by_weekday   TEXT NOT NULL DEFAULT '[]',
+  start_at     INTEGER NOT NULL,
+  until_at     INTEGER,
+  next_due     INTEGER,
+  active       INTEGER NOT NULL DEFAULT 1,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_recurrences_context ON recurrences(context);
+CREATE INDEX IF NOT EXISTS idx_recurrences_due ON recurrences(active, next_due);
+CREATE TABLE IF NOT EXISTS mcp_activity (
           id          TEXT PRIMARY KEY,
           tool        TEXT NOT NULL,
           context     TEXT,
@@ -219,6 +238,28 @@ function runMigrations(db: Database.Database): void {
         );
         CREATE INDEX IF NOT EXISTS idx_mcp_activity_created ON mcp_activity(created_at DESC);
       `)
+    }
+    if (userVersion < 8) {
+      // Same DDL as SCHEMA_SQL.
+      db.exec(`CREATE TABLE IF NOT EXISTS recurrences (
+  id           TEXT PRIMARY KEY,
+  context      TEXT NOT NULL,
+  type         TEXT NOT NULL DEFAULT 'task',
+  title        TEXT NOT NULL,
+  body         TEXT NOT NULL DEFAULT '',
+  status       TEXT NOT NULL DEFAULT 'open',
+  priority     INTEGER NOT NULL DEFAULT 2,
+  freq         TEXT NOT NULL,
+  interval     INTEGER NOT NULL DEFAULT 1,
+  by_weekday   TEXT NOT NULL DEFAULT '[]',
+  start_at     INTEGER NOT NULL,
+  until_at     INTEGER,
+  next_due     INTEGER,
+  active       INTEGER NOT NULL DEFAULT 1,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_recurrences_context ON recurrences(context);
+CREATE INDEX IF NOT EXISTS idx_recurrences_due ON recurrences(active, next_due);`)
     }
     db.pragma(`user_version = ${CURRENT_VERSION}`)
   })()
@@ -664,7 +705,39 @@ export function updateItem(
   }
 
   const row = stmtGetItemById.get(id) as Record<string, unknown>
-  return rowToItem(row)
+  const item = rowToItem(row)
+
+  // Only on the transition into a finished state, so repeated edits to an
+  // already-done item do not each try to advance the rule.
+  const wasOpen = existing.status !== 'done' && existing.status !== 'archived'
+  const nowClosed = item.status === 'done' || item.status === 'archived'
+  if (wasOpen && nowClosed && onRecurrenceInstanceClosed) {
+    try {
+      const meta = JSON.parse(item.metadata || '{}') as { recurrenceId?: unknown }
+      if (typeof meta.recurrenceId === 'string' && meta.recurrenceId) {
+        onRecurrenceInstanceClosed(meta.recurrenceId)
+      }
+    } catch {
+      // Metadata that is not JSON simply has no recurrence to advance.
+    }
+  }
+
+  return item
+}
+
+let onRecurrenceInstanceClosed: ((recurrenceId: string) => void) | null = null
+
+/**
+ * Called when an item belonging to a recurrence reaches a finished state.
+ *
+ * Wired up from index.ts. Without it the next occurrence would still appear, but
+ * only on the next hourly sweep, completing today's task should offer
+ * tomorrow's straight away.
+ */
+export function setRecurrenceInstanceClosedHandler(
+  handler: ((recurrenceId: string) => void) | null
+): void {
+  onRecurrenceInstanceClosed = handler
 }
 
 export function recordTombstone(id: string, tableName: string): void {
@@ -949,6 +1022,88 @@ export function markMcpActivityUndone(id: string, at: number): boolean {
     .prepare(`UPDATE mcp_activity SET undone_at = ? WHERE id = ? AND undone_at IS NULL`)
     .run(at, id)
   return result.changes > 0
+}
+
+export interface RecurrenceRow {
+  id: string
+  context: string
+  type: string
+  title: string
+  body: string
+  status: string
+  priority: number
+  freq: string
+  interval: number
+  by_weekday: string
+  start_at: number
+  until_at: number | null
+  next_due: number | null
+  active: number
+  created_at: number
+}
+
+export function insertRecurrence(row: RecurrenceRow): void {
+  getDb()
+    .prepare(
+      `INSERT INTO recurrences (id, context, type, title, body, status, priority, freq, interval,
+                                by_weekday, start_at, until_at, next_due, active, created_at)
+       VALUES (@id, @context, @type, @title, @body, @status, @priority, @freq, @interval,
+               @by_weekday, @start_at, @until_at, @next_due, @active, @created_at)`
+    )
+    .run(row)
+}
+
+export function getRecurrences(context?: string): RecurrenceRow[] {
+  const db = getDb()
+  return (context
+    ? db.prepare(`SELECT * FROM recurrences WHERE context = ? ORDER BY created_at DESC`).all(context)
+    : db.prepare(`SELECT * FROM recurrences ORDER BY created_at DESC`).all()) as RecurrenceRow[]
+}
+
+export function getRecurrenceById(id: string): RecurrenceRow | null {
+  return (getDb().prepare(`SELECT * FROM recurrences WHERE id = ?`).get(id) as RecurrenceRow | undefined) ?? null
+}
+
+/** Active rules whose next occurrence has come due. */
+export function getDueRecurrences(now: number): RecurrenceRow[] {
+  return getDb()
+    .prepare(`SELECT * FROM recurrences WHERE active = 1 AND next_due IS NOT NULL AND next_due <= ? ORDER BY next_due`)
+    .all(now) as RecurrenceRow[]
+}
+
+export function setRecurrenceNextDue(id: string, nextDue: number | null): void {
+  // A rule with no further occurrences is deactivated rather than deleted, so
+  // the instances it already produced keep something to point back at.
+  getDb()
+    .prepare(`UPDATE recurrences SET next_due = ?, active = ? WHERE id = ?`)
+    .run(nextDue, nextDue === null ? 0 : 1, id)
+}
+
+export function setRecurrenceActive(id: string, active: boolean): void {
+  getDb().prepare(`UPDATE recurrences SET active = ? WHERE id = ?`).run(active ? 1 : 0, id)
+}
+
+export function deleteRecurrence(id: string): void {
+  getDb().prepare(`DELETE FROM recurrences WHERE id = ?`).run(id)
+}
+
+/**
+ * True when an unfinished instance of this rule already exists.
+ *
+ * This is what bounds the items table: a rule spawns its next occurrence only
+ * once the previous one is done or archived, so a daily task left untouched for
+ * a month produces one card, not thirty.
+ */
+export function hasOpenRecurrenceInstance(recurrenceId: string): boolean {
+  const row = getDb()
+    .prepare(
+      `SELECT 1 FROM items
+       WHERE status NOT IN ('done', 'archived')
+         AND json_extract(metadata, '$.recurrenceId') = ?
+       LIMIT 1`
+    )
+    .get(recurrenceId)
+  return row !== undefined
 }
 
 /** Drops entries older than the cutoff. The log is a convenience, not an audit. */

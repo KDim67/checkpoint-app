@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { McpActivityEntry } from '../shared/mcpActivity'
+
+import type { RecurrenceSummary } from '../shared/recurrence'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type {
   Item,
@@ -342,6 +344,25 @@ const api = {
       ipcRenderer.on(IpcChannels.WEBHOOK_EVENT, handler)
       return () => ipcRenderer.removeListener(IpcChannels.WEBHOOK_EVENT, handler)
     }
+  },
+
+  recurrence: {
+    list: (context?: string): Promise<RecurrenceSummary[]> =>
+      ipcRenderer.invoke(IpcChannels.RECURRENCE_LIST, context),
+    create: (input: {
+      context: string
+      title: string
+      body?: string
+      type?: 'card' | 'task'
+      status?: string
+      priority?: number
+      rule: { freq: string; interval?: number; byWeekday?: number[]; startAt: number; untilAt?: number | null }
+    }): Promise<{ ok: boolean; id?: string; reason?: string }> =>
+      ipcRenderer.invoke(IpcChannels.RECURRENCE_CREATE, input),
+    remove: (id: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.RECURRENCE_DELETE, id),
+    setActive: (id: string, active: boolean): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.RECURRENCE_SET_ACTIVE, id, active)
   },
 
   mcp: {

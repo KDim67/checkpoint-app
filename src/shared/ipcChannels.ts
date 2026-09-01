@@ -105,6 +105,11 @@ export const enum IpcChannels {
   /** Main → renderer: something outside the UI changed the data. */
   MCP_DATA_CHANGED       = 'mcp:dataChanged',
   MCP_ACTIVITY_LIST      = 'mcp:activityList',
+  // Recurring work
+  RECURRENCE_LIST        = 'recurrence:list',
+  RECURRENCE_CREATE      = 'recurrence:create',
+  RECURRENCE_DELETE      = 'recurrence:delete',
+  RECURRENCE_SET_ACTIVE  = 'recurrence:setActive',
   MCP_ACTIVITY_UNDO      = 'mcp:activityUndo',
 
   // Backup
