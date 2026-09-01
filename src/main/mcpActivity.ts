@@ -12,6 +12,8 @@ import { v4 as uuidv4 } from 'uuid'
 import {
   deleteItem,
   deleteRecurrence,
+  deleteSubtask,
+  updateSubtask,
   deleteRelation,
   deleteTag,
   getMcpActivity,
@@ -95,6 +97,12 @@ function runUndoAction(action: McpUndoAction): void {
       break
     case 'delete_recurrence':
       deleteRecurrence(action.id)
+      break
+    case 'delete_subtask':
+      deleteSubtask(action.id)
+      break
+    case 'set_subtask_done':
+      updateSubtask(action.id, { done: action.done })
       break
     case 'board_ops':
       applyBoardUndo(action)

@@ -87,7 +87,7 @@ export function getDb(): Database.Database {
 }
 
 // Current schema version
-const CURRENT_VERSION = 8
+const CURRENT_VERSION = 9
 
 // Prepared statement cache (populated by initDb)
 /**
@@ -208,7 +208,17 @@ function runMigrations(db: Database.Database): void {
       // Same DDL as SCHEMA_SQL. Existing databases predate the MCP server
       // keeping any record of what it changed.
       db.exec(`
-        CREATE TABLE IF NOT EXISTS recurrences (
+        CREATE TABLE IF NOT EXISTS subtasks (
+  id          TEXT PRIMARY KEY,
+  item_id     TEXT NOT NULL,
+  title       TEXT NOT NULL,
+  done        INTEGER NOT NULL DEFAULT 0,
+  position    REAL NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL,
+  FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_subtasks_item ON subtasks(item_id, position);
+CREATE TABLE IF NOT EXISTS recurrences (
   id           TEXT PRIMARY KEY,
   context      TEXT NOT NULL,
   type         TEXT NOT NULL DEFAULT 'task',
@@ -260,6 +270,20 @@ CREATE TABLE IF NOT EXISTS mcp_activity (
 );
 CREATE INDEX IF NOT EXISTS idx_recurrences_context ON recurrences(context);
 CREATE INDEX IF NOT EXISTS idx_recurrences_due ON recurrences(active, next_due);`)
+    }
+    if (userVersion < 9) {
+      // Same DDL as SCHEMA_SQL. Subtasks previously lived as markdown checkboxes
+      // inside a task body; those are converted on request, not automatically.
+      db.exec(`CREATE TABLE IF NOT EXISTS subtasks (
+  id          TEXT PRIMARY KEY,
+  item_id     TEXT NOT NULL,
+  title       TEXT NOT NULL,
+  done        INTEGER NOT NULL DEFAULT 0,
+  position    REAL NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL,
+  FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_subtasks_item ON subtasks(item_id, position);`)
     }
     db.pragma(`user_version = ${CURRENT_VERSION}`)
   })()
@@ -991,6 +1015,66 @@ export function createRelation(fromId: string, toId: string, type: RelationType)
 export function deleteRelation(id: string): void {
   recordTombstone(id, 'relations')
   stmtDeleteRelation.run(id)
+}
+
+// Subtasks
+
+export interface SubtaskRow {
+  id: string
+  item_id: string
+  title: string
+  done: number
+  position: number
+  created_at: number
+}
+
+export function getSubtasks(itemId: string): SubtaskRow[] {
+  return getDb()
+    .prepare(`SELECT * FROM subtasks WHERE item_id = ? ORDER BY position, created_at`)
+    .all(itemId) as SubtaskRow[]
+}
+
+/**
+ * Counts for many parents at once.
+ *
+ * A row-by-row query would be one round trip per task in the table, which is
+ * what makes a progress column too slow to be worth showing.
+ */
+export function getSubtaskCounts(itemIds: string[]): Map<string, { total: number; done: number }> {
+  const out = new Map<string, { total: number; done: number }>()
+  if (itemIds.length === 0) return out
+  const rows = getDb()
+    .prepare(
+      `SELECT item_id, COUNT(*) as total, SUM(done) as done
+       FROM subtasks WHERE item_id IN (${itemIds.map(() => '?').join(',')})
+       GROUP BY item_id`
+    )
+    .all(...itemIds) as { item_id: string; total: number; done: number | null }[]
+  for (const row of rows) out.set(row.item_id, { total: row.total, done: row.done ?? 0 })
+  return out
+}
+
+export function insertSubtask(row: SubtaskRow): void {
+  getDb()
+    .prepare(
+      `INSERT INTO subtasks (id, item_id, title, done, position, created_at)
+       VALUES (@id, @item_id, @title, @done, @position, @created_at)`
+    )
+    .run(row)
+}
+
+export function updateSubtask(id: string, patch: { title?: string; done?: boolean; position?: number }): void {
+  const sets: string[] = []
+  const args: Record<string, unknown> = { id }
+  if (patch.title !== undefined) { sets.push('title = @title'); args.title = patch.title }
+  if (patch.done !== undefined) { sets.push('done = @done'); args.done = patch.done ? 1 : 0 }
+  if (patch.position !== undefined) { sets.push('position = @position'); args.position = patch.position }
+  if (sets.length === 0) return
+  getDb().prepare(`UPDATE subtasks SET ${sets.join(', ')} WHERE id = @id`).run(args)
+}
+
+export function deleteSubtask(id: string): void {
+  getDb().prepare(`DELETE FROM subtasks WHERE id = ?`).run(id)
 }
 
 // MCP activity

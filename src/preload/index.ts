@@ -4,6 +4,7 @@ import type { McpActivityEntry } from '../shared/mcpActivity'
 
 import type { RecurrenceSummary } from '../shared/recurrence'
 import type { NotificationCategory, NotificationPolicy } from '../shared/notificationPolicy'
+import type { Subtask } from '../shared/subtasks'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type {
   Item,
@@ -345,6 +346,18 @@ const api = {
       ipcRenderer.on(IpcChannels.WEBHOOK_EVENT, handler)
       return () => ipcRenderer.removeListener(IpcChannels.WEBHOOK_EVENT, handler)
     }
+  },
+
+  subtasks: {
+    list: (itemId: string): Promise<Subtask[]> => ipcRenderer.invoke(IpcChannels.SUBTASK_LIST, itemId),
+    add: (itemId: string, title: string): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke(IpcChannels.SUBTASK_ADD, itemId, title),
+    update: (id: string, patch: { title?: string; done?: boolean; position?: number }): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.SUBTASK_UPDATE, id, patch),
+    remove: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke(IpcChannels.SUBTASK_DELETE, id),
+    /** Converts the markdown checkboxes in a task body into real subtasks. */
+    convert: (itemId: string): Promise<{ ok: boolean; converted?: number; reason?: string }> =>
+      ipcRenderer.invoke(IpcChannels.SUBTASK_CONVERT, itemId)
   },
 
   exporter: {
