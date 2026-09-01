@@ -10,10 +10,20 @@ this category does: features that give the agent more to work with compound,
 because they land twice, once for the user, once for anything driving the app
 from outside.
 
-Each entry was checked against the codebase before being listed. Notes already
-have backlinks (`NotesView.tsx:356`), so wiki-linking is not a gap; subtasks
-exist only as markdown checkboxes appended to a task body
-(`TaskDetailDrawer.tsx:56`), so they are a partial.
+Each entry was checked against the codebase before being listed, with two
+exceptions found later, recorded below, so this document is read with the right
+amount of trust.
+
+**Corrections.** The first version of this list claimed a note graph view and
+card/note templates were missing. Both already existed: `notes/GraphView.tsx`
+is a force-directed graph rendered in NotesView, `NOTE_TEMPLATES` in
+`notesUtils.ts` covers notes, and any card can be marked a template from the
+card detail modal and instantiated from the board. They were the two entries
+written without a grep to back them.
+
+Verified: notes already have backlinks (`NotesView.tsx:356`), so wiki-linking is
+not a gap; subtasks existed only as markdown checkboxes appended to a task body
+(`TaskDetailDrawer.tsx:56`) and are now first-class rows.
 
 ---
 
@@ -106,10 +116,9 @@ back out is asking for a leap of faith it has not earned. Cheap insurance.
 - **Time estimates vs. actuals.** Focus sessions already record real time spent;
   adding an estimate turns that into calibration data. Small, and analytics has
   somewhere to put it.
-- **Note graph view.** Backlinks exist, so the edges are already computed. This
-  is visualisation only, genuinely nice, genuinely optional.
-- **Templates** for cards, notes, and projects. Modest win on its own; better
-  once recurring tasks exist, since the two share machinery.
+- **Project templates**, creating a whole board, or a set of related cards, in
+  one action. Card and note templates already exist and are one-at-a-time; this
+  is the part that does not.
 
 ---
 
