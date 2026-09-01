@@ -630,6 +630,8 @@ const api = {
       ipcRenderer.invoke('customizer:getEngineState'),
     updateTheme: (vars: Record<string, string>): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_UPDATE_THEME, vars),
+    /** The CSS to apply right now. Empty when the engine is off. */
+    getCss: (): Promise<string> => ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_CSS),
     getTheme: (): Promise<Record<string, string>> =>
       ipcRenderer.invoke('customizer:getTheme'),
     getPlugins: (): Promise<PluginInfo[]> =>

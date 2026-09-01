@@ -672,6 +672,15 @@ function registerIpcHandlers(): void {
 
   // Handled here rather than in mcpServer.ts so the log stays readable and
   // reversible while the server itself is switched off.
+  ipcMain.handle(IpcChannels.CUSTOMIZER_GET_CSS, async () => {
+    const { getSetting } = await import('./db')
+    // Silent when the engine is off: the stored variables should not apply until
+    // the user turns it back on.
+    if (getSetting<string>('customizer_enabled', 'false') !== 'true') return ''
+    const { resolveThemeCss } = await import('./customizer')
+    return resolveThemeCss()
+  })
+
   ipcMain.handle(IpcChannels.STARTUP_GET, async () => {
     const { getStartupSettings } = await import('./tray')
     return getStartupSettings()

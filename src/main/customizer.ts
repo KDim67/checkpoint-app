@@ -19,6 +19,32 @@ function getThemePath(): string {
   return join(getConfigDir(), 'theme.css')
 }
 
+/**
+ * The CSS the engine should currently be applying, or '' when it should apply
+ * none.
+ *
+ * Pulled out of enableCustomizer because a broadcast is only heard by windows
+ * that already exist and have already subscribed. At startup neither is true, 
+ * the engine initialises before React mounts, so the stored theme was being
+ * sent to nobody and the app painted its defaults. Renderers now ask for this on
+ * mount, which works no matter the ordering.
+ */
+export function resolveThemeCss(): string {
+  try {
+    const rawVars = getSetting<string>('customizer_theme_vars', '{}')
+    const vars = JSON.parse(rawVars)
+    const css = buildCssVariablesString(vars)
+    if (css) return css
+
+    // No stored variables: fall back to a hand-written theme.css if present.
+    const themePath = getThemePath()
+    if (existsSync(themePath)) return readFileSync(themePath, 'utf8')
+  } catch (err) {
+    console.error('[customizer] Could not resolve the current theme:', err)
+  }
+  return ''
+}
+
 /** Broadcasts a CSS string to all open renderer windows. */
 export function broadcastTheme(css: string): void {
   BrowserWindow.getAllWindows().forEach(win => {
@@ -76,22 +102,14 @@ export async function enableCustomizer(): Promise<void> {
 
   ensurePluginsDir()
   const configDir = getConfigDir()
-  const themePath = getThemePath()
 
-  // 1. Load custom theme variables if defined in DB
+  // 1. Apply the stored theme. The broadcast is kept for windows that are
+  //    already open; a window opening later fetches the same CSS on mount.
   try {
-    const rawVars = getSetting<string>('customizer_theme_vars', '{}')
-    const vars = JSON.parse(rawVars)
-    const css = buildCssVariablesString(vars)
+    const css = resolveThemeCss()
     if (css) {
-      console.log(`[customizer] Injecting stored theme variables (${Object.keys(vars).length} vars)`)
       broadcastTheme(css)
-      updateTitleBarOverlay(vars)
-    } else if (existsSync(themePath)) {
-      // Fallback to theme.css file if it exists
-      const fileCss = readFileSync(themePath, 'utf8')
-      broadcastTheme(fileCss)
-      updateTitleBarOverlay(parseVarsFromCss(fileCss))
+      updateTitleBarOverlay(parseVarsFromCss(css))
     }
   } catch (err) {
     console.error('[customizer] Failed to load initial custom theme variables:', err)

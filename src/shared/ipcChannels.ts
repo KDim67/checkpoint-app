@@ -160,6 +160,8 @@ export const enum IpcChannels {
   CUSTOMIZER_TOGGLE_PLUGIN       = 'customizer:togglePlugin',
   CUSTOMIZER_OPEN_PLUGINS_FOLDER = 'customizer:openPluginsFolder',
   CUSTOMIZER_UPDATE_THEME        = 'customizer:updateTheme',
+  /** Renderer asks for the theme CSS to apply now, rather than awaiting a push. */
+  CUSTOMIZER_GET_CSS             = 'customizer:getCss',
   CUSTOMIZER_REGISTER_SHORTCUTS  = 'customizer:registerShortcuts',
 
   // Cheatsheets
