@@ -99,8 +99,17 @@ export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
  *
  * Deliberately not a copy of DEFAULT_THEME, "Reset to Defaults" already covers
  * going back, so a preset that only restored the brand would be a second button
- * for a control that exists. These are three genuinely different looks, each
- * with its body text kept well clear of its own canvas so none ships unreadable.
+ * for a control that exists.
+ *
+ * The set is chosen to span lighting conditions rather than to collect hues:
+ * two light themes (warm Paper and Clay, cool Daylight) and five darks (cool
+ * Midnight, warm Ember, green Forest, violet Amethyst, and Ink for OLED panels
+ * where a true black costs no backlight).
+ *
+ * Every one is held to the same readability bar as the shipped palette, body
+ * text above 7:1 on its own surfaces, accents above 4.5:1, and the test in
+ * tests/themePresets.ts enforces it, so none of them can ship unreadable. Clay's
+ * accent and Paper's were both darkened to clear it.
  */
 export const BUILT_IN_PRESETS: ThemePreset[] = [
   {
@@ -157,6 +166,101 @@ export const BUILT_IN_PRESETS: ThemePreset[] = [
       '--color-text-base': '#f5ede6',
       '--color-text-muted': '#b5a396',
       '--color-text-faint': '#8a7a6e',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-forest',
+    name: 'Forest',
+    builtIn: true,
+    vars: {
+      '--color-background': '#0b1210',
+      '--color-surface-1': '#121b18',
+      '--color-surface-2': '#1a2521',
+      '--color-surface-offset': '#24332d',
+      '--color-surface-elevated': '#2d3f38',
+      '--color-primary': '#5eead4',
+      '--color-secondary': '#a3e635',
+      '--color-balance': '#6b8a7d',
+      '--color-text-base': '#e6f0ec',
+      '--color-text-muted': '#9db5ab',
+      '--color-text-faint': '#7a958a',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-amethyst',
+    name: 'Amethyst',
+    builtIn: true,
+    vars: {
+      '--color-background': '#0d0a14',
+      '--color-surface-1': '#171223',
+      '--color-surface-2': '#1f1830',
+      '--color-surface-offset': '#2b2140',
+      '--color-surface-elevated': '#372a52',
+      '--color-primary': '#a78bfa',
+      '--color-secondary': '#f0abfc',
+      '--color-balance': '#7d6ea6',
+      '--color-text-base': '#ece8f5',
+      '--color-text-muted': '#aca0c8',
+      '--color-text-faint': '#8a7cae',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-daylight',
+    name: 'Daylight',
+    builtIn: true,
+    vars: {
+      '--color-background': '#eef1f6',
+      '--color-surface-1': '#ffffff',
+      '--color-surface-2': '#e6ebf3',
+      '--color-surface-offset': '#d3dbe8',
+      '--color-surface-elevated': '#ffffff',
+      '--color-primary': '#1d4ed8',
+      '--color-secondary': '#0f766e',
+      '--color-balance': '#7286a1',
+      '--color-text-base': '#0f172a',
+      '--color-text-muted': '#475569',
+      '--color-text-faint': '#5d6b7d',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-ink',
+    name: 'Ink',
+    builtIn: true,
+    vars: {
+      '--color-background': '#000000',
+      '--color-surface-1': '#0a0a0a',
+      '--color-surface-2': '#141414',
+      '--color-surface-offset': '#262626',
+      '--color-surface-elevated': '#303030',
+      '--color-primary': '#60a5fa',
+      '--color-secondary': '#facc15',
+      '--color-balance': '#6b6b6b',
+      '--color-text-base': '#fafafa',
+      '--color-text-muted': '#a8a8a8',
+      '--color-text-faint': '#8a8a8a',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
+  {
+    id: 'builtin-clay',
+    name: 'Clay',
+    builtIn: true,
+    vars: {
+      '--color-background': '#f2ece6',
+      '--color-surface-1': '#fdfaf7',
+      '--color-surface-2': '#e9e1d8',
+      '--color-surface-offset': '#d8cec2',
+      '--color-surface-elevated': '#fdfaf7',
+      '--color-primary': '#9a3412',
+      '--color-secondary': '#45700e',
+      '--color-balance': '#8a7a68',
+      '--color-text-base': '#241d17',
+      '--color-text-muted': '#5a4d40',
+      '--color-text-faint': '#6d5f50',
       '--font-sans': "'Inter', sans-serif"
     }
   }
