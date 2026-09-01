@@ -1,15 +1,14 @@
+import { readableForegroundOn, LIGHT_FOREGROUND } from '../../../shared/color'
+
 /**
  * Picks a readable foreground for a user-chosen background.
- * YIQ rather than WCAG relative luminance: the threshold was tuned against the
- * board's colour picker presets, and switching formulas flips several of them.
+ *
+ * The YIQ formula and its threshold now live in `shared/color.ts` so the theme
+ * model derives the same answer; this wrapper keeps the renderer-specific
+ * fallbacks it always had, a missing colour defers to the theme's own text
+ * colour, while an unparseable one is assumed dark.
  */
 export function getTextColorForBackground(bgColor?: string): string {
   if (!bgColor) return 'var(--color-text-base)'
-  const hex = bgColor.replace('#', '')
-  if (hex.length !== 6) return '#ffffff'
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000
-  return yiq >= 115 ? '#0f172a' : '#ffffff'
+  return readableForegroundOn(bgColor, LIGHT_FOREGROUND)
 }

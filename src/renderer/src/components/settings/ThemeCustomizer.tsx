@@ -18,6 +18,7 @@ const COLOR_VARIABLE_LABELS: Record<Exclude<keyof ThemeVariables, '--font-sans'>
   '--color-surface-elevated': { label: 'Context Menus & Tooltips', desc: 'Background color for popovers and tooltips.' },
   '--color-primary': { label: 'Primary Brand Color', desc: 'Brand Electric Blue used for links and focus borders.' },
   '--color-secondary': { label: 'Secondary Accent Color', desc: 'Brand Volt Lime used for highlight alerts and selections.' },
+  '--color-balance': { label: 'Idle Icons & Outlines', desc: 'Sidebar icons at rest, card outlines, and neutral marks.' },
   '--color-text-base': { label: 'Primary Text', desc: 'Color of normal, high-visibility body text.' },
   '--color-text-muted': { label: 'Muted Labels', desc: 'Secondary details, metadata, and description text.' },
   '--color-text-faint': { label: 'Faint Labels / Placeholders', desc: 'Disabled inputs, metadata timestamps, and placeholder text.' }
