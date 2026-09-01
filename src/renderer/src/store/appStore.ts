@@ -49,6 +49,8 @@ interface AppState {
   isLoading: boolean
   // Preselected task for Pomodoro Navigation
   preselectedTaskId: string | null
+  /** Note the palette asked for. Consumed and cleared by NotesView on mount. */
+  pendingNoteTitle: string | null
   // Game Dev PBR Generator Preload
   gamedevPreloadTexturePath: string | null
   gamedevSourceCardId: string | null
@@ -81,6 +83,7 @@ interface AppState {
   setContextsList: (list: ContextEntry[]) => void
   setLoading: (loading: boolean) => void
   setPreselectedTaskId: (id: string | null) => void
+  setPendingNoteTitle: (title: string | null) => void
   setGamedevPreloadTexture: (path: string | null, cardId?: string | null) => void
   setGamedevPreloadSeamless: (path: string | null, cardId?: string | null) => void
 
@@ -113,6 +116,7 @@ export const useAppStore = create<AppState>()(
     selectedItemId: null,
     isLoading: false,
     preselectedTaskId: null,
+    pendingNoteTitle: null,
     gamedevPreloadTexturePath: null,
     gamedevSourceCardId: null,
     gamedevPreloadSeamlessPath: null,
@@ -215,6 +219,11 @@ export const useAppStore = create<AppState>()(
     setPreselectedTaskId: (id: string | null) =>
       set(state => {
         state.preselectedTaskId = id
+      }),
+
+    setPendingNoteTitle: (title: string | null) =>
+      set(state => {
+        state.pendingNoteTitle = title
       }),
 
     setGamedevPreloadTexture: (path: string | null, cardId: string | null = null) =>

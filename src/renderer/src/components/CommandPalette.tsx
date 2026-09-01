@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, CornerDownLeft } from 'lucide-react'
+import { Search, CornerDownLeft, FileText } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { rankCommands } from '../../../shared/commandMatch'
 import { buildCommands, type Command } from '../lib/commands'
 import { VIEW_FEATURES } from '../lib/features'
 import { getBoolSetting } from '../lib/settings'
+import { searchEverything, MIN_QUERY_LENGTH } from '../lib/globalSearch'
+import { kindLabel, type SearchHit } from '../../../shared/searchResults'
 import type { ActiveView } from '../store/appStore'
 
 interface Props {
@@ -24,6 +26,10 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
   const [enabledViews, setEnabledViews] = useState<Partial<Record<ActiveView, boolean>>>({})
+  const [hits, setHits] = useState<SearchHit[]>([])
+  const selectItem = useAppStore(s => s.selectItem)
+  const setRightPanel = useAppStore(s => s.setRightPanelContent)
+  const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -47,6 +53,22 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
     return () => { cancelled = true }
   }, [open])
 
+  useEffect(() => {
+    if (!open) { setHits([]); return }
+    const q = query.trim()
+    if (q.length < MIN_QUERY_LENGTH) { setHits([]); return }
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const found = await searchEverything(q, activeContext)
+      // Guarded because a slower earlier query can land after a faster later
+      // one, which would show results for something no longer typed.
+      if (!cancelled) setHits(found)
+    }, 140)
+
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [open, query, activeContext])
+
   const commands = useMemo(
     () =>
       buildCommands({
@@ -64,9 +86,19 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
 
   const results = useMemo(() => rankCommands(commands, query), [commands, query])
 
+  // One flat list so the arrow keys and Enter cross the boundary without the
+  // user having to think about which half they are in.
+  const rows = useMemo(
+    () => [
+      ...results.map(command => ({ type: 'command' as const, command })),
+      ...hits.map(hit => ({ type: 'hit' as const, hit }))
+    ],
+    [results, hits]
+  )
+
   // Clamped rather than reset: typing a narrower query should not throw away the
   // selection when the highlighted row is still in the list.
-  const active = Math.min(selected, Math.max(0, results.length - 1))
+  const active = Math.min(selected, Math.max(0, rows.length - 1))
 
   useEffect(() => {
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' })
@@ -83,17 +115,51 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
     }
   }
 
+  const openHit = (hit: SearchHit) => {
+    onClose()
+    if (!hit.target) return
+    switch (hit.kind) {
+      case 'note':
+        // Parked in the store rather than dispatched: setView only schedules a
+        // render, so NotesView has not mounted yet and would miss an event.
+        setPendingNoteTitle(hit.target)
+        setView('notes')
+        break
+      case 'cheatsheet':
+        setView('cheatsheets')
+        break
+      case 'log':
+        setView('log')
+        selectItem(hit.target)
+        break
+      case 'task':
+        setView('backlog')
+        selectItem(hit.target)
+        break
+      default:
+        setView('kanban')
+        selectItem(hit.target)
+        setRightPanel('item-detail')
+    }
+  }
+
+  const activate = (index: number) => {
+    const row = rows[index]
+    if (!row) return
+    if (row.type === 'command') runCommand(row.command)
+    else openHit(row.hit)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setSelected(i => (results.length === 0 ? 0 : (Math.min(i, results.length - 1) + 1) % results.length))
+      setSelected(i => (rows.length === 0 ? 0 : (Math.min(i, rows.length - 1) + 1) % rows.length))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setSelected(i => (results.length === 0 ? 0 : (Math.min(i, results.length - 1) - 1 + results.length) % results.length))
+      setSelected(i => (rows.length === 0 ? 0 : (Math.min(i, rows.length - 1) - 1 + rows.length) % rows.length))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      const command = results[active]
-      if (command) runCommand(command)
+      activate(active)
     } else if (e.key === 'Escape') {
       e.preventDefault()
       onClose()
@@ -158,26 +224,43 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         </div>
 
         <div ref={listRef} style={{ maxHeight: '52vh', overflowY: 'auto', padding: 'var(--space-1)' }}>
-          {results.length === 0 && (
+          {rows.length === 0 && (
             <div style={{
               padding: 'var(--space-4)',
               textAlign: 'center',
               fontSize: 'var(--text-xs)',
               color: 'var(--color-text-faint)'
             }}>
-              No commands match “{query}”.
+              {query.trim().length >= MIN_QUERY_LENGTH
+                ? `Nothing matches "${query.trim()}".`
+                : 'Type to search commands, cards, notes and cheatsheets.'}
             </div>
           )}
 
-          {results.map((command, index) => {
-            // Headings only make sense while the authored order still holds;
-            // once results are score-ordered they would appear to repeat.
-            const showGroup = !query.trim() && command.group !== lastGroup
-            if (showGroup) lastGroup = command.group
+          {rows.map((row, index) => {
             const isActive = index === active
+            const key = row.type === 'command' ? row.command.id : row.hit.id
+
+            // Group headings only make sense while the authored order still
+            // holds; once rows are score-ordered they would appear to repeat.
+            let heading: string | null = null
+            if (row.type === 'command' && !query.trim() && row.command.group !== lastGroup) {
+              heading = row.command.group
+              lastGroup = row.command.group
+            } else if (row.type === 'hit' && lastGroup !== 'Results') {
+              heading = 'Results'
+              lastGroup = 'Results'
+            }
+
+            const label = row.type === 'command' ? row.command.label : row.hit.title
+            const meta =
+              row.type === 'command'
+                ? (query.trim() ? row.command.group : row.command.hint)
+                : kindLabel(row.hit.kind)
+
             return (
-              <React.Fragment key={command.id}>
-                {showGroup && (
+              <React.Fragment key={key}>
+                {heading && (
                   <div style={{
                     padding: 'var(--space-2) var(--space-3) var(--space-1)',
                     fontSize: '10px',
@@ -186,13 +269,13 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
                     textTransform: 'uppercase',
                     letterSpacing: 'var(--tracking-wider)'
                   }}>
-                    {command.group}
+                    {heading}
                   </div>
                 )}
                 <div
                   data-index={index}
                   onMouseEnter={() => setSelected(index)}
-                  onClick={() => runCommand(command)}
+                  onClick={() => activate(index)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -206,8 +289,25 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
                     fontSize: 'var(--text-sm)'
                   }}
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {command.label}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
+                    {row.type === 'hit' && <FileText size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {label}
+                      </span>
+                      {row.type === 'hit' && row.hit.subtitle && (
+                        <span style={{
+                          display: 'block',
+                          fontSize: '11px',
+                          color: 'var(--color-text-faint)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {row.hit.subtitle}
+                        </span>
+                      )}
+                    </span>
                   </span>
                   <span style={{
                     display: 'flex',
@@ -217,7 +317,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
                     fontSize: '11px',
                     color: isActive ? 'var(--color-secondary)' : 'var(--color-text-faint)'
                   }}>
-                    {query.trim() ? command.group : command.hint}
+                    {meta}
                     {isActive && <CornerDownLeft size={12} />}
                   </span>
                 </div>
