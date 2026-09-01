@@ -52,6 +52,8 @@ interface AppState {
   preselectedTaskId: string | null
   /** Note the palette asked for. Consumed and cleared by NotesView on mount. */
   pendingNoteTitle: string | null
+  /** Saved view the palette asked for. Consumed and cleared by BacklogView. */
+  pendingViewId: string | null
   // Game Dev PBR Generator Preload
   gamedevPreloadTexturePath: string | null
   gamedevSourceCardId: string | null
@@ -85,6 +87,7 @@ interface AppState {
   setLoading: (loading: boolean) => void
   setPreselectedTaskId: (id: string | null) => void
   setPendingNoteTitle: (title: string | null) => void
+  setPendingViewId: (id: string | null) => void
   setGamedevPreloadTexture: (path: string | null, cardId?: string | null) => void
   setGamedevPreloadSeamless: (path: string | null, cardId?: string | null) => void
 
@@ -118,6 +121,7 @@ export const useAppStore = create<AppState>()(
     isLoading: false,
     preselectedTaskId: null,
     pendingNoteTitle: null,
+    pendingViewId: null,
     gamedevPreloadTexturePath: null,
     gamedevSourceCardId: null,
     gamedevPreloadSeamlessPath: null,
@@ -225,6 +229,11 @@ export const useAppStore = create<AppState>()(
     setPendingNoteTitle: (title: string | null) =>
       set(state => {
         state.pendingNoteTitle = title
+      }),
+
+    setPendingViewId: (id: string | null) =>
+      set(state => {
+        state.pendingViewId = id
       }),
 
     setGamedevPreloadTexture: (path: string | null, cardId: string | null = null) =>

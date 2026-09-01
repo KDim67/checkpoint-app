@@ -1243,6 +1243,16 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
     args.push(params.dueEnd)
   }
 
+  // Distinct from a date range: a task with no due date satisfies no range, so
+  // "has no due date" needs its own clause rather than an open-ended one.
+  if (params.noDueDate) {
+    sql += ` AND i.due_at IS NULL`
+  }
+
+  if (params.untagged) {
+    sql += ` AND NOT EXISTS (SELECT 1 FROM item_tags x WHERE x.item_id = i.id)`
+  }
+
   if (params.hasRelations !== undefined && params.hasRelations !== null) {
     if (params.hasRelations) {
       sql += ` AND (SELECT COUNT(*) FROM relations r WHERE r.from_id = i.id OR r.to_id = i.id) > 0`
