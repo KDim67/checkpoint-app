@@ -616,8 +616,13 @@ export default function App() {
       }
     }).catch(console.error)
 
-    // Hot-reload user theme CSS
-    const unsubTheme = window.electronAPI.onThemeUpdate((css: string) => {
+    // Hot-reload user theme CSS.
+    //
+    // The push alone was not enough: the customization engine starts before this
+    // component mounts, so its startup broadcast arrived with nobody listening
+    // and a saved preset silently reverted to the defaults on every launch. The
+    // subscription handles later edits; the fetch below covers this launch.
+    const applyThemeCss = (css: string): void => {
       let el = document.getElementById('user-theme') as HTMLStyleElement | null
       if (!el) {
         el = document.createElement('style')
@@ -635,7 +640,14 @@ export default function App() {
         const elFont = document.getElementById('custom-google-font')
         if (elFont) elFont.remove()
       }
-    })
+    }
+
+    const unsubTheme = window.electronAPI.onThemeUpdate(applyThemeCss)
+    // Ask for whatever should be applied now, independent of any broadcast.
+    window.electronAPI.customizer
+      .getCss()
+      .then(css => { if (css) applyThemeCss(css) })
+      .catch(console.error)
 
     // Navigation hotkey listener
     const unsubNavigate = window.electronAPI.app.onNavigateToView((view: string) => {
