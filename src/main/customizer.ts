@@ -121,7 +121,12 @@ export async function enableCustomizer(): Promise<void> {
     const activePlugins: string[] = JSON.parse(rawPlugins)
     console.log(`[customizer] Loading active plugins:`, activePlugins)
     for (const pluginFile of activePlugins) {
-      loadPlugin(pluginFile)
+      const result = loadPlugin(pluginFile)
+      // Logged rather than thrown: one bad plugin must not stop the others, or
+      // the engine, from starting.
+      if (!result.ok) {
+        console.error(`[customizer] Plugin "${pluginFile}" failed to load: ${result.error}`)
+      }
     }
   } catch (err) {
     console.error('[customizer] Failed to load active plugins:', err)

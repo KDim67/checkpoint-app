@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Divider, ToggleSwitch } from './SettingsSection'
 import { useToast } from '../ui/Toast'
-import { FolderOpen, Sparkles, AlertTriangle, Terminal } from 'lucide-react'
+import { FolderOpen, Sparkles, AlertTriangle, Terminal, ShieldAlert, X } from 'lucide-react'
 import { PluginInfo } from '../../../../shared/types'
 
 export default function ExtensionsTab() {
@@ -9,6 +9,7 @@ export default function ExtensionsTab() {
   const [engineEnabled, setEngineEnabled] = useState(false)
   const [plugins, setPlugins] = useState<PluginInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<{ filename: string; message: string } | null>(null)
 
   const loadPluginsList = async () => {
     try {
@@ -30,7 +31,15 @@ export default function ExtensionsTab() {
 
   const handleTogglePlugin = async (filename: string, checked: boolean) => {
     try {
-      await window.electronAPI.customizer.togglePlugin(filename, checked)
+      const result = await window.electronAPI.customizer.togglePlugin(filename, checked)
+      if (!result.ok) {
+        // The switch stays off and the reason is shown. Previously a plugin that
+        // threw on load was recorded as enabled and failed silently every launch.
+        setLoadError({ filename, message: result.error ?? 'The plugin failed to load.' })
+        toast(`${filename} could not be enabled`)
+        return
+      }
+      setLoadError(current => (current?.filename === filename ? null : current))
       setPlugins(prev =>
         prev.map(p => p.filename === filename ? { ...p, active: checked } : p)
       )
@@ -56,9 +65,66 @@ export default function ExtensionsTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+      {/* Plugins are required into the main process, so they run with the app's
+          full privileges. Saying so plainly is the honest thing: the engine's
+          own description used to call them "sandboxed", which they are not. */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 'var(--space-3)',
+        padding: 'var(--space-3) var(--space-4)',
+        background: 'var(--color-surface-2)',
+        border: '1px solid var(--color-surface-offset)',
+        borderRadius: 'var(--radius-lg)'
+      }}>
+        <ShieldAlert size={16} style={{ color: 'var(--color-warning)', flexShrink: 0, marginTop: '1px' }} />
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 'var(--leading-relaxed)' }}>
+          A plugin runs inside Checkpoint with the same access the app has, your
+          files, your database and the network. Only enable code you have read or
+          trust. Nothing here is sandboxed.
+        </div>
+      </div>
+
+      {loadError && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 'var(--space-3)',
+          padding: 'var(--space-3) var(--space-4)',
+          background: 'var(--color-error-muted)',
+          border: '1px solid var(--color-error)',
+          borderRadius: 'var(--radius-lg)'
+        }}>
+          <AlertTriangle size={16} style={{ color: 'var(--color-error)', flexShrink: 0, marginTop: '1px' }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)', fontWeight: 'var(--weight-semibold)' }}>
+              {loadError.filename} could not be enabled
+            </div>
+            <code style={{
+              display: 'block',
+              marginTop: 'var(--space-1)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              color: 'var(--color-text-muted)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}>
+              {loadError.message}
+            </code>
+          </div>
+          <button
+            className="btn-secondary"
+            onClick={() => setLoadError(null)}
+            aria-label="Dismiss the plugin error"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {!engineEnabled && (
         <div style={{
-          background: 'rgba(249, 115, 22, 0.1)',
+          background: 'var(--color-warning-muted)',
           border: '1px solid var(--color-warning)',
           borderRadius: 'var(--radius-lg)',
           padding: 'var(--space-3) var(--space-4)',
