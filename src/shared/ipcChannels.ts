@@ -105,6 +105,13 @@ export const enum IpcChannels {
   /** Main → renderer: something outside the UI changed the data. */
   MCP_DATA_CHANGED       = 'mcp:dataChanged',
   MCP_ACTIVITY_LIST      = 'mcp:activityList',
+  // Notifications
+  NOTIFY_SEND            = 'notify:send',
+  NOTIFY_GET_POLICY      = 'notify:getPolicy',
+  NOTIFY_SET_POLICY      = 'notify:setPolicy',
+  /** Main → renderer: a notification was clicked. */
+  NOTIFY_ACTIVATED       = 'notification:activated',
+
   // Recurring work
   RECURRENCE_LIST        = 'recurrence:list',
   RECURRENCE_CREATE      = 'recurrence:create',

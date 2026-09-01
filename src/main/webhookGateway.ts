@@ -1,6 +1,6 @@
 import http from 'http'
+import { notify } from './notificationService'
 import { Socket } from 'net'
-import { Notification } from 'electron'
 import { z } from 'zod'
 import { getDb, createItem } from './db'
 import { mainWindow } from './index'
@@ -122,14 +122,12 @@ export function startWebhookServer(requestedPort: number): Promise<number> {
             })
           }
 
-          // Trigger native OS notification
-          if (Notification.isSupported()) {
-            new Notification({
-              title: `Checkpoint Webhook Received (${type})`,
-              body: parsed.data.title || `Added to context: ${parsed.data.context}`,
-              silent: false
-            }).show()
-          }
+          notify({
+            category: 'webhook',
+            title: `Checkpoint Webhook Received (${type})`,
+            body: parsed.data.title || `Added to context: ${parsed.data.context}`,
+            itemId: item?.id
+          })
 
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ success: true, item }))
@@ -164,14 +162,15 @@ export function startWebhookServer(requestedPort: number): Promise<number> {
         })
 
         if (port !== requestedPort) {
-          // Port collision: send system warning notification
-          if (Notification.isSupported()) {
-            new Notification({
-              title: 'Webhook Port Conflict',
-              body: `Port ${requestedPort} was blocked. Listening on ${port} instead.`,
-              silent: false
-            }).show()
-          }
+          // Deduped: a port that stays blocked would otherwise warn on every
+          // restart, and the message is identical each time.
+          notify({
+            category: 'webhook',
+            title: 'Webhook Port Conflict',
+            body: `Port ${requestedPort} was blocked. Listening on ${port} instead.`,
+            dedupeKey: `webhook-port:${requestedPort}:${port}`,
+            dedupeWindowMs: 24 * 60 * 60 * 1000
+          })
         }
 
         resolve(port)

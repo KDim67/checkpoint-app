@@ -23,8 +23,7 @@ import {
   Cloud,
   Server,
   HardDrive,
-  Plug
-} from 'lucide-react'
+  Plug, Bell } from 'lucide-react'
 import SettingsSection, {
   FieldRow,
   SettingsInput,
@@ -34,6 +33,7 @@ import SettingsSection, {
 } from './settings/SettingsSection'
 import ContextManager from './settings/ContextManager'
 import SyncSettings from './settings/SyncSettings'
+import NotificationSettings from './settings/NotificationSettings'
 import McpSettings from './settings/McpSettings'
 import AppearanceSettings from './settings/AppearanceSettings'
 import FeatureToggleCenter from './settings/FeatureToggleCenter'
@@ -93,6 +93,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
     tabs: [
       { id: 'hotkeyBinder', label: 'Keyboard Shortcuts', icon: <Keyboard size={14} />, description: 'Rebind the global hotkeys registered by Checkpoint.' },
       { id: 'features',     label: 'Features & Plugins', icon: <Zap size={14} />,      description: 'Toggle background subsystems and manage user plugins.' },
+      { id: 'notifications', label: 'Notifications',      icon: <Bell size={14} />,     description: 'What Checkpoint tells you about, and when it stays quiet.' },
       { id: 'backup',       label: 'Database Backup',    icon: <Archive size={14} />,  description: 'Automated database snapshots, retention and restore points.' },
       { id: 'storage',      label: 'Storage & Media',    icon: <HardDrive size={14} />, description: 'Manage local attachment vaults and clean up orphaned files.' },
       { id: 'sync',         label: 'P2P Network Sync',   icon: <RefreshCw size={14} />, description: 'Sync database and note directories with other machines.' },
@@ -1155,6 +1156,12 @@ export default function SettingsView() {
         return (
           <SettingsSection icon={<RefreshCw size={14} />} title="P2P Network Sync" description="Synchronize database and note folders with other machines.">
             <SyncSettings />
+          </SettingsSection>
+        )
+      case 'notifications':
+        return (
+          <SettingsSection icon={<Bell size={14} />} title="Notifications" description="What Checkpoint tells you about, and when it stays quiet.">
+            <NotificationSettings />
           </SettingsSection>
         )
       case 'mcp':
