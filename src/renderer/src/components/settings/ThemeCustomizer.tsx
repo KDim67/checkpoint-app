@@ -129,7 +129,7 @@ export default function ThemeCustomizer() {
               Enable Customizer Engine
             </h3>
             <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-              Turns on dynamic theme variable overriding and sandboxed plugins.
+              Turns on theme variable overriding and user plugins.
             </p>
           </div>
           <ToggleSwitch checked={engineEnabled} onChange={handleEngineToggle} label="Enable Customizer Engine" />

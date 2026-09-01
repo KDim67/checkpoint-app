@@ -645,7 +645,8 @@ const api = {
       ipcRenderer.invoke('customizer:getTheme'),
     getPlugins: (): Promise<PluginInfo[]> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_PLUGINS),
-    togglePlugin: (filename: string, active: boolean): Promise<void> =>
+    /** Resolves to why it failed, so a broken plugin does not silently stay off. */
+    togglePlugin: (filename: string, active: boolean): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_TOGGLE_PLUGIN, filename, active),
     openPluginsFolder: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER),

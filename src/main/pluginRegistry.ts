@@ -1,8 +1,12 @@
 import { app, ipcMain, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, readdirSync } from 'fs'
+import { existsSync, readdirSync, readFileSync } from 'fs'
 import { PluginInfo } from '../shared/types'
 import { getPluginsDir, ensureDir } from './paths'
+import { isSafePluginFilename, parsePluginMetadata } from '../shared/pluginMetadata'
+
+/** What a load attempt reports back, so a failure can reach the user. */
+export type PluginLoadResult = { ok: true } | { ok: false; error: string }
 
 export function ensurePluginsDir(): void {
   ensureDir(getPluginsDir())
@@ -66,25 +70,21 @@ export function scanPlugins(activeFilenames: string[]): PluginInfo[] {
   const files = readdirSync(dir).filter(f => f.endsWith('.js'))
 
   return files.map(filename => {
-    const fullPath = join(dir, filename)
     let name = filename
     let description = 'No description provided.'
     let version = '1.0.0'
 
     try {
-      // Purge cache if not active so we read fresh metadata
-      if (!loadedPlugins.has(filename)) {
-        delete require.cache[require.resolve(fullPath)]
-      }
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const plugin = require(fullPath)
-      if (plugin.metadata) {
-        name = plugin.metadata.name || name
-        description = plugin.metadata.description || description
-        version = plugin.metadata.version || version
-      }
+      // Read, do not require. This previously executed every file in the folder
+      //, including plugins the user had switched off, just to read three
+      // strings, which made the off switch meaningless.
+      const source = readFileSync(join(dir, filename), 'utf8')
+      const metadata = parsePluginMetadata(source)
+      name = metadata.name || name
+      description = metadata.description || description
+      version = metadata.version || version
     } catch (err) {
-      console.error(`[PluginRegistry] Error reading metadata for ${filename}:`, err)
+      console.error(`[PluginRegistry] Could not read ${filename}:`, err)
       description = `Failed to parse: ${(err as Error).message}`
     }
 
@@ -101,16 +101,26 @@ export function scanPlugins(activeFilenames: string[]): PluginInfo[] {
 /**
  * Hot-load a plugin JS entry point.
  */
-export function loadPlugin(filename: string): void {
-  if (loadedPlugins.has(filename)) return
+export function loadPlugin(filename: string): PluginLoadResult {
+  if (loadedPlugins.has(filename)) return { ok: true }
+
+  // The name comes over IPC from the renderer. Without this a crafted value
+  // could walk out of the plugins folder and execute any file on disk with the
+  // main process's privileges.
+  if (!isSafePluginFilename(filename)) {
+    const error = `Refused to load "${filename}": not a plain .js filename inside the plugins folder.`
+    console.error(`[PluginRegistry] ${error}`)
+    return { ok: false, error }
+  }
 
   ensurePluginsDir()
   const dir = getPluginsDir()
   const fullPath = join(dir, filename)
 
   if (!existsSync(fullPath)) {
-    console.error(`[PluginRegistry] Plugin file not found: ${fullPath}`)
-    return
+    const error = `Plugin file not found: ${filename}`
+    console.error(`[PluginRegistry] ${error}`)
+    return { ok: false, error }
   }
 
   try {
@@ -119,16 +129,26 @@ export function loadPlugin(filename: string): void {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const plugin = require(fullPath)
     const sandbox = new PluginSandbox(filename)
-    const api = sandbox.getAPI()
 
     if (typeof plugin.onLoad === 'function') {
-      plugin.onLoad(api)
+      plugin.onLoad(sandbox.getAPI())
     }
 
     loadedPlugins.set(filename, { exports: plugin, sandbox })
     console.log(`[PluginRegistry] Successfully loaded extension: ${filename}`)
+    return { ok: true }
   } catch (err) {
+    // Reported rather than only logged: a plugin that throws on load used to
+    // fail silently while the UI still showed it as enabled.
+    const error = err instanceof Error ? err.message : String(err)
     console.error(`[PluginRegistry] Failed to load plugin ${filename}:`, err)
+    // Leave nothing half-registered behind.
+    try {
+      delete require.cache[require.resolve(fullPath)]
+    } catch {
+      // The file may not have resolved at all; nothing to purge.
+    }
+    return { ok: false, error }
   }
 }
 

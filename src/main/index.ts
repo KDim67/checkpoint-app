@@ -1095,16 +1095,21 @@ function registerIpcHandlers(): void {
     }
 
     if (active) {
+      // Loaded before it is recorded. Persisting first meant a plugin that threw
+      // was still stored as enabled: the switch claimed something untrue, and
+      // the failure was retried silently on every launch.
+      const result = loadPlugin(filename)
+      if (!result.ok) return result
       if (!activePlugins.includes(filename)) {
         activePlugins.push(filename)
       }
-      loadPlugin(filename)
     } else {
       activePlugins = activePlugins.filter(name => name !== filename)
       unloadPlugin(filename)
     }
 
     setSetting('customizer_active_plugins', JSON.stringify(activePlugins))
+    return { ok: true as const }
   })
 
   ipcMain.handle(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER, async () => {
