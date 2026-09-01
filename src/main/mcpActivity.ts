@@ -11,6 +11,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import {
   deleteItem,
+  deleteRecurrence,
   deleteRelation,
   deleteTag,
   getMcpActivity,
@@ -91,6 +92,9 @@ function runUndoAction(action: McpUndoAction): void {
       break
     case 'delete_relation':
       deleteRelation(action.id)
+      break
+    case 'delete_recurrence':
+      deleteRecurrence(action.id)
       break
     case 'board_ops':
       applyBoardUndo(action)

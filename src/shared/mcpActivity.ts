@@ -23,6 +23,7 @@ export type McpUndoAction =
   | { kind: 'write_note'; title: string; content: string }
   | { kind: 'delete_tag'; id: string }
   | { kind: 'delete_relation'; id: string }
+  | { kind: 'delete_recurrence'; id: string }
 
 export interface McpActivityEntry {
   id: string
@@ -73,6 +74,8 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
       return str(o.id) ? { kind: 'delete_tag', id: str(o.id) } : null
     case 'delete_relation':
       return str(o.id) ? { kind: 'delete_relation', id: str(o.id) } : null
+    case 'delete_recurrence':
+      return str(o.id) ? { kind: 'delete_recurrence', id: str(o.id) } : null
     default:
       return null
   }
@@ -115,7 +118,9 @@ export const MCP_WRITE_TOOLS = [
   'write_note',
   'create_tag',
   'link_items',
-  'archive_item'
+  'archive_item',
+  'create_recurrence',
+  'delete_recurrence'
 ] as const
 
 export type McpWriteTool = (typeof MCP_WRITE_TOOLS)[number]
