@@ -736,8 +736,11 @@ function registerIpcHandlers(): void {
         break
       case 'capture': {
         hidePanel()
-        const { enableHud } = await import('./hud')
-        enableHud()
+        // showHud, not enableHud: the latter only registers the global hotkey
+        // and pre-creates the window hidden, so the button appeared to do
+        // nothing. showHud creates the window if needed and displays it.
+        const { showHud } = await import('./hud')
+        showHud()
         break
       }
       case 'quit':
