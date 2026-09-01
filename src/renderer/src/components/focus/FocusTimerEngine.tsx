@@ -116,27 +116,20 @@ export default function FocusTimerEngine(): null {
   }
 
   const notifyCompletion = (isFocus: boolean) => {
-    try {
-      if (typeof Notification === 'undefined') return
-      const fire = (): void => {
-        new Notification(isFocus ? 'Focus interval complete 🧠' : 'Break complete ☕', {
-          body: isFocus
-            ? 'Nice work, time to log a quick retrospective.'
-            : 'Ready to start another focus interval when you are.',
-          silent: true
-        })
-      }
-      if (Notification.permission === 'granted') {
-        fire()
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(p => {
-          if (p === 'granted') fire()
-        })
-      }
-    } catch (err) {
-      // Notifications aren't essential, never let this break the timer
-      console.error('Desktop notification failed:', err)
-    }
+    // Routed through main rather than the web Notification API so it obeys the
+    // same policy as everything else, and so it still fires when this window is
+    // not the focused one, which is the whole point of a timer alert.
+    // No dedupe key: two intervals ending really are two things to say.
+    window.electronAPI.notifications
+      .send({
+        category: 'focus',
+        title: isFocus ? 'Focus interval complete 🧠' : 'Break complete ☕',
+        body: isFocus
+          ? 'Nice work, time to log a quick retrospective.'
+          : 'Ready to start another focus interval when you are.'
+      })
+      // Notifications are not essential, never let this break the timer.
+      .catch(err => console.error('Desktop notification failed:', err))
   }
 
   // Only ticks while a session is on screen. Subscribing to focusStep rather

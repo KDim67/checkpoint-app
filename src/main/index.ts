@@ -631,6 +631,25 @@ function registerIpcHandlers(): void {
 
   // Handled here rather than in mcpServer.ts so the log stays readable and
   // reversible while the server itself is switched off.
+  ipcMain.handle(IpcChannels.NOTIFY_SEND, async (_event, input: unknown) => {
+    const { notify } = await import('./notificationService')
+    return notify(input as Parameters<typeof notify>[0])
+  })
+
+  ipcMain.handle(IpcChannels.NOTIFY_GET_POLICY, async () => {
+    const { getNotificationPolicy } = await import('./notificationService')
+    return getNotificationPolicy()
+  })
+
+  ipcMain.handle(IpcChannels.NOTIFY_SET_POLICY, async (_event, policy: unknown) => {
+    const { POLICY_SETTING_KEY } = await import('./notificationService')
+    const { normalizePolicy } = await import('../shared/notificationPolicy')
+    const { setSetting } = await import('./db')
+    const next = normalizePolicy(policy)
+    setSetting(POLICY_SETTING_KEY, next)
+    return next
+  })
+
   ipcMain.handle(IpcChannels.RECURRENCE_LIST, async (_event, context?: string) => {
     const { getRecurrences } = await import('./db')
     const { ruleFromRow } = await import('./recurrenceService')
@@ -1337,6 +1356,16 @@ app.whenReady().then(async () => {
 
   // Register application hotkeys (HUD & Clipboard)
   registerAppShortcuts()
+
+  // Due-date reminders. In main because the renderer's Notification API only
+  // fires while a window exists, and a reminder that needs the app focused is
+  // not a reminder.
+  try {
+    const { initializeDueReminders } = await import('./dueReminders')
+    initializeDueReminders()
+  } catch (err) {
+    console.error('Failed to start due-date reminders:', err)
+  }
 
   // Recurring work: sweep at startup, then hourly. Completing an instance also
   // advances its rule immediately, wired through the db handler below.

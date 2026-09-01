@@ -30,6 +30,26 @@ export const app = {
   }
 }
 
+/**
+ * Records what was raised instead of showing anything, so a test can assert on
+ * the notifications a sweep produced. `shown` is cleared between tests.
+ */
+export const shown: { title: string; body: string }[] = []
+
+export class Notification {
+  private options: { title: string; body: string }
+  static isSupported(): boolean {
+    return true
+  }
+  constructor(options: { title: string; body: string }) {
+    this.options = options
+  }
+  on(): void {}
+  show(): void {
+    shown.push({ title: this.options.title, body: this.options.body })
+  }
+}
+
 export class BrowserWindow {
   static getAllWindows(): BrowserWindow[] {
     return []
@@ -49,4 +69,4 @@ export const clipboard = {
   writeText(): void {}
 }
 
-export default { ipcMain, nativeTheme, app, BrowserWindow, shell, clipboard }
+export default { ipcMain, nativeTheme, app, BrowserWindow, shell, clipboard, Notification }

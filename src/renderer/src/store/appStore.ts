@@ -27,6 +27,7 @@ export type SettingsTab =
   | 'hotkeyBinder'
   | 'features'
   | 'backup'
+  | 'notifications'
   | 'storage'
   | 'sync'
   | 'mcp'

@@ -3,6 +3,7 @@ import { IpcChannels } from '../shared/ipcChannels'
 import type { McpActivityEntry } from '../shared/mcpActivity'
 
 import type { RecurrenceSummary } from '../shared/recurrence'
+import type { NotificationCategory, NotificationPolicy } from '../shared/notificationPolicy'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type {
   Item,
@@ -343,6 +344,26 @@ const api = {
       const handler = (_event: IpcRendererEvent, payload: unknown) => callback(payload)
       ipcRenderer.on(IpcChannels.WEBHOOK_EVENT, handler)
       return () => ipcRenderer.removeListener(IpcChannels.WEBHOOK_EVENT, handler)
+    }
+  },
+
+  notifications: {
+    /** Raises a notification through the shared policy. Resolves to whether it fired. */
+    send: (input: {
+      category: NotificationCategory
+      title: string
+      body: string
+      dedupeKey?: string
+      dedupeWindowMs?: number
+      itemId?: string
+    }): Promise<boolean> => ipcRenderer.invoke(IpcChannels.NOTIFY_SEND, input),
+    getPolicy: (): Promise<NotificationPolicy> => ipcRenderer.invoke(IpcChannels.NOTIFY_GET_POLICY),
+    setPolicy: (policy: NotificationPolicy): Promise<NotificationPolicy> =>
+      ipcRenderer.invoke(IpcChannels.NOTIFY_SET_POLICY, policy),
+    onActivated: (callback: (payload: { itemId?: string }) => void): (() => void) => {
+      const listener = (_e: IpcRendererEvent, payload: { itemId?: string }): void => callback(payload)
+      ipcRenderer.on(IpcChannels.NOTIFY_ACTIVATED, listener)
+      return () => ipcRenderer.removeListener(IpcChannels.NOTIFY_ACTIVATED, listener)
     }
   },
 

@@ -54,6 +54,7 @@ const SETTINGS_TABS: { tab: SettingsTab; label: string; keywords?: string[] }[] 
   { tab: 'ai', label: 'AI Assistant', keywords: ['model', 'provider', 'api key'] },
   { tab: 'hotkeyBinder', label: 'Keyboard Shortcuts', keywords: ['keys', 'bindings'] },
   { tab: 'features', label: 'Features & Plugins', keywords: ['toggles', 'extensions'] },
+  { tab: 'notifications', label: 'Notifications', keywords: ['alerts', 'quiet hours', 'reminders'] },
   { tab: 'backup', label: 'Database Backup', keywords: ['snapshot', 'restore'] },
   { tab: 'storage', label: 'Storage & Media', keywords: ['files', 'disk'] },
   { tab: 'sync', label: 'P2P Network Sync', keywords: ['peer', 'lan', 'devices'] },
