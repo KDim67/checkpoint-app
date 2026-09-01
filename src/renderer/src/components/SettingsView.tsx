@@ -23,7 +23,7 @@ import {
   Cloud,
   Server,
   HardDrive,
-  Plug, Bell } from 'lucide-react'
+  Plug, Bell, PanelTop } from 'lucide-react'
 import SettingsSection, {
   FieldRow,
   SettingsInput,
@@ -35,6 +35,7 @@ import ContextManager from './settings/ContextManager'
 import SyncSettings from './settings/SyncSettings'
 import ExportPanel from './settings/ExportPanel'
 import NotificationSettings from './settings/NotificationSettings'
+import StartupSettings from './settings/StartupSettings'
 import McpSettings from './settings/McpSettings'
 import AppearanceSettings from './settings/AppearanceSettings'
 import FeatureToggleCenter from './settings/FeatureToggleCenter'
@@ -1085,6 +1086,11 @@ export default function SettingsView() {
             <SettingsSection icon={<Settings size={14} />} title="Startup" description="What Checkpoint opens with.">
               <GeneralSettings />
             </SettingsSection>
+            {isWindows && (
+              <SettingsSection icon={<PanelTop size={14} />} title="Tray & Windows Startup" description="The notification-area icon, and what happens when you sign in or close the window.">
+                <StartupSettings />
+              </SettingsSection>
+            )}
             {isWindows && (
               <SettingsSection icon={<Monitor size={14} />} title="Desktop Widget" description="Always-on-top overlay for glanceable tasks (Windows only).">
                 <WidgetSettings />

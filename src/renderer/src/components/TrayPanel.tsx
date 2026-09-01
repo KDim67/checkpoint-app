@@ -4,6 +4,7 @@ import { ToggleSwitch } from './settings/SettingsSection'
 import { applyStoredTheme, watchTheme } from '../lib/themeBoot'
 import {
   DEFAULT_STARTUP_SETTINGS,
+  STARTUP_OPTIONS,
   type StartupSettings
 } from '../../../shared/startupSettings'
 
@@ -14,11 +15,9 @@ interface Summary {
   open: number
 }
 
-const STARTUP_ROWS: { key: keyof StartupSettings; label: string; hint: string }[] = [
-  { key: 'openAtLogin', label: 'Start with Windows', hint: 'Launch when you sign in' },
-  { key: 'startMinimised', label: 'Start hidden', hint: 'Go straight to the tray' },
-  { key: 'closeToTray', label: 'Close to tray', hint: 'The X button hides instead of quitting' }
-]
+// The tray panel omits "Show tray icon": switching it off from here would
+// destroy the window the switch is drawn in. It lives in Settings instead.
+const TRAY_PANEL_OPTIONS = STARTUP_OPTIONS.filter(o => o.key !== 'showTrayIcon')
 
 /**
  * The tray popup.
@@ -196,10 +195,10 @@ export default function TrayPanel(): React.JSX.Element {
           Startup
         </span>
 
-        {STARTUP_ROWS.map(({ key, label, hint }) => {
-          // Both of these need somewhere to hide to; without the tray icon they
-          // would strand the window, so main refuses them and so does this.
-          const disabled = !startup.showTrayIcon && key !== 'openAtLogin'
+        {TRAY_PANEL_OPTIONS.map(({ key, label, hint, needsTray }) => {
+          // Without a tray icon these would strand the window, so main refuses
+          // them and the control says so rather than appearing to work.
+          const disabled = needsTray && !startup.showTrayIcon
           return (
             <div
               key={key}
