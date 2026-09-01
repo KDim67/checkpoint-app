@@ -107,16 +107,16 @@ export default function WidgetView() {
         width: '280px',
         height: '160px',
         padding: '12px 14px',
-        background: 'rgba(10, 12, 18, 0.85)',
+        background: 'color-mix(in srgb, var(--color-background) 85%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         borderRadius: '16px',
         border: hovered 
-          ? '1px solid rgba(205, 241, 43, 0.35)' 
-          : '1px solid rgba(255, 255, 255, 0.08)',
+          ? '1px solid color-mix(in srgb, var(--color-secondary) 40%, transparent)' 
+          : '1px solid color-mix(in srgb, var(--color-text-base) 10%, transparent)',
         boxShadow: hovered
-          ? '0 12px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(205, 241, 43, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-          : '0 8px 24px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+          ? 'var(--shadow-2xl), 0 0 15px var(--color-secondary-muted)'
+          : 'var(--shadow-xl)',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
@@ -143,7 +143,7 @@ export default function WidgetView() {
       </div>
 
       {/* Divider */}
-      <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', width: '100%', flexShrink: 0 }} />
+      <div style={{ height: '1px', background: 'var(--color-surface-offset)', width: '100%', flexShrink: 0 }} />
 
       {/* Bottom Area: Split columns */}
       <div style={{ display: 'flex', flex: 1, gap: '12px', minHeight: 0 }}>
@@ -155,7 +155,7 @@ export default function WidgetView() {
           alignItems: 'center',
           justifyContent: 'center',
           gap: '6px',
-          borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+          borderRight: '1px solid var(--color-surface-offset)',
           paddingRight: '10px',
           flexShrink: 0
         }}>
@@ -166,7 +166,7 @@ export default function WidgetView() {
                 cy="24"
                 r={radius}
                 fill="transparent"
-                stroke="rgba(255, 255, 255, 0.04)"
+                stroke="var(--color-surface-offset)"
                 strokeWidth="3.5"
               />
               <circle
@@ -221,13 +221,13 @@ export default function WidgetView() {
           {/* Middle: Micro Indicators */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 6px #3b82f6aa' }} />
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-priority-low)', boxShadow: '0 0 6px var(--color-priority-low)' }} />
               <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>
                 <strong>{data.inProgressCount}</strong> Active
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0baa' }} />
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-priority-med)', boxShadow: '0 0 6px var(--color-priority-med)' }} />
               <span style={{ fontSize: '10.5px', color: 'var(--color-text-muted)' }}>
                 <strong>{data.openCount}</strong> To Do
               </span>
@@ -236,8 +236,8 @@ export default function WidgetView() {
 
           {/* Bottom: Activity Log */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.04)',
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-surface-offset)',
             borderRadius: '8px',
             padding: '6px 8px',
             display: 'flex',

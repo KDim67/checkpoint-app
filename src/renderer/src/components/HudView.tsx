@@ -235,9 +235,9 @@ export default function HudView() {
   const priorityLabels = ['None', 'Low', 'Med', 'High']
   const priorityColors = [
     'var(--color-text-faint)',
-    '#3b82f6',
+    'var(--color-priority-low)',
     'var(--color-priority-med)',
-    '#ef4444'
+    'var(--color-priority-high)'
   ]
 
   return (
@@ -257,21 +257,21 @@ export default function HudView() {
           width: 590px;
           display: flex;
           flex-direction: column;
-          background: rgba(19, 22, 34, 0.94);
+          background: color-mix(in srgb, var(--color-surface-1) 94%, transparent);
           backdrop-filter: blur(12px);
           border: 1px solid var(--color-surface-offset);
           border-radius: var(--radius-lg);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+          box-shadow: var(--shadow-2xl), 0 0 0 1px color-mix(in srgb, var(--color-text-base) 8%, transparent);
           overflow: hidden;
           transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
         }
         .hud-container.focused {
           border-color: var(--color-secondary);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 12px var(--color-secondary-muted);
+          box-shadow: var(--shadow-2xl), 0 0 12px var(--color-secondary-muted);
         }
         .hud-container.has-error {
           border-color: var(--color-error);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 12px var(--color-error-muted);
+          box-shadow: var(--shadow-2xl), 0 0 12px var(--color-error-muted);
         }
         .hud-bar {
           height: 54px;
@@ -305,7 +305,7 @@ export default function HudView() {
         .hud-error-tray {
           height: 36px;
           background: var(--color-error-muted);
-          border-top: 1px solid rgba(239, 68, 68, 0.2);
+          border-top: 1px solid color-mix(in srgb, var(--color-error) 25%, transparent);
           display: flex;
           align-items: center;
           padding: 0 var(--space-4);
@@ -376,7 +376,7 @@ export default function HudView() {
 
               {/* Tags Count */}
               {parsed.tags.map((tag, idx) => (
-                <div key={idx} className="hud-pill" style={{ background: 'rgba(83, 94, 133, 0.25)', color: 'var(--color-text-muted)', border: '1px solid var(--color-balance)' }}>
+                <div key={idx} className="hud-pill" style={{ background: 'color-mix(in srgb, var(--color-balance) 25%, transparent)', color: 'var(--color-text-muted)', border: '1px solid var(--color-balance)' }}>
                   #{tag}
                 </div>
               ))}
