@@ -105,6 +105,13 @@ export const enum IpcChannels {
   /** Main → renderer: something outside the UI changed the data. */
   MCP_DATA_CHANGED       = 'mcp:dataChanged',
   MCP_ACTIVITY_LIST      = 'mcp:activityList',
+  // Subtasks
+  SUBTASK_LIST           = 'subtask:list',
+  SUBTASK_ADD            = 'subtask:add',
+  SUBTASK_UPDATE         = 'subtask:update',
+  SUBTASK_DELETE         = 'subtask:delete',
+  SUBTASK_CONVERT        = 'subtask:convert',
+
   // Export
   EXPORT_ITEMS           = 'export:items',
 

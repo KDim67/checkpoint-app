@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
 import { X, Tag, Link2, Sparkles, Check, CheckSquare, Square, Plus } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
+import {
+  parseChecklist,
+  computeProgress,
+  type Subtask
+} from '../../../../shared/subtasks'
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import ColorPicker from '../ui/ColorPicker'
@@ -18,44 +23,13 @@ interface TaskDetailDrawerProps {
 
 type EditorMode = 'edit' | 'preview' | 'split'
 
-interface SubTask {
-  index: number // line index in the markdown text
-  checked: boolean
-  text: string
-}
 
-// Parse checklist items (- [ ] and - [x]) from markdown
-function parseSubTasks(markdown: string): SubTask[] {
-  const lines = markdown.split('\n')
-  const subTasks: SubTask[] = []
-  lines.forEach((line, index) => {
-    const match = /^\s*-\s*\[([ xX])\]\s*(.*)$/.exec(line)
-    if (match) {
-      subTasks.push({
-        index,
-        checked: match[1].toLowerCase() === 'x',
-        text: match[2].trim()
-      })
-    }
-  })
-  return subTasks
-}
-
-// Update checkbox value inside markdown string
-function toggleSubTaskMarkdown(markdown: string, lineIndex: number, currentChecked: boolean): string {
-  const lines = markdown.split('\n')
-  const oldLine = lines[lineIndex]
-  const nextChar = currentChecked ? ' ' : 'x'
-  lines[lineIndex] = oldLine.replace(/-\s*\[([ xX])\]/, `- [${nextChar}]`)
-  return lines.join('\n')
-}
-
-// Append a sub-task line to markdown string
-function addSubTaskMarkdown(markdown: string, text: string): string {
-  const trimmed = markdown.trim()
-  const subtaskLine = `- [ ] ${text}`
-  if (!trimmed) return subtaskLine
-  return `${trimmed}\n${subtaskLine}`
+// Detecting the checkboxes people wrote before subtasks were real rows, so the
+// drawer can offer to convert them. The parsing itself lives in shared/ and is
+// the same code the conversion uses, so the count offered always matches what
+// conversion produces.
+function legacyChecklistOf(markdown: string): { title: string; done: boolean }[] {
+  return parseChecklist(markdown).items
 }
 
 export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }: TaskDetailDrawerProps) {
@@ -71,8 +45,17 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   // Estimates: parsed from metadata.estimate
   const [estimate, setEstimate] = useState<number | ''>('')
 
-  // Subtasks
+  // Subtasks, rows in their own table, not checkboxes in the body.
   const [newSubtaskText, setNewSubtaskText] = useState('')
+  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+
+  const loadSubtasks = useCallback(async (id: string) => {
+    try {
+      setSubtasks(await window.electronAPI.subtasks.list(id))
+    } catch (err) {
+      console.error('Failed to load subtasks:', err)
+    }
+  }, [])
 
   // Editor mode
   const [editorMode, setEditorMode] = useState<EditorMode>('split')
@@ -117,6 +100,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
         
         if (active) {
           setTask(found)
+        loadSubtasks(found.id)
           setTitle(found.title)
           setBody(found.body)
           setSelectedTagIds(found.tags?.map(t => t.id) || [])
@@ -231,23 +215,45 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     setTask(prev => prev ? { ...prev, tags: refreshedTags } : null)
   }
 
-  const handleToggleSubtask = async (lineIndex: number, currentChecked: boolean) => {
-    if (!task) return
-    const newBody = toggleSubTaskMarkdown(body, lineIndex, currentChecked)
-    setBody(newBody)
-    await onUpdate(task.id, { body: newBody })
-    setTask(prev => prev ? { ...prev, body: newBody } : null)
+  const handleToggleSubtask = async (subtask: Subtask) => {
+    // Applied locally first: a checkbox that waits for a round trip feels broken.
+    setSubtasks(prev => prev.map(s => (s.id === subtask.id ? { ...s, done: !s.done } : s)))
+    await window.electronAPI.subtasks.update(subtask.id, { done: !subtask.done })
+    if (task) loadSubtasks(task.id)
+  }
+
+  const handleDeleteSubtask = async (subtask: Subtask) => {
+    setSubtasks(prev => prev.filter(s => s.id !== subtask.id))
+    await window.electronAPI.subtasks.remove(subtask.id)
   }
 
   const handleAddSubtaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newSubtaskText.trim() || !task) return
-
-    const newBody = addSubTaskMarkdown(body, newSubtaskText.trim())
-    setBody(newBody)
+    const title = newSubtaskText.trim()
+    if (!title || !task) return
     setNewSubtaskText('')
-    await onUpdate(task.id, { body: newBody })
-    setTask(prev => prev ? { ...prev, body: newBody } : null)
+    await window.electronAPI.subtasks.add(task.id, title)
+    await loadSubtasks(task.id)
+  }
+
+  /** Rescues the checkboxes written before subtasks were real rows. */
+  const handleConvertChecklist = async () => {
+    if (!task) return
+    const result = await window.electronAPI.subtasks.convert(task.id)
+    if (!result.ok) return
+    // Re-read rather than trusting a local edit: the conversion rewrote the body
+    // in main, and this is the same lookup the drawer opens with.
+    const found = await window.electronAPI.db.searchItems({
+      query: task.id,
+      context: activeContext,
+      type: 'task'
+    })
+    const refreshed = found.items.find(i => i.id === task.id)
+    if (refreshed) {
+      setBody(refreshed.body)
+      setTask(refreshed)
+    }
+    await loadSubtasks(task.id)
   }
 
   const handleAddRelation = async (targetId: string) => {
@@ -278,7 +284,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     toggleRightPanel('ai-chat')
   }
 
-  const subtasks = parseSubTasks(body)
+  const legacyChecklist = legacyChecklistOf(body)
+  const progress = useMemo(() => computeProgress(subtasks), [subtasks])
 
   if (loading) {
     return (
@@ -758,6 +765,36 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </span>
 
             {subtasks.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                <div style={{
+                  flex: 1, height: '4px', borderRadius: '2px',
+                  background: 'var(--color-surface-offset)', overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${Math.round(progress.ratio * 100)}%`,
+                    height: '100%',
+                    background: 'var(--color-secondary)',
+                    transition: 'width 150ms ease'
+                  }} />
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flexShrink: 0 }}>
+                  {progress.done}/{progress.total}
+                </span>
+              </div>
+            )}
+
+            {legacyChecklist.length > 0 && (
+              <button
+                className="btn-secondary"
+                onClick={handleConvertChecklist}
+                style={{ alignSelf: 'flex-start', marginBottom: 'var(--space-2)' }}
+                title="Move the markdown checkboxes in the description into real subtasks"
+              >
+                Convert {legacyChecklist.length} checkbox{legacyChecklist.length === 1 ? '' : 'es'} from the description
+              </button>
+            )}
+
+            {subtasks.length > 0 && (
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -769,25 +806,43 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               }}>
                 {subtasks.map(t => (
                   <div
-                    key={t.index}
-                    onClick={() => handleToggleSubtask(t.index, t.checked)}
+                    key={t.id}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 'var(--space-2)',
                       fontSize: 'var(--text-xs)',
-                      cursor: 'pointer',
-                      color: t.checked ? 'var(--color-text-faint)' : 'var(--color-text-base)',
-                      textDecoration: t.checked ? 'line-through' : 'none',
+                      color: t.done ? 'var(--color-text-faint)' : 'var(--color-text-base)',
                       userSelect: 'none'
                     }}
                   >
-                    {t.checked ? (
-                      <CheckSquare size={14} style={{ color: 'var(--color-secondary)' }} />
-                    ) : (
-                      <Square size={14} style={{ color: 'var(--color-text-muted)' }} />
-                    )}
-                    <span>{t.text}</span>
+                    <button
+                      onClick={() => handleToggleSubtask(t)}
+                      aria-pressed={t.done}
+                      aria-label={t.title}
+                      style={{
+                        display: 'flex', background: 'none', border: 'none',
+                        padding: 0, cursor: 'pointer', flexShrink: 0
+                      }}
+                    >
+                      {t.done ? (
+                        <CheckSquare size={14} style={{ color: 'var(--color-secondary)' }} />
+                      ) : (
+                        <Square size={14} style={{ color: 'var(--color-text-muted)' }} />
+                      )}
+                    </button>
+                    <span style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
+                    <button
+                      onClick={() => handleDeleteSubtask(t)}
+                      title="Delete subtask"
+                      aria-label={'Delete ' + t.title}
+                      style={{
+                        display: 'flex', background: 'none', border: 'none',
+                        padding: 0, cursor: 'pointer', color: 'var(--color-text-faint)', flexShrink: 0
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                 ))}
               </div>

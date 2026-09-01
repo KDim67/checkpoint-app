@@ -24,6 +24,8 @@ export type McpUndoAction =
   | { kind: 'delete_tag'; id: string }
   | { kind: 'delete_relation'; id: string }
   | { kind: 'delete_recurrence'; id: string }
+  | { kind: 'delete_subtask'; id: string }
+  | { kind: 'set_subtask_done'; id: string; done: boolean }
 
 export interface McpActivityEntry {
   id: string
@@ -76,6 +78,12 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
       return str(o.id) ? { kind: 'delete_relation', id: str(o.id) } : null
     case 'delete_recurrence':
       return str(o.id) ? { kind: 'delete_recurrence', id: str(o.id) } : null
+    case 'delete_subtask':
+      return str(o.id) ? { kind: 'delete_subtask', id: str(o.id) } : null
+    case 'set_subtask_done':
+      return str(o.id) && typeof o.done === 'boolean'
+        ? { kind: 'set_subtask_done', id: str(o.id), done: o.done }
+        : null
     default:
       return null
   }
@@ -120,7 +128,9 @@ export const MCP_WRITE_TOOLS = [
   'link_items',
   'archive_item',
   'create_recurrence',
-  'delete_recurrence'
+  'delete_recurrence',
+  'add_subtask',
+  'set_subtask_done'
 ] as const
 
 export type McpWriteTool = (typeof MCP_WRITE_TOOLS)[number]
