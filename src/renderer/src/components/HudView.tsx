@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { parseNaturalDate, describeDue } from '../../../shared/naturalDate'
 
 // SVG Icons
 
@@ -34,6 +35,10 @@ interface ParsedResult {
   context: string
   priority: 0 | 1 | 2 | 3
   tags: string[]
+  /** Epoch milliseconds from a phrase like "tomorrow 3pm", or null. */
+  dueAt: number | null
+  /** The phrase that produced it, shown back as a pill while typing. */
+  dueSource: string | null
 }
 
 function parseInput(input: string): ParsedResult {
@@ -77,11 +82,16 @@ function parseInput(input: string): ParsedResult {
   })
   text = text.replace(/#([a-zA-Z0-9_-]+)\b/g, '')
 
-  const cleanedText = text.replace(/\s+/g, ' ').trim()
+  // 5. Parse the due date last, so it only ever sees what the other rules left
+  //    behind, otherwise a tag like #tuesday would be read as a weekday.
+  const dated = parseNaturalDate(text.replace(/\s+/g, ' ').trim())
+  const cleanedText = dated.cleanedText
 
   return {
     text: input,
     cleanedText,
+    dueAt: dated.dueAt,
+    dueSource: dated.matched,
     type,
     context,
     priority,
@@ -214,7 +224,7 @@ export default function HudView() {
           status: 'open',
           priority: parsed.priority,
           position: Date.now(),
-          due_at: null,
+          due_at: parsed.dueAt,
           metadata: '{}'
         }, tagIds)
 
@@ -346,7 +356,7 @@ export default function HudView() {
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder="Type a task (- task #tag @unity !high) or daily log..."
+            placeholder="Type a task (- task #tag @unity !high tomorrow 3pm) or daily log..."
             aria-label="Quick capture input"
             disabled={submitting}
             style={{ opacity: submitting ? 0.5 : 1 }}
@@ -359,6 +369,22 @@ export default function HudView() {
               <div className="hud-pill" style={{ background: 'var(--color-surface-offset)', color: 'var(--color-text-base)' }}>
                 {parsed.type}
               </div>
+
+              {/* Shown resolved rather than as typed, so an ambiguous phrase is
+                  confirmed before the item is created. */}
+              {parsed.dueAt !== null && (
+                <div
+                  className="hud-pill"
+                  title={parsed.dueSource ? 'from "' + parsed.dueSource + '"' : undefined}
+                  style={{
+                    background: 'var(--color-primary-muted)',
+                    color: 'var(--color-primary)',
+                    border: '1px solid var(--color-primary)'
+                  }}
+                >
+                  {describeDue(parsed.dueAt)}
+                </div>
+              )}
 
               {/* Context Badge */}
               {parsed.context !== 'default' && (
@@ -394,7 +420,7 @@ export default function HudView() {
         {/* Syntax Tip Tray */}
         {isFocused && !error && (
           <div className="hud-tip-tray">
-            💡 Tip: Use - for tasks, @context for context, #tag for tags, !high/med/low for priority.
+            💡 Tip: Use - for tasks, @context, #tag, !high/med/low, and a date like tomorrow 3pm, friday, or in 2 days.
           </div>
         )}
       </div>
