@@ -14,6 +14,7 @@ import {
   type SortKey, type ViewMode
 } from './notes/notesUtils'
 import type { NoteMetadata, NoteSearchResult } from '../../../shared/types'
+import { useAppStore } from '../store/appStore'
 
 export default function NotesView(): React.JSX.Element {
   const { toast } = useToast()
@@ -67,8 +68,10 @@ export default function NotesView(): React.JSX.Element {
       setLoading(true)
       const list = await loadNotesList()
       // Restore last-opened note if it still exists
+      // Skipped when the palette asked for a specific note: this runs after an
+      // IPC round trip, so restoring the last-opened one here would overwrite it.
       const last = prefs.getLastNote()
-      if (last && list.some(n => n.title === last)) {
+      if (!useAppStore.getState().pendingNoteTitle && last && list.some(n => n.title === last)) {
         setActiveNoteTitle(last)
       }
       setLoading(false)
@@ -176,6 +179,19 @@ export default function NotesView(): React.JSX.Element {
     await flushPending()
     setActiveNoteTitle(title)
   }, [activeNoteTitle, flushPending])
+
+  // Open a note the command palette asked for
+  // Held in the store rather than sent as an event: navigation only schedules a
+  // render, so this view does not exist at the moment the palette acts and an
+  // event would land with nobody listening. Subscribed rather than read once,
+  // because the palette can also be used while Notes is already open. Cleared on
+  // arrival so returning here later does not reopen it.
+  const pendingNoteTitle = useAppStore(s => s.pendingNoteTitle)
+  useEffect(() => {
+    if (!pendingNoteTitle) return
+    useAppStore.getState().setPendingNoteTitle(null)
+    handleSelectNote(pendingNoteTitle)
+  }, [pendingNoteTitle, handleSelectNote])
 
   // Ctrl+S
   useEffect(() => {
