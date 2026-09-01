@@ -13,6 +13,7 @@
 
 import { app, BrowserWindow, Tray, nativeImage, screen } from 'electron'
 import { join } from 'path'
+import { IpcChannels } from '../shared/ipcChannels'
 import { getSetting, setSetting } from './db'
 import {
   normalizeStartupSettings,
@@ -68,6 +69,12 @@ export function setStartupSettings(next: unknown): StartupSettings {
 
   if (settings.showTrayIcon) createTray()
   else destroyTray()
+
+  // The same switches appear in the tray panel and in Settings. Without this the
+  // two drift apart the moment one of them is used.
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(IpcChannels.STARTUP_CHANGED, settings)
+  }
 
   return settings
 }

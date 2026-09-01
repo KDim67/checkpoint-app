@@ -24,6 +24,10 @@ export default function StartupSettings(): React.JSX.Element {
       .getStartup()
       .then(s => { setSettings(s); setLoaded(true) })
       .catch(err => { console.error('Failed to load startup settings:', err); setLoaded(true) })
+
+    // These switches also live in the tray panel; without this the two disagree
+    // until one of them is reloaded.
+    return window.electronAPI.tray.onStartupChanged(setSettings)
   }, [])
 
   const toggle = async (key: keyof Settings, value: boolean) => {
