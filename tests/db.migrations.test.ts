@@ -17,7 +17,7 @@ import { initDb, closeDb, getDb, searchItems } from '../src/main/db'
 // Deliberately a literal rather than an import from db.ts: asserting the
 // pragma against the same constant that set it would pass no matter what. Bump
 // this by hand whenever a migration is added.
-const CURRENT_VERSION = 6
+const CURRENT_VERSION = 7
 
 /** The items table as shipped by early builds: status carried a CHECK constraint. */
 const LEGACY_SCHEMA = `
@@ -313,7 +313,7 @@ describe('partial upgrades', () => {
     expect(db.prepare(`SELECT notes FROM focus_sessions WHERE id = 'fs_1'`).get()).toMatchObject({
       notes: 'deep work'
     })
-    expect(tableNames()).toEqual(expect.arrayContaining(['clipboard_items', 'ai_memories']))
+    expect(tableNames()).toEqual(expect.arrayContaining(['clipboard_items', 'ai_memories', 'mcp_activity']))
   })
 
   it('leaves a database already at the current version alone', () => {

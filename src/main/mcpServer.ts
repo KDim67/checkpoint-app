@@ -64,6 +64,8 @@ import {
 } from '../shared/boardModel'
 import { applyConfigOps, normalizeConfigUpdate } from '../shared/boardOps'
 import type { CreateItemPayload, Item } from '../shared/types'
+import { recordMcpActivity } from './mcpActivity'
+import { shorten, type McpUndoAction } from '../shared/mcpActivity'
 import { MCP_DEFAULT_PORT } from '../shared/ports'
 
 // Re-exported so the dynamic importers in index.ts keep resolving it here.
@@ -385,6 +387,12 @@ function buildMcpServer(): McpServer {
         metadata: '{}'
       }
       const created = createItem(getDb(), payload)
+      recordMcpActivity(
+        'create_item',
+        ctx,
+        `Created ${type} "${shorten(title)}"`,
+        [{ kind: 'delete_item', id: created.id }]
+      )
       notifyRenderer()
       return json({ created: summarizeItem(created) })
     }
@@ -407,7 +415,24 @@ function buildMcpServer(): McpServer {
       if (!getItemById(id)) return text(`No item with id "${id}".`)
       const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))
       if (Object.keys(clean).length === 0) return text('Nothing to update.')
+
+      // Captured before the write: afterwards the old values are gone, and only
+      // the fields actually being changed are worth restoring.
+      const before = getItemById(id)
+      const restored: Record<string, unknown> = {}
+      if (before) {
+        for (const key of Object.keys(clean)) {
+          restored[key] = (before as unknown as Record<string, unknown>)[key]
+        }
+      }
+
       const updated = updateItem(getDb(), id, clean as Partial<Item>)
+      recordMcpActivity(
+        'update_item',
+        before?.context ?? null,
+        `Updated "${shorten(before?.title ?? id)}" (${Object.keys(clean).join(', ')})`,
+        before ? [{ kind: 'restore_item', id, fields: restored }] : null
+      )
       notifyRenderer()
       return json({ updated: summarizeItem(updated) })
     }
@@ -452,6 +477,19 @@ function buildMcpServer(): McpServer {
       }
 
       writeBoardConfig(ctx, applied.next)
+      recordMcpActivity(
+        'configure_board',
+        ctx,
+        applied.summary.length > 0
+          ? `Board: ${applied.summary.join('; ')}`
+          : 'Board configuration changed',
+        // Cards moved off a deleted column are not restored by the inverse, the
+        // column comes back, but which cards sat in it is not recoverable from
+        // the config alone, so undo is only offered when nothing moved.
+        applied.inverse.length > 0 && movedCards === 0
+          ? [{ kind: 'board_ops', context: ctx, operations: applied.inverse }]
+          : null
+      )
       notifyRenderer()
       return json({
         applied: applied.summary,
@@ -473,7 +511,29 @@ function buildMcpServer(): McpServer {
       }
     },
     async ({ title, content, oldTitle }) => {
+      // Read before writing: this is the only moment the previous body exists.
+      let previous: string | null = null
+      try {
+        previous = await readNote(oldTitle ?? title)
+      } catch {
+        previous = null   // no such note yet, so undo means deleting this one
+      }
+
       await writeNote(title, content, oldTitle)
+
+      const undo: McpUndoAction[] = []
+      if (previous === null) {
+        undo.push({ kind: 'delete_note', title })
+      } else {
+        if (oldTitle && oldTitle !== title) undo.push({ kind: 'delete_note', title })
+        undo.push({ kind: 'write_note', title: oldTitle ?? title, content: previous })
+      }
+      recordMcpActivity(
+        'write_note',
+        null,
+        previous === null ? `Created note "${shorten(title)}"` : `Rewrote note "${shorten(title)}"`,
+        undo
+      )
       notifyRenderer()
       return text(`Saved note "${title}".`)
     }
@@ -639,6 +699,9 @@ function buildMcpServer(): McpServer {
       // call; falling back keeps a tag from being lost over a formatting slip.
       const hex = color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#535e85'
       const tag = createTag({ name, color: hex })
+      recordMcpActivity('create_tag', null, `Created tag "${shorten(name, 30)}"`, [
+        { kind: 'delete_tag', id: tag.id }
+      ])
       notifyRenderer()
       return json({ created: tag })
     }
@@ -667,6 +730,9 @@ function buildMcpServer(): McpServer {
       if (!getItemById(fromId)) return text(`No item with id "${fromId}".`)
       if (!getItemById(toId)) return text(`No item with id "${toId}".`)
       const relation = createRelation(fromId, toId, type)
+      recordMcpActivity('link_items', null, `Linked two items (${type})`, [
+        { kind: 'delete_relation', id: relation.id }
+      ])
       notifyRenderer()
       return json({ created: relation })
     }
@@ -685,7 +751,14 @@ function buildMcpServer(): McpServer {
       // Archiving rather than deleting is deliberate: an agent acting on a
       // misread instruction should not be able to destroy work irreversibly,
       // and the app already treats 'archived' as its recoverable state.
+      const before = getItemById(id)
       updateItem(getDb(), id, { status: 'archived' })
+      recordMcpActivity(
+        'archive_item',
+        before?.context ?? null,
+        `Archived "${shorten(before?.title ?? id)}"`,
+        before ? [{ kind: 'restore_item', id, fields: { status: before.status } }] : null
+      )
       notifyRenderer()
       return text(`Archived "${id}". It can be restored from the archive bin.`)
     }

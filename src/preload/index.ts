@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
+import type { McpActivityEntry } from '../shared/mcpActivity'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type {
   Item,
@@ -351,6 +352,10 @@ const api = {
     getStatus: (): Promise<{ running: boolean; port: number; enabled: boolean; token: string }> =>
       ipcRenderer.invoke(IpcChannels.MCP_GET_STATUS),
 
+    listActivity: (limit?: number): Promise<McpActivityEntry[]> =>
+      ipcRenderer.invoke(IpcChannels.MCP_ACTIVITY_LIST, limit),
+    undoActivity: (id: string): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke(IpcChannels.MCP_ACTIVITY_UNDO, id),
     regenerateToken: (): Promise<string> =>
       ipcRenderer.invoke(IpcChannels.MCP_REGENERATE_TOKEN),
 
