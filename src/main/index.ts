@@ -19,6 +19,7 @@ import {
 } from './cheatsheetService'
 import { batchRenameFiles, selectTextureFile, loadTextureFile, savePbrMaps, saveSeamlessTexture, selectFolder, saveSpriteAtlas, saveSlicedSprites, saveLutTexture, saveUpscaledTexture } from './gamedevService'
 import { SyncService } from './syncService'
+import { getStartupSettings } from './tray'
 
 // Pure constants with no dependencies of their own, so importing them
 // statically does not defeat the dynamic `import('./mcpServer')` calls below, 
@@ -28,6 +29,15 @@ import { MCP_DEFAULT_PORT, WEBHOOK_DEFAULT_PORT } from '../shared/ports'
 import type { WidgetPosition } from './widget'
 
 const syncService = new SyncService()
+
+/**
+ * Set once the app is genuinely on its way out.
+ *
+ * Close-to-tray works by cancelling the window's close, so without a way to say
+ * "this time we mean it" Quit would be cancelled too and the app could never
+ * exit.
+ */
+let isQuitting = false
 
 // Register protocols as privileged before app.whenReady()
 protocol.registerSchemesAsPrivileged([
@@ -297,6 +307,27 @@ function createWindow(): void {
   mainWindow.on('unmaximize', scheduleSaveWindowBounds)
   // Flush before teardown, or a resize inside the debounce window is lost.
   mainWindow.on('close', saveWindowBoundsNow)
+
+  // Close-to-tray. Off by default: closing has always quit this app, and the
+  // setting exists so nobody discovers the change by accident.
+  mainWindow.on('close', event => {
+    if (isQuitting || process.platform === 'darwin') return
+    let closeToTray = false
+    try {
+      // Read at the moment of closing rather than cached, so toggling the
+      // setting takes effect without a restart. Statically imported because the
+      // main bundle is ESM, a require() here would throw, and this catch would
+      // swallow it, leaving close-to-tray silently dead.
+      const settings = getStartupSettings()
+      closeToTray = settings.closeToTray && settings.showTrayIcon
+    } catch (err) {
+      console.error('[tray] Could not read the close behaviour:', err)
+    }
+    if (closeToTray) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
+  })
 
   // Null reference on close, allows V8 garbage collection of the window
   mainWindow.on('closed', () => {
@@ -641,6 +672,75 @@ function registerIpcHandlers(): void {
 
   // Handled here rather than in mcpServer.ts so the log stays readable and
   // reversible while the server itself is switched off.
+  ipcMain.handle(IpcChannels.STARTUP_GET, async () => {
+    const { getStartupSettings } = await import('./tray')
+    return getStartupSettings()
+  })
+
+  ipcMain.handle(IpcChannels.STARTUP_SET, async (_event, next: unknown) => {
+    const { setStartupSettings } = await import('./tray')
+    return setStartupSettings(next)
+  })
+
+  /** Live counts for the tray panel, so it says something worth reading. */
+  ipcMain.handle(IpcChannels.TRAY_SUMMARY, async () => {
+    const { getDb, getSetting } = await import('./db')
+    try {
+      const now = Date.now()
+      const endOfDay = new Date(now)
+      endOfDay.setHours(23, 59, 59, 999)
+
+      const counts = getDb()
+        .prepare(
+          `SELECT
+             SUM(CASE WHEN due_at IS NOT NULL AND due_at < ? THEN 1 ELSE 0 END) AS overdue,
+             SUM(CASE WHEN due_at IS NOT NULL AND due_at >= ? AND due_at <= ? THEN 1 ELSE 0 END) AS today,
+             COUNT(*) AS open
+           FROM items
+           WHERE status NOT IN ('done', 'archived') AND type IN ('card', 'task')`
+        )
+        .get(now, now, endOfDay.getTime()) as { overdue: number | null; today: number | null; open: number | null }
+
+      return {
+        context: getSetting<string>('active_context', 'default'),
+        overdue: counts.overdue ?? 0,
+        dueToday: counts.today ?? 0,
+        open: counts.open ?? 0
+      }
+    } catch (err) {
+      console.error('[tray] Could not build the summary:', err)
+      return { context: '', overdue: 0, dueToday: 0, open: 0 }
+    }
+  })
+
+  ipcMain.handle(IpcChannels.TRAY_ACTION, async (_event, action: string) => {
+    const { showMainWindow, hidePanel, openDataFolder } = await import('./tray')
+    switch (action) {
+      case 'open':
+        showMainWindow()
+        break
+      case 'capture': {
+        hidePanel()
+        const { enableHud } = await import('./hud')
+        enableHud()
+        break
+      }
+      case 'data-folder':
+        hidePanel()
+        openDataFolder()
+        break
+      case 'quit':
+        hidePanel()
+        isQuitting = true
+        app.quit()
+        break
+      case 'close':
+        hidePanel()
+        break
+    }
+    return { ok: true as const }
+  })
+
   ipcMain.handle(IpcChannels.SUBTASK_LIST, async (_event, itemId: string) => {
     const { getSubtasks } = await import('./db')
     const { normalizeSubtasks } = await import('../shared/subtasks')
@@ -1475,6 +1575,15 @@ app.whenReady().then(async () => {
   // Register application hotkeys (HUD & Clipboard)
   registerAppShortcuts()
 
+  // Tray icon. Created before the window is shown so a login launch that starts
+  // minimised still has somewhere to go.
+  try {
+    const { initializeTray } = await import('./tray')
+    initializeTray()
+  } catch (err) {
+    console.error('Failed to create the tray icon:', err)
+  }
+
   // Due-date reminders. In main because the renderer's Notification API only
   // fires while a window exists, and a reminder that needs the app focused is
   // not a reminder.
@@ -1560,6 +1669,10 @@ app.whenReady().then(async () => {
       createWindow()
     }
   })
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
 })
 
 app.on('window-all-closed', () => {

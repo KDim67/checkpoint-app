@@ -5,6 +5,7 @@ import type { McpActivityEntry } from '../shared/mcpActivity'
 import type { RecurrenceSummary } from '../shared/recurrence'
 import type { NotificationCategory, NotificationPolicy } from '../shared/notificationPolicy'
 import type { Subtask } from '../shared/subtasks'
+import type { StartupSettings } from '../shared/startupSettings'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type {
   Item,
@@ -346,6 +347,16 @@ const api = {
       ipcRenderer.on(IpcChannels.WEBHOOK_EVENT, handler)
       return () => ipcRenderer.removeListener(IpcChannels.WEBHOOK_EVENT, handler)
     }
+  },
+
+  tray: {
+    summary: (): Promise<{ context: string; overdue: number; dueToday: number; open: number }> =>
+      ipcRenderer.invoke(IpcChannels.TRAY_SUMMARY),
+    action: (action: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.TRAY_ACTION, action),
+    getStartup: (): Promise<StartupSettings> => ipcRenderer.invoke(IpcChannels.STARTUP_GET),
+    setStartup: (settings: StartupSettings): Promise<StartupSettings> =>
+      ipcRenderer.invoke(IpcChannels.STARTUP_SET, settings)
   },
 
   subtasks: {

@@ -20,6 +20,7 @@ import {
 
 // Lazy-loaded views (code split per view)
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
+const TrayPanel      = lazy(() => import('./components/TrayPanel'))
 const LogView      = lazy(() => import('./components/LogView'))
 const KanbanView   = lazy(() => import('./components/KanbanView'))
 const BacklogView  = lazy(() => import('./components/BacklogView'))
@@ -442,6 +443,17 @@ function WidgetShell() {
     </div>
   )
 }
+/**
+ * The tray popup. No transparent wrapper: the panel draws its own rounded
+ * surface and shadow, and a centring flex parent would letterbox it.
+ */
+function TrayShell() {
+  return (
+    <ErrorBoundary label="The tray panel">
+      <Suspense fallback={null}><TrayPanel /></Suspense>
+    </ErrorBoundary>
+  )
+}
 function HudShell() {
   return (
     <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -753,5 +765,6 @@ export function AppRouter() {
   const hash = window.location.hash
   if (hash === '#widget') return <WidgetShell />
   if (hash === '#hud')    return <HudShell />
+  if (hash === '#tray')   return <TrayShell />
   return <App />
 }
