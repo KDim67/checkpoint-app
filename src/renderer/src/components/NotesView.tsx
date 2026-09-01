@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Save, Trash2, FileText, Eye, Edit3, Columns,
-  Download, PanelRightOpen, PanelRightClose, ArrowLeft, ArrowRight, FileWarning
-} from 'lucide-react'
+  Download, PanelRightOpen, PanelRightClose, ArrowLeft, ArrowRight, FileWarning, Maximize2, X } from 'lucide-react'
 import { useToast } from './ui/Toast'
 import GraphView from './notes/GraphView'
 import NotesSidebar, { type SidebarItem } from './notes/NotesSidebar'
@@ -35,6 +34,10 @@ export default function NotesView(): React.JSX.Element {
   const [loading, setLoading] = useState<boolean>(true)
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState<string | null>(null)
   const [pins, setPins] = useState<string[]>(prefs.getPins())
+  // The graph has always existed, but only as a 220px thumbnail in the info
+  // panel, too small to trace a link through, which is the point of having one.
+  // This opens the same component at a size you can actually read.
+  const [graphExpanded, setGraphExpanded] = useState(false)
   const [sort, setSort] = useState<SortKey>(prefs.getSort())
 
   const renamingRef = useRef(false)
@@ -386,6 +389,63 @@ export default function NotesView(): React.JSX.Element {
     <div className={`notes-layout-grid ${showInfo ? '' : 'no-info'}`}>
       <style>{NOTES_CSS}</style>
 
+      {/* Rendered as a child rather than a sibling: it is position:fixed, so its
+          place in the tree does not matter and the layout grid stays intact. */}
+      {graphExpanded && (
+        <div
+          onMouseDown={e => { if (e.target === e.currentTarget) setGraphExpanded(false) }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9998,
+            background: 'rgba(0, 0, 0, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--space-6)'
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Note graph"
+            style={{
+              width: '100%',
+              height: '100%',
+              background: 'var(--color-surface-1)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-2xl)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <div className="row-between" style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+                Note graph
+                <span style={{ marginLeft: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-regular)' }}>
+                  {notes.length} note{notes.length === 1 ? '' : 's'} · click one to open it
+                </span>
+              </span>
+              <button className="btn-secondary" onClick={() => setGraphExpanded(false)} aria-label="Close the graph">
+                <X size={13} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0 }}>
+              {/* The same component, it sizes to its container, so the physics
+                  and the click-to-open behaviour are identical at both sizes. */}
+              <GraphView
+                notes={notes}
+                activeTitle={activeNoteTitle}
+                onSelectNote={title => { handleSelectNote(title); setGraphExpanded(false) }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* COLUMN 1: SIDEBAR */}
       <NotesSidebar
         items={displayItems}
@@ -501,9 +561,33 @@ export default function NotesView(): React.JSX.Element {
         <div className="notes-right-panel">
           <div className="row-between">
             <span className="notes-panel-label">Connections</span>
+            <button
+              onClick={() => setGraphExpanded(true)}
+              title="Open the graph full size"
+              aria-label="Open the graph full size"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'none',
+                border: 'none',
+                padding: '2px 4px',
+                cursor: 'pointer',
+                color: 'var(--color-text-faint)',
+                fontSize: '10px'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-secondary)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-faint)' }}
+            >
+              <Maximize2 size={11} />
+              Expand
+            </button>
           </div>
 
-          <div style={{ height: '220px', flexShrink: 0 }}>
+          <div
+            style={{ height: '220px', flexShrink: 0, cursor: 'zoom-in' }}
+            onDoubleClick={() => setGraphExpanded(true)}
+          >
             <GraphView notes={notes} activeTitle={activeNoteTitle} onSelectNote={handleSelectNote} />
           </div>
 
