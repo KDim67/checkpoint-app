@@ -629,6 +629,24 @@ function registerIpcHandlers(): void {
     return actualPort
   })
 
+  // Handled here rather than in mcpServer.ts so the log stays readable and
+  // reversible while the server itself is switched off.
+  ipcMain.handle(IpcChannels.MCP_ACTIVITY_LIST, async (_event, limit?: number) => {
+    const { listMcpActivity } = await import('./mcpActivity')
+    return listMcpActivity(typeof limit === 'number' ? limit : 50)
+  })
+
+  ipcMain.handle(IpcChannels.MCP_ACTIVITY_UNDO, async (_event, id: string) => {
+    const { undoMcpActivity } = await import('./mcpActivity')
+    const result = undoMcpActivity(id)
+    if (result.ok && mainWindow && !mainWindow.isDestroyed()) {
+      // The board and lists are already open; without this the reversal only
+      // appears after a manual refresh.
+      mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
+    }
+    return result
+  })
+
   ipcMain.handle(IpcChannels.MCP_TOGGLE, async (_event, active: boolean, port: number) => {
     const { toggleMcpServer, setMcpDataChangedHandler, MCP_DEFAULT_PORT: fallback } = await import('./mcpServer')
     const { setSetting } = await import('./db')

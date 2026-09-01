@@ -104,6 +104,8 @@ export const enum IpcChannels {
   MCP_REGENERATE_TOKEN   = 'mcp:regenerateToken',
   /** Main → renderer: something outside the UI changed the data. */
   MCP_DATA_CHANGED       = 'mcp:dataChanged',
+  MCP_ACTIVITY_LIST      = 'mcp:activityList',
+  MCP_ACTIVITY_UNDO      = 'mcp:activityUndo',
 
   // Backup
   BACKUP_RUN             = 'backup:run',

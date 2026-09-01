@@ -87,7 +87,7 @@ export function getDb(): Database.Database {
 }
 
 // Current schema version
-const CURRENT_VERSION = 6
+const CURRENT_VERSION = 7
 
 // Prepared statement cache (populated by initDb)
 /**
@@ -203,6 +203,22 @@ function runMigrations(db: Database.Database): void {
       // rebuild, and rows written either before items_fts existed or during a
       // session when the rebuild had dropped its triggers. Cheap and idempotent.
       db.exec(`INSERT INTO items_fts(items_fts) VALUES('rebuild');`)
+    }
+    if (userVersion < 7) {
+      // Same DDL as SCHEMA_SQL. Existing databases predate the MCP server
+      // keeping any record of what it changed.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS mcp_activity (
+          id          TEXT PRIMARY KEY,
+          tool        TEXT NOT NULL,
+          context     TEXT,
+          summary     TEXT NOT NULL,
+          undo        TEXT,
+          undone_at   INTEGER,
+          created_at  INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_mcp_activity_created ON mcp_activity(created_at DESC);
+      `)
     }
     db.pragma(`user_version = ${CURRENT_VERSION}`)
   })()
@@ -321,6 +337,16 @@ CREATE INDEX IF NOT EXISTS idx_items_type      ON items(type);
 CREATE INDEX IF NOT EXISTS idx_items_status    ON items(status);
 CREATE INDEX IF NOT EXISTS idx_items_position  ON items(position);
 CREATE INDEX IF NOT EXISTS idx_items_created   ON items(created_at DESC);
+CREATE TABLE IF NOT EXISTS mcp_activity (
+  id          TEXT PRIMARY KEY,
+  tool        TEXT NOT NULL,
+  context     TEXT,
+  summary     TEXT NOT NULL,
+  undo        TEXT,
+  undone_at   INTEGER,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_activity_created ON mcp_activity(created_at DESC);
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
   id UNINDEXED,
   title,
@@ -869,6 +895,65 @@ export function createRelation(fromId: string, toId: string, type: RelationType)
 export function deleteRelation(id: string): void {
   recordTombstone(id, 'relations')
   stmtDeleteRelation.run(id)
+}
+
+// MCP activity
+// A record of what an external agent changed. Prepared lazily rather than in the
+// init block because these run rarely, only when the MCP server is switched on
+//, and there is no reason to pay for them on every launch.
+
+export interface McpActivityRow {
+  id: string
+  tool: string
+  context: string | null
+  summary: string
+  undo: string | null
+  undone_at: number | null
+  created_at: number
+}
+
+export function insertMcpActivity(row: McpActivityRow): void {
+  getDb()
+    .prepare(
+      `INSERT INTO mcp_activity (id, tool, context, summary, undo, undone_at, created_at)
+       VALUES (@id, @tool, @context, @summary, @undo, @undone_at, @created_at)`
+    )
+    .run(row)
+}
+
+export function getMcpActivity(limit = 50): McpActivityRow[] {
+  // rowid breaks the tie. An agent can easily make several writes inside one
+  // millisecond, and on created_at alone SQLite is free to return those in any
+  // order, so the log would show a card being updated before it was created.
+  return getDb()
+    .prepare(`SELECT * FROM mcp_activity ORDER BY created_at DESC, rowid DESC LIMIT ?`)
+    .all(limit) as McpActivityRow[]
+}
+
+export function getMcpActivityById(id: string): McpActivityRow | null {
+  return (getDb()
+    .prepare(`SELECT * FROM mcp_activity WHERE id = ?`)
+    .get(id) as McpActivityRow | undefined) ?? null
+}
+
+/**
+ * Stamps an entry as reversed.
+ *
+ * The guard on `undone_at IS NULL` is what makes undo idempotent: two clicks on
+ * the same row, or a click racing a sync, would otherwise replay the reversing
+ * actions twice, and replaying a `delete_item` that already ran would go on to
+ * delete whatever later took that id.
+ */
+export function markMcpActivityUndone(id: string, at: number): boolean {
+  const result = getDb()
+    .prepare(`UPDATE mcp_activity SET undone_at = ? WHERE id = ? AND undone_at IS NULL`)
+    .run(at, id)
+  return result.changes > 0
+}
+
+/** Drops entries older than the cutoff. The log is a convenience, not an audit. */
+export function pruneMcpActivity(olderThan: number): number {
+  return getDb().prepare(`DELETE FROM mcp_activity WHERE created_at < ?`).run(olderThan).changes
 }
 
 export function searchItems(query: SearchQuery): PaginatedResult<Item> {

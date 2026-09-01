@@ -3,6 +3,7 @@ import { Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react'
 import { FieldRow, SettingsInput, ToggleSwitch, RowBetween, Divider } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import { useConfirm } from '../ui/ConfirmDialog'
+import McpActivityLog from './McpActivityLog'
 
 /**
  * Controls the Model Context Protocol server.
@@ -222,6 +223,15 @@ export default function McpSettings(): React.JSX.Element {
             <RefreshCw size={13} />
           </button>
         </div>
+      </FieldRow>
+
+      <Divider />
+
+      <FieldRow
+        label="Recent Agent Activity"
+        hint="Every change an external agent made through MCP. Reversible ones can be undone here."
+      >
+        <McpActivityLog />
       </FieldRow>
 
       <Divider />
