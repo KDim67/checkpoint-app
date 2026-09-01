@@ -13,6 +13,7 @@
 
 import type { CommandLike } from '../../../shared/commandMatch'
 import type { ActiveView, SettingsTab } from '../store/appStore'
+import type { SavedView } from '../../../shared/savedViews'
 
 export interface Command extends CommandLike {
   /** Shown on the right of the row, a shortcut hint or the current value. */
@@ -32,6 +33,9 @@ export interface CommandContext {
   activeContext: string
   /** Views the user has switched off are not offered. */
   enabledViews: Partial<Record<ActiveView, boolean>>
+  /** Saved filters, offered as commands so a view is one keystroke away. */
+  savedViews: SavedView[]
+  applyView: (id: string) => void
 }
 
 const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
@@ -91,6 +95,16 @@ export function buildCommands(ctx: CommandContext): Command[] {
       group: 'Workspace',
       keywords: ['context', 'workspace', 'project'],
       run: () => ctx.setContext(context)
+    })
+  }
+
+  for (const view of ctx.savedViews) {
+    commands.push({
+      id: `savedview:${view.id}`,
+      label: view.name,
+      group: 'Views',
+      keywords: ['view', 'filter', 'saved', 'overdue', 'tasks'],
+      run: () => ctx.applyView(view.id)
     })
   }
 

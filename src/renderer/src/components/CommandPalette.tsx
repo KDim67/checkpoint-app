@@ -7,6 +7,7 @@ import { VIEW_FEATURES } from '../lib/features'
 import { getBoolSetting } from '../lib/settings'
 import { searchEverything, MIN_QUERY_LENGTH } from '../lib/globalSearch'
 import { kindLabel, type SearchHit } from '../../../shared/searchResults'
+import { BUILT_IN_VIEWS, normalizeSavedViews, type SavedView } from '../../../shared/savedViews'
 import type { ActiveView } from '../store/appStore'
 
 interface Props {
@@ -27,6 +28,8 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const [selected, setSelected] = useState(0)
   const [enabledViews, setEnabledViews] = useState<Partial<Record<ActiveView, boolean>>>({})
   const [hits, setHits] = useState<SearchHit[]>([])
+  const [savedViews, setSavedViews] = useState<SavedView[]>(BUILT_IN_VIEWS)
+  const setPendingViewId = useAppStore(s => s.setPendingViewId)
   const selectItem = useAppStore(s => s.selectItem)
   const setRightPanel = useAppStore(s => s.setRightPanelContent)
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
@@ -48,6 +51,9 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         VIEW_FEATURES.map(async f => [f.view, await getBoolSetting(f.key, f.defaultOn)] as const)
       )
       if (!cancelled) setEnabledViews(Object.fromEntries(entries) as Partial<Record<ActiveView, boolean>>)
+
+      const stored = await window.electronAPI.db.getSetting('saved_views').catch(() => null)
+      if (!cancelled) setSavedViews([...BUILT_IN_VIEWS, ...normalizeSavedViews(stored)])
     }
     load()
     return () => { cancelled = true }
@@ -79,9 +85,15 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         toggleRightPanel,
         contexts: availableContexts,
         activeContext,
-        enabledViews
+        enabledViews,
+        savedViews,
+        applyView: id => {
+          // Parked in the store, then navigate: BacklogView reads it on arrival.
+          setPendingViewId(id)
+          setView('backlog')
+        }
       }),
-    [setView, setContext, setSettingsTab, setRightPanelContent, toggleRightPanel, availableContexts, activeContext, enabledViews]
+    [setView, setContext, setSettingsTab, setRightPanelContent, toggleRightPanel, availableContexts, activeContext, enabledViews, savedViews, setPendingViewId]
   )
 
   const results = useMemo(() => rankCommands(commands, query), [commands, query])

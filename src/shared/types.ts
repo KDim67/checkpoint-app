@@ -226,6 +226,13 @@ export interface TaskQueryParams {
   pageSize?: number
   /** When true, returns only archived (soft-deleted) tasks instead of the normal active set. */
   archivedOnly?: boolean
+  /**
+   * Only tasks with no due date. Distinct from an open dueStart/dueEnd range,
+   * which a task without a date can never satisfy.
+   */
+  noDueDate?: boolean
+  /** Only tasks carrying no tags at all, which tagIds cannot express. */
+  untagged?: boolean
 }
 
 export interface FocusSession {

@@ -13,6 +13,13 @@ import { loadBoardConfig } from '../lib/boardConfig'
 import StandupTranslatorView from './StandupTranslatorView'
 import ConfirmDialog from './ui/ConfirmDialog'
 import RecurringPanel from './backlog/RecurringPanel'
+import {
+  BUILT_IN_VIEWS,
+  normalizeSavedViews,
+  toQueryParams,
+  describeView,
+  type SavedView
+} from '../../../shared/savedViews'
 
 interface WorkflowColumn {
   id: string
@@ -22,6 +29,26 @@ interface WorkflowColumn {
 export default function BacklogView() {
   const activeContext = useAppStore(s => s.activeContext)
   const [showRecurring, setShowRecurring] = useState(false)
+  const [activeView, setActiveView] = useState<SavedView | null>(null)
+  const pendingViewId = useAppStore(s => s.pendingViewId)
+
+  // Subscribed rather than read once: the palette can apply a view while this
+  // screen is already open, in which case no mount effect would fire.
+  useEffect(() => {
+    if (!pendingViewId) return
+    useAppStore.getState().setPendingViewId(null)
+    let cancelled = false
+    ;(async () => {
+      const stored = await window.electronAPI.db.getSetting('saved_views').catch(() => null)
+      const all = [...BUILT_IN_VIEWS, ...normalizeSavedViews(stored)]
+      const found = all.find(v => v.id === pendingViewId) ?? null
+      if (!cancelled) {
+        setActiveView(found)
+        setPage(1)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [pendingViewId])
   const { toast } = useToast()
 
   // Items and Schema configurations
@@ -196,20 +223,31 @@ export default function BacklogView() {
   const loadTasks = useCallback(async () => {
     setLoading(true)
     try {
-      const params = {
-        query: debouncedQuery,
-        status: selectedStatuses,
-        priority: selectedPriorities,
-        tagIds: selectedTagIds,
-        dueStart: dueStart ? new Date(dueStart).getTime() : null,
-        dueEnd: dueEnd ? new Date(dueEnd).getTime() : null,
-        hasRelations:
-          hasRelations === 'all' ? null : hasRelations === 'yes',
-        sortBy,
-        sortDesc,
-        page,
-        pageSize
-      }
+      const params = activeView
+        ? {
+            ...toQueryParams(activeView, Date.now()),
+            // The search box stays live on top of a view, narrowing a view is
+            // a normal thing to want, and it does not change what the view is.
+            ...(debouncedQuery ? { query: debouncedQuery } : {}),
+            sortBy,
+            sortDesc,
+            page,
+            pageSize
+          }
+        : {
+            query: debouncedQuery,
+            status: selectedStatuses,
+            priority: selectedPriorities,
+            tagIds: selectedTagIds,
+            dueStart: dueStart ? new Date(dueStart).getTime() : null,
+            dueEnd: dueEnd ? new Date(dueEnd).getTime() : null,
+            hasRelations:
+              hasRelations === 'all' ? null : hasRelations === 'yes',
+            sortBy,
+            sortDesc,
+            page,
+            pageSize
+          }
       const res = await window.electronAPI.db.queryTasks(activeContext, params)
       setTasks(res.items)
       setTotalTasks(res.total)
@@ -219,6 +257,7 @@ export default function BacklogView() {
       setLoading(false)
     }
   }, [
+    activeView,
     activeContext,
     debouncedQuery,
     selectedStatuses,
@@ -831,6 +870,31 @@ export default function BacklogView() {
             setHasRelations={setHasRelations}
             onReset={handleResetFilters}
           />
+        </div>
+      )}
+
+      {activeView && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+          padding: 'var(--space-2) var(--space-3)', marginBottom: 'var(--space-3)',
+          background: 'var(--color-secondary-muted)',
+          border: '1px solid var(--color-secondary)',
+          borderRadius: 'var(--radius-md)', flexShrink: 0
+        }}>
+          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-secondary)' }}>
+            {activeView.name}
+          </span>
+          <span style={{ flex: 1, fontSize: '11px', color: 'var(--color-text-muted)' }}>
+            {describeView(activeView)}
+          </span>
+          <button
+            className="btn-secondary"
+            onClick={() => { setActiveView(null); setPage(1) }}
+            aria-label="Clear the active view"
+            title="Clear view"
+          >
+            <X size={12} />
+          </button>
         </div>
       )}
 
