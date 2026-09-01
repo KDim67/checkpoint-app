@@ -1,0 +1,192 @@
+/**
+ * The system-tray icon and its panel.
+ *
+ * The panel is a small frameless BrowserWindow loading the renderer at `#tray`,
+ * not a native `Menu`. A native menu is drawn by Windows and cannot be styled,
+ * so it would sit beside a heavily themed app looking like part of a different
+ * one, and it could not show live counts or a toggle. This follows the pattern
+ * the widget and the quick-capture HUD already use.
+ *
+ * The cost is that positioning and dismissal become ours to handle, which is
+ * what most of this file is.
+ */
+
+import { app, BrowserWindow, Tray, nativeImage, screen, shell } from 'electron'
+import { join } from 'path'
+import { getSetting, setSetting } from './db'
+import {
+  normalizeStartupSettings,
+  reconcile,
+  type StartupSettings
+} from '../shared/startupSettings'
+
+export const STARTUP_SETTING_KEY = 'startup_settings'
+
+const PANEL_WIDTH = 288
+const PANEL_HEIGHT = 356
+/** Gap between the tray icon and the panel, so it does not touch the taskbar. */
+const PANEL_MARGIN = 8
+
+let tray: Tray | null = null
+let panel: BrowserWindow | null = null
+
+export function getStartupSettings(): StartupSettings {
+  return normalizeStartupSettings(getSetting<unknown>(STARTUP_SETTING_KEY, null))
+}
+
+/**
+ * Stores settings and applies the ones the OS owns.
+ *
+ * `openAtLogin` is not a value we keep, it is a Windows registry entry that
+ * Electron manages, so it is written through rather than merely recorded, or the
+ * checkbox would drift from what actually happens at login.
+ */
+export function setStartupSettings(next: unknown): StartupSettings {
+  const settings = reconcile(normalizeStartupSettings(next))
+  setSetting(STARTUP_SETTING_KEY, settings)
+
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: settings.openAtLogin,
+      // Passed so a login launch can start hidden; the app reads it back at
+      // startup rather than guessing from the absence of a window.
+      args: settings.startMinimised ? ['--start-minimised'] : []
+    })
+  } catch (err) {
+    console.error('[tray] Could not update the login item:', err)
+  }
+
+  if (settings.showTrayIcon) createTray()
+  else destroyTray()
+
+  return settings
+}
+
+/** True when this launch was started by Windows at login, minimised. */
+export function launchedMinimised(): boolean {
+  return process.argv.includes('--start-minimised')
+}
+
+function panelPosition(): { x: number; y: number } {
+  const bounds = tray?.getBounds()
+  const cursor = screen.getCursorScreenPoint()
+  // getBounds is empty on some Windows configurations, so the cursor is the
+  // fallback, the click that opened this happened at it.
+  const anchor = bounds && bounds.width > 0 ? bounds : { x: cursor.x, y: cursor.y, width: 0, height: 0 }
+  const display = screen.getDisplayNearestPoint({ x: anchor.x, y: anchor.y })
+  const area = display.workArea
+
+  // Centred on the icon, then pulled back inside the work area. The taskbar can
+  // sit on any edge, so the panel goes above or below depending on which half of
+  // the screen the icon is in rather than assuming the bottom.
+  const x = Math.round(
+    Math.min(Math.max(anchor.x + anchor.width / 2 - PANEL_WIDTH / 2, area.x + PANEL_MARGIN),
+      area.x + area.width - PANEL_WIDTH - PANEL_MARGIN)
+  )
+  const below = anchor.y < area.y + area.height / 2
+  const y = below
+    ? Math.round(anchor.y + anchor.height + PANEL_MARGIN)
+    : Math.round(anchor.y - PANEL_HEIGHT - PANEL_MARGIN)
+
+  return { x, y: Math.round(Math.min(Math.max(y, area.y + PANEL_MARGIN), area.y + area.height - PANEL_HEIGHT - PANEL_MARGIN)) }
+}
+
+function createPanel(): BrowserWindow {
+  if (panel && !panel.isDestroyed()) return panel
+
+  panel = new BrowserWindow({
+    width: PANEL_WIDTH,
+    height: PANEL_HEIGHT,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    // Focusable so blur can dismiss it, an unfocusable panel would have to be
+    // closed some other way, and there is nothing obvious to click.
+    focusable: true,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+
+  panel.on('blur', () => hidePanel())
+  panel.on('closed', () => { panel = null })
+
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    panel.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#tray`)
+  } else {
+    panel.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'tray' })
+  }
+  return panel
+}
+
+export function showPanel(): void {
+  const win = createPanel()
+  const { x, y } = panelPosition()
+  win.setPosition(x, y, false)
+  win.show()
+  win.focus()
+}
+
+export function hidePanel(): void {
+  if (panel && !panel.isDestroyed() && panel.isVisible()) panel.hide()
+}
+
+export function togglePanel(): void {
+  if (panel && !panel.isDestroyed() && panel.isVisible()) hidePanel()
+  else showPanel()
+}
+
+/** Brings the main window forward, restoring and creating it as needed. */
+export function showMainWindow(): void {
+  hidePanel()
+  const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.getParentWindow() && w.isResizable())
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
+export function createTray(): void {
+  if (tray && !tray.isDestroyed()) return
+
+  const icon = nativeImage.createFromPath(join(__dirname, '../../resources/icon.png'))
+  if (icon.isEmpty()) {
+    console.error('[tray] Icon could not be loaded; not creating a tray icon.')
+    return
+  }
+
+  // Windows wants a small icon; passing the full-size image gives a blurry one.
+  tray = new Tray(icon.resize({ width: 16, height: 16 }))
+  tray.setToolTip('Checkpoint')
+
+  tray.on('click', () => togglePanel())
+  // Right-click opens the same panel rather than a native menu, so there is one
+  // place the tray behaviour lives.
+  tray.on('right-click', () => togglePanel())
+  tray.on('double-click', () => showMainWindow())
+}
+
+export function destroyTray(): void {
+  hidePanel()
+  if (panel && !panel.isDestroyed()) { panel.destroy(); panel = null }
+  if (tray && !tray.isDestroyed()) { tray.destroy(); tray = null }
+}
+
+/** Opens the folder holding the user's data, for the panel's shortcut. */
+export function openDataFolder(): void {
+  shell.openPath(app.getPath('userData')).catch(err =>
+    console.error('[tray] Could not open the data folder:', err)
+  )
+}
+
+export function initializeTray(): void {
+  const settings = getStartupSettings()
+  if (settings.showTrayIcon) createTray()
+}
