@@ -722,8 +722,14 @@ function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle(IpcChannels.TRAY_RESIZE, async (_event, height: number) => {
+    const { setPanelHeight } = await import('./tray')
+    if (Number.isFinite(height)) setPanelHeight(height)
+    return { ok: true as const }
+  })
+
   ipcMain.handle(IpcChannels.TRAY_ACTION, async (_event, action: string) => {
-    const { showMainWindow, hidePanel, openDataFolder } = await import('./tray')
+    const { showMainWindow, hidePanel } = await import('./tray')
     switch (action) {
       case 'open':
         showMainWindow()
@@ -734,10 +740,6 @@ function registerIpcHandlers(): void {
         enableHud()
         break
       }
-      case 'data-folder':
-        hidePanel()
-        openDataFolder()
-        break
       case 'quit':
         hidePanel()
         isQuitting = true

@@ -11,7 +11,7 @@
  * what most of this file is.
  */
 
-import { app, BrowserWindow, Tray, nativeImage, screen, shell } from 'electron'
+import { app, BrowserWindow, Tray, nativeImage, screen } from 'electron'
 import { join } from 'path'
 import { getSetting, setSetting } from './db'
 import {
@@ -23,7 +23,17 @@ import {
 export const STARTUP_SETTING_KEY = 'startup_settings'
 
 const PANEL_WIDTH = 288
-const PANEL_HEIGHT = 356
+/**
+ * Starting height only. The panel measures its own content and asks to be
+ * resized, because the content grows with the user's font-size setting and a
+ * fixed height clipped the Quit button at anything above the default.
+ */
+const PANEL_HEIGHT = 380
+/** Bounds on what the panel may ask for, so a bad measurement cannot fill the screen. */
+const PANEL_MIN_HEIGHT = 200
+const PANEL_MAX_HEIGHT = 720
+
+let panelHeight = PANEL_HEIGHT
 /** Gap between the tray icon and the panel, so it does not touch the taskbar. */
 const PANEL_MARGIN = 8
 
@@ -86,9 +96,9 @@ function panelPosition(): { x: number; y: number } {
   const below = anchor.y < area.y + area.height / 2
   const y = below
     ? Math.round(anchor.y + anchor.height + PANEL_MARGIN)
-    : Math.round(anchor.y - PANEL_HEIGHT - PANEL_MARGIN)
+    : Math.round(anchor.y - panelHeight - PANEL_MARGIN)
 
-  return { x, y: Math.round(Math.min(Math.max(y, area.y + PANEL_MARGIN), area.y + area.height - PANEL_HEIGHT - PANEL_MARGIN)) }
+  return { x, y: Math.round(Math.min(Math.max(y, area.y + PANEL_MARGIN), area.y + area.height - panelHeight - PANEL_MARGIN)) }
 }
 
 function createPanel(): BrowserWindow {
@@ -96,7 +106,7 @@ function createPanel(): BrowserWindow {
 
   panel = new BrowserWindow({
     width: PANEL_WIDTH,
-    height: PANEL_HEIGHT,
+    height: panelHeight,
     show: false,
     frame: false,
     transparent: true,
@@ -124,6 +134,23 @@ function createPanel(): BrowserWindow {
     panel.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'tray' })
   }
   return panel
+}
+
+/**
+ * Resizes to the height the panel measured, then repositions.
+ *
+ * Repositioning matters as much as the size: the panel usually sits above the
+ * taskbar, so growing it downward would push it off-screen rather than upward
+ * away from the tray.
+ */
+export function setPanelHeight(height: number): void {
+  const next = Math.round(Math.min(Math.max(height, PANEL_MIN_HEIGHT), PANEL_MAX_HEIGHT))
+  if (next === panelHeight) return
+  panelHeight = next
+  if (!panel || panel.isDestroyed()) return
+  panel.setContentSize(PANEL_WIDTH, panelHeight)
+  const { x, y } = panelPosition()
+  panel.setPosition(x, y, false)
 }
 
 export function showPanel(): void {
@@ -177,13 +204,6 @@ export function destroyTray(): void {
   hidePanel()
   if (panel && !panel.isDestroyed()) { panel.destroy(); panel = null }
   if (tray && !tray.isDestroyed()) { tray.destroy(); tray = null }
-}
-
-/** Opens the folder holding the user's data, for the panel's shortcut. */
-export function openDataFolder(): void {
-  shell.openPath(app.getPath('userData')).catch(err =>
-    console.error('[tray] Could not open the data folder:', err)
-  )
 }
 
 export function initializeTray(): void {

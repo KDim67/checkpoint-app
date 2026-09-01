@@ -354,6 +354,9 @@ const api = {
       ipcRenderer.invoke(IpcChannels.TRAY_SUMMARY),
     action: (action: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.TRAY_ACTION, action),
+    /** The panel measures its own content and asks to be sized to it. */
+    resize: (height: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IpcChannels.TRAY_RESIZE, height),
     getStartup: (): Promise<StartupSettings> => ipcRenderer.invoke(IpcChannels.STARTUP_GET),
     setStartup: (settings: StartupSettings): Promise<StartupSettings> =>
       ipcRenderer.invoke(IpcChannels.STARTUP_SET, settings)
