@@ -34,6 +34,17 @@ export const app = {
  * Records what was raised instead of showing anything, so a test can assert on
  * the notifications a sweep produced. `shown` is cleared between tests.
  */
+/**
+ * Reports every image as empty, which is the honest answer here: there is no
+ * Chromium to decode one. notificationService treats an empty image as "no icon"
+ * and omits it, so the stub exercises that branch rather than a fake success.
+ */
+export const nativeImage = {
+  createFromPath(): { isEmpty(): boolean } {
+    return { isEmpty: () => true }
+  }
+}
+
 export const shown: { title: string; body: string }[] = []
 
 export class Notification {
@@ -69,4 +80,4 @@ export const clipboard = {
   writeText(): void {}
 }
 
-export default { ipcMain, nativeTheme, app, BrowserWindow, shell, clipboard, Notification }
+export default { ipcMain, nativeTheme, app, BrowserWindow, shell, clipboard, Notification, nativeImage }

@@ -53,6 +53,16 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
+// Windows notification identity, BEFORE app.whenReady()
+// Windows takes the name and icon shown on a toast from the AppUserModelID, not
+// from the app, without this, every notification is headed "electron.app.Electron".
+// The value must match electron-builder's appId, because the installer registers
+// the Start Menu shortcut under it and that shortcut is what Windows reads the
+// display name and icon from.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.checkpoint.app')
+}
+
 // Disable background throttling BEFORE app.whenReady()
 // Critical: allows the app to function fully alongside Unity/VS/JetBrains.
 app.commandLine.appendSwitch('disable-background-timer-throttling')

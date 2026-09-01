@@ -12,7 +12,8 @@
  * notifications off.
  */
 
-import { Notification, BrowserWindow } from 'electron'
+import { Notification, BrowserWindow, nativeImage } from 'electron'
+import { join } from 'path'
 import { getSetting, setSetting } from './db'
 import {
   normalizePolicy,
@@ -23,6 +24,21 @@ import {
 } from '../shared/notificationPolicy'
 
 export const POLICY_SETTING_KEY = 'notification_policy'
+
+/**
+ * The toast icon.
+ *
+ * Set explicitly rather than relying on the AppUserModelID alone: the AUMID only
+ * resolves to an icon once an installed shortcut is registered under it, so an
+ * unpackaged run would otherwise show no logo at all. PNG rather than the .ico,
+ * which Windows toasts render inconsistently.
+ *
+ * Resolved once, the file does not change while the app is running, and reading
+ * it per notification would be work for nothing.
+ */
+const NOTIFICATION_ICON = nativeImage.createFromPath(
+  join(__dirname, '../../resources/icon.png')
+)
 const DEDUPE_SETTING_KEY = 'notification_dedupe'
 
 /** Dedupe entries older than this are forgotten. */
@@ -98,7 +114,14 @@ export function notify(input: NotifyInput): boolean {
     })
     if (!decision.allow) return false
 
-    const notification = new Notification({ title: input.title, body: input.body, silent: false })
+    const notification = new Notification({
+      title: input.title,
+      body: input.body,
+      silent: false,
+      // An empty image would blank the icon rather than fall back, so it is only
+      // passed when the file actually loaded.
+      ...(NOTIFICATION_ICON.isEmpty() ? {} : { icon: NOTIFICATION_ICON })
+    })
 
     notification.on('click', () => {
       const win = BrowserWindow.getAllWindows()[0]
