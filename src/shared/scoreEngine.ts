@@ -80,28 +80,39 @@ export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): F
   score = Math.max(0, Math.min(100, score))
 
   // 4. Determine FitStatus
+  //
+  // Capped by the execution mode decided in step 2. Deriving it from the score
+  // alone let the +10 RAM headroom bonus outweigh the GPU penalty, so a machine
+  // with plenty of RAM and no usable VRAM landed in a bracket whose text claims
+  // GPU execution, and users choose a model on the strength of that sentence.
   let status: FitStatus = 'not_recommended'
   if (score >= 80) status = 'optimal'
   else if (score >= 55) status = 'tight'
   else if (score >= 25) status = 'cpu_offload'
   else status = 'not_recommended'
 
-  // 5. Build reason string
+  // Both 'optimal' and 'tight' assert the model runs on the GPU, so neither can
+  // survive a verdict of not-GPU-viable however high the score climbed.
+  if (!gpuViable && (status === 'optimal' || status === 'tight')) {
+    status = score >= 25 ? 'cpu_offload' : 'not_recommended'
+  }
+
+  // 5. Build reason string.
+  //
+  // Keyed off the execution mode rather than the status bracket, so the text can
+  // never describe hardware the machine does not have. Partial offload and pure
+  // CPU share the 'cpu_offload' status but are not the same claim.
   let reason = ''
-  switch (status) {
-    case 'optimal':
-      reason = `Runs natively on GPU (${specs.gpuName || 'GPU'}) at ${bestVariantName.toUpperCase()} quantization with sufficient VRAM headroom.`
-      break
-    case 'tight':
-      reason = `GPU-capable at ${bestVariantName.toUpperCase()} but with less than 10% VRAM headroom. Performance may vary under load.`
-      break
-    case 'cpu_offload':
-      reason = `Insufficient VRAM for full GPU inference. Model will run with CPU offloading, expect 3–8x slower generation.`
-      break
-    case 'not_recommended':
-    default:
-      reason = `System RAM or VRAM insufficient for any supported quantization of this model.`
-      break
+  if (status === 'not_recommended') {
+    reason = `System RAM or VRAM insufficient for any supported quantization of this model.`
+  } else if (gpuViable) {
+    reason = status === 'optimal'
+      ? `Runs natively on GPU (${specs.gpuName || 'GPU'}) at ${bestVariantName.toUpperCase()} quantization with sufficient VRAM headroom.`
+      : `GPU-capable at ${bestVariantName.toUpperCase()} but with less than 10% VRAM headroom. Performance may vary under load.`
+  } else if (canOffload) {
+    reason = `Insufficient VRAM for full GPU inference. Model will run with CPU offloading, expect 3–8x slower generation.`
+  } else {
+    reason = `No usable GPU memory detected. Model will run on the CPU at ${bestVariantName.toUpperCase()}, expect 3–8x slower generation.`
   }
 
   return {

@@ -87,7 +87,7 @@ export function getDb(): Database.Database {
 }
 
 // Current schema version
-const CURRENT_VERSION = 5
+const CURRENT_VERSION = 6
 
 // Prepared statement cache (populated by initDb)
 /**
@@ -135,6 +135,7 @@ function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
         CREATE INDEX IF NOT EXISTS idx_items_status    ON items(status);
         CREATE INDEX IF NOT EXISTS idx_items_position  ON items(position);
         CREATE INDEX IF NOT EXISTS idx_items_created   ON items(created_at DESC);
+        ${ITEMS_FTS_TRIGGERS_SQL}
       `)
     })()
     console.log('[db] items table rebuilt, custom column statuses now accepted')
@@ -197,6 +198,12 @@ function runMigrations(db: Database.Database): void {
         CREATE INDEX IF NOT EXISTS idx_ai_memories_key ON ai_memories(memory_key);
       `)
     }
+    if (userVersion < 6) {
+      // Repairs two things at once: rowids invalidated by the legacy items
+      // rebuild, and rows written either before items_fts existed or during a
+      // session when the rebuild had dropped its triggers. Cheap and idempotent.
+      db.exec(`INSERT INTO items_fts(items_fts) VALUES('rebuild');`)
+    }
     db.pragma(`user_version = ${CURRENT_VERSION}`)
   })()
 }
@@ -237,6 +244,22 @@ let stmtClearClipboardHistory: Database.Statement
 let stmtDeleteClipboardHistoryOverflow: Database.Statement
 
 // Schema
+
+/**
+ * The FTS bridge triggers, kept separate because they are needed twice: once in
+ * SCHEMA_SQL, and again after the legacy items rebuild, which drops them along
+ * with the table. Two copies would drift.
+ */
+const ITEMS_FTS_TRIGGERS_SQL = `CREATE TRIGGER IF NOT EXISTS items_fts_insert AFTER INSERT ON items BEGIN
+  INSERT INTO items_fts(rowid, id, title, body) VALUES (new.rowid, new.id, new.title, new.body);
+END;
+CREATE TRIGGER IF NOT EXISTS items_fts_delete AFTER DELETE ON items BEGIN
+  INSERT INTO items_fts(items_fts, rowid, id, title, body) VALUES('delete', old.rowid, old.id, old.title, old.body);
+END;
+CREATE TRIGGER IF NOT EXISTS items_fts_update AFTER UPDATE ON items BEGIN
+  INSERT INTO items_fts(items_fts, rowid, id, title, body) VALUES('delete', old.rowid, old.id, old.title, old.body);
+  INSERT INTO items_fts(rowid, id, title, body) VALUES (new.rowid, new.id, new.title, new.body);
+END;`
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS items (
@@ -305,16 +328,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
   content='items',
   content_rowid='rowid'
 );
-CREATE TRIGGER IF NOT EXISTS items_fts_insert AFTER INSERT ON items BEGIN
-  INSERT INTO items_fts(rowid, id, title, body) VALUES (new.rowid, new.id, new.title, new.body);
-END;
-CREATE TRIGGER IF NOT EXISTS items_fts_delete AFTER DELETE ON items BEGIN
-  INSERT INTO items_fts(items_fts, rowid, id, title, body) VALUES('delete', old.rowid, old.id, old.title, old.body);
-END;
-CREATE TRIGGER IF NOT EXISTS items_fts_update AFTER UPDATE ON items BEGIN
-  INSERT INTO items_fts(items_fts, rowid, id, title, body) VALUES('delete', old.rowid, old.id, old.title, old.body);
-  INSERT INTO items_fts(rowid, id, title, body) VALUES (new.rowid, new.id, new.title, new.body);
-END;
+${ITEMS_FTS_TRIGGERS_SQL}
 `
 
 

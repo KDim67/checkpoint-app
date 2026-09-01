@@ -14,7 +14,10 @@ import { initDb, closeDb, getDb, searchItems } from '../src/main/db'
 // binding. The migrations are plain SQL and pragmas, so what is under test here
 // is unaffected; what a plain-Node runner cannot check is the binding itself.
 
-const CURRENT_VERSION = 5
+// Deliberately a literal rather than an import from db.ts: asserting the
+// pragma against the same constant that set it would pass no matter what. Bump
+// this by hand whenever a migration is added.
+const CURRENT_VERSION = 6
 
 /** The items table as shipped by early builds: status carried a CHECK constraint. */
 const LEGACY_SCHEMA = `
