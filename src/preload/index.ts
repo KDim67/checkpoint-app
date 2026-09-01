@@ -650,6 +650,9 @@ const api = {
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_TOGGLE_PLUGIN, filename, active),
     openPluginsFolder: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER),
+    /** Writes a shipped example into the plugins folder. It is not enabled by this. */
+    installExample: (filename: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_INSTALL_EXAMPLE, filename),
     registerShortcuts: (shortcuts: ShortcutMap): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_REGISTER_SHORTCUTS, shortcuts),
     getShortcuts: (): Promise<ShortcutMap> =>

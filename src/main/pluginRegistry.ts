@@ -4,6 +4,14 @@ import { existsSync, readdirSync, readFileSync } from 'fs'
 import { PluginInfo } from '../shared/types'
 import { getPluginsDir, ensureDir } from './paths'
 import { isSafePluginFilename, parsePluginMetadata } from '../shared/pluginMetadata'
+import {
+  onPluginEvent,
+  type PluginEventHandler,
+  type PluginEventName
+} from './pluginEvents'
+import { createItem, getDb, getItemById, getItemsPaginated, getSetting, setSetting, updateItem } from './db'
+import { notify } from './notificationService'
+import type { CreateItemPayload, Item } from '../shared/types'
 
 /** What a load attempt reports back, so a failure can reach the user. */
 export type PluginLoadResult = { ok: true } | { ok: false; error: string }
@@ -19,27 +27,89 @@ const loadedPlugins = new Map<string, {
   sandbox: PluginSandbox
 }>()
 
+/**
+ * What a plugin is handed on load.
+ *
+ * Everything routes through the same functions the app itself uses, so a plugin
+ * inherits their validation, their sync tombstones and their notification
+ * policy rather than reaching past them into the database.
+ *
+ * The class is named for what it tracks, not for isolation it does not provide:
+ * a plugin is required into the main process and can ignore all of this. What it
+ * genuinely guarantees is teardown, every subscription made through the API is
+ * recorded and undone on unload, which is what makes enable/disable and hot
+ * reload work rather than leaking a handler per cycle.
+ */
 class PluginSandbox {
   private ipcHandlers: string[] = []
+  private unsubscribers: (() => void)[] = []
 
   constructor(private filename: string) {}
 
   getAPI() {
+    const filename = this.filename
     return {
       app,
       BrowserWindow,
+
       ipc: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handle: (channel: string, listener: (...args: any[]) => any) => {
           // Prevent plugins from overwriting core system handlers or colliding
           if (ipcMain.listenerCount(channel) > 0) {
-            console.warn(`[Plugin Sandbox] Handler already registered for channel: ${channel}`)
+            console.warn(`[Plugin] Handler already registered for channel: ${channel}`)
             return
           }
           ipcMain.handle(channel, listener)
           this.ipcHandlers.push(channel)
         }
       },
+
+      /**
+       * React to things happening in the app.
+       *
+       * Returns an unsubscribe, and the subscription is tracked either way, so a
+       * plugin that forgets to tidy up still stops firing when it is disabled.
+       */
+      events: {
+        on: <K extends PluginEventName>(name: K, handler: PluginEventHandler<K>): (() => void) => {
+          const off = onPluginEvent(name, handler)
+          this.unsubscribers.push(off)
+          return off
+        }
+      },
+
+      /** Reading and writing work, through the app's own validated paths. */
+      items: {
+        create: (payload: CreateItemPayload) => createItem(getDb(), payload),
+        get: (id: string) => getItemById(id),
+        query: (context: string, type: 'card' | 'task' | 'log', limit = 50) =>
+          getItemsPaginated(context, type, 1, limit).items,
+        update: (id: string, patch: Partial<Item>) => updateItem(getDb(), id, patch)
+      },
+
+      /**
+       * Raise a desktop notification.
+       *
+       * Goes through the shared policy, so a plugin obeys the user's quiet hours
+       * and category switches instead of talking over them.
+       */
+      notify: (title: string, body: string) =>
+        notify({ category: 'agent', title, body, dedupeKey: `plugin:${filename}:${title}` }),
+
+      /**
+       * Storage scoped to this plugin.
+       *
+       * Namespaced by filename so two plugins cannot quietly overwrite each
+       * other, and so none of them can reach an app setting.
+       */
+      storage: {
+        get: <T>(key: string, fallback: T): T =>
+          getSetting<T>(`plugin:${filename}:${key}`, fallback),
+        set: (key: string, value: unknown): void =>
+          setSetting(`plugin:${filename}:${key}`, value)
+      },
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       log: (...args: any[]) => {
         console.log(`[Plugin: ${this.filename}]`, ...args)
@@ -48,16 +118,26 @@ class PluginSandbox {
   }
 
   cleanup(): void {
-    // Teardown all handlers registered by this sandbox
     for (const channel of this.ipcHandlers) {
       try {
         ipcMain.removeHandler(channel)
-        console.log(`[Plugin Sandbox] Unregistered handler: ${channel}`)
       } catch (err) {
-        console.error(`[Plugin Sandbox] Failed to unregister handler ${channel}:`, err)
+        console.error(`[Plugin] Failed to unregister handler ${channel}:`, err)
       }
     }
     this.ipcHandlers = []
+
+    // Unsubscribed here rather than trusting onUnload: a plugin that throws on
+    // the way out, or never implements onUnload, would otherwise keep receiving
+    // events after being disabled.
+    for (const off of this.unsubscribers) {
+      try {
+        off()
+      } catch (err) {
+        console.error(`[Plugin] Failed to unsubscribe a listener for ${this.filename}:`, err)
+      }
+    }
+    this.unsubscribers = []
   }
 }
 

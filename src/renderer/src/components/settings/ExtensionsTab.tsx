@@ -3,6 +3,7 @@ import { Divider, ToggleSwitch } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import { FolderOpen, Sparkles, AlertTriangle, Terminal, ShieldAlert, X } from 'lucide-react'
 import { PluginInfo } from '../../../../shared/types'
+import { EXAMPLE_PLUGINS } from '../../../../shared/examplePlugins'
 
 export default function ExtensionsTab() {
   const { toast } = useToast()
@@ -47,6 +48,23 @@ export default function ExtensionsTab() {
     } catch (err) {
       console.error(err)
       toast(`Failed to toggle plugin: ${filename}`)
+    }
+  }
+
+  const handleInstallExample = async (filename: string) => {
+    try {
+      const result = await window.electronAPI.customizer.installExample(filename)
+      if (!result.ok) {
+        toast(result.error ?? 'Could not install that example')
+        return
+      }
+      // Re-scanned rather than assumed: the list is what the folder actually
+      // holds, and the new file should appear with its metadata read from disk.
+      await loadPluginsList()
+      toast(`Installed ${filename}. Read it, then enable it below.`)
+    } catch (err) {
+      console.error(err)
+      toast('Could not install that example')
     }
   }
 
@@ -196,6 +214,51 @@ export default function ExtensionsTab() {
           <FolderOpen size={12} />
           Open Plugins Folder
         </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div>
+          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+            Example plugins
+          </div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+            Written into your plugins folder so you can read them before enabling anything.
+            Installing does not switch a plugin on.
+          </div>
+        </div>
+
+        {EXAMPLE_PLUGINS.map(example => {
+          const installed = plugins.some(plugin => plugin.filename === example.filename)
+          return (
+            <div
+              key={example.filename}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-2) var(--space-3)',
+                background: 'var(--color-surface-1)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)'
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{example.name}</div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '1px' }}>
+                  {example.description}
+                </div>
+              </div>
+              <button
+                className="btn-secondary"
+                disabled={installed}
+                onClick={() => handleInstallExample(example.filename)}
+                style={{ flexShrink: 0, opacity: installed ? 0.5 : 1 }}
+              >
+                {installed ? 'Installed' : 'Install'}
+              </button>
+            </div>
+          )
+        })}
       </div>
 
       <Divider />
