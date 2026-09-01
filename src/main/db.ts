@@ -633,6 +633,29 @@ export function getItemsPaginated(
   return { items: rows.map(rowToItem), total, page, pageSize }
 }
 
+/**
+ * Every item, for export. Unpaginated on purpose.
+ *
+ * An export that quietly stopped at a page boundary would be worse than none,
+ * so this deliberately does not take a limit. It runs through the same tag join
+ * and rowToItem mapping the rest of the app uses, so an exported row carries its
+ * tags rather than a bare column dump.
+ */
+export function getAllItemsForExport(context: string | null): Item[] {
+  const sql = `
+    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
+    FROM items i
+    LEFT JOIN item_tags it ON i.id = it.item_id
+    LEFT JOIN tags t ON it.tag_id = t.id
+    ${context ? 'WHERE i.context = @context' : ''}
+    GROUP BY i.id
+    ORDER BY i.context, i.created_at
+  `
+  const stmt = getDb().prepare(sql)
+  const rows = (context ? stmt.all({ context }) : stmt.all()) as Record<string, unknown>[]
+  return rows.map(rowToItem)
+}
+
 export function getItemById(id: string): Item | null {
   const row = stmtGetItemById.get(id) as Record<string, unknown> | undefined
   return row ? rowToItem(row) : null

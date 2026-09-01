@@ -33,6 +33,7 @@ import SettingsSection, {
 } from './settings/SettingsSection'
 import ContextManager from './settings/ContextManager'
 import SyncSettings from './settings/SyncSettings'
+import ExportPanel from './settings/ExportPanel'
 import NotificationSettings from './settings/NotificationSettings'
 import McpSettings from './settings/McpSettings'
 import AppearanceSettings from './settings/AppearanceSettings'
@@ -95,7 +96,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
       { id: 'features',     label: 'Features & Plugins', icon: <Zap size={14} />,      description: 'Toggle background subsystems and manage user plugins.' },
       { id: 'notifications', label: 'Notifications',      icon: <Bell size={14} />,     description: 'What Checkpoint tells you about, and when it stays quiet.' },
       { id: 'backup',       label: 'Database Backup',    icon: <Archive size={14} />,  description: 'Automated database snapshots, retention and restore points.' },
-      { id: 'storage',      label: 'Storage & Media',    icon: <HardDrive size={14} />, description: 'Manage local attachment vaults and clean up orphaned files.' },
+      { id: 'storage',      label: 'Storage & Export',    icon: <HardDrive size={14} />, description: 'Manage local attachment vaults and clean up orphaned files.' },
       { id: 'sync',         label: 'P2P Network Sync',   icon: <RefreshCw size={14} />, description: 'Sync database and note directories with other machines.' },
       { id: 'mcp',          label: 'MCP Server',         icon: <Plug size={14} />,      description: 'Let external AI agents read and edit Checkpoint over a local connection.' },
       { id: 'about',        label: 'About',              icon: <Info size={14} />,     description: 'Version, credits and diagnostics.' }
@@ -1148,7 +1149,7 @@ export default function SettingsView() {
         )
       case 'storage':
         return (
-          <SettingsSection icon={<HardDrive size={14} />} title="Storage & Media" description="Track local attachment usage and clean up unreferenced file artifacts.">
+          <SettingsSection icon={<HardDrive size={14} />} title="Storage & Media" description="Export your data, track attachment usage and clean up unreferenced files.">
             <StorageSettings />
           </SettingsSection>
         )
@@ -1729,6 +1730,10 @@ function StorageSettings() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+      <div style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)' }}>
+        <ExportPanel />
+      </div>
+
       <div style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)' }}>
         <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--space-3)' }}>
           Media Vault Statistics

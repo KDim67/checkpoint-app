@@ -347,6 +347,15 @@ const api = {
     }
   },
 
+  exporter: {
+    /** Opens a save dialog and writes the chosen format. */
+    items: (options: {
+      context: string | null
+      format: 'markdown' | 'csv' | 'json'
+    }): Promise<{ ok: boolean; filePath?: string; count?: number; reason?: string }> =>
+      ipcRenderer.invoke(IpcChannels.EXPORT_ITEMS, options)
+  },
+
   notifications: {
     /** Raises a notification through the shared policy. Resolves to whether it fired. */
     send: (input: {
