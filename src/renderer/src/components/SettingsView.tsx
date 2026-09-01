@@ -23,7 +23,8 @@ import {
   Cloud,
   Server,
   HardDrive,
-  Plug, Bell, PanelTop } from 'lucide-react'
+  Plug, Bell, PanelTop, Moon, Sun, MonitorCog } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import SettingsSection, {
   FieldRow,
   SettingsInput,
@@ -945,10 +946,12 @@ function ThemeModeSettings() {
     await window.electronAPI.db.setSetting('app_theme', t)
   }
 
-  const THEME_OPTIONS: { value: typeof theme; label: string; desc: string }[] = [
-    { value: 'dark',   label: '🌙 Dark',   desc: 'Easy on the eyes' },
-    { value: 'light',  label: '☀️ Light',  desc: 'High contrast'    },
-    { value: 'system', label: '💻 System', desc: 'Follows OS'       }
+  // Icons rather than emoji: emoji are rendered by the OS font, so they ignore
+  // the theme entirely and shift shape between Windows versions.
+  const THEME_OPTIONS: { value: typeof theme; Icon: LucideIcon; label: string; desc: string }[] = [
+    { value: 'dark',   Icon: Moon,    label: 'Dark',   desc: 'Easy on the eyes' },
+    { value: 'light',  Icon: Sun,     label: 'Light',  desc: 'High contrast'    },
+    { value: 'system', Icon: MonitorCog, label: 'System', desc: 'Follows OS'    }
   ]
 
   return (
@@ -975,7 +978,10 @@ function ThemeModeSettings() {
               transition: 'all 100ms ease'
             }}
           >
-            <span>{opt.label}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
+              <opt.Icon size={14} />
+              {opt.label}
+            </span>
             <span style={{ fontSize: '10px', opacity: 0.6 }}>{opt.desc}</span>
           </button>
         ))}
