@@ -31,6 +31,20 @@ export const DEFAULT_STARTUP_SETTINGS: StartupSettings = {
   showTrayIcon: true
 }
 
+/** The switches, and what each one actually does, for every surface that shows them. */
+export const STARTUP_OPTIONS: {
+  key: keyof StartupSettings
+  label: string
+  hint: string
+  /** True when the option is meaningless without a tray icon to hide to. */
+  needsTray: boolean
+}[] = [
+  { key: 'openAtLogin', label: 'Start with Windows', hint: 'Launch Checkpoint when you sign in.', needsTray: false },
+  { key: 'startMinimised', label: 'Start hidden', hint: 'Go straight to the tray without opening a window.', needsTray: true },
+  { key: 'closeToTray', label: 'Close to tray', hint: 'The window close button hides Checkpoint instead of quitting it.', needsTray: true },
+  { key: 'showTrayIcon', label: 'Show tray icon', hint: 'The icon in the notification area. Turning it off disables the two above.', needsTray: false }
+]
+
 const bool = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback
 

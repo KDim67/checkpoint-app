@@ -193,11 +193,11 @@ export function createTray(): void {
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.setToolTip('Checkpoint')
 
-  tray.on('click', () => togglePanel())
-  // Right-click opens the same panel rather than a native menu, so there is one
-  // place the tray behaviour lives.
-  tray.on('right-click', () => togglePanel())
+  // Left-click goes straight to the app, right-click opens the panel, the
+  // convention Windows users already have from everything else in the tray.
+  tray.on('click', () => showMainWindow())
   tray.on('double-click', () => showMainWindow())
+  tray.on('right-click', () => togglePanel())
 }
 
 export function destroyTray(): void {
