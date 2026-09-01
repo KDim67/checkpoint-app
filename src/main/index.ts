@@ -1112,6 +1112,31 @@ function registerIpcHandlers(): void {
     return { ok: true as const }
   })
 
+  ipcMain.handle(IpcChannels.CUSTOMIZER_INSTALL_EXAMPLE, async (_event, filename: string) => {
+    const { findExamplePlugin } = await import('../shared/examplePlugins')
+    const { getPluginsDir, ensureDir } = await import('./paths')
+    const { writeFileSync, existsSync } = await import('fs')
+    const { join } = await import('path')
+
+    const example = findExamplePlugin(filename)
+    if (!example) return { ok: false as const, error: 'Unknown example.' }
+
+    try {
+      const dir = getPluginsDir()
+      ensureDir(dir)
+      const target = join(dir, example.filename)
+      // Never overwritten: the copy on disk may have been edited, and silently
+      // replacing someone's edits would be worse than refusing.
+      if (existsSync(target)) {
+        return { ok: false as const, error: `${example.filename} already exists in the plugins folder.` }
+      }
+      writeFileSync(target, example.source, 'utf8')
+      return { ok: true as const }
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : 'Could not write the file.' }
+    }
+  })
+
   ipcMain.handle(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER, async () => {
     const { getPluginsDir } = await import('./paths')
     const dir = getPluginsDir()

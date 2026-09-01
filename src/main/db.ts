@@ -14,6 +14,7 @@ import { join } from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { ipcMain } from 'electron'
 import { z } from 'zod'
+import { emitPluginEvent } from './pluginEvents'
 import {
   CreateItemSchema,
   UpdateItemSchema,
@@ -714,7 +715,11 @@ export function createItem(
     }
   })()
 
-  return { ...item, tags: tagIds.length ? (stmtGetTagsForItem.all(id) as Tag[]) : [] }
+  const created = { ...item, tags: tagIds.length ? (stmtGetTagsForItem.all(id) as Tag[]) : [] }
+  // Emitted for every creation path, the UI, an agent over MCP, a webhook, 
+  // because a plugin cares that a card appeared, not who typed it.
+  emitPluginEvent('item:created', { item: created })
+  return created
 }
 
 export function updateItem(
@@ -755,9 +760,11 @@ export function updateItem(
   const item = rowToItem(row)
 
   // Only on the transition into a finished state, so repeated edits to an
-  // already-done item do not each try to advance the rule.
+  // already-done item do not each try to advance the rule, and a plugin
+  // listening for completions does not hear the same one repeatedly.
   const wasOpen = existing.status !== 'done' && existing.status !== 'archived'
   const nowClosed = item.status === 'done' || item.status === 'archived'
+  if (wasOpen && nowClosed) emitPluginEvent('item:completed', { item })
   if (wasOpen && nowClosed && onRecurrenceInstanceClosed) {
     try {
       const meta = JSON.parse(item.metadata || '{}') as { recurrenceId?: unknown }

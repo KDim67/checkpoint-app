@@ -162,6 +162,8 @@ export const enum IpcChannels {
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
   CUSTOMIZER_TOGGLE_PLUGIN       = 'customizer:togglePlugin',
   CUSTOMIZER_OPEN_PLUGINS_FOLDER = 'customizer:openPluginsFolder',
+  /** Writes one of the shipped example plugins into the user's plugins folder. */
+  CUSTOMIZER_INSTALL_EXAMPLE     = 'customizer:installExample',
   CUSTOMIZER_UPDATE_THEME        = 'customizer:updateTheme',
   /** Renderer asks for the theme CSS to apply now, rather than awaiting a push. */
   CUSTOMIZER_GET_CSS             = 'customizer:getCss',
