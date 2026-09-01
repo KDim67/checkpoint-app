@@ -244,12 +244,62 @@ export function stripThink(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<\/?think>/gi, '').trim()
 }
 
+/**
+ * Strips line and block comments that sit OUTSIDE string literals.
+ *
+ * Replaces two regexes that had no notion of string boundaries. Any URL in the
+ * payload was truncated at its "//", so a single trailing comma in a response
+ * containing "https://example.com" made the repair emit invalid JSON and the
+ * whole generation was discarded. Card bodies carry links routinely, and a
+ * trailing comma is exactly the defect this repair ladder exists to absorb.
+ */
+function stripJsonComments(input: string): string {
+  let out = ''
+  let inString = false
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i]
+
+    if (inString) {
+      out += c
+      // A backslash escapes what follows, so an escaped quote does not close it.
+      if (c === '\\') {
+        i++
+        if (i < input.length) out += input[i]
+      } else if (c === '"') {
+        inString = false
+      }
+      continue
+    }
+
+    if (c === '"') { inString = true; out += c; continue }
+
+    if (c === '/' && input[i + 1] === '/') {
+      while (i < input.length && input[i] !== '\n') i++
+      // Newline preserved: the missing-comma repair above is line-oriented.
+      if (i < input.length) out += '\n'
+      continue
+    }
+
+    if (c === '/' && input[i + 1] === '*') {
+      i += 2
+      while (i < input.length && !(input[i] === '*' && input[i + 1] === '/')) i++
+      i++
+      continue
+    }
+
+    out += c
+  }
+
+  return out
+}
+
 export function repairJson(s: string): string {
-  return s
-    .replace(/(["\d\]}])\s*[\r\n]+\s*(?=")/g, '$1,') // missing commas between lines
-    .replace(/,\s*([\]}])/g, '$1')                    // trailing commas
-    .replace(/\/\/.*$/gm, '')                          // line comments
-    .replace(/\/\*[\s\S]*?\*\//g, '')                  // block comments
+  return stripJsonComments(
+    s
+      .replace(/(["\d\]}])\s*[\r\n]+\s*(?=")/g, '$1,') // missing commas between lines
+      .replace(/,\s*([\]}])/g, '$1')                    // trailing commas
+  )
 }
 
 /** Robustly pull a JSON object/array out of arbitrary model text. */
