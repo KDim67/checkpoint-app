@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { LayoutGrid, Zap, FolderOpen, Power, Settings as SettingsIcon } from 'lucide-react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { LayoutGrid, Zap, Power } from 'lucide-react'
+import { ToggleSwitch } from './settings/SettingsSection'
+import { applyStoredTheme, watchTheme } from '../lib/themeBoot'
 import {
   DEFAULT_STARTUP_SETTINGS,
   type StartupSettings
@@ -12,60 +14,75 @@ interface Summary {
   open: number
 }
 
+const STARTUP_ROWS: { key: keyof StartupSettings; label: string; hint: string }[] = [
+  { key: 'openAtLogin', label: 'Start with Windows', hint: 'Launch when you sign in' },
+  { key: 'startMinimised', label: 'Start hidden', hint: 'Go straight to the tray' },
+  { key: 'closeToTray', label: 'Close to tray', hint: 'The X button hides instead of quitting' }
+]
+
 /**
  * The tray popup.
  *
  * A themed window rather than a native menu, so it can carry live counts and
- * toggles and look like the rest of the app. It applies the stored theme itself:
- * this window is its own renderer instance and never runs App's startup effect,
- * so without this it would always paint with the default dark tokens.
+ * real controls. It measures itself and asks main to resize: the content grows
+ * with the user's font-size setting, and a fixed height clipped the Quit button
+ * at anything above the default.
  */
 export default function TrayPanel(): React.JSX.Element {
   const [summary, setSummary] = useState<Summary>({ context: '', overdue: 0, dueToday: 0, open: 0 })
   const [startup, setStartup] = useState<StartupSettings>(DEFAULT_STARTUP_SETTINGS)
+  const [ready, setReady] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     try {
-      const [nextSummary, nextStartup, theme] = await Promise.all([
+      const [nextSummary, nextStartup] = await Promise.all([
         window.electronAPI.tray.summary(),
-        window.electronAPI.tray.getStartup(),
-        window.electronAPI.db.getSetting('app_theme').catch(() => null)
+        window.electronAPI.tray.getStartup()
       ])
       setSummary(nextSummary)
       setStartup(nextStartup)
-
-      const resolved =
-        theme === 'light' || theme === 'dark'
-          ? theme
-          : window.matchMedia('(prefers-color-scheme: light)').matches
-            ? 'light'
-            : 'dark'
-      document.documentElement.setAttribute('data-theme', resolved)
     } catch (err) {
       console.error('Failed to load the tray panel:', err)
+    } finally {
+      setReady(true)
     }
   }, [])
 
-  // Reloaded every time the panel is shown, not just on mount: the window is
-  // reused between openings, so a mount-only read would go stale immediately.
   useEffect(() => {
+    applyStoredTheme()
+    const stopWatching = watchTheme()
     load()
+    // The window is reused between openings, so a mount-only read would be stale
+    // the second time it is shown.
     window.addEventListener('focus', load)
-    return () => window.removeEventListener('focus', load)
+    return () => {
+      stopWatching()
+      window.removeEventListener('focus', load)
+    }
   }, [load])
 
-  const act = (action: string) => window.electronAPI.tray.action(action)
+  // Measured after paint so the height accounts for the real fonts.
+  useLayoutEffect(() => {
+    if (!ready || !rootRef.current) return
+    const height = Math.ceil(rootRef.current.getBoundingClientRect().height)
+    window.electronAPI.tray.resize(height).catch(() => {})
+  }, [ready, startup, summary])
 
-  const toggle = async (key: keyof StartupSettings) => {
+  const act = (action: string): void => { window.electronAPI.tray.action(action) }
+
+  const toggle = async (key: keyof StartupSettings): Promise<void> => {
     const next = { ...startup, [key]: !startup[key] }
     setStartup(next)
+    // Main reconciles, turning the tray icon off forces the other two off, so
+    // its answer is authoritative, not the optimistic value above.
     setStartup(await window.electronAPI.tray.setStartup(next))
   }
 
-  const row: React.CSSProperties = {
+  const actionRow: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: 'var(--space-2)',
+    gap: 'var(--space-2-5)',
     width: '100%',
     padding: 'var(--space-2) var(--space-2-5)',
     background: 'transparent',
@@ -75,57 +92,67 @@ export default function TrayPanel(): React.JSX.Element {
     fontSize: 'var(--text-xs)',
     fontFamily: 'var(--font-sans)',
     cursor: 'pointer',
-    textAlign: 'left'
+    textAlign: 'left',
+    transition: 'background 100ms ease'
   }
 
-  const hoverable = {
-    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
-      e.currentTarget.style.background = 'var(--color-surface-2)'
-    },
-    onMouseLeave: (e: React.MouseEvent<HTMLElement>) => {
-      e.currentTarget.style.background = 'transparent'
-    }
+  const hover = (enter: boolean) => (e: React.MouseEvent<HTMLElement>) => {
+    e.currentTarget.style.background = enter ? 'var(--color-surface-2)' : 'transparent'
   }
 
-  const Stat = ({ value, label, warn }: { value: number; label: string; warn?: boolean }) => (
-    <div style={{ flex: 1, textAlign: 'center' }}>
-      <div style={{
-        fontSize: 'var(--text-lg)',
-        fontWeight: 'var(--weight-semibold)',
-        color: warn && value > 0 ? 'var(--color-error)' : 'var(--color-secondary)'
-      }}>
-        {value}
+  const Stat = ({ value, label, warn }: { value: number; label: string; warn?: boolean }) => {
+    const alert = warn && value > 0
+    return (
+      <div style={{ flex: 1, textAlign: 'center', padding: 'var(--space-2) 0' }}>
+        <div style={{
+          fontSize: 'var(--text-lg)',
+          fontWeight: 'var(--weight-semibold)',
+          lineHeight: 1.1,
+          color: alert ? 'var(--color-error)' : value > 0 ? 'var(--color-secondary)' : 'var(--color-text-faint)'
+        }}>
+          {value}
+        </div>
+        <div style={{
+          fontSize: '10px',
+          marginTop: '3px',
+          color: 'var(--color-text-faint)',
+          textTransform: 'uppercase',
+          letterSpacing: 'var(--tracking-wide)'
+        }}>
+          {label}
+        </div>
       </div>
-      <div style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>{label}</div>
-    </div>
-  )
+    )
+  }
 
   return (
-    <div style={{
-      width: '100vw',
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--color-surface-1)',
-      border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-lg)',
-      boxShadow: 'var(--shadow-2xl)',
-      overflow: 'hidden',
-      fontFamily: 'var(--font-sans)'
-    }}>
+    <div
+      ref={rootRef}
+      style={{
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--color-surface-1)',
+        border: '1px solid var(--color-surface-offset)',
+        borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-2xl)',
+        overflow: 'hidden',
+        fontFamily: 'var(--font-sans)'
+      }}
+    >
       <div style={{
-        display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)',
-        padding: 'var(--space-3) var(--space-3) var(--space-2)'
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+        gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-3-5) var(--space-2)'
       }}>
         <span style={{
-          fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)',
-          color: 'var(--color-secondary)', letterSpacing: 'var(--tracking-wide)'
+          fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)',
+          color: 'var(--color-secondary)', letterSpacing: 'var(--tracking-wider)'
         }}>
           CHECKPOINT
         </span>
         {summary.context && (
           <span style={{
-            fontSize: '10px', color: 'var(--color-text-faint)',
+            fontSize: '10px', color: 'var(--color-text-faint)', minWidth: 0,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>
             {summary.context}
@@ -134,83 +161,76 @@ export default function TrayPanel(): React.JSX.Element {
       </div>
 
       <div style={{
-        display: 'flex', gap: 'var(--space-2)',
-        margin: '0 var(--space-3) var(--space-3)',
-        padding: 'var(--space-2-5) 0',
+        display: 'flex',
+        margin: '0 var(--space-3) var(--space-2)',
         background: 'var(--color-surface-2)',
         border: '1px solid var(--color-surface-offset)',
         borderRadius: 'var(--radius-md)'
       }}>
         <Stat value={summary.overdue} label="overdue" warn />
-        <Stat value={summary.dueToday} label="due today" />
+        <div style={{ width: '1px', background: 'var(--color-surface-offset)' }} />
+        <Stat value={summary.dueToday} label="today" />
+        <div style={{ width: '1px', background: 'var(--color-surface-offset)' }} />
         <Stat value={summary.open} label="open" />
       </div>
 
-      <div style={{ padding: '0 var(--space-2)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-        <button style={row} {...hoverable} onClick={() => act('open')}>
-          <LayoutGrid size={13} style={{ color: 'var(--color-text-muted)' }} />
+      <div style={{ padding: '0 var(--space-2)', display: 'flex', flexDirection: 'column' }}>
+        <button style={actionRow} onMouseEnter={hover(true)} onMouseLeave={hover(false)} onClick={() => act('open')}>
+          <LayoutGrid size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
           Open Checkpoint
         </button>
-        <button style={row} {...hoverable} onClick={() => act('capture')}>
-          <Zap size={13} style={{ color: 'var(--color-text-muted)' }} />
+        <button style={actionRow} onMouseEnter={hover(true)} onMouseLeave={hover(false)} onClick={() => act('capture')}>
+          <Zap size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
           Quick capture
-        </button>
-        <button style={row} {...hoverable} onClick={() => act('data-folder')}>
-          <FolderOpen size={13} style={{ color: 'var(--color-text-muted)' }} />
-          Open data folder
         </button>
       </div>
 
       <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: 'var(--space-2) var(--space-3)' }} />
 
-      <div style={{ padding: '0 var(--space-2)', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+      <div style={{ padding: '0 var(--space-3-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <span style={{
-          padding: '0 var(--space-2-5) var(--space-1)',
           fontSize: '9px', fontWeight: 'var(--weight-bold)',
           color: 'var(--color-text-faint)', textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wider)'
         }}>
-          <SettingsIcon size={9} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
           Startup
         </span>
 
-        {([
-          ['openAtLogin', 'Start with Windows'],
-          ['startMinimised', 'Start hidden in the tray'],
-          ['closeToTray', 'Close button hides to tray']
-        ] as [keyof StartupSettings, string][]).map(([key, label]) => {
-          // Both of these need somewhere to hide to, and would strand the window
-          // if the tray icon were off.
+        {STARTUP_ROWS.map(({ key, label, hint }) => {
+          // Both of these need somewhere to hide to; without the tray icon they
+          // would strand the window, so main refuses them and so does this.
           const disabled = !startup.showTrayIcon && key !== 'openAtLogin'
           return (
-            <label
+            <div
               key={key}
-              style={{ ...row, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1 }}
-              {...(disabled ? {} : hoverable)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 'var(--space-3)', opacity: disabled ? 0.45 : 1
+              }}
             >
-              <input
-                type="checkbox"
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{label}</div>
+                <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginTop: '1px' }}>{hint}</div>
+              </div>
+              <ToggleSwitch
                 checked={startup[key]}
-                disabled={disabled}
                 onChange={() => toggle(key)}
-                style={{ accentColor: 'var(--color-secondary)', cursor: 'inherit' }}
+                disabled={disabled}
+                label={label}
               />
-              {label}
-            </label>
+            </div>
           )
         })}
       </div>
 
-      <div style={{ flex: 1 }} />
-
-      <div style={{ padding: '0 var(--space-2) var(--space-2)' }}>
+      <div style={{ padding: 'var(--space-2-5) var(--space-2) var(--space-2)' }}>
         <button
-          style={{ ...row, color: 'var(--color-error)' }}
+          style={{ ...actionRow, color: 'var(--color-error)' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-error-muted)' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           onClick={() => act('quit')}
         >
-          <Power size={13} />
+          <Power size={14} style={{ flexShrink: 0 }} />
           Quit Checkpoint
         </button>
       </div>

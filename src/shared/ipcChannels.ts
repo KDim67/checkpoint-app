@@ -110,6 +110,7 @@ export const enum IpcChannels {
   STARTUP_SET            = 'startup:set',
   TRAY_SUMMARY           = 'tray:summary',
   TRAY_ACTION            = 'tray:action',
+  TRAY_RESIZE            = 'tray:resize',
 
   // Subtasks
   SUBTASK_LIST           = 'subtask:list',
