@@ -10,6 +10,12 @@ import { applyStoredTheme, watchTheme } from './lib/themeBoot'
 import Lightbox from './components/ui/Lightbox'
 import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
 import { getNumberSetting, setNumberSetting } from './lib/settings'
+import { getBoolSetting, setBoolSetting } from './lib/settings'
+import { createWorkspace, slugifyWorkspace, type WorkspaceEntry } from './lib/createWorkspace'
+
+const ONBOARDING_SEEN_KEY = 'onboarding_seen'
+/** Same palette the context manager assigns from, so colours stay consistent. */
+const ONBOARDING_COLORS = ['#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 import {
   APP_SHORTCUTS,
   loadBindings,
@@ -21,6 +27,7 @@ import {
 
 // Lazy-loaded views (code split per view)
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
+const OnboardingModal = lazy(() => import('./components/OnboardingModal'))
 const TrayPanel      = lazy(() => import('./components/TrayPanel'))
 const LogView      = lazy(() => import('./components/LogView'))
 const KanbanView   = lazy(() => import('./components/KanbanView'))
@@ -491,6 +498,57 @@ export default function App() {
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Shown once, then never again unless replayed from Settings. Read rather
+  // than pushed, so a slow first paint cannot race it: the panel appears when
+  // the answer arrives instead of flashing and disappearing.
+  useEffect(() => {
+    let cancelled = false
+    getBoolSetting(ONBOARDING_SEEN_KEY, false)
+      .then(seen => { if (!cancelled && !seen) setShowOnboarding(true) })
+      .catch(() => {})
+
+    // Settings asks for a replay through the same event the rest of the app
+    // uses to talk across views.
+    const replay = (): void => setShowOnboarding(true)
+    window.addEventListener('replay-onboarding', replay)
+    return () => { cancelled = true; window.removeEventListener('replay-onboarding', replay) }
+  }, [])
+
+  const dismissOnboarding = useCallback(() => {
+    setShowOnboarding(false)
+    setBoolSetting(ONBOARDING_SEEN_KEY, true).catch(() => {})
+  }, [])
+
+  /**
+   * Creates the workspace the first-run panel asked for and switches to it.
+   *
+   * Shares createWorkspace with the context manager in Settings, so a workspace
+   * made here is identical to one made there.
+   */
+  const createOnboardingWorkspace = useCallback(async (name: string, templateId: string) => {
+    const slug = slugifyWorkspace(name)
+    if (!slug) throw new Error('That name has no letters or numbers in it.')
+
+    const raw = await window.electronAPI.db.getSetting('contexts_list') as string | null
+    let existing: WorkspaceEntry[] = []
+    try { existing = raw ? JSON.parse(raw) : [] } catch { existing = [] }
+    if (existing.some(c => c.slug === slug)) {
+      throw new Error(`A workspace called "${slug}" already exists.`)
+    }
+
+    const entry: WorkspaceEntry = {
+      slug,
+      name: name.trim(),
+      color: ONBOARDING_COLORS[existing.length % ONBOARDING_COLORS.length]
+    }
+    const { list } = await createWorkspace(existing, entry, templateId)
+
+    setContextsList(list)
+    setAvailableContexts(list.map(c => c.slug))
+    setContext(slug)
+  }, [setContextsList, setAvailableContexts, setContext])
 
   // Ctrl/Cmd+K, bound in the renderer rather than as a global shortcut: a global
   // one would fire while Checkpoint is in the background and steal the keystroke
@@ -760,6 +818,12 @@ export default function App() {
         <ErrorBoundary label="Checkpoint">
         <Suspense fallback={null}>
           <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+          {showOnboarding && (
+            <OnboardingModal
+              onCreateWorkspace={createOnboardingWorkspace}
+              onClose={dismissOnboarding}
+            />
+          )}
         </Suspense>
         <div className="app-shell">
           <Titlebar />

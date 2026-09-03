@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ExternalLink, FolderOpen, Info } from 'lucide-react'
+import { ExternalLink, FolderOpen, Info, PlayCircle } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
 
@@ -55,6 +55,30 @@ export default function AboutPanel() {
             Developer productivity workspace
           </div>
         </div>
+      </div>
+
+      <Divider />
+
+      {/* Replay of the first-run panel. Lives here rather than in Appearance
+          because this is where someone looks when they want to know what the
+          app is, which is the same question the panel answers. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+        <div>
+          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+            Getting started
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+            The welcome panel, with the keyboard shortcuts worth knowing.
+          </div>
+        </div>
+        <button
+          className="btn-secondary"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', flexShrink: 0 }}
+          onClick={() => window.dispatchEvent(new CustomEvent('replay-onboarding'))}
+        >
+          <PlayCircle size={13} />
+          Show again
+        </button>
       </div>
 
       <Divider />

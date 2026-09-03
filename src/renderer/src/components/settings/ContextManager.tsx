@@ -5,31 +5,19 @@ import { useAppStore } from '../../store/appStore'
 import ColorPicker from '../ui/ColorPicker'
 import { useToast } from '../ui/Toast'
 import ModalShell from '../ui/ModalShell'
-import { saveBoardConfig, normalizeBoardConfig } from '../../lib/boardConfig'
+import { createWorkspace, slugifyWorkspace, type WorkspaceEntry } from '../../lib/createWorkspace'
 import {
   PROJECT_TEMPLATES,
   DEFAULT_TEMPLATE_ID,
-  findProjectTemplate,
-  buildTemplateColumns,
-  buildTemplateCards,
   describeTemplate
 } from '../../../../shared/projectTemplates'
 
-interface ContextEntry {
-  slug: string
-  name: string
-  color: string
-  gitPath?: string
-}
+type ContextEntry = WorkspaceEntry
 
 const PRESET_COLORS = [
   '#1e45fc', '#cdf12b', '#10b981', '#f97316',
   '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'
 ]
-
-function slugify(name: string): string {
-  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-}
 
 const STORAGE_KEY = 'contexts_list'
 
@@ -83,7 +71,7 @@ export default function ContextManager() {
         const initialName = res.payload.context
         const baseName = initialName.charAt(0).toUpperCase() + initialName.slice(1)
         setImportName(baseName)
-        setImportSlug(slugify(baseName))
+        setImportSlug(slugifyWorkspace(baseName))
       } else if (res.error) {
         toast(`Import failed: ${res.error}`)
       }
@@ -94,7 +82,7 @@ export default function ContextManager() {
 
   const handleImportConfirm = async () => {
     if (!importPayload || !importName.trim()) return
-    const slug = slugify(importName)
+    const slug = slugifyWorkspace(importName)
     if (!slug) return
 
     try {
@@ -153,44 +141,10 @@ export default function ContextManager() {
     setContextsList(updated)
   }
 
-  /**
-   * Writes the template's board and seeds its cards.
-   *
-   * Everything goes through the ordinary board-config and item paths, so a
-   * templated workspace is an ordinary one the moment it exists, there is no
-   * template state left behind to reason about later.
-   */
-  const applyTemplate = async (slug: string, templateId: string): Promise<string> => {
-    const template = findProjectTemplate(templateId)
-    if (!template) return ''
-
-    await saveBoardConfig(slug, normalizeBoardConfig({
-      version: 1,
-      columns: buildTemplateColumns(template)
-    }))
-
-    const drafts = buildTemplateCards(template)
-    for (const draft of drafts) {
-      await window.electronAPI.db.createItem({
-        type: 'card',
-        context: slug,
-        title: draft.title,
-        body: draft.body,
-        status: draft.status,
-        priority: draft.priority,
-        position: draft.position,
-        due_at: null,
-        metadata: draft.metadata
-      })
-    }
-
-    return `Created "${template.name}" workspace, ${describeTemplate(template)}.`
-  }
-
   const handleAdd = async () => {
     const trimmed = addName.trim()
     if (!trimmed || creating) return
-    const slug = slugify(trimmed)
+    const slug = slugifyWorkspace(trimmed)
     if (contexts.some(c => c.slug === slug)) return
 
     const newEntry: ContextEntry = {
@@ -202,17 +156,15 @@ export default function ContextManager() {
 
     setCreating(true)
     try {
-      await persist([...contexts, newEntry])
+      // Shared with the first-run panel, so both produce the same workspace.
+      const { list, summary, templateFailed } = await createWorkspace(contexts, newEntry, addTemplateId)
+      setContexts(list)
+      setAvailableContexts(list.map(c => c.slug))
+      setContextsList(list)
 
-      let summary = ''
-      try {
-        summary = await applyTemplate(slug, addTemplateId)
-      } catch (err) {
-        // The workspace itself is already saved; losing the scaffolding is
-        // worth a warning, not an unwind that would leave nothing behind.
-        console.error('Failed to apply project template:', err)
-        toast('Workspace created, but the template could not be applied.')
-      }
+      // The workspace itself is already saved; losing the scaffolding is worth
+      // a warning, not an unwind that would leave nothing behind.
+      if (templateFailed) toast('Workspace created, but the template could not be applied.')
 
       setContext(slug)
       if (summary) toast(summary)
@@ -231,7 +183,7 @@ export default function ContextManager() {
     const trimmed = editName.trim()
     if (!trimmed) { setEditingSlug(null); return }
 
-    const newSlug = slugify(editSlugVal) || slugify(trimmed)
+    const newSlug = slugifyWorkspace(editSlugVal) || slugifyWorkspace(trimmed)
     if (!newSlug) { toast('Invalid workspace slug'); return }
 
     // If slug changed, ensure it's unique
@@ -359,7 +311,7 @@ export default function ContextManager() {
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Slug (#):</span>
                 <input
                   value={editSlugVal}
-                  onChange={e => setEditSlugVal(slugify(e.target.value))}
+                  onChange={e => setEditSlugVal(slugifyWorkspace(e.target.value))}
                   onKeyDown={e => {
                     if (e.key === 'Enter') handleSaveEdit(ctx.slug)
                     if (e.key === 'Escape') setEditingSlug(null)
@@ -662,7 +614,7 @@ export default function ContextManager() {
 
           {addName.trim() && (
             <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
-              Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{slugify(addName)}</code>
+              Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{slugifyWorkspace(addName)}</code>
             </div>
           )}
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -790,7 +742,7 @@ export default function ContextManager() {
                 value={importName}
                 onChange={e => {
                   setImportName(e.target.value)
-                  setImportSlug(slugify(e.target.value))
+                  setImportSlug(slugifyWorkspace(e.target.value))
                 }}
                 placeholder="e.g. My Imported Project"
                 style={{
