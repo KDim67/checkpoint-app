@@ -3,18 +3,14 @@ import { v4 as uuidv4 } from 'uuid'
 import { getDb } from './db'
 import type Database from 'better-sqlite3'
 import { IpcChannels } from '../shared/ipcChannels'
+import type { AiMemory, CreateMemoryPayload } from '../shared/types'
 
-export interface AiMemory {
-  id: string
-  context: string
-  category: 'semantic' | 'episodic' | 'working'
-  memory_key: string
-  content: string
-  is_pinned: boolean
-  access_count: number
-  created_at: number
-  updated_at: number
-}
+// Re-exported: this module owned the definition before the preload and the
+// renderer needed it too, and existing importers still reach for it here.
+export type { AiMemory } from '../shared/types'
+
+/** The row as SQLite actually returns it, before is_pinned is normalised. */
+type AiMemoryRow = Omit<AiMemory, 'is_pinned'> & { is_pinned: number }
 
 // Module-level prepared statement singletons
 // All initialized once in initMemoryStatements(), never inside a per-call function.
@@ -72,7 +68,7 @@ function initMemoryStatements(): void {
 }
 
 export function getMemories(context: string = 'default'): AiMemory[] {
-  const rows = stmtGetMemories.all(context) as any[]
+  const rows = stmtGetMemories.all(context) as AiMemoryRow[]
   return rows.map(r => ({
     ...r,
     is_pinned: Boolean(r.is_pinned)
@@ -463,7 +459,7 @@ export function initMemoryIpc(): void {
     return getMemories(context)
   })
 
-  ipcMain.handle(IpcChannels.AI_SAVE_MEMORY, (_event, payload: any) => {
+  ipcMain.handle(IpcChannels.AI_SAVE_MEMORY, (_event, payload: CreateMemoryPayload) => {
     return saveMemory(payload)
   })
 
@@ -483,7 +479,7 @@ export function initMemoryIpc(): void {
     return updateMemoryContent(id, content)
   })
 
-  ipcMain.handle('ai:batchSaveMemories', (_event, items: any[], context: string) => {
+  ipcMain.handle('ai:batchSaveMemories', (_event, items: CreateMemoryPayload[], context: string) => {
     return batchSaveMemories(items, context)
   })
 

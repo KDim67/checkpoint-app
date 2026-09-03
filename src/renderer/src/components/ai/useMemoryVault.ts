@@ -18,13 +18,11 @@
 
 import { useEffect, useState } from 'react'
 import type { useToast } from '../ui/Toast'
+import type { AiMemory, MemoryCategory } from '../../../../shared/types'
 
-export type MemoryCategory = 'semantic' | 'episodic' | 'working'
-
-// The memory rows come straight from IPC and are consumed by JSX that reads a
-// dozen optional columns; typing them properly is a separate job to this move.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export type MemoryRow = any
+// Re-exported so the modal and the panel can keep importing them from here,
+// where the vault they belong to lives.
+export type { MemoryCategory, AiMemory as MemoryRow } from '../../../../shared/types'
 
 interface Options {
   activeContext: string
@@ -35,7 +33,7 @@ interface Options {
 
 export function useMemoryVault({ activeContext, selectedModel, toast }: Options) {
   const [showMemoryPanel, setShowMemoryPanel] = useState(false)
-  const [memories, setMemories] = useState<MemoryRow[]>([])
+  const [memories, setMemories] = useState<AiMemory[]>([])
   const [memoryLoading, setMemoryLoading] = useState(false)
   const [memorySearchQuery, setMemorySearchQuery] = useState('')
   const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null)
@@ -82,7 +80,7 @@ export function useMemoryVault({ activeContext, selectedModel, toast }: Options)
   const handleDeleteMemory = async (id: string) => {
     try {
       await window.electronAPI.memory.deleteMemory(id)
-      setMemories(prev => prev.filter((m: MemoryRow) => m.id !== id))
+      setMemories(prev => prev.filter(m => m.id !== id))
     } catch (e) {
       console.warn('Failed to delete memory:', e)
     }
@@ -91,13 +89,13 @@ export function useMemoryVault({ activeContext, selectedModel, toast }: Options)
   const handleTogglePinMemory = async (id: string) => {
     try {
       const newPinned = await window.electronAPI.memory.togglePinMemory(id)
-      setMemories(prev => prev.map((m: MemoryRow) => m.id === id ? { ...m, is_pinned: newPinned } : m))
+      setMemories(prev => prev.map(m => m.id === id ? { ...m, is_pinned: newPinned } : m))
     } catch (e) {
       console.warn('Failed to toggle pin memory:', e)
     }
   }
 
-  const handleStartEditMemory = (mem: MemoryRow) => {
+  const handleStartEditMemory = (mem: AiMemory) => {
     setEditingMemoryId(mem.id)
     setEditingMemoryContent(mem.content)
   }
@@ -105,7 +103,7 @@ export function useMemoryVault({ activeContext, selectedModel, toast }: Options)
   const handleSaveEditMemory = async (id: string) => {
     try {
       await window.electronAPI.memory.updateMemoryContent(id, editingMemoryContent)
-      setMemories(prev => prev.map((m: MemoryRow) => m.id === id ? { ...m, content: editingMemoryContent, updated_at: Date.now() } : m))
+      setMemories(prev => prev.map(m => m.id === id ? { ...m, content: editingMemoryContent, updated_at: Date.now() } : m))
       setEditingMemoryId(null)
     } catch (e) {
       console.warn('Failed to update memory:', e)

@@ -35,7 +35,11 @@ import type {
   ClipboardItem,
   AnalyticsData,
   PluginInfo,
-  ShortcutMap
+  ShortcutMap,
+  AiMemory,
+  CreateMemoryPayload,
+  ContextExport,
+  WorkspaceFileInfo
 } from '../shared/types'
 
 /**
@@ -246,7 +250,7 @@ const api = {
      */
     importContext: async (): Promise<{
       success: boolean
-      payload?: any
+      payload?: ContextExport
       foreign?: ImportedBoard
       cancelled?: boolean
       error?: string
@@ -254,7 +258,7 @@ const api = {
       return ipcRenderer.invoke(IpcChannels.DB_IMPORT_CONTEXT)
     },
 
-    importContextData: async (newContextSlug: string, data: any): Promise<{ success: boolean; error?: string }> => {
+    importContextData: async (newContextSlug: string, data: ContextExport): Promise<{ success: boolean; error?: string }> => {
       return ipcRenderer.invoke(IpcChannels.DB_IMPORT_CONTEXT_DATA, newContextSlug, data)
     },
 
@@ -714,35 +718,35 @@ const api = {
       ipcRenderer.invoke(IpcChannels.GAMEDEV_SAVE_UPSCALED, params)
   },
   memory: {
-    getMemories: (context?: string): Promise<any[]> =>
+    getMemories: (context?: string): Promise<AiMemory[]> =>
       ipcRenderer.invoke(IpcChannels.AI_GET_MEMORIES, context),
-    saveMemory: (payload: any): Promise<any> =>
+    saveMemory: (payload: CreateMemoryPayload): Promise<AiMemory> =>
       ipcRenderer.invoke(IpcChannels.AI_SAVE_MEMORY, payload),
     deleteMemory: (id: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.AI_DELETE_MEMORY, id),
-    searchMemories: (query: string, context?: string, limit?: number): Promise<any[]> =>
+    searchMemories: (query: string, context?: string, limit?: number): Promise<AiMemory[]> =>
       ipcRenderer.invoke(IpcChannels.AI_SEARCH_MEMORIES, query, context, limit),
     togglePinMemory: (id: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.AI_TOGGLE_PIN_MEMORY, id),
     updateMemoryContent: (id: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.AI_UPDATE_MEMORY_CONTENT, id, content),
-    batchSaveMemories: (items: any[], context: string): Promise<void> =>
+    batchSaveMemories: (items: CreateMemoryPayload[], context: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.AI_BATCH_SAVE_MEMORIES, items, context),
     pruneMemories: (context: string, limit: number): Promise<void> =>
       ipcRenderer.invoke('ai:pruneMemories', context, limit),
-    auditMemories: (context: string, model: string): Promise<any[]> =>
+    auditMemories: (context: string, model: string): Promise<AiMemory[]> =>
       ipcRenderer.invoke('ai:auditMemories', context, model),
     consolidateMemory: (params: {
       context: string
       userText: string
       assistantText: string
       model: string
-    }): Promise<any[]> => ipcRenderer.invoke(IpcChannels.AI_CONSOLIDATE_MEMORY, params)
+    }): Promise<AiMemory[]> => ipcRenderer.invoke(IpcChannels.AI_CONSOLIDATE_MEMORY, params)
   },
   workspace: {
     selectFolder: (): Promise<string | null> =>
       ipcRenderer.invoke(IpcChannels.WORKSPACE_SELECT_FOLDER),
-    getStructure: (folderPath: string): Promise<any[]> =>
+    getStructure: (folderPath: string): Promise<WorkspaceFileInfo[]> =>
       ipcRenderer.invoke(IpcChannels.WORKSPACE_GET_STRUCTURE, folderPath),
     readFile: (folderPath: string, relativePath: string): Promise<string> =>
       ipcRenderer.invoke(IpcChannels.WORKSPACE_READ_FILE, folderPath, relativePath)

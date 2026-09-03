@@ -39,12 +39,9 @@ export interface SavedChat {
   messages: Message[]
 }
 
-export interface WorkspaceFileInfo {
-  name: string
-  relativePath: string
-  extension: string
-  size: number
-}
+// Defined in shared/types so the preload, the main process and the panel all
+// describe an indexed file the same way.
+export type { WorkspaceFileInfo } from '../../../../shared/types'
 
 export interface CustomAction {
   id: string
