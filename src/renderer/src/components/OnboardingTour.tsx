@@ -244,7 +244,20 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
         }}
       />
 
-      {/* The card */}
+      {/* The card
+          Two elements on purpose. The outer one owns the position, including
+          the translate that centres it; the inner one owns the pop-in, whose
+          keyframes animate `transform`. In one element the animation wins the
+          cascade for those 250ms and the centring translate is dropped, so the
+          card opens with its corner at the middle of the screen and jumps into
+          place when the animation ends. */}
+      <div
+        style={{
+          position: 'fixed',
+          ...cardStyle,
+          transition: 'top var(--duration-slow) var(--ease-default), left var(--duration-slow) var(--ease-default)'
+        }}
+      >
       <div
         ref={cardRef}
         role="dialog"
@@ -252,8 +265,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
         aria-label={step.title}
         tabIndex={-1}
         style={{
-          position: 'fixed',
-          ...cardStyle,
+          width: '100%',
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-surface-offset)',
           borderRadius: 'var(--radius-lg)',
@@ -265,8 +277,8 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           outline: 'none',
           maxHeight: 'calc(100vh - 32px)',
           overflowY: 'auto',
-          animation: 'modal-pop-in var(--duration-enter) var(--ease-enter)',
-          transition: 'top var(--duration-slow) var(--ease-default), left var(--duration-slow) var(--ease-default)'
+          boxSizing: 'border-box',
+          animation: 'modal-pop-in var(--duration-enter) var(--ease-enter)'
         }}
       >
         {/* Progress */}
@@ -544,6 +556,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
