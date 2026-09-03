@@ -27,7 +27,7 @@ import {
 
 // Lazy-loaded views (code split per view)
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
-const OnboardingModal = lazy(() => import('./components/OnboardingModal'))
+const OnboardingTour = lazy(() => import('./components/OnboardingTour'))
 const TrayPanel      = lazy(() => import('./components/TrayPanel'))
 const LogView      = lazy(() => import('./components/LogView'))
 const KanbanView   = lazy(() => import('./components/KanbanView'))
@@ -819,7 +819,7 @@ export default function App() {
         <Suspense fallback={null}>
           <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
           {showOnboarding && (
-            <OnboardingModal
+            <OnboardingTour
               onCreateWorkspace={createOnboardingWorkspace}
               onClose={dismissOnboarding}
             />
