@@ -5,6 +5,15 @@ import { useAppStore } from '../../store/appStore'
 import ColorPicker from '../ui/ColorPicker'
 import { useToast } from '../ui/Toast'
 import ModalShell from '../ui/ModalShell'
+import { saveBoardConfig, normalizeBoardConfig } from '../../lib/boardConfig'
+import {
+  PROJECT_TEMPLATES,
+  DEFAULT_TEMPLATE_ID,
+  findProjectTemplate,
+  buildTemplateColumns,
+  buildTemplateCards,
+  describeTemplate
+} from '../../../../shared/projectTemplates'
 
 interface ContextEntry {
   slug: string
@@ -45,6 +54,8 @@ export default function ContextManager() {
   const [addGitPath, setAddGitPath] = useState('')
   const [addColor, setAddColor] = useState(PRESET_COLORS[0])
   const [showAddForm, setShowAddForm] = useState(false)
+  const [addTemplateId, setAddTemplateId] = useState(DEFAULT_TEMPLATE_ID)
+  const [creating, setCreating] = useState(false)
 
   // State for Import Modal
   const [importPayload, setImportPayload] = useState<any | null>(null)
@@ -142,9 +153,43 @@ export default function ContextManager() {
     setContextsList(updated)
   }
 
+  /**
+   * Writes the template's board and seeds its cards.
+   *
+   * Everything goes through the ordinary board-config and item paths, so a
+   * templated workspace is an ordinary one the moment it exists, there is no
+   * template state left behind to reason about later.
+   */
+  const applyTemplate = async (slug: string, templateId: string): Promise<string> => {
+    const template = findProjectTemplate(templateId)
+    if (!template) return ''
+
+    await saveBoardConfig(slug, normalizeBoardConfig({
+      version: 1,
+      columns: buildTemplateColumns(template)
+    }))
+
+    const drafts = buildTemplateCards(template)
+    for (const draft of drafts) {
+      await window.electronAPI.db.createItem({
+        type: 'card',
+        context: slug,
+        title: draft.title,
+        body: draft.body,
+        status: draft.status,
+        priority: draft.priority,
+        position: draft.position,
+        due_at: null,
+        metadata: draft.metadata
+      })
+    }
+
+    return `Created "${template.name}" workspace, ${describeTemplate(template)}.`
+  }
+
   const handleAdd = async () => {
     const trimmed = addName.trim()
-    if (!trimmed) return
+    if (!trimmed || creating) return
     const slug = slugify(trimmed)
     if (contexts.some(c => c.slug === slug)) return
 
@@ -154,11 +199,32 @@ export default function ContextManager() {
       color: addColor,
       gitPath: addGitPath.trim() || undefined
     }
-    await persist([...contexts, newEntry])
-    setAddName('')
-    setAddGitPath('')
-    setAddColor(PRESET_COLORS[0])
-    setShowAddForm(false)
+
+    setCreating(true)
+    try {
+      await persist([...contexts, newEntry])
+
+      let summary = ''
+      try {
+        summary = await applyTemplate(slug, addTemplateId)
+      } catch (err) {
+        // The workspace itself is already saved; losing the scaffolding is
+        // worth a warning, not an unwind that would leave nothing behind.
+        console.error('Failed to apply project template:', err)
+        toast('Workspace created, but the template could not be applied.')
+      }
+
+      setContext(slug)
+      if (summary) toast(summary)
+
+      setAddName('')
+      setAddGitPath('')
+      setAddColor(PRESET_COLORS[0])
+      setAddTemplateId(DEFAULT_TEMPLATE_ID)
+      setShowAddForm(false)
+    } finally {
+      setCreating(false)
+    }
   }
 
   const handleSaveEdit = async (slug: string) => {
@@ -547,18 +613,74 @@ export default function ContextManager() {
               />
             </div>
           </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+              Start from
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '210px', overflowY: 'auto' }}>
+              {PROJECT_TEMPLATES.map(t => {
+                const selected = addTemplateId === t.id
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setAddTemplateId(t.id)}
+                    aria-pressed={selected}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: '2px',
+                      textAlign: 'left',
+                      background: selected ? 'var(--color-surface-offset)' : 'var(--color-surface-1)',
+                      border: selected
+                        ? `1px solid ${addColor}`
+                        : '1px solid var(--color-surface-offset)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      cursor: 'pointer',
+                      width: '100%'
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: 'var(--weight-medium)',
+                      color: 'var(--color-text-base)'
+                    }}>
+                      {t.name}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                      {t.description}
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>
+                      {describeTemplate(t)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {addName.trim() && (
             <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
               Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{slugify(addName)}</code>
             </div>
           )}
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <button className="btn-primary" style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-1-5) var(--space-4)' }}
-              onClick={handleAdd}>
-              Add Context
+            <button
+              className="btn-primary"
+              style={{
+                fontSize: 'var(--text-xs)',
+                padding: 'var(--space-1-5) var(--space-4)',
+                opacity: creating || !addName.trim() ? 0.5 : 1
+              }}
+              disabled={creating || !addName.trim()}
+              onClick={handleAdd}
+            >
+              {creating ? 'Creating…' : 'Add Context'}
             </button>
             <button className="btn-secondary" style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-1-5) var(--space-4)' }}
-              onClick={() => { setShowAddForm(false); setAddName(''); setAddGitPath('') }}>
+              disabled={creating}
+              onClick={() => { setShowAddForm(false); setAddName(''); setAddGitPath(''); setAddTemplateId(DEFAULT_TEMPLATE_ID) }}>
               Cancel
             </button>
           </div>
