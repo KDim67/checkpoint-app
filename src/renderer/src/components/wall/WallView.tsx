@@ -29,14 +29,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
-  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette
+  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import {
   bringToFront, boundsOf, createWallItem, duplicateItems, fitCamera, inPaintOrder,
   itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
-  itemAtPoint, snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
+  boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
+  snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   type WallCamera, type WallDoc, type WallItem, type WallItemKind
 } from '../../../../shared/wallModel'
 import {
@@ -84,6 +85,7 @@ export default function WallView() {
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   /** Name of an image job in flight, shown so a slow one does not look frozen. */
   const [busy, setBusy] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   /** Bumped whenever the ref-held history changes, so the buttons re-render. */
   const [historyTick, setHistoryTick] = useState(0)
 
@@ -285,6 +287,14 @@ export default function WallView() {
       { x: e.clientX - rect.left, y: e.clientY - rect.top },
       e.deltaY < 0 ? 1.1 : 1 / 1.1
     ))
+  }, [setCamera])
+
+  /** Centres one item without changing zoom, and selects it so it stands out. */
+  const jumpTo = useCallback((item: WallItem) => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setCamera(cameraCentredOn(item, { width: rect.width, height: rect.height }, docRef.current.camera.zoom))
+    setSelectedIds(new Set([item.id]))
   }, [setCamera])
 
   const fitToContent = useCallback(() => {
@@ -596,6 +606,15 @@ export default function WallView() {
       ? notes.filter(n => !placed.has(n.title)).map(n => ({ ref: n.title, label: n.title }))
       : []
 
+  /** What an item is called, wherever its name actually lives. */
+  const labelOf = (i: WallItem): string | undefined => {
+    if (i.kind === 'card') return cardsById.get(i.ref ?? '')?.title
+    if (i.kind === 'doc') return i.ref
+    if (i.kind === 'image') return i.text
+    return i.text
+  }
+  const matches = query.trim() ? searchItems(doc.items, query, labelOf) : []
+
   // Read after historyTick so the buttons reflect the ref-held stack.
   void historyTick
   const undoable = canUndo(historyRef.current)
@@ -662,10 +681,68 @@ export default function WallView() {
           {Math.round(camera.zoom * 100)}%
         </span>
 
-        {/* Stated rather than left to be discovered: neither is guessable. */}
-        <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--color-text-faint)' }}>
-          Drag to select · Right-drag to pan · Right-click for more
-        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', position: 'relative' }}>
+          {/* Stated rather than left to be discovered: neither is guessable. */}
+          <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
+            Drag to select · Right-drag to pan · Right-click for more
+          </span>
+
+          <div style={{ position: 'relative' }}>
+            <Search
+              size={12}
+              style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-faint)', pointerEvents: 'none' }}
+            />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') { setQuery(''); (e.target as HTMLInputElement).blur() }
+                // Enter jumps to the best match, so finding something never
+                // needs the mouse.
+                if (e.key === 'Enter' && matches.length > 0) { jumpTo(matches[0]); setQuery('') }
+              }}
+              placeholder="Find on this wall"
+              aria-label="Find on this wall"
+              style={{
+                width: '170px',
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--color-text-base)',
+                padding: '4px 8px 4px 24px',
+                fontSize: 'var(--text-xs)',
+                outline: 'none'
+              }}
+            />
+
+            {matches.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 25,
+                width: '260px', maxHeight: '260px', overflowY: 'auto',
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', padding: '4px'
+              }}>
+                {matches.slice(0, 12).map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => { jumpTo(m); setQuery('') }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left', background: 'none',
+                      border: 'none', cursor: 'pointer', padding: 'var(--space-2)',
+                      borderRadius: 'var(--radius-sm)', color: 'var(--color-text-base)',
+                      fontSize: 'var(--text-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                  >
+                    {labelOf(m) || '(untitled)'}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {picker && (
           <div style={{
@@ -891,6 +968,79 @@ export default function WallView() {
         {picker && (
           <div onPointerDown={() => setPicker(null)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
         )}
+
+        {/* A minimap only earns its space once there is something to lose track
+            of, so it appears with the fourth item rather than sitting empty. */}
+        {doc.items.length > 3 && (() => {
+          const b = wallBounds(doc.items)
+          const rect = viewportRef.current?.getBoundingClientRect()
+          if (!b || !rect) return null
+
+          const W = 150
+          const H = 110
+          const pad = 8
+          const contentW = Math.max(1, b.maxX - b.minX)
+          const contentH = Math.max(1, b.maxY - b.minY)
+          const k = Math.min((W - pad * 2) / contentW, (H - pad * 2) / contentH)
+          const ox = pad - b.minX * k
+          const oy = pad - b.minY * k
+
+          // The camera's own window onto the wall, drawn in the same space.
+          const viewX = (-camera.x / camera.zoom) * k + ox
+          const viewY = (-camera.y / camera.zoom) * k + oy
+          const viewW = (rect.width / camera.zoom) * k
+          const viewH = (rect.height / camera.zoom) * k
+
+          return (
+            <div
+              onPointerDown={e => {
+                e.stopPropagation()
+                // Click the map, go there: the wall point under the click
+                // becomes the centre of the view.
+                const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                const wx = (e.clientX - box.left - ox) / k
+                const wy = (e.clientY - box.top - oy) / k
+                setCamera({
+                  ...docRef.current.camera,
+                  x: rect.width / 2 - wx * docRef.current.camera.zoom,
+                  y: rect.height / 2 - wy * docRef.current.camera.zoom
+                })
+              }}
+              title="Click to jump"
+              style={{
+                position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
+                width: `${W}px`, height: `${H}px`, zIndex: 20, cursor: 'pointer',
+                background: 'var(--color-surface-1)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-md)',
+                overflow: 'hidden'
+              }}
+            >
+              {doc.items.map(i => (
+                <div
+                  key={i.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${i.x * k + ox}px`, top: `${i.y * k + oy}px`,
+                    width: `${Math.max(2, i.width * k)}px`, height: `${Math.max(2, i.height * k)}px`,
+                    background: i.color || 'var(--color-surface-offset)',
+                    borderRadius: '1px',
+                    opacity: selectedIds.has(i.id) ? 1 : 0.7
+                  }}
+                />
+              ))}
+              <div style={{
+                position: 'absolute',
+                left: `${viewX}px`, top: `${viewY}px`,
+                width: `${viewW}px`, height: `${viewH}px`,
+                border: '1px solid var(--color-secondary)',
+                background: 'var(--color-secondary-muted)',
+                pointerEvents: 'none'
+              }} />
+            </div>
+          )
+        })()}
 
         {busy && (
           <div
