@@ -40,6 +40,12 @@ export interface WallItem {
   rotation?: number
   /** Paint order. Explicit because it has to survive a reload. */
   z: number
+  /**
+   * Pinned in place: not draggable, not resizable, not selectable by marquee.
+   * What a background reference image needs so that reaching past it to pan
+   * does not drag it instead.
+   */
+  locked?: boolean
 }
 
 export interface WallCamera {
@@ -121,6 +127,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(typeof o.text === 'string' ? { text: o.text } : {}),
     ...(str(o.color) ? { color: str(o.color) } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
+    ...(o.locked === true ? { locked: true } : {}),
     z: num(o.z, index)
   }
 }
@@ -287,3 +294,87 @@ export function createWallItem(
     ...extra
   }
 }
+
+// Selection and bulk edits
+
+export interface Rect { x: number; y: number; width: number; height: number }
+
+/** Normalises a drag between two points into a rectangle with positive size. */
+export function rectFromPoints(a: { x: number; y: number }, b: { x: number; y: number }): Rect {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.abs(a.x - b.x),
+    height: Math.abs(a.y - b.y)
+  }
+}
+
+/**
+ * Ids of items the marquee touches.
+ *
+ * Intersection rather than containment: having to fully enclose a large frame
+ * to select it means zooming out first, and every tool that gets this wrong
+ * feels broken. Locked items are skipped, being unselectable is what locked
+ * means.
+ */
+export function itemsInRect(items: WallItem[], rect: Rect): string[] {
+  const right = rect.x + rect.width
+  const bottom = rect.y + rect.height
+  return items
+    .filter(i => !i.locked)
+    .filter(i => i.x < right && i.x + i.width > rect.x && i.y < bottom && i.y + i.height > rect.y)
+    .map(i => i.id)
+}
+
+/** Moves a set of items together, leaving locked ones where they are. */
+export function moveItems(items: WallItem[], ids: Set<string>, dx: number, dy: number): WallItem[] {
+  return items.map(i =>
+    ids.has(i.id) && !i.locked ? { ...i, x: i.x + dx, y: i.y + dy } : i
+  )
+}
+
+/** Applies the same patch to a set of items. Locked items are left alone. */
+export function patchItems(
+  items: WallItem[],
+  ids: Set<string>,
+  patch: Partial<WallItem>
+): WallItem[] {
+  return items.map(i => (ids.has(i.id) && !i.locked ? { ...i, ...patch } : i))
+}
+
+/**
+ * Copies items, offset so the duplicates are visibly separate from the
+ * originals rather than exactly on top of them.
+ *
+ * Returns the new items only; the caller appends and selects them, so a
+ * duplicate can be dragged away immediately.
+ */
+export function duplicateItems(
+  items: WallItem[],
+  ids: Set<string>,
+  offset = 24
+): WallItem[] {
+  let z = topZ(items)
+  return items
+    .filter(i => ids.has(i.id))
+    .map(i => {
+      // A duplicate arrives unlocked whatever the original was: otherwise the
+      // copy of a locked background cannot be moved into place.
+      const { locked: _wasLocked, ...rest } = i
+      return {
+        ...rest,
+        id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        x: i.x + offset,
+        y: i.y + offset,
+        z: z++
+      }
+    })
+}
+
+/** Rounds to a grid. Used only when the user asks for snapping. */
+export function snap(value: number, grid: number): number {
+  if (grid <= 0) return value
+  return Math.round(value / grid) * grid
+}
+
+export const SNAP_GRID = 24
