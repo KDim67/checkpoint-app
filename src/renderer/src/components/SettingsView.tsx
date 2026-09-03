@@ -68,6 +68,8 @@ import {
 // actually decides which tab is open, so the copy here was only ever a way to
 // get them out of step.
 import type { SettingsTab } from '../store/appStore'
+import { loadEmailSamples, saveEmailSamples, type EmailSample } from '../lib/emailSamples'
+import { MAX_EMAIL_SAMPLES } from '../../../shared/emailSamples'
 
 interface TabInfo {
   id: SettingsTab
@@ -344,11 +346,6 @@ function WidgetSettings() {
   )
 }
 
-interface EmailSample {
-  id: string
-  title: string
-  body: string
-}
 
 function MemoryVaultManager() {
   const activeContext = useAppStore(s => s.activeContext)
@@ -463,17 +460,9 @@ function AiSettings() {
   const [activeId, setActiveId] = useState<string>('')
   const [showPresetMenu, setShowPresetMenu] = useState(false)
 
-  const [emailSamples, setEmailSamples] = useState<EmailSample[]>(() => {
-    try {
-      const stored = localStorage.getItem('checkpoint_email_writing_samples')
-      if (stored) return JSON.parse(stored)
-      const legacy = localStorage.getItem('checkpoint_email_writing_style')
-      if (legacy) {
-        return [{ id: 'sample_1', title: 'Sample Email 1', body: legacy }]
-      }
-    } catch {}
-    return [{ id: 'sample_1', title: 'Sample Email 1', body: '' }]
-  })
+  const [emailSamples, setEmailSamples] = useState<EmailSample[]>([
+    { id: 'sample_1', title: 'Sample Email 1', body: '' }
+  ])
 
   useEffect(() => {
     const load = async () => {
@@ -491,21 +480,14 @@ function AiSettings() {
 
         const dbTemp     = await window.electronAPI.db.getSetting('ai_temperature')
         const dbMaxToks  = await window.electronAPI.db.getSetting('ai_max_tokens')
-        const dbSamples  = await window.electronAPI.db.getSetting('ai_email_writing_samples')
+
         // Explicit null check, not truthiness: temperature 0 is a valid and
         // meaningful setting (fully deterministic output), and `if (dbTemp)`
         // skipped it, so choosing 0 silently reverted to the default on reopen.
         if (dbTemp !== null && dbTemp !== undefined) setTemperature(Number(dbTemp))
         if (dbMaxToks !== null && dbMaxToks !== undefined) setMaxTokens(Number(dbMaxToks))
-        if (dbSamples) {
-          try {
-            const parsed = JSON.parse(dbSamples as string)
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setEmailSamples(parsed)
-              localStorage.setItem('checkpoint_email_writing_samples', dbSamples as string)
-            }
-          } catch {}
-        }
+        const samples = await loadEmailSamples()
+        if (samples.length > 0) setEmailSamples(samples)
       } catch (err) { console.error('Failed to load AI settings:', err) }
     }
     load()
@@ -573,21 +555,13 @@ function AiSettings() {
   }
 
   const handleUpdateSamples = (updated: EmailSample[]) => {
-    const capped = updated.slice(0, 5)
+    const capped = updated.slice(0, MAX_EMAIL_SAMPLES)
     setEmailSamples(capped)
-    const str = JSON.stringify(capped)
-    try {
-      localStorage.setItem('checkpoint_email_writing_samples', str)
-      // Also sync first sample body to legacy key for compatibility
-      if (capped.length > 0) {
-        localStorage.setItem('checkpoint_email_writing_style', capped[0].body)
-      }
-    } catch {}
-    save('ai_email_writing_samples', str)
+    saveEmailSamples(capped).catch(() => {})
   }
 
   const handleAddSample = () => {
-    if (emailSamples.length >= 5) return
+    if (emailSamples.length >= MAX_EMAIL_SAMPLES) return
     const newSample: EmailSample = {
       id: `sample_${Date.now()}`,
       title: `Sample Email ${emailSamples.length + 1}`,
