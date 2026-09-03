@@ -158,5 +158,16 @@ export function buildCommands(ctx: CommandContext): Command[] {
     })
   }
 
+  // Also offered from Settings → About, but that is the last tab of a settings
+  // screen, nobody looking for the tour finds it there. The palette is where
+  // someone actually asks for something by name.
+  commands.push({
+    id: 'help:tour',
+    label: 'Show the getting started tour',
+    group: 'Help',
+    keywords: ['onboarding', 'welcome', 'walkthrough', 'intro', 'guide', 'shortcuts', 'help', 'again'],
+    run: () => { window.dispatchEvent(new CustomEvent('replay-onboarding')) }
+  })
+
   return commands
 }
