@@ -358,16 +358,17 @@ export function duplicateItems(
   return items
     .filter(i => ids.has(i.id))
     .map(i => {
-      // A duplicate arrives unlocked whatever the original was: otherwise the
-      // copy of a locked background cannot be moved into place.
-      const { locked: _wasLocked, ...rest } = i
-      return {
-        ...rest,
+      const copy: WallItem = {
+        ...i,
         id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         x: i.x + offset,
         y: i.y + offset,
         z: z++
       }
+      // A duplicate arrives unlocked whatever the original was: otherwise the
+      // copy of a locked background cannot be moved into place.
+      delete copy.locked
+      return copy
     })
 }
 
