@@ -1,151 +1,115 @@
 # Feature gaps
 
-What comparable productivity tools do that Checkpoint does not, ranked by
-impact-to-effort for *this* app specifically.
+What comparable productivity tools do that Checkpoint does not.
 
-Two things shape every judgement below. Checkpoint is **local-first and
-single-user**, so multiplayer, cloud, and sharing features cost a great deal
-and return little. And it has an **MCP server**, which almost nothing else in
-this category does: features that give the agent more to work with compound,
-because they land twice, once for the user, once for anything driving the app
-from outside.
+**Status: the roadmap this document used to hold is finished.** Every Tier 1,
+Tier 2 and Tier 3 item shipped. What follows is the record of that, then the
+short list of what genuinely remains.
 
-Each entry was checked against the codebase before being listed, with two
-exceptions found later, recorded below, so this document is read with the right
-amount of trust.
-
-**Corrections.** The first version of this list claimed a note graph view and
-card/note templates were missing. Both already existed: `notes/GraphView.tsx`
-is a force-directed graph rendered in NotesView, `NOTE_TEMPLATES` in
-`notesUtils.ts` covers notes, and any card can be marked a template from the
-card detail modal and instantiated from the board. They were the two entries
-written without a grep to back them.
-
-Verified: notes already have backlinks (`NotesView.tsx:356`), so wiki-linking is
-not a gap; subtasks existed only as markdown checkboxes appended to a task body
-(`TaskDetailDrawer.tsx:56`) and are now first-class rows.
+Two things shape every judgement here. Checkpoint is **local-first and
+single-user**, multiplayer, cloud and sharing features cost a great deal and
+return little. And it has an **MCP server**, which almost nothing else in this
+category does: features that give an agent more to work with land twice, once
+for the user and once for anything driving the app from outside.
 
 ---
 
-## Tier 1, do these first
+## A warning about this document
 
-### Command palette
-**Who does it:** Linear, Raycast, Notion, Obsidian, VS Code, at this point it is
-table stakes for anything keyboard-driven.
-**Gap:** absent. Global hotkeys exist (`registerAppShortcuts`, `index.ts:82`) but
-they are fixed single-purpose bindings; there is no way to reach an arbitrary
-action by name.
-**Why it matters here:** Checkpoint has fourteen views and roughly thirty
-services. The surface has outgrown its navigation. This is also the single
-cheapest way to make the app feel fast, and it is the feature users of Linear
-and Raycast miss most immediately when it is absent.
-**Where:** a new overlay component plus an action registry the existing views
-register into. The MCP tool list is very nearly the same catalogue of verbs, so
-the registry can be shared.
-**Effort:** medium, the registry is the work, not the UI.
+Three times now, an entry here has claimed something was missing that already
+existed, a note graph view, card and note templates, and (in an earlier draft)
+first-class subtasks. Each was written from memory instead of from a grep.
 
-### Global search
-**Who does it:** everything. Obsidian, Notion, Linear.
-**Gap:** absent as a unified surface. The pieces are all there, `search_items`,
-`search_notes`, `search_cheatsheets`, `search_memories` are already MCP tools,
-and FTS5 backs them, but nothing in the UI queries across all of them at once.
-**Why it matters here:** the data is already indexed and the queries already
-exist. This is mostly assembly, and it turns four siloed searches into the thing
-users actually want.
-**Where:** one view over the existing FTS-backed services; pairs naturally with
-the command palette.
-**Effort:** small, given the indexes exist. Note the FTS backfill that migration
-6 just added is what makes results trustworthy for older rows.
+A later sweep probed roughly fifteen more candidate gaps and found **all but two
+already implemented**: task dependencies, bulk operations, archived-item
+recovery for both tasks and cards, card attachments with images, undo, empty
+states in every primary view, lazy loading of every route, and rebindable
+shortcuts.
 
-### Recurring tasks
-**Who does it:** Todoist, TickTick, Things, OmniFocus, the defining feature of
-the entire category.
-**Gap:** fully absent. No recurrence, rrule, or repeat field anywhere.
-**Why it matters here:** standups, weekly reviews, backups, releases. A tool
-built around a work log is exactly where repeating work lives, and right now
-every recurring obligation has to be re-typed.
-**Where:** a recurrence field on `items`, plus a materialiser that runs at
-startup next to `initializeBackupScheduler`. The scheduler pattern already
-exists and can be copied.
-**Effort:** medium. The trap is materialisation strategy, generate instances
-lazily on read, not eagerly, or the table grows without bound.
+**Check the codebase before adding anything to this list.** The app is far more
+complete than its surface suggests, and a gap analysis written from impressions
+will be wrong more often than right.
 
 ---
 
-## Tier 2, worth doing
+## Shipped
 
-### Due-date reminders
-**Gap:** partial. `due_at` is stored and displayed, and the app already raises
-OS notifications (`FocusTimerEngine.tsx:122`, `webhookGateway.ts:127`), but
-nothing ever fires on a due date. The field is decorative.
-**Why:** the two halves already exist and have never been connected. Small work,
-and it closes a promise the UI currently makes and does not keep.
-**Effort:** small.
+Everything below was once an entry on this list.
 
-### Saved views / smart lists
-**Who does it:** Linear (views), Todoist (filters), Notion (database views).
-**Gap:** absent.
-**Why:** "everything overdue", "high priority across all workspaces", "untagged".
-Checkpoint already has multiple workspaces, tags, priorities and statuses, the
-filter dimensions exist, there is just no way to name a combination and return
-to it. Worth more here than elsewhere because an MCP client could then ask for a
-saved view by name instead of restating the query.
-**Effort:** small, persist a filter object, apply it on read.
+**Tier 1**, command palette (`shared/commandMatch.ts`), global search
+(`shared/searchResults.ts`), recurring tasks (`shared/recurrence.ts` +
+`main/recurrenceService.ts`).
 
-### First-class subtasks
-**Gap:** partial, as noted, markdown checkboxes in the body only.
-**Why:** checkbox subtasks cannot be counted, filtered, rolled up into progress,
-or handed to the agent as separate work. `relations` and `link_items` already
-model item-to-item edges, so the data layer is largely present.
-**Effort:** medium, mostly UI.
+**Tier 2**, due-date reminders (`main/dueReminders.ts`,
+`shared/notificationPolicy.ts`), saved views (`shared/savedViews.ts`),
+first-class subtasks (`shared/subtasks.ts`), export to markdown/CSV/JSON
+(`shared/exportFormats.ts`).
 
-### Export
-**Who does it:** all of them, usually as a trust signal rather than a feature.
-**Gap:** absent, no markdown, CSV, JSON, or PDF export path exists.
-**Why:** this ships to real users, and a local-first tool with no way to get data
-back out is asking for a leap of faith it has not earned. Cheap insurance.
-**Effort:** small.
+**Tier 3**, natural-language capture (`shared/naturalDate.ts`), project
+templates (`shared/projectTemplates.ts`).
+
+**Already existed when first listed**, note graph view (`notes/GraphView.tsx`,
+since given a full-size mode), note templates (`NOTE_TEMPLATES`), card templates
+(the `isTemplate` metadata flag), and wiki-style backlinks.
 
 ---
 
-## Tier 3, plausible, not urgent
+## What actually remains
 
-- **Natural-language capture** ("fix auth bug tomorrow 3pm #backend"). Fits the
-  HUD quick-capture flow well. But there is already a local LLM in the app, so
-  this may be better done through it than with a date-parsing library.
-- **Time estimates vs. actuals.** Focus sessions already record real time spent;
-  adding an estimate turns that into calibration data. Small, and analytics has
-  somewhere to put it.
-- **Project templates**, creating a whole board, or a set of related cards, in
-  one action. Card and note templates already exist and are one-at-a-time; this
-  is the part that does not.
+### First-run experience, the one real gap
+**Verified absent:** no seeding, no tour, no tips, no keyboard-shortcut
+discovery outside Settings.
+
+A new install opens fourteen views and around thirty services with no
+orientation. The command palette and global search, two of the best things in
+the app, are undiscoverable unless you already know they exist. Shortcuts are
+rebindable via `settings/HotkeyBinder.tsx`, but only if you think to look.
+
+**Cheapest fix that closes most of it:** a first-run panel naming the palette
+hotkey and offering a project template. The templates already exist, so this is
+mostly wiring.
+
+### Import from other tools
+`db.importContext` reads Checkpoint's own export format only. Someone arriving
+from Trello, Todoist or an Obsidian vault retypes everything.
+
+Worth doing only if you are recruiting users off other tools. Trello's JSON
+export is the easiest and highest-yield source.
 
 ---
 
-## Skip
+## Deliberately not doing
 
 - **Calendar view and two-way calendar sync.** Motion, Sunsama and Akiflow are
-  built entirely around this, and it is where they spend their engineering.
-  OAuth against Google or Microsoft, recurring-event expansion, and timezone
-  correctness are each larger than anything in Tier 1. It also drags a
-  local-first app into cloud dependency. Read-only iCal import later, if ever.
+  built entirely around this and spend their engineering there. OAuth against
+  Google or Microsoft, recurring-event expansion and timezone correctness are
+  each larger than anything in the shipped list, and it drags a local-first app
+  into a cloud dependency. Read-only iCal import later, if ever.
 - **Mobile or web companion.** A second platform, not a feature.
 - **Real-time multiplayer.** P2P sync already covers the actual need, one
   person, several machines. CRDTs are a different application.
-- **Habit and streak tracking.** Genuinely popular, genuinely a different app.
-  Recurring tasks cover most of the overlap.
+- **Habit and streak tracking.** Recurring tasks cover most of the overlap.
 - **Browser extension / web clipper.** The webhook gateway already accepts
-  external input; point a bookmarklet at it rather than shipping and maintaining
-  an extension.
+  external input; point a bookmarklet at it.
+- **Localisation.** A single-user local tool with one maintainer.
+- **Custom fields, goals/OKRs, print-to-PDF.** Card metadata is already a free
+  JSON column, export already covers getting data out, and neither of the others
+  fits how this app is used.
+- **Time estimates vs. actuals.** Considered and declined.
 
 ---
 
-## The one to start with
+## Where Checkpoint sits
 
-**Command palette**, then **global search** immediately after, they share the
-action registry, and the second is mostly assembly once the first exists. Both
-are pure additions with no migration risk, which matters given how much of the
-recent work has been repairing settings and schema drift.
+It already covers what each of these does in its own lane: **Obsidian** (notes,
+backlinks, graph, plugins), **Linear** (command palette, saved views, WIP
+limits), **Todoist** (recurring work, natural-language dates, filters),
+**Trello** (board, templates, attachments), **ActivityWatch** (window tracking,
+heatmaps), **Raycast** (quick-capture HUD).
 
-**Recurring tasks** is the highest-value single feature on this list, but it
-touches the schema and wants the calmest possible moment to land.
+Two things none of them have: an MCP server exposing 34 tools, and an assistant
+with direct write access to the board.
+
+The useful comparison is not what is missing. It is that this app spans six
+categories that are normally six separate subscriptions, which is also why the
+first-run problem above matters more than any individual feature would.
