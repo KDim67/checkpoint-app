@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book } from 'lucide-react'
+import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid } from 'lucide-react'
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 import { VIEW_FEATURES, setViewFeature } from '../../lib/features'
 import { getBoolSetting } from '../../lib/settings'
@@ -146,6 +146,12 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
     description: 'Local file-based Markdown notes with wiki-link navigation and search.',
     warning: 'Disabling hides the Notes tab on the left navigation bar.'
   },
+  'feature_view_wall': {
+    key: 'view_wall',
+    icon: <LayoutGrid size={16} />,
+    description: 'Freeform canvas for arranging cards, notes, images and reference material.',
+    warning: 'Disabling hides the Wall tab on the left navigation bar.'
+  },
   'feature_view_clipboard': {
     key: 'view_clipboard',
     icon: <Clipboard size={16} />,
@@ -178,8 +184,19 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
   }
 }
 
+/**
+ * Copy is written by hand, so a view can be added to VIEW_FEATURES without one.
+ * That used to read `undefined.key` and crash the whole Settings screen, 
+ * losing every other toggle because one description was missing. A view with no
+ * copy now renders with its own label instead.
+ */
 const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = VIEW_FEATURES.map(feature => {
-  const copy = VIEW_COPY[feature.key]
+  const copy = VIEW_COPY[feature.key] ?? {
+    key: feature.key,
+    icon: <Columns size={16} />,
+    description: '',
+    warning: `Disabling hides the ${feature.label} tab on the left navigation bar.`
+  }
   return {
     key: copy.key,
     icon: copy.icon,
