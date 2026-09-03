@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.node.json",
-  "include": ["tests/**/*.ts", "vitest.config.ts"],
+  // The renderer's ambient bridge types come along because tests import renderer
+  // modules that call window.electronAPI. Without this the test program sees a
+  // bare Window and every such call fails to typecheck here but nowhere else.
+  "include": ["tests/**/*.ts", "vitest.config.ts", "src/renderer/src/electron.d.ts"],
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
