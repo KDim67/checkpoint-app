@@ -29,7 +29,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
-  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search
+  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -46,6 +46,7 @@ import {
 } from '../../../../shared/history'
 import { flushWallDoc, loadWallDoc, saveWallDoc } from '../../lib/wallDoc'
 import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImageOps'
+import { exportWallToPng } from '../../lib/wallExport'
 import { errorMessage } from '../../../../shared/errors'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
@@ -94,6 +95,11 @@ export default function WallView() {
   /** A right-press in flight: becomes a menu on release if it barely moved. */
   const rightPressRef = useRef<{ clientX: number; clientY: number; itemId: string | null; at: { x: number; y: number }; moved: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  /**
+   * Resolves an item to whatever it is called. Held in a ref because the
+   * export callback is created long before the lookup maps exist further down.
+   */
+  const labelRef = useRef<(item: WallItem) => string | undefined>(() => undefined)
   const docRef = useRef(doc)
   docRef.current = doc
   const selectedRef = useRef(selectedIds)
@@ -296,6 +302,32 @@ export default function WallView() {
     setCamera(cameraCentredOn(item, { width: rect.width, height: rect.height }, docRef.current.camera.zoom))
     setSelectedIds(new Set([item.id]))
   }, [setCamera])
+
+  /** Redraws the wall to a canvas and offers it as a PNG. */
+  const exportPng = useCallback(async () => {
+    const items = docRef.current.items
+    if (items.length === 0) { toast('Nothing on this wall to export yet.'); return }
+    setBusy('Rendering')
+    try {
+      // Colours are read from the live theme rather than hardcoded, so an
+      // export matches the wall the user is looking at.
+      const style = getComputedStyle(document.documentElement)
+      const png = await exportWallToPng(items, {
+        titleOf: labelRef.current,
+        background: style.getPropertyValue('--color-background').trim() || '#0b0c10',
+        textColor: style.getPropertyValue('--color-text-base').trim() || '#ffffff',
+        surfaceColor: style.getPropertyValue('--color-surface-1').trim() || '#131622',
+        borderColor: style.getPropertyValue('--color-surface-offset').trim() || '#24293f'
+      })
+      if (!png) { toast('Could not render the wall.', { type: 'error' }); return }
+      const saved = await window.electronAPI.app.saveBinaryFile(`${activeContext}-wall.png`, await png.arrayBuffer(), 'png')
+      if (saved) toast('Wall exported.')
+    } catch (err) {
+      toast(`Export failed: ${errorMessage(err)}`, { type: 'error' })
+    } finally {
+      setBusy(null)
+    }
+  }, [activeContext, toast])
 
   const fitToContent = useCallback(() => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -613,6 +645,7 @@ export default function WallView() {
     if (i.kind === 'image') return i.text
     return i.text
   }
+  labelRef.current = labelOf
   const matches = query.trim() ? searchItems(doc.items, query, labelOf) : []
 
   // Read after historyTick so the buttons reflect the ref-held stack.
@@ -676,6 +709,7 @@ export default function WallView() {
         {tool('Redo', <Redo2 size={14} />, () => applyHistory(redo(historyRef.current)), { disabled: !redoable })}
         {tool('Snap to grid', <Grid3x3 size={14} />, () => setSnapping(v => !v), { active: snapping })}
         {tool('Fit to content', <Maximize2 size={14} />, fitToContent, { disabled: doc.items.length === 0 })}
+        {tool('Export as PNG', <Download size={14} />, () => void exportPng(), { disabled: doc.items.length === 0 })}
 
         <span style={{ fontSize: '11px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', minWidth: '42px' }}>
           {Math.round(camera.zoom * 100)}%
