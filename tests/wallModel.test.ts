@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   boundsOf,
   duplicateItems,
+  itemAtPoint,
   itemsInRect,
   moveItems,
   patchItems,
@@ -376,5 +377,34 @@ describe('snap', () => {
 
   it('is a no-op when snapping is off', () => {
     expect(snap(37, 0)).toBe(37)
+  })
+})
+
+describe('itemAtPoint', () => {
+  const items = [
+    item({ id: 'back', x: 0, y: 0, width: 200, height: 200, z: 1 }),
+    item({ id: 'front', x: 50, y: 50, width: 100, height: 100, z: 5 })
+  ]
+
+  it('returns the topmost item under the point', () => {
+    // Both contain (100,100); the one painted last is the one clicked.
+    expect(itemAtPoint(items, { x: 100, y: 100 })?.id).toBe('front')
+  })
+
+  it('returns the lower item where the upper one does not reach', () => {
+    expect(itemAtPoint(items, { x: 10, y: 10 })?.id).toBe('back')
+  })
+
+  it('returns null on empty canvas', () => {
+    expect(itemAtPoint(items, { x: 900, y: 900 })).toBeNull()
+    expect(itemAtPoint([], { x: 0, y: 0 })).toBeNull()
+  })
+
+  it('counts the edges as inside, so a click on the border still lands', () => {
+    expect(itemAtPoint([item({ id: 'a', x: 0, y: 0, width: 100, height: 100 })], { x: 100, y: 100 })?.id).toBe('a')
+  })
+
+  it('finds locked items too, they can still be right-clicked to unlock', () => {
+    expect(itemAtPoint([item({ id: 'l', locked: true, width: 100, height: 100 })], { x: 10, y: 10 })?.id).toBe('l')
   })
 })

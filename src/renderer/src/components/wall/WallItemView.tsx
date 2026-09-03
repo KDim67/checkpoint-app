@@ -12,9 +12,9 @@
  */
 
 import React from 'react'
-import { FileQuestion } from 'lucide-react'
+import { FileQuestion, FileText } from 'lucide-react'
 import type { WallItem } from '../../../../shared/wallModel'
-import type { Item } from '../../../../shared/types'
+import type { Item, NoteMetadata } from '../../../../shared/types'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
@@ -22,6 +22,8 @@ interface Props {
   item: WallItem
   /** The real card, when this item references one that still exists. */
   card?: Item
+  /** The real note, for a doc item. */
+  note?: NoteMetadata
   selected: boolean
   /** Editing is driven by the canvas so only one item edits at a time. */
   editing: boolean
@@ -29,7 +31,7 @@ interface Props {
   onFinishEditing: () => void
 }
 
-export default function WallItemView({ item, card, selected, editing, onTextChange, onFinishEditing }: Props) {
+export default function WallItemView({ item, card, note, selected, editing, onTextChange, onFinishEditing }: Props) {
   const base: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -139,6 +141,57 @@ export default function WallItemView({ item, card, selected, editing, onTextChan
           borderRadius: 'var(--radius-md)',
           background: 'transparent'
         }} />
+      </div>
+    )
+  }
+
+  // A note from the Notes view
+  // Referenced by title, like a card is by id, and rendered from the live
+  // metadata so a renamed or edited note is never shown stale.
+  if (item.kind === 'doc') {
+    if (!note) {
+      return (
+        <div style={{
+          ...base,
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+          padding: 'var(--space-3)',
+          background: 'var(--color-surface-2)',
+          border: '1px dashed var(--color-surface-offset)',
+          borderRadius: 'var(--radius-md)',
+          color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)'
+        }}>
+          <FileQuestion size={14} />
+          This note no longer exists
+        </div>
+      )
+    }
+    return (
+      <div style={{
+        ...base,
+        display: 'flex', flexDirection: 'column', gap: '6px',
+        padding: 'var(--space-3)',
+        background: 'var(--color-surface-1)',
+        border: `1px solid ${item.color || 'var(--color-surface-offset)'}`,
+        borderLeft: `3px solid ${item.color || 'var(--color-secondary)'}`,
+        borderRadius: 'var(--radius-md)',
+        boxShadow: selected ? 'none' : '0 2px 8px rgba(0,0,0,0.25)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <FileText size={12} style={{ color: 'var(--color-text-faint)', flexShrink: 0 }} />
+          <span style={{
+            fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',
+            color: 'var(--color-text-base)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          }}>
+            {note.title}
+          </span>
+        </div>
+        <span style={{
+          fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45,
+          display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+        }}>
+          {note.excerpt || 'Empty note'}
+        </span>
       </div>
     )
   }
