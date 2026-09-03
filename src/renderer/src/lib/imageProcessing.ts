@@ -250,3 +250,41 @@ export function buildLutData(params: LutParams) {
 
   return d
 }
+
+// Palette extraction
+
+/**
+ * The dominant colours of an image, most common first.
+ *
+ * Colours are bucketed by their top four bits per channel before counting.
+ * Counting exact RGB values would return sixteen imperceptibly different
+ * browns from a photograph and call them a palette; bucketing groups shades
+ * that read as one colour, then each bucket reports the average of what landed
+ * in it so the result is a real colour from the image rather than the corner of
+ * its bucket.
+ *
+ * Nearly transparent pixels are skipped, the background of a cut-out sprite is
+ * not one of its colours.
+ */
+export function extractPalette(src: Uint8ClampedArray, count = 6): string[] {
+  const buckets = new Map<number, { n: number; r: number; g: number; b: number }>()
+
+  for (let i = 0; i < src.length; i += 4) {
+    if (src[i + 3] < 128) continue
+    const r = src[i], g = src[i + 1], b = src[i + 2]
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
+    const bucket = buckets.get(key)
+    if (bucket) {
+      bucket.n++; bucket.r += r; bucket.g += g; bucket.b += b
+    } else {
+      buckets.set(key, { n: 1, r, g, b })
+    }
+  }
+
+  const hex = (v: number): string => Math.round(v).toString(16).padStart(2, '0')
+
+  return [...buckets.values()]
+    .sort((a, b) => b.n - a.n)
+    .slice(0, count)
+    .map(c => `#${hex(c.r / c.n)}${hex(c.g / c.n)}${hex(c.b / c.n)}`)
+}

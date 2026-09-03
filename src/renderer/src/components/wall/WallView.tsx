@@ -29,7 +29,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
-  Grid3x3, RotateCw, ExternalLink, FileText
+  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -44,6 +44,7 @@ import {
   type History
 } from '../../../../shared/history'
 import { flushWallDoc, loadWallDoc, saveWallDoc } from '../../lib/wallDoc'
+import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImageOps'
 import { errorMessage } from '../../../../shared/errors'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
@@ -81,6 +82,8 @@ export default function WallView() {
   const [menu, setMenu] = useState<Menu | null>(null)
   const [snapping, setSnapping] = useState(false)
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+  /** Name of an image job in flight, shown so a slow one does not look frozen. */
+  const [busy, setBusy] = useState<string | null>(null)
   /** Bumped whenever the ref-held history changes, so the buttons re-render. */
   const [historyTick, setHistoryTick] = useState(0)
 
@@ -212,6 +215,41 @@ export default function WallView() {
     const lock = chosen.some(i => !i.locked)
     setItems(items.map(i => (ids.has(i.id) ? { ...i, locked: lock ? true : undefined } : i)))
   }, [setItems])
+
+  /**
+   * Results are placed in a row beneath the source rather than on top of it,
+   * so four PBR maps arrive as a strip you can read instead of a stack you have
+   * to pull apart.
+   */
+  const placeDerived = useCallback((source: WallItem, made: { filename: string; label: string; width: number; height: number }[]) => {
+    const items = [...docRef.current.items]
+    const created: WallItem[] = []
+    made.forEach((m, i) => {
+      created.push(createWallItem('image', {
+        x: source.x + i * (source.width + 16) + source.width / 2,
+        y: source.y + source.height + 16 + source.height / 2
+      }, [...items, ...created], {
+        ref: m.filename,
+        text: `${source.text ?? 'image'}, ${m.label}`,
+        width: source.width,
+        height: source.height
+      }))
+    })
+    setItems([...items, ...created])
+    setSelectedIds(new Set(created.map(c => c.id)))
+  }, [setItems])
+
+  /** Wraps a slow image job with a waiting toast and one error path. */
+  const runImageOp = useCallback(async (label: string, job: () => Promise<void>) => {
+    setBusy(label)
+    try {
+      await job()
+    } catch (err) {
+      toast(`${label} failed: ${errorMessage(err)}`, { type: 'error' })
+    } finally {
+      setBusy(null)
+    }
+  }, [toast])
 
   const openCard = useCallback((item: WallItem) => {
     if (item.kind === 'card' && item.ref) selectItem(item.ref)
@@ -474,7 +512,56 @@ export default function WallView() {
       const item = doc.items.find(i => i.id === menu.itemId)
       if (!item) return []
       const many = selectedIds.size > 1
+
+      // Only for a single image: these read the source pixels, and there is no
+      // sensible meaning for "generate maps" from a mixed selection.
+      const imageOps: MenuEntry[] = item.kind === 'image' && item.ref && !many
+        ? [
+            {
+              label: 'Generate PBR maps',
+              icon: <Wand2 size={13} />,
+              onClick: () => void runImageOp('Generating maps', async () => {
+                placeDerived(item, await derivePbrMaps(item.ref as string))
+              })
+            },
+            {
+              label: 'Upscale 2×',
+              icon: <Expand size={13} />,
+              onClick: () => void runImageOp('Upscaling', async () => {
+                placeDerived(item, [await deriveUpscale(item.ref as string, 2)])
+              })
+            },
+            {
+              label: 'Upscale 3×',
+              icon: <Expand size={13} />,
+              onClick: () => void runImageOp('Upscaling', async () => {
+                placeDerived(item, [await deriveUpscale(item.ref as string, 3)])
+              })
+            },
+            {
+              label: 'Extract palette',
+              icon: <Palette size={13} />,
+              onClick: () => void runImageOp('Reading colours', async () => {
+                const colors = await derivePalette(item.ref as string)
+                if (colors.length === 0) { toast('No colours found in that image.'); return }
+                // Swatches: small squares in a row under the image, each one a
+                // colour you can then paint other items with.
+                const base = docRef.current.items
+                const swatches = colors.map((c, i) =>
+                  createWallItem('note', {
+                    x: item.x + i * 56 + 24,
+                    y: item.y + item.height + 24
+                  }, base, { color: c, text: c, width: 48, height: 48 })
+                )
+                setItems([...base, ...swatches])
+                setSelectedIds(new Set(swatches.map(sw => sw.id)))
+              })
+            }
+          ]
+        : []
+
       return [
+        ...imageOps,
         ...(item.kind === 'card' && !many
           ? [{ label: 'Open card', icon: <ExternalLink size={13} />, onClick: () => openCard(item) }]
           : []),
@@ -803,6 +890,24 @@ export default function WallView() {
 
         {picker && (
           <div onPointerDown={() => setPicker(null)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
+        )}
+
+        {busy && (
+          <div
+            aria-live="polite"
+            style={{
+              position: 'absolute', bottom: 'var(--space-4)', left: '50%', transform: 'translateX(-50%)',
+              padding: 'var(--space-2) var(--space-4)',
+              background: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-full, 999px)',
+              boxShadow: 'var(--shadow-lg)',
+              fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)',
+              zIndex: 30
+            }}
+          >
+            {busy}…
+          </div>
         )}
       </div>
 
