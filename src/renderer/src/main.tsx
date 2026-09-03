@@ -7,6 +7,7 @@ import '@fontsource/inter/700.css'
 import '@fontsource/jetbrains-mono/400.css'
 import '@fontsource/jetbrains-mono/500.css'
 import { AppRouter } from './App'
+import './preflight.css'
 import './index.css'
 
 const root = document.getElementById('root')
