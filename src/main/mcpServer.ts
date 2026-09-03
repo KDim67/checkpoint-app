@@ -460,13 +460,91 @@ function buildMcpServer(): McpServer {
         'set the background, priority swimlanes, or which fields appear on cards. Does not change card contents.',
       inputSchema: {
         context,
+        // Spelled out rather than left as a free-form record. The shared
+        // normalizer below is deliberately tolerant of aliases and loose types
+        // because a small local model goes through it too, but that tolerance
+        // is invisible to an MCP client, which only ever sees this schema and
+        // was previously told nothing beyond "an array of objects".
+        // .passthrough() keeps the aliases working for anything not named here.
         operations: z
-          .array(z.record(z.unknown()))
-          .describe(
-            'Operations. Each has "op", one of add_column, update_column, delete_column, reorder_columns, ' +
-            'set_background, set_swimlanes, set_card_display, plus that op\'s fields. ' +
-            'Column ops take "target" (a column name or id).'
+          .array(
+            z
+              .object({
+                op: z
+                  .enum([
+                    'add_column',
+                    'update_column',
+                    'delete_column',
+                    'reorder_columns',
+                    'set_background',
+                    'set_swimlanes',
+                    'set_card_display'
+                  ])
+                  .describe('Which change to make.'),
+                target: z
+                  .string()
+                  .optional()
+                  .describe('Column name or id. Required by update_column and delete_column.'),
+                name: z
+                  .string()
+                  .optional()
+                  .describe('Column name: the identity for add_column, a rename for update_column.'),
+                wipLimit: z
+                  .number()
+                  .int()
+                  .positive()
+                  .nullable()
+                  .optional()
+                  .describe('Work-in-progress limit, or null for no limit.'),
+                color: z.string().optional().describe('Column colour as hex, e.g. "#1e45fc".'),
+                colorMode: z
+                  .enum(['header', 'full'])
+                  .optional()
+                  .describe('Tint only the header, or the whole column.'),
+                collapsed: z
+                  .boolean()
+                  .optional()
+                  .describe('Collapse to a narrow strip showing the name and count.'),
+                sort: z
+                  .enum(['manual', 'priority', 'due'])
+                  .optional()
+                  .describe('Ordering within the column. "manual" preserves drag order.'),
+                description: z
+                  .string()
+                  .optional()
+                  .describe("The column's definition of done, surfaced on hover."),
+                position: z
+                  .number()
+                  .int()
+                  .nonnegative()
+                  .optional()
+                  .describe('Insertion index for add_column. Appends when omitted.'),
+                order: z
+                  .array(z.string())
+                  .optional()
+                  .describe('Column ids or names in the desired order. Required by reorder_columns.'),
+                background: z
+                  .string()
+                  .optional()
+                  .describe('Preset id, hex colour, CSS gradient or image url. Required by set_background.'),
+                swimlanes: z
+                  .boolean()
+                  .optional()
+                  .describe('Group the board into priority swimlanes. Required by set_swimlanes.'),
+                cardDisplay: z
+                  .object({
+                    priority: z.boolean().optional(),
+                    tags: z.boolean().optional(),
+                    due: z.boolean().optional(),
+                    bodyPreview: z.boolean().optional()
+                  })
+                  .optional()
+                  .describe('Which fields appear on cards. Required by set_card_display.')
+              })
+              .passthrough()
           )
+          .min(1)
+          .describe('The changes to apply, in order.')
       }
     },
     async ({ context: ctx, operations }) => {
@@ -474,6 +552,11 @@ function buildMcpServer(): McpServer {
       // tolerance for aliases and loose types that a local model gets.
       const normalized = normalizeConfigUpdate({ operations })
       if (!normalized) return text('No valid operations found. Check the "op" values.')
+
+      // An operation the normalizer cannot use is dropped before applyConfigOps
+      // ever sees it, so it appeared in neither "applied" nor "skipped". A
+      // client asking for three changes and getting two was told nothing.
+      const unusable = operations.length - normalized.operations.length
 
       const config = readBoardConfig(ctx)
       const applied = applyConfigOps(config, normalized.operations)
@@ -507,7 +590,12 @@ function buildMcpServer(): McpServer {
       notifyRenderer()
       return json({
         applied: applied.summary,
-        skipped: applied.skipped,
+        skipped: unusable > 0
+          ? [
+              ...applied.skipped,
+              `${unusable} operation${unusable === 1 ? '' : 's'} could not be read, check the fields that op requires.`
+            ]
+          : applied.skipped,
         movedCards,
         columns: applied.next.columns.map(c => ({ id: c.id, name: c.name, wipLimit: c.wipLimit }))
       })
