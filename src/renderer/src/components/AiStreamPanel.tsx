@@ -14,6 +14,7 @@ import { loadBoardConfig, patchBoardConfig } from '../lib/boardConfig'
 import { useModelCapabilities } from '../lib/useModelCapabilities'
 import ModelCapabilityBar from './ai/ModelCapabilityBar'
 import { TIER_BUDGETS, detectVisionFromName } from '../../../shared/modelCapabilities'
+import { loadSamplesPromptBlock } from '../lib/emailSamples'
 
 interface Message {
   role: 'system' | 'user' | 'assistant'
@@ -1319,20 +1320,9 @@ Otherwise, answer the user's question in friendly plain text.`
       // skill is active. Injecting this while a skill runs pollutes the skill's system prompt.
       if (!activeSkillId) {
         try {
-          let samplesText = ''
-          const storedSamples = localStorage.getItem('checkpoint_email_writing_samples')
-          if (storedSamples) {
-            const parsed = JSON.parse(storedSamples)
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const validBodies = parsed.filter((s: { body?: string }) => s.body && s.body.trim())
-              if (validBodies.length > 0) {
-                samplesText = validBodies.map((s: { title?: string; body: string }, i: number) => `--- Sample ${i + 1} (${s.title || 'Draft'}) ---\n${s.body}`).join('\n\n')
-              }
-            }
-          }
-          if (!samplesText) {
-            samplesText = localStorage.getItem('checkpoint_email_writing_style') || ''
-          }
+          // Read through the database rather than localStorage: a restored or
+          // synced database used to carry samples the panel could not see.
+          const samplesText = await loadSamplesPromptBlock()
           if (samplesText.trim()) {
             systemPrompt.push({
               role: 'system',
