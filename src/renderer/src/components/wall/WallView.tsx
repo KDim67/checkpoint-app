@@ -259,6 +259,13 @@ export default function WallView() {
   const onPointerDown = (e: React.PointerEvent) => {
     setMenu(null)
     const target = e.target as HTMLElement
+
+    // A press inside a text field belongs to the text field. Capturing it here
+    // would turn every attempt to select a word into a drag of the whole item,
+    // and the capture has to be skipped as well as the drag, a captured
+    // pointer never reaches the textarea at all.
+    if (target.closest('input, textarea, [contenteditable="true"]')) return
+
     const handle = target.closest<HTMLElement>('[data-wall-handle]')
     const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -627,6 +634,8 @@ export default function WallView() {
         // taken during a drag retargets the following dblclick to this element,
         // so the target reports the viewport whatever was actually clicked.
         onDoubleClick={e => {
+          // Double-clicking a word inside a note being edited selects the word.
+          if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
           const at = toWallPoint(screenPoint(e), docRef.current.camera)
           const hit = itemAtPoint(docRef.current.items, at)
           if (!hit) { addItem('note', {}, at); return }
