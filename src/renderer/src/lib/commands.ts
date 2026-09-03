@@ -44,6 +44,7 @@ const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
   { view: 'backlog', label: 'Backlog', keywords: ['tasks', 'todo'] },
   { view: 'focus', label: 'Focus', keywords: ['pomodoro', 'timer', 'session'] },
   { view: 'notes', label: 'Notes', keywords: ['markdown', 'scratchpad', 'writing'] },
+  { view: 'wall', label: 'Wall', keywords: ['canvas', 'freeform', 'moodboard', 'sticky', 'whiteboard'] },
   { view: 'clipboard', label: 'Clipboard', keywords: ['history', 'snippets', 'paste'] },
   { view: 'analytics', label: 'Analytics', keywords: ['stats', 'charts', 'metrics'] },
   { view: 'cookbook', label: 'Cookbook', keywords: ['models', 'ai', 'ollama'] },

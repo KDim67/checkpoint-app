@@ -9,6 +9,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
+import { normalizeWallDoc } from '../shared/wallModel'
 import {
   deleteItem,
   deleteRecurrence,
@@ -107,6 +108,13 @@ function runUndoAction(action: McpUndoAction): void {
     case 'board_ops':
       applyBoardUndo(action)
       break
+    case 'remove_wall_item': {
+      // Read back rather than remembered: the wall may have been edited since,
+      // and reversing a placement should not also reverse that.
+      const doc = normalizeWallDoc(getSetting<unknown>(action.key, null))
+      setSetting(action.key, { ...doc, items: doc.items.filter(i => i.id !== action.itemId) })
+      break
+    }
     case 'delete_note':
       // Notes are filesystem-backed and therefore async, unlike everything else
       // here. Fired and logged rather than awaited so one slow write cannot hold

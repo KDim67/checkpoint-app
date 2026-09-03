@@ -26,6 +26,12 @@ export type McpUndoAction =
   | { kind: 'delete_recurrence'; id: string }
   | { kind: 'delete_subtask'; id: string }
   | { kind: 'set_subtask_done'; id: string; done: boolean }
+  /**
+   * Takes one item back off a wall. The wall is named by its storage key rather
+   * than by workspace-and-id, because that key is what actually locates the
+   * document, and it stays correct even if the wall is renamed afterwards.
+   */
+  | { kind: 'remove_wall_item'; key: string; itemId: string }
 
 export interface McpActivityEntry {
   id: string
@@ -78,6 +84,10 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
       return str(o.id) ? { kind: 'delete_relation', id: str(o.id) } : null
     case 'delete_recurrence':
       return str(o.id) ? { kind: 'delete_recurrence', id: str(o.id) } : null
+    case 'remove_wall_item':
+      return str(o.key) && str(o.itemId)
+        ? { kind: 'remove_wall_item', key: str(o.key), itemId: str(o.itemId) }
+        : null
     case 'delete_subtask':
       return str(o.id) ? { kind: 'delete_subtask', id: str(o.id) } : null
     case 'set_subtask_done':

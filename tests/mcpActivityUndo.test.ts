@@ -10,7 +10,9 @@ import {
   getItemById,
   updateItem,
   createTag,
-  getAllTags
+  getAllTags,
+  getSetting,
+  setSetting
 } from '../src/main/db'
 import { listMcpActivity, recordMcpActivity, undoMcpActivity } from '../src/main/mcpActivity'
 
@@ -152,5 +154,58 @@ describe('undo refuses to run twice', () => {
     const result = undoMcpActivity('no-such-entry')
     expect(result.ok).toBe(false)
     expect('reason' in result && result.reason).toMatch(/no longer in the log/i)
+  })
+})
+
+describe('taking something back off a wall', () => {
+  const KEY = 'wall_work'
+
+  const placeTwo = (): void => {
+    setSetting(KEY, {
+      version: 1,
+      items: [
+        { id: 'kept', kind: 'note', x: 0, y: 0, width: 10, height: 10, z: 1 },
+        { id: 'placed', kind: 'note', x: 20, y: 20, width: 10, height: 10, z: 2 }
+      ],
+      camera: { x: 0, y: 0, zoom: 1 },
+      background: 'default'
+    })
+  }
+
+  const itemIds = (): string[] =>
+    (getSetting<{ items: { id: string }[] } | null>(KEY, null)?.items ?? []).map(i => i.id)
+
+  it('removes only the item the agent placed', () => {
+    placeTwo()
+    recordMcpActivity('place_on_wall', 'work', 'Placed a note', [
+      { kind: 'remove_wall_item', key: KEY, itemId: 'placed' }
+    ])
+    undoMcpActivity(listMcpActivity(10)[0].id)
+    expect(itemIds()).toEqual(['kept'])
+  })
+
+  it('keeps edits made to the wall after the placement', () => {
+    // The document is read back at undo time rather than remembered, so
+    // reversing a placement must not also reverse everything since.
+    placeTwo()
+    recordMcpActivity('place_on_wall', 'work', 'Placed a note', [
+      { kind: 'remove_wall_item', key: KEY, itemId: 'placed' }
+    ])
+
+    const doc = getSetting<{ items: unknown[] }>(KEY, { items: [] })
+    setSetting(KEY, {
+      ...doc,
+      items: [...doc.items, { id: 'later', kind: 'text', x: 5, y: 5, width: 10, height: 10, z: 3 }]
+    })
+
+    undoMcpActivity(listMcpActivity(10)[0].id)
+    expect(itemIds()).toEqual(['kept', 'later'])
+  })
+
+  it('does nothing when the wall is gone', () => {
+    recordMcpActivity('place_on_wall', 'work', 'Placed a note', [
+      { kind: 'remove_wall_item', key: 'wall_deleted', itemId: 'placed' }
+    ])
+    expect(() => undoMcpActivity(listMcpActivity(10)[0].id)).not.toThrow()
   })
 })
