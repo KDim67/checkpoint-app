@@ -5,6 +5,7 @@ import path from 'path'
 import os from 'os'
 import crypto from 'crypto'
 import { getDb } from './db'
+import type { SyncPayload } from '../shared/types'
 import { filterSyncableSettings, isSyncableSettingKey } from '../shared/syncSettings'
 
 const DEFAULT_TCP_PORT = 5739
@@ -25,16 +26,9 @@ interface FileMetadata {
   sha256: string
 }
 
-interface DatabasePayload {
-  items: any[]
-  tags: any[]
-  item_tags: any[]
-  relations: any[]
-  app_settings: any[]
-  focus_sessions: any[]
-  clipboard_items: any[]
-  tombstones: any[]
-}
+// Defined in shared/types so the preload and the renderer's collaboration
+// coordinator describe the same wire format.
+type DatabasePayload = SyncPayload
 
 export class SyncService {
   private tcpServer: net.Server | null = null
@@ -243,18 +237,20 @@ export class SyncService {
   public getDatabasePayload(): DatabasePayload {
     const db = getDb()
     
-    const items = db.prepare('SELECT * FROM items').all()
-    const tags = db.prepare('SELECT * FROM tags').all()
-    const item_tags = db.prepare('SELECT * FROM item_tags').all()
-    const relations = db.prepare('SELECT * FROM relations').all()
+    // Cast at the query, which is the only place the row shape is actually
+    // known: better-sqlite3 returns unknown[] and cannot know the schema.
+    const items = db.prepare('SELECT * FROM items').all() as SyncPayload['items']
+    const tags = db.prepare('SELECT * FROM tags').all() as SyncPayload['tags']
+    const item_tags = db.prepare('SELECT * FROM item_tags').all() as SyncPayload['item_tags']
+    const relations = db.prepare('SELECT * FROM relations').all() as SyncPayload['relations']
     
     // Drops credentials and anything that describes this machine, see shared/syncSettings.
     const rawSettings = db.prepare('SELECT * FROM app_settings').all() as { key: string, value: string }[]
     const app_settings = filterSyncableSettings(rawSettings)
     
-    const focus_sessions = db.prepare('SELECT * FROM focus_sessions').all()
-    const clipboard_items = db.prepare('SELECT * FROM clipboard_items').all()
-    const tombstones = db.prepare('SELECT * FROM sync_tombstones').all()
+    const focus_sessions = db.prepare('SELECT * FROM focus_sessions').all() as SyncPayload['focus_sessions']
+    const clipboard_items = db.prepare('SELECT * FROM clipboard_items').all() as SyncPayload['clipboard_items']
+    const tombstones = db.prepare('SELECT * FROM sync_tombstones').all() as SyncPayload['tombstones']
 
     return {
       items,

@@ -39,8 +39,17 @@ import type {
   AiMemory,
   CreateMemoryPayload,
   ContextExport,
-  WorkspaceFileInfo
+  WorkspaceFileInfo,
+  SyncPayload
 } from '../shared/types'
+
+/** One file offered by a sync peer. */
+interface SyncFileEntry {
+  relPath: string
+  mtime: number
+  size: number
+  sha256: string
+}
 
 /**
  * Secure IPC bridge, exposes a typed API surface to the renderer.
@@ -781,11 +790,11 @@ const api = {
     }> => ipcRenderer.invoke(IpcChannels.SYNC_GET_STATUS),
     getDiscoveredPeers: (): Promise<Array<{ name: string; ip: string; port: number; lastSeen: number }>> =>
       ipcRenderer.invoke(IpcChannels.SYNC_GET_DISCOVERED_PEERS),
-    getDbPayload: (): Promise<any> =>
+    getDbPayload: (): Promise<SyncPayload> =>
       ipcRenderer.invoke(IpcChannels.SYNC_GET_DB_PAYLOAD),
-    applyDbPayload: (payload: any): Promise<{ pulledNewerCount: number }> =>
+    applyDbPayload: (payload: SyncPayload): Promise<{ pulledNewerCount: number }> =>
       ipcRenderer.invoke(IpcChannels.SYNC_APPLY_DB_PAYLOAD, payload),
-    getFileIndex: (subDir: 'notes' | 'media'): Promise<any[]> =>
+    getFileIndex: (subDir: 'notes' | 'media'): Promise<SyncFileEntry[]> =>
       ipcRenderer.invoke(IpcChannels.SYNC_GET_FILE_INDEX, subDir),
     readFileChunk: (subDir: 'notes' | 'media', relPath: string): Promise<Uint8Array | null> =>
       ipcRenderer.invoke(IpcChannels.SYNC_READ_FILE_CHUNK, subDir, relPath),
@@ -795,10 +804,10 @@ const api = {
       ipcRenderer.invoke(IpcChannels.SYNC_DELETE_FILE, subDir, relPath),
     applyBoardBaseline: (
       context: string,
-      items: any[],
-      tags: any[],
-      itemTags: any[],
-      relations: any[]
+      items: Item[],
+      tags: Tag[],
+      itemTags: { item_id: string; tag_id: string }[],
+      relations: Relation[]
     ): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.SYNC_APPLY_BOARD_BASELINE, context, items, tags, itemTags, relations),
     applyRemoteMutation: (mutation: any): Promise<void> =>

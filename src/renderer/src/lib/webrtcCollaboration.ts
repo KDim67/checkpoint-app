@@ -23,7 +23,12 @@ interface CollabOptions {
   onConnect: () => void
   onDisconnect: () => void
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onError: (err: any) => void
+  /**
+   * Anything can arrive here: a caught unknown, or an RTCErrorEvent, which is
+   * not an Error at all. Read it with errorMessage rather than reaching for
+   * .message.
+   */
+  onError: (err: unknown) => void
   /**
    * Asked before the host's board replaces the local one. Joining wipes every
    * card and task in the target context, so this is the user's only chance to
@@ -245,14 +250,14 @@ export class WebRTCCollaborationCoordinator {
     try {
       // 1. Gather all database records for this context
       const fullDb = await window.electronAPI.sync.getDbPayload()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const items = (fullDb as any).items.filter((i: any) => i.context === this.options.context && (i.type === 'card' || i.type === 'task'))
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tags = (fullDb as any).tags
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const itemTags = (fullDb as any).item_tags.filter((it: any) => items.some((item: any) => item.id === it.item_id))
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const relations = (fullDb as any).relations.filter((r: any) => items.some((item: any) => item.id === r.from_id || item.id === r.to_id))
+      const items = fullDb.items.filter(
+        i => i.context === this.options.context && (i.type === 'card' || i.type === 'task')
+      )
+      const tags = fullDb.tags
+      const itemTags = fullDb.item_tags.filter(it => items.some(item => item.id === it.item_id))
+      const relations = fullDb.relations.filter(
+        r => items.some(item => item.id === r.from_id || item.id === r.to_id)
+      )
 
       await this.send({
         type: 'board-baseline',
