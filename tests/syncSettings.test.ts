@@ -58,6 +58,8 @@ describe('isMachineLocalSettingKey', () => {
     expect(isMachineLocalSettingKey('kanban_columns_position')).toBe(false)
     expect(isMachineLocalSettingKey('kanban_swimlanes_bounds')).toBe(false)
     expect(isMachineLocalSettingKey('backlog_columns_layout_port')).toBe(false)
+    expect(isMachineLocalSettingKey('wall_port')).toBe(false)
+    expect(isMachineLocalSettingKey('wall_path')).toBe(false)
   })
 
   it('leaves genuine preferences alone', () => {
