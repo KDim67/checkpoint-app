@@ -94,6 +94,31 @@ export interface ContextExport {
   relations: Relation[]
 }
 
+/** A row of `sync_tombstones`, a deletion, so peers can replay it. */
+export interface SyncTombstone {
+  id: string
+  table_name: string
+  deleted_at: number
+}
+
+/**
+ * The whole database as it travels between paired machines.
+ *
+ * Every field is the table verbatim. `app_settings` has already been filtered
+ * by `shared/syncSettings` before it gets here, credentials and machine-local
+ * rows never reach this shape.
+ */
+export interface SyncPayload {
+  items: Item[]
+  tags: Tag[]
+  item_tags: { item_id: string; tag_id: string }[]
+  relations: Relation[]
+  app_settings: AppSetting[]
+  focus_sessions: FocusSession[]
+  clipboard_items: ClipboardItem[]
+  tombstones: SyncTombstone[]
+}
+
 export interface Context {
   slug: string           // e.g. 'unity-project'
   name: string           // e.g. 'Unity Project'

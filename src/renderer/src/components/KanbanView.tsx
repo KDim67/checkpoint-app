@@ -45,6 +45,7 @@ import {
   type ColumnSort
 } from '../lib/boardConfig'
 import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
+import { errorMessage } from '../../../shared/errors'
 
 
 // Re-exported rather than declared: the shape now belongs to lib/boardConfig,
@@ -359,7 +360,7 @@ export default function KanbanView() {
         setCollabActive(false)
       },
       onError: (err) => {
-        setCollabProgress(`Error: ${err.message || err}`)
+        setCollabProgress(`Error: ${errorMessage(err)}`)
         setCollabActive(false)
       },
       // The host keeps its own board; only a joining peer is ever asked.
@@ -388,7 +389,7 @@ export default function KanbanView() {
         setCollabActive(false)
       },
       onError: (err) => {
-        setCollabProgress(`Error: ${err.message || err}`)
+        setCollabProgress(`Error: ${errorMessage(err)}`)
         setCollabActive(false)
       },
       onConfirmBaseline: async ({ context, incomingItems }) =>
