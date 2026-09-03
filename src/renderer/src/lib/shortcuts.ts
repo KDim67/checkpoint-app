@@ -29,6 +29,7 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_backlog',     label: 'Go to Backlog',     defaultCombo: 'Ctrl+3', action: { kind: 'view', view: 'backlog' } },
   { id: 'view_focus',       label: 'Go to Focus',       defaultCombo: 'Ctrl+4', action: { kind: 'view', view: 'focus' } },
   { id: 'view_notes',       label: 'Go to Notes',       defaultCombo: 'Ctrl+5', action: { kind: 'view', view: 'notes' } },
+  { id: 'view_wall',        label: 'Go to Wall',        defaultCombo: 'Ctrl+9', action: { kind: 'view', view: 'wall' } },
   { id: 'view_clipboard',   label: 'Go to Clipboard',   defaultCombo: 'Ctrl+6', action: { kind: 'view', view: 'clipboard' } },
   { id: 'view_cookbook',    label: 'Go to Cookbook',    defaultCombo: 'Ctrl+7', action: { kind: 'view', view: 'cookbook' } },
   { id: 'view_analytics',   label: 'Go to Analytics',   defaultCombo: 'Ctrl+8', action: { kind: 'view', view: 'analytics' } },

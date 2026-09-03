@@ -261,6 +261,28 @@ export default function WallView() {
     }
   }, [docKey])
 
+  /**
+   * An MCP client writes the wall document straight from the main process, so
+   * the open view knows nothing about it until it reads again.
+   *
+   * Skipped mid-gesture on purpose: replacing the document under a drag or an
+   * open editor would throw away what the user is in the middle of doing, which
+   * is worse than being briefly out of date.
+   */
+  useEffect(() => {
+    if (!docKey) return
+    const refresh = (): void => {
+      if (dragRef.current || editingId) return
+      void loadWallDoc(docKey).then(loaded => {
+        setDoc(loaded)
+        historyRef.current = initHistory(loaded.items)
+        setHistoryTick(t => t + 1)
+      })
+    }
+    window.addEventListener('wall-refresh', refresh)
+    return () => window.removeEventListener('wall-refresh', refresh)
+  }, [docKey, editingId])
+
   // Mutation
   const write = useCallback((next: WallDoc) => {
     setDoc(next)

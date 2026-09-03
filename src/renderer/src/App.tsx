@@ -737,6 +737,7 @@ export default function App() {
     const unsubMcp = window.electronAPI.mcp.onDataChanged(() => {
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       window.dispatchEvent(new CustomEvent('item-updated'))
+      window.dispatchEvent(new CustomEvent('wall-refresh'))
     })
 
     // Global keyboard navigation shortcuts, matched against the user's bindings.
