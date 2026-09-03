@@ -410,3 +410,43 @@ export function itemAtPoint(items: WallItem[], point: { x: number; y: number }):
   }
   return hit
 }
+
+/** A camera that centres one item in the viewport, keeping the current zoom. */
+export function cameraCentredOn(
+  item: WallItem,
+  viewport: { width: number; height: number },
+  zoom: number
+): WallCamera {
+  return {
+    zoom,
+    x: viewport.width / 2 - (item.x + item.width / 2) * zoom,
+    y: viewport.height / 2 - (item.y + item.height / 2) * zoom
+  }
+}
+
+/**
+ * Text to match an item against when searching.
+ *
+ * A card's or note's own title lives on the referenced record, not on the wall
+ * item, so the caller resolves those and passes them in, the model has no way
+ * to look them up and should not pretend otherwise.
+ */
+export function searchableText(item: WallItem, resolvedTitle?: string): string {
+  return [item.text ?? '', resolvedTitle ?? ''].join(' ').trim().toLowerCase()
+}
+
+/** Items whose text contains every word of the query, in paint order. */
+export function searchItems(
+  items: WallItem[],
+  query: string,
+  titleOf: (item: WallItem) => string | undefined
+): WallItem[] {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  return inPaintOrder(items)
+    .filter(i => {
+      const hay = searchableText(i, titleOf(i))
+      return hay && words.every(w => hay.includes(w))
+    })
+    .reverse()
+}

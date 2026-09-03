@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   boundsOf,
   duplicateItems,
+  cameraCentredOn,
   itemAtPoint,
+  searchItems,
   itemsInRect,
   moveItems,
   patchItems,
@@ -406,5 +408,57 @@ describe('itemAtPoint', () => {
 
   it('finds locked items too, they can still be right-clicked to unlock', () => {
     expect(itemAtPoint([item({ id: 'l', locked: true, width: 100, height: 100 })], { x: 10, y: 10 })?.id).toBe('l')
+  })
+})
+
+describe('cameraCentredOn', () => {
+  const viewport = { width: 1000, height: 800 }
+
+  it('puts the item in the middle of the viewport', () => {
+    const target = item({ x: 500, y: 500, width: 100, height: 100 })
+    const cam = cameraCentredOn(target, viewport, 1)
+    // Centre of the item, through the camera, should land at viewport centre.
+    expect((target.x + 50) * cam.zoom + cam.x).toBeCloseTo(500, 6)
+    expect((target.y + 50) * cam.zoom + cam.y).toBeCloseTo(400, 6)
+  })
+
+  it('keeps the zoom it was given, since jumping should not rescale', () => {
+    expect(cameraCentredOn(item(), viewport, 2.5).zoom).toBe(2.5)
+  })
+})
+
+describe('searchItems', () => {
+  const items = [
+    item({ id: 'a', kind: 'note', text: 'deadzone handling', z: 1 }),
+    item({ id: 'b', kind: 'card', ref: 'card-1', z: 2 }),
+    item({ id: 'c', kind: 'note', text: 'art direction', z: 3 })
+  ]
+  const titles = (i: typeof items[0]) => (i.ref === 'card-1' ? 'Fix the deadzone' : undefined)
+
+  it('matches a sticky note by its own text', () => {
+    expect(searchItems(items, 'handling', titles).map(i => i.id)).toEqual(['a'])
+  })
+
+  it('matches a card by the title of the card it references', () => {
+    // The title is not stored on the wall item, so the caller resolves it.
+    expect(searchItems(items, 'fix', titles).map(i => i.id)).toEqual(['b'])
+  })
+
+  it('requires every word, so a second word narrows rather than widens', () => {
+    expect(searchItems(items, 'deadzone handling', titles).map(i => i.id)).toEqual(['a'])
+    expect(searchItems(items, 'deadzone missing', titles)).toEqual([])
+  })
+
+  it('ignores case', () => {
+    expect(searchItems(items, 'ART', titles).map(i => i.id)).toEqual(['c'])
+  })
+
+  it('returns nothing for an empty query rather than everything', () => {
+    expect(searchItems(items, '   ', titles)).toEqual([])
+  })
+
+  it('puts the topmost item first', () => {
+    const stack = [item({ id: 'low', text: 'x', z: 1 }), item({ id: 'high', text: 'x', z: 9 })]
+    expect(searchItems(stack, 'x', () => undefined).map(i => i.id)).toEqual(['high', 'low'])
   })
 })
