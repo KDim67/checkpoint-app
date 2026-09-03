@@ -86,6 +86,9 @@ import { MCP_DEFAULT_PORT } from '../shared/ports'
 export { MCP_DEFAULT_PORT }
 const TOKEN_SETTING_KEY = 'mcp_auth_token'
 
+/** Repeated in every tool that takes a priority; the direction is not guessable. */
+const PRIORITY_SCALE = '0 none, 1 low, 2 medium, 3 high.'
+
 /** Host header values accepted. Anything else is a rebinding attempt. */
 const ALLOWED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 
@@ -298,7 +301,9 @@ function buildMcpServer(): McpServer {
   mcp.registerTool(
     'search_items',
     {
-      description: 'Full-text search across logs, cards and tasks.',
+      description:
+        'Full-text search across logs, cards and tasks. Use this when looking for wording, ' +
+        'a phrase in a title or body. Use query_tasks instead to filter by status, priority or due date.',
       inputSchema: {
         query: z.string().describe('Search text.'),
         context: z.string().optional().describe('Restrict to one workspace.'),
@@ -316,14 +321,28 @@ function buildMcpServer(): McpServer {
   mcp.registerTool(
     'query_tasks',
     {
-      description: 'Filtered query over the structured backlog.',
+      description:
+        'Filter and sort a workspace\'s tasks by status, priority or due date. ' +
+        'Use search_items instead to find something by its wording.',
       inputSchema: {
         context,
-        query: z.string().optional(),
-        status: z.array(z.string()).optional(),
-        priority: z.array(z.number().int()).optional(),
-        sortBy: z.string().optional(),
-        sortDesc: z.boolean().optional(),
+        query: z.string().optional().describe('Narrows to tasks whose title or body contains this.'),
+        status: z
+          .array(z.string())
+          .optional()
+          .describe('Column ids to include. get_board lists them.'),
+        priority: z
+          .array(z.number().int())
+          .optional()
+          .describe(`Priority levels to include. ${PRIORITY_SCALE}`),
+        // An enum rather than a free string: an unrecognised field used to fall
+        // back to created_at silently, so a client got results that looked
+        // sorted and were not.
+        sortBy: z
+          .enum(['status', 'priority', 'title', 'created_at', 'due_at', 'relations_count'])
+          .optional()
+          .describe('Defaults to created_at.'),
+        sortDesc: z.boolean().optional().describe('Highest or latest first.'),
         pageSize: z.number().int().positive().max(200).optional()
       }
     },
@@ -379,7 +398,7 @@ function buildMcpServer(): McpServer {
         title: z.string(),
         body: z.string().optional(),
         status: z.string().optional().describe('Column id for cards. Defaults to the first column.'),
-        priority: z.number().int().min(0).max(3).optional(),
+        priority: z.number().int().min(0).max(3).optional().describe(PRIORITY_SCALE),
         due_at: z.number().nullable().optional().describe('Epoch milliseconds.')
       }
     },
@@ -420,9 +439,12 @@ function buildMcpServer(): McpServer {
         id: z.string(),
         title: z.string().optional(),
         body: z.string().optional(),
-        status: z.string().optional().describe('Move to this column id.'),
-        priority: z.number().int().min(0).max(3).optional(),
-        due_at: z.number().nullable().optional()
+        status: z
+          .string()
+          .optional()
+          .describe('Move to this column id. get_board lists them; this is how a card changes column.'),
+        priority: z.number().int().min(0).max(3).optional().describe(PRIORITY_SCALE),
+        due_at: z.number().nullable().optional().describe('Epoch milliseconds, or null to clear.')
       }
     },
     async ({ id, ...patch }) => {
@@ -811,7 +833,9 @@ function buildMcpServer(): McpServer {
   mcp.registerTool(
     'write_note',
     {
-      description: 'Create or overwrite a markdown note.',
+      description:
+        'Create a markdown note, or replace the whole content of an existing one. ' +
+        'Writing to a title that already exists overwrites it, read_note first if the current content matters.',
       inputSchema: {
         title: z.string(),
         content: z.string(),
