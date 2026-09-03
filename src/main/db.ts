@@ -26,6 +26,8 @@ import {
   CreateFocusSessionSchema
 } from './validation'
 import { IpcChannels } from '../shared/ipcChannels'
+import { contextSettingKeys, remapContextSettings } from '../shared/contextSettings'
+import { wallIndexKey } from '../shared/wallModel'
 import { updateNativeTitleBarFromSettings } from './titleBarSync'
 import {
   isSecretSetting,
@@ -1656,13 +1658,33 @@ export function exportContextData(db: Database.Database, context: string): Conte
     `).all(...itemIds, ...itemIds) as Relation[]
   }
 
+  // A workspace is not only its rows. Its columns, background, swimlanes,
+  // backlog layout and walls all live in app_settings, and an export without
+  // them hands back the cards arranged on a board the user never configured.
+  const settings: Record<string, string> = {}
+  const readSetting = db.prepare(`SELECT value FROM app_settings WHERE key = ?`)
+  const collect = (key: string): void => {
+    // Secrets are stored encrypted and belong to this machine, not to the
+    // workspace. None of the keys below are secret; the guard is so that stays
+    // true if one is ever added.
+    if (isSecretSetting(key)) return
+    const row = readSetting.get(key) as { value: string } | undefined
+    if (row) settings[key] = row.value
+  }
+
+  // The index has to be read before the walls can be found: every wall after
+  // the first is keyed by its own id rather than by the workspace.
+  const storedIndex = (readSetting.get(wallIndexKey(context)) as { value: string } | undefined)?.value
+  contextSettingKeys(context, storedIndex ?? null).forEach(collect)
+
   return {
-    version: 1,
+    version: 2,
     context,
     items,
     tags,
     item_tags,
-    relations
+    relations,
+    settings
   }
 }
 
@@ -1704,6 +1726,23 @@ export function importContextData(db: Database.Database, newContextSlug: string,
     if (Array.isArray(data.relations)) {
       for (const rel of data.relations) {
         stmtRelation.run(rel)
+      }
+    }
+
+    // 5. The workspace's own settings, rewritten for the workspace being
+    // imported into. Absent from a version 1 export, which still imports.
+    if (data.settings && typeof data.settings === 'object') {
+      const stmtSetting = db.prepare(
+        `INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      )
+      const entries = remapContextSettings(
+        data.settings,
+        data.context,
+        newContextSlug,
+        () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+      )
+      for (const entry of entries) {
+        if (!isSecretSetting(entry.key)) stmtSetting.run(entry.key, entry.value)
       }
     }
   })()
