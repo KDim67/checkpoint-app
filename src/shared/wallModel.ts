@@ -56,6 +56,18 @@ export interface WallItem {
   locked?: boolean
 }
 
+/** A wall's identity. The contents live under `wallDocKey`, not in here. */
+export interface WallRef {
+  id: string
+  name: string
+}
+
+export interface WallIndex {
+  version: 1
+  walls: WallRef[]
+  activeId: string
+}
+
 export interface WallCamera {
   x: number
   y: number
@@ -94,8 +106,22 @@ export const WALL_COLORS = [
 
 export const DEFAULT_CAMERA: WallCamera = { x: 0, y: 0, zoom: 1 }
 
-/** One document per workspace, keyed like the board's. */
-export const wallDocKey = (context: string): string => `wall_${context}`
+/**
+ * A workspace can hold several walls, and the first one keeps the original
+ * single-wall key so walls made before that was true are still found.
+ *
+ * Later walls are keyed by their own id rather than by workspace-and-id: a
+ * workspace name is free text, so `wall_${context}_${id}` would collide with a
+ * workspace named after another workspace's wall.
+ */
+export const DEFAULT_WALL_ID = 'main'
+export const DEFAULT_WALL_NAME = 'Wall'
+
+export const wallDocKey = (context: string, wallId: string = DEFAULT_WALL_ID): string =>
+  wallId === DEFAULT_WALL_ID ? `wall_${context}` : `wall_doc_${wallId}`
+
+/** Which walls a workspace has, and which one it was left on. */
+export const wallIndexKey = (context: string): string => `wall_index_${context}`
 
 // Normalisation
 
@@ -449,4 +475,84 @@ export function searchItems(
       return hay && words.every(w => hay.includes(w))
     })
     .reverse()
+}
+
+// Several walls per workspace
+
+function newWallId(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+}
+
+export function normalizeWallIndex(raw: unknown): WallIndex {
+  let source = raw
+  if (typeof raw === 'string') {
+    try { source = JSON.parse(raw) } catch { source = null }
+  }
+
+  const o = source && typeof source === 'object' && !Array.isArray(source)
+    ? (source as Record<string, unknown>)
+    : {}
+
+  const seen = new Set<string>()
+  const walls: WallRef[] = (Array.isArray(o.walls) ? o.walls : [])
+    .map((entry): WallRef | null => {
+      if (!entry || typeof entry !== 'object') return null
+      const e = entry as Record<string, unknown>
+      const id = str(e.id).trim()
+      // A duplicate id would mean two tabs writing the same document, which
+      // reads as one wall losing edits to another.
+      if (!id || seen.has(id)) return null
+      seen.add(id)
+      return { id, name: str(e.name).trim() || DEFAULT_WALL_NAME }
+    })
+    .filter((w): w is WallRef => w !== null)
+
+  // Only when nothing was stored: a workspace that has never had an index still
+  // has a wall at the original key, and this is what makes it reachable. A
+  // stored list is trusted as it stands, so a deleted wall stays deleted.
+  if (walls.length === 0) walls.push({ id: DEFAULT_WALL_ID, name: DEFAULT_WALL_NAME })
+
+  const stored = str(o.activeId)
+  return {
+    version: 1,
+    walls,
+    activeId: walls.some(w => w.id === stored) ? stored : walls[0].id
+  }
+}
+
+/** Adds a wall and switches to it, since creating one is a request to use it. */
+export function createWall(index: WallIndex, name?: string): { index: WallIndex; wall: WallRef } {
+  const wall: WallRef = {
+    id: newWallId(),
+    name: (name ?? '').trim() || `Wall ${index.walls.length + 1}`
+  }
+  return {
+    index: { ...index, walls: [...index.walls, wall], activeId: wall.id },
+    wall
+  }
+}
+
+export function renameWall(index: WallIndex, id: string, name: string): WallIndex {
+  const trimmed = name.trim()
+  if (!trimmed) return index
+  return { ...index, walls: index.walls.map(w => (w.id === id ? { ...w, name: trimmed } : w)) }
+}
+
+/**
+ * Refuses to remove the last wall: a workspace with no wall has nowhere to put
+ * the next thing, and the view would have nothing to show.
+ */
+export function removeWall(index: WallIndex, id: string): WallIndex {
+  if (index.walls.length <= 1) return index
+  const walls = index.walls.filter(w => w.id !== id)
+  if (walls.length === index.walls.length) return index
+  return {
+    ...index,
+    walls,
+    activeId: index.activeId === id ? walls[0].id : index.activeId
+  }
+}
+
+export function setActiveWall(index: WallIndex, id: string): WallIndex {
+  return index.walls.some(w => w.id === id) ? { ...index, activeId: id } : index
 }

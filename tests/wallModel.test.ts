@@ -25,7 +25,14 @@ import {
   toWallPoint,
   wallDocKey,
   zoomAt,
-  type WallItem
+  type WallItem,
+  createWall,
+  normalizeWallIndex,
+  removeWall,
+  renameWall,
+  setActiveWall,
+  wallIndexKey,
+  DEFAULT_WALL_ID
 } from '../src/shared/wallModel'
 
 const item = (over: Partial<WallItem> = {}): WallItem => ({
@@ -460,5 +467,109 @@ describe('searchItems', () => {
   it('puts the topmost item first', () => {
     const stack = [item({ id: 'low', text: 'x', z: 1 }), item({ id: 'high', text: 'x', z: 9 })]
     expect(searchItems(stack, 'x', () => undefined).map(i => i.id)).toEqual(['high', 'low'])
+  })
+})
+
+describe('several walls per workspace', () => {
+  it('keys the first wall the way a single wall was always keyed', () => {
+    // Walls made before this existed live at the old key. Changing it would
+    // lose every one of them.
+    expect(wallDocKey('work')).toBe('wall_work')
+    expect(wallDocKey('work', DEFAULT_WALL_ID)).toBe('wall_work')
+  })
+
+  it('keys later walls by id alone, so a workspace name cannot collide', () => {
+    expect(wallDocKey('work', 'abc123')).toBe('wall_doc_abc123')
+    // The naive scheme would give these two the same key.
+    expect(wallDocKey('work', 'side')).not.toBe(wallDocKey('work_side'))
+  })
+
+  it('scopes the index to the workspace', () => {
+    expect(wallIndexKey('work')).toBe('wall_index_work')
+  })
+
+  it('gives a workspace with nothing stored the original wall', () => {
+    const index = normalizeWallIndex(null)
+    expect(index.walls).toEqual([{ id: DEFAULT_WALL_ID, name: 'Wall' }])
+    expect(index.activeId).toBe(DEFAULT_WALL_ID)
+  })
+
+  it('reads a stored index back as it was written', () => {
+    const stored = { version: 1, walls: [{ id: 'a', name: 'Ideas' }, { id: 'b', name: 'Ship' }], activeId: 'b' }
+    expect(normalizeWallIndex(stored)).toEqual(stored)
+    expect(normalizeWallIndex(JSON.stringify(stored))).toEqual(stored)
+  })
+
+  it('leaves a deleted original wall deleted', () => {
+    // The seeding rule only applies to an empty list, or removing the first
+    // wall would bring it back on the next read.
+    const index = normalizeWallIndex({ walls: [{ id: 'a', name: 'Ideas' }], activeId: 'a' })
+    expect(index.walls.map(w => w.id)).toEqual(['a'])
+  })
+
+  it('drops entries that are unusable, and duplicated ids', () => {
+    const index = normalizeWallIndex({
+      walls: [{ id: 'a', name: 'Ideas' }, { id: 'a', name: 'Copy' }, { name: 'No id' }, null, 7],
+      activeId: 'a'
+    })
+    expect(index.walls).toEqual([{ id: 'a', name: 'Ideas' }])
+  })
+
+  it('names an unnamed wall rather than showing a blank row', () => {
+    expect(normalizeWallIndex({ walls: [{ id: 'a', name: '  ' }] }).walls[0].name).toBe('Wall')
+  })
+
+  it('falls back to the first wall when the active one is gone', () => {
+    const index = normalizeWallIndex({ walls: [{ id: 'a', name: 'Ideas' }], activeId: 'vanished' })
+    expect(index.activeId).toBe('a')
+  })
+
+  it('opens a newly created wall, since making one is a request to use it', () => {
+    const { index, wall } = createWall(normalizeWallIndex(null), 'Sprint 4')
+    expect(wall.name).toBe('Sprint 4')
+    expect(index.walls).toHaveLength(2)
+    expect(index.activeId).toBe(wall.id)
+  })
+
+  it('numbers an unnamed new wall', () => {
+    const { wall } = createWall(normalizeWallIndex(null))
+    expect(wall.name).toBe('Wall 2')
+  })
+
+  it('gives new walls distinct ids', () => {
+    const first = createWall(normalizeWallIndex(null))
+    const second = createWall(first.index)
+    expect(second.wall.id).not.toBe(first.wall.id)
+    expect(second.index.walls).toHaveLength(3)
+  })
+
+  it('renames a wall, and ignores a name that is only whitespace', () => {
+    const base = normalizeWallIndex(null)
+    expect(renameWall(base, DEFAULT_WALL_ID, ' Moodboard ').walls[0].name).toBe('Moodboard')
+    expect(renameWall(base, DEFAULT_WALL_ID, '   ')).toBe(base)
+  })
+
+  it('refuses to remove the last wall', () => {
+    const base = normalizeWallIndex(null)
+    expect(removeWall(base, DEFAULT_WALL_ID)).toBe(base)
+  })
+
+  it('moves off a removed wall onto one that still exists', () => {
+    const { index } = createWall(normalizeWallIndex(null), 'Second')
+    const after = removeWall(index, index.activeId)
+    expect(after.walls).toHaveLength(1)
+    expect(after.activeId).toBe(DEFAULT_WALL_ID)
+  })
+
+  it('leaves the open wall alone when a different one is removed', () => {
+    const { index } = createWall(normalizeWallIndex(null), 'Second')
+    const after = removeWall(index, DEFAULT_WALL_ID)
+    expect(after.activeId).toBe(index.activeId)
+  })
+
+  it('only switches to a wall that exists', () => {
+    const base = normalizeWallIndex({ walls: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], activeId: 'a' })
+    expect(setActiveWall(base, 'b').activeId).toBe('b')
+    expect(setActiveWall(base, 'nope')).toBe(base)
   })
 })

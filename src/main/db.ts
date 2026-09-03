@@ -306,6 +306,7 @@ let stmtInsertItemTag: Database.Statement
 let stmtDeleteItemTags: Database.Statement
 let stmtGetSetting: Database.Statement
 let stmtSetSetting: Database.Statement
+let stmtDeleteSetting: Database.Statement
 let stmtGetRelations: Database.Statement
 let stmtInsertRelation: Database.Statement
 let stmtDeleteRelation: Database.Statement
@@ -510,6 +511,7 @@ export function initDb(dataPath: string): Database.Database {
   stmtSetSetting = db.prepare(
     `INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
   )
+  stmtDeleteSetting = db.prepare(`DELETE FROM app_settings WHERE key = ?`)
 
   stmtGetRelations = db.prepare(
     `SELECT * FROM relations WHERE from_id = ? OR to_id = ?`
@@ -983,6 +985,16 @@ export function updateTag(id: string, payload: Partial<CreateTagPayload>): Tag {
 export function deleteTag(id: string): void {
   recordTombstone(id, 'tags')
   stmtDeleteTag.run(id)
+}
+
+/**
+ * Removes a setting outright. Writing an empty value would leave a row that
+ * still syncs and still shows up in a settings dump; a deleted wall should
+ * leave nothing behind.
+ */
+export function deleteSetting(key: string): void {
+  if (!stmtDeleteSetting) return
+  stmtDeleteSetting.run(key)
 }
 
 export function getSetting<T>(key: string, defaultValue: T): T {
@@ -1783,6 +1795,13 @@ export function registerDbHandlers(db: Database.Database): void {
     return handleSafe(() => {
       const parsedKey = z.string().parse(key)
       setSetting(parsedKey, value)
+    })
+  })
+
+  ipcMain.handle(IpcChannels.DB_DELETE_SETTING, (_event, key: unknown) => {
+    return handleSafe(() => {
+      const parsedKey = z.string().parse(key)
+      deleteSetting(parsedKey)
     })
   })
 

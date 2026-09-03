@@ -29,7 +29,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
-  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download
+  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
+  ChevronDown, Pencil
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -38,19 +39,23 @@ import {
   itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
   snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
-  type WallCamera, type WallDoc, type WallItem, type WallItemKind
+  createWall, removeWall, renameWall, setActiveWall, wallDocKey,
+  type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
 } from '../../../../shared/wallModel'
 import {
   canRedo, canUndo, initHistory, pushHistory, redo, replacePresent, undo,
   type History
 } from '../../../../shared/history'
-import { flushWallDoc, loadWallDoc, saveWallDoc } from '../../lib/wallDoc'
+import {
+  deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex
+} from '../../lib/wallDoc'
 import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImageOps'
 import { exportWallToPng } from '../../lib/wallExport'
 import { errorMessage } from '../../../../shared/errors'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
 import WallContextMenu, { type MenuEntry } from './WallContextMenu'
+import ConfirmDialog from '../ui/ConfirmDialog'
 
 const NUDGE = 4
 /** How far a press may travel and still count as a click rather than a drag. */
@@ -90,11 +95,28 @@ export default function WallView() {
   /** Bumped whenever the ref-held history changes, so the buttons re-render. */
   const [historyTick, setHistoryTick] = useState(0)
 
+  /**
+   * The workspace's walls, tagged with the workspace they were read for. Without
+   * the tag, the moment after switching workspaces still holds the old
+   * workspace's active wall id, and the first load opens a wall this workspace
+   * does not have.
+   */
+  const [index, setIndex] = useState<{ context: string; value: WallIndex } | null>(null)
+  const [wallMenuOpen, setWallMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<WallRef | null>(null)
+
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
   /** A right-press in flight: becomes a menu on release if it barely moved. */
   const rightPressRef = useRef<{ clientX: number; clientY: number; itemId: string | null; at: { x: number; y: number }; moved: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  /**
+   * Documents that have just been deleted. Switching away from a wall flushes
+   * it on the way out, and without this that flush writes a deleted wall
+   * straight back.
+   */
+  const discardedRef = useRef<Set<string>>(new Set())
   /**
    * Resolves an item to whatever it is called. Held in a ref because the
    * export callback is created long before the lookup maps exist further down.
@@ -113,43 +135,98 @@ export default function WallView() {
   const selectedItems = doc.items.filter(i => selectedIds.has(i.id))
   const single = selectedItems.length === 1 ? selectedItems[0] : null
 
+  const wallIndex = index?.context === activeContext ? index.value : null
+  const activeWall = wallIndex?.walls.find(w => w.id === wallIndex.activeId) ?? null
+  /** Null until the index has been read: there is no wall to open before then. */
+  const docKey = activeWall ? wallDocKey(activeContext, activeWall.id) : null
+
   // Load
+  /** What the walls can point at. Workspace-wide, so switching wall leaves it. */
   useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      window.electronAPI.db.getItems(activeContext, 'card', 1, 500).catch(() => ({ items: [] as Item[] })),
+      // Notes are not per-workspace, so they are offered whole.
+      window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[])
+    ]).then(([res, noteList]) => {
+      if (cancelled) return
+      setCards((res.items ?? []).filter(c => c.status !== 'archived'))
+      setNotes(noteList ?? [])
+    })
+    return () => { cancelled = true }
+  }, [activeContext])
+
+  useEffect(() => {
+    let cancelled = false
+    setIndex(null)
+    setWallMenuOpen(false)
+    loadWallIndex(activeContext).then(loaded => {
+      if (!cancelled) setIndex({ context: activeContext, value: loaded })
+    })
+    return () => { cancelled = true }
+  }, [activeContext])
+
+  useEffect(() => {
+    if (!docKey) return
     let cancelled = false
     setLoading(true)
     setSelectedIds(new Set())
     setEditingId(null)
 
-    Promise.all([
-      loadWallDoc(activeContext),
-      window.electronAPI.db.getItems(activeContext, 'card', 1, 500).catch(() => ({ items: [] as Item[] })),
-      // Notes are not per-workspace, so they are offered whole.
-      window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[])
-    ])
-      .then(([loaded, res, noteList]) => {
+    loadWallDoc(docKey)
+      .then(loaded => {
         if (cancelled) return
         setDoc(loaded)
         historyRef.current = initHistory(loaded.items)
         setHistoryTick(t => t + 1)
-        setCards((res.items ?? []).filter(c => c.status !== 'archived'))
-        setNotes(noteList ?? [])
       })
       .catch(err => !cancelled && toast(`Could not open the wall: ${errorMessage(err)}`, { type: 'error' }))
       .finally(() => !cancelled && setLoading(false))
 
     return () => { cancelled = true }
-  }, [activeContext, toast])
+  }, [docKey, toast])
 
   useEffect(() => {
-    const context = activeContext
-    return () => { void flushWallDoc(context, docRef.current) }
-  }, [activeContext])
+    if (!docKey) return
+    // Runs on the way out of *this* wall, while docRef still holds it.
+    return () => {
+      if (discardedRef.current.delete(docKey)) return
+      void flushWallDoc(docKey, docRef.current)
+    }
+  }, [docKey])
 
   // Mutation
   const write = useCallback((next: WallDoc) => {
     setDoc(next)
-    saveWallDoc(activeContext, next)
+    if (docKey) saveWallDoc(docKey, next)
+  }, [docKey])
+
+  const commitIndex = useCallback((next: WallIndex) => {
+    setIndex({ context: activeContext, value: next })
+    void saveWallIndex(activeContext, next)
   }, [activeContext])
+
+  const addWall = useCallback(() => {
+    // Built from the loaded index rather than a fresh one, so a workspace whose
+    // index has not arrived yet cannot start a second, competing list.
+    if (!wallIndex) return
+    commitIndex(createWall(wallIndex).index)
+    setWallMenuOpen(false)
+  }, [wallIndex, commitIndex])
+
+  const confirmDeleteWall = useCallback(async () => {
+    if (!pendingDelete || !wallIndex) return
+    const next = removeWall(wallIndex, pendingDelete.id)
+    setPendingDelete(null)
+    if (next === wallIndex) return
+
+    const key = wallDocKey(activeContext, pendingDelete.id)
+    discardedRef.current.add(key)
+    // Removed before the switch: moving off this wall flushes it on the way
+    // out, and that write would otherwise land after the delete.
+    await deleteWallDoc(key)
+    commitIndex(next)
+  }, [pendingDelete, wallIndex, activeContext, commitIndex])
 
   /**
    * `record: false` is for the frames of a drag. Recording each one would make
@@ -320,14 +397,14 @@ export default function WallView() {
         borderColor: style.getPropertyValue('--color-surface-offset').trim() || '#24293f'
       })
       if (!png) { toast('Could not render the wall.', { type: 'error' }); return }
-      const saved = await window.electronAPI.app.saveBinaryFile(`${activeContext}-wall.png`, await png.arrayBuffer(), 'png')
+      const saved = await window.electronAPI.app.saveBinaryFile(`${activeContext}-${activeWall?.name ?? 'wall'}.png`.replace(/[^\w.-]+/g, '-'), await png.arrayBuffer(), 'png')
       if (saved) toast('Wall exported.')
     } catch (err) {
       toast(`Export failed: ${errorMessage(err)}`, { type: 'error' })
     } finally {
       setBusy(null)
     }
-  }, [activeContext, toast])
+  }, [activeContext, activeWall, toast])
 
   const fitToContent = useCallback(() => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -689,6 +766,17 @@ export default function WallView() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
 
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        title="Delete wall"
+        message={`Delete "${pendingDelete?.name ?? ''}" and everything on it?`}
+        warning="Cards and notes placed on it are only removed from the wall, the originals are untouched."
+        confirmText="Delete wall"
+        isDestructive
+        onConfirm={() => void confirmDeleteWall()}
+        onCancel={() => setPendingDelete(null)}
+      />
+
       {/* Toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
@@ -696,6 +784,153 @@ export default function WallView() {
         borderBottom: '1px solid var(--color-surface-offset)',
         flexShrink: 0, position: 'relative'
       }}>
+        {/* Which wall */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => { setWallMenuOpen(v => !v); setRenaming(null) }}
+            title="Switch wall"
+            aria-haspopup="menu"
+            aria-expanded={wallMenuOpen}
+            disabled={!wallIndex}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              maxWidth: '170px', height: '30px', padding: '0 var(--space-2)',
+              background: wallMenuOpen ? 'var(--color-surface-offset)' : 'transparent',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-text-base)', fontSize: 'var(--text-xs)',
+              fontWeight: 500, cursor: wallIndex ? 'pointer' : 'default'
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeWall?.name ?? '…'}
+            </span>
+            {/* Only a hint that there is a choice; one wall is still a list of one. */}
+            <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
+          </button>
+
+          {wallMenuOpen && wallIndex && (
+            <>
+              <div
+                onPointerDown={() => { setWallMenuOpen(false); setRenaming(null) }}
+                style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+              />
+              <div
+                role="menu"
+                style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
+                  width: '240px', padding: '4px',
+                  background: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--color-surface-offset)',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: 'var(--shadow-lg)'
+                }}
+              >
+                {wallIndex.walls.map(w => {
+                  const isActive = w.id === wallIndex.activeId
+                  const isRenaming = renaming?.id === w.id
+
+                  if (isRenaming) {
+                    return (
+                      <input
+                        key={w.id}
+                        autoFocus
+                        value={renaming.draft}
+                        onChange={e => setRenaming({ id: w.id, draft: e.target.value })}
+                        onBlur={() => setRenaming(null)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            commitIndex(renameWall(wallIndex, w.id, renaming.draft))
+                            setRenaming(null)
+                          }
+                          if (e.key === 'Escape') setRenaming(null)
+                        }}
+                        aria-label="Wall name"
+                        style={{
+                          display: 'block', width: '100%', boxSizing: 'border-box',
+                          padding: 'var(--space-2)',
+                          background: 'var(--color-surface-2)',
+                          border: '1px solid var(--color-secondary)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--color-text-base)', fontSize: 'var(--text-xs)',
+                          outline: 'none'
+                        }}
+                      />
+                    )
+                  }
+
+                  return (
+                    <div
+                      key={w.id}
+                      className="wall-switcher-row"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                        borderRadius: 'var(--radius-sm)',
+                        background: isActive ? 'var(--color-surface-offset)' : 'transparent'
+                      }}
+                    >
+                      <button
+                        onClick={() => { commitIndex(setActiveWall(wallIndex, w.id)); setWallMenuOpen(false) }}
+                        style={{
+                          flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none',
+                          cursor: 'pointer', padding: 'var(--space-2)',
+                          color: isActive ? 'var(--color-text-base)' : 'var(--color-text-muted)',
+                          fontSize: 'var(--text-xs)', fontWeight: isActive ? 600 : 400,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {w.name}
+                      </button>
+
+                      <button
+                        onClick={() => setRenaming({ id: w.id, draft: w.name })}
+                        title="Rename"
+                        aria-label={`Rename ${w.name}`}
+                        className="btn-icon"
+                        style={{ width: '24px', height: '24px', flexShrink: 0 }}
+                      >
+                        <Pencil size={12} />
+                      </button>
+
+                      {/* Hidden rather than disabled on the last wall: an always-greyed
+                          button reads as broken, and the rule never changes. */}
+                      {wallIndex.walls.length > 1 && (
+                        <button
+                          onClick={() => { setPendingDelete(w); setWallMenuOpen(false) }}
+                          title="Delete wall"
+                          aria-label={`Delete ${w.name}`}
+                          className="btn-icon"
+                          style={{ width: '24px', height: '24px', flexShrink: 0, marginRight: '2px' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+
+                <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+
+                <button
+                  onClick={addWall}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
+                    color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                >
+                  <Plus size={12} /> New wall
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
+
         {tool('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
         {tool('Text', <Type size={14} />, () => addItem('text'))}
         {tool('Frame', <Square size={14} />, () => addItem('frame'))}
