@@ -9,6 +9,7 @@ import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import ColorPicker from '../ui/ColorPicker'
 import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
+import RewindPanel from './RewindPanel'
 
 interface CardDetailModalProps {
   cardId: string
@@ -1692,6 +1693,15 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </div>
             </div>
           </div>
+
+          {/* Rewind, what the user was doing the last time this card was
+              worked on. Sits with the historical material rather than above the
+              description, which every card has and most cards edit. */}
+          {card && (
+            <div style={{ borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+              <RewindPanel item={card} />
+            </div>
+          )}
 
           {/* Comments & Activity Log Segment (Split layouts) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 'var(--space-5)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
