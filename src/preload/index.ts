@@ -7,6 +7,7 @@ import type { NotificationCategory, NotificationPolicy } from '../shared/notific
 import type { Subtask } from '../shared/subtasks'
 import type { StartupSettings } from '../shared/startupSettings'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
+import type { ImportedBoard } from '../shared/foreignImport'
 import type {
   Item,
   Tag,
@@ -239,7 +240,17 @@ const api = {
       return ipcRenderer.invoke(IpcChannels.DB_EXPORT_CONTEXT, context, contextName)
     },
 
-    importContext: async (): Promise<{ success: boolean; payload?: any; cancelled?: boolean; error?: string }> => {
+    /**
+     * Opens a file and classifies it: `payload` for Checkpoint's own export,
+     * `foreign` for a board exported from another app. Exactly one is set.
+     */
+    importContext: async (): Promise<{
+      success: boolean
+      payload?: any
+      foreign?: ImportedBoard
+      cancelled?: boolean
+      error?: string
+    }> => {
       return ipcRenderer.invoke(IpcChannels.DB_IMPORT_CONTEXT)
     },
 

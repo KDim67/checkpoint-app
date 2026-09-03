@@ -5,7 +5,8 @@ import { useAppStore } from '../../store/appStore'
 import ColorPicker from '../ui/ColorPicker'
 import { useToast } from '../ui/Toast'
 import ModalShell from '../ui/ModalShell'
-import { createWorkspace, slugifyWorkspace, type WorkspaceEntry } from '../../lib/createWorkspace'
+import { applyImportedBoard, createWorkspace, slugifyWorkspace, type WorkspaceEntry } from '../../lib/createWorkspace'
+import type { ImportedBoard } from '../../../../shared/foreignImport'
 import {
   PROJECT_TEMPLATES,
   DEFAULT_TEMPLATE_ID,
@@ -47,6 +48,9 @@ export default function ContextManager() {
 
   // State for Import Modal
   const [importPayload, setImportPayload] = useState<any | null>(null)
+  /** Set instead of importPayload when the file came from another app. */
+  const [importBoard, setImportBoard] = useState<ImportedBoard | null>(null)
+  const [importing, setImporting] = useState(false)
   const [importName, setImportName] = useState('')
   const [importSlug, setImportSlug] = useState('')
 
@@ -67,16 +71,55 @@ export default function ContextManager() {
     try {
       const res = await window.electronAPI.db.importContext()
       if (res.success && res.payload) {
+        setImportBoard(null)
         setImportPayload(res.payload)
         const initialName = res.payload.context
         const baseName = initialName.charAt(0).toUpperCase() + initialName.slice(1)
         setImportName(baseName)
         setImportSlug(slugifyWorkspace(baseName))
+      } else if (res.success && res.foreign) {
+        // A board from another app. Its own name is the obvious default, and
+        // the user can change it before anything is written.
+        setImportPayload(null)
+        setImportBoard(res.foreign)
+        setImportName(res.foreign.name)
+        setImportSlug(slugifyWorkspace(res.foreign.name))
       } else if (res.error) {
         toast(`Import failed: ${res.error}`)
       }
     } catch (err: any) {
       toast(`Import failed: ${err.message || String(err)}`)
+    }
+  }
+
+  /** A board exported from another app, written through the ordinary paths. */
+  const handleForeignImportConfirm = async () => {
+    if (!importBoard || !importName.trim() || importing) return
+    const slug = slugifyWorkspace(importName)
+    if (!slug) { toast('That name has no letters or numbers in it.'); return }
+    if (contexts.some(c => c.slug === slug)) {
+      toast(`A workspace called "${slug}" already exists. Choose another name.`)
+      return
+    }
+
+    setImporting(true)
+    try {
+      const newEntry: ContextEntry = {
+        slug,
+        name: importName.trim(),
+        color: PRESET_COLORS[contexts.length % PRESET_COLORS.length]
+      }
+      // Registered first: if writing the cards fails part way, the workspace
+      // still exists holding whatever arrived, which beats losing all of it.
+      await persist([...contexts, newEntry])
+      const summary = await applyImportedBoard(slug, importBoard)
+      setContext(slug)
+      setImportBoard(null)
+      toast(summary, { duration: 8000 })
+    } catch (err: any) {
+      toast(`Import failed: ${err.message || String(err)}`)
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -674,7 +717,7 @@ export default function ContextManager() {
             onClick={handleImportStart}
           >
             <Upload size={14} />
-            Import Context / Workspace
+            Import a workspace or Trello board
           </button>
         </div>
       )}
@@ -722,8 +765,8 @@ export default function ContextManager() {
       )}
 
       {/* Import confirmation modal */}
-      {importPayload && (
-        <ModalShell label="Import workspace" onClose={() => setImportPayload(null)} closeOnBackdrop={false}>
+      {(importPayload || importBoard) && (
+        <ModalShell label="Import workspace" onClose={() => { setImportPayload(null); setImportBoard(null) }} closeOnBackdrop={false}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <Plus size={20} color="var(--color-secondary)" />
             <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
@@ -769,19 +812,33 @@ export default function ContextManager() {
             )}
 
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
-              Contains: <strong>{importPayload.items?.length || 0}</strong> items, <strong>{importPayload.tags?.length || 0}</strong> tags, and <strong>{importPayload.relations?.length || 0}</strong> relations.
+              {importBoard ? (
+                <>
+                  From <strong>Trello</strong>: <strong>{importBoard.columns.length}</strong> columns
+                  and <strong>{importBoard.cards.length}</strong> cards.
+                  {importBoard.notes.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {importBoard.notes.map(note => (
+                        <span key={note} style={{ color: 'var(--color-text-faint)' }}>· {note}</span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>Contains: <strong>{importPayload.items?.length || 0}</strong> items, <strong>{importPayload.tags?.length || 0}</strong> tags, and <strong>{importPayload.relations?.length || 0}</strong> relations.</>
+              )}
             </div>
           </div>
 
           <div style={{ marginTop: 'var(--space-2)' }}>
             <RowBetween>
               <button className="btn-secondary" style={{ fontSize: 'var(--text-sm)' }}
-                onClick={() => setImportPayload(null)}>
+                onClick={() => { setImportPayload(null); setImportBoard(null) }}>
                 Cancel
               </button>
               <button
-                onClick={handleImportConfirm}
-                disabled={!importName.trim() || !importSlug}
+                onClick={importBoard ? handleForeignImportConfirm : handleImportConfirm}
+                disabled={!importName.trim() || !importSlug || importing}
                 className="btn-primary"
                 style={{
                   fontSize: 'var(--text-sm)',
@@ -789,7 +846,7 @@ export default function ContextManager() {
                   opacity: (!importName.trim() || !importSlug) ? 0.5 : 1
                 }}
               >
-                Import Workspace
+                {importing ? 'Importing…' : 'Import Workspace'}
               </button>
             </RowBetween>
           </div>

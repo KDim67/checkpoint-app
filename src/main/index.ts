@@ -1516,8 +1516,8 @@ app.whenReady().then(async () => {
       if (!window) return { success: false, error: 'No active window' }
 
       const { filePaths } = await dialog.showOpenDialog(window, {
-        title: 'Import Workspace Context',
-        filters: [{ name: 'JSON Workspace', extensions: ['json'] }],
+        title: 'Import a workspace',
+        filters: [{ name: 'Checkpoint or Trello export (JSON)', extensions: ['json'] }],
         properties: ['openFile']
       })
 
@@ -1527,11 +1527,22 @@ app.whenReady().then(async () => {
       const raw = fs.readFileSync(filePath, 'utf8')
       const parsed = JSON.parse(raw)
 
-      if (!parsed.context || !Array.isArray(parsed.items)) {
-        return { success: false, error: 'Invalid workspace context file format.' }
+      // Checkpoint's own export.
+      if (parsed && parsed.context && Array.isArray(parsed.items)) {
+        return { success: true, payload: parsed }
       }
 
-      return { success: true, payload: parsed }
+      // Otherwise it may be an export from somewhere else. Recognised here
+      // rather than in the renderer so the file is classified where it is read,
+      // and the renderer only ever sees a shape it already understands.
+      const { parseForeignBoard } = await import('../shared/foreignImport')
+      const foreign = parseForeignBoard(parsed)
+      if (foreign) return { success: true, foreign }
+
+      return {
+        success: false,
+        error: 'Not a Checkpoint or Trello export. Trello boards export from Board menu → Print, export and share → Export as JSON.'
+      }
     } catch (err: any) {
       console.error('Failed to import workspace context:', err)
       return { success: false, error: err.message || String(err) }
