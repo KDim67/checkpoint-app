@@ -79,6 +79,8 @@ const api = {
     close: (): void => ipcRenderer.send(IpcChannels.APP_CLOSE),
     saveFile: (defaultName: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.APP_SAVE_FILE, defaultName, content),
+    saveBinaryFile: (defaultName: string, data: ArrayBuffer, extension: string): Promise<boolean> =>
+      ipcRenderer.invoke(IpcChannels.APP_SAVE_BINARY_FILE, defaultName, data, extension),
     showItemInFolder: (filePath: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, filePath),
     // Electron ≥32 removed File.path from renderer File objects, this is the

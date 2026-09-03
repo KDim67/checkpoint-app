@@ -421,6 +421,29 @@ function registerIpcHandlers(): void {
     }
   })
 
+  /**
+   * The text sibling above cannot carry a PNG: writing bytes through a string
+   * mangles them. This takes the buffer as it is.
+   */
+  ipcMain.handle(
+    IpcChannels.APP_SAVE_BINARY_FILE,
+    async (_event, defaultName: string, data: ArrayBuffer, extension: string) => {
+      if (!mainWindow) return false
+      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        defaultPath: defaultName,
+        filters: [{ name: extension.toUpperCase(), extensions: [extension] }]
+      })
+      if (canceled || !filePath) return false
+      try {
+        writeFileSync(filePath, Buffer.from(data))
+        return true
+      } catch (err) {
+        console.error('Failed to write exported file:', err)
+        return false
+      }
+    }
+  )
+
   ipcMain.handle(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, (_event, filePath: string) => {
     try {
       shell.showItemInFolder(filePath)
