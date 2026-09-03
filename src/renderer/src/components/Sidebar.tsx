@@ -18,6 +18,17 @@ function IconLog(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+function IconWall(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="4" width="8" height="6" rx="1"/>
+      <rect x="13" y="4" width="8" height="10" rx="1"/>
+      <rect x="3" y="13" width="8" height="7" rx="1"/>
+      <rect x="13" y="17" width="8" height="3" rx="1"/>
+    </svg>
+  )
+}
+
 function IconKanban(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -154,6 +165,7 @@ const NAV_ITEMS: Array<{
   { view: 'backlog',     label: 'Backlog',     Icon: IconBacklog },
   { view: 'focus',       label: 'Focus',       Icon: IconFocus },
   { view: 'notes',       label: 'Notes',       Icon: IconNotes },
+  { view: 'wall',        label: 'Wall',        Icon: IconWall },
   { view: 'clipboard',   label: 'Clipboard',   Icon: IconClipboard },
   { view: 'analytics',   label: 'Analytics',   Icon: IconAnalytics },
   { view: 'cookbook',    label: 'Cookbook',    Icon: IconCookbook },

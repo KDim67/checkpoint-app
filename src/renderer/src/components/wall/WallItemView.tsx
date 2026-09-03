@@ -1,0 +1,229 @@
+/**
+ * One item on the Wall.
+ *
+ * Split from the canvas because the canvas is about camera, pointer maths and
+ * persistence, and this is about how five unrelated things happen to look. The
+ * two change for entirely different reasons.
+ *
+ * The card case is the one that matters: it renders from the *live* item passed
+ * in, never from anything stored on the wall. A card whose title changed on the
+ * board changes here, and a card that was deleted says so instead of silently
+ * showing stale text.
+ */
+
+import React from 'react'
+import { FileQuestion } from 'lucide-react'
+import type { WallItem } from '../../../../shared/wallModel'
+import type { Item } from '../../../../shared/types'
+
+const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
+
+interface Props {
+  item: WallItem
+  /** The real card, when this item references one that still exists. */
+  card?: Item
+  selected: boolean
+  /** Editing is driven by the canvas so only one item edits at a time. */
+  editing: boolean
+  onTextChange: (text: string) => void
+  onFinishEditing: () => void
+}
+
+export default function WallItemView({ item, card, selected, editing, onTextChange, onFinishEditing }: Props) {
+  const base: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    boxSizing: 'border-box',
+    overflow: 'hidden'
+  }
+
+  // Sticky note
+  if (item.kind === 'note') {
+    const bg = item.color || '#f6c453'
+    return (
+      <div style={{
+        ...base,
+        background: bg,
+        borderRadius: '2px',
+        // A sticky note reads as paper because of the shadow, not the colour.
+        boxShadow: selected ? 'none' : '0 2px 6px rgba(0,0,0,0.28)',
+        padding: '12px'
+      }}>
+        {editing ? (
+          <textarea
+            autoFocus
+            value={item.text ?? ''}
+            onChange={e => onTextChange(e.target.value)}
+            onBlur={onFinishEditing}
+            onKeyDown={e => { if (e.key === 'Escape') onFinishEditing() }}
+            style={{
+              width: '100%', height: '100%', resize: 'none', border: 'none',
+              outline: 'none', background: 'transparent', color: '#1a1a1a',
+              fontFamily: 'var(--font-sans)', fontSize: '13px', lineHeight: 1.45
+            }}
+          />
+        ) : (
+          <div style={{
+            color: '#1a1a1a', fontSize: '13px', lineHeight: 1.45,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word', height: '100%'
+          }}>
+            {item.text || <span style={{ opacity: 0.45 }}>Double-click to write</span>}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Free text
+  if (item.kind === 'text') {
+    return (
+      <div style={{ ...base, display: 'flex', alignItems: 'center' }}>
+        {editing ? (
+          <input
+            autoFocus
+            value={item.text ?? ''}
+            onChange={e => onTextChange(e.target.value)}
+            onBlur={onFinishEditing}
+            onKeyDown={e => { if (e.key === 'Escape' || e.key === 'Enter') onFinishEditing() }}
+            style={{
+              width: '100%', border: 'none', outline: 'none', background: 'transparent',
+              color: item.color || 'var(--color-text-base)',
+              fontFamily: 'var(--font-sans)', fontSize: '20px', fontWeight: 600
+            }}
+          />
+        ) : (
+          <span style={{
+            color: item.color || 'var(--color-text-base)',
+            fontSize: '20px', fontWeight: 600, lineHeight: 1.3,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+          }}>
+            {item.text || <span style={{ opacity: 0.4 }}>Double-click to write</span>}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  // Frame
+  // Drawn as an outline with the label above it, so whatever it groups stays
+  // fully visible, a frame is an annotation, not a container.
+  if (item.kind === 'frame') {
+    const stroke = item.color || 'var(--color-surface-elevated)'
+    return (
+      <div style={{ ...base, position: 'relative', overflow: 'visible' }}>
+        <div style={{
+          position: 'absolute', bottom: '100%', left: 0, marginBottom: '4px',
+          maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+        }}>
+          {editing ? (
+            <input
+              autoFocus
+              value={item.text ?? ''}
+              onChange={e => onTextChange(e.target.value)}
+              onBlur={onFinishEditing}
+              onKeyDown={e => { if (e.key === 'Escape' || e.key === 'Enter') onFinishEditing() }}
+              style={{
+                border: 'none', outline: 'none', background: 'transparent',
+                color: stroke, fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 600
+              }}
+            />
+          ) : (
+            <span style={{ color: stroke, fontSize: '13px', fontWeight: 600 }}>
+              {item.text || 'Frame'}
+            </span>
+          )}
+        </div>
+        <div style={{
+          width: '100%', height: '100%',
+          border: `2px solid ${stroke}`,
+          borderRadius: 'var(--radius-md)',
+          background: 'transparent'
+        }} />
+      </div>
+    )
+  }
+
+  // Image
+  if (item.kind === 'image') {
+    return (
+      <img
+        src={`checkpoint-media://${item.ref}`}
+        alt={item.text || 'Wall image'}
+        draggable={false}
+        style={{
+          ...base,
+          objectFit: 'cover',
+          borderRadius: 'var(--radius-sm)',
+          boxShadow: selected ? 'none' : '0 2px 8px rgba(0,0,0,0.3)',
+          display: 'block'
+        }}
+      />
+    )
+  }
+
+  // Card
+  // Referenced, never copied. A card deleted from the board leaves a marker
+  // rather than stale text pretending the work still exists.
+  if (!card) {
+    return (
+      <div style={{
+        ...base,
+        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+        padding: 'var(--space-3)',
+        background: 'var(--color-surface-2)',
+        border: '1px dashed var(--color-surface-offset)',
+        borderRadius: 'var(--radius-md)',
+        color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)'
+      }}>
+        <FileQuestion size={14} />
+        This card no longer exists
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      ...base,
+      display: 'flex', flexDirection: 'column', gap: '6px',
+      padding: 'var(--space-3)',
+      background: 'var(--color-surface-1)',
+      border: `1px solid ${item.color || 'var(--color-surface-offset)'}`,
+      borderLeft: `3px solid ${item.color || 'var(--color-primary)'}`,
+      borderRadius: 'var(--radius-md)',
+      boxShadow: selected ? 'none' : '0 2px 8px rgba(0,0,0,0.25)'
+    }}>
+      <span style={{
+        fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',
+        color: 'var(--color-text-base)', lineHeight: 1.35,
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+      }}>
+        {card.title}
+      </span>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: 'auto' }}>
+        <span style={{
+          fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em',
+          color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)'
+        }}>
+          {card.status}
+        </span>
+        {card.priority > 0 && (
+          <span style={{
+            fontSize: '9px', padding: '1px 5px', borderRadius: '3px',
+            background: 'var(--color-surface-offset)', color: 'var(--color-text-muted)'
+          }}>
+            {PRIORITY_LABEL[card.priority]}
+          </span>
+        )}
+        {(card.tags ?? []).slice(0, 2).map(t => (
+          <span key={t.id} style={{
+            fontSize: '9px', padding: '1px 5px', borderRadius: '3px',
+            background: `${t.color}22`, color: t.color
+          }}>
+            {t.name}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}

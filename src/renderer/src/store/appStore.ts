@@ -8,7 +8,7 @@ import {
   type FocusSettings
 } from '../components/focus/pomodoroTimer'
 
-export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
+export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
 export interface ContextEntry {
   slug: string

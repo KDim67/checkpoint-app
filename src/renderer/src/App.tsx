@@ -33,6 +33,7 @@ const LogView      = lazy(() => import('./components/LogView'))
 const KanbanView   = lazy(() => import('./components/KanbanView'))
 const BacklogView  = lazy(() => import('./components/BacklogView'))
 const CookbookView = lazy(() => import('./components/CookbookView'))
+const WallView      = lazy(() => import('./components/wall/WallView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
 const WidgetView    = lazy(() => import('./components/WidgetView'))
 const FocusView     = lazy(() => import('./components/FocusView'))
@@ -798,6 +799,7 @@ export default function App() {
       case 'backlog':   return <BacklogView />
       case 'focus':     return <FocusView />
       case 'notes':     return <NotesView />
+      case 'wall':      return <WallView />
       case 'clipboard': return <ClipboardView />
       case 'cookbook':  return <CookbookView />
       case 'analytics': return <AnalyticsView />
