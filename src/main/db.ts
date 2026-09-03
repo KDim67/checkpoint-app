@@ -47,7 +47,8 @@ import type {
   FocusSession,
   CreateFocusSessionPayload,
   ClipboardItem,
-  ContextExport
+  ContextExport,
+  SyncPayload
 } from '../shared/types'
 
 export let dbInstance: Database.Database | null = null
@@ -805,10 +806,10 @@ export function recordTombstone(id: string, tableName: string): void {
 
 export function applyBoardBaselineTx(
   context: string,
-  items: any[],
-  tags: any[],
-  itemTags: any[],
-  relations: any[]
+  items: Item[],
+  tags: Tag[],
+  itemTags: SyncPayload['item_tags'],
+  relations: Relation[]
 ): void {
   const db = getDb()
   db.transaction(() => {
@@ -857,7 +858,18 @@ export function applyBoardBaselineTx(
   })()
 }
 
-export function applyRemoteMutationTx(mutation: any): void {
+export type RemoteMutation =
+  | { type: 'createItem' | 'updateItem'; item: Item; tagIds?: string[] }
+  | { type: 'deleteItem'; id: string }
+  | { type: 'createTag' | 'updateTag'; tag: Tag }
+  | { type: 'deleteTag'; id: string }
+  | { type: 'createRelation'; relation: Relation }
+  | { type: 'deleteRelation'; id: string }
+  | { type: 'bulkUpdateItems'; payload: { updates: { id: string; position: number; status: string }[] } }
+  | { type: 'bulkDeleteItems'; ids: string[] }
+  | { type: 'rebalancePositions'; context: string; status: string }
+
+export function applyRemoteMutationTx(mutation: RemoteMutation): void {
   const db = getDb()
   const { type } = mutation
 
@@ -1555,7 +1567,7 @@ export function getActivityStats(
 } {
   const isContextFilter = context && context !== 'all' && context !== ''
   const contextFilter = isContextFilter ? 'AND context = ?' : ''
-  const params: any[] = [timeStart, timeEnd]
+  const params: (string | number)[] = [timeStart, timeEnd]
   if (isContextFilter) params.push(context)
 
   const db = getDb()
@@ -1619,17 +1631,17 @@ export function exportContextData(db: Database.Database, context: string): Conte
       SELECT DISTINCT t.* FROM tags t
       INNER JOIN item_tags it ON t.id = it.tag_id
       WHERE it.item_id IN (${placeholders})
-    `).all(...itemIds) as any[]
+    `).all(...itemIds) as Tag[]
 
     item_tags = db.prepare(`
       SELECT * FROM item_tags
       WHERE item_id IN (${placeholders})
-    `).all(...itemIds) as any[]
+    `).all(...itemIds) as ContextExport['item_tags']
 
     relations = db.prepare(`
       SELECT * FROM relations
       WHERE from_id IN (${placeholders}) OR to_id IN (${placeholders})
-    `).all(...itemIds, ...itemIds) as any[]
+    `).all(...itemIds, ...itemIds) as Relation[]
   }
 
   return {
