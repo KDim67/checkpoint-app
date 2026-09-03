@@ -182,6 +182,11 @@ const api = {
       if (!res.success) throw new Error(res.error)
     },
 
+    deleteSetting: async (key: string): Promise<void> => {
+      const res = await ipcRenderer.invoke(IpcChannels.DB_DELETE_SETTING, key)
+      if (!res.success) throw new Error(res.error)
+    },
+
     getRelations: async (itemId: string): Promise<Relation[]> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_GET_RELATIONS, itemId)
       if (!res.success) throw new Error(res.error)

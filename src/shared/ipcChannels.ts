@@ -15,6 +15,7 @@ export const enum IpcChannels {
   DB_DELETE_TAG          = 'db:deleteTag',
   DB_GET_SETTING         = 'db:getSetting',
   DB_SET_SETTING         = 'db:setSetting',
+  DB_DELETE_SETTING      = 'db:deleteSetting',
   DB_GET_RELATIONS       = 'db:getRelations',
   DB_CREATE_RELATION     = 'db:createRelation',
   DB_DELETE_RELATION     = 'db:deleteRelation',
