@@ -1,76 +1,98 @@
 /**
  * The Wall: a freeform canvas per workspace.
  *
- * Every other view imposes a shape. This one imposes none, nothing snaps,
- * nothing sorts, nothing has a status, and an item stays exactly where it was
- * put. The design work here is almost entirely about *not* being clever.
+ * Every other view imposes a shape. This one imposes none, nothing snaps
+ * (unless asked), nothing sorts, nothing has a status, and an item stays where
+ * it was put. The design work is mostly about *not* being clever.
  *
- * Three things are deliberate:
+ * Decisions worth stating:
  *
  * - **The dot grid scales with the camera.** On an infinite canvas with no
- *   scrollbars, a plain background gives no sense of movement or scale, and
- *   panning feels like nothing is happening. The grid is the only cue that the
- *   camera moved rather than the content changing.
+ *   scrollbars, a flat background gives no sense of movement; panning feels
+ *   like nothing happened. The grid is the only cue that the camera moved.
  * - **"Fit" is always reachable.** Panning into empty space is the one mistake
- *   a user cannot undo by looking harder, so there is a permanent way back.
- * - **Cards are references.** Placing a card here does not copy it; the board
- *   remains the source of truth, and moving a card on the Wall means nothing to
- *   its status. That is what stops this becoming a second, lying board.
+ *   the user cannot undo by looking harder.
+ * - **Cards are references.** Placing a card does not copy it, and moving it
+ *   here means nothing to its column. That is what stops the Wall becoming a
+ *   second, lying board.
+ * - **Plain drag pans; Shift-drag selects.** Most canvases invert this, but the
+ *   Wall shipped with drag-to-pan, and changing it would break the habit of
+ *   anyone already using it. Selection takes the modifier instead.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
-  Trash2, ArrowUp, ArrowDown, Plus
+  Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
+  Grid3x3, RotateCw, ExternalLink
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import {
-  bringToFront, createWallItem, fitCamera, inPaintOrder,
-  normalizeWallDoc, sendToBack, toWallPoint, WALL_COLORS, zoomAt,
+  bringToFront, boundsOf, createWallItem, duplicateItems, fitCamera, inPaintOrder,
+  itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
+  snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   type WallCamera, type WallDoc, type WallItem, type WallItemKind
 } from '../../../../shared/wallModel'
+import {
+  canRedo, canUndo, initHistory, pushHistory, redo, replacePresent, undo,
+  type History
+} from '../../../../shared/history'
 import { flushWallDoc, loadWallDoc, saveWallDoc } from '../../lib/wallDoc'
 import { errorMessage } from '../../../../shared/errors'
 import type { Item } from '../../../../shared/types'
 import WallItemView from './WallItemView'
+import WallContextMenu, { type MenuEntry } from './WallContextMenu'
 
-/** Nudge distance for arrow keys; Shift multiplies it. */
 const NUDGE = 4
 
 type Drag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
-  | { mode: 'move'; id: string; startX: number; startY: number; itemX: number; itemY: number }
+  | { mode: 'move'; startX: number; startY: number; origin: WallItem[] }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
+  | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
+  | { mode: 'marquee'; startX: number; startY: number }
   | null
+
+interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
 export default function WallView() {
   const activeContext = useAppStore(s => s.activeContext)
+  const selectItem = useAppStore(s => s.selectItem)
   const { toast } = useToast()
 
   const [doc, setDoc] = useState<WallDoc>(() => normalizeWallDoc(null))
   const [cards, setCards] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showCardPicker, setShowCardPicker] = useState(false)
+  const [menu, setMenu] = useState<Menu | null>(null)
+  const [snapping, setSnapping] = useState(false)
+  const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+  /** Bumped whenever the ref-held history changes, so the buttons re-render. */
+  const [historyTick, setHistoryTick] = useState(0)
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // Kept in a ref as well so the unmount flush writes the latest, not the
-  // document captured when the effect was created.
   const docRef = useRef(doc)
   docRef.current = doc
+  const selectedRef = useRef(selectedIds)
+  selectedRef.current = selectedIds
+
+  /** Undo covers the items only: the camera is a view, not an edit. */
+  const historyRef = useRef<History<WallItem[]>>(initHistory([]))
 
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards])
-  const selected = doc.items.find(i => i.id === selectedId) ?? null
+  const selectedItems = doc.items.filter(i => selectedIds.has(i.id))
+  const single = selectedItems.length === 1 ? selectedItems[0] : null
 
   // Load
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    setSelectedId(null)
+    setSelectedIds(new Set())
     setEditingId(null)
 
     Promise.all([
@@ -80,6 +102,8 @@ export default function WallView() {
       .then(([loaded, res]) => {
         if (cancelled) return
         setDoc(loaded)
+        historyRef.current = initHistory(loaded.items)
+        setHistoryTick(t => t + 1)
         setCards((res.items ?? []).filter(c => c.status !== 'archived'))
       })
       .catch(err => !cancelled && toast(`Could not open the wall: ${errorMessage(err)}`, { type: 'error' }))
@@ -88,29 +112,41 @@ export default function WallView() {
     return () => { cancelled = true }
   }, [activeContext, toast])
 
-  // Leaving the view must not lose the last few hundred milliseconds of work.
   useEffect(() => {
     const context = activeContext
     return () => { void flushWallDoc(context, docRef.current) }
   }, [activeContext])
 
-  /** Every mutation goes through here, so nothing can change without saving. */
-  const commit = useCallback((next: WallDoc) => {
+  // Mutation
+  const write = useCallback((next: WallDoc) => {
     setDoc(next)
     saveWallDoc(activeContext, next)
   }, [activeContext])
 
-  const setItems = useCallback((items: WallItem[]) => {
-    commit({ ...docRef.current, items })
-  }, [commit])
-
-  const patchItem = useCallback((id: string, patch: Partial<WallItem>) => {
-    setItems(docRef.current.items.map(i => (i.id === id ? { ...i, ...patch } : i)))
-  }, [setItems])
+  /**
+   * `record: false` is for the frames of a drag. Recording each one would make
+   * a single gesture take fifty presses of undo to reverse, so the whole drag
+   * is recorded once when the pointer comes up.
+   */
+  const setItems = useCallback((items: WallItem[], { record = true } = {}) => {
+    historyRef.current = record
+      ? pushHistory(historyRef.current, items)
+      : replacePresent(historyRef.current, items)
+    if (record) setHistoryTick(t => t + 1)
+    write({ ...docRef.current, items })
+  }, [write])
 
   const setCamera = useCallback((camera: WallCamera) => {
-    commit({ ...docRef.current, camera })
-  }, [commit])
+    write({ ...docRef.current, camera })
+  }, [write])
+
+  const applyHistory = useCallback((next: History<WallItem[]>) => {
+    historyRef.current = next
+    setHistoryTick(t => t + 1)
+    write({ ...docRef.current, items: next.present })
+    // A selection can point at items the step removed.
+    setSelectedIds(prev => new Set([...prev].filter(id => next.present.some(i => i.id === id))))
+  }, [write])
 
   // Placing
   const centreOfView = useCallback((): { x: number; y: number } => {
@@ -126,22 +162,43 @@ export default function WallView() {
       ...extra
     })
     setItems([...items, created])
-    setSelectedId(created.id)
-    // Text-bearing kinds open straight into editing: placing one and then
-    // having to find it again to type is a step with no purpose.
+    setSelectedIds(new Set([created.id]))
     if (kind === 'note' || kind === 'text' || kind === 'frame') setEditingId(created.id)
   }, [centreOfView, setItems])
 
-  const removeItem = useCallback((id: string) => {
+  const removeSelected = useCallback(() => {
+    const ids = selectedRef.current
+    if (ids.size === 0) return
     const items = docRef.current.items
-    const gone = items.find(i => i.id === id)
-    if (!gone) return
-    setItems(items.filter(i => i.id !== id))
-    setSelectedId(null)
-    toast('Removed from the wall.', {
-      action: { label: 'Undo', onClick: () => setItems([...docRef.current.items, gone]) }
+    const gone = items.filter(i => ids.has(i.id))
+    setItems(items.filter(i => !ids.has(i.id)))
+    setSelectedIds(new Set())
+    toast(`Removed ${gone.length} item${gone.length === 1 ? '' : 's'}.`, {
+      action: { label: 'Undo', onClick: () => setItems([...docRef.current.items, ...gone]) }
     })
   }, [setItems, toast])
+
+  const duplicateSelected = useCallback(() => {
+    const ids = selectedRef.current
+    if (ids.size === 0) return
+    const copies = duplicateItems(docRef.current.items, ids)
+    setItems([...docRef.current.items, ...copies])
+    setSelectedIds(new Set(copies.map(c => c.id)))
+  }, [setItems])
+
+  const toggleLock = useCallback(() => {
+    const ids = selectedRef.current
+    const items = docRef.current.items
+    const chosen = items.filter(i => ids.has(i.id))
+    if (chosen.length === 0) return
+    // A mixed selection locks everything, which is the less surprising direction.
+    const lock = chosen.some(i => !i.locked)
+    setItems(items.map(i => (ids.has(i.id) ? { ...i, locked: lock ? true : undefined } : i)))
+  }, [setItems])
+
+  const openCard = useCallback((item: WallItem) => {
+    if (item.kind === 'card' && item.ref) selectItem(item.ref)
+  }, [selectItem])
 
   // Images
   const placeImageFiles = useCallback(async (files: File[], at?: { x: number; y: number }) => {
@@ -160,11 +217,19 @@ export default function WallView() {
   }, [addItem, toast])
 
   // Camera
+  const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : { x: 0, y: 0 }
+  }
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return
-    const at = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-    setCamera(zoomAt(docRef.current.camera, at, e.deltaY < 0 ? 1.1 : 1 / 1.1))
+    setCamera(zoomAt(
+      docRef.current.camera,
+      { x: e.clientX - rect.left, y: e.clientY - rect.top },
+      e.deltaY < 0 ? 1.1 : 1 / 1.1
+    ))
   }, [setCamera])
 
   const fitToContent = useCallback(() => {
@@ -175,37 +240,54 @@ export default function WallView() {
 
   // Pointer
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0 && e.button !== 1) return
+    if (e.button === 2) return
+    setMenu(null)
     const target = e.target as HTMLElement
-    const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     const handle = target.closest<HTMLElement>('[data-wall-handle]')
-
+    const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
-    if (handle && selectedId) {
-      const item = docRef.current.items.find(i => i.id === selectedId)
-      if (item) {
-        dragRef.current = { mode: 'resize', id: item.id, startX: e.clientX, startY: e.clientY, w: item.width, h: item.height }
-        return
-      }
-    }
-
-    if (itemEl && e.button === 0) {
-      const id = itemEl.dataset.wallItem
-      const item = id ? docRef.current.items.find(i => i.id === id) : undefined
-      if (id && item) {
-        setSelectedId(id)
-        // Raised on grab: what you are moving should be what you can see.
-        if (item.z < Math.max(...docRef.current.items.map(i => i.z))) {
-          setItems(bringToFront(docRef.current.items, id))
+    if (handle && single && !single.locked) {
+      if (handle.dataset.wallHandle === 'rotate') {
+        const rect = viewportRef.current?.getBoundingClientRect()
+        const cam = docRef.current.camera
+        const cx = (single.x + single.width / 2) * cam.zoom + cam.x + (rect?.left ?? 0)
+        const cy = (single.y + single.height / 2) * cam.zoom + cam.y + (rect?.top ?? 0)
+        dragRef.current = {
+          mode: 'rotate', id: single.id, cx, cy,
+          start: Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) - (single.rotation ?? 0)
         }
-        dragRef.current = { mode: 'move', id, startX: e.clientX, startY: e.clientY, itemX: item.x, itemY: item.y }
-        return
+      } else {
+        dragRef.current = { mode: 'resize', id: single.id, startX: e.clientX, startY: e.clientY, w: single.width, h: single.height }
       }
+      return
     }
 
-    setSelectedId(null)
+    const id = itemEl?.dataset.wallItem
+    const item = id ? docRef.current.items.find(i => i.id === id) : undefined
+
+    if (id && item && e.button === 0) {
+      if (item.locked) { setSelectedIds(new Set()); return }
+      const already = selectedRef.current.has(id)
+      const next = e.shiftKey
+        ? new Set(already ? [...selectedRef.current].filter(x => x !== id) : [...selectedRef.current, id])
+        : (already ? selectedRef.current : new Set([id]))
+      setSelectedIds(next)
+      if (!e.shiftKey) setItems(bringToFront(docRef.current.items, id), { record: false })
+      dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: docRef.current.items }
+      return
+    }
+
+    setSelectedIds(new Set())
     setEditingId(null)
+
+    if (e.shiftKey && e.button === 0) {
+      const p = screenPoint(e)
+      dragRef.current = { mode: 'marquee', startX: p.x, startY: p.y }
+      setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
+      return
+    }
+
     const cam = docRef.current.camera
     dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
   }
@@ -213,60 +295,110 @@ export default function WallView() {
   const onPointerMove = (e: React.PointerEvent) => {
     const drag = dragRef.current
     if (!drag) return
-    const zoom = docRef.current.camera.zoom
-    const dx = e.clientX - drag.startX
-    const dy = e.clientY - drag.startY
+    const cam = docRef.current.camera
 
     if (drag.mode === 'pan') {
-      setCamera({ ...docRef.current.camera, x: drag.camX + dx, y: drag.camY + dy })
-    } else if (drag.mode === 'move') {
-      patchItem(drag.id, { x: drag.itemX + dx / zoom, y: drag.itemY + dy / zoom })
+      setCamera({ ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) })
+      return
+    }
+
+    if (drag.mode === 'marquee') {
+      const p = screenPoint(e)
+      setMarquee(rectFromPoints({ x: drag.startX, y: drag.startY }, p))
+      const a = toWallPoint({ x: drag.startX, y: drag.startY }, cam)
+      const b = toWallPoint(p, cam)
+      setSelectedIds(new Set(itemsInRect(docRef.current.items, rectFromPoints(a, b))))
+      return
+    }
+
+    if (drag.mode === 'rotate') {
+      const angle = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx) * (180 / Math.PI) - drag.start
+      // Shift snaps to 15°, the way every rotation handle does.
+      setItems(
+        docRef.current.items.map(i =>
+          i.id === drag.id ? { ...i, rotation: e.shiftKey ? Math.round(angle / 15) * 15 : Math.round(angle) } : i
+        ),
+        { record: false }
+      )
+      return
+    }
+
+    const dx = (e.clientX - drag.startX) / cam.zoom
+    const dy = (e.clientY - drag.startY) / cam.zoom
+
+    if (drag.mode === 'move') {
+      const moved = moveItems(drag.origin, selectedRef.current, dx, dy)
+      setItems(
+        snapping
+          ? moved.map(i => (selectedRef.current.has(i.id) ? { ...i, x: snap(i.x, SNAP_GRID), y: snap(i.y, SNAP_GRID) } : i))
+          : moved,
+        { record: false }
+      )
     } else {
-      patchItem(drag.id, {
-        width: Math.max(40, drag.w + dx / zoom),
-        height: Math.max(32, drag.h + dy / zoom)
-      })
+      setItems(
+        docRef.current.items.map(i =>
+          i.id === drag.id
+            ? {
+                ...i,
+                width: Math.max(40, snapping ? snap(drag.w + dx, SNAP_GRID) : drag.w + dx),
+                height: Math.max(32, snapping ? snap(drag.h + dy, SNAP_GRID) : drag.h + dy)
+              }
+            : i
+        ),
+        { record: false }
+      )
     }
   }
 
   const endDrag = (e: React.PointerEvent) => {
+    const drag = dragRef.current
     dragRef.current = null
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already gone */ }
+    setMarquee(null)
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
+    // One undo step for the whole gesture, recorded now that it is finished.
+    if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate')) {
+      historyRef.current = pushHistory(historyRef.current, docRef.current.items)
+      setHistoryTick(t => t + 1)
+    }
   }
 
   // Keyboard
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const el = document.activeElement
-      const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
-      if (typing) return
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
 
-      if (e.key === 'Escape') { setSelectedId(null); setEditingId(null); return }
-      if (!selectedId) return
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
-        removeItem(selectedId)
+        applyHistory(e.shiftKey ? redo(historyRef.current) : undo(historyRef.current))
         return
       }
+      if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return }
+      if (mod && e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        setSelectedIds(new Set(docRef.current.items.filter(i => !i.locked).map(i => i.id)))
+        return
+      }
+      if (e.key === 'Escape') { setSelectedIds(new Set()); setEditingId(null); setMenu(null); return }
+      if (selectedRef.current.size === 0) return
 
-      // Arrow keys, so an item can be placed exactly without a steady hand.
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); return }
+
       const step = e.shiftKey ? NUDGE * 5 : NUDGE
-      const move: Record<string, [number, number]> = {
+      const deltas: Record<string, [number, number]> = {
         ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step]
       }
-      const delta = move[e.key]
+      const delta = deltas[e.key]
       if (delta) {
         e.preventDefault()
-        const item = docRef.current.items.find(i => i.id === selectedId)
-        if (item) patchItem(selectedId, { x: item.x + delta[0], y: item.y + delta[1] })
+        setItems(moveItems(docRef.current.items, selectedRef.current, delta[0], delta[1]))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedId, removeItem, patchItem])
+  }, [applyHistory, duplicateSelected, removeSelected, setItems])
 
-  // Paste an image straight onto the wall.
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const el = document.activeElement
@@ -281,18 +413,76 @@ export default function WallView() {
     return () => window.removeEventListener('paste', onPaste)
   }, [placeImageFiles])
 
+  // Context menus
+  const menuEntries = (): MenuEntry[] => {
+    if (!menu) return []
+
+    if (menu.itemId) {
+      const item = doc.items.find(i => i.id === menu.itemId)
+      if (!item) return []
+      const many = selectedIds.size > 1
+      return [
+        ...(item.kind === 'card' && !many
+          ? [{ label: 'Open card', icon: <ExternalLink size={13} />, onClick: () => openCard(item) }]
+          : []),
+        { label: many ? `Duplicate ${selectedIds.size} items` : 'Duplicate', icon: <Copy size={13} />, hint: 'Ctrl D', onClick: duplicateSelected },
+        { label: 'Bring to front', icon: <ArrowUp size={13} />, onClick: () => setItems(bringToFront(doc.items, item.id)) },
+        { label: 'Send to back', icon: <ArrowDown size={13} />, onClick: () => setItems(sendToBack(doc.items, item.id)) },
+        {
+          label: item.locked ? 'Unlock' : 'Lock in place',
+          icon: item.locked ? <Unlock size={13} /> : <Lock size={13} />,
+          onClick: toggleLock
+        },
+        { label: many ? `Delete ${selectedIds.size} items` : 'Delete', icon: <Trash2 size={13} />, hint: 'Del', destructive: true, onClick: removeSelected }
+      ]
+    }
+
+    return [
+      { label: 'Sticky note here', icon: <StickyNote size={13} />, onClick: () => addItem('note', {}, menu.at) },
+      { label: 'Text here', icon: <Type size={13} />, onClick: () => addItem('text', {}, menu.at) },
+      { label: 'Frame here', icon: <Square size={13} />, onClick: () => addItem('frame', {}, menu.at) },
+      { label: 'Select all', icon: <Layers size={13} />, hint: 'Ctrl A', onClick: () => setSelectedIds(new Set(doc.items.filter(i => !i.locked).map(i => i.id))) },
+      { label: 'Fit to content', icon: <Maximize2 size={13} />, onClick: fitToContent, disabled: doc.items.length === 0 }
+    ]
+  }
+
   const { camera } = doc
   const placedCardIds = new Set(doc.items.filter(i => i.kind === 'card').map(i => i.ref))
   const availableCards = cards.filter(c => !placedCardIds.has(c.id))
 
-  const toolButton = (label: string, icon: React.ReactNode, onClick: () => void): React.JSX.Element => (
+  // Read after historyTick so the buttons reflect the ref-held stack.
+  void historyTick
+  const undoable = canUndo(historyRef.current)
+  const redoable = canRedo(historyRef.current)
+
+  // Floating toolbar position, in screen space above the selection.
+  const selectionBounds = boundsOf(selectedItems)
+  const floatingPos = selectionBounds && !editingId
+    ? {
+        left: (selectionBounds.minX + (selectionBounds.maxX - selectionBounds.minX) / 2) * camera.zoom + camera.x,
+        top: selectionBounds.minY * camera.zoom + camera.y - 44
+      }
+    : null
+
+  const tool = (
+    label: string,
+    icon: React.ReactNode,
+    onClick: () => void,
+    opts: { active?: boolean; disabled?: boolean } = {}
+  ): React.JSX.Element => (
     <button
       key={label}
       onClick={onClick}
       title={label}
       aria-label={label}
+      aria-pressed={opts.active}
+      disabled={opts.disabled}
       className="btn-icon"
-      style={{ width: '30px', height: '30px' }}
+      style={{
+        width: '30px', height: '30px',
+        background: opts.active ? 'var(--color-surface-offset)' : undefined,
+        opacity: opts.disabled ? 0.4 : 1
+      }}
     >
       {icon}
     </button>
@@ -308,52 +498,33 @@ export default function WallView() {
         borderBottom: '1px solid var(--color-surface-offset)',
         flexShrink: 0, position: 'relative'
       }}>
-        {toolButton('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
-        {toolButton('Text', <Type size={14} />, () => addItem('text'))}
-        {toolButton('Frame', <Square size={14} />, () => addItem('frame'))}
-        {toolButton('Place a card', <Layers size={14} />, () => setShowCardPicker(v => !v))}
-        {toolButton('Image', <ImageIcon size={14} />, () => fileInputRef.current?.click())}
+        {tool('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
+        {tool('Text', <Type size={14} />, () => addItem('text'))}
+        {tool('Frame', <Square size={14} />, () => addItem('frame'))}
+        {tool('Place a card', <Layers size={14} />, () => setShowCardPicker(v => !v))}
+        {tool('Image', <ImageIcon size={14} />, () => fileInputRef.current?.click())}
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
-        {toolButton('Fit to content', <Maximize2 size={14} />, fitToContent)}
-        <span style={{
-          fontSize: '11px', color: 'var(--color-text-faint)',
-          fontFamily: 'var(--font-mono)', minWidth: '42px'
-        }}>
+        {tool('Undo', <Undo2 size={14} />, () => applyHistory(undo(historyRef.current)), { disabled: !undoable })}
+        {tool('Redo', <Redo2 size={14} />, () => applyHistory(redo(historyRef.current)), { disabled: !redoable })}
+        {tool('Snap to grid', <Grid3x3 size={14} />, () => setSnapping(v => !v), { active: snapping })}
+        {tool('Fit to content', <Maximize2 size={14} />, fitToContent, { disabled: doc.items.length === 0 })}
+
+        <span style={{ fontSize: '11px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', minWidth: '42px' }}>
           {Math.round(camera.zoom * 100)}%
         </span>
 
-        {selected && (
-          <>
-            <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
-            <div style={{ display: 'flex', gap: '3px' }}>
-              {WALL_COLORS.map(c => (
-                <button
-                  key={c}
-                  onClick={() => patchItem(selected.id, { color: c })}
-                  aria-label={`Colour ${c}`}
-                  style={{
-                    width: '16px', height: '16px', borderRadius: '3px', background: c,
-                    border: selected.color === c ? '2px solid var(--color-text-base)' : '1px solid rgba(0,0,0,0.25)',
-                    cursor: 'pointer', padding: 0
-                  }}
-                />
-              ))}
-            </div>
-            {toolButton('Bring to front', <ArrowUp size={14} />, () => setItems(bringToFront(doc.items, selected.id)))}
-            {toolButton('Send to back', <ArrowDown size={14} />, () => setItems(sendToBack(doc.items, selected.id)))}
-            {toolButton('Remove', <Trash2 size={14} />, () => removeItem(selected.id))}
-          </>
-        )}
+        {/* Stated rather than left to be discovered: neither is guessable. */}
+        <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--color-text-faint)' }}>
+          Drag to pan · Shift-drag to select · Right-click for more
+        </span>
 
-        {/* Card picker */}
         {showCardPicker && (
           <div style={{
             position: 'absolute', top: '100%', left: 'var(--space-3)', zIndex: 20,
             marginTop: '4px', width: '280px', maxHeight: '320px', overflowY: 'auto',
-            background: 'var(--color-surface-elevated)',
-            border: '1px solid var(--color-surface-offset)',
+            background: 'var(--color-surface-elevated)', border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', padding: '4px'
           }}>
             {availableCards.length === 0 ? (
@@ -381,15 +552,8 @@ export default function WallView() {
         )}
 
         <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          style={{ display: 'none' }}
-          onChange={e => {
-            void placeImageFiles(Array.from(e.target.files ?? []))
-            e.target.value = ''
-          }}
+          ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+          onChange={e => { void placeImageFiles(Array.from(e.target.files ?? [])); e.target.value = '' }}
         />
       </div>
 
@@ -401,29 +565,27 @@ export default function WallView() {
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onContextMenu={e => {
+          e.preventDefault()
+          const itemEl = (e.target as HTMLElement).closest<HTMLElement>('[data-wall-item]')
+          const id = itemEl?.dataset.wallItem ?? null
+          // Right-clicking outside the selection makes that item the selection,
+          // so the menu always acts on what was actually clicked.
+          if (id && !selectedRef.current.has(id)) setSelectedIds(new Set([id]))
+          setMenu({ x: e.clientX, y: e.clientY, itemId: id, at: toWallPoint(screenPoint(e), docRef.current.camera) })
+        }}
         onDoubleClick={e => {
           if ((e.target as HTMLElement).closest('[data-wall-item]')) return
-          const rect = viewportRef.current?.getBoundingClientRect()
-          if (!rect) return
-          addItem('note', {}, toWallPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, docRef.current.camera))
+          addItem('note', {}, toWallPoint(screenPoint(e), docRef.current.camera))
         }}
         onDragOver={e => e.preventDefault()}
         onDrop={e => {
           e.preventDefault()
-          const rect = viewportRef.current?.getBoundingClientRect()
-          const at = rect
-            ? toWallPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, docRef.current.camera)
-            : undefined
-          void placeImageFiles(Array.from(e.dataTransfer.files ?? []), at)
+          void placeImageFiles(Array.from(e.dataTransfer.files ?? []), toWallPoint(screenPoint(e), docRef.current.camera))
         }}
         style={{
-          flex: 1,
-          minHeight: 0,
-          position: 'relative',
-          overflow: 'hidden',
-          cursor: dragRef.current?.mode === 'pan' ? 'grabbing' : 'default',
+          flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
           background: 'var(--color-background)',
-          // The only cue that the camera moved rather than the content changing.
           backgroundImage: 'radial-gradient(circle, var(--color-surface-offset) 1px, transparent 1px)',
           backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
           backgroundPosition: `${camera.x}px ${camera.y}px`
@@ -444,41 +606,37 @@ export default function WallView() {
             alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
             pointerEvents: 'none', textAlign: 'center', padding: 'var(--space-6)'
           }}>
-            <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>
-              An empty wall
-            </span>
-            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)', maxWidth: '420px', lineHeight: 1.6 }}>
+            <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>An empty wall</span>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)', maxWidth: '440px', lineHeight: 1.6 }}>
               Double-click anywhere for a sticky note, drop images straight on, or place cards
               from the board. Nothing snaps and nothing sorts, put things where you want them.
             </span>
           </div>
         )}
 
-        {/* One transformed layer: items are stored in wall coordinates and the
-            camera is applied once, so nothing has to know about zoom. */}
         <div style={{
           position: 'absolute', top: 0, left: 0,
           transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
           transformOrigin: '0 0'
         }}>
           {inPaintOrder(doc.items).map(item => {
-            const isSelected = item.id === selectedId
+            const isSelected = selectedIds.has(item.id)
             return (
               <div
                 key={item.id}
                 data-wall-item={item.id}
                 onDoubleClick={e => {
                   e.stopPropagation()
-                  if (item.kind === 'note' || item.kind === 'text' || item.kind === 'frame') setEditingId(item.id)
+                  if (item.locked) return
+                  if (item.kind === 'card') openCard(item)
+                  else if (item.kind !== 'image') setEditingId(item.id)
                 }}
                 style={{
                   position: 'absolute',
-                  left: `${item.x}px`,
-                  top: `${item.y}px`,
-                  width: `${item.width}px`,
-                  height: `${item.height}px`,
+                  left: `${item.x}px`, top: `${item.y}px`,
+                  width: `${item.width}px`, height: `${item.height}px`,
                   transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
-                  cursor: 'grab',
+                  cursor: item.locked ? 'default' : 'grab',
                   outline: isSelected ? '2px solid var(--color-secondary)' : 'none',
                   outlineOffset: '2px'
                 }}
@@ -488,35 +646,102 @@ export default function WallView() {
                   card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
                   selected={isSelected}
                   editing={editingId === item.id}
-                  onTextChange={text => patchItem(item.id, { text })}
-                  onFinishEditing={() => setEditingId(null)}
+                  onTextChange={text => setItems(patchItems(docRef.current.items, new Set([item.id]), { text }), { record: false })}
+                  onFinishEditing={() => { setEditingId(null); setItems(docRef.current.items) }}
                 />
 
-                {isSelected && (
-                  <div
-                    data-wall-handle="se"
-                    style={{
-                      position: 'absolute', right: '-6px', bottom: '-6px',
-                      width: '12px', height: '12px',
-                      background: 'var(--color-secondary)',
-                      border: '2px solid var(--color-surface-1)',
-                      borderRadius: '2px', cursor: 'nwse-resize'
-                    }}
-                  />
+                {item.locked && isSelected && (
+                  <div style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>
+                    <Lock size={12} />
+                  </div>
+                )}
+
+                {/* Handles only for a single unlocked selection: dragging one
+                    corner of five items has no obvious meaning. */}
+                {isSelected && single?.id === item.id && !item.locked && (
+                  <>
+                    <div
+                      data-wall-handle="se"
+                      style={{
+                        position: 'absolute', right: '-6px', bottom: '-6px', width: '12px', height: '12px',
+                        background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
+                        borderRadius: '2px', cursor: 'nwse-resize'
+                      }}
+                    />
+                    <div
+                      data-wall-handle="rotate"
+                      title="Drag to rotate, hold Shift for 15° steps"
+                      style={{
+                        position: 'absolute', left: '50%', top: '-26px', transform: 'translateX(-50%)',
+                        width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'var(--color-surface-1)', border: '1px solid var(--color-secondary)',
+                        borderRadius: '50%', cursor: 'grab', color: 'var(--color-secondary)'
+                      }}
+                    >
+                      <RotateCw size={9} />
+                    </div>
+                  </>
                 )}
               </div>
             )
           })}
         </div>
 
-        {/* Closes the picker without stealing a click from the canvas. */}
+        {/* Marquee, drawn in screen space so it does not scale with the camera. */}
+        {marquee && (
+          <div style={{
+            position: 'absolute',
+            left: `${marquee.x}px`, top: `${marquee.y}px`,
+            width: `${marquee.width}px`, height: `${marquee.height}px`,
+            border: '1px solid var(--color-secondary)',
+            background: 'var(--color-secondary-muted)',
+            pointerEvents: 'none'
+          }} />
+        )}
+
+        {/* Controls for the current selection, floated above it. */}
+        {floatingPos && selectedItems.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            left: `${floatingPos.left}px`, top: `${floatingPos.top}px`,
+            transform: 'translateX(-50%)',
+            display: 'flex', alignItems: 'center', gap: '2px',
+            padding: '3px',
+            background: 'var(--color-surface-elevated)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            zIndex: 15
+          }}>
+            {WALL_COLORS.slice(0, 6).map(c => (
+              <button
+                key={c}
+                onClick={() => setItems(patchItems(doc.items, selectedIds, { color: c }))}
+                aria-label={`Colour ${c}`}
+                style={{
+                  width: '16px', height: '16px', borderRadius: '3px', background: c,
+                  border: single?.color === c ? '2px solid var(--color-text-base)' : '1px solid rgba(0,0,0,0.25)',
+                  cursor: 'pointer', padding: 0
+                }}
+              />
+            ))}
+            <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
+            {tool('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
+            {tool('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
+            {tool('Duplicate', <Copy size={13} />, duplicateSelected)}
+            {tool(single?.locked ? 'Unlock' : 'Lock', single?.locked ? <Unlock size={13} /> : <Lock size={13} />, toggleLock)}
+            {tool('Delete', <Trash2 size={13} />, removeSelected)}
+          </div>
+        )}
+
         {showCardPicker && (
-          <div
-            onPointerDown={() => setShowCardPicker(false)}
-            style={{ position: 'absolute', inset: 0, zIndex: 10 }}
-          />
+          <div onPointerDown={() => setShowCardPicker(false)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
         )}
       </div>
+
+      {menu && (
+        <WallContextMenu x={menu.x} y={menu.y} entries={menuEntries()} onClose={() => setMenu(null)} />
+      )}
     </div>
   )
 }
