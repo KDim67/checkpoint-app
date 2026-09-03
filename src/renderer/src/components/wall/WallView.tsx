@@ -68,8 +68,10 @@ const NUDGE = 4
 /** Narrow enough not to crowd the wall, wide enough for a real card title. */
 const RAIL_MIN = 190
 const RAIL_MAX = 460
-const RAIL_OPEN_KEY = 'wall_rail_open'
-const RAIL_WIDTH_KEY = 'wall_rail_width'
+// Deliberately not under the `wall_` prefix: those keys name a workspace,
+// and a workspace called "rail_open" would own this one. These are preferences.
+const RAIL_OPEN_KEY = 'wallview_rail_open'
+const RAIL_WIDTH_KEY = 'wallview_rail_width'
 
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */

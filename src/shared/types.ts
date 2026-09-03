@@ -92,6 +92,15 @@ export interface ContextExport {
   tags: Tag[]
   item_tags: { item_id: string; tag_id: string }[]
   relations: Relation[]
+  /**
+   * The workspace's own settings, board columns, background, swimlanes,
+   * backlog layout and every wall, keyed as stored, with values as stored.
+   *
+   * Absent in a version 1 export, which is why it is optional: those files
+   * still import, they just arrive with default columns the way they always
+   * did.
+   */
+  settings?: Record<string, string>
 }
 
 /** A row of `sync_tombstones`, a deletion, so peers can replay it. */
