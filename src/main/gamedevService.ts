@@ -2,6 +2,7 @@ import { rename, writeFile, readFile, readdir } from 'fs/promises'
 import { isAbsolute, dirname, extname, basename, join } from 'path'
 import { existsSync } from 'fs'
 import { dialog } from 'electron'
+import { errorMessage } from '../shared/errors'
 
 export interface RenameResult {
   success: boolean
@@ -32,12 +33,12 @@ export async function batchRenameFiles(
       }
       await rename(oldPath, newPath)
       renamedCount++
-    } catch (err: any) {
+    } catch (err) {
       console.error(`Failed to rename ${oldPath} to ${newPath}:`, err)
       errors.push({
         oldPath,
         newPath,
-        error: err.message || String(err)
+        error: errorMessage(err)
       })
     }
   }
@@ -148,12 +149,12 @@ export async function savePbrMaps(
       success: true,
       writtenFiles
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to save PBR maps:', err)
     return {
       success: false,
       writtenFiles: [],
-      error: err.message || String(err)
+      error: errorMessage(err)
     }
   }
 }
@@ -206,11 +207,11 @@ export async function saveSeamlessTexture(
       success: true,
       filePath: targetPath
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to save seamless texture:', err)
     return {
       success: false,
-      error: err.message || String(err)
+      error: errorMessage(err)
     }
   }
 }
@@ -282,11 +283,11 @@ export async function saveSpriteAtlas(
       pngPath,
       jsonPath
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to save sprite atlas:', err)
     return {
       success: false,
-      error: err.message || String(err)
+      error: errorMessage(err)
     }
   }
 }
@@ -321,9 +322,9 @@ export async function saveSlicedSprites(
     }
 
     return { success: true, count }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to save sliced sprites:', err)
-    return { success: false, count: 0, error: err.message || String(err) }
+    return { success: false, count: 0, error: errorMessage(err) }
   }
 }
 
@@ -353,9 +354,9 @@ export async function saveLutTexture(
     await writeFile(targetPath, buffer)
 
     return { success: true, filePath: targetPath }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to save LUT texture:', err)
-    return { success: false, error: err.message || String(err) }
+    return { success: false, error: errorMessage(err) }
   }
 }
 
@@ -386,9 +387,9 @@ export async function saveUpscaledTexture(
     await writeFile(targetPath, buffer)
 
     return { success: true, filePath: targetPath }
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to save upscaled texture:', err)
-    return { success: false, error: err.message || String(err) }
+    return { success: false, error: errorMessage(err) }
   }
 }
 

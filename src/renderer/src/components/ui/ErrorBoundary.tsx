@@ -1,4 +1,5 @@
 import React from 'react'
+import { errorMessage } from '../../../../shared/errors'
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
@@ -122,7 +123,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
             wordBreak: 'break-word'
           }}
         >
-          {error.message || String(error)}
+          {errorMessage(error)}
         </code>
 
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>

@@ -3,6 +3,7 @@ import { Wifi, Globe, Play, Loader2, RefreshCw, Terminal } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import { WebRTCSyncCoordinator } from '../../lib/webrtcSync'
 import ModalShell from '../ui/ModalShell'
+import { errorMessage } from '../../../../shared/errors'
 
 interface Peer {
   name: string
@@ -204,7 +205,7 @@ export default function SyncSettings() {
         await saveSyncSuccess('Internet (P2P)', stats.dbUpdates, stats.filesSynced)
       },
       onError: (err) => {
-        addLog(`[WebRTC Error] ${err.message || String(err)}`)
+        addLog(`[WebRTC Error] ${errorMessage(err)}`)
         toast('Internet sync failed')
         setIsWebrtcActive(false)
       }
@@ -239,7 +240,7 @@ export default function SyncSettings() {
         await saveSyncSuccess('Internet (P2P)', stats.dbUpdates, stats.filesSynced)
       },
       onError: (err) => {
-        addLog(`[WebRTC Error] ${err.message || String(err)}`)
+        addLog(`[WebRTC Error] ${errorMessage(err)}`)
         toast('Internet sync failed')
         setIsWebrtcActive(false)
       }

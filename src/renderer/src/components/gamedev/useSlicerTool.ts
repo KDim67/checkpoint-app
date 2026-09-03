@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
+import { errorMessage } from '../../../../shared/errors'
 
 /**
  * Sprite Slicer: sheet selection, grid/auto slicing, and export.
@@ -189,9 +190,9 @@ export function useSlicerTool() {
       } else {
         throw new Error(res.error || 'Failed to save')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast('Export Error: ' + (err.message || String(err)), { type: 'error' })
+      toast('Export Error: ' + (errorMessage(err)), { type: 'error' })
     } finally {
       setIsSlicerSaving(false)
     }
