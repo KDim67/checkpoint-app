@@ -20,6 +20,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Command, Zap, ClipboardList, Check, ArrowRight, ArrowLeft } from 'lucide-react'
 import useEscapeKey from './ui/useEscapeKey'
+import useFocusTrap from './ui/useFocusTrap'
 import { PROJECT_TEMPLATES, DEFAULT_TEMPLATE_ID, describeTemplate } from '../../../shared/projectTemplates'
 
 /** Breathing room between the spotlight edge and the element it reveals. */
@@ -93,7 +94,16 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const nameRef = useRef<HTMLInputElement>(null)
-  const cardRef = useRef<HTMLDivElement>(null)
+  const primaryRef = useRef<HTMLButtonElement>(null)
+
+  // The card declares aria-modal, so focus has to actually be held inside it.
+  // Without the trap, Tab walked out into the app behind, which is dimmed and
+  // click-blocked, so focus landed on controls the user could neither see the
+  // state of nor operate.
+  //
+  // Focus starts on the primary action rather than the first focusable in DOM
+  // order, which is Skip: landing there means Enter abandons the tour.
+  const cardRef = useFocusTrap(true, primaryRef)
 
   const step = STEPS[index]
   useEscapeKey(onClose, true)
@@ -122,7 +132,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
 
   useEffect(() => {
     if (step.id === 'workspace') nameRef.current?.focus()
-    else cardRef.current?.focus()
+    else primaryRef.current?.focus()
   }, [step.id])
 
   const next = (): void => setIndex(i => Math.min(i + 1, STEPS.length - 1))
@@ -407,6 +417,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
 
             {step.id === 'workspace' ? (
               <button
+                ref={primaryRef}
                 className="btn-primary"
                 onClick={handleCreate}
                 disabled={creating || !name.trim()}
@@ -423,6 +434,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               </button>
             ) : isLast ? (
               <button
+                ref={primaryRef}
                 className="btn-primary"
                 onClick={onClose}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)' }}
@@ -431,6 +443,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               </button>
             ) : (
               <button
+                ref={primaryRef}
                 className="btn-primary"
                 onClick={next}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)' }}
