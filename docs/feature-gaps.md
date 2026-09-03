@@ -48,6 +48,12 @@ first-class subtasks (`shared/subtasks.ts`), export to markdown/CSV/JSON
 **Tier 3**, natural-language capture (`shared/naturalDate.ts`), project
 templates (`shared/projectTemplates.ts`).
 
+**Since**, a first-run spotlight tour (`components/OnboardingTour.tsx`,
+replayable from Settings), Rewind (`shared/rewind.ts`, what you were doing the
+last time you touched a card), the Wall (`shared/wallModel.ts`, several per
+workspace, with the board shown beside it), and Trello import
+(`shared/foreignImport.ts`).
+
 **Already existed when first listed**, note graph view (`notes/GraphView.tsx`,
 since given a full-size mode), note templates (`NOTE_TEMPLATES`), card templates
 (the `isTemplate` metadata flag), and wiki-style backlinks.
@@ -56,25 +62,26 @@ since given a full-size mode), note templates (`NOTE_TEMPLATES`), card templates
 
 ## What actually remains
 
-### First-run experience, the one real gap
-**Verified absent:** no seeding, no tour, no tips, no keyboard-shortcut
-discovery outside Settings.
+Both entries this section used to hold are gone, and neither was closed the way
+it was written up here.
 
-A new install opens fourteen views and around thirty services with no
-orientation. The command palette and global search, two of the best things in
-the app, are undiscoverable unless you already know they exist. Shortcuts are
-rebindable via `settings/HotkeyBinder.tsx`, but only if you think to look.
+**First-run experience, shipped.** It said the cheapest fix was a panel naming
+the palette hotkey. What shipped is a spotlight tour that points at the real
+interface, replayable from Settings, and the Wall was added to it afterwards.
 
-**Cheapest fix that closes most of it:** a first-run panel naming the palette
-hotkey and offering a project template. The templates already exist, so this is
-mostly wiring.
+**Import from other tools, half shipped.** It said `db.importContext` reads
+Checkpoint's own format only. Trello now imports: `shared/foreignImport.ts`
+detects the source and maps lists to columns, cards to cards and labels to tags,
+and the open dialog already offers it. Todoist and Obsidian vaults do not, and
+whether they are worth writing depends entirely on whether you are recruiting
+users off those tools.
 
-### Import from other tools
-`db.importContext` reads Checkpoint's own export format only. Someone arriving
-from Trello, Todoist or an Obsidian vault retypes everything.
+### Adding to this list
 
-Worth doing only if you are recruiting users off other tools. Trello's JSON
-export is the easiest and highest-yield source.
+Two things every future entry needs, because the section above is what happens
+without them: a grep proving the gap is real, and a sentence on who it is for.
+An entry written from an impression of the app has been wrong more often than
+right.
 
 ---
 
@@ -107,7 +114,8 @@ limits), **Todoist** (recurring work, natural-language dates, filters),
 **Trello** (board, templates, attachments), **ActivityWatch** (window tracking,
 heatmaps), **Raycast** (quick-capture HUD).
 
-Two things none of them have: an MCP server exposing 34 tools, and an assistant
+Two things none of them have: an MCP server exposing 37 tools, including the
+Wall, so an agent can read a canvas and place things on it, and an assistant
 with direct write access to the board.
 
 The useful comparison is not what is missing. It is that this app spans six
