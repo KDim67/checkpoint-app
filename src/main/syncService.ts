@@ -5,6 +5,7 @@ import path from 'path'
 import os from 'os'
 import crypto from 'crypto'
 import { getDb } from './db'
+import { filterSyncableSettings, isSyncableSettingKey } from '../shared/syncSettings'
 
 const DEFAULT_TCP_PORT = 5739
 const DEFAULT_UDP_PORT = 5740
@@ -50,24 +51,6 @@ export class SyncService {
   
   private discoveredPeers: Map<string, DiscoveredPeer> = new Map()
   
-  // Excluded sensitive settings (AI providers, API keys, presets, system prompts, sync config)
-  private isSettingKeySensitive(key: string): boolean {
-    const k = key.toLowerCase()
-    return (
-      k.startsWith('ai_') ||
-      k.startsWith('sync_') ||
-      k.includes('api_key') ||
-      k.includes('secret') ||
-      k.includes('token') ||
-      k.includes('preset') ||
-      k.includes('openai') ||
-      k.includes('gemini') ||
-      k.includes('anthropic') ||
-      k.includes('groq') ||
-      k.includes('ollama')
-    )
-  }
-
   // Retrieve current sync status
   public getStatus() {
     return {
@@ -265,9 +248,9 @@ export class SyncService {
     const item_tags = db.prepare('SELECT * FROM item_tags').all()
     const relations = db.prepare('SELECT * FROM relations').all()
     
-    // Filter sensitive key-values out of settings
+    // Drops credentials and anything that describes this machine, see shared/syncSettings.
     const rawSettings = db.prepare('SELECT * FROM app_settings').all() as { key: string, value: string }[]
-    const app_settings = rawSettings.filter(s => !this.isSettingKeySensitive(s.key))
+    const app_settings = filterSyncableSettings(rawSettings)
     
     const focus_sessions = db.prepare('SELECT * FROM focus_sessions').all()
     const clipboard_items = db.prepare('SELECT * FROM clipboard_items').all()
@@ -389,11 +372,14 @@ export class SyncService {
         }
       }
 
-      // 6. Sync App Settings (Merge non-sensitive values)
+      // 6. Sync App Settings (Merge shareable values)
+      // Re-checked on the way in as well as on the way out: a peer on an older
+      // build still sends its backup path and window geometry, and accepting
+      // those would point this machine at a directory it doesn't have.
       const settings = payload.app_settings || []
       const stmtSetSetting = db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)')
       for (const s of settings) {
-        if (this.isSettingKeySensitive(s.key)) continue
+        if (!isSyncableSettingKey(s.key)) continue
         stmtSetSetting.run(s.key, s.value)
       }
 
