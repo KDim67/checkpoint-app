@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /*
    CHECKPOINT DESIGN TOKEN SYSTEM
    All colors, spacing, typography, and motion values live here as CSS
@@ -552,6 +548,29 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* The only two Tailwind utilities the app ever actually used, spinners in
+   CheatsheetsView and the Game Dev panels. Declared here so removing Tailwind
+   did not stop them animating. The spin keyframes above are byte-identical to
+   the ones Tailwind emitted, so nothing about the motion changed. */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
 }
 
 @keyframes dropdown-in {
