@@ -66,7 +66,8 @@ const MACHINE_LOCAL_SUFFIXES = ['_path', '_port', '_bounds', '_position']
  */
 const CONTEXT_SCOPED_PREFIXES = [
   'kanban_',
-  'backlog_columns_layout_'
+  'backlog_columns_layout_',
+  'wall_'
 ]
 
 export function isMachineLocalSettingKey(key: string): boolean {
