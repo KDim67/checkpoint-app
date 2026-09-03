@@ -49,6 +49,51 @@ export interface AppSetting {
   value: string          // JSON-stringified value
 }
 
+export type MemoryCategory = 'semantic' | 'episodic' | 'working'
+
+/** A row of `ai_memories`, what the assistant has remembered about a workspace. */
+export interface AiMemory {
+  id: string
+  context: string
+  category: MemoryCategory
+  memory_key: string
+  content: string
+  /**
+   * SQLite stores this as 0 or 1; memoryService normalises it before the row
+   * leaves the main process, so everything downstream sees a real boolean.
+   */
+  is_pinned: boolean
+  access_count: number
+  created_at: number
+  updated_at: number
+}
+
+export type CreateMemoryPayload = Pick<AiMemory, 'context' | 'category' | 'memory_key' | 'content'>
+
+/** One file in an imported workspace folder. */
+export interface WorkspaceFileInfo {
+  name: string
+  relativePath: string
+  extension: string
+  size: number
+}
+
+/**
+ * A whole workspace, as written by Export and read by Import.
+ *
+ * `item_tags` is the join table verbatim rather than tags nested inside items:
+ * the import replays it into the same table, and flattening it there and
+ * rebuilding it here would be work that could only introduce discrepancies.
+ */
+export interface ContextExport {
+  version: number
+  context: string
+  items: Item[]
+  tags: Tag[]
+  item_tags: { item_id: string; tag_id: string }[]
+  relations: Relation[]
+}
+
 export interface Context {
   slug: string           // e.g. 'unity-project'
   name: string           // e.g. 'Unity Project'

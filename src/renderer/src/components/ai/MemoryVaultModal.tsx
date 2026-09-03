@@ -55,15 +55,15 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
           working: 'WORKING'
         }
         const filteredMems = memorySearchQuery.trim()
-          ? memories.filter((m: any) =>
+          ? memories.filter(m =>
               m.memory_key.toLowerCase().includes(memorySearchQuery.toLowerCase()) ||
               m.content.toLowerCase().includes(memorySearchQuery.toLowerCase()) ||
               m.category.toLowerCase().includes(memorySearchQuery.toLowerCase())
             )
           : memories
 
-        const pinnedMems = filteredMems.filter((m: any) => m.is_pinned)
-        const unpinnedMems = filteredMems.filter((m: any) => !m.is_pinned)
+        const pinnedMems = filteredMems.filter(m => m.is_pinned)
+        const unpinnedMems = filteredMems.filter(m => !m.is_pinned)
         const orderedMems = [...pinnedMems, ...unpinnedMems]
 
         return (
@@ -309,7 +309,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                     )}
                   </div>
                 ) : (
-                  orderedMems.map((mem: any) => (
+                  orderedMems.map(mem => (
                     <div key={mem.id} style={{
                       padding: '14px 16px',
                       background: mem.is_pinned

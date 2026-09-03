@@ -46,7 +46,8 @@ import type {
   TaskQueryParams,
   FocusSession,
   CreateFocusSessionPayload,
-  ClipboardItem
+  ClipboardItem,
+  ContextExport
 } from '../shared/types'
 
 export let dbInstance: Database.Database | null = null
@@ -1603,13 +1604,13 @@ export function getActivityStats(
   }
 }
 
-export function exportContextData(db: Database.Database, context: string): any {
-  const items = db.prepare(`SELECT * FROM items WHERE context = ?`).all(context) as any[]
+export function exportContextData(db: Database.Database, context: string): ContextExport {
+  const items = db.prepare(`SELECT * FROM items WHERE context = ?`).all(context) as Item[]
   const itemIds = items.map(i => i.id)
 
-  let tags: any[] = []
-  let item_tags: any[] = []
-  let relations: any[] = []
+  let tags: Tag[] = []
+  let item_tags: ContextExport['item_tags'] = []
+  let relations: Relation[] = []
 
   if (itemIds.length > 0) {
     const placeholders = itemIds.map(() => '?').join(',')
@@ -1641,7 +1642,7 @@ export function exportContextData(db: Database.Database, context: string): any {
   }
 }
 
-export function importContextData(db: Database.Database, newContextSlug: string, data: any): void {
+export function importContextData(db: Database.Database, newContextSlug: string, data: ContextExport): void {
   db.transaction(() => {
     // 1. Insert tags
     const stmtTag = db.prepare(`INSERT OR IGNORE INTO tags (id, name, color) VALUES (@id, @name, @color)`)
