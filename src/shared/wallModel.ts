@@ -17,7 +17,15 @@
  * being absent, wrong, or written by an older build.
  */
 
-export type WallItemKind = 'card' | 'note' | 'image' | 'text' | 'frame'
+/**
+ * `note` is a sticky note, paper, written on the wall itself. `doc` is a real
+ * note from the Notes view, referenced by title.
+ *
+ * They are not named the other way round, however much `sticky`/`note` would
+ * read better: walls already exist that store sticky notes as `note`, and no
+ * migration could tell an old sticky from a new document after a rename.
+ */
+export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame'
 
 export interface WallItem {
   /** Wall-local id. Two placements of the same card are two items. */
@@ -28,8 +36,8 @@ export interface WallItem {
   width: number
   height: number
   /**
-   * What this points at: an item id for 'card', a note title for 'note', a
-   * media filename for 'image'. Unused by 'text' and 'frame'.
+   * What this points at: an item id for 'card', a note title for 'doc', a media
+   * filename for 'image'. Unused by 'note', 'text' and 'frame'.
    */
   ref?: string
   /** Body for 'note' and 'text'; the label for 'frame'. */
@@ -72,6 +80,7 @@ export const MAX_ZOOM = 3
 export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number }> = {
   card: { width: 260, height: 120 },
   note: { width: 200, height: 200 },
+  doc: { width: 240, height: 150 },
   image: { width: 280, height: 200 },
   text: { width: 240, height: 48 },
   frame: { width: 480, height: 360 }
@@ -99,7 +108,7 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-const KINDS: WallItemKind[] = ['card', 'note', 'image', 'text', 'frame']
+const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame']
 
 export function normalizeWallItem(raw: unknown, index: number): WallItem | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -108,10 +117,10 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const kind = KINDS.includes(o.kind as WallItemKind) ? (o.kind as WallItemKind) : null
   if (!kind) return null
 
-  // A card or image with nothing to point at cannot render, and an empty box
-  // the user cannot identify is worse than a missing one.
+  // A card, doc or image with nothing to point at cannot render, and an empty
+  // box the user cannot identify is worse than a missing one.
   const ref = str(o.ref).trim()
-  if ((kind === 'card' || kind === 'image') && !ref) return null
+  if ((kind === 'card' || kind === 'doc' || kind === 'image') && !ref) return null
 
   const size = DEFAULT_SIZES[kind]
   return {
@@ -379,3 +388,25 @@ export function snap(value: number, grid: number): number {
 }
 
 export const SNAP_GRID = 24
+
+/**
+ * The topmost item containing a wall point, or null.
+ *
+ * Needed because the canvas takes pointer capture while dragging, and a
+ * captured pointer retargets the click and dblclick that follow to the
+ * capturing element, so `event.target` reports the viewport rather than the
+ * item that was actually under the cursor. Coordinates do not lie.
+ *
+ * Hit-testing uses the unrotated box. A rotated item is therefore slightly
+ * generous at its corners, which is the harmless direction to be wrong in.
+ */
+export function itemAtPoint(items: WallItem[], point: { x: number; y: number }): WallItem | null {
+  let hit: WallItem | null = null
+  for (const i of items) {
+    const inside =
+      point.x >= i.x && point.x <= i.x + i.width &&
+      point.y >= i.y && point.y <= i.y + i.height
+    if (inside && (!hit || i.z > hit.z)) hit = i
+  }
+  return hit
+}

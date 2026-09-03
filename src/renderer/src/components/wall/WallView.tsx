@@ -29,14 +29,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
-  Grid3x3, RotateCw, ExternalLink
+  Grid3x3, RotateCw, ExternalLink, FileText
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import {
   bringToFront, boundsOf, createWallItem, duplicateItems, fitCamera, inPaintOrder,
   itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
-  snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
+  itemAtPoint, snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   type WallCamera, type WallDoc, type WallItem, type WallItemKind
 } from '../../../../shared/wallModel'
 import {
@@ -45,7 +45,7 @@ import {
 } from '../../../../shared/history'
 import { flushWallDoc, loadWallDoc, saveWallDoc } from '../../lib/wallDoc'
 import { errorMessage } from '../../../../shared/errors'
-import type { Item } from '../../../../shared/types'
+import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
 import WallContextMenu, { type MenuEntry } from './WallContextMenu'
 
@@ -66,14 +66,18 @@ interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y
 export default function WallView() {
   const activeContext = useAppStore(s => s.activeContext)
   const selectItem = useAppStore(s => s.selectItem)
+  const setView = useAppStore(s => s.setView)
+  const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
   const { toast } = useToast()
 
   const [doc, setDoc] = useState<WallDoc>(() => normalizeWallDoc(null))
   const [cards, setCards] = useState<Item[]>([])
+  const [notes, setNotes] = useState<NoteMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [showCardPicker, setShowCardPicker] = useState(false)
+  /** Which picker is open, if any. One at a time: they occupy the same corner. */
+  const [picker, setPicker] = useState<'card' | 'doc' | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [snapping, setSnapping] = useState(false)
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -94,6 +98,7 @@ export default function WallView() {
   const historyRef = useRef<History<WallItem[]>>(initHistory([]))
 
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards])
+  const notesByTitle = useMemo(() => new Map(notes.map(n => [n.title, n])), [notes])
   const selectedItems = doc.items.filter(i => selectedIds.has(i.id))
   const single = selectedItems.length === 1 ? selectedItems[0] : null
 
@@ -106,14 +111,17 @@ export default function WallView() {
 
     Promise.all([
       loadWallDoc(activeContext),
-      window.electronAPI.db.getItems(activeContext, 'card', 1, 500).catch(() => ({ items: [] as Item[] }))
+      window.electronAPI.db.getItems(activeContext, 'card', 1, 500).catch(() => ({ items: [] as Item[] })),
+      // Notes are not per-workspace, so they are offered whole.
+      window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[])
     ])
-      .then(([loaded, res]) => {
+      .then(([loaded, res, noteList]) => {
         if (cancelled) return
         setDoc(loaded)
         historyRef.current = initHistory(loaded.items)
         setHistoryTick(t => t + 1)
         setCards((res.items ?? []).filter(c => c.status !== 'archived'))
+        setNotes(noteList ?? [])
       })
       .catch(err => !cancelled && toast(`Could not open the wall: ${errorMessage(err)}`, { type: 'error' }))
       .finally(() => !cancelled && setLoading(false))
@@ -485,8 +493,14 @@ export default function WallView() {
   }
 
   const { camera } = doc
-  const placedCardIds = new Set(doc.items.filter(i => i.kind === 'card').map(i => i.ref))
-  const availableCards = cards.filter(c => !placedCardIds.has(c.id))
+  // Anything already on the wall is left out: placing a second copy of the same
+  // card is possible but never what the picker is for.
+  const placed = new Set(doc.items.filter(i => i.kind === 'card' || i.kind === 'doc').map(i => i.ref))
+  const pickerRows = picker === 'card'
+    ? cards.filter(c => !placed.has(c.id)).map(c => ({ ref: c.id, label: c.title }))
+    : picker === 'doc'
+      ? notes.filter(n => !placed.has(n.title)).map(n => ({ ref: n.title, label: n.title }))
+      : []
 
   // Read after historyTick so the buttons reflect the ref-held stack.
   void historyTick
@@ -539,7 +553,8 @@ export default function WallView() {
         {tool('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
         {tool('Text', <Type size={14} />, () => addItem('text'))}
         {tool('Frame', <Square size={14} />, () => addItem('frame'))}
-        {tool('Place a card', <Layers size={14} />, () => setShowCardPicker(v => !v))}
+        {tool('Place a card', <Layers size={14} />, () => setPicker(p => (p === 'card' ? null : 'card')))}
+        {tool('Place a note', <FileText size={14} />, () => setPicker(p => (p === 'doc' ? null : 'doc')))}
         {tool('Image', <ImageIcon size={14} />, () => fileInputRef.current?.click())}
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
@@ -558,21 +573,23 @@ export default function WallView() {
           Drag to select · Right-drag to pan · Right-click for more
         </span>
 
-        {showCardPicker && (
+        {picker && (
           <div style={{
             position: 'absolute', top: '100%', left: 'var(--space-3)', zIndex: 20,
-            marginTop: '4px', width: '280px', maxHeight: '320px', overflowY: 'auto',
+            marginTop: '4px', width: '300px', maxHeight: '340px', overflowY: 'auto',
             background: 'var(--color-surface-elevated)', border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', padding: '4px'
           }}>
-            {availableCards.length === 0 ? (
+            {pickerRows.length === 0 ? (
               <div style={{ padding: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
-                Every card is already on the wall.
+                {picker === 'card'
+                  ? 'Every card is already on the wall.'
+                  : notes.length === 0 ? 'No notes yet.' : 'Every note is already on the wall.'}
               </div>
-            ) : availableCards.map(c => (
+            ) : pickerRows.map(row => (
               <button
-                key={c.id}
-                onClick={() => { addItem('card', { ref: c.id }); setShowCardPicker(false) }}
+                key={row.ref}
+                onClick={() => { addItem(picker === 'card' ? 'card' : 'doc', { ref: row.ref }); setPicker(null) }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
                   textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
@@ -583,7 +600,7 @@ export default function WallView() {
                 onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
               >
                 <Plus size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
               </button>
             ))}
           </div>
@@ -606,9 +623,23 @@ export default function WallView() {
         // Suppressed entirely: the menu is opened from the pointer release,
         // which is the only place a click can be told apart from a pan.
         onContextMenu={e => e.preventDefault()}
+        // Hit-tested by coordinate, not by event.target: the pointer capture
+        // taken during a drag retargets the following dblclick to this element,
+        // so the target reports the viewport whatever was actually clicked.
         onDoubleClick={e => {
-          if ((e.target as HTMLElement).closest('[data-wall-item]')) return
-          addItem('note', {}, toWallPoint(screenPoint(e), docRef.current.camera))
+          const at = toWallPoint(screenPoint(e), docRef.current.camera)
+          const hit = itemAtPoint(docRef.current.items, at)
+          if (!hit) { addItem('note', {}, at); return }
+          if (hit.locked) return
+          if (hit.kind === 'card') openCard(hit)
+          else if (hit.kind === 'doc') {
+            // Hands the title to the Notes view, which opens it on arrival.
+            if (hit.ref) {
+              setPendingNoteTitle(hit.ref)
+              setView('notes')
+            }
+          }
+          else if (hit.kind !== 'image') setEditingId(hit.id)
         }}
         onDragOver={e => e.preventDefault()}
         onDrop={e => {
@@ -657,12 +688,6 @@ export default function WallView() {
               <div
                 key={item.id}
                 data-wall-item={item.id}
-                onDoubleClick={e => {
-                  e.stopPropagation()
-                  if (item.locked) return
-                  if (item.kind === 'card') openCard(item)
-                  else if (item.kind !== 'image') setEditingId(item.id)
-                }}
                 style={{
                   position: 'absolute',
                   left: `${item.x}px`, top: `${item.y}px`,
@@ -676,6 +701,7 @@ export default function WallView() {
                 <WallItemView
                   item={item}
                   card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
+                  note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
                   selected={isSelected}
                   editing={editingId === item.id}
                   onTextChange={text => setItems(patchItems(docRef.current.items, new Set([item.id]), { text }), { record: false })}
@@ -766,8 +792,8 @@ export default function WallView() {
           </div>
         )}
 
-        {showCardPicker && (
-          <div onPointerDown={() => setShowCardPicker(false)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
+        {picker && (
+          <div onPointerDown={() => setPicker(null)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
         )}
       </div>
 
