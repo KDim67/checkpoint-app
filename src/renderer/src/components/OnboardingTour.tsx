@@ -44,40 +44,37 @@ const STEPS: Step[] = [
     body: 'A board, a backlog, notes, a focus timer, clipboard history and an AI assistant, in one place, organised by workspace. Everything stays on this machine: no account, no cloud, no sign-in.'
   },
   {
+    // Second, not last. This is the most useful thing in the tour, and anything
+    // at the end is read by whoever did not skip, which is the wrong half.
+    id: 'palette',
+    title: 'Try the command palette',
+    body: 'It reaches any view, workspace or action by name, and it is the fastest way around the app. Press it now and the tour moves on.'
+  },
+  {
     id: 'workspace',
     title: 'What are you working on?',
     body: 'A workspace keeps one project’s board, notes and tasks together. You can add more later.'
   },
   {
-    id: 'switcher',
-    title: 'Switch projects here',
-    body: 'Every workspace has its own board, notes and history. This is how you move between them.',
-    target: '#context-switcher'
-  },
-  {
-    id: 'rail',
-    title: 'Everything lives on this rail',
-    body: 'Board, backlog, notes, focus timer, clipboard, analytics and more. Hover any icon for its name, and turn off the ones you do not want in Settings.',
-    target: '#nav-kanban'
-  },
-  {
-    id: 'settings',
-    title: 'Make it yours',
-    body: 'Themes, keyboard shortcuts, which features are on, sync, and backups. You can replay this tour from Settings → About.',
-    target: '#nav-settings'
+    id: 'sidebar',
+    title: 'Your workspaces and views',
+    body: 'The badge at the top switches between workspaces, each has its own board, notes and history. Below it is every view: board, backlog, notes, focus timer, clipboard, analytics. Hover any icon for its name.',
+    target: '#app-sidebar'
   },
   {
     id: 'keys',
-    title: 'Three keys worth knowing',
-    body: 'These work from anywhere, even when Checkpoint is in the background.'
+    title: 'Two more worth knowing',
+    body: 'Like the palette, these work from anywhere, even when Checkpoint is in the background.'
   }
 ]
 
 const KEYS: { combo: string; name: string; why: string; icon: React.ReactNode }[] = [
-  { combo: 'Ctrl + K', name: 'Command palette', why: 'Reach any view or action by name.', icon: <Command size={15} /> },
   { combo: 'Ctrl + Shift + Space', name: 'Quick capture', why: 'Jot a task without leaving what you are doing.', icon: <Zap size={15} /> },
   { combo: 'Ctrl + Shift + V', name: 'Clipboard history', why: 'Everything you have copied, searchable.', icon: <ClipboardList size={15} /> }
 ]
+
+/** What the palette step listens for. Matches the binding in App.tsx. */
+const PALETTE_COMBO = 'Ctrl + K'
 
 interface Rect { top: number; left: number; width: number; height: number }
 
@@ -92,6 +89,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   const [name, setName] = useState('')
   const [templateId, setTemplateId] = useState(DEFAULT_TEMPLATE_ID)
   const [creating, setCreating] = useState(false)
+  const [palettePressed, setPalettePressed] = useState(false)
   const [error, setError] = useState('')
   const nameRef = useRef<HTMLInputElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
@@ -134,6 +132,40 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
     if (step.id === 'workspace') nameRef.current?.focus()
     else primaryRef.current?.focus()
   }, [step.id])
+
+  /**
+   * The palette step is passed by doing, not by reading.
+   *
+   * Captured on the window rather than the card, so it fires wherever focus
+   * happens to be, and swallowed so the palette does not open on top of the
+   * tour: what the step is teaching is the gesture, and a second modal over the
+   * first would only be something else to dismiss. App.tsx binds the same combo
+   * on the bubble phase, which stopPropagation here prevents from running.
+   */
+  useEffect(() => {
+    if (step.id !== 'palette' || palettePressed) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        e.stopPropagation()
+        setPalettePressed(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [step.id, palettePressed])
+
+  // Long enough to register as a confirmation, short enough not to feel like a
+  // wait. Advancing by index rather than through `next` keeps this free of a
+  // stale closure over the render that scheduled it.
+  useEffect(() => {
+    if (!palettePressed) return
+    const timer = setTimeout(() => {
+      setIndex(i => Math.min(i + 1, STEPS.length - 1))
+      setPalettePressed(false)
+    }, 850)
+    return () => clearTimeout(timer)
+  }, [palettePressed])
 
   const next = (): void => setIndex(i => Math.min(i + 1, STEPS.length - 1))
   const back = (): void => setIndex(i => Math.max(i - 1, 0))
@@ -267,6 +299,53 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             {step.body}
           </p>
         </div>
+
+        {/* Press the combo */}
+        {step.id === 'palette' && (
+          <div
+            aria-live="polite"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              padding: 'var(--space-5) var(--space-3)',
+              background: 'var(--color-surface-2)',
+              border: `1px solid ${palettePressed ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+              borderRadius: 'var(--radius-md)',
+              transition: 'border-color var(--duration-normal) var(--ease-default)'
+            }}
+          >
+            {palettePressed ? (
+              <>
+                <Check size={22} style={{ color: 'var(--color-secondary)' }} />
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+                  That’s it, that is how you reach anything.
+                </span>
+              </>
+            ) : (
+              <>
+                <Command size={22} style={{ color: 'var(--color-secondary)' }} />
+                <kbd style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 'var(--weight-semibold)',
+                  color: 'var(--color-text-base)',
+                  background: 'var(--color-surface-offset)',
+                  border: '1px solid var(--color-surface-elevated)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '6px 14px',
+                  letterSpacing: '0.02em'
+                }}>
+                  {PALETTE_COMBO}
+                </kbd>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+                  Waiting for the keystroke…
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Workspace form */}
         {step.id === 'workspace' && (
@@ -405,7 +484,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               >
                 Not now
               </button>
-            ) : index > 0 && !isLast ? (
+            ) : step.id === 'palette' ? null : index > 0 && !isLast ? (
               <button
                 className="btn-ghost"
                 onClick={onClose}
@@ -415,7 +494,19 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               </button>
             ) : null}
 
-            {step.id === 'workspace' ? (
+            {/* No primary Next on the palette step: an easier way past would be
+                the one most people take, and the keystroke is the whole point.
+                The way out is deliberately the quieter control. */}
+            {step.id === 'palette' ? (
+              <button
+                ref={primaryRef}
+                className="btn-ghost"
+                onClick={next}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)' }}
+              >
+                Skip this <ArrowRight size={13} />
+              </button>
+            ) : step.id === 'workspace' ? (
               <button
                 ref={primaryRef}
                 className="btn-primary"
