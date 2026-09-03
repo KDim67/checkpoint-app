@@ -58,9 +58,21 @@ const MACHINE_LOCAL_KEYS = new Set([
  */
 const MACHINE_LOCAL_SUFFIXES = ['_path', '_port', '_bounds', '_position']
 
+/**
+ * Families whose key ends in a name the user chose, so the suffix rules can't
+ * be trusted on them: a context called "port" would produce kanban_board_port
+ * and be mistaken for a socket. These are per-workspace board configuration and
+ * are meant to travel, see shared/boardModel.
+ */
+const CONTEXT_SCOPED_PREFIXES = [
+  'kanban_',
+  'backlog_columns_layout_'
+]
+
 export function isMachineLocalSettingKey(key: string): boolean {
   const k = key.toLowerCase()
   if (MACHINE_LOCAL_KEYS.has(k)) return true
+  if (CONTEXT_SCOPED_PREFIXES.some(prefix => k.startsWith(prefix))) return false
   return MACHINE_LOCAL_SUFFIXES.some(suffix => k.endsWith(suffix))
 }
 
