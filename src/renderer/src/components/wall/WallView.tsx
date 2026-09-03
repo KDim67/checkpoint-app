@@ -30,7 +30,7 @@ import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
   Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  ChevronDown, Pencil, PanelLeft
+  ChevronDown, Pencil, PanelLeft, Paintbrush, Check
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -39,7 +39,7 @@ import {
   itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
   snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
-  createWall, removeWall, renameWall, setActiveWall, wallDocKey,
+  createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
   type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
 } from '../../../../shared/wallModel'
 import {
@@ -62,6 +62,7 @@ import {
 } from '../../../../shared/wallBoard'
 import { loadBoardConfig } from '../../lib/boardConfig'
 import { getBoolSetting, getNumberSetting, setBoolSetting, setNumberSetting } from '../../lib/settings'
+import { getTextColorForBackground } from '../../lib/contrast'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
 
 const NUDGE = 4
@@ -131,9 +132,17 @@ export default function WallView() {
   /** The rail column a wall drag is over, if any. Mirrored in a ref: this is
    *  read on every pointer move, and re-rendering on each one would stutter. */
   const [dropColumnId, setDropColumnId] = useState<string | null>(null)
+  const [bgOpen, setBgOpen] = useState(false)
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
+  /**
+   * What a drag actually moves. Not the same as the selection: dragging a frame
+   * takes its contents with it, and the contents are decided once when the drag
+   * starts rather than every frame, otherwise an item would join the drag the
+   * moment the frame swept over it.
+   */
+  const movingRef = useRef<Set<string>>(new Set())
   /** A right-press in flight: becomes a menu on release if it barely moved. */
   const rightPressRef = useRef<{ clientX: number; clientY: number; itemId: string | null; at: { x: number; y: number }; moved: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -336,6 +345,10 @@ export default function WallView() {
     }
   }
 
+  const setBackground = useCallback((background: string) => {
+    write({ ...docRef.current, background })
+  }, [write])
+
   const toggleRail = useCallback(() => {
     setRailOpen(open => {
       void setBoolSetting(RAIL_OPEN_KEY, !open)
@@ -513,6 +526,7 @@ export default function WallView() {
   const exportPng = useCallback(async () => {
     const items = docRef.current.items
     if (items.length === 0) { toast('Nothing on this wall to export yet.'); return }
+    const wallBackground = docRef.current.background
     setBusy('Rendering')
     try {
       // Colours are read from the live theme rather than hardcoded, so an
@@ -520,7 +534,9 @@ export default function WallView() {
       const style = getComputedStyle(document.documentElement)
       const png = await exportWallToPng(items, {
         titleOf: labelRef.current,
-        background: style.getPropertyValue('--color-background').trim() || '#0b0c10',
+        background: wallBackground !== 'default'
+          ? wallBackground
+          : style.getPropertyValue('--color-background').trim() || '#0b0c10',
         textColor: style.getPropertyValue('--color-text-base').trim() || '#ffffff',
         surfaceColor: style.getPropertyValue('--color-surface-1').trim() || '#131622',
         borderColor: style.getPropertyValue('--color-surface-offset').trim() || '#24293f'
@@ -598,6 +614,7 @@ export default function WallView() {
         : (already ? selectedRef.current : new Set([id]))
       setSelectedIds(next)
       if (!e.shiftKey) setItems(bringToFront(docRef.current.items, id), { record: false })
+      movingRef.current = withFrameContents(docRef.current.items, next)
       dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: docRef.current.items }
       return
     }
@@ -666,10 +683,11 @@ export default function WallView() {
       // comparing against the rendered one risks missing a change instead.
       setDropColumnId(columnId)
 
-      const moved = moveItems(drag.origin, selectedRef.current, dx, dy)
+      const moving = movingRef.current
+      const moved = moveItems(drag.origin, moving, dx, dy)
       setItems(
         snapping
-          ? moved.map(i => (selectedRef.current.has(i.id) ? { ...i, x: snap(i.x, SNAP_GRID), y: snap(i.y, SNAP_GRID) } : i))
+          ? moved.map(i => (moving.has(i.id) ? { ...i, x: snap(i.x, SNAP_GRID), y: snap(i.y, SNAP_GRID) } : i))
           : moved,
         { record: false }
       )
@@ -756,7 +774,13 @@ export default function WallView() {
       const delta = deltas[e.key]
       if (delta) {
         e.preventDefault()
-        setItems(moveItems(docRef.current.items, selectedRef.current, delta[0], delta[1]))
+        // Nudging matches dragging: a frame takes its contents either way.
+        setItems(moveItems(
+          docRef.current.items,
+          withFrameContents(docRef.current.items, selectedRef.current),
+          delta[0],
+          delta[1]
+        ))
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -860,6 +884,15 @@ export default function WallView() {
   }
 
   const { camera } = doc
+  // 'default' means the theme's own background, so a wall follows light and
+  // dark like everything else until someone deliberately picks a colour.
+  const custom = doc.background && doc.background !== 'default' ? doc.background : null
+  const canvasBackground = custom ?? 'var(--color-background)'
+  // A fixed dot colour disappears on half the palette. Derived from the chosen
+  // background instead, at an opacity that marks the grid without ruling it.
+  const dotColor = custom
+    ? (getTextColorForBackground(custom) === '#ffffff' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)')
+    : 'var(--color-surface-offset)'
   // Anything already on the wall is left out: placing a second copy of the same
   // card is possible but never what the picker is for.
   const placed = new Set(
@@ -948,6 +981,69 @@ export default function WallView() {
           toggleRail,
           { active: railOpen }
         )}
+
+        <div style={{ position: 'relative' }}>
+          {tool('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
+
+          {bgOpen && (
+            <>
+              <div onPointerDown={() => setBgOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+              <div
+                style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
+                  padding: 'var(--space-2)', width: '188px',
+                  background: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--color-surface-offset)',
+                  borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
+                }}
+              >
+                <button
+                  onClick={() => { setBackground('default'); setBgOpen(false) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
+                    background: 'none', border: 'none', cursor: 'pointer', marginBottom: 'var(--space-2)',
+                    padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
+                    color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)'
+                  }}
+                >
+                  {!custom && <Check size={12} />}
+                  Follow the theme
+                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {WALL_COLORS.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => { setBackground(color); setBgOpen(false) }}
+                      title={color}
+                      aria-label={`Background ${color}`}
+                      style={{
+                        height: '26px', background: color, cursor: 'pointer',
+                        border: custom === color ? '2px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
+                        borderRadius: 'var(--radius-sm)'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Any colour at all, since the point of this view is that it
+                    imposes nothing. */}
+                <label style={{
+                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                  marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)'
+                }}>
+                  <input
+                    type="color"
+                    value={custom ?? '#111318'}
+                    onChange={e => setBackground(e.target.value)}
+                    style={{ width: '26px', height: '26px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+                  />
+                  Custom
+                </label>
+              </div>
+            </>
+          )}
+        </div>
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
@@ -1310,8 +1406,8 @@ export default function WallView() {
           }}
           style={{
             flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
-            background: 'var(--color-background)',
-            backgroundImage: 'radial-gradient(circle, var(--color-surface-offset) 1px, transparent 1px)',
+            background: canvasBackground,
+            backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
             backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
             backgroundPosition: `${camera.x}px ${camera.y}px`
           }}

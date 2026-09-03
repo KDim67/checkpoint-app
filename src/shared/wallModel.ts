@@ -556,3 +556,63 @@ export function removeWall(index: WallIndex, id: string): WallIndex {
 export function setActiveWall(index: WallIndex, id: string): WallIndex {
   return index.walls.some(w => w.id === id) ? { ...index, activeId: id } : index
 }
+
+// Frames as containers
+
+/**
+ * What a frame holds: every item whose centre falls inside it.
+ *
+ * Centre rather than full containment, because a sticky note pushed half over
+ * a frame's edge still reads as being in that frame, and requiring full
+ * enclosure would make a frame quietly drop things at its border.
+ *
+ * Locked items are excluded. Locked means pinned in place, and a background
+ * reference image is exactly the thing someone locks and then draws a frame
+ * over.
+ *
+ * Rotation is ignored: containment is tested against the unrotated rectangle.
+ * A rotated frame is rare, and the alternative, a rotated hit test, would
+ * make which items belong to a frame depend on an angle nobody is thinking
+ * about while dragging it.
+ */
+export function itemsInFrame(items: WallItem[], frame: WallItem): string[] {
+  if (frame.kind !== 'frame') return []
+  const right = frame.x + frame.width
+  const bottom = frame.y + frame.height
+
+  return items
+    .filter(item => {
+      if (item.id === frame.id || item.locked) return false
+      const cx = item.x + item.width / 2
+      const cy = item.y + item.height / 2
+      return cx >= frame.x && cx <= right && cy >= frame.y && cy <= bottom
+    })
+    .map(item => item.id)
+}
+
+/**
+ * The set that should actually move, given what is selected: a frame brings its
+ * contents with it.
+ *
+ * Repeated until nothing new is added, so a frame inside a frame comes along
+ * too. The loop terminates because the set only ever grows and is bounded by
+ * the number of items.
+ */
+export function withFrameContents(items: WallItem[], ids: Set<string>): Set<string> {
+  const out = new Set(ids)
+  let growing = true
+
+  while (growing) {
+    growing = false
+    for (const item of items) {
+      if (item.kind !== 'frame' || !out.has(item.id)) continue
+      for (const inner of itemsInFrame(items, item)) {
+        if (!out.has(inner)) {
+          out.add(inner)
+          growing = true
+        }
+      }
+    }
+  }
+  return out
+}

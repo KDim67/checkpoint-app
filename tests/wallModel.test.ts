@@ -32,6 +32,8 @@ import {
   renameWall,
   setActiveWall,
   wallIndexKey,
+  itemsInFrame,
+  withFrameContents,
   DEFAULT_WALL_ID
 } from '../src/shared/wallModel'
 
@@ -571,5 +573,85 @@ describe('several walls per workspace', () => {
     const base = normalizeWallIndex({ walls: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], activeId: 'a' })
     expect(setActiveWall(base, 'b').activeId).toBe('b')
     expect(setActiveWall(base, 'nope')).toBe(base)
+  })
+})
+
+describe('a frame carries what is inside it', () => {
+  const frame = (over: Partial<WallItem> = {}): WallItem =>
+    item({ id: 'f', kind: 'frame', x: 0, y: 0, width: 200, height: 200, ...over })
+
+  it('holds an item whose centre is inside it', () => {
+    const inside = item({ id: 'a', x: 50, y: 50, width: 20, height: 20 })
+    expect(itemsInFrame([frame(), inside], frame())).toEqual(['a'])
+  })
+
+  it('holds one hanging over the edge, since that still reads as inside', () => {
+    // Requiring full enclosure would make a frame quietly drop things at its
+    // border, which is the opposite of what dragging a frame should do.
+    // Centre at 195, inside; right edge at 210, hanging over.
+    const straddling = item({ id: 'a', x: 180, y: 50, width: 30, height: 20 })
+    expect(itemsInFrame([frame(), straddling], frame())).toEqual(['a'])
+  })
+
+  it('leaves out one whose centre is beyond the edge', () => {
+    const outside = item({ id: 'a', x: 195, y: 50, width: 40, height: 20 })
+    expect(itemsInFrame([frame(), outside], frame())).toEqual([])
+  })
+
+  it('leaves out a locked item, which is pinned on purpose', () => {
+    const pinned = item({ id: 'a', x: 50, y: 50, width: 20, height: 20, locked: true })
+    expect(itemsInFrame([frame(), pinned], frame())).toEqual([])
+  })
+
+  it('never holds itself', () => {
+    expect(itemsInFrame([frame()], frame())).toEqual([])
+  })
+
+  it('returns nothing for an item that is not a frame', () => {
+    const note = item({ id: 'n', kind: 'note', x: 0, y: 0, width: 200, height: 200 })
+    expect(itemsInFrame([note, item({ id: 'a', x: 50, y: 50 })], note)).toEqual([])
+  })
+})
+
+describe('what actually moves when a frame is dragged', () => {
+  it('adds the frame’s contents to the selection being moved', () => {
+    const items = [
+      item({ id: 'f', kind: 'frame', x: 0, y: 0, width: 200, height: 200 }),
+      item({ id: 'a', x: 50, y: 50, width: 20, height: 20 })
+    ]
+    expect(withFrameContents(items, new Set(['f']))).toEqual(new Set(['f', 'a']))
+  })
+
+  it('leaves a plain selection alone', () => {
+    const items = [item({ id: 'a' }), item({ id: 'b' })]
+    expect(withFrameContents(items, new Set(['a']))).toEqual(new Set(['a']))
+  })
+
+  it('follows a frame inside a frame', () => {
+    const items = [
+      item({ id: 'outer', kind: 'frame', x: 0, y: 0, width: 400, height: 400 }),
+      item({ id: 'inner', kind: 'frame', x: 20, y: 20, width: 100, height: 100 }),
+      item({ id: 'leaf', x: 40, y: 40, width: 10, height: 10 })
+    ]
+    expect(withFrameContents(items, new Set(['outer']))).toEqual(new Set(['outer', 'inner', 'leaf']))
+  })
+
+  it('terminates when two frames sit inside each other', () => {
+    // Overlapping frames each contain the other's centre. The set only grows,
+    // so this settles rather than looping.
+    const items = [
+      item({ id: 'f1', kind: 'frame', x: 0, y: 0, width: 100, height: 100 }),
+      item({ id: 'f2', kind: 'frame', x: 10, y: 10, width: 100, height: 100 })
+    ]
+    expect(withFrameContents(items, new Set(['f1']))).toEqual(new Set(['f1', 'f2']))
+  })
+
+  it('does not move an item that only a different frame holds', () => {
+    const items = [
+      item({ id: 'f1', kind: 'frame', x: 0, y: 0, width: 100, height: 100 }),
+      item({ id: 'f2', kind: 'frame', x: 500, y: 500, width: 100, height: 100 }),
+      item({ id: 'a', x: 520, y: 520, width: 10, height: 10 })
+    ]
+    expect(withFrameContents(items, new Set(['f1']))).toEqual(new Set(['f1']))
   })
 })
