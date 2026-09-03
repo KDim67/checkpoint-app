@@ -433,6 +433,9 @@ export function Sidebar() {
   return (
     <div
       ref={sidebarRef}
+      // Named so the first-run tour can spotlight the whole rail at once, 
+      // the workspace switcher and the view icons are one idea to a newcomer.
+      id="app-sidebar"
       style={{
         width: '56px',
         height: '100%',
