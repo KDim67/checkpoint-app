@@ -15,9 +15,14 @@
  * - **Cards are references.** Placing a card does not copy it, and moving it
  *   here means nothing to its column. That is what stops the Wall becoming a
  *   second, lying board.
- * - **Plain drag pans; Shift-drag selects.** Most canvases invert this, but the
- *   Wall shipped with drag-to-pan, and changing it would break the habit of
- *   anyone already using it. Selection takes the modifier instead.
+ * - **Left-drag selects; right-drag pans.** The convention from Unity and
+ *   Unreal rather than from Figma, and right-drag pans from *anywhere*, on a
+ *   busy wall, having to find empty space before you can move the view is the
+ *   thing that makes a canvas feel cramped.
+ *
+ *   That leaves right-click doing two jobs, separated by distance: a press that
+ *   travels less than a few pixels was a click and opens a menu; anything
+ *   further was a pan and does not.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -45,13 +50,15 @@ import WallItemView from './WallItemView'
 import WallContextMenu, { type MenuEntry } from './WallContextMenu'
 
 const NUDGE = 4
+/** How far a press may travel and still count as a click rather than a drag. */
+const CLICK_SLOP = 4
 
 type Drag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
   | { mode: 'move'; startX: number; startY: number; origin: WallItem[] }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
-  | { mode: 'marquee'; startX: number; startY: number }
+  | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
   | null
 
 interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
@@ -75,6 +82,8 @@ export default function WallView() {
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
+  /** A right-press in flight: becomes a menu on release if it barely moved. */
+  const rightPressRef = useRef<{ clientX: number; clientY: number; itemId: string | null; at: { x: number; y: number }; moved: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const docRef = useRef(doc)
   docRef.current = doc
@@ -240,12 +249,26 @@ export default function WallView() {
 
   // Pointer
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 2) return
     setMenu(null)
     const target = e.target as HTMLElement
     const handle = target.closest<HTMLElement>('[data-wall-handle]')
     const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+
+    // Right button: pan from anywhere. Whether this turns out to be a menu
+    // instead is decided on release, by how far it travelled.
+    if (e.button === 2) {
+      const cam = docRef.current.camera
+      rightPressRef.current = {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        itemId: itemEl?.dataset.wallItem ?? null,
+        at: toWallPoint(screenPoint(e), cam),
+        moved: false
+      }
+      dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
+      return
+    }
 
     if (handle && single && !single.locked) {
       if (handle.dataset.wallHandle === 'rotate') {
@@ -278,18 +301,16 @@ export default function WallView() {
       return
     }
 
-    setSelectedIds(new Set())
+    // Shift keeps whatever was selected, so a marquee can add to it.
+    if (!e.shiftKey) setSelectedIds(new Set())
     setEditingId(null)
 
-    if (e.shiftKey && e.button === 0) {
-      const p = screenPoint(e)
-      dragRef.current = { mode: 'marquee', startX: p.x, startY: p.y }
-      setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
-      return
-    }
-
-    const cam = docRef.current.camera
-    dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
+    const p = screenPoint(e)
+    // The selection as it was when the drag began. Unioning against the live
+    // selection instead would mean an item, once caught, could never be
+    // released by moving the marquee back off it.
+    dragRef.current = { mode: 'marquee', startX: p.x, startY: p.y, base: e.shiftKey ? new Set(selectedRef.current) : new Set() }
+    setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -298,6 +319,11 @@ export default function WallView() {
     const cam = docRef.current.camera
 
     if (drag.mode === 'pan') {
+      const press = rightPressRef.current
+      if (press && !press.moved) {
+        const travelled = Math.hypot(e.clientX - press.clientX, e.clientY - press.clientY)
+        if (travelled > CLICK_SLOP) press.moved = true
+      }
       setCamera({ ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) })
       return
     }
@@ -307,7 +333,8 @@ export default function WallView() {
       setMarquee(rectFromPoints({ x: drag.startX, y: drag.startY }, p))
       const a = toWallPoint({ x: drag.startX, y: drag.startY }, cam)
       const b = toWallPoint(p, cam)
-      setSelectedIds(new Set(itemsInRect(docRef.current.items, rectFromPoints(a, b))))
+      const hit = itemsInRect(docRef.current.items, rectFromPoints(a, b))
+      setSelectedIds(new Set([...drag.base, ...hit]))
       return
     }
 
@@ -355,6 +382,17 @@ export default function WallView() {
     dragRef.current = null
     setMarquee(null)
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
+
+    // A right press that went nowhere was a click, so it opens a menu.
+    const press = rightPressRef.current
+    rightPressRef.current = null
+    if (press && !press.moved) {
+      if (press.itemId && !selectedRef.current.has(press.itemId)) {
+        setSelectedIds(new Set([press.itemId]))
+      }
+      setMenu({ x: press.clientX, y: press.clientY, itemId: press.itemId, at: press.at })
+      return
+    }
     // One undo step for the whole gesture, recorded now that it is finished.
     if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate')) {
       historyRef.current = pushHistory(historyRef.current, docRef.current.items)
@@ -517,7 +555,7 @@ export default function WallView() {
 
         {/* Stated rather than left to be discovered: neither is guessable. */}
         <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--color-text-faint)' }}>
-          Drag to pan · Shift-drag to select · Right-click for more
+          Drag to select · Right-drag to pan · Right-click for more
         </span>
 
         {showCardPicker && (
@@ -565,15 +603,9 @@ export default function WallView() {
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onContextMenu={e => {
-          e.preventDefault()
-          const itemEl = (e.target as HTMLElement).closest<HTMLElement>('[data-wall-item]')
-          const id = itemEl?.dataset.wallItem ?? null
-          // Right-clicking outside the selection makes that item the selection,
-          // so the menu always acts on what was actually clicked.
-          if (id && !selectedRef.current.has(id)) setSelectedIds(new Set([id]))
-          setMenu({ x: e.clientX, y: e.clientY, itemId: id, at: toWallPoint(screenPoint(e), docRef.current.camera) })
-        }}
+        // Suppressed entirely: the menu is opened from the pointer release,
+        // which is the only place a click can be told apart from a pan.
+        onContextMenu={e => e.preventDefault()}
         onDoubleClick={e => {
           if ((e.target as HTMLElement).closest('[data-wall-item]')) return
           addItem('note', {}, toWallPoint(screenPoint(e), docRef.current.camera))
