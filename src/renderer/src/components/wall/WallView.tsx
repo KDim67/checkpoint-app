@@ -30,7 +30,7 @@ import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
   Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  ChevronDown, Pencil
+  ChevronDown, Pencil, PanelLeft
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -56,8 +56,22 @@ import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
 import WallContextMenu, { type MenuEntry } from './WallContextMenu'
 import ConfirmDialog from '../ui/ConfirmDialog'
+import WallBoardRail, { type RailTab } from './WallBoardRail'
+import {
+  decodeWallDrag, filterGroups, groupCardsByColumn, planHandoff, WALL_DRAG_MIME
+} from '../../../../shared/wallBoard'
+import { loadBoardConfig } from '../../lib/boardConfig'
+import { getBoolSetting, getNumberSetting, setBoolSetting, setNumberSetting } from '../../lib/settings'
+import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
 
 const NUDGE = 4
+/** Narrow enough not to crowd the wall, wide enough for a real card title. */
+const RAIL_MIN = 190
+const RAIL_MAX = 460
+const RAIL_OPEN_KEY = 'wall_rail_open'
+const RAIL_WIDTH_KEY = 'wall_rail_width'
+
+const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
 const CLICK_SLOP = 4
 
@@ -106,6 +120,16 @@ export default function WallView() {
   const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<WallRef | null>(null)
 
+  /** The board, shown beside the wall so a card can be dragged straight onto it. */
+  const [railOpen, setRailOpen] = useState(false)
+  const [railWidth, setRailWidth] = useState(260)
+  const [railTab, setRailTab] = useState<RailTab>('board')
+  const [railQuery, setRailQuery] = useState('')
+  const [columns, setColumns] = useState<ColumnConfig[]>([])
+  /** The rail column a wall drag is over, if any. Mirrored in a ref: this is
+   *  read on every pointer move, and re-rendering on each one would stutter. */
+  const [dropColumnId, setDropColumnId] = useState<string | null>(null)
+
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
   /** A right-press in flight: becomes a menu on release if it barely moved. */
@@ -117,6 +141,8 @@ export default function WallView() {
    * straight back.
    */
   const discardedRef = useRef<Set<string>>(new Set())
+  const railHoverRef = useRef<{ overRail: boolean; columnId: string | null }>({ overRail: false, columnId: null })
+  const railResizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
   /**
    * Resolves an item to whatever it is called. Held in a ref because the
    * export callback is created long before the lookup maps exist further down.
@@ -144,17 +170,55 @@ export default function WallView() {
   /** What the walls can point at. Workspace-wide, so switching wall leaves it. */
   useEffect(() => {
     let cancelled = false
+
+    const readCards = (): Promise<void> =>
+      window.electronAPI.db
+        .getItems(activeContext, 'card', 1, 500)
+        .catch(() => ({ items: [] as Item[] }))
+        .then(res => { if (!cancelled) setCards((res.items ?? []).filter(c => c.status !== 'archived')) })
+
+    void readCards()
     Promise.all([
-      window.electronAPI.db.getItems(activeContext, 'card', 1, 500).catch(() => ({ items: [] as Item[] })),
       // Notes are not per-workspace, so they are offered whole.
-      window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[])
-    ]).then(([res, noteList]) => {
+      window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[]),
+      // The rail is the board, so it has to be the board's own columns rather
+      // than a list of whatever statuses happen to be in use.
+      loadBoardConfig(activeContext).catch(() => null)
+    ]).then(([noteList, config]) => {
       if (cancelled) return
-      setCards((res.items ?? []).filter(c => c.status !== 'archived'))
       setNotes(noteList ?? [])
+      // Falls back to the standard columns rather than to none: with no
+      // columns every card is an orphan, which reads as a broken board.
+      setColumns(config?.columns ?? DEFAULT_COLUMNS)
+    })
+
+    // A card moved from the rail, from the board, or by a peer all arrive the
+    // same way. Without this the rail keeps showing the column a card left.
+    const onMutation = (e: Event): void => {
+      const type = (e as CustomEvent<{ type?: string }>).detail?.type ?? ''
+      if (type === 'createItem' || type === 'updateItem' || type === 'deleteItem') void readCards()
+    }
+    window.addEventListener('db-mutation', onMutation)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('db-mutation', onMutation)
+    }
+  }, [activeContext])
+
+  /** The rail's own state is a preference, not part of any wall. */
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      getBoolSetting(RAIL_OPEN_KEY, false),
+      getNumberSetting(RAIL_WIDTH_KEY, 260)
+    ]).then(([open, width]) => {
+      if (cancelled) return
+      setRailOpen(open)
+      setRailWidth(clampRail(width))
     })
     return () => { cancelled = true }
-  }, [activeContext])
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -213,6 +277,47 @@ export default function WallView() {
     commitIndex(createWall(wallIndex).index)
     setWallMenuOpen(false)
   }, [wallIndex, commitIndex])
+
+  /**
+   * The reverse direction: a card dragged off the wall and onto a column moves
+   * for real. Position on the wall still means nothing, but a drop onto a
+   * named column is not a position, it is an instruction.
+   */
+  const handOffToColumn = async (columnId: string): Promise<void> => {
+    const refs = docRef.current.items
+      .filter(i => selectedRef.current.has(i.id) && i.kind === 'card' && i.ref)
+      .map(i => i.ref as string)
+
+    if (refs.length === 0) {
+      toast('Only cards can be moved to a column.')
+      return
+    }
+
+    const plan = planHandoff(refs, columnId, cards)
+    if (plan.length === 0) {
+      toast('Already in that column.')
+      return
+    }
+
+    try {
+      // One at a time: each write fires the mutation event the rest of the app
+      // listens on, and a batch would have to reproduce all of that.
+      for (const move of plan) {
+        await window.electronAPI.db.updateItem(move.id, { status: move.status, position: move.position })
+      }
+      const name = columns.find(c => c.id === columnId)?.name ?? columnId
+      toast(`Moved ${plan.length} card${plan.length === 1 ? '' : 's'} to ${name}.`)
+    } catch (err) {
+      toast(`Could not move the card: ${errorMessage(err)}`, { type: 'error' })
+    }
+  }
+
+  const toggleRail = useCallback(() => {
+    setRailOpen(open => {
+      void setBoolSetting(RAIL_OPEN_KEY, !open)
+      return !open
+    })
+  }, [])
 
   const confirmDeleteWall = useCallback(async () => {
     if (!pendingDelete || !wallIndex) return
@@ -526,6 +631,17 @@ export default function WallView() {
     const dy = (e.clientY - drag.startY) / cam.zoom
 
     if (drag.mode === 'move') {
+      // Hit-tested against the document rather than the event target: the
+      // pointer is captured by the canvas, so the events keep arriving here
+      // even once the cursor has left it for the rail.
+      const under = railOpen ? document.elementFromPoint(e.clientX, e.clientY) : null
+      const columnId = under?.closest<HTMLElement>('[data-wall-column]')?.dataset.wallColumn ?? null
+      const overRail = !!under?.closest('[data-wall-rail]')
+      railHoverRef.current = { overRail, columnId }
+      // Set unconditionally: React drops a write of the same value, and
+      // comparing against the rendered one risks missing a change instead.
+      setDropColumnId(columnId)
+
       const moved = moveItems(drag.origin, selectedRef.current, dx, dy)
       setItems(
         snapping
@@ -565,6 +681,20 @@ export default function WallView() {
       setMenu({ x: press.clientX, y: press.clientY, itemId: press.itemId, at: press.at })
       return
     }
+
+    const hover = railHoverRef.current
+    railHoverRef.current = { overRail: false, columnId: null }
+    setDropColumnId(null)
+
+    // The rail is beside the canvas, not part of it. An item released over it
+    // goes back where it came from, otherwise it ends up parked off-screen
+    // behind the panel, which reads as having lost it.
+    if (drag?.mode === 'move' && hover.overRail) {
+      setItems(drag.origin, { record: false })
+      if (hover.columnId) void handOffToColumn(hover.columnId)
+      return
+    }
+
     // One undo step for the whole gesture, recorded now that it is finished.
     if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate')) {
       historyRef.current = pushHistory(historyRef.current, docRef.current.items)
@@ -708,7 +838,11 @@ export default function WallView() {
   const { camera } = doc
   // Anything already on the wall is left out: placing a second copy of the same
   // card is possible but never what the picker is for.
-  const placed = new Set(doc.items.filter(i => i.kind === 'card' || i.kind === 'doc').map(i => i.ref))
+  const placed = new Set(
+    doc.items
+      .filter(i => (i.kind === 'card' || i.kind === 'doc') && i.ref)
+      .map(i => i.ref as string)
+  )
   const pickerRows = picker === 'card'
     ? cards.filter(c => !placed.has(c.id)).map(c => ({ ref: c.id, label: c.title }))
     : picker === 'doc'
@@ -784,6 +918,15 @@ export default function WallView() {
         borderBottom: '1px solid var(--color-surface-offset)',
         flexShrink: 0, position: 'relative'
       }}>
+        {tool(
+          railOpen ? 'Hide the board' : 'Show the board beside the wall',
+          <PanelLeft size={14} />,
+          toggleRail,
+          { active: railOpen }
+        )}
+
+        <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
+
         {/* Which wall */}
         <div style={{ position: 'relative' }}>
           <button
@@ -1052,282 +1195,336 @@ export default function WallView() {
         />
       </div>
 
-      {/* Canvas */}
-      <div
-        ref={viewportRef}
-        onWheel={onWheel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        // Suppressed entirely: the menu is opened from the pointer release,
-        // which is the only place a click can be told apart from a pan.
-        onContextMenu={e => e.preventDefault()}
-        // Hit-tested by coordinate, not by event.target: the pointer capture
-        // taken during a drag retargets the following dblclick to this element,
-        // so the target reports the viewport whatever was actually clicked.
-        onDoubleClick={e => {
-          // Double-clicking a word inside a note being edited selects the word.
-          if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
-          const at = toWallPoint(screenPoint(e), docRef.current.camera)
-          const hit = itemAtPoint(docRef.current.items, at)
-          if (!hit) { addItem('note', {}, at); return }
-          if (hit.locked) return
-          if (hit.kind === 'card') openCard(hit)
-          else if (hit.kind === 'doc') {
-            // Hands the title to the Notes view, which opens it on arrival.
-            if (hit.ref) {
-              setPendingNoteTitle(hit.ref)
-              setView('notes')
-            }
-          }
-          else if (hit.kind !== 'image') setEditingId(hit.id)
-        }}
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => {
-          e.preventDefault()
-          void placeImageFiles(Array.from(e.dataTransfer.files ?? []), toWallPoint(screenPoint(e), docRef.current.camera))
-        }}
-        style={{
-          flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
-          background: 'var(--color-background)',
-          backgroundImage: 'radial-gradient(circle, var(--color-surface-offset) 1px, transparent 1px)',
-          backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
-          backgroundPosition: `${camera.x}px ${camera.y}px`
-        }}
-      >
-        {loading && (
-          <div style={{
-            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)'
-          }}>
-            Opening the wall…
-          </div>
-        )}
+      {/* The rail sits beside the canvas rather than over it: dragging a card
+          from one to the other should be a straight line, not a hover. */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {railOpen && (
+          <>
+            <WallBoardRail
+              width={railWidth}
+              tab={railTab}
+              onTabChange={setRailTab}
+              groups={filterGroups(groupCardsByColumn(cards, columns), railQuery)}
+              notes={notes}
+              placed={placed}
+              query={railQuery}
+              onQueryChange={setRailQuery}
+              dropColumnId={dropColumnId}
+              onClose={toggleRail}
+            />
 
-        {!loading && doc.items.length === 0 && (
-          <div style={{
-            position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
-            pointerEvents: 'none', textAlign: 'center', padding: 'var(--space-6)'
-          }}>
-            <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>An empty wall</span>
-            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)', maxWidth: '440px', lineHeight: 1.6 }}>
-              Double-click anywhere for a sticky note, drop images straight on, or place cards
-              from the board. Nothing snaps and nothing sorts, put things where you want them.
-            </span>
-          </div>
-        )}
-
-        <div style={{
-          position: 'absolute', top: 0, left: 0,
-          transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-          transformOrigin: '0 0'
-        }}>
-          {inPaintOrder(doc.items).map(item => {
-            const isSelected = selectedIds.has(item.id)
-            return (
-              <div
-                key={item.id}
-                data-wall-item={item.id}
-                style={{
-                  position: 'absolute',
-                  left: `${item.x}px`, top: `${item.y}px`,
-                  width: `${item.width}px`, height: `${item.height}px`,
-                  transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
-                  cursor: item.locked ? 'default' : 'grab',
-                  outline: isSelected ? '2px solid var(--color-secondary)' : 'none',
-                  outlineOffset: '2px'
-                }}
-              >
-                <WallItemView
-                  item={item}
-                  card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
-                  note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
-                  selected={isSelected}
-                  editing={editingId === item.id}
-                  onTextChange={text => setItems(patchItems(docRef.current.items, new Set([item.id]), { text }), { record: false })}
-                  onFinishEditing={() => { setEditingId(null); setItems(docRef.current.items) }}
-                />
-
-                {item.locked && isSelected && (
-                  <div style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>
-                    <Lock size={12} />
-                  </div>
-                )}
-
-                {/* Handles only for a single unlocked selection: dragging one
-                    corner of five items has no obvious meaning. */}
-                {isSelected && single?.id === item.id && !item.locked && (
-                  <>
-                    <div
-                      data-wall-handle="se"
-                      style={{
-                        position: 'absolute', right: '-6px', bottom: '-6px', width: '12px', height: '12px',
-                        background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
-                        borderRadius: '2px', cursor: 'nwse-resize'
-                      }}
-                    />
-                    <div
-                      data-wall-handle="rotate"
-                      title="Drag to rotate, hold Shift for 15° steps"
-                      style={{
-                        position: 'absolute', left: '50%', top: '-26px', transform: 'translateX(-50%)',
-                        width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'var(--color-surface-1)', border: '1px solid var(--color-secondary)',
-                        borderRadius: '50%', cursor: 'grab', color: 'var(--color-secondary)'
-                      }}
-                    >
-                      <RotateCw size={9} />
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Marquee, drawn in screen space so it does not scale with the camera. */}
-        {marquee && (
-          <div style={{
-            position: 'absolute',
-            left: `${marquee.x}px`, top: `${marquee.y}px`,
-            width: `${marquee.width}px`, height: `${marquee.height}px`,
-            border: '1px solid var(--color-secondary)',
-            background: 'var(--color-secondary-muted)',
-            pointerEvents: 'none'
-          }} />
-        )}
-
-        {/* Controls for the current selection, floated above it. */}
-        {floatingPos && selectedItems.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            left: `${floatingPos.left}px`, top: `${floatingPos.top}px`,
-            transform: 'translateX(-50%)',
-            display: 'flex', alignItems: 'center', gap: '2px',
-            padding: '3px',
-            background: 'var(--color-surface-elevated)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-md)',
-            boxShadow: 'var(--shadow-lg)',
-            zIndex: 15
-          }}>
-            {WALL_COLORS.slice(0, 6).map(c => (
-              <button
-                key={c}
-                onClick={() => setItems(patchItems(doc.items, selectedIds, { color: c }))}
-                aria-label={`Colour ${c}`}
-                style={{
-                  width: '16px', height: '16px', borderRadius: '3px', background: c,
-                  border: single?.color === c ? '2px solid var(--color-text-base)' : '1px solid rgba(0,0,0,0.25)',
-                  cursor: 'pointer', padding: 0
-                }}
-              />
-            ))}
-            <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
-            {tool('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
-            {tool('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
-            {tool('Duplicate', <Copy size={13} />, duplicateSelected)}
-            {tool(single?.locked ? 'Unlock' : 'Lock', single?.locked ? <Unlock size={13} /> : <Lock size={13} />, toggleLock)}
-            {tool('Delete', <Trash2 size={13} />, removeSelected)}
-          </div>
-        )}
-
-        {picker && (
-          <div onPointerDown={() => setPicker(null)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
-        )}
-
-        {/* A minimap only earns its space once there is something to lose track
-            of, so it appears with the fourth item rather than sitting empty. */}
-        {doc.items.length > 3 && (() => {
-          const b = wallBounds(doc.items)
-          const rect = viewportRef.current?.getBoundingClientRect()
-          if (!b || !rect) return null
-
-          const W = 150
-          const H = 110
-          const pad = 8
-          const contentW = Math.max(1, b.maxX - b.minX)
-          const contentH = Math.max(1, b.maxY - b.minY)
-          const k = Math.min((W - pad * 2) / contentW, (H - pad * 2) / contentH)
-          const ox = pad - b.minX * k
-          const oy = pad - b.minY * k
-
-          // The camera's own window onto the wall, drawn in the same space.
-          const viewX = (-camera.x / camera.zoom) * k + ox
-          const viewY = (-camera.y / camera.zoom) * k + oy
-          const viewW = (rect.width / camera.zoom) * k
-          const viewH = (rect.height / camera.zoom) * k
-
-          return (
             <div
               onPointerDown={e => {
-                e.stopPropagation()
-                // Click the map, go there: the wall point under the click
-                // becomes the centre of the view.
-                const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                const wx = (e.clientX - box.left - ox) / k
-                const wy = (e.clientY - box.top - oy) / k
-                setCamera({
-                  ...docRef.current.camera,
-                  x: rect.width / 2 - wx * docRef.current.camera.zoom,
-                  y: rect.height / 2 - wy * docRef.current.camera.zoom
-                })
+                ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+                railResizeRef.current = { startX: e.clientX, startWidth: railWidth }
               }}
-              title="Click to jump"
+              onPointerMove={e => {
+                const resize = railResizeRef.current
+                if (resize) setRailWidth(clampRail(resize.startWidth + (e.clientX - resize.startX)))
+              }}
+              onPointerUp={e => {
+                if (!railResizeRef.current) return
+                railResizeRef.current = null
+                try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
+                void setNumberSetting(RAIL_WIDTH_KEY, railWidth)
+              }}
+              role="separator"
+              aria-label="Resize the board panel"
               style={{
-                position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
-                width: `${W}px`, height: `${H}px`, zIndex: 20, cursor: 'pointer',
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-md)',
-                overflow: 'hidden'
+                width: '5px', flexShrink: 0, cursor: 'col-resize',
+                background: 'var(--color-surface-offset)'
               }}
-            >
-              {doc.items.map(i => (
+            />
+          </>
+        )}
+
+        {/* Canvas */}
+        <div
+          ref={viewportRef}
+          onWheel={onWheel}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          // Suppressed entirely: the menu is opened from the pointer release,
+          // which is the only place a click can be told apart from a pan.
+          onContextMenu={e => e.preventDefault()}
+          // Hit-tested by coordinate, not by event.target: the pointer capture
+          // taken during a drag retargets the following dblclick to this element,
+          // so the target reports the viewport whatever was actually clicked.
+          onDoubleClick={e => {
+            // Double-clicking a word inside a note being edited selects the word.
+            if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
+            const at = toWallPoint(screenPoint(e), docRef.current.camera)
+            const hit = itemAtPoint(docRef.current.items, at)
+            if (!hit) { addItem('note', {}, at); return }
+            if (hit.locked) return
+            if (hit.kind === 'card') openCard(hit)
+            else if (hit.kind === 'doc') {
+              // Hands the title to the Notes view, which opens it on arrival.
+              if (hit.ref) {
+                setPendingNoteTitle(hit.ref)
+                setView('notes')
+              }
+            }
+            else if (hit.kind !== 'image') setEditingId(hit.id)
+          }}
+          onDragOver={e => {
+            e.preventDefault()
+            // Copy, not move: the card stays on the board. What lands here is a
+            // reference to it.
+            if (e.dataTransfer.types.includes(WALL_DRAG_MIME)) e.dataTransfer.dropEffect = 'copy'
+          }}
+          onDrop={e => {
+            e.preventDefault()
+            const at = toWallPoint(screenPoint(e), docRef.current.camera)
+            const dragged = decodeWallDrag(e.dataTransfer.getData(WALL_DRAG_MIME))
+            // Dropped where the cursor was, which is the entire point of dragging
+            // it rather than picking it from a list.
+            if (dragged) { addItem(dragged.kind, { ref: dragged.ref }, at); return }
+            void placeImageFiles(Array.from(e.dataTransfer.files ?? []), at)
+          }}
+          style={{
+            flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
+            background: 'var(--color-background)',
+            backgroundImage: 'radial-gradient(circle, var(--color-surface-offset) 1px, transparent 1px)',
+            backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
+            backgroundPosition: `${camera.x}px ${camera.y}px`
+          }}
+        >
+          {loading && (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)'
+            }}>
+              Opening the wall…
+            </div>
+          )}
+
+          {!loading && doc.items.length === 0 && (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
+              pointerEvents: 'none', textAlign: 'center', padding: 'var(--space-6)'
+            }}>
+              <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>An empty wall</span>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)', maxWidth: '440px', lineHeight: 1.6 }}>
+                Double-click anywhere for a sticky note, drop images straight on, or place cards
+                from the board. Nothing snaps and nothing sorts, put things where you want them.
+              </span>
+            </div>
+          )}
+
+          <div style={{
+            position: 'absolute', top: 0, left: 0,
+            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+            transformOrigin: '0 0'
+          }}>
+            {inPaintOrder(doc.items).map(item => {
+              const isSelected = selectedIds.has(item.id)
+              return (
                 <div
-                  key={i.id}
+                  key={item.id}
+                  data-wall-item={item.id}
                   style={{
                     position: 'absolute',
-                    left: `${i.x * k + ox}px`, top: `${i.y * k + oy}px`,
-                    width: `${Math.max(2, i.width * k)}px`, height: `${Math.max(2, i.height * k)}px`,
-                    background: i.color || 'var(--color-surface-offset)',
-                    borderRadius: '1px',
-                    opacity: selectedIds.has(i.id) ? 1 : 0.7
+                    left: `${item.x}px`, top: `${item.y}px`,
+                    width: `${item.width}px`, height: `${item.height}px`,
+                    transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
+                    cursor: item.locked ? 'default' : 'grab',
+                    outline: isSelected ? '2px solid var(--color-secondary)' : 'none',
+                    outlineOffset: '2px'
+                  }}
+                >
+                  <WallItemView
+                    item={item}
+                    card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
+                    note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
+                    selected={isSelected}
+                    editing={editingId === item.id}
+                    onTextChange={text => setItems(patchItems(docRef.current.items, new Set([item.id]), { text }), { record: false })}
+                    onFinishEditing={() => { setEditingId(null); setItems(docRef.current.items) }}
+                  />
+
+                  {item.locked && isSelected && (
+                    <div style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>
+                      <Lock size={12} />
+                    </div>
+                  )}
+
+                  {/* Handles only for a single unlocked selection: dragging one
+                      corner of five items has no obvious meaning. */}
+                  {isSelected && single?.id === item.id && !item.locked && (
+                    <>
+                      <div
+                        data-wall-handle="se"
+                        style={{
+                          position: 'absolute', right: '-6px', bottom: '-6px', width: '12px', height: '12px',
+                          background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
+                          borderRadius: '2px', cursor: 'nwse-resize'
+                        }}
+                      />
+                      <div
+                        data-wall-handle="rotate"
+                        title="Drag to rotate, hold Shift for 15° steps"
+                        style={{
+                          position: 'absolute', left: '50%', top: '-26px', transform: 'translateX(-50%)',
+                          width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'var(--color-surface-1)', border: '1px solid var(--color-secondary)',
+                          borderRadius: '50%', cursor: 'grab', color: 'var(--color-secondary)'
+                        }}
+                      >
+                        <RotateCw size={9} />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Marquee, drawn in screen space so it does not scale with the camera. */}
+          {marquee && (
+            <div style={{
+              position: 'absolute',
+              left: `${marquee.x}px`, top: `${marquee.y}px`,
+              width: `${marquee.width}px`, height: `${marquee.height}px`,
+              border: '1px solid var(--color-secondary)',
+              background: 'var(--color-secondary-muted)',
+              pointerEvents: 'none'
+            }} />
+          )}
+
+          {/* Controls for the current selection, floated above it. */}
+          {floatingPos && selectedItems.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              left: `${floatingPos.left}px`, top: `${floatingPos.top}px`,
+              transform: 'translateX(-50%)',
+              display: 'flex', alignItems: 'center', gap: '2px',
+              padding: '3px',
+              background: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-lg)',
+              zIndex: 15
+            }}>
+              {WALL_COLORS.slice(0, 6).map(c => (
+                <button
+                  key={c}
+                  onClick={() => setItems(patchItems(doc.items, selectedIds, { color: c }))}
+                  aria-label={`Colour ${c}`}
+                  style={{
+                    width: '16px', height: '16px', borderRadius: '3px', background: c,
+                    border: single?.color === c ? '2px solid var(--color-text-base)' : '1px solid rgba(0,0,0,0.25)',
+                    cursor: 'pointer', padding: 0
                   }}
                 />
               ))}
-              <div style={{
-                position: 'absolute',
-                left: `${viewX}px`, top: `${viewY}px`,
-                width: `${viewW}px`, height: `${viewH}px`,
-                border: '1px solid var(--color-secondary)',
-                background: 'var(--color-secondary-muted)',
-                pointerEvents: 'none'
-              }} />
+              <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
+              {tool('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
+              {tool('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
+              {tool('Duplicate', <Copy size={13} />, duplicateSelected)}
+              {tool(single?.locked ? 'Unlock' : 'Lock', single?.locked ? <Unlock size={13} /> : <Lock size={13} />, toggleLock)}
+              {tool('Delete', <Trash2 size={13} />, removeSelected)}
             </div>
-          )
-        })()}
+          )}
 
-        {busy && (
-          <div
-            aria-live="polite"
-            style={{
-              position: 'absolute', bottom: 'var(--space-4)', left: '50%', transform: 'translateX(-50%)',
-              padding: 'var(--space-2) var(--space-4)',
-              background: 'var(--color-surface-elevated)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-full, 999px)',
-              boxShadow: 'var(--shadow-lg)',
-              fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)',
-              zIndex: 30
-            }}
-          >
-            {busy}…
-          </div>
-        )}
+          {picker && (
+            <div onPointerDown={() => setPicker(null)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
+          )}
+
+          {/* A minimap only earns its space once there is something to lose track
+              of, so it appears with the fourth item rather than sitting empty. */}
+          {doc.items.length > 3 && (() => {
+            const b = wallBounds(doc.items)
+            const rect = viewportRef.current?.getBoundingClientRect()
+            if (!b || !rect) return null
+
+            const W = 150
+            const H = 110
+            const pad = 8
+            const contentW = Math.max(1, b.maxX - b.minX)
+            const contentH = Math.max(1, b.maxY - b.minY)
+            const k = Math.min((W - pad * 2) / contentW, (H - pad * 2) / contentH)
+            const ox = pad - b.minX * k
+            const oy = pad - b.minY * k
+
+            // The camera's own window onto the wall, drawn in the same space.
+            const viewX = (-camera.x / camera.zoom) * k + ox
+            const viewY = (-camera.y / camera.zoom) * k + oy
+            const viewW = (rect.width / camera.zoom) * k
+            const viewH = (rect.height / camera.zoom) * k
+
+            return (
+              <div
+                onPointerDown={e => {
+                  e.stopPropagation()
+                  // Click the map, go there: the wall point under the click
+                  // becomes the centre of the view.
+                  const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                  const wx = (e.clientX - box.left - ox) / k
+                  const wy = (e.clientY - box.top - oy) / k
+                  setCamera({
+                    ...docRef.current.camera,
+                    x: rect.width / 2 - wx * docRef.current.camera.zoom,
+                    y: rect.height / 2 - wy * docRef.current.camera.zoom
+                  })
+                }}
+                title="Click to jump"
+                style={{
+                  position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
+                  width: `${W}px`, height: `${H}px`, zIndex: 20, cursor: 'pointer',
+                  background: 'var(--color-surface-1)',
+                  border: '1px solid var(--color-surface-offset)',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: 'var(--shadow-md)',
+                  overflow: 'hidden'
+                }}
+              >
+                {doc.items.map(i => (
+                  <div
+                    key={i.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${i.x * k + ox}px`, top: `${i.y * k + oy}px`,
+                      width: `${Math.max(2, i.width * k)}px`, height: `${Math.max(2, i.height * k)}px`,
+                      background: i.color || 'var(--color-surface-offset)',
+                      borderRadius: '1px',
+                      opacity: selectedIds.has(i.id) ? 1 : 0.7
+                    }}
+                  />
+                ))}
+                <div style={{
+                  position: 'absolute',
+                  left: `${viewX}px`, top: `${viewY}px`,
+                  width: `${viewW}px`, height: `${viewH}px`,
+                  border: '1px solid var(--color-secondary)',
+                  background: 'var(--color-secondary-muted)',
+                  pointerEvents: 'none'
+                }} />
+              </div>
+            )
+          })()}
+
+          {busy && (
+            <div
+              aria-live="polite"
+              style={{
+                position: 'absolute', bottom: 'var(--space-4)', left: '50%', transform: 'translateX(-50%)',
+                padding: 'var(--space-2) var(--space-4)',
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-full, 999px)',
+                boxShadow: 'var(--shadow-lg)',
+                fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)',
+                zIndex: 30
+              }}
+            >
+              {busy}…
+            </div>
+          )}
+        </div>
       </div>
 
       {menu && (
