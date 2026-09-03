@@ -50,6 +50,16 @@ describe('isMachineLocalSettingKey', () => {
     expect(isMachineLocalSettingKey('overlay_position')).toBe(true)
   })
 
+  it('does not mistake a user-named context for a port or a path', () => {
+    // Contexts are named by the user and interpolated into the key, so a project
+    // called "port" produces kanban_board_port. Board config has to keep syncing.
+    expect(isMachineLocalSettingKey('kanban_board_port')).toBe(false)
+    expect(isMachineLocalSettingKey('kanban_bg_path')).toBe(false)
+    expect(isMachineLocalSettingKey('kanban_columns_position')).toBe(false)
+    expect(isMachineLocalSettingKey('kanban_swimlanes_bounds')).toBe(false)
+    expect(isMachineLocalSettingKey('backlog_columns_layout_port')).toBe(false)
+  })
+
   it('leaves genuine preferences alone', () => {
     expect(isMachineLocalSettingKey('app_theme')).toBe(false)
     expect(isMachineLocalSettingKey('appearance_compact')).toBe(false)
@@ -72,6 +82,11 @@ describe('isSyncableSettingKey', () => {
     ]) {
       expect(isSyncableSettingKey(key)).toBe(true)
     }
+  })
+
+  it('carries board configuration for a context with an awkward name', () => {
+    expect(isSyncableSettingKey('kanban_board_port')).toBe(true)
+    expect(isSyncableSettingKey('kanban_board_my-game')).toBe(true)
   })
 
   it('refuses both kinds of held-back key', () => {
