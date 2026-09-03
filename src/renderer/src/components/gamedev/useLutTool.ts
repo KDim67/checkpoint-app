@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
 import { buildLutData } from '../../lib/imageProcessing'
+import { errorMessage } from '../../../../shared/errors'
 
 /**
  * LUT Color Grader.
@@ -152,9 +153,9 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
       } else {
         throw new Error(res.error || 'Failed to save')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast('Export LUT Error: ' + (err.message || String(err)), { type: 'error' })
+      toast('Export LUT Error: ' + (errorMessage(err)), { type: 'error' })
     } finally {
       setIsLutSaving(false)
     }

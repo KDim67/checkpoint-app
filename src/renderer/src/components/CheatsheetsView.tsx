@@ -3,6 +3,7 @@ import { Plus, Search, FileText, Trash2, Edit3, UploadCloud, X, BookOpen, Extern
 import { useToast } from './ui/Toast'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { useAppStore } from '../store/appStore'
+import { errorMessage } from '../../../shared/errors'
 
 interface CheatsheetFile {
   name: string
@@ -232,9 +233,9 @@ export default function CheatsheetsView() {
       const newName = await window.electronAPI.cheatsheets.add(srcPath)
       toast(`Successfully added cheatsheet: ${newName}`, { type: 'success' })
       await loadCheatsheets()
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to add cheatsheet:', err)
-      toast(err.message || 'Failed to add cheatsheet file', { type: 'error' })
+      toast(errorMessage(err, 'Failed to add cheatsheet file'), { type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -286,8 +287,8 @@ export default function CheatsheetsView() {
           await window.electronAPI.cheatsheets.add(filePath)
           addedCount++
         }
-      } catch (err: any) {
-        lastError = err.message || 'Error uploading'
+      } catch (err) {
+        lastError = errorMessage(err, 'Error uploading')
       }
     }
 
@@ -337,9 +338,9 @@ export default function CheatsheetsView() {
 
       setRenamePdf(null)
       await loadCheatsheets()
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to rename cheatsheet:', err)
-      toast(err.message || 'Failed to rename cheatsheet', { type: 'error' })
+      toast(errorMessage(err, 'Failed to rename cheatsheet'), { type: 'error' })
     }
   }
 
@@ -368,9 +369,9 @@ export default function CheatsheetsView() {
 
       setDeletePdf(null)
       await loadCheatsheets()
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to delete cheatsheet:', err)
-      toast(err.message || 'Failed to delete cheatsheet', { type: 'error' })
+      toast(errorMessage(err, 'Failed to delete cheatsheet'), { type: 'error' })
     }
   }
 

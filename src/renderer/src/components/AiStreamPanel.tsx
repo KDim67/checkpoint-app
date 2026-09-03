@@ -48,6 +48,7 @@ import SettingsPanel from './ai/SettingsPanel'
 import CookbookModal from './ai/CookbookModal'
 import RevertConfirmModal from './ai/RevertConfirmModal'
 import CustomModelPromptModal from './ai/CustomModelPromptModal'
+import { errorMessage } from '../../../shared/errors'
 
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
@@ -1075,9 +1076,8 @@ export default function AiStreamPanel() {
       }
       await window.electronAPI.ai.startStream(params, ASSISTANT_STREAM_ID)
     } catch (err) {
-      const error = err as Error
       setIsStreaming(false)
-      setMessages(prev => [...prev, { role: 'assistant', content: `**Failed to initiate stream:** ${error.message || String(err)}` }])
+      setMessages(prev => [...prev, { role: 'assistant', content: `**Failed to initiate stream:** ${errorMessage(err)}` }])
     }
   }
 

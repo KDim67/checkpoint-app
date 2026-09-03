@@ -5,6 +5,7 @@ import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
 import { loadProviders, isLocalUrl } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
+import { errorMessage } from '../../../shared/errors'
 
 // Zero-dependency SVG Icons
 const SparklesIcon = () => (
@@ -368,8 +369,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
       }, STANDUP_STREAM_ID)
     } catch (err) {
       setIsStreaming(false)
-      const error = err as Error
-      setStreamingText(`**Failed to initiate stream:** ${error.message || String(err)}`)
+      setStreamingText(`**Failed to initiate stream:** ${errorMessage(err)}`)
     }
   }
 

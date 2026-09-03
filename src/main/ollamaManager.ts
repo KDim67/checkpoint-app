@@ -3,6 +3,7 @@ import { getAiConfig } from './aiService'
 import { BrowserWindow } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { OllamaStatus, PullProgressEvent } from '../shared/cookbookTypes'
+import { errorMessage } from '../shared/errors'
 
 let activeAbortController: AbortController | null = null
 let lastOfflineLogged = false
@@ -141,7 +142,7 @@ export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Pr
   } catch (err) {
     const errorObj = err as Error
     const isAbort = errorObj.name === 'AbortError' || errorObj.message?.toLowerCase().includes('aborted')
-    const message = isAbort ? 'Installation cancelled by user.' : errorObj.message || String(err)
+    const message = isAbort ? 'Installation cancelled by user.' : errorMessage(err)
 
     if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IpcChannels.OLLAMA_PULL_ERROR, { modelTag, message })

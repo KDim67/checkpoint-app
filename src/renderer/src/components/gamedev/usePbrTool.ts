@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { useToast } from '../ui/Toast'
 import { useAppStore } from '../../store/appStore'
 import { computePbrMaps } from '../../lib/imageProcessing'
+import { errorMessage } from '../../../../shared/errors'
 
 /**
  * PBR Map Generator: albedo intake, height/normal/roughness/AO derivation, the
@@ -204,9 +205,9 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
       } else {
         throw new Error(res.error || 'Failed to save maps')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast('Export Error: ' + (err.message || String(err)), { type: 'error' })
+      toast('Export Error: ' + (errorMessage(err)), { type: 'error' })
     } finally {
       setIsSaving(false)
     }

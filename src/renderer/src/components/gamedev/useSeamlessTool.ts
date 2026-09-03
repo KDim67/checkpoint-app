@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
 import { useAppStore } from '../../store/appStore'
+import { errorMessage } from '../../../../shared/errors'
 
 /**
  * Seamless Texture Generator: stitching, the tiling preview, and export.
@@ -45,7 +46,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
         setSeamlessUrl(res.dataUrl)
         setSeamlessExportedFile(null)
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
       toast('Failed to load preloaded seamless texture', { type: 'error' })
     } finally {
@@ -464,9 +465,9 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
       } else {
         throw new Error(res.error || 'Failed to save seamless texture')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast('Export Error: ' + (err.message || String(err)), { type: 'error' })
+      toast('Export Error: ' + (errorMessage(err)), { type: 'error' })
     } finally {
       setIsSeamlessSaving(false)
     }

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
 import { BinaryTreePacker } from '../../lib/imageProcessing'
+import { errorMessage } from '../../../../shared/errors'
 
 /**
  * Atlas Forge: folder selection, bin packing, and PNG/JSON export.
@@ -292,9 +293,9 @@ export function useAtlasTool() {
       } else {
         throw new Error(res.error || 'Failed to export')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast('Export Error: ' + (err.message || String(err)), { type: 'error' })
+      toast('Export Error: ' + (errorMessage(err)), { type: 'error' })
     } finally {
       setIsAtlasSaving(false)
     }

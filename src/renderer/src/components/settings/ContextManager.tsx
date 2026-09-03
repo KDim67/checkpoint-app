@@ -7,6 +7,7 @@ import { useToast } from '../ui/Toast'
 import ModalShell from '../ui/ModalShell'
 import { applyImportedBoard, createWorkspace, slugifyWorkspace, type WorkspaceEntry } from '../../lib/createWorkspace'
 import type { ImportedBoard } from '../../../../shared/foreignImport'
+import { errorMessage } from '../../../../shared/errors'
 import {
   PROJECT_TEMPLATES,
   DEFAULT_TEMPLATE_ID,
@@ -62,8 +63,8 @@ export default function ContextManager() {
       } else if (res.error) {
         toast(`Export failed: ${res.error}`)
       }
-    } catch (err: any) {
-      toast(`Export failed: ${err.message || String(err)}`)
+    } catch (err) {
+      toast(`Export failed: ${errorMessage(err)}`)
     }
   }
 
@@ -87,8 +88,8 @@ export default function ContextManager() {
       } else if (res.error) {
         toast(`Import failed: ${res.error}`)
       }
-    } catch (err: any) {
-      toast(`Import failed: ${err.message || String(err)}`)
+    } catch (err) {
+      toast(`Import failed: ${errorMessage(err)}`)
     }
   }
 
@@ -116,8 +117,8 @@ export default function ContextManager() {
       setContext(slug)
       setImportBoard(null)
       toast(summary, { duration: 8000 })
-    } catch (err: any) {
-      toast(`Import failed: ${err.message || String(err)}`)
+    } catch (err) {
+      toast(`Import failed: ${errorMessage(err)}`)
     } finally {
       setImporting(false)
     }
@@ -147,8 +148,8 @@ export default function ContextManager() {
       } else {
         toast(`Import failed: ${res.error}`)
       }
-    } catch (err: any) {
-      toast(`Import failed: ${err.message || String(err)}`)
+    } catch (err) {
+      toast(`Import failed: ${errorMessage(err)}`)
     }
   }
 
@@ -255,8 +256,8 @@ export default function ContextManager() {
       await persist(updated)
       setEditingSlug(null)
       toast('Workspace updated successfully!')
-    } catch (err: any) {
-      toast(`Failed to save: ${err.message || String(err)}`)
+    } catch (err) {
+      toast(`Failed to save: ${errorMessage(err)}`)
     }
   }
 

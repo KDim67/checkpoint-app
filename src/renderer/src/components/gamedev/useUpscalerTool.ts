@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
 import { scale2xData, scale3xData } from '../../lib/imageProcessing'
+import { errorMessage } from '../../../../shared/errors'
 
 /**
  * Pixel Art Upscaler: source selection, nearest/EPX scaling, and export.
@@ -164,9 +165,9 @@ export function useUpscalerTool(isActive: boolean) {
       } else {
         throw new Error(res.error || 'Failed to save')
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast('Export Upscaled Error: ' + (err.message || String(err)), { type: 'error' })
+      toast('Export Upscaled Error: ' + (errorMessage(err)), { type: 'error' })
     } finally {
       setIsUpscaleSaving(false)
     }
