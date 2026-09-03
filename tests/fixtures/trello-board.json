@@ -1,0 +1,140 @@
+{
+  "id": "5f2b1c9d8e7a6b5c4d3e2f10",
+  "name": "Roguelike Prototype",
+  "desc": "Sample Trello export for testing Checkpoint's importer.",
+  "closed": false,
+  "labels": [
+    { "id": "lb1", "name": "code", "color": "blue" },
+    { "id": "lb2", "name": "art", "color": "purple" },
+    { "id": "lb3", "name": "bug", "color": "red" },
+    { "id": "lb4", "name": "design", "color": "green" }
+  ],
+  "lists": [
+    { "id": "list_done", "name": "Done", "closed": false, "pos": 393216 },
+    { "id": "list_todo", "name": "To Do", "closed": false, "pos": 65536 },
+    { "id": "list_doing", "name": "In Progress", "closed": false, "pos": 131072 },
+    { "id": "list_review", "name": "Playtesting", "closed": false, "pos": 262144 },
+    { "id": "list_old", "name": "Old Ideas (archived)", "closed": true, "pos": 500000 }
+  ],
+  "cards": [
+    {
+      "id": "card_1",
+      "name": "Procedural dungeon generator",
+      "desc": "Rooms and corridors via BSP. Seedable so a run can be replayed.",
+      "idList": "list_doing",
+      "closed": false,
+      "pos": 65536,
+      "due": "2026-10-15T17:00:00.000Z",
+      "dueComplete": false,
+      "labels": [{ "id": "lb1", "name": "code", "color": "blue" }]
+    },
+    {
+      "id": "card_2",
+      "name": "Enemy AI: pathfinding",
+      "desc": "A* on the tile grid, with a cheap fallback when the path is long.",
+      "idList": "list_doing",
+      "closed": false,
+      "pos": 131072,
+      "due": null,
+      "labels": [{ "id": "lb1", "name": "code", "color": "blue" }]
+    },
+    {
+      "id": "card_3",
+      "name": "Player sprite sheet",
+      "desc": "Idle, walk, attack, hurt, death. 32x32.",
+      "idList": "list_todo",
+      "closed": false,
+      "pos": 65536,
+      "labels": [{ "id": "lb2", "name": "art", "color": "purple" }]
+    },
+    {
+      "id": "card_4",
+      "name": "Decide the death penalty",
+      "desc": "Full restart, or keep meta-currency? Affects the whole loop.",
+      "idList": "list_todo",
+      "closed": false,
+      "pos": 131072,
+      "labels": [{ "id": "lb4", "name": "design", "color": "green" }]
+    },
+    {
+      "id": "card_5",
+      "name": "Torches light through walls",
+      "desc": "Line of sight is not being checked before applying the light falloff.",
+      "idList": "list_todo",
+      "closed": false,
+      "pos": 196608,
+      "due": "2026-09-30T12:00:00.000Z",
+      "labels": [
+        { "id": "lb3", "name": "bug", "color": "red" },
+        { "id": "lb1", "name": "code", "color": "blue" }
+      ]
+    },
+    {
+      "id": "card_6",
+      "name": "First playable build",
+      "desc": "One floor, one enemy type, a win and a lose state.",
+      "idList": "list_review",
+      "closed": false,
+      "pos": 65536,
+      "labels": []
+    },
+    {
+      "id": "card_7",
+      "name": "Core loop settled",
+      "desc": "Descend, fight, loot, repeat. Written down and agreed.",
+      "idList": "list_done",
+      "closed": false,
+      "pos": 65536,
+      "labels": [{ "id": "lb4", "name": "design", "color": "green" }]
+    },
+    {
+      "id": "card_8",
+      "name": "Project setup and repo",
+      "desc": "",
+      "idList": "list_done",
+      "closed": false,
+      "pos": 131072,
+      "labels": []
+    },
+    {
+      "id": "card_9",
+      "name": "Abandoned: multiplayer co-op",
+      "desc": "Out of scope for the jam.",
+      "idList": "list_todo",
+      "closed": true,
+      "pos": 262144,
+      "labels": [{ "id": "lb4", "name": "design", "color": "green" }]
+    },
+    {
+      "id": "card_10",
+      "name": "Isometric camera experiment",
+      "desc": "Came from a list that was archived.",
+      "idList": "list_old",
+      "closed": false,
+      "pos": 65536,
+      "labels": []
+    }
+  ],
+  "checklists": [
+    {
+      "id": "chk_1",
+      "idCard": "card_1",
+      "name": "Generator steps",
+      "checkItems": [
+        { "id": "ci1", "name": "BSP split", "state": "complete", "pos": 16384 },
+        { "id": "ci2", "name": "Carve corridors", "state": "complete", "pos": 32768 },
+        { "id": "ci3", "name": "Place stairs", "state": "incomplete", "pos": 49152 },
+        { "id": "ci4", "name": "Seed from a string", "state": "incomplete", "pos": 65536 }
+      ]
+    },
+    {
+      "id": "chk_2",
+      "idCard": "card_3",
+      "name": "Animations",
+      "checkItems": [
+        { "id": "ci5", "name": "Idle", "state": "complete", "pos": 16384 },
+        { "id": "ci6", "name": "Walk", "state": "incomplete", "pos": 32768 }
+      ]
+    }
+  ]
+}
