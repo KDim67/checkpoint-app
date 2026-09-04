@@ -64,6 +64,7 @@ const RAIL_MAX = 460
 // and a workspace called "rail_open" would own this one. These are preferences.
 const RAIL_OPEN_KEY = 'wallview_rail_open'
 const RAIL_WIDTH_KEY = 'wallview_rail_width'
+const SMOOTHING_KEY = 'wallview_pen_smoothing'
 
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
@@ -104,6 +105,8 @@ export default function WallView() {
   const [tool, setTool] = useState<'select' | 'pen' | 'arrow'>('select')
   const [penColor, setPenColor] = useState(WALL_COLORS[0])
   const [penWidth, setPenWidth] = useState(STROKE_WIDTHS[1])
+  /** On by default: a hand-drawn line is shaky and almost nobody wants that. */
+  const [smoothing, setSmoothing] = useState(true)
   /** The stroke being drawn, in wall coordinates. Null when not drawing. */
   const [drawing, setDrawing] = useState<{ x: number; y: number }[] | null>(null)
   /** The first item picked for an arrow, waiting for its second. */
@@ -233,11 +236,13 @@ export default function WallView() {
     let cancelled = false
     Promise.all([
       getBoolSetting(RAIL_OPEN_KEY, false),
-      getNumberSetting(RAIL_WIDTH_KEY, 260)
-    ]).then(([open, width]) => {
+      getNumberSetting(RAIL_WIDTH_KEY, 260),
+      getBoolSetting(SMOOTHING_KEY, true)
+    ]).then(([open, width, smooth]) => {
       if (cancelled) return
       setRailOpen(open)
       setRailWidth(clampRail(width))
+      setSmoothing(smooth)
     })
     return () => { cancelled = true }
   }, [])
@@ -783,7 +788,9 @@ export default function WallView() {
     }
 
     if (drag?.mode === 'draw') {
-      const ink = drawing && inkFromPath(drawing, docRef.current.items, { color: penColor, strokeWidth: penWidth })
+      const ink = drawing && inkFromPath(drawing, docRef.current.items, {
+        color: penColor, strokeWidth: penWidth, ...(smoothing ? { smooth: true } : {})
+      })
       setDrawing(null)
       if (ink) {
         setItems([...docRef.current.items, ink])
@@ -1852,6 +1859,28 @@ export default function WallView() {
                 }} />
               </button>
             ))}
+
+            <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
+
+            <button
+              onClick={() => {
+                const next = !smoothing
+                setSmoothing(next)
+                void setBoolSetting(SMOOTHING_KEY, next)
+              }}
+              title={smoothing ? 'Smoothing on' : 'Smoothing off'}
+              aria-label="Smooth strokes"
+              aria-pressed={smoothing}
+              style={{
+                width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: smoothing ? 'var(--color-secondary-muted)' : 'none',
+                color: smoothing ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                transition: 'background var(--duration-fast) var(--ease-default)'
+              }}
+            >
+              <Spline size={13} />
+            </button>
           </div>
         )}
 
