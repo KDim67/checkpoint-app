@@ -7,6 +7,8 @@ import {
   normalizeWallItem,
   pruneArrows,
   STROKE_WIDTHS,
+  SMOOTHING_LEVELS,
+  smoothPoints,
   boundsOf,
   itemsInRect,
   itemAtPoint,
@@ -203,7 +205,7 @@ describe('stroke smoothing', () => {
   })
 
   it('draws curves when it is on', () => {
-    const d = inkPath(item({ kind: 'ink', points: many(6), smooth: true }))
+    const d = inkPath(item({ kind: 'ink', points: many(6), smooth: 0.6 }))
     expect(d).toContain('Q')
   })
 
@@ -211,26 +213,71 @@ describe('stroke smoothing', () => {
     // Smoothing must not move where the stroke begins or ends, or a line drawn
     // to touch something would stop short of it.
     const points = many(8)
-    const smooth = inkPath(item({ kind: 'ink', points, smooth: true }))
+    const smooth = inkPath(item({ kind: 'ink', points, smooth: 0.6 }))
     const last = `${points[points.length - 2].toFixed(1)},${points[points.length - 1].toFixed(1)}`
     expect(smooth.startsWith(`M${points[0].toFixed(1)},${points[1].toFixed(1)}`)).toBe(true)
     expect(smooth.endsWith(`L${last}`)).toBe(true)
   })
 
   it('leaves a very short stroke straight, having nothing to smooth', () => {
-    const d = inkPath(item({ kind: 'ink', points: [0, 0, 5, 5, 10, 0], smooth: true }))
+    const d = inkPath(item({ kind: 'ink', points: [0, 0, 5, 5, 10, 0], smooth: 0.6 }))
     expect(d).not.toContain('Q')
   })
 
   it('is remembered per stroke, not read from a live setting', () => {
     // Otherwise switching the toggle would redraw every line already on the wall.
-    const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: true }
-    expect(normalizeWallItem(raw, 0)?.smooth).toBe(true)
-    expect(normalizeWallItem({ ...raw, smooth: false }, 0)?.smooth).toBeUndefined()
+    const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: 0.6 }
+    expect(normalizeWallItem(raw, 0)?.smooth).toBe(0.6)
+    expect(normalizeWallItem({ ...raw, smooth: 0 }, 0)?.smooth).toBeUndefined()
   })
 
   it('carries the flag from the pen that drew it', () => {
-    const ink = inkFromPath([{ x: 0, y: 0 }, { x: 5, y: 5 }], [], { smooth: true })!
-    expect(ink.smooth).toBe(true)
+    const ink = inkFromPath([{ x: 0, y: 0 }, { x: 5, y: 5 }], [], { smooth: 0.6 })!
+    expect(ink.smooth).toBe(0.6)
+  })
+})
+
+describe('smoothing intensity', () => {
+  const shaky = [0, 0, 10, 40, 20, 0, 30, 40, 40, 0, 50, 40]
+
+  it('leaves the raw samples alone at zero', () => {
+    expect(smoothPoints(shaky, 0)).toEqual(shaky)
+  })
+
+  it('pulls interior points further as it rises', () => {
+    // The second sample sits at y=40 between two neighbours at y=0, so both
+    // strengths pull it towards 0 and the stronger one gets closer.
+    const light = smoothPoints(shaky, 0.3)
+    const strong = smoothPoints(shaky, 0.9)
+    expect(light[3]).toBeLessThan(shaky[3])
+    expect(strong[3]).toBeLessThan(light[3])
+  })
+
+  it('never moves the first or last point, at any strength', () => {
+    // A line drawn to touch something has to keep touching it.
+    for (const strength of [0.3, 0.6, 0.9, 1]) {
+      const out = smoothPoints(shaky, strength)
+      expect(out.slice(0, 2)).toEqual(shaky.slice(0, 2))
+      expect(out.slice(-2)).toEqual(shaky.slice(-2))
+    }
+  })
+
+  it('returns the same count it was given', () => {
+    expect(smoothPoints(shaky, 0.6)).toHaveLength(shaky.length)
+  })
+
+  it('has nothing to do with too few points', () => {
+    expect(smoothPoints([0, 0, 5, 5], 0.9)).toEqual([0, 0, 5, 5])
+  })
+
+  it('reads a stroke saved by the first version, which stored true', () => {
+    const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: true }
+    expect(normalizeWallItem(raw, 0)?.smooth).toBe(SMOOTHING_LEVELS[1])
+  })
+
+  it('clamps a strength from outside the range rather than exaggerating it', () => {
+    const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1] }
+    expect(normalizeWallItem({ ...raw, smooth: 5 }, 0)?.smooth).toBe(1)
+    expect(normalizeWallItem({ ...raw, smooth: -2 }, 0)?.smooth).toBeUndefined()
   })
 })
