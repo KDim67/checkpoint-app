@@ -29,7 +29,8 @@ import {
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
   snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
-  arrowGeometry, arrowDash, arrowHeadPoints, distanceToPolyline, inkFromPath, pruneArrows,
+  arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset,
+  distanceToPolyline, inkFromPath, pruneArrows,
   STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES,
   type ArrowShape, type ArrowLine, type ArrowHeads,
   type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
@@ -113,12 +114,19 @@ const nameOf = (value: string): string => value.charAt(0).toUpperCase() + value.
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
 const CLICK_SLOP = 4
+/**
+ * How far a connector has to be dragged before it will be left pointing at
+ * empty canvas. Well past the click threshold, so a short slip does not leave
+ * a stub of an arrow behind.
+ */
+const LOOSE_END_SLOP = 24
 
 type Drag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
   | { mode: 'move'; startX: number; startY: number; origin: WallItem[]; moved: boolean }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
   | { mode: 'arrow'; fromId: string; startX: number; startY: number; moved: boolean; overId: string | null }
+  | { mode: 'arrowEnd'; id: string; end: 'start' | 'end' }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
   | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
   | { mode: 'draw' }
@@ -162,6 +170,8 @@ export default function WallView() {
    * before the pointer is let go.
    */
   const [arrowDrag, setArrowDrag] = useState<{ fromId: string; at: { x: number; y: number }; overId: string | null } | null>(null)
+  /** The item a dragged end is currently over, so it can light up. */
+  const [arrowEndHover, setArrowEndHover] = useState<string | null>(null)
   const [arrowShape, setArrowShape] = useState<ArrowShape>(ARROW_SHAPES[0])
   const [arrowLine, setArrowLine] = useState<ArrowLine>(ARROW_LINES[0])
   const [arrowHeads, setArrowHeads] = useState<ArrowHeads>(ARROW_HEAD_MODES[0])
@@ -628,8 +638,9 @@ export default function WallView() {
   const arrowAt = (at: { x: number; y: number }): WallItem | null => {
     const slack = 8 / docRef.current.camera.zoom
     for (const arrow of docRef.current.items.filter(i => i.kind === 'arrow')) {
-      const from = itemsById.get(arrow.from ?? '')
-      const to = itemsById.get(arrow.to ?? '')
+      const ends = arrowAnchors(arrow, itemsById)
+      if (!ends) continue
+      const { from, to } = ends
       if (!from || !to) continue
       // Against the same points the renderer draws, so a curve is clicked
       // where it looks rather than along the straight line under it.
@@ -669,6 +680,18 @@ export default function WallView() {
         moved: false
       }
       dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
+      return
+    }
+
+    // An end handle is grabbed before anything else on the canvas: it sits over
+    // the item it is attached to, and the item would otherwise win.
+    const endHandle = target.closest<HTMLElement>('[data-arrow-handle]')
+    if (endHandle && single?.kind === 'arrow' && e.button === 0) {
+      dragRef.current = {
+        mode: 'arrowEnd',
+        id: single.id,
+        end: endHandle.dataset.arrowHandle === 'start' ? 'start' : 'end'
+      }
       return
     }
 
@@ -757,6 +780,29 @@ export default function WallView() {
         if (travelled > CLICK_SLOP) press.moved = true
       }
       setCamera({ ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) })
+      return
+    }
+
+    if (drag.mode === 'arrowEnd') {
+      const at = toWallPoint(screenPoint(e), cam)
+      const arrow = docRef.current.items.find(i => i.id === drag.id)
+      if (!arrow) return
+
+      // Not onto the item at the other end, which would be a loop with nothing
+      // to draw, and not onto another arrow.
+      const other = drag.end === 'start' ? arrow.to : arrow.from
+      const hit = itemAtPoint(docRef.current.items, at)
+      const target = hit && hit.kind !== 'arrow' && hit.id !== other ? hit : null
+
+      // Left where it is dropped when that is nowhere: an arrow pointing at a
+      // spot on the wall is a thing people mean.
+      const patch = drag.end === 'start'
+        ? (target ? { from: target.id, fromPoint: undefined } : { from: undefined, fromPoint: at })
+        : (target ? { to: target.id, toPoint: undefined } : { to: undefined, toPoint: at })
+
+      setArrowEndHover(target?.id ?? null)
+      // Recorded once when the drag ends, not per frame.
+      setItems(patchItems(docRef.current.items, new Set([drag.id]), patch), { record: false })
       return
     }
 
@@ -850,6 +896,7 @@ export default function WallView() {
   }
 
   const endDrag = (e: React.PointerEvent) => {
+    setArrowEndHover(null)
     const drag = dragRef.current
     dragRef.current = null
     setMarquee(null)
@@ -877,9 +924,19 @@ export default function WallView() {
       }
 
       if (drag.moved) {
-        if (drag.overId) addItem('arrow', { from: drag.fromId, to: drag.overId, ...style })
+        if (drag.overId) {
+          addItem('arrow', { from: drag.fromId, to: drag.overId, ...style })
+        } else if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > LOOSE_END_SLOP) {
+          // Dropped on empty canvas, so the far end stays where it was let go.
+          // An arrow pointing at a spot rather than at a thing is a normal
+          // thing to want on a wall.
+          addItem('arrow', {
+            from: drag.fromId,
+            toPoint: toWallPoint(screenPoint(e), docRef.current.camera),
+            ...style
+          })
+        }
         setArrowFrom(null)
-        setArrowDrag(null)
         return
       }
 
@@ -922,7 +979,7 @@ export default function WallView() {
     // One undo step for the whole gesture, recorded now that it is finished.
     // A move that never passed the threshold changed nothing worth recording.
     if (drag?.mode === 'move' && !drag.moved) return
-    if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate')) {
+    if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'arrowEnd')) {
       historyRef.current = pushHistory(historyRef.current, docRef.current.items)
       setHistoryTick(t => t + 1)
     }
@@ -967,6 +1024,7 @@ export default function WallView() {
         setPicker(null)
         setTool('select')
         setArrowFrom(null)
+        setArrowDrag(null)
         setSelectedIds(new Set())
         setEditingId(null)
         setMenu(null)
@@ -1493,7 +1551,7 @@ export default function WallView() {
             {tool === 'pen'
               ? 'Drag to draw · Esc to stop'
               : tool === 'arrow'
-                ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another')
+                ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another, or to anywhere')
                 : 'Drag to select · Right-drag to pan'}
           </span>
 
@@ -1712,15 +1770,20 @@ export default function WallView() {
               }}
             >
               {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
-                const from = itemsById.get(arrow.from ?? '')
-                const to = itemsById.get(arrow.to ?? '')
-                if (!from || !to) return null
+                const ends = arrowAnchors(arrow, itemsById)
+                if (!ends) return null
 
                 const width = arrow.strokeWidth ?? 2
                 const stroke = arrow.color || 'var(--color-text-muted)'
                 const selected = selectedIds.has(arrow.id)
                 const heads = arrow.arrowHeads ?? ARROW_HEAD_MODES[0]
-                const g = arrowGeometry(from, to, arrow.arrowShape ?? ARROW_SHAPES[0])
+                // Stopped behind whichever ends carry a head, so a thick stroke
+                // does not fill in the notch it is supposed to meet.
+                const inset = arrowHeadInset(width)
+                const g = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0], {
+                  end: heads !== 'none' ? inset : 0,
+                  start: heads === 'both' ? inset : 0
+                })
 
                 return (
                   <g key={arrow.id} opacity={selected ? 1 : 0.85}>
@@ -1756,7 +1819,11 @@ export default function WallView() {
                   id: '', kind: 'note', z: 0,
                   x: arrowDrag.at.x, y: arrowDrag.at.y, width: 1, height: 1
                 }
-                const g = arrowGeometry(from, landing, arrowShape)
+                const inset = arrowHeadInset(penWidth)
+                const g = arrowGeometry(from, landing, arrowShape, {
+                  end: arrowHeads !== 'none' ? inset : 0,
+                  start: arrowHeads === 'both' ? inset : 0
+                })
 
                 return (
                   <g opacity={target ? 0.9 : 0.55}>
@@ -1816,7 +1883,7 @@ export default function WallView() {
                     // Ink lets presses through: only its stroke takes them.
                     pointerEvents: item.kind === 'ink' ? 'none' : undefined,
                     cursor: item.locked ? 'default' : 'grab',
-                    outline: arrowDrag?.overId === item.id
+                    outline: arrowDrag?.overId === item.id || arrowEndHover === item.id
                       ? '3px solid var(--color-secondary)'
                       : arrowFrom === item.id
                         ? '2px dashed var(--color-secondary)'
@@ -1902,6 +1969,47 @@ export default function WallView() {
               )
             })}
           </div>
+
+          {/* Both ends of the selected connector, as something to grab. Drawn
+              in the canvas layer so they sit exactly on the line, but sized
+              against the zoom so they stay the same size to grab. */}
+          {single?.kind === 'arrow' && (() => {
+            const ends = arrowAnchors(single, itemsById)
+            if (!ends) return null
+
+            const heads = single.arrowHeads ?? ARROW_HEAD_MODES[0]
+            const g = arrowGeometry(ends.from, ends.to, single.arrowShape ?? ARROW_SHAPES[0])
+            const size = 12 / camera.zoom
+            const ring = 2 / camera.zoom
+
+            return (
+              <div style={{
+                position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
+                transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+                transformOrigin: '0 0', zIndex: 6
+              }}>
+                {([['start', g.start], ['end', g.end]] as const).map(([which, at]) => (
+                  <div
+                    key={which}
+                    data-arrow-handle={which}
+                    title={which === 'end' ? 'Drag to point somewhere else' : 'Drag to start somewhere else'}
+                    style={{
+                      position: 'absolute', left: 0, top: 0,
+                      width: `${size}px`, height: `${size}px`, boxSizing: 'border-box',
+                      transform: `translate3d(${at.x - size / 2}px, ${at.y - size / 2}px, 0)`,
+                      borderRadius: '50%',
+                      background: 'var(--color-surface-elevated)',
+                      border: `${ring}px solid var(--color-secondary)`,
+                      // Square at the tail, round at the head, so which end is
+                      // which is readable without hovering either of them.
+                      ...(which === 'start' && heads !== 'both' ? { borderRadius: '20%' } : {}),
+                      cursor: 'grab'
+                    }}
+                  />
+                ))}
+              </div>
+            )
+          })()}
 
           {/* Marquee, drawn in screen space so it does not scale with the camera. */}
           {marquee && (
