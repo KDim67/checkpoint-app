@@ -28,7 +28,7 @@ export interface WallItem {
    * filename for 'image'. Unused by 'note', 'text' and 'frame'.
    */
   ref?: string
-  /** Body for 'note' and 'text'; the label for 'frame'. */
+  /** Body for 'note' and 'text'; the label for 'frame' and for an arrow. */
   text?: string
   /** Hex, or absent to use the kind's default. */
   color?: string
@@ -951,6 +951,42 @@ export interface ArrowGeometry {
   startAngle: number
   /** Straight segments following the line, for hit testing. */
   polyline: Point[]
+  /**
+   * Halfway along, where a label sits.
+   *
+   * Measured on the untrimmed line, so adding or removing an arrowhead does
+   * not shift the label that is already there.
+   */
+  mid: Point
+}
+
+/** The point half way along a run of segments, by length rather than by index. */
+export function midpointAlong(points: Point[]): Point {
+  if (points.length === 0) return { x: 0, y: 0 }
+  if (points.length === 1) return points[0]
+
+  const legs: number[] = []
+  let total = 0
+  for (let i = 1; i < points.length; i++) {
+    const length = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y)
+    legs.push(length)
+    total += length
+  }
+  // Every point in the same place, so anywhere is the middle.
+  if (total === 0) return points[0]
+
+  let walked = 0
+  for (let i = 0; i < legs.length; i++) {
+    if (walked + legs[i] >= total / 2) {
+      const t = legs[i] === 0 ? 0 : (total / 2 - walked) / legs[i]
+      return {
+        x: points[i].x + (points[i + 1].x - points[i].x) * t,
+        y: points[i].y + (points[i + 1].y - points[i].y) * t
+      }
+    }
+    walked += legs[i]
+  }
+  return points[points.length - 1]
 }
 
 /**
@@ -1029,7 +1065,8 @@ export function arrowGeometry(
       d: roundedPath(drawn, ELBOW_RADIUS),
       endAngle,
       startAngle,
-      polyline: drawn
+      polyline: drawn,
+      mid: midpointAlong(corners)
     }
   }
 
@@ -1077,7 +1114,12 @@ export function arrowGeometry(
       d: `M${drawnStart.x},${drawnStart.y}Q${control.x},${control.y} ${drawnEnd.x},${drawnEnd.y}`,
       endAngle,
       startAngle,
-      polyline
+      polyline,
+      // The quadratic at t = 0.5, which is exact rather than sampled.
+      mid: {
+        x: 0.25 * start.x + 0.5 * control.x + 0.25 * end.x,
+        y: 0.25 * start.y + 0.5 * control.y + 0.25 * end.y
+      }
     }
   }
 
@@ -1092,7 +1134,8 @@ export function arrowGeometry(
     d: `M${drawnStart.x},${drawnStart.y}L${drawnEnd.x},${drawnEnd.y}`,
     endAngle: angle,
     startAngle: angle + Math.PI,
-    polyline: [drawnStart, drawnEnd]
+    polyline: [drawnStart, drawnEnd],
+    mid: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
   }
 }
 

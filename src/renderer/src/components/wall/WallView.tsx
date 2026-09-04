@@ -1699,7 +1699,14 @@ export default function WallView() {
             if ((e.target as HTMLElement).closest('[data-wall-ui]')) return
             const at = toWallPoint(screenPoint(e), docRef.current.camera)
             const hit = itemAtPoint(docRef.current.items, at)
-            if (!hit) { addItem('note', {}, at); return }
+            if (!hit) {
+              // A connector has no box to hit, so it is asked for by hand
+              // before the empty canvas gets to make a note.
+              const arrow = arrowAt(at)
+              if (arrow) { setSelectedIds(new Set([arrow.id])); setEditingId(arrow.id); return }
+              addItem('note', {}, at)
+              return
+            }
             if (hit.locked) return
             if (hit.kind === 'card') openCard(hit)
             else if (hit.kind === 'doc') {
@@ -1970,6 +1977,70 @@ export default function WallView() {
             })}
           </div>
 
+          {/* Labels, above the lines and the items so they stay readable.
+              An arrow's label lives in `text`, the same field a frame's does. */}
+          <div style={{
+            position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
+            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+            transformOrigin: '0 0', zIndex: 5, pointerEvents: 'none'
+          }}>
+            {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
+              const editing = editingId === arrow.id
+              if (!arrow.text && !editing) return null
+
+              const ends = arrowAnchors(arrow, itemsById)
+              if (!ends) return null
+              const { mid } = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0])
+
+              return (
+                <div
+                  key={arrow.id}
+                  data-arrow-label={arrow.id}
+                  onPointerDown={e => { e.stopPropagation(); setSelectedIds(new Set([arrow.id])) }}
+                  onDoubleClick={e => { e.stopPropagation(); setEditingId(arrow.id) }}
+                  style={{
+                    position: 'absolute', left: 0, top: 0,
+                    transform: `translate3d(${mid.x}px, ${mid.y}px, 0) translate(-50%, -50%)`,
+                    maxWidth: '220px',
+                    padding: '2px 6px',
+                    background: 'var(--color-surface-1)',
+                    border: `1px solid ${selectedIds.has(arrow.id) ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--color-text-base)',
+                    fontSize: '12px', lineHeight: 1.3,
+                    pointerEvents: 'auto', cursor: 'text'
+                  }}
+                >
+                  {editing ? (
+                    <input
+                      autoFocus
+                      defaultValue={arrow.text ?? ''}
+                      placeholder="Label"
+                      onBlur={e => {
+                        setEditingId(null)
+                        const text = e.target.value.trim()
+                        // An emptied label is removed rather than kept as a
+                        // blank chip sitting on the line.
+                        setItems(patchItems(docRef.current.items, new Set([arrow.id]), {
+                          text: text || undefined
+                        }))
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
+                      }}
+                      style={{
+                        width: '120px', background: 'none', border: 'none', outline: 'none',
+                        color: 'var(--color-text-base)', font: 'inherit', padding: 0
+                      }}
+                    />
+                  ) : (
+                    <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{arrow.text}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
           {/* Both ends of the selected connector, as something to grab. Drawn
               in the canvas layer so they sit exactly on the line, but sized
               against the zoom so they stay the same size to grab. */}
@@ -2053,6 +2124,11 @@ export default function WallView() {
                 v => setItems(patchItems(doc.items, selectedIds, { arrowShape: v })),
                 v => setItems(patchItems(doc.items, selectedIds, { arrowLine: v })),
                 v => setItems(patchItems(doc.items, selectedIds, { arrowHeads: v }))
+              )}
+              {arrowsSelected && single && toolButton(
+                single.text ? 'Edit label' : 'Add a label',
+                <Type size={13} />,
+                () => setEditingId(single.id)
               )}
               {arrowsSelected && (
                 <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />

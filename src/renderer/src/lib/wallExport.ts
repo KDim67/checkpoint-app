@@ -125,6 +125,28 @@ export async function exportWallToPng(
 
         if (heads !== 'none') fillHead(arrowHeadPoints(g.end, g.endAngle, width))
         if (heads === 'both') fillHead(arrowHeadPoints(g.start, g.startAngle, width))
+
+        // The label, on a chip so the line does not run through it.
+        if (item.text) {
+          ctx.font = '500 12px sans-serif'
+          ctx.textBaseline = 'middle'
+          const textWidth = ctx.measureText(item.text).width
+          const padX = 6
+          const boxW = textWidth + padX * 2
+          const boxH = 18
+
+          ctx.fillStyle = ctxInfo.surfaceColor
+          ctx.strokeStyle = ctxInfo.borderColor
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.rect(g.mid.x - boxW / 2, g.mid.y - boxH / 2, boxW, boxH)
+          ctx.fill()
+          ctx.stroke()
+
+          ctx.fillStyle = ctxInfo.textColor
+          ctx.fillText(item.text, g.mid.x - boxW / 2 + padX, g.mid.y)
+          ctx.textBaseline = 'alphabetic'
+        }
       }
     } else if (item.kind === 'ink') {
       // Drawn through the same box scaling the SVG uses, so a resized stroke
