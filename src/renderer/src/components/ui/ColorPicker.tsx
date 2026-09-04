@@ -24,7 +24,13 @@ export default function ColorPicker({
 }: ColorPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
-  const [open, setOpen] = useState(false)
+  /**
+   * Viewport coordinates for the panel, so it is not clipped by whatever it
+   * sits in. Several callers put this inside a scrolling modal or settings
+   * pane, where an absolutely positioned panel cannot escape.
+   */
+  const [openAt, setOpenAt] = useState<{ left: number; top: number } | null>(null)
+  const open = openAt !== null
 
   // Closes on a click anywhere else. The panel is absolutely positioned inside
   // whatever opened it, so a full-screen backdrop would sit above that caller's
@@ -32,9 +38,9 @@ export default function ColorPicker({
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent): void => {
-      if (!anchorRef.current?.contains(e.target as Node)) setOpen(false)
+      if (!anchorRef.current?.contains(e.target as Node)) setOpenAt(null)
     }
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpenAt(null) }
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -81,7 +87,14 @@ export default function ColorPicker({
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
       <div ref={anchorRef} style={{ position: 'relative', flexShrink: 0 }}>
         <button
-          onClick={() => setOpen(o => !o)}
+          onClick={e => {
+            if (open) { setOpenAt(null); return }
+            const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setOpenAt({
+              left: Math.min(box.left, window.innerWidth - 232),
+              top: Math.min(box.bottom + 6, window.innerHeight - 232)
+            })
+          }}
           title={title}
           aria-label={title}
           aria-expanded={open}
@@ -97,10 +110,10 @@ export default function ColorPicker({
           }}
         />
 
-        {open && (
+        {openAt && (
           <div
             style={{
-              position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 60,
+              position: 'fixed', left: `${openAt.left}px`, top: `${openAt.top}px`, zIndex: 60,
               padding: 'var(--space-3)',
               background: 'var(--color-surface-elevated)',
               border: '1px solid var(--color-surface-offset)',
