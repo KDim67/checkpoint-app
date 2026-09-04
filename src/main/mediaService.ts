@@ -1,7 +1,9 @@
 import { join, extname } from 'path'
 import { existsSync, readdirSync, writeFileSync, copyFileSync, statSync, unlinkSync, readFileSync } from 'fs'
+import type Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb } from './db'
+import { removePreviewsFor } from './mediaPreview'
 import { getMediaDir, getNotesDir, ensureDir } from './paths'
 
 export function ensureMediaDir(): void {
@@ -60,12 +62,58 @@ interface PruneResult {
 }
 
 /**
- * Scans the database items (logs, cards, tasks) and Markdown notes directory
- * to find any media files that are no longer referenced, and safely deletes them.
+ * Every stored string that could name a media file.
+ *
+ * Walks the schema rather than a list of tables. This feeds a delete, so a
+ * table left out costs the user their files, and that is not hypothetical:
+ * walls live in `app_settings`, which the hand-written list did not include,
+ * so every image on every wall counted as an orphan and got removed.
+ */
+export function collectDbTexts(db: Database.Database): string[] {
+  const texts: string[] = []
+
+  const tables = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
+    .all() as Array<{ name: string }>
+
+  for (const { name } of tables) {
+    // The full-text index copies columns out of `items`, which is read anyway,
+    // and its shadow tables hold packed blobs rather than readable text.
+    if (name.includes('_fts')) continue
+
+    try {
+      const columns = db.prepare(`PRAGMA table_info("${name}")`).all() as Array<{ name: string; type: string }>
+      // Untyped columns included: SQLite lets a column have no declared type,
+      // and it still holds whatever was put in it.
+      const textColumns = columns
+        .filter(c => c.type === '' || /CHAR|CLOB|TEXT|JSON|BLOB/i.test(c.type))
+        .map(c => c.name)
+      if (textColumns.length === 0) continue
+
+      const quoted = textColumns.map(c => `"${c}"`).join(', ')
+      const rows = db.prepare(`SELECT ${quoted} FROM "${name}"`).all() as Array<Record<string, unknown>>
+      for (const row of rows) {
+        for (const column of textColumns) {
+          const value = row[column]
+          if (typeof value === 'string' && value !== '') texts.push(value)
+        }
+      }
+    } catch (err) {
+      // One unreadable table must not make everything else look orphaned.
+      console.error(`[mediaService] Could not scan table ${name} for references:`, err)
+    }
+  }
+
+  return texts
+}
+
+/**
+ * Scans the database and the Markdown notes directory to find any media files
+ * that are no longer referenced, and safely deletes them.
  */
 export function scanAndPruneOrphanedMedia(): PruneResult {
   ensureMediaDir()
-  
+
   const mediaDir = getMediaDir()
   const files = readdirSync(mediaDir)
   const results: PruneResult = {
@@ -80,33 +128,7 @@ export function scanAndPruneOrphanedMedia(): PruneResult {
   }
 
   // 1. Scan SQLite DB
-  const db = getDb()
-  
-  // Get all references in items table (title, body, metadata)
-  const items = db.prepare('SELECT title, body, metadata FROM items').all() as Array<{
-    title: string
-    body: string
-    metadata: string
-  }>
-  
-  // Get references in clipboard_items
-  let clipboardItems: Array<{ content: string }> = []
-  try {
-    clipboardItems = db.prepare('SELECT content FROM clipboard_items').all() as Array<{ content: string }>
-  } catch {
-    // clipboard table might not exist in older versions, ignore
-  }
-
-  // Gather all text fields from DB
-  const dbTexts: string[] = []
-  for (const item of items) {
-    dbTexts.push(item.title || '')
-    dbTexts.push(item.body || '')
-    dbTexts.push(item.metadata || '')
-  }
-  for (const clip of clipboardItems) {
-    dbTexts.push(clip.content || '')
-  }
+  const dbTexts = collectDbTexts(getDb())
 
   // 2. Scan Markdown Notes Folder
   const notesDir = getNotesDir()
@@ -144,7 +166,9 @@ export function scanAndPruneOrphanedMedia(): PruneResult {
         unlinkSync(filePath)
         
         results.prunedCount++
-        results.spaceSavedBytes += size
+        // Its scaled copies go with it: they are only reachable through the
+        // original, so once that is gone nothing would ever remove them.
+        results.spaceSavedBytes += size + removePreviewsFor(filename)
         results.prunedFiles.push(filename)
       } catch (err) {
         console.error(`[mediaService] Failed to delete orphaned media: ${filename}`, err)
