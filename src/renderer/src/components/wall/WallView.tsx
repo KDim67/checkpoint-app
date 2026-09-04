@@ -1100,13 +1100,6 @@ export default function WallView() {
         borderBottom: '1px solid var(--color-surface-offset)',
         flexShrink: 0, position: 'relative'
       }}>
-        {toolButton(
-          railOpen ? 'Hide the board' : 'Show the board beside the wall',
-          <PanelRight size={14} />,
-          toggleRail,
-          { active: railOpen }
-        )}
-
         <div data-wall-popover="bg" style={{ position: 'relative' }}>
           {toolButton('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
 
