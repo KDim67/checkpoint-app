@@ -19,7 +19,7 @@ import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
   Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  ChevronDown, Pencil, PanelRight, Paintbrush, Check
+  ChevronDown, Pencil, PanelRight, Paintbrush, Check, PenLine, Spline, MousePointer2
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -29,6 +29,7 @@ import {
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
   snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
+  arrowEnds, distanceToSegment, inkFromPath, pruneArrows, STROKE_WIDTHS,
   type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
 } from '../../../../shared/wallModel'
 import {
@@ -73,6 +74,7 @@ type Drag =
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
   | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
+  | { mode: 'draw' }
   | null
 
 interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
@@ -94,6 +96,17 @@ export default function WallView() {
   const [picker, setPicker] = useState<'card' | 'doc' | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [snapping, setSnapping] = useState(false)
+  /**
+   * What a left-drag on empty canvas does. Select is the resting state: the pen
+   * and the arrow are modes you enter deliberately and leave with Escape.
+   */
+  const [tool, setTool] = useState<'select' | 'pen' | 'arrow'>('select')
+  const [penColor, setPenColor] = useState(WALL_COLORS[0])
+  const [penWidth, setPenWidth] = useState(STROKE_WIDTHS[1])
+  /** The stroke being drawn, in wall coordinates. Null when not drawing. */
+  const [drawing, setDrawing] = useState<{ x: number; y: number }[] | null>(null)
+  /** The first item picked for an arrow, waiting for its second. */
+  const [arrowFrom, setArrowFrom] = useState<string | null>(null)
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   /** Name of an image job in flight, shown so a slow one does not look frozen. */
   const [busy, setBusy] = useState<string | null>(null)
@@ -146,6 +159,7 @@ export default function WallView() {
   const historyRef = useRef<History<WallItem[]>>(initHistory([]))
 
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards])
+  const itemsById = useMemo(() => new Map(doc.items.map(i => [i.id, i])), [doc.items])
   const notesByTitle = useMemo(() => new Map(notes.map(n => [n.title, n])), [notes])
   const selectedItems = doc.items.filter(i => selectedIds.has(i.id))
   const single = selectedItems.length === 1 ? selectedItems[0] : null
@@ -381,7 +395,9 @@ export default function WallView() {
     if (ids.size === 0) return
     const items = docRef.current.items
     const gone = items.filter(i => ids.has(i.id))
-    setItems(items.filter(i => !ids.has(i.id)))
+    // Pruned as well as filtered: an arrow whose end just went would otherwise
+    // stay in the document, invisible and impossible to select.
+    setItems(pruneArrows(items.filter(i => !ids.has(i.id))))
     setSelectedIds(new Set())
     toast(`Removed ${gone.length} item${gone.length === 1 ? '' : 's'}.`, {
       action: { label: 'Undo', onClick: () => setItems([...docRef.current.items, ...gone]) }
@@ -517,6 +533,19 @@ export default function WallView() {
   }, [setCamera])
 
   // Pointer
+  /** The arrow under a wall point, if the click landed near enough to one. */
+  const arrowAt = (at: { x: number; y: number }): WallItem | null => {
+    const slack = 8 / docRef.current.camera.zoom
+    for (const arrow of docRef.current.items.filter(i => i.kind === 'arrow')) {
+      const from = itemsById.get(arrow.from ?? '')
+      const to = itemsById.get(arrow.to ?? '')
+      if (!from || !to) continue
+      const { start, end } = arrowEnds(from, to)
+      if (distanceToSegment(at, start, end) <= slack + (arrow.strokeWidth ?? 2)) return arrow
+    }
+    return null
+  }
+
   const onPointerDown = (e: React.PointerEvent) => {
     setMenu(null)
     const target = e.target as HTMLElement
@@ -563,6 +592,18 @@ export default function WallView() {
     const id = itemEl?.dataset.wallItem
     const item = id ? docRef.current.items.find(i => i.id === id) : undefined
 
+    // Two clicks make an arrow: pick a source, then a target. Picking the same
+    // item twice cancels rather than drawing a loop nobody asked for.
+    if (tool === 'arrow' && e.button === 0) {
+      if (!item || item.kind === 'arrow') { setArrowFrom(null); return }
+      if (!arrowFrom) { setArrowFrom(item.id); return }
+      if (arrowFrom !== item.id) {
+        addItem('arrow', { from: arrowFrom, to: item.id, color: penColor, strokeWidth: penWidth })
+      }
+      setArrowFrom(null)
+      return
+    }
+
     if (id && item && e.button === 0) {
       if (item.locked) { setSelectedIds(new Set()); return }
       const already = selectedRef.current.has(id)
@@ -573,6 +614,22 @@ export default function WallView() {
       if (!e.shiftKey) setItems(bringToFront(docRef.current.items, id), { record: false })
       movingRef.current = withFrameContents(docRef.current.items, next)
       dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: docRef.current.items }
+      return
+    }
+
+    // The pen takes the whole gesture: on empty canvas and over items alike,
+    // because drawing over a card is the ordinary thing to want.
+    if (tool === 'pen' && e.button === 0) {
+      dragRef.current = { mode: 'draw' }
+      setDrawing([toWallPoint(screenPoint(e), docRef.current.camera)])
+      return
+    }
+
+    // Before the marquee starts, since a click near a line reads as a click on
+    // empty canvas otherwise.
+    const arrow = arrowAt(toWallPoint(screenPoint(e), docRef.current.camera))
+    if (arrow && e.button === 0) {
+      setSelectedIds(new Set([arrow.id]))
       return
     }
 
@@ -599,6 +656,18 @@ export default function WallView() {
         if (travelled > CLICK_SLOP) press.moved = true
       }
       setCamera({ ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) })
+      return
+    }
+
+    if (drag.mode === 'draw') {
+      const at = toWallPoint(screenPoint(e), cam)
+      // Dropped when the pointer has barely moved: raw pointer events are far
+      // denser than the drawing needs, and every point is persisted.
+      setDrawing(path => {
+        if (!path) return path
+        const last = path[path.length - 1]
+        return Math.hypot(at.x - last.x, at.y - last.y) < 2 / cam.zoom ? path : [...path, at]
+      })
       return
     }
 
@@ -678,6 +747,16 @@ export default function WallView() {
       return
     }
 
+    if (drag?.mode === 'draw') {
+      const ink = drawing && inkFromPath(drawing, docRef.current.items, { color: penColor, strokeWidth: penWidth })
+      setDrawing(null)
+      if (ink) {
+        setItems([...docRef.current.items, ink])
+        setSelectedIds(new Set())
+      }
+      return
+    }
+
     const hover = railHoverRef.current
     railHoverRef.current = { overRail: false, columnId: null }
     setDropColumnId(null)
@@ -715,7 +794,14 @@ export default function WallView() {
         setSelectedIds(new Set(docRef.current.items.filter(i => !i.locked).map(i => i.id)))
         return
       }
-      if (e.key === 'Escape') { setSelectedIds(new Set()); setEditingId(null); setMenu(null); return }
+      if (e.key === 'Escape') {
+        setTool('select')
+        setArrowFrom(null)
+        setSelectedIds(new Set())
+        setEditingId(null)
+        setMenu(null)
+        return
+      }
       if (selectedRef.current.size === 0) return
 
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); return }
@@ -881,7 +967,7 @@ export default function WallView() {
       }
     : null
 
-  const tool = (
+  const toolButton = (
     label: string,
     icon: React.ReactNode,
     onClick: () => void,
@@ -926,7 +1012,7 @@ export default function WallView() {
         borderBottom: '1px solid var(--color-surface-offset)',
         flexShrink: 0, position: 'relative'
       }}>
-        {tool(
+        {toolButton(
           railOpen ? 'Hide the board' : 'Show the board beside the wall',
           <PanelRight size={14} />,
           toggleRail,
@@ -934,7 +1020,7 @@ export default function WallView() {
         )}
 
         <div style={{ position: 'relative' }}>
-          {tool('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
+          {toolButton('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
 
           {bgOpen && (
             <>
@@ -1143,20 +1229,63 @@ export default function WallView() {
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
-        {tool('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
-        {tool('Text', <Type size={14} />, () => addItem('text'))}
-        {tool('Frame', <Square size={14} />, () => addItem('frame'))}
-        {tool('Place a card', <Layers size={14} />, () => setPicker(p => (p === 'card' ? null : 'card')))}
-        {tool('Place a note', <FileText size={14} />, () => setPicker(p => (p === 'doc' ? null : 'doc')))}
-        {tool('Image', <ImageIcon size={14} />, () => fileInputRef.current?.click())}
+        {toolButton('Select', <MousePointer2 size={14} />, () => setTool('select'), { active: tool === 'select' })}
+        {toolButton('Draw', <PenLine size={14} />, () => setTool(t => (t === 'pen' ? 'select' : 'pen')), { active: tool === 'pen' })}
+        {toolButton('Connect two items', <Spline size={14} />, () => { setArrowFrom(null); setTool(t => (t === 'arrow' ? 'select' : 'arrow')) }, { active: tool === 'arrow' })}
+
+        {/* Only while a tool that draws is chosen: a palette with nothing to
+            colour is a row of buttons that appear to do nothing. */}
+        {tool !== 'select' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 var(--space-1)' }}>
+            {WALL_COLORS.map(color => (
+              <button
+                key={color}
+                onClick={() => setPenColor(color)}
+                title={color}
+                aria-label={`Ink ${color}`}
+                aria-pressed={penColor === color}
+                style={{
+                  width: '16px', height: '16px', borderRadius: '50%', cursor: 'pointer',
+                  background: color,
+                  border: penColor === color ? '2px solid var(--color-text-base)' : '1px solid var(--color-surface-offset)'
+                }}
+              />
+            ))}
+            {STROKE_WIDTHS.map(width => (
+              <button
+                key={width}
+                onClick={() => setPenWidth(width)}
+                title={`${width}px`}
+                aria-label={`Stroke ${width}`}
+                aria-pressed={penWidth === width}
+                style={{
+                  width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: penWidth === width ? 'var(--color-surface-offset)' : 'none',
+                  border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer'
+                }}
+              >
+                <span style={{ width: `${width + 4}px`, height: `${width}px`, borderRadius: '999px', background: 'var(--color-text-muted)' }} />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
-        {tool('Undo', <Undo2 size={14} />, () => applyHistory(undo(historyRef.current)), { disabled: !undoable })}
-        {tool('Redo', <Redo2 size={14} />, () => applyHistory(redo(historyRef.current)), { disabled: !redoable })}
-        {tool('Snap to grid', <Grid3x3 size={14} />, () => setSnapping(v => !v), { active: snapping })}
-        {tool('Fit to content', <Maximize2 size={14} />, fitToContent, { disabled: doc.items.length === 0 })}
-        {tool('Export as PNG', <Download size={14} />, () => void exportPng(), { disabled: doc.items.length === 0 })}
+        {toolButton('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
+        {toolButton('Text', <Type size={14} />, () => addItem('text'))}
+        {toolButton('Frame', <Square size={14} />, () => addItem('frame'))}
+        {toolButton('Place a card', <Layers size={14} />, () => setPicker(p => (p === 'card' ? null : 'card')))}
+        {toolButton('Place a note', <FileText size={14} />, () => setPicker(p => (p === 'doc' ? null : 'doc')))}
+        {toolButton('Image', <ImageIcon size={14} />, () => fileInputRef.current?.click())}
+
+        <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
+
+        {toolButton('Undo', <Undo2 size={14} />, () => applyHistory(undo(historyRef.current)), { disabled: !undoable })}
+        {toolButton('Redo', <Redo2 size={14} />, () => applyHistory(redo(historyRef.current)), { disabled: !redoable })}
+        {toolButton('Snap to grid', <Grid3x3 size={14} />, () => setSnapping(v => !v), { active: snapping })}
+        {toolButton('Fit to content', <Maximize2 size={14} />, fitToContent, { disabled: doc.items.length === 0 })}
+        {toolButton('Export as PNG', <Download size={14} />, () => void exportPng(), { disabled: doc.items.length === 0 })}
 
         <span style={{ fontSize: '11px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', minWidth: '42px' }}>
           {Math.round(camera.zoom * 100)}%
@@ -1312,6 +1441,7 @@ export default function WallView() {
           }}
           style={{
             flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
+            cursor: tool === 'pen' ? 'crosshair' : tool === 'arrow' ? 'copy' : undefined,
             background: canvasBackground,
             backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
             backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
@@ -1346,7 +1476,63 @@ export default function WallView() {
             transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
             transformOrigin: '0 0'
           }}>
-            {inPaintOrder(doc.items).map(item => {
+            {/* One layer for every arrow. They have no box of their own: each
+                is redrawn from wherever its two items currently are. */}
+            <svg
+              style={{
+                position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
+                overflow: 'visible', pointerEvents: 'none', zIndex: 1
+              }}
+            >
+              {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
+                const from = itemsById.get(arrow.from ?? '')
+                const to = itemsById.get(arrow.to ?? '')
+                if (!from || !to) return null
+
+                const { start, end } = arrowEnds(from, to)
+                const angle = Math.atan2(end.y - start.y, end.x - start.x)
+                const head = 10 + (arrow.strokeWidth ?? 2) * 2
+                const spread = 0.4
+                const stroke = arrow.color || 'var(--color-text-muted)'
+                const selected = selectedIds.has(arrow.id)
+
+                return (
+                  <g key={arrow.id} opacity={selected ? 1 : 0.85}>
+                    <line
+                      x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+                      stroke={stroke}
+                      strokeWidth={(arrow.strokeWidth ?? 2) + (selected ? 2 : 0)}
+                      strokeLinecap="round"
+                    />
+                    <polygon
+                      points={[
+                        `${end.x},${end.y}`,
+                        `${end.x - head * Math.cos(angle - spread)},${end.y - head * Math.sin(angle - spread)}`,
+                        `${end.x - head * Math.cos(angle + spread)},${end.y - head * Math.sin(angle + spread)}`
+                      ].join(' ')}
+                      fill={stroke}
+                    />
+                  </g>
+                )
+              })}
+            </svg>
+
+            {/* The stroke in progress. Drawn separately because it is not an
+                item yet: it becomes one when the pointer comes up. */}
+            {drawing && drawing.length > 1 && (
+              <svg style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', overflow: 'visible', pointerEvents: 'none', zIndex: 2 }}>
+                <polyline
+                  points={drawing.map(pt => `${pt.x},${pt.y}`).join(' ')}
+                  fill="none"
+                  stroke={penColor}
+                  strokeWidth={penWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+
+            {inPaintOrder(doc.items).filter(i => i.kind !== 'arrow').map(item => {
               const isSelected = selectedIds.has(item.id)
               return (
                 <div
@@ -1455,11 +1641,11 @@ export default function WallView() {
                 />
               ))}
               <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
-              {tool('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
-              {tool('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
-              {tool('Duplicate', <Copy size={13} />, duplicateSelected)}
-              {tool(single?.locked ? 'Unlock' : 'Lock', single?.locked ? <Unlock size={13} /> : <Lock size={13} />, toggleLock)}
-              {tool('Delete', <Trash2 size={13} />, removeSelected)}
+              {toolButton('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
+              {toolButton('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
+              {toolButton('Duplicate', <Copy size={13} />, duplicateSelected)}
+              {toolButton(single?.locked ? 'Unlock' : 'Lock', single?.locked ? <Unlock size={13} /> : <Lock size={13} />, toggleLock)}
+              {toolButton('Delete', <Trash2 size={13} />, removeSelected)}
             </div>
           )}
 
@@ -1515,7 +1701,7 @@ export default function WallView() {
                   overflow: 'hidden'
                 }}
               >
-                {doc.items.map(i => (
+                {doc.items.filter(i => i.kind !== 'arrow').map(i => (
                   <div
                     key={i.id}
                     style={{

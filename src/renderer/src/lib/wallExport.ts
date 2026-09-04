@@ -6,7 +6,9 @@
  * cards are drawn as title plus status. Fine for a moodboard, not pixel-exact.
  */
 
-import { boundsOf, inPaintOrder, type WallItem } from '../../../shared/wallModel'
+import {
+  arrowEnds, boundsOf, inkNaturalSize, inPaintOrder, type WallItem
+} from '../../../shared/wallModel'
 
 /** Margin around the content, in wall units. */
 const MARGIN = 40
@@ -74,6 +76,9 @@ export async function exportWallToPng(
   // Wall coordinates, shifted to the margin. The translation the camera applies.
   ctx.translate(MARGIN - bounds.minX, MARGIN - bounds.minY)
 
+  // Arrows are drawn from their two ends, so the ends have to be findable.
+  const byId = new Map(items.map(i => [i.id, i]))
+
   for (const item of inPaintOrder(items)) {
     ctx.save()
     if (item.rotation) {
@@ -82,7 +87,51 @@ export async function exportWallToPng(
       ctx.translate(-(item.x + item.width / 2), -(item.y + item.height / 2))
     }
 
-    if (item.kind === 'image' && item.ref) {
+    if (item.kind === 'arrow') {
+      const from = byId.get(item.from ?? '')
+      const to = byId.get(item.to ?? '')
+      if (from && to) {
+        const { start, end } = arrowEnds(from, to)
+        const angle = Math.atan2(end.y - start.y, end.x - start.x)
+        const head = 10 + (item.strokeWidth ?? 2) * 2
+
+        ctx.strokeStyle = item.color || ctxInfo.textColor
+        ctx.fillStyle = item.color || ctxInfo.textColor
+        ctx.lineWidth = item.strokeWidth ?? 2
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(start.x, start.y)
+        ctx.lineTo(end.x, end.y)
+        ctx.stroke()
+
+        ctx.beginPath()
+        ctx.moveTo(end.x, end.y)
+        ctx.lineTo(end.x - head * Math.cos(angle - 0.4), end.y - head * Math.sin(angle - 0.4))
+        ctx.lineTo(end.x - head * Math.cos(angle + 0.4), end.y - head * Math.sin(angle + 0.4))
+        ctx.closePath()
+        ctx.fill()
+      }
+    } else if (item.kind === 'ink') {
+      // Drawn through the same box scaling the SVG uses, so a resized stroke
+      // exports at the size it is shown at.
+      const natural = inkNaturalSize(item)
+      const points = item.points ?? []
+      const scaleX = natural.width === 0 ? 1 : item.width / natural.width
+      const scaleY = natural.height === 0 ? 1 : item.height / natural.height
+
+      ctx.strokeStyle = item.color || ctxInfo.textColor
+      ctx.lineWidth = item.strokeWidth ?? 4
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.beginPath()
+      for (let i = 0; i < points.length; i += 2) {
+        const x = item.x + points[i] * scaleX
+        const y = item.y + points[i + 1] * scaleY
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+    } else if (item.kind === 'image' && item.ref) {
       const img = await loadImage(item.ref)
       if (img) ctx.drawImage(img, item.x, item.y, item.width, item.height)
     } else if (item.kind === 'note') {

@@ -9,7 +9,7 @@
 
 import React from 'react'
 import { FileQuestion, FileText } from 'lucide-react'
-import type { WallItem } from '../../../../shared/wallModel'
+import { inkNaturalSize, inkPath, type WallItem } from '../../../../shared/wallModel'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
@@ -193,6 +193,30 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
   }
 
   // Image
+  if (item.kind === 'ink') {
+    const natural = inkNaturalSize(item)
+    return (
+      <svg
+        width="100%"
+        height="100%"
+        // The box the stroke was drawn in. Keeping it as the viewBox is what
+        // makes resizing scale the drawing rather than crop it.
+        viewBox={`0 0 ${natural.width} ${natural.height}`}
+        preserveAspectRatio="none"
+        style={{ display: 'block', overflow: 'visible', pointerEvents: 'none' }}
+      >
+        <path
+          d={inkPath(item)}
+          fill="none"
+          stroke={item.color || 'var(--color-text-base)'}
+          strokeWidth={item.strokeWidth ?? 4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+
   if (item.kind === 'image') {
     return (
       <img

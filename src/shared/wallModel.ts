@@ -13,7 +13,7 @@
  * `sticky`/`note` would read better, but walls already store stickies as
  * `note` and no migration could tell the two apart after a rename.
  */
-export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame'
+export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow'
 
 export interface WallItem {
   /** Wall-local id. Two placements of the same card are two items. */
@@ -32,6 +32,20 @@ export interface WallItem {
   text?: string
   /** Hex, or absent to use the kind's default. */
   color?: string
+  /**
+   * An ink stroke, as flat [x0,y0,x1,y1,…] in the item's own box. Kept in box
+   * coordinates rather than wall ones so moving and resizing are the same
+   * operations they are for everything else: the SVG scales with the box.
+   */
+  points?: number[]
+  strokeWidth?: number
+  /**
+   * An arrow's ends, as item ids. An arrow is not positioned: it is redrawn
+   * from whatever the two items are doing, so it follows them for free and
+   * cannot drift out of step with what it is pointing at.
+   */
+  from?: string
+  to?: string
   /** Degrees. Freedom includes the freedom to put something on a slant. */
   rotation?: number
   /** Paint order. Explicit because it has to survive a reload. */
@@ -83,7 +97,10 @@ export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number
   doc: { width: 240, height: 150 },
   image: { width: 280, height: 200 },
   text: { width: 240, height: 48 },
-  frame: { width: 480, height: 360 }
+  frame: { width: 480, height: 360 },
+  // Both are sized from their contents, never from a default.
+  ink: { width: 120, height: 120 },
+  arrow: { width: 1, height: 1 }
 }
 
 /** Sticky-note colours. Muted on purpose: a wall of saturated squares is noise. */
@@ -119,7 +136,20 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame']
+const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow']
+
+/** Pen widths, in wall units. Three is enough to be useful and to choose from. */
+export const STROKE_WIDTHS = [2, 4, 8]
+
+/**
+ * A path is only a path with two points, and an odd-length array means the
+ * coordinates have been truncated somewhere, so the pairs cannot be trusted.
+ */
+function normalizePoints(raw: unknown): number[] | null {
+  if (!Array.isArray(raw) || raw.length < 4 || raw.length % 2 !== 0) return null
+  const points = raw.map(v => (typeof v === 'number' && Number.isFinite(v) ? v : null))
+  return points.every((v): v is number => v !== null) ? (points as number[]) : null
+}
 
 export function normalizeWallItem(raw: unknown, index: number): WallItem | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -132,6 +162,16 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   // box the user cannot identify is worse than a missing one.
   const ref = str(o.ref).trim()
   if ((kind === 'card' || kind === 'doc' || kind === 'image') && !ref) return null
+
+  // Same rule for the two drawn kinds: a stroke with no path and an arrow with
+  // no ends are both invisible, and an invisible item cannot be selected to be
+  // deleted.
+  const points = normalizePoints(o.points)
+  if (kind === 'ink' && !points) return null
+
+  const from = str(o.from).trim()
+  const to = str(o.to).trim()
+  if (kind === 'arrow' && (!from || !to)) return null
 
   const size = DEFAULT_SIZES[kind]
   return {
@@ -146,6 +186,10 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(ref ? { ref } : {}),
     ...(typeof o.text === 'string' ? { text: o.text } : {}),
     ...(str(o.color) ? { color: str(o.color) } : {}),
+    ...(points ? { points } : {}),
+    ...(num(o.strokeWidth, 0) > 0 ? { strokeWidth: num(o.strokeWidth, STROKE_WIDTHS[1]) } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
     ...(o.locked === true ? { locked: true } : {}),
     z: num(o.z, index)
@@ -214,8 +258,12 @@ export function inPaintOrder(items: WallItem[]): WallItem[] {
 export interface Bounds { minX: number; minY: number; maxX: number; maxY: number }
 
 export function boundsOf(items: WallItem[]): Bounds | null {
-  if (items.length === 0) return null
-  return items.reduce<Bounds>(
+  // Arrows are excluded: they carry a placeholder box that is not where they
+  // are drawn, so counting it would pull "fit to content" towards a point with
+  // nothing at it.
+  const boxed = items.filter(i => i.kind !== 'arrow')
+  if (boxed.length === 0) return null
+  return boxed.reduce<Bounds>(
     (b, i) => ({
       minX: Math.min(b.minX, i.x),
       minY: Math.min(b.minY, i.y),
@@ -334,7 +382,7 @@ export function itemsInRect(items: WallItem[], rect: Rect): string[] {
   const right = rect.x + rect.width
   const bottom = rect.y + rect.height
   return items
-    .filter(i => !i.locked)
+    .filter(i => !i.locked && i.kind !== 'arrow')
     .filter(i => i.x < right && i.x + i.width > rect.x && i.y < bottom && i.y + i.height > rect.y)
     .map(i => i.id)
 }
@@ -399,6 +447,9 @@ export const SNAP_GRID = 24
 export function itemAtPoint(items: WallItem[], point: { x: number; y: number }): WallItem | null {
   let hit: WallItem | null = null
   for (const i of items) {
+    // An arrow's box is a placeholder, not where it is drawn. Clicking one goes
+    // through the line test in the view instead.
+    if (i.kind === 'arrow') continue
     const inside =
       point.x >= i.x && point.x <= i.x + i.width &&
       point.y >= i.y && point.y <= i.y + i.height
@@ -569,4 +620,129 @@ export function withFrameContents(items: WallItem[], ids: Set<string>): Set<stri
     }
   }
   return out
+}
+
+// Drawing and arrows
+
+/** Margin around a stroke so the cap is not clipped by its own box. */
+const INK_PAD = 8
+
+/**
+ * Turns a drawn path in wall coordinates into an ink item.
+ *
+ * The box is the path's bounds plus a pad, and the points are rebased into it,
+ * so the stroke moves and resizes like any other item with no special cases.
+ * Null when the path is a single point, which is a click and not a stroke.
+ */
+export function inkFromPath(
+  path: { x: number; y: number }[],
+  items: WallItem[],
+  extra: Partial<WallItem> = {}
+): WallItem | null {
+  if (path.length < 2) return null
+
+  const xs = path.map(p => p.x)
+  const ys = path.map(p => p.y)
+  const minX = Math.min(...xs) - INK_PAD
+  const minY = Math.min(...ys) - INK_PAD
+  const width = Math.max(...xs) + INK_PAD - minX
+  const height = Math.max(...ys) + INK_PAD - minY
+
+  return {
+    id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    kind: 'ink',
+    x: minX,
+    y: minY,
+    // Not floored to the usual minimum: a straight horizontal line is a
+    // legitimate stroke and its box is genuinely only as tall as the pad.
+    width,
+    height,
+    points: path.flatMap(p => [p.x - minX, p.y - minY]),
+    z: topZ(items),
+    ...extra
+  }
+}
+
+/** The `d` of an ink stroke, with the box scaled to whatever size it now is. */
+export function inkPath(item: WallItem): string {
+  const points = item.points ?? []
+  if (points.length < 4) return ''
+
+  return points.reduce((d, value, i) => {
+    if (i % 2 !== 0) return d
+    const command = i === 0 ? 'M' : 'L'
+    return `${d}${command}${value.toFixed(1)},${points[i + 1].toFixed(1)}`
+  }, '')
+}
+
+export interface Point { x: number; y: number }
+
+const centreOf = (item: WallItem): Point => ({
+  x: item.x + item.width / 2,
+  y: item.y + item.height / 2
+})
+
+/**
+ * Where an arrow between two items should start and stop: on the edge of each
+ * box rather than at its centre, so the head lands against the item instead of
+ * inside it.
+ */
+export function arrowEnds(from: WallItem, to: WallItem): { start: Point; end: Point } {
+  const a = centreOf(from)
+  const b = centreOf(to)
+  return { start: edgePoint(from, a, b), end: edgePoint(to, b, a) }
+}
+
+/** Walks from a box's centre towards a target and stops at the box edge. */
+function edgePoint(box: WallItem, centre: Point, towards: Point): Point {
+  const dx = towards.x - centre.x
+  const dy = towards.y - centre.y
+  if (dx === 0 && dy === 0) return centre
+
+  // The scale at which the ray first crosses each pair of sides. The smaller
+  // one is the side it actually leaves through.
+  const scaleX = dx === 0 ? Infinity : (box.width / 2) / Math.abs(dx)
+  const scaleY = dy === 0 ? Infinity : (box.height / 2) / Math.abs(dy)
+  const scale = Math.min(scaleX, scaleY)
+
+  return { x: centre.x + dx * scale, y: centre.y + dy * scale }
+}
+
+/** Distance from a point to a segment. Used to click a line that has no box. */
+export function distanceToSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lengthSq = dx * dx + dy * dy
+  if (lengthSq === 0) return Math.hypot(p.x - a.x, p.y - a.y)
+
+  // Clamped, so a point beyond either end measures to that end and not to the
+  // infinite line through them.
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq))
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+/**
+ * Arrows whose ends both still exist. Deleting an item leaves its arrows
+ * pointing at nothing, and an arrow to nowhere cannot be drawn or explained.
+ */
+export function pruneArrows(items: WallItem[]): WallItem[] {
+  const present = new Set(items.filter(i => i.kind !== 'arrow').map(i => i.id))
+  return items.filter(i =>
+    i.kind !== 'arrow' || (present.has(i.from ?? '') && present.has(i.to ?? ''))
+  )
+}
+
+/**
+ * The size the stroke was drawn at. The SVG keeps this as its viewBox, so
+ * resizing the box scales the drawing instead of cropping it.
+ */
+export function inkNaturalSize(item: WallItem): { width: number; height: number } {
+  const points = item.points ?? []
+  let maxX = 0
+  let maxY = 0
+  for (let i = 0; i < points.length; i += 2) {
+    if (points[i] > maxX) maxX = points[i]
+    if (points[i + 1] > maxY) maxY = points[i + 1]
+  }
+  return { width: maxX + INK_PAD, height: maxY + INK_PAD }
 }
