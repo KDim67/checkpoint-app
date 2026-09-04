@@ -488,7 +488,7 @@ function buildMcpServer(): McpServer {
     'place_on_wall',
     {
       description:
-        "Put something on a wall. 'note' is a sticky note and 'text' a bare label, both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. Coordinates are optional; items are placed near the origin when omitted.",
+        "Put something on a wall. 'note' is a sticky note and 'text' a bare label, both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. x and y are where the item is CENTRED, not its top-left corner, so the coordinates that come back are offset by half its size. Both are optional and default to the origin.",
       inputSchema: {
         context,
         wall_id: z.string().optional(),
