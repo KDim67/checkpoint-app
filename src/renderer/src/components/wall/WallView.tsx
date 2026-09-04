@@ -206,6 +206,27 @@ export default function WallView() {
     }
   }, [activeContext])
 
+  /**
+   * Closes a toolbar popover when the click lands elsewhere.
+   *
+   * These used to sit under a full-screen backdrop, which swallowed the click
+   * that dismissed them: reaching the other popover took two clicks, one to
+   * close and one to open. Matching on the popover's own subtree lets the click
+   * through to whatever it was aimed at, the way WallContextMenu already does.
+   */
+  useEffect(() => {
+    if (!wallMenuOpen && !bgOpen) return
+
+    const onDown = (e: PointerEvent): void => {
+      const inside = (e.target as HTMLElement).closest('[data-wall-popover]')?.getAttribute('data-wall-popover')
+      if (inside !== 'wall') { setWallMenuOpen(false); setRenaming(null) }
+      if (inside !== 'bg') setBgOpen(false)
+    }
+
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [wallMenuOpen, bgOpen])
+
   /** The rail's own state is a preference, not part of any wall. */
   useEffect(() => {
     let cancelled = false
@@ -1077,12 +1098,11 @@ export default function WallView() {
           { active: railOpen }
         )}
 
-        <div style={{ position: 'relative' }}>
+        <div data-wall-popover="bg" style={{ position: 'relative' }}>
           {toolButton('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
 
           {bgOpen && (
             <>
-              <div onPointerDown={() => setBgOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
               <div
                 style={{
                   position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
@@ -1142,7 +1162,7 @@ export default function WallView() {
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
         {/* Which wall */}
-        <div style={{ position: 'relative' }}>
+        <div data-wall-popover="wall" style={{ position: 'relative' }}>
           <button
             onClick={() => { setWallMenuOpen(v => !v); setRenaming(null) }}
             title="Switch wall"
@@ -1168,10 +1188,6 @@ export default function WallView() {
 
           {wallMenuOpen && wallIndex && (
             <>
-              <div
-                onPointerDown={() => { setWallMenuOpen(false); setRenaming(null) }}
-                style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-              />
               <div
                 role="menu"
                 style={{
@@ -1367,6 +1383,19 @@ export default function WallView() {
                 outline: 'none'
               }}
             />
+
+            {query.trim() !== '' && matches.length === 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 25,
+                width: '260px', padding: 'var(--space-3)',
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
+                fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)'
+              }}>
+                Nothing on this wall matches.
+              </div>
+            )}
 
             {matches.length > 0 && (
               <div style={{
