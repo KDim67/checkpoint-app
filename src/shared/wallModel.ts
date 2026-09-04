@@ -40,11 +40,11 @@ export interface WallItem {
   points?: number[]
   strokeWidth?: number
   /**
-   * Whether this stroke is drawn as curves. Stored per stroke rather than read
-   * from the live setting, so turning smoothing off later does not go back and
-   * change every line already on the wall.
+   * How hard this stroke was smoothed, 0 to 1. Absent or zero draws the raw
+   * samples. Stored per stroke rather than read from the live setting, so
+   * changing the dial later does not redraw every line already on the wall.
    */
-  smooth?: boolean
+  smooth?: number
   /**
    * An arrow's ends, as item ids. An arrow is not positioned: it is redrawn
    * from whatever the two items are doing, so it follows them for free and
@@ -147,6 +147,9 @@ const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 
 /** Pen widths, in wall units. Three is enough to be useful and to choose from. */
 export const STROKE_WIDTHS = [2, 4, 8]
 
+/** How hard to smooth, as offered in the palette. Zero is the raw line. */
+export const SMOOTHING_LEVELS = [0.3, 0.6, 0.9]
+
 /**
  * A path is only a path with two points, and an odd-length array means the
  * coordinates have been truncated somewhere, so the pairs cannot be trusted.
@@ -179,6 +182,12 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const to = str(o.to).trim()
   if (kind === 'arrow' && (!from || !to)) return null
 
+  // `true` is what the first version of smoothing wrote. Read as the middle of
+  // the dial so those strokes keep looking the way they were drawn.
+  const smooth = o.smooth === true
+    ? SMOOTHING_LEVELS[1]
+    : Math.min(1, Math.max(0, num(o.smooth, 0)))
+
   const size = DEFAULT_SIZES[kind]
   return {
     id: str(o.id).trim() || `w${index}-${Math.random().toString(36).slice(2, 8)}`,
@@ -194,7 +203,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(str(o.color) ? { color: str(o.color) } : {}),
     ...(points ? { points } : {}),
     ...(num(o.strokeWidth, 0) > 0 ? { strokeWidth: num(o.strokeWidth, STROKE_WIDTHS[1]) } : {}),
-    ...(o.smooth === true ? { smooth: true } : {}),
+    ...(smooth > 0 ? { smooth } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
@@ -679,8 +688,28 @@ export function inkFromPath(
  * spaced, so this is enough to take the hand-shake out without the line
  * drifting away from where it was drawn.
  */
+/**
+ * Pulls each interior sample towards the average of its neighbours.
+ *
+ * The ends are left exactly where they were: a line drawn to touch something
+ * has to keep touching it, however hard the rest is smoothed.
+ */
+export function smoothPoints(points: number[], strength: number): number[] {
+  if (strength <= 0 || points.length < 6) return points
+
+  const out = points.slice()
+  for (let i = 2; i < points.length - 2; i += 2) {
+    const midX = (points[i - 2] + points[i + 2]) / 2
+    const midY = (points[i - 1] + points[i + 3]) / 2
+    out[i] = points[i] + (midX - points[i]) * strength
+    out[i + 1] = points[i + 1] + (midY - points[i + 1]) * strength
+  }
+  return out
+}
+
 export function inkPath(item: WallItem): string {
-  const p = item.points ?? []
+  const raw = item.points ?? []
+  const p = smoothPoints(raw, item.smooth ?? 0)
   if (p.length < 4) return ''
 
   if (!item.smooth || p.length < 8) {

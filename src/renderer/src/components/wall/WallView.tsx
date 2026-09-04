@@ -29,7 +29,7 @@ import {
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
   snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
-  arrowEnds, distanceToSegment, inkFromPath, pruneArrows, STROKE_WIDTHS,
+  arrowEnds, distanceToSegment, inkFromPath, pruneArrows, STROKE_WIDTHS, SMOOTHING_LEVELS,
   type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
 } from '../../../../shared/wallModel'
 import {
@@ -65,6 +65,23 @@ const RAIL_MAX = 460
 const RAIL_OPEN_KEY = 'wallview_rail_open'
 const RAIL_WIDTH_KEY = 'wallview_rail_width'
 const SMOOTHING_KEY = 'wallview_pen_smoothing'
+
+/** Off first, so the dial reads left to right from raw to heavily smoothed. */
+const SMOOTHING_CHOICES = [
+  { label: 'Off', short: 'Off', value: 0 },
+  { label: 'Light', short: 'Low', value: SMOOTHING_LEVELS[0] },
+  { label: 'Medium', short: 'Med', value: SMOOTHING_LEVELS[1] },
+  { label: 'Strong', short: 'High', value: SMOOTHING_LEVELS[2] }
+]
+
+/** The small heading above each group in the pen panel. */
+const caption: React.CSSProperties = {
+  fontSize: '9px',
+  fontWeight: 600,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'var(--color-text-faint)'
+}
 
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
@@ -105,8 +122,8 @@ export default function WallView() {
   const [tool, setTool] = useState<'select' | 'pen' | 'arrow'>('select')
   const [penColor, setPenColor] = useState(WALL_COLORS[0])
   const [penWidth, setPenWidth] = useState(STROKE_WIDTHS[1])
-  /** On by default: a hand-drawn line is shaky and almost nobody wants that. */
-  const [smoothing, setSmoothing] = useState(true)
+  /** Medium by default: a hand-drawn line is shaky and almost nobody wants that. */
+  const [smoothing, setSmoothing] = useState(SMOOTHING_LEVELS[1])
   /** The stroke being drawn, in wall coordinates. Null when not drawing. */
   const [drawing, setDrawing] = useState<{ x: number; y: number }[] | null>(null)
   /** The first item picked for an arrow, waiting for its second. */
@@ -237,12 +254,12 @@ export default function WallView() {
     Promise.all([
       getBoolSetting(RAIL_OPEN_KEY, false),
       getNumberSetting(RAIL_WIDTH_KEY, 260),
-      getBoolSetting(SMOOTHING_KEY, true)
+      getNumberSetting(SMOOTHING_KEY, SMOOTHING_LEVELS[1])
     ]).then(([open, width, smooth]) => {
       if (cancelled) return
       setRailOpen(open)
       setRailWidth(clampRail(width))
-      setSmoothing(smooth)
+      setSmoothing(Math.min(1, Math.max(0, smooth)))
     })
     return () => { cancelled = true }
   }, [])
@@ -789,7 +806,7 @@ export default function WallView() {
 
     if (drag?.mode === 'draw') {
       const ink = drawing && inkFromPath(drawing, docRef.current.items, {
-        color: penColor, strokeWidth: penWidth, ...(smoothing ? { smooth: true } : {})
+        color: penColor, strokeWidth: penWidth, ...(smoothing > 0 ? { smooth: smoothing } : {})
       })
       setDrawing(null)
       if (ink) {
@@ -1469,6 +1486,11 @@ export default function WallView() {
           onDoubleClick={e => {
             // Double-clicking a word inside a note being edited selects the word.
             if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
+
+            // The floating panels are children of the canvas, and this handler
+            // works from coordinates rather than the target, so without the
+            // guard a double-click on the ink palette made a note behind it.
+            if ((e.target as HTMLElement).closest('[data-wall-ui]')) return
             const at = toWallPoint(screenPoint(e), docRef.current.camera)
             const hit = itemAtPoint(docRef.current.items, at)
             if (!hit) { addItem('note', {}, at); return }
@@ -1817,72 +1839,83 @@ export default function WallView() {
           })()}
 
           {tool !== 'select' && (
-          <div
-            data-wall-ui
-            role="group"
-            aria-label="Ink colour and width"
-            style={{
-              position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)',
-              zIndex: 20, display: 'flex', flexDirection: 'column', gap: '6px',
-              padding: 'var(--space-2)',
-              background: 'var(--color-surface-elevated)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-lg)'
-            }}
-          >
-            <WallColorPicker
-              colors={WALL_COLORS}
-              value={penColor}
-              onChange={setPenColor}
-              columns={1}
-            />
-
-            <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
-
-            {STROKE_WIDTHS.map(width => (
-              <button
-                key={width}
-                onClick={() => setPenWidth(width)}
-                title={`${width}px`}
-                aria-label={`Stroke width ${width}`}
-                aria-pressed={penWidth === width}
-                style={{
-                  width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: penWidth === width ? 'var(--color-secondary-muted)' : 'none',
-                  border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer'
-                }}
-              >
-                <span style={{
-                  width: `${width + 6}px`, height: `${width}px`, borderRadius: '999px',
-                  background: penWidth === width ? 'var(--color-secondary)' : 'var(--color-text-muted)'
-                }} />
-              </button>
-            ))}
-
-            <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
-
-            <button
-              onClick={() => {
-                const next = !smoothing
-                setSmoothing(next)
-                void setBoolSetting(SMOOTHING_KEY, next)
-              }}
-              title={smoothing ? 'Smoothing on' : 'Smoothing off'}
-              aria-label="Smooth strokes"
-              aria-pressed={smoothing}
+            <div
+              data-wall-ui
+              role="group"
+              aria-label="Pen settings"
               style={{
-                width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: smoothing ? 'var(--color-secondary-muted)' : 'none',
-                color: smoothing ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-                border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                transition: 'background var(--duration-fast) var(--ease-default)'
+                position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)',
+                zIndex: 20, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+                padding: 'var(--space-2)',
+                // Capped and scrollable: as a single column this ran off the
+                // bottom of a short window and took the controls with it.
+                maxHeight: 'calc(100% - var(--space-6))', overflowY: 'auto',
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-lg)'
               }}
             >
-              <Spline size={13} />
-            </button>
-          </div>
-        )}
+              <span style={caption}>Ink</span>
+              <WallColorPicker
+                colors={WALL_COLORS}
+                value={penColor}
+                onChange={setPenColor}
+                columns={3}
+              />
+
+              <span style={caption}>Width</span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {STROKE_WIDTHS.map(width => (
+                  <button
+                    key={width}
+                    onClick={() => setPenWidth(width)}
+                    title={`${width}px`}
+                    aria-label={`Stroke width ${width}`}
+                    aria-pressed={penWidth === width}
+                    style={{
+                      width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: penWidth === width ? 'var(--color-secondary-muted)' : 'none',
+                      border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                      transition: 'background var(--duration-fast) var(--ease-default)'
+                    }}
+                  >
+                    <span style={{
+                      width: `${width + 6}px`, height: `${width}px`, borderRadius: '999px',
+                      background: penWidth === width ? 'var(--color-secondary)' : 'var(--color-text-muted)'
+                    }} />
+                  </button>
+                ))}
+              </div>
+
+              {/* Off is one of the choices rather than a separate switch, so the
+                  panel does not change height when smoothing is turned off. */}
+              <span style={caption}>Smoothing</span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {SMOOTHING_CHOICES.map(choice => (
+                  <button
+                    key={choice.label}
+                    onClick={() => {
+                      setSmoothing(choice.value)
+                      void setNumberSetting(SMOOTHING_KEY, choice.value)
+                    }}
+                    title={choice.label}
+                    aria-label={`Smoothing ${choice.label}`}
+                    aria-pressed={smoothing === choice.value}
+                    style={{
+                      flex: 1, height: '22px', fontSize: '10px',
+                      background: smoothing === choice.value ? 'var(--color-secondary-muted)' : 'none',
+                      color: smoothing === choice.value ? 'var(--color-secondary)' : 'var(--color-text-faint)',
+                      border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                      transition: 'background var(--duration-fast) var(--ease-default)'
+                    }}
+                  >
+                    {choice.short}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
         {busy && (
             <div
