@@ -1394,9 +1394,16 @@ export default function WallView() {
                   data-wall-item={item.id}
                   style={{
                     position: 'absolute',
-                    left: `${item.x}px`, top: `${item.y}px`,
+                    left: 0, top: 0,
                     width: `${item.width}px`, height: `${item.height}px`,
-                    transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
+                    // translate, not left/top. Moving an item this way costs no
+                    // layout, and a layout here repaints the whole canvas layer,
+                    // which means resampling every image on the wall per frame.
+                    transform: `translate3d(${item.x}px, ${item.y}px, 0)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`,
+                    // Images get their own compositor layer so a repaint of the
+                    // canvas does not re-rasterise them. They are the expensive
+                    // ones: a photo can be tens of megapixels behind a 280px box.
+                    willChange: item.kind === 'image' ? 'transform' : undefined,
                     cursor: item.locked ? 'default' : 'grab',
                     outline: isSelected ? '2px solid var(--color-secondary)' : 'none',
                     outlineOffset: '2px'
