@@ -8,7 +8,19 @@ try {
   mermaid.initialize({
     startOnLoad: false,
     theme: 'dark',
-    securityLevel: 'loose',
+    /**
+     * Diagrams are rendered with `dangerouslySetInnerHTML`, and the text they
+     * are built from is not always the user's own: a ```mermaid fence can
+     * arrive in an AI reply, in a note synced from another machine, or in an
+     * imported Obsidian vault.
+     *
+     * 'loose' lets that text carry raw HTML and click handlers, which in a
+     * renderer holding `window.electronAPI` means the database and the file
+     * system. 'strict' escapes the HTML and drops the handlers. The cost is
+     * that HTML markup inside a node label shows as text, which is the right
+     * trade for markup nobody in this app writes on purpose.
+     */
+    securityLevel: 'strict',
     themeVariables: {
       background: '#131622',
       primaryColor: '#1e45fc',

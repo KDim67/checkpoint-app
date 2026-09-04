@@ -340,6 +340,19 @@ function createWindow(): void {
   })
 
   // Open external links in the system browser, not a new Electron window
+  /**
+   * The window shows the app and nothing else. Without this, anything that
+   * managed to set `location` in the renderer could replace the whole app with
+   * a remote page that still sits behind the same preload bridge.
+   */
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const here = mainWindow?.webContents.getURL() ?? ''
+    // The dev server reloads through this path, so same-origin stays allowed.
+    if (here && new URL(url).origin === new URL(here).origin) return
+    event.preventDefault()
+    openExternalSafely(url)
+  })
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     openExternalSafely(url)
     return { action: 'deny' }
@@ -1832,7 +1845,20 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', (e) => {
-  // Prevent immediate termination so we can perform async cleanup
+  /**
+ * Last resort. Electron's default for an uncaught exception is to tear the
+ * process down, which for a local-first app means the user loses whatever was
+ * in flight with no message at all. Logged and survived instead: a broken
+ * feature is better than a vanished window.
+ */
+process.on('uncaughtException', err => {
+  console.error('[main] uncaught exception:', err)
+})
+process.on('unhandledRejection', reason => {
+  console.error('[main] unhandled rejection:', reason)
+})
+
+// Prevent immediate termination so we can perform async cleanup
   e.preventDefault()
 
   globalShortcut.unregisterAll()
