@@ -333,12 +333,19 @@ export function inPaintOrder(items: WallItem[]): WallItem[] {
 export interface Bounds { minX: number; minY: number; maxX: number; maxY: number }
 
 export function boundsOf(items: WallItem[]): Bounds | null {
-  // Arrows are excluded: they carry a placeholder box that is not where they
-  // are drawn, so counting it would pull "fit to content" towards a point with
-  // nothing at it.
+  // An arrow's own box is a placeholder that is not where it is drawn, so
+  // counting it would pull "fit to content" towards a point with nothing at
+  // it. An end pinned to the wall is different: that really is somewhere the
+  // wall extends to, and leaving it out crops it off an export.
   const boxed = items.filter(i => i.kind !== 'arrow')
-  if (boxed.length === 0) return null
-  return boxed.reduce<Bounds>(
+  const loose = items
+    .filter(i => i.kind === 'arrow')
+    .flatMap(i => [i.fromPoint, i.toPoint])
+    .filter((p): p is { x: number; y: number } => !!p)
+
+  if (boxed.length === 0 && loose.length === 0) return null
+
+  const bounds = boxed.reduce<Bounds>(
     (b, i) => ({
       minX: Math.min(b.minX, i.x),
       minY: Math.min(b.minY, i.y),
@@ -346,6 +353,16 @@ export function boundsOf(items: WallItem[]): Bounds | null {
       maxY: Math.max(b.maxY, i.y + i.height)
     }),
     { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+  )
+
+  return loose.reduce<Bounds>(
+    (b, p) => ({
+      minX: Math.min(b.minX, p.x),
+      minY: Math.min(b.minY, p.y),
+      maxX: Math.max(b.maxX, p.x),
+      maxY: Math.max(b.maxY, p.y)
+    }),
+    bounds
   )
 }
 

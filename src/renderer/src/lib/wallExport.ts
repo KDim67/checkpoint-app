@@ -7,7 +7,9 @@
  */
 
 import {
-  arrowEnds, boundsOf, inkNaturalSize, inPaintOrder, type WallItem
+  arrowAnchors, arrowGeometry, arrowDash, arrowHeadPoints, arrowHeadInset,
+  boundsOf, inkNaturalSize, inPaintOrder,
+  ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallItem
 } from '../../../shared/wallModel'
 
 /** Margin around the content, in wall units. */
@@ -88,28 +90,41 @@ export async function exportWallToPng(
     }
 
     if (item.kind === 'arrow') {
-      const from = byId.get(item.from ?? '')
-      const to = byId.get(item.to ?? '')
-      if (from && to) {
-        const { start, end } = arrowEnds(from, to)
-        const angle = Math.atan2(end.y - start.y, end.x - start.x)
-        const head = 10 + (item.strokeWidth ?? 2) * 2
+      // Through the same geometry the canvas draws with. This used to be a
+      // second copy of it, which meant a curve exported as a straight line and
+      // an end pinned to a point exported as nothing at all.
+      const ends = arrowAnchors(item, byId)
+      if (ends) {
+        const width = item.strokeWidth ?? 2
+        const heads = item.arrowHeads ?? ARROW_HEAD_MODES[0]
+        const inset = arrowHeadInset(width)
+        const g = arrowGeometry(ends.from, ends.to, item.arrowShape ?? ARROW_SHAPES[0], {
+          end: heads !== 'none' ? inset : 0,
+          start: heads === 'both' ? inset : 0
+        })
 
         ctx.strokeStyle = item.color || ctxInfo.textColor
         ctx.fillStyle = item.color || ctxInfo.textColor
-        ctx.lineWidth = item.strokeWidth ?? 2
+        ctx.lineWidth = width
         ctx.lineCap = 'round'
-        ctx.beginPath()
-        ctx.moveTo(start.x, start.y)
-        ctx.lineTo(end.x, end.y)
-        ctx.stroke()
+        ctx.lineJoin = 'round'
 
-        ctx.beginPath()
-        ctx.moveTo(end.x, end.y)
-        ctx.lineTo(end.x - head * Math.cos(angle - 0.4), end.y - head * Math.sin(angle - 0.4))
-        ctx.lineTo(end.x - head * Math.cos(angle + 0.4), end.y - head * Math.sin(angle + 0.4))
-        ctx.closePath()
-        ctx.fill()
+        const dash = arrowDash(item.arrowLine ?? ARROW_LINES[0], width)
+        ctx.setLineDash(dash ? dash.split(' ').map(Number) : [])
+        // Path2D takes SVG path data, so the one string serves both renderers.
+        ctx.stroke(new Path2D(g.d))
+        ctx.setLineDash([])
+
+        const fillHead = (points: string): void => {
+          const coords = points.split(' ').map(p => p.split(',').map(Number))
+          ctx.beginPath()
+          coords.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
+          ctx.closePath()
+          ctx.fill()
+        }
+
+        if (heads !== 'none') fillHead(arrowHeadPoints(g.end, g.endAngle, width))
+        if (heads === 'both') fillHead(arrowHeadPoints(g.start, g.startAngle, width))
       }
     } else if (item.kind === 'ink') {
       // Drawn through the same box scaling the SVG uses, so a resized stroke

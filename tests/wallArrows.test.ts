@@ -8,6 +8,7 @@ import {
   arrowAnchors,
   arrowHeadInset,
   pruneArrows,
+  boundsOf,
   normalizeWallItem,
   ARROW_SHAPES,
   ARROW_LINES,
@@ -384,5 +385,32 @@ describe('an end attached to nothing', () => {
     }, 0)
     expect(item?.to).toBe('b')
     expect(item?.toPoint).toBeUndefined()
+  })
+})
+
+describe('what a loose end does to the wall bounds', () => {
+  const note = box({ id: 'n', x: 0, y: 0, width: 100, height: 100 })
+
+  it('is counted, so an export cannot crop it off', () => {
+    const b = boundsOf([note, box({ id: 'a', kind: 'arrow', from: 'n', toPoint: { x: 500, y: 400 } })])!
+    expect(b.maxX).toBe(500)
+    expect(b.maxY).toBe(400)
+  })
+
+  it(`still ignores the placeholder box when both ends are attached`, () => {
+    // The box an arrow carries is not where it is drawn, so counting it would
+    // pull "fit to content" towards a point with nothing at it.
+    const other = box({ id: 'o', x: 200, y: 0 })
+    const arrow = box({ id: 'a', kind: 'arrow', from: 'n', to: 'o', x: 9000, y: 9000 })
+    expect(boundsOf([note, other, arrow])).toEqual(boundsOf([note, other]))
+  })
+
+  it('works from loose ends alone', () => {
+    const b = boundsOf([box({ id: 'a', kind: 'arrow', fromPoint: { x: 10, y: 20 }, toPoint: { x: 30, y: 5 } })])!
+    expect(b).toEqual({ minX: 10, minY: 5, maxX: 30, maxY: 20 })
+  })
+
+  it('is still null for a wall with nothing on it', () => {
+    expect(boundsOf([])).toBeNull()
   })
 })
