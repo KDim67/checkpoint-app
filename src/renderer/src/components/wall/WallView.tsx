@@ -70,7 +70,7 @@ const CLICK_SLOP = 4
 
 type Drag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
-  | { mode: 'move'; startX: number; startY: number; origin: WallItem[] }
+  | { mode: 'move'; startX: number; startY: number; origin: WallItem[]; moved: boolean }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
   | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
@@ -631,6 +631,15 @@ export default function WallView() {
       return
     }
 
+    // The pen takes the whole gesture, over items as well as empty canvas:
+    // drawing over a card is the ordinary thing to want. Checked before the
+    // move branch, which previously won and dragged the card instead.
+    if (tool === 'pen' && e.button === 0) {
+      dragRef.current = { mode: 'draw' }
+      setDrawing([toWallPoint(screenPoint(e), docRef.current.camera)])
+      return
+    }
+
     if (id && item && e.button === 0) {
       if (item.locked) { setSelectedIds(new Set()); return }
       const already = selectedRef.current.has(id)
@@ -640,15 +649,7 @@ export default function WallView() {
       setSelectedIds(next)
       if (!e.shiftKey) setItems(bringToFront(docRef.current.items, id), { record: false })
       movingRef.current = withFrameContents(docRef.current.items, next)
-      dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: docRef.current.items }
-      return
-    }
-
-    // The pen takes the whole gesture: on empty canvas and over items alike,
-    // because drawing over a card is the ordinary thing to want.
-    if (tool === 'pen' && e.button === 0) {
-      dragRef.current = { mode: 'draw' }
-      setDrawing([toWallPoint(screenPoint(e), docRef.current.camera)])
+      dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: docRef.current.items, moved: false }
       return
     }
 
@@ -724,6 +725,12 @@ export default function WallView() {
     const dy = (e.clientY - drag.startY) / cam.zoom
 
     if (drag.mode === 'move') {
+      // A press that has not travelled yet is still a click. Without this a
+      // hand that shifts a pixel while clicking nudges the item and spends an
+      // undo step on it.
+      if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < CLICK_SLOP) return
+      drag.moved = true
+
       // Hit-tested against the document: capture keeps sending us events even
       // once the cursor has left the canvas for the rail.
       const under = railOpen ? document.elementFromPoint(e.clientX, e.clientY) : null
@@ -797,6 +804,8 @@ export default function WallView() {
     }
 
     // One undo step for the whole gesture, recorded now that it is finished.
+    // A move that never passed the threshold changed nothing worth recording.
+    if (drag?.mode === 'move' && !drag.moved) return
     if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate')) {
       historyRef.current = pushHistory(historyRef.current, docRef.current.items)
       setHistoryTick(t => t + 1)
@@ -1424,6 +1433,15 @@ export default function WallView() {
               </div>
             )}
           </div>
+
+          {/* At this end because the panel it opens is on this side. It used
+              to sit on the far left, pointing across the whole toolbar. */}
+          {toolButton(
+            railOpen ? 'Hide the board' : 'Show the board beside the wall',
+            <PanelRight size={14} />,
+            toggleRail,
+            { active: railOpen }
+          )}
         </div>
 
         {picker && (
@@ -1622,6 +1640,8 @@ export default function WallView() {
                     // canvas does not re-rasterise them. They are the expensive
                     // ones: a photo can be tens of megapixels behind a 280px box.
                     willChange: item.kind === 'image' ? 'transform' : undefined,
+                    // Ink lets presses through: only its stroke takes them.
+                    pointerEvents: item.kind === 'ink' ? 'none' : undefined,
                     cursor: item.locked ? 'default' : 'grab',
                     outline: arrowFrom === item.id
                       ? '2px dashed var(--color-secondary)'
