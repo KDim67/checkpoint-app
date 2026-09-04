@@ -205,6 +205,19 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
         preserveAspectRatio="none"
         style={{ display: 'block', overflow: 'visible', pointerEvents: 'none' }}
       >
+        {/* A fat invisible copy underneath, and the only part that takes a
+            press. The box around a diagonal stroke is mostly empty space, and
+            leaving that clickable meant one stroke could blanket everything
+            under it and swallow every drag aimed at the items beneath. */}
+        <path
+          d={inkPath(item)}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={(item.strokeWidth ?? 4) + 14}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ pointerEvents: 'stroke' }}
+        />
         <path
           d={inkPath(item)}
           fill="none"

@@ -447,9 +447,10 @@ export const SNAP_GRID = 24
 export function itemAtPoint(items: WallItem[], point: { x: number; y: number }): WallItem | null {
   let hit: WallItem | null = null
   for (const i of items) {
-    // An arrow's box is a placeholder, not where it is drawn. Clicking one goes
-    // through the line test in the view instead.
-    if (i.kind === 'arrow') continue
+    // Neither of these is really the shape of its box. An arrow's box is a
+    // placeholder, and a stroke's is a rectangle around a line that is mostly
+    // not in it, so treating either as solid blocks whatever is underneath.
+    if (i.kind === 'arrow' || i.kind === 'ink') continue
     const inside =
       point.x >= i.x && point.x <= i.x + i.width &&
       point.y >= i.y && point.y <= i.y + i.height
