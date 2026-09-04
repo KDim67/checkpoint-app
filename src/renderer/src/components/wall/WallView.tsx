@@ -77,10 +77,17 @@ const SMOOTHING_CHOICES = [
 /** The small heading above each group in the pen panel. */
 const caption: React.CSSProperties = {
   fontSize: '9px',
-  fontWeight: 600,
-  letterSpacing: '0.06em',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  color: 'var(--color-text-faint)'
+  color: 'var(--color-text-faint)',
+  marginBottom: '2px'
+}
+
+/** One group in the pen panel: a caption and whatever it labels. */
+const group: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column'
 }
 
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
@@ -1845,17 +1852,18 @@ export default function WallView() {
               aria-label="Pen settings"
               style={{
                 position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)',
-                zIndex: 20, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-                padding: 'var(--space-2)',
-                // Capped and scrollable: as a single column this ran off the
-                // bottom of a short window and took the controls with it.
-                maxHeight: 'calc(100% - var(--space-6))', overflowY: 'auto',
+                zIndex: 20, display: 'flex', flexDirection: 'column', gap: 'var(--space-4)',
+                padding: 'var(--space-3)', width: '124px', boxSizing: 'border-box',
+                // Only scrolls if the window is genuinely too short for it. In
+                // three columns it fits, so the bars normally never appear.
+                maxHeight: 'calc(100% - var(--space-6))', overflowY: 'auto', overflowX: 'hidden',
                 background: 'var(--color-surface-elevated)',
                 border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)',
+                borderRadius: 'var(--radius-lg, 10px)',
                 boxShadow: 'var(--shadow-lg)'
               }}
             >
+              <div style={group}>
               <span style={caption}>Ink</span>
               <WallColorPicker
                 colors={WALL_COLORS}
@@ -1863,7 +1871,9 @@ export default function WallView() {
                 onChange={setPenColor}
                 columns={3}
               />
+              </div>
 
+              <div style={group}>
               <span style={caption}>Width</span>
               <div style={{ display: 'flex', gap: '4px' }}>
                 {STROKE_WIDTHS.map(width => (
@@ -1887,11 +1897,21 @@ export default function WallView() {
                   </button>
                 ))}
               </div>
+              </div>
 
-              {/* Off is one of the choices rather than a separate switch, so the
-                  panel does not change height when smoothing is turned off. */}
+              {/* A segmented control, with Off as one of the segments: a
+                  separate switch would change the panel's height when used. */}
+              <div style={group}>
               <span style={caption}>Smoothing</span>
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <div
+                role="group"
+                style={{
+                  display: 'flex', padding: '2px', gap: '2px',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-surface-offset)',
+                  borderRadius: 'var(--radius-md)'
+                }}
+              >
                 {SMOOTHING_CHOICES.map(choice => (
                   <button
                     key={choice.label}
@@ -1903,16 +1923,18 @@ export default function WallView() {
                     aria-label={`Smoothing ${choice.label}`}
                     aria-pressed={smoothing === choice.value}
                     style={{
-                      flex: 1, height: '22px', fontSize: '10px',
-                      background: smoothing === choice.value ? 'var(--color-secondary-muted)' : 'none',
-                      color: smoothing === choice.value ? 'var(--color-secondary)' : 'var(--color-text-faint)',
+                      flex: 1, minWidth: 0, height: '20px', padding: 0,
+                      fontSize: '9px', fontWeight: smoothing === choice.value ? 700 : 500,
+                      background: smoothing === choice.value ? 'var(--color-secondary)' : 'transparent',
+                      color: smoothing === choice.value ? 'var(--color-surface-1)' : 'var(--color-text-muted)',
                       border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                      transition: 'background var(--duration-fast) var(--ease-default)'
+                      transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
                     }}
                   >
                     {choice.short}
                   </button>
                 ))}
+              </div>
               </div>
             </div>
           )}

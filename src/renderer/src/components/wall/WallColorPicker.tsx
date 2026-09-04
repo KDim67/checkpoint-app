@@ -38,16 +38,29 @@ export default function WallColorPicker({
   colors, value, onChange, columns = 4, defaultLabel, onDefault, allowCustom = true
 }: Props): React.JSX.Element {
   const isCustom = !!value && !colors.includes(value)
-  const [customOpen, setCustomOpen] = useState(false)
+  /**
+   * Where to draw the panel, in viewport coordinates.
+   *
+   * Fixed rather than absolute because the pen palette scrolls: an absolutely
+   * positioned panel was a child of that scroller, so it could not escape it
+   * and only ever produced scrollbars.
+   */
+  const [customAt, setCustomAt] = useState<{ left: number; top: number } | null>(null)
   const customRef = useRef<HTMLDivElement>(null)
+  const customOpen = customAt !== null
 
   useEffect(() => {
     if (!customOpen) return
     const onDown = (e: PointerEvent): void => {
-      if (!customRef.current?.contains(e.target as Node)) setCustomOpen(false)
+      if (!customRef.current?.contains(e.target as Node)) setCustomAt(null)
     }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setCustomAt(null) }
     document.addEventListener('pointerdown', onDown)
-    return () => document.removeEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [customOpen])
 
   const swatch = (color: string, selected: boolean, label: string, onClick: () => void): React.JSX.Element => (
@@ -112,7 +125,16 @@ export default function WallColorPicker({
         {allowCustom && (
           <div ref={customRef} style={{ position: 'relative' }}>
             <button
-              onClick={() => setCustomOpen(o => !o)}
+              onClick={e => {
+                if (customOpen) { setCustomAt(null); return }
+                const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                // Kept inside the window: the panel is 220 by 210 or so, and
+                // near a bottom corner it would otherwise open off-screen.
+                setCustomAt({
+                  left: Math.min(box.right + 10, window.innerWidth - 232),
+                  top: Math.min(box.top, window.innerHeight - 232)
+                })
+              }}
               title="Any colour"
               aria-label="Custom colour"
               aria-expanded={customOpen}
@@ -138,9 +160,9 @@ export default function WallColorPicker({
               }} />
             </button>
 
-            {customOpen && (
+            {customAt && (
               <div style={{
-                position: 'absolute', top: 0, left: `${TARGET + 10}px`, zIndex: 60,
+                position: 'fixed', left: `${customAt.left}px`, top: `${customAt.top}px`, zIndex: 60,
                 padding: 'var(--space-3)',
                 background: 'var(--color-surface-elevated)',
                 border: '1px solid var(--color-surface-offset)',
