@@ -52,6 +52,13 @@ export interface WallItem {
    */
   from?: string
   to?: string
+  /**
+   * How an arrow is drawn. All three are absent at their default, so an arrow
+   * saved before styles existed still reads as the plain one it was.
+   */
+  arrowShape?: ArrowShape
+  arrowLine?: ArrowLine
+  arrowHeads?: ArrowHeads
   /** Degrees. Freedom includes the freedom to put something on a slant. */
   rotation?: number
   /** Paint order. Explicit because it has to survive a reload. */
@@ -147,6 +154,19 @@ const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 
 /** Pen widths, in wall units. Three is enough to be useful and to choose from. */
 export const STROKE_WIDTHS = [2, 4, 8]
 
+/** The route a connector takes between its two items. */
+export type ArrowShape = 'straight' | 'curved' | 'elbow'
+/** What the line itself looks like. */
+export type ArrowLine = 'solid' | 'dashed' | 'dotted'
+/** Which ends get a head. `none` makes it a plain connector. */
+export type ArrowHeads = 'end' | 'both' | 'none'
+
+// Order matters: the palette steps through each in turn, and the first is the
+// default that is never written to the document.
+export const ARROW_SHAPES: readonly ArrowShape[] = ['straight', 'curved', 'elbow']
+export const ARROW_LINES: readonly ArrowLine[] = ['solid', 'dashed', 'dotted']
+export const ARROW_HEAD_MODES: readonly ArrowHeads[] = ['end', 'both', 'none']
+
 /** How hard a smoothed stroke gets smoothed. The pen offers this or nothing. */
 export const SMOOTHING_STRENGTH = 0.9
 
@@ -189,6 +209,16 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ? SMOOTHING_STRENGTH
     : Math.min(1, Math.max(0, num(o.smooth, 0)))
 
+  // Anything unrecognised falls back to the default rather than being kept,
+  // so a document edited by hand cannot ask for a style that cannot be drawn.
+  const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | null => {
+    const v = str(value) as T
+    return allowed.includes(v) ? v : null
+  }
+  const arrowShape = oneOf(o.arrowShape, ARROW_SHAPES)
+  const arrowLine = oneOf(o.arrowLine, ARROW_LINES)
+  const arrowHeads = oneOf(o.arrowHeads, ARROW_HEAD_MODES)
+
   const size = DEFAULT_SIZES[kind]
   return {
     id: str(o.id).trim() || `w${index}-${Math.random().toString(36).slice(2, 8)}`,
@@ -207,6 +237,11 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(smooth > 0 ? { smooth } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
+    // The default is left out, so only an arrow that was actually restyled
+    // carries the field.
+    ...(arrowShape && arrowShape !== ARROW_SHAPES[0] ? { arrowShape } : {}),
+    ...(arrowLine && arrowLine !== ARROW_LINES[0] ? { arrowLine } : {}),
+    ...(arrowHeads && arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
     ...(o.locked === true ? { locked: true } : {}),
     z: num(o.z, index)
@@ -774,6 +809,196 @@ export function distanceToSegment(p: Point, a: Point, b: Point): number {
   // infinite line through them.
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq))
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+
+/** Distance to the nearest of a run of segments. */
+export function distanceToPolyline(p: Point, points: Point[]): number {
+  if (points.length === 0) return Infinity
+  if (points.length === 1) return Math.hypot(p.x - points[0].x, p.y - points[0].y)
+
+  let best = Infinity
+  for (let i = 1; i < points.length; i++) {
+    best = Math.min(best, distanceToSegment(p, points[i - 1], points[i]))
+  }
+  return best
+}
+
+/** The point where a ray leaving `box` horizontally or vertically crosses it. */
+function sidePoint(box: WallItem, horizontal: boolean, positive: boolean): Point {
+  const c = centreOf(box)
+  return horizontal
+    ? { x: c.x + (positive ? 1 : -1) * box.width / 2, y: c.y }
+    : { x: c.x, y: c.y + (positive ? 1 : -1) * box.height / 2 }
+}
+
+/**
+ * A path through a run of points with the corners taken off.
+ *
+ * The radius shrinks to fit whichever segment is shortest, so two items almost
+ * on top of each other get a tight corner rather than a curve that overshoots
+ * the line it belongs to.
+ */
+export function roundedPath(points: Point[], radius: number): string {
+  if (points.length < 2) return ''
+  if (points.length === 2) {
+    return `M${points[0].x},${points[0].y}L${points[1].x},${points[1].y}`
+  }
+
+  let d = `M${points[0].x},${points[0].y}`
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]
+    const corner = points[i]
+    const next = points[i + 1]
+
+    const inLen = Math.hypot(corner.x - prev.x, corner.y - prev.y) || 1
+    const outLen = Math.hypot(next.x - corner.x, next.y - corner.y) || 1
+    const r = Math.min(radius, inLen / 2, outLen / 2)
+
+    const enter = {
+      x: corner.x - ((corner.x - prev.x) / inLen) * r,
+      y: corner.y - ((corner.y - prev.y) / inLen) * r
+    }
+    const leave = {
+      x: corner.x + ((next.x - corner.x) / outLen) * r,
+      y: corner.y + ((next.y - corner.y) / outLen) * r
+    }
+
+    d += `L${enter.x},${enter.y}Q${corner.x},${corner.y} ${leave.x},${leave.y}`
+  }
+
+  const last = points[points.length - 1]
+  return `${d}L${last.x},${last.y}`
+}
+
+export interface ArrowGeometry {
+  start: Point
+  end: Point
+  /** The line, as SVG path data. */
+  d: string
+  /** Which way a head at the far end points, in radians. */
+  endAngle: number
+  /** Which way a head at the near end points. Back out of the item it left. */
+  startAngle: number
+  /** Straight segments following the line, for hit testing. */
+  polyline: Point[]
+}
+
+/** How far a curved connector bows out, as a fraction of its own length. */
+const BOW = 0.22
+/** Past this it stops bowing further, or a wall-length arrow becomes a circle. */
+const MAX_BOW = 140
+const ELBOW_RADIUS = 12
+
+/**
+ * Everything needed to draw one connector: where it starts and ends, the path
+ * between them, and which way each head points.
+ *
+ * The renderer gets no say in any of it, so the line that is drawn and the
+ * line that is clicked are the same line by construction.
+ */
+export function arrowGeometry(from: WallItem, to: WallItem, shape: ArrowShape = 'straight'): ArrowGeometry {
+  if (shape === 'elbow') {
+    const a = centreOf(from)
+    const b = centreOf(to)
+    // Whichever way the two are further apart is the way the connector leaves,
+    // which is what keeps an elbow from doubling back on itself.
+    const horizontal = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
+    const positive = horizontal ? b.x >= a.x : b.y >= a.y
+
+    const start = sidePoint(from, horizontal, positive)
+    const end = sidePoint(to, horizontal, !positive)
+    const mid = horizontal ? (start.x + end.x) / 2 : (start.y + end.y) / 2
+    const corners: Point[] = horizontal
+      ? [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end]
+      : [start, { x: start.x, y: mid }, { x: end.x, y: mid }, end]
+
+    const forward = positive ? 0 : Math.PI
+    const endAngle = horizontal ? forward : (positive ? Math.PI / 2 : -Math.PI / 2)
+
+    return {
+      start,
+      end,
+      d: roundedPath(corners, ELBOW_RADIUS),
+      endAngle,
+      startAngle: endAngle + Math.PI,
+      polyline: corners
+    }
+  }
+
+  const { start, end } = arrowEnds(from, to)
+
+  if (shape === 'curved') {
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    const length = Math.hypot(dx, dy) || 1
+    const bow = Math.min(length * BOW, MAX_BOW)
+
+    // Perpendicular to the line, so it always bows the same way round.
+    const control = {
+      x: (start.x + end.x) / 2 - (dy / length) * bow,
+      y: (start.y + end.y) / 2 + (dx / length) * bow
+    }
+
+    // Sampled rather than solved: a handful of points is close enough to click
+    // and avoids a quadratic root-finder living in a hit test.
+    const polyline: Point[] = []
+    const steps = 12
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const u = 1 - t
+      polyline.push({
+        x: u * u * start.x + 2 * u * t * control.x + t * t * end.x,
+        y: u * u * start.y + 2 * u * t * control.y + t * t * end.y
+      })
+    }
+
+    return {
+      start,
+      end,
+      d: `M${start.x},${start.y}Q${control.x},${control.y} ${end.x},${end.y}`,
+      // The tangent at either end of a quadratic points away from the control.
+      endAngle: Math.atan2(end.y - control.y, end.x - control.x),
+      startAngle: Math.atan2(start.y - control.y, start.x - control.x),
+      polyline
+    }
+  }
+
+  const angle = Math.atan2(end.y - start.y, end.x - start.x)
+  return {
+    start,
+    end,
+    d: `M${start.x},${start.y}L${end.x},${end.y}`,
+    endAngle: angle,
+    startAngle: angle + Math.PI,
+    polyline: [start, end]
+  }
+}
+
+/**
+ * The dash pattern for a line style, scaled to the stroke so a thick dashed
+ * line does not read as solid.
+ *
+ * Undefined for a solid line rather than a pattern meaning "no gaps", since
+ * that is what SVG wants and it keeps the attribute off the element.
+ */
+export function arrowDash(line: ArrowLine, strokeWidth: number): string | undefined {
+  const w = Math.max(1, strokeWidth)
+  if (line === 'dashed') return `${w * 3} ${w * 2}`
+  // Round caps turn a very short dash into a dot.
+  if (line === 'dotted') return `1 ${w * 2}`
+  return undefined
+}
+
+/** The three points of an arrowhead pointing along `angle`. */
+export function arrowHeadPoints(tip: Point, angle: number, strokeWidth: number): string {
+  const size = 10 + Math.max(1, strokeWidth) * 2
+  const spread = 0.4
+  return [
+    `${tip.x},${tip.y}`,
+    `${tip.x - size * Math.cos(angle - spread)},${tip.y - size * Math.sin(angle - spread)}`,
+    `${tip.x - size * Math.cos(angle + spread)},${tip.y - size * Math.sin(angle + spread)}`
+  ].join(' ')
 }
 
 /**

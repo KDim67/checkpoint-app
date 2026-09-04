@@ -29,7 +29,9 @@ import {
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
   snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
-  arrowEnds, distanceToSegment, inkFromPath, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH,
+  arrowGeometry, arrowDash, arrowHeadPoints, distanceToPolyline, inkFromPath, pruneArrows,
+  STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES,
+  type ArrowShape, type ArrowLine, type ArrowHeads,
   type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
 } from '../../../../shared/wallModel'
 import {
@@ -52,7 +54,7 @@ import {
   decodeWallDrag, filterGroups, groupCardsByColumn, planHandoff, WALL_DRAG_MIME
 } from '../../../../shared/wallBoard'
 import { loadBoardConfig } from '../../lib/boardConfig'
-import { getBoolSetting, getNumberSetting, setBoolSetting, setNumberSetting } from '../../lib/settings'
+import { getBoolSetting, getNumberSetting, getEnumSetting, setBoolSetting, setNumberSetting, setStringSetting } from '../../lib/settings'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
 
@@ -65,6 +67,48 @@ const RAIL_MAX = 460
 const RAIL_OPEN_KEY = 'wallview_rail_open'
 const RAIL_WIDTH_KEY = 'wallview_rail_width'
 const SMOOTHING_KEY = 'wallview_pen_smoothing'
+const ARROW_SHAPE_KEY = 'wallview_arrow_shape'
+const ARROW_LINE_KEY = 'wallview_arrow_line'
+const ARROW_HEADS_KEY = 'wallview_arrow_heads'
+
+
+/**
+ * The style buttons draw their own option rather than borrowing an icon.
+ * "Dashed" as a picture of a dashed line needs no legend, and there is no
+ * icon in the set that means "elbow" without a caption next to it.
+ */
+const glyphProps = {
+  width: 15, height: 15, viewBox: '0 0 15 15',
+  fill: 'none', stroke: 'currentColor', strokeWidth: 1.7,
+  strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const
+}
+
+const SHAPE_GLYPHS: Record<ArrowShape, string> = {
+  straight: 'M2 12L13 3',
+  curved: 'M2 12Q3 3 13 4',
+  elbow: 'M2 12H8V3H13'
+}
+
+const shapeGlyph = (shape: ArrowShape): React.JSX.Element => (
+  <svg {...glyphProps}><path d={SHAPE_GLYPHS[shape]} /></svg>
+)
+
+const lineGlyph = (line: ArrowLine): React.JSX.Element => (
+  <svg {...glyphProps} strokeWidth={2}>
+    <path d="M2 7.5H13" strokeDasharray={line === 'dashed' ? '4 3' : line === 'dotted' ? '0.5 3' : undefined} />
+  </svg>
+)
+
+const headsGlyph = (heads: ArrowHeads): React.JSX.Element => (
+  <svg {...glyphProps}>
+    <path d="M2 7.5H13" />
+    {heads !== 'none' && <path d="M10 4.5L13 7.5L10 10.5" />}
+    {heads === 'both' && <path d="M5 4.5L2 7.5L5 10.5" />}
+  </svg>
+)
+
+/** Sentence case for a tooltip, since the values are lower-case identifiers. */
+const nameOf = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
 
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
@@ -74,6 +118,7 @@ type Drag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
   | { mode: 'move'; startX: number; startY: number; origin: WallItem[]; moved: boolean }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
+  | { mode: 'arrow'; fromId: string; startX: number; startY: number; moved: boolean; overId: string | null }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
   | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
   | { mode: 'draw' }
@@ -111,6 +156,15 @@ export default function WallView() {
   const [drawing, setDrawing] = useState<{ x: number; y: number }[] | null>(null)
   /** The first item picked for an arrow, waiting for its second. */
   const [arrowFrom, setArrowFrom] = useState<string | null>(null)
+  /**
+   * The connector being dragged out, in wall coordinates. `overId` is the item
+   * under the pointer, so the preview can snap to it and the item can light up
+   * before the pointer is let go.
+   */
+  const [arrowDrag, setArrowDrag] = useState<{ fromId: string; at: { x: number; y: number }; overId: string | null } | null>(null)
+  const [arrowShape, setArrowShape] = useState<ArrowShape>(ARROW_SHAPES[0])
+  const [arrowLine, setArrowLine] = useState<ArrowLine>(ARROW_LINES[0])
+  const [arrowHeads, setArrowHeads] = useState<ArrowHeads>(ARROW_HEAD_MODES[0])
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   /** Name of an image job in flight, shown so a slow one does not look frozen. */
   const [busy, setBusy] = useState<string | null>(null)
@@ -167,6 +221,8 @@ export default function WallView() {
   const notesByTitle = useMemo(() => new Map(notes.map(n => [n.title, n])), [notes])
   const selectedItems = doc.items.filter(i => selectedIds.has(i.id))
   const single = selectedItems.length === 1 ? selectedItems[0] : null
+  /** Restyling only makes sense when everything selected is a connector. */
+  const arrowsSelected = selectedItems.length > 0 && selectedItems.every(i => i.kind === 'arrow')
 
   const wallIndex = index?.context === activeContext ? index.value : null
   const activeWall = wallIndex?.walls.find(w => w.id === wallIndex.activeId) ?? null
@@ -237,11 +293,17 @@ export default function WallView() {
     Promise.all([
       getBoolSetting(RAIL_OPEN_KEY, false),
       getNumberSetting(RAIL_WIDTH_KEY, 260),
-      getNumberSetting(SMOOTHING_KEY, SMOOTHING_STRENGTH)
-    ]).then(([open, width, smooth]) => {
+      getNumberSetting(SMOOTHING_KEY, SMOOTHING_STRENGTH),
+      getEnumSetting(ARROW_SHAPE_KEY, ARROW_SHAPES, ARROW_SHAPES[0]),
+      getEnumSetting(ARROW_LINE_KEY, ARROW_LINES, ARROW_LINES[0]),
+      getEnumSetting(ARROW_HEADS_KEY, ARROW_HEAD_MODES, ARROW_HEAD_MODES[0])
+    ]).then(([open, width, smooth, shape, line, heads]) => {
       if (cancelled) return
       setRailOpen(open)
       setRailWidth(clampRail(width))
+      setArrowShape(shape)
+      setArrowLine(line)
+      setArrowHeads(heads)
       // Still kept as a strength so the preference carries over from the build
       // that had a dial. Anything above zero means on.
       setSmoothing(smooth > 0)
@@ -569,8 +631,10 @@ export default function WallView() {
       const from = itemsById.get(arrow.from ?? '')
       const to = itemsById.get(arrow.to ?? '')
       if (!from || !to) continue
-      const { start, end } = arrowEnds(from, to)
-      if (distanceToSegment(at, start, end) <= slack + (arrow.strokeWidth ?? 2)) return arrow
+      // Against the same points the renderer draws, so a curve is clicked
+      // where it looks rather than along the straight line under it.
+      const { polyline } = arrowGeometry(from, to, arrow.arrowShape ?? ARROW_SHAPES[0])
+      if (distanceToPolyline(at, polyline) <= slack + (arrow.strokeWidth ?? 2)) return arrow
     }
     return null
   }
@@ -627,15 +691,16 @@ export default function WallView() {
     const id = itemEl?.dataset.wallItem
     const item = id ? docRef.current.items.find(i => i.id === id) : undefined
 
-    // Two clicks make an arrow: pick a source, then a target. Picking the same
-    // item twice cancels rather than drawing a loop nobody asked for.
+    // Drag from one item to another, with the line following the pointer. A
+    // press that never moves still works the old way, picking two items in
+    // turn, which is easier between two items that nearly touch.
     if (tool === 'arrow' && e.button === 0) {
       if (!item || item.kind === 'arrow') { setArrowFrom(null); return }
-      if (!arrowFrom) { setArrowFrom(item.id); return }
-      if (arrowFrom !== item.id) {
-        addItem('arrow', { from: arrowFrom, to: item.id, color: penColor, strokeWidth: penWidth })
+      dragRef.current = {
+        mode: 'arrow', fromId: item.id,
+        startX: e.clientX, startY: e.clientY, moved: false, overId: null
       }
-      setArrowFrom(null)
+      setArrowDrag({ fromId: item.id, at: toWallPoint(screenPoint(e), docRef.current.camera), overId: null })
       return
     }
 
@@ -692,6 +757,18 @@ export default function WallView() {
         if (travelled > CLICK_SLOP) press.moved = true
       }
       setCamera({ ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) })
+      return
+    }
+
+    if (drag.mode === 'arrow') {
+      if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > CLICK_SLOP) {
+        drag.moved = true
+      }
+      const at = toWallPoint(screenPoint(e), cam)
+      const hit = itemAtPoint(docRef.current.items, at)
+      // An arrow cannot end on another arrow, or on the item it started from.
+      drag.overId = hit && hit.id !== drag.fromId && hit.kind !== 'arrow' ? hit.id : null
+      setArrowDrag({ fromId: drag.fromId, at, overId: drag.overId })
       return
     }
 
@@ -786,6 +863,35 @@ export default function WallView() {
         setSelectedIds(new Set([press.itemId]))
       }
       setMenu({ x: press.clientX, y: press.clientY, itemId: press.itemId, at: press.at })
+      return
+    }
+
+    if (drag?.mode === 'arrow') {
+      setArrowDrag(null)
+      const style = {
+        color: penColor,
+        strokeWidth: penWidth,
+        ...(arrowShape !== ARROW_SHAPES[0] ? { arrowShape } : {}),
+        ...(arrowLine !== ARROW_LINES[0] ? { arrowLine } : {}),
+        ...(arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {})
+      }
+
+      if (drag.moved) {
+        if (drag.overId) addItem('arrow', { from: drag.fromId, to: drag.overId, ...style })
+        setArrowFrom(null)
+        setArrowDrag(null)
+        return
+      }
+
+      // Never moved, so it was a click. Pick a source, then a target, which is
+      // the easier gesture when the two items nearly touch.
+      if (arrowFrom && arrowFrom !== drag.fromId) {
+        addItem('arrow', { from: arrowFrom, to: drag.fromId, ...style })
+        setArrowFrom(null)
+      } else {
+        // Clicking the same item again puts it down rather than looping it.
+        setArrowFrom(arrowFrom === drag.fromId ? null : drag.fromId)
+      }
       return
     }
 
@@ -1053,6 +1159,63 @@ export default function WallView() {
    * which matters most for the pen and arrow, where being wrong about which
    * tool is armed changes what a click does.
    */
+  /**
+   * One button per property, showing the option in force and moving to the
+   * next on click. Three buttons rather than nine, which is what keeps the
+   * palette a single narrow column.
+   */
+  const cycleButton = <T extends string>(
+    label: string,
+    options: readonly T[],
+    current: T,
+    glyph: (value: T) => React.ReactNode,
+    onPick: (next: T) => void,
+    compact = false
+  ): React.JSX.Element => {
+    const next = options[(options.indexOf(current) + 1) % options.length]
+    const size = compact ? '26px' : '30px'
+    return (
+      <button
+        key={label}
+        onClick={() => onPick(next)}
+        title={`${label}: ${nameOf(current)}. Click for ${nameOf(next)}.`}
+        aria-label={`${label}: ${nameOf(current)}`}
+        style={{
+          width: size, height: size,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'none', color: 'var(--color-text-muted)',
+          border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+          transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'var(--color-secondary-muted)'
+          e.currentTarget.style.color = 'var(--color-secondary)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'none'
+          e.currentTarget.style.color = 'var(--color-text-muted)'
+        }}
+      >
+        {glyph(current)}
+      </button>
+    )
+  }
+
+  /** The three style controls, shared by the palette and the toolbar. */
+  const arrowStyleButtons = (
+    shape: ArrowShape,
+    line: ArrowLine,
+    heads: ArrowHeads,
+    onShape: (v: ArrowShape) => void,
+    onLine: (v: ArrowLine) => void,
+    onHeads: (v: ArrowHeads) => void,
+    compact = false
+  ): React.JSX.Element[] => [
+    cycleButton('Route', ARROW_SHAPES, shape, shapeGlyph, onShape, compact),
+    cycleButton('Line', ARROW_LINES, line, lineGlyph, onLine, compact),
+    cycleButton('Heads', ARROW_HEAD_MODES, heads, headsGlyph, onHeads, compact)
+  ]
+
   const toolButton = (
     label: string,
     icon: React.ReactNode,
@@ -1330,7 +1493,7 @@ export default function WallView() {
             {tool === 'pen'
               ? 'Drag to draw · Esc to stop'
               : tool === 'arrow'
-                ? (arrowFrom ? 'Now click the item to point at' : 'Click an item to start from')
+                ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another')
                 : 'Drag to select · Right-drag to pan'}
           </span>
 
@@ -1553,32 +1716,68 @@ export default function WallView() {
                 const to = itemsById.get(arrow.to ?? '')
                 if (!from || !to) return null
 
-                const { start, end } = arrowEnds(from, to)
-                const angle = Math.atan2(end.y - start.y, end.x - start.x)
-                const head = 10 + (arrow.strokeWidth ?? 2) * 2
-                const spread = 0.4
+                const width = arrow.strokeWidth ?? 2
                 const stroke = arrow.color || 'var(--color-text-muted)'
                 const selected = selectedIds.has(arrow.id)
+                const heads = arrow.arrowHeads ?? ARROW_HEAD_MODES[0]
+                const g = arrowGeometry(from, to, arrow.arrowShape ?? ARROW_SHAPES[0])
 
                 return (
                   <g key={arrow.id} opacity={selected ? 1 : 0.85}>
-                    <line
-                      x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+                    <path
+                      d={g.d}
+                      fill="none"
                       stroke={stroke}
-                      strokeWidth={(arrow.strokeWidth ?? 2) + (selected ? 2 : 0)}
+                      strokeWidth={width + (selected ? 2 : 0)}
                       strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeDasharray={arrowDash(arrow.arrowLine ?? ARROW_LINES[0], width)}
                     />
-                    <polygon
-                      points={[
-                        `${end.x},${end.y}`,
-                        `${end.x - head * Math.cos(angle - spread)},${end.y - head * Math.sin(angle - spread)}`,
-                        `${end.x - head * Math.cos(angle + spread)},${end.y - head * Math.sin(angle + spread)}`
-                      ].join(' ')}
-                      fill={stroke}
-                    />
+                    {heads !== 'none' && (
+                      <polygon points={arrowHeadPoints(g.end, g.endAngle, width)} fill={stroke} />
+                    )}
+                    {heads === 'both' && (
+                      <polygon points={arrowHeadPoints(g.start, g.startAngle, width)} fill={stroke} />
+                    )}
                   </g>
                 )
               })}
+
+              {/* The connector being dragged out. Drawn in the style it will
+                  have, so what is on screen is what gets made. */}
+              {arrowDrag && (() => {
+                const from = itemsById.get(arrowDrag.fromId)
+                if (!from) return null
+
+                // Snaps to the item under the pointer when there is one, and
+                // otherwise follows the pointer itself as a point with no size.
+                const target = arrowDrag.overId ? itemsById.get(arrowDrag.overId) : undefined
+                const landing: WallItem = target ?? {
+                  id: '', kind: 'note', z: 0,
+                  x: arrowDrag.at.x, y: arrowDrag.at.y, width: 1, height: 1
+                }
+                const g = arrowGeometry(from, landing, arrowShape)
+
+                return (
+                  <g opacity={target ? 0.9 : 0.55}>
+                    <path
+                      d={g.d}
+                      fill="none"
+                      stroke={penColor}
+                      strokeWidth={penWidth}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeDasharray={arrowDash(arrowLine, penWidth)}
+                    />
+                    {arrowHeads !== 'none' && (
+                      <polygon points={arrowHeadPoints(g.end, g.endAngle, penWidth)} fill={penColor} />
+                    )}
+                    {arrowHeads === 'both' && (
+                      <polygon points={arrowHeadPoints(g.start, g.startAngle, penWidth)} fill={penColor} />
+                    )}
+                  </g>
+                )
+              })()}
             </svg>
 
             {/* The stroke in progress. Drawn separately because it is not an
@@ -1617,9 +1816,11 @@ export default function WallView() {
                     // Ink lets presses through: only its stroke takes them.
                     pointerEvents: item.kind === 'ink' ? 'none' : undefined,
                     cursor: item.locked ? 'default' : 'grab',
-                    outline: arrowFrom === item.id
-                      ? '2px dashed var(--color-secondary)'
-                      : isSelected ? '2px solid var(--color-secondary)' : 'none',
+                    outline: arrowDrag?.overId === item.id
+                      ? '3px solid var(--color-secondary)'
+                      : arrowFrom === item.id
+                        ? '2px dashed var(--color-secondary)'
+                        : isSelected ? '2px solid var(--color-secondary)' : 'none',
                     outlineOffset: '2px'
                   }}
                 >
@@ -1737,6 +1938,17 @@ export default function WallView() {
                 columns={WALL_COLORS.length + 1}
               />
               <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
+              {arrowsSelected && arrowStyleButtons(
+                single?.arrowShape ?? ARROW_SHAPES[0],
+                single?.arrowLine ?? ARROW_LINES[0],
+                single?.arrowHeads ?? ARROW_HEAD_MODES[0],
+                v => setItems(patchItems(doc.items, selectedIds, { arrowShape: v })),
+                v => setItems(patchItems(doc.items, selectedIds, { arrowLine: v })),
+                v => setItems(patchItems(doc.items, selectedIds, { arrowHeads: v }))
+              )}
+              {arrowsSelected && (
+                <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
+              )}
               {toolButton('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
               {toolButton('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
               {toolButton('Duplicate', <Copy size={13} />, duplicateSelected)}
@@ -1874,6 +2086,15 @@ export default function WallView() {
 
               <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
 
+              {tool === 'arrow' && arrowStyleButtons(
+                arrowShape, arrowLine, arrowHeads,
+                v => { setArrowShape(v); void setStringSetting(ARROW_SHAPE_KEY, v) },
+                v => { setArrowLine(v); void setStringSetting(ARROW_LINE_KEY, v) },
+                v => { setArrowHeads(v); void setStringSetting(ARROW_HEADS_KEY, v) },
+                true
+              )}
+
+              {tool === 'pen' && (
               <button
                 onClick={() => {
                   const next = !smoothing
@@ -1893,6 +2114,7 @@ export default function WallView() {
               >
                 <Spline size={13} />
               </button>
+              )}
             </div>
           )}
 
