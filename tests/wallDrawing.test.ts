@@ -7,7 +7,7 @@ import {
   normalizeWallItem,
   pruneArrows,
   STROKE_WIDTHS,
-  SMOOTHING_LEVELS,
+  SMOOTHING_STRENGTH,
   smoothPoints,
   boundsOf,
   itemsInRect,
@@ -237,7 +237,7 @@ describe('stroke smoothing', () => {
   })
 })
 
-describe('smoothing intensity', () => {
+describe('smoothing strength', () => {
   const shaky = [0, 0, 10, 40, 20, 0, 30, 40, 40, 0, 50, 40]
 
   it('leaves the raw samples alone at zero', () => {
@@ -272,7 +272,14 @@ describe('smoothing intensity', () => {
 
   it('reads a stroke saved by the first version, which stored true', () => {
     const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: true }
-    expect(normalizeWallItem(raw, 0)?.smooth).toBe(SMOOTHING_LEVELS[1])
+    expect(normalizeWallItem(raw, 0)?.smooth).toBe(SMOOTHING_STRENGTH)
+  })
+
+  it('keeps a strength written by the build that had a dial', () => {
+    // The pen writes one strength now, but a stroke drawn on Light should still
+    // look like Light instead of jumping to the full amount.
+    const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: 0.3 }
+    expect(normalizeWallItem(raw, 0)?.smooth).toBe(0.3)
   })
 
   it('clamps a strength from outside the range rather than exaggerating it', () => {

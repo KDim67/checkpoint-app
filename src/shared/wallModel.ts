@@ -42,7 +42,7 @@ export interface WallItem {
   /**
    * How hard this stroke was smoothed, 0 to 1. Absent or zero draws the raw
    * samples. Stored per stroke rather than read from the live setting, so
-   * changing the dial later does not redraw every line already on the wall.
+   * turning smoothing off later does not redraw the lines already on the wall.
    */
   smooth?: number
   /**
@@ -147,8 +147,8 @@ const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 
 /** Pen widths, in wall units. Three is enough to be useful and to choose from. */
 export const STROKE_WIDTHS = [2, 4, 8]
 
-/** How hard to smooth, as offered in the palette. Zero is the raw line. */
-export const SMOOTHING_LEVELS = [0.3, 0.6, 0.9]
+/** How hard a smoothed stroke gets smoothed. The pen offers this or nothing. */
+export const SMOOTHING_STRENGTH = 0.9
 
 /**
  * A path is only a path with two points, and an odd-length array means the
@@ -182,10 +182,11 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const to = str(o.to).trim()
   if (kind === 'arrow' && (!from || !to)) return null
 
-  // `true` is what the first version of smoothing wrote. Read as the middle of
-  // the dial so those strokes keep looking the way they were drawn.
+  // `true` is what the first version wrote, and the build after it wrote a
+  // strength off a dial. Any strength still renders, so nothing already drawn
+  // changes shape under the user.
   const smooth = o.smooth === true
-    ? SMOOTHING_LEVELS[1]
+    ? SMOOTHING_STRENGTH
     : Math.min(1, Math.max(0, num(o.smooth, 0)))
 
   const size = DEFAULT_SIZES[kind]

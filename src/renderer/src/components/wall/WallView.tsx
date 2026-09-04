@@ -29,7 +29,7 @@ import {
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
   snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
   createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
-  arrowEnds, distanceToSegment, inkFromPath, pruneArrows, STROKE_WIDTHS, SMOOTHING_LEVELS,
+  arrowEnds, distanceToSegment, inkFromPath, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH,
   type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
 } from '../../../../shared/wallModel'
 import {
@@ -65,14 +65,6 @@ const RAIL_MAX = 460
 const RAIL_OPEN_KEY = 'wallview_rail_open'
 const RAIL_WIDTH_KEY = 'wallview_rail_width'
 const SMOOTHING_KEY = 'wallview_pen_smoothing'
-
-/** Off first, so the dial reads left to right from raw to heavily smoothed. */
-const SMOOTHING_CHOICES = [
-  { label: 'Off', short: 'Off', value: 0 },
-  { label: 'Light', short: 'Low', value: SMOOTHING_LEVELS[0] },
-  { label: 'Medium', short: 'Med', value: SMOOTHING_LEVELS[1] },
-  { label: 'Strong', short: 'High', value: SMOOTHING_LEVELS[2] }
-]
 
 /** The small heading above each group in the pen panel. */
 const caption: React.CSSProperties = {
@@ -129,8 +121,8 @@ export default function WallView() {
   const [tool, setTool] = useState<'select' | 'pen' | 'arrow'>('select')
   const [penColor, setPenColor] = useState(WALL_COLORS[0])
   const [penWidth, setPenWidth] = useState(STROKE_WIDTHS[1])
-  /** Medium by default: a hand-drawn line is shaky and almost nobody wants that. */
-  const [smoothing, setSmoothing] = useState(SMOOTHING_LEVELS[1])
+  /** On by default: a hand-drawn line is shaky and almost nobody wants that. */
+  const [smoothing, setSmoothing] = useState(true)
   /** The stroke being drawn, in wall coordinates. Null when not drawing. */
   const [drawing, setDrawing] = useState<{ x: number; y: number }[] | null>(null)
   /** The first item picked for an arrow, waiting for its second. */
@@ -261,12 +253,14 @@ export default function WallView() {
     Promise.all([
       getBoolSetting(RAIL_OPEN_KEY, false),
       getNumberSetting(RAIL_WIDTH_KEY, 260),
-      getNumberSetting(SMOOTHING_KEY, SMOOTHING_LEVELS[1])
+      getNumberSetting(SMOOTHING_KEY, SMOOTHING_STRENGTH)
     ]).then(([open, width, smooth]) => {
       if (cancelled) return
       setRailOpen(open)
       setRailWidth(clampRail(width))
-      setSmoothing(Math.min(1, Math.max(0, smooth)))
+      // Still kept as a strength so the preference carries over from the build
+      // that had a dial. Anything above zero means on.
+      setSmoothing(smooth > 0)
     })
     return () => { cancelled = true }
   }, [])
@@ -813,7 +807,7 @@ export default function WallView() {
 
     if (drag?.mode === 'draw') {
       const ink = drawing && inkFromPath(drawing, docRef.current.items, {
-        color: penColor, strokeWidth: penWidth, ...(smoothing > 0 ? { smooth: smoothing } : {})
+        color: penColor, strokeWidth: penWidth, ...(smoothing ? { smooth: SMOOTHING_STRENGTH } : {})
       })
       setDrawing(null)
       if (ink) {
@@ -1899,8 +1893,8 @@ export default function WallView() {
               </div>
               </div>
 
-              {/* A segmented control, with Off as one of the segments: a
-                  separate switch would change the panel's height when used. */}
+              {/* Two segments rather than a switch, so it lines up with the
+                  widths above and keeps the panel the same height either way. */}
               <div style={group}>
               <span style={caption}>Smoothing</span>
               <div
@@ -1912,26 +1906,26 @@ export default function WallView() {
                   borderRadius: 'var(--radius-md)'
                 }}
               >
-                {SMOOTHING_CHOICES.map(choice => (
+                {[false, true].map(on => (
                   <button
-                    key={choice.label}
+                    key={String(on)}
                     onClick={() => {
-                      setSmoothing(choice.value)
-                      void setNumberSetting(SMOOTHING_KEY, choice.value)
+                      setSmoothing(on)
+                      void setNumberSetting(SMOOTHING_KEY, on ? SMOOTHING_STRENGTH : 0)
                     }}
-                    title={choice.label}
-                    aria-label={`Smoothing ${choice.label}`}
-                    aria-pressed={smoothing === choice.value}
+                    title={on ? 'Smoothing on' : 'Smoothing off'}
+                    aria-label={on ? 'Smoothing on' : 'Smoothing off'}
+                    aria-pressed={smoothing === on}
                     style={{
                       flex: 1, minWidth: 0, height: '20px', padding: 0,
-                      fontSize: '9px', fontWeight: smoothing === choice.value ? 700 : 500,
-                      background: smoothing === choice.value ? 'var(--color-secondary)' : 'transparent',
-                      color: smoothing === choice.value ? 'var(--color-surface-1)' : 'var(--color-text-muted)',
+                      fontSize: '9px', fontWeight: smoothing === on ? 700 : 500,
+                      background: smoothing === on ? 'var(--color-secondary)' : 'transparent',
+                      color: smoothing === on ? 'var(--color-surface-1)' : 'var(--color-text-muted)',
                       border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                       transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
                     }}
                   >
-                    {choice.short}
+                    {on ? 'On' : 'Off'}
                   </button>
                 ))}
               </div>
