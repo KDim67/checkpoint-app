@@ -1,34 +1,20 @@
 /**
- * The board, shown beside the Wall.
+ * The board shown beside the Wall. The DOM-free half: what a drag carries, how
+ * cards group into columns, where one lands when handed back.
  *
- * The Wall and the Kanban board are separate views, so until now a card got
- * onto a wall through a picker: open a list, find the card, and it appears in
- * the middle of the view. That works, but it is not what anyone means by
- * putting a card on a wall.
- *
- * Side by side, the board becomes a rail down one edge and the gesture becomes
- * the literal one, pick a card up out of its column and drop it where you want
- * it. This module is the part of that with no DOM in it: what a drag carries,
- * how cards group into columns, and where a card lands when it is handed back.
- *
- * The direction back matters as much as the direction out. **Moving an item on
- * the wall still means nothing**, that is the Wall's whole premise, and it does
- * not change here. But dropping a card *onto a named column* is not a position,
- * it is a statement, and it is allowed to move the card for real.
+ * Position on the wall still means nothing. Dropping onto a named column is not
+ * a position though, so that one gesture moves the card for real.
  */
 
 import type { Item } from './types'
 import type { ColumnConfig } from './boardModel'
 
-/**
- * A private type, so a drop that came from a browser, a file manager, or
- * another part of the app cannot be mistaken for a card being placed.
- */
+/** Private type, so a drop from a browser or file manager cannot look like a card. */
 export const WALL_DRAG_MIME = 'application/x-checkpoint-wall-item'
 
 export interface WallDragPayload {
   kind: 'card' | 'doc'
-  /** An item id for a card, a note title for a doc, as `WallItem.ref`. */
+  /** An item id for a card, a note title for a doc. As `WallItem.ref`. */
   ref: string
 }
 
@@ -36,10 +22,7 @@ export function encodeWallDrag(payload: WallDragPayload): string {
   return JSON.stringify(payload)
 }
 
-/**
- * Hand-normalised rather than trusted: a drop carries whatever the source chose
- * to write, and the source is not necessarily this application.
- */
+/** A drop carries whatever the source wrote, and that source may not be us. */
 export function decodeWallDrag(raw: string | null | undefined): WallDragPayload | null {
   if (!raw) return null
 
@@ -61,10 +44,8 @@ export interface BoardGroup {
 }
 
 /**
- * Where cards go when the column they name is gone. Deleting a column leaves
- * its cards behind holding its id, and they are invisible on the board itself, 
- * so the rail is the one place they can be seen, and they are worth showing
- * rather than silently dropping.
+ * Cards whose column was deleted keep its id and vanish from the board, so the
+ * rail is the only place left to see them.
  */
 export const ORPHAN_COLUMN_ID = '__orphaned__'
 
@@ -74,10 +55,7 @@ export const ORPHAN_COLUMN: ColumnConfig = {
   wipLimit: null
 }
 
-/**
- * Groups cards the way the board does: by status, in column order, sorted by
- * position. Archived cards are left out, the board hides them too.
- */
+/** By status, in column order, sorted by position. Archived left out, as on the board. */
 export function groupCardsByColumn(cards: Item[], columns: ColumnConfig[]): BoardGroup[] {
   const byStatus = new Map<string, Item[]>()
   for (const card of cards) {
@@ -109,10 +87,7 @@ export function cardMatches(card: Item, words: string[]): boolean {
   return words.every(w => hay.includes(w))
 }
 
-/**
- * Filters the cards, and drops the columns left empty: with a query running,
- * a column of nothing is noise rather than structure.
- */
+/** Empty columns are dropped while filtering. They are noise, not structure. */
 export function filterGroups(groups: BoardGroup[], query: string): BoardGroup[] {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   if (words.length === 0) return groups
@@ -126,19 +101,15 @@ export function filterGroups(groups: BoardGroup[], query: string): BoardGroup[] 
 /** Matches the board's own gap, so positions stay comparable between the two. */
 const POSITION_GAP = 1000
 
-/**
- * Where a card lands when it is dropped on a column rather than between two
- * cards: at the end, which is what the board does for the same gesture.
- */
+/** At the end of the column, matching what the board does for the same drop. */
 export function appendPosition(cardsInColumn: Item[]): number {
   if (cardsInColumn.length === 0) return POSITION_GAP
   return Math.max(...cardsInColumn.map(c => c.position)) + POSITION_GAP
 }
 
 /**
- * Which of the selected wall items are cards that would actually move, and to
- * what position. A card already in the target column is left out: the move
- * would be a no-op, and reporting "moved 3 cards" for it would be a lie.
+ * Which selected items are cards that would actually move, and where to. Cards
+ * already in the column are skipped so the "moved N" count stays honest.
  */
 export function planHandoff(
   refs: string[],
@@ -155,8 +126,7 @@ export function planHandoff(
     const card = byId.get(ref)
     if (!card || card.status === columnId) continue
     plan.push({ id: card.id, status: columnId, position: next })
-    // Spaced apart, so a multi-card hand-off keeps the order it was picked up in
-    // instead of collapsing onto one position.
+    // Spaced, so a multi-card hand-off keeps the order it was picked up in.
     next += POSITION_GAP
   }
   return plan

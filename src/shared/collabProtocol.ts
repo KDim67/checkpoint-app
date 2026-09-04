@@ -1,26 +1,14 @@
 /**
  * The wire protocol between two collaborating Checkpoint instances.
  *
- * This is the one place where data from another machine becomes data this
- * machine acts on, and until now both ends of it were typed `any`. What arrives
- * on the data channel was destructured and handed straight to prepared
- * statements, `INSERT OR REPLACE INTO items`, `DELETE FROM items WHERE id = ?`
- *, so a peer sending a field of the wrong shape either wrote nonsense into the
- * database or threw somewhere deep inside SQLite.
+ * Whatever arrives here goes straight into prepared statements, and the pairing
+ * code only proves the peer knows the code, not that it is a sane Checkpoint.
+ * Usually it is just an older build.
  *
- * Encryption does not help here. The pairing code establishes that the peer
- * knows the code, not that it is a well-behaved Checkpoint, and a peer running
- * an older or newer build is the ordinary case rather than the adversarial one.
- *
- * Two rules shape the normalizers:
- *
- * - **Reject structure, default decoration.** A missing id, a non-numeric
- *   position or an unknown kind means the message is not one this build
- *   understands, and guessing would write a corrupt row. A missing title is
- *   just an empty title.
- * - **Everything a genuine peer sends must survive.** These run on every
- *   mutation of a live session, so a normalizer that is stricter than the
- *   sender breaks collaboration rather than protecting it.
+ * Reject structure, default decoration: a bad id or position means we cannot
+ * apply the message, a missing title is just an empty title. And never be
+ * stricter than the sender, or this breaks live sessions instead of guarding
+ * them.
  */
 
 import type { BulkUpdatePayload, Item, ItemPriority, ItemType, Relation, RelationType, Tag } from './types'
@@ -35,14 +23,9 @@ export type RemoteMutation =
   | { type: 'createRelation'; relation: Relation }
   | { type: 'deleteRelation'; id: string }
   /**
-   * The same payload the local bulk edit takes: some ids and one patch applied
-   * to all of them.
-   *
-   * It used to be declared here as `{ updates: [{ id, position, status }] }`,
-   * a shape nothing in the app has ever sent. The receiving end read
-   * `payload.updates`, found undefined, and threw, so every bulk edit made
-   * during a shared session failed on the peer while succeeding locally. The
-   * declaration was wrong, not the senders.
+   * Same payload the local bulk edit takes. It was once declared as
+   * `{ updates: [...] }`, which nothing ever sent, so the receiver read
+   * undefined and threw, and bulk edits silently failed on the peer.
    */
   | { type: 'bulkUpdateItems'; payload: BulkUpdatePayload }
   | { type: 'bulkDeleteItems'; ids: string[] }
@@ -92,13 +75,9 @@ const RELATION_TYPES: RelationType[] = ['blocks', 'relates_to', 'duplicates']
 // Rows
 
 /**
- * An item as it can safely be written.
- *
- * `id`, `type` and `context` are required because they decide *which* row is
- * replaced and which workspace it lands in, getting one wrong overwrites
- * something that has nothing to do with the message. The timestamps are
- * required because a row without them sorts and filters as though it were from
- * 1970.
+ * id, type and context decide which row is replaced and where. A wrong one
+ * overwrites something unrelated. Timestamps required too, or the row sorts as
+ * though it were from 1970.
  */
 export function normalizeSyncItem(raw: unknown): Item | null {
   const o = obj(raw)
@@ -121,16 +100,14 @@ export function normalizeSyncItem(raw: unknown): Item | null {
     context,
     title: str(o.title),
     body: str(o.body),
-    // Status is a free string by design, it holds a column id, and columns are
-    // user-defined, so there is no set to check it against.
+    // Free string by design: it holds a user-defined column id.
     status: str(o.status),
     priority: (priority !== null && priority >= 0 && priority <= 3 ? Math.round(priority) : 0) as ItemPriority,
     position,
     created_at: created,
     updated_at: updated,
     due_at: due,
-    // Stored as a JSON string. A peer sending an object would write "[object
-    // Object]" into the column and break every reader of it.
+    // JSON text. An object here writes "[object Object]" and breaks every reader.
     metadata: typeof o.metadata === 'string' ? o.metadata : '{}'
   }
 }
@@ -183,9 +160,7 @@ export function normalizeRemoteMutation(raw: unknown): RemoteMutation | null {
     case 'updateItem': {
       const item = normalizeSyncItem(o.item)
       if (!item) return null
-      // Absent and empty are different: absent leaves the row's tags alone,
-      // while an empty array clears them. Preserving that distinction is the
-      // difference between an edit and a silent untagging.
+      // Absent leaves tags alone; empty clears them. Collapsing the two untags silently.
       const tagIds = o.tagIds === undefined || o.tagIds === null ? undefined : idList(o.tagIds)
       return { type: o.type, item, ...(tagIds ? { tagIds } : {}) }
     }
@@ -216,17 +191,14 @@ export function normalizeRemoteMutation(raw: unknown): RemoteMutation | null {
       const rawPatch = obj(payload.patch)
       if (ids.length === 0 || !rawPatch) return null
 
-      // Only the three fields the local bulk edit can set. A patch naming
-      // anything else is either a newer build or a peer trying its luck, and
-      // in both cases the extra field is not something to write.
+      // Only the three the local bulk edit can set; anything else is not ours to write.
       const patch: BulkUpdatePayload['patch'] = {}
       if (typeof rawPatch.status === 'string') patch.status = rawPatch.status
       if (typeof rawPatch.context === 'string' && rawPatch.context.trim() !== '') patch.context = rawPatch.context
       const priority = num(rawPatch.priority)
       if (priority !== null && priority >= 0 && priority <= 3) patch.priority = Math.round(priority) as ItemPriority
 
-      // Nothing to set means an UPDATE with an empty SET clause, which is a
-      // syntax error rather than a no-op.
+      // An empty patch is an empty SET clause. A syntax error, not a no-op.
       return Object.keys(patch).length > 0 ? { type: 'bulkUpdateItems', payload: { ids, patch } } : null
     }
 
@@ -240,8 +212,7 @@ export function normalizeRemoteMutation(raw: unknown): RemoteMutation | null {
       return context ? { type: 'rebalancePositions', context, status: str(o.status) } : null
     }
 
-    // Anything else is from a build this one does not know. Dropped rather than
-    // guessed at: a message whose shape is unknown cannot be applied safely.
+    // From a build we do not know. Dropped rather than guessed at.
     default:
       return null
   }
@@ -259,14 +230,12 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
     return {
       type: 'board-baseline',
       context,
-      // Rows that cannot be written are dropped individually. One corrupt card
-      // should cost the user that card, not the whole board they are joining.
+      // Dropped one by one: a corrupt card should not cost the whole board.
       items: normalizeAll(o.items, normalizeSyncItem),
       tags: normalizeAll(o.tags, normalizeSyncTag),
       itemTags: normalizeAll(o.itemTags, normalizeItemTag),
       relations: normalizeAll(o.relations, normalizeSyncRelation),
-      // Read-only is the safe default: a peer that fails to say means this end
-      // does not start broadcasting its own writes back.
+      // Read-only by default, so an unclear peer does not make us broadcast back.
       mode: o.mode === 'collaborative' ? 'collaborative' : 'readonly'
     }
   }

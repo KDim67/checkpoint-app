@@ -12,7 +12,7 @@ import {
 
 const PRESETS_SETTING_KEY = 'customizer_theme_presets'
 
-/** The variables worth showing on a card, enough to recognise a theme at a glance. */
+/** The variables worth showing on a card. Enough to recognise a theme at a glance. */
 const SWATCH_KEYS: (keyof ThemeVariables)[] = [
   '--color-background',
   '--color-surface-1',

@@ -10,10 +10,8 @@ import { DEFAULT_WALL_ID, wallIndexKey } from '../src/shared/wallModel'
 import { boardConfigKey } from '../src/shared/boardModel'
 import { backlogLayoutKey } from '../src/shared/contextSettings'
 
-// A workspace is not only its rows. These run the real export and import against
-// a throwaway database, because the bug being guarded against was not in any
-// one function, it was that the export never looked at app_settings at all, so
-// a workspace came back with its cards on a board nobody had configured.
+// Real export and import against a throwaway database. The bug guarded against
+// was not in one function. The export never read app_settings at all.
 
 let dir: string
 

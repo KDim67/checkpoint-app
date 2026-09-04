@@ -5,7 +5,7 @@ import { errorMessage } from '../../../../shared/errors'
 /**
  * Sprite Slicer: sheet selection, grid/auto slicing, and export.
  *
- * A hook rather than state inside SlicerPanel, the panel unmounts on tab
+ * A hook rather than state inside SlicerPanel. The panel unmounts on tab
  * switch, which would throw away the sliced frames.
  */
 export function useSlicerTool() {

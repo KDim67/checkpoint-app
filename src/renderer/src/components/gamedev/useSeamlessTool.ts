@@ -65,7 +65,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
   // Seamless processing math
   //
   // Best practices applied:
-  //   1. All parameters are explicit, no closure captures. Empty dep array = stable ref.
+  //   1. All parameters are explicit. No closure captures. Empty dep array = stable ref.
   //   2. Center offset uses Math.round() to prevent half-pixel drift on odd dimensions.
   //   3. Toroidal luminance equalisation pad avoids edge-bleed from CSS blur().
   //   4. Four-offset separable blend: every seam of every wrap-offset copy gets
@@ -191,13 +191,13 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
       // A two-sample "half-shift + blend the centre cross" can never be fully
       // seamless: wherever a cross arm meets the tile border, either the
       // original's border mismatch or the shifted copy's centre seam is
-      // exposed, visible as short "whisker" artefacts at tile-boundary
+      // exposed. Visible as short "whisker" artefacts at tile-boundary
       // midpoints. Blending FOUR wrap-offset copies with separable weights
       // gives every seam of every copy exactly zero weight:
-      //   S00 unshifted, seams at the borders          (w = ax·ay)
-      //   S10 x-shifted by cx, seams at x=cx and y-borders   (w = bx·ay)
-      //   S01 y-shifted by cy, seams at y=cy and x-borders   (w = ax·by)
-      //   S11 xy-shifted, seams at x=cx and y=cy        (w = bx·by)
+      //   S00 unshifted. Seams at the borders          (w = ax·ay)
+      //   S10 x-shifted by cx. Seams at x=cx and y-borders   (w = bx·ay)
+      //   S01 y-shifted by cy. Seams at y=cy and x-borders   (w = ax·by)
+      //   S11 xy-shifted. Seams at x=cx and y=cy        (w = bx·by)
       // ax rises 0→1 over the blend band measured inward from the x-borders:
       // it is 0 at the borders (hiding S00/S01 there) and 1 in the interior
       // (where bx = 1−ax = 0 hides S10/S11's centre seams). ay likewise.
@@ -230,7 +230,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
       const smooth01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v))
 
       for (let y = 0; y < targetH; y++) {
-        // Wave along the x-transition, driven by y (toroidally periodic, 
+        // Wave along the x-transition, driven by y (toroidally periodic:
         // whole numbers of cycles, so it matches across tile copies)
         const angleX = (2 * Math.PI * 3 * y) / targetH
         const waveX = Math.sin(angleX) * 0.08 + Math.cos(angleX * 2) * 0.03
@@ -247,7 +247,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
           // Normalised distance inward from the nearest border. The wave
           // modulates multiplicatively so the value stays exactly 0 at the
-          // border, continuity across tile copies is never broken.
+          // border. Continuity across tile copies is never broken.
           let ax = smooth01((dxB / B_w) * (1 + waveX * wavySeams))
           let ay = smooth01((dyB / B_h) * (1 + waveY * wavySeams))
 
@@ -264,7 +264,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
           const i00 = sampleAt(x, y)
 
           // Fast path: the interior (the vast majority of pixels) is the
-          // untouched original, skip the other three samples entirely.
+          // untouched original. Skip the other three samples entirely.
           if (ax === 1 && ay === 1) {
             dst[idx]     = activeSrc[i00]
             dst[idx + 1] = activeSrc[i00 + 1]
@@ -293,17 +293,17 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
       ctx.putImageData(outImgData, 0, 0)
     }
-  }, []) // No deps: all inputs arrive as explicit parameters, stable reference
+  }, []) // No deps: all inputs arrive as explicit parameters. Stable reference
 
   // Helper that tiles a canvas (either the seamless result or the raw original)
   // onto the visible tiling preview canvas, optionally overlaying grid lines.
-  // Tiles are drawn at the source's true aspect ratio, a 2:1 texture renders
+  // Tiles are drawn at the source's true aspect ratio. A 2:1 texture renders
   // as 2:1 tiles instead of being squashed into squares.
   //
   // The tile is downscaled ONCE into an integer-sized stamp, then blitted as
   // byte-identical unscaled copies. Scaling each tile individually (and at
   // fractional positions) filters every tile's edges independently, which
-  // shows up as faint hairlines along the tile boundaries, artifacts of the
+  // shows up as faint hairlines along the tile boundaries. Artifacts of the
   // preview, not the texture.
   const drawTilingCanvas = useCallback((
     sourceCanvas: HTMLCanvasElement | HTMLImageElement,
@@ -491,7 +491,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     setIsSeamlessProcessing(true)
     setSeamlessShowOriginal(false) // reset compare to 'result' on new file
     try {
-      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
       const path = window.electronAPI.app.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {

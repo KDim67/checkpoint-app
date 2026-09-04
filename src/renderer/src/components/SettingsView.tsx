@@ -55,6 +55,7 @@ import {
 } from '../lib/features'
 import { getStringSetting, setStringSetting } from '../lib/settings'
 import { useAppStore } from '../store/appStore'
+import { useAiEnabled } from '../lib/useAiEnabled'
 import {
   loadProviders, persistProviders, activateProvider, providerFromPreset,
   isLocalUrl, PROVIDER_PRESETS, type AiProvider, type ProviderPreset
@@ -132,7 +133,7 @@ function KanbanSettings({ activeContext }: { activeContext: string }) {
         // Shares the board document with the Kanban view and the AI action
         // blocks. This tab used to keep its own ColumnConfig type and read the
         // raw column key, so it silently dropped colour and colour-mode on
-        // every save, any column styled on the board lost that styling as soon
+        // every save. Any column styled on the board lost that styling as soon
         // as its WIP limit was edited here.
         const config = await loadBoardConfig(activeContext)
         setColumns(config.columns)
@@ -618,7 +619,7 @@ function AiSettings() {
             >
               {providers.map(p => (
                 <option key={p.id} value={p.id}>
-                  {p.name}{isLocalUrl(p.baseURL) ? ', local' : ', cloud'}
+                  {p.name}{isLocalUrl(p.baseURL) ? '. Local' : '. Cloud'}
                 </option>
               ))}
             </select>
@@ -893,7 +894,7 @@ function AiSettings() {
   )
 }
 
-// Theme mode (dark / light / system), rendered in Appearance & Theme
+// Theme mode (dark / light / system). Rendered in Appearance & Theme
 function ThemeModeSettings() {
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark')
 
@@ -1053,6 +1054,7 @@ export default function SettingsView() {
   const setActiveTab = useAppStore(s => s.setSettingsTab)
   const activeContext = useAppStore(s => s.activeContext)
   const isWindows = window.electronAPI.app.platform === 'win32'
+  const aiEnabled = useAiEnabled()
 
   // Resolve any pre-merge tab id that might still arrive from old navigation paths
   const activeTab: SettingsTab = (LEGACY_TAB_ALIASES[rawTab as string] ?? rawTab) as SettingsTab
@@ -1168,6 +1170,12 @@ export default function SettingsView() {
     }
   }
 
+  // Switching AI off while its tab is open would otherwise leave the panel
+  // showing settings for something that no longer exists.
+  useEffect(() => {
+    if (!aiEnabled && activeTab === 'ai') setActiveTab('general')
+  }, [aiEnabled, activeTab, setActiveTab])
+
   const activeTabInfo = ALL_TABS.find(t => t.id === activeTab)
 
   return (
@@ -1212,7 +1220,7 @@ export default function SettingsView() {
             }}>
               {group.group}
             </div>
-            {group.tabs.map(tab => (
+            {group.tabs.filter(tab => tab.id !== 'ai' || aiEnabled).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -1295,7 +1303,7 @@ export default function SettingsView() {
             </p>
           </div>
 
-          {/* Tab content, one or more section cards.
+          {/* Tab content. One or more section cards.
               The grid holds ONLY the cards: a full-width title inside it would
               span every track, and `auto-fit` collapses a track only when it is
               genuinely empty, so a single-card tab was left sitting in the

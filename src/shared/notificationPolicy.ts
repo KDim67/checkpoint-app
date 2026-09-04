@@ -1,14 +1,11 @@
 /**
- * Whether a notification is allowed to fire.
+ * Whether a notification is allowed to fire. Split from delivery because the
+ * judgement is the part that goes subtly wrong: quiet hours wrapping midnight,
+ * and dedupe.
  *
- * Split out from the delivery code because this is where the judgement lives, 
- * quiet hours that wrap midnight, and dedupe, and both are easy to get subtly
- * wrong in ways no one notices until the app is nagging every hour.
- *
- * Dedupe is the reason this layer exists at all. Reminders are produced by a
- * scheduler that re-examines the same overdue items on every pass, so without a
- * memory of what has already been said, one overdue task becomes one alert an
- * hour indefinitely.
+ * Dedupe is why this layer exists. The scheduler re-examines the same overdue
+ * items every pass, so without a memory of what was already said, one overdue
+ * task becomes an alert an hour forever.
  */
 
 export type NotificationCategory = 'due' | 'focus' | 'webhook' | 'recurrence' | 'agent'

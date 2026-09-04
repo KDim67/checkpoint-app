@@ -23,7 +23,7 @@ try {
 
 interface MermaidChartProps {
   code: string
-  /** Merged over the frame style, callers use it to cap height in dense panels. */
+  /** Merged over the frame style. Callers use it to cap height in dense panels. */
   style?: React.CSSProperties
 }
 

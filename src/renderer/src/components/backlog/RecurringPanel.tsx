@@ -11,7 +11,7 @@ interface Props {
   onChanged?: () => void
 }
 
-/** Today at 9am, a saner default than "this exact second" for repeating work. */
+/** Today at 9am. A saner default than "this exact second" for repeating work. */
 function defaultStart(): string {
   const d = new Date()
   d.setHours(9, 0, 0, 0)
@@ -192,7 +192,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
 
       {rules.length === 0 && !adding && (
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
-          Nothing repeats yet. One task appears at a time, the next only after you finish the last.
+          Nothing repeats yet. One task appears at a time, and the next only after you finish the last.
         </div>
       )}
 

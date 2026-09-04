@@ -1,7 +1,7 @@
 /**
  * Renderer-side persistence for the board configuration document.
  *
- * The model itself, types, defaults, normalisation, migration, lives in
+ * The model itself (types, defaults, normalisation, migration) lives in
  * `src/shared/boardModel.ts`, because the MCP server in the main process needs
  * the same logic and cannot import from `src/renderer`. This file is only the
  * IPC-backed read/write half, plus the lock that serialises it.
@@ -102,8 +102,8 @@ export async function patchBoardConfig(
 
 /**
  * The lock key every board-config mutation serialises on. Exported for callers
- * that need to hold it across a wider critical section than a single patch, 
- * for example an AI action block that reads the columns, decides which ones are
+ * that need to hold it across a wider critical section than a single patch.
+ * For example an AI action block that reads the columns, decides which ones are
  * new, and writes, all as one atomic step.
  */
 export const boardConfigLockKey = boardLockKey

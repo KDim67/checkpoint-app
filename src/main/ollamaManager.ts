@@ -10,7 +10,7 @@ let lastOfflineLogged = false
 
 /**
  * Ollama's REST root for the configured endpoint. isLocalUrl deliberately
- * accepts LAN addresses, so an Ollama on another machine is a supported setup, 
+ * accepts LAN addresses, so an Ollama on another machine is a supported setup,
  * but these calls used to hardcode localhost, leaving that user with an empty
  * model list. Falls back to localhost when the endpoint is a cloud provider.
  */

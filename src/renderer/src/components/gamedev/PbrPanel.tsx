@@ -184,7 +184,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
               {/* Sliders Container */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
 
-                {/* Invert height, dark pixels read as crevices vs. ridges */}
+                {/* Invert height. Dark pixels read as crevices vs. ridges */}
                 <label style={{
                   display: 'flex',
                   alignItems: 'center',

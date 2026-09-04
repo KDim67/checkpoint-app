@@ -550,7 +550,7 @@ export default function KanbanView() {
   // NOTE: we deliberately do NOT move a card into another column during dragOver.
   // Doing so unmounts/remounts the card in a different SortableContext on every
   // frame you hover a new column, which forces dnd-kit to re-register and
-  // re-measure, the cause of the cross-column drag lag. Instead, the target
+  // re-measure. The cause of the cross-column drag lag. Instead, the target
   // column's own `isOver` droppable highlight provides live feedback, the drag
   // overlay follows the cursor, and the actual move is committed once in
   // handleDragEnd. Within-column reordering still previews smoothly via dnd-kit's
@@ -844,7 +844,7 @@ export default function KanbanView() {
     }
   }, [cards, activeContext])
 
-  // Quick add card to Backlog, uses first column as fallback (not hardcoded 'open')
+  // Quick add card to Backlog. Uses first column as fallback (not hardcoded 'open')
   const handleAddCardToBacklog = () => {
     const fallbackCol = columns[0]
     if (!fallbackCol) {
@@ -1035,7 +1035,7 @@ export default function KanbanView() {
   // Group + filter + sort all cards into their columns in a SINGLE pass, memoized
   // on the inputs. Previously each column re-filtered the whole card list on every
   // render, so a drag (which calls setCards on each cross-column move) did O(columns
-  // × cards) work per frame, the main source of drag lag. Now it's one pass, and
+  // × cards) work per frame. The main source of drag lag. Now it's one pass, and
   // card object refs are preserved so the memoized columns only re-render when their
   // own cards actually change.
   const cardsByColumn = useMemo(() => {
@@ -2094,7 +2094,7 @@ export default function KanbanView() {
             {swimlanesEnabled ? 'Priority View' : 'Flat Board'}
           </HeaderBtn>
 
-          {/* Card face toggles, what each card shows */}
+          {/* Card face toggles. What each card shows */}
           <div style={{ position: 'relative' }} ref={cardDisplayRef}>
             <HeaderBtn
               active={showCardDisplayMenu}
@@ -2589,7 +2589,7 @@ export default function KanbanView() {
                       )}
                     </div>
 
-                    {/* Bulk action bar, appears when items are selected */}
+                    {/* Bulk action bar. Appears when items are selected */}
                     {selCount > 0 && (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--color-primary-muted)', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }}>
                         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)' }}>

@@ -1,28 +1,17 @@
 /**
- * The Wall: a freeform canvas per workspace.
+ * The Wall: a freeform canvas per workspace. The work here is mostly about not
+ * being clever.
  *
- * Every other view imposes a shape. This one imposes none, nothing snaps
- * (unless asked), nothing sorts, nothing has a status, and an item stays where
- * it was put. The design work is mostly about *not* being clever.
- *
- * Decisions worth stating:
- *
- * - **The dot grid scales with the camera.** On an infinite canvas with no
- *   scrollbars, a flat background gives no sense of movement; panning feels
- *   like nothing happened. The grid is the only cue that the camera moved.
- * - **"Fit" is always reachable.** Panning into empty space is the one mistake
- *   the user cannot undo by looking harder.
- * - **Cards are references.** Placing a card does not copy it, and moving it
- *   here means nothing to its column. That is what stops the Wall becoming a
- *   second, lying board.
- * - **Left-drag selects; right-drag pans.** The convention from Unity and
- *   Unreal rather than from Figma, and right-drag pans from *anywhere*, on a
- *   busy wall, having to find empty space before you can move the view is the
- *   thing that makes a canvas feel cramped.
- *
- *   That leaves right-click doing two jobs, separated by distance: a press that
- *   travels less than a few pixels was a click and opens a menu; anything
- *   further was a pan and does not.
+ * - The dot grid scales with the camera. Without it, panning an infinite
+ *   canvas looks like nothing happened.
+ * - "Fit" is always reachable. Panning into empty space is the one mistake you
+ *   cannot undo by looking harder.
+ * - Cards are references. Moving one here means nothing to its column, which is
+ *   what stops the Wall becoming a second, lying board.
+ * - Left-drag selects, right-drag pans (Unity/Unreal, not Figma), and pans from
+ *   anywhere. Hunting for empty space first makes a canvas feel cramped.
+ *   So right-click does two jobs split by distance: barely moved opens a menu,
+ *   further was a pan.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -113,10 +102,8 @@ export default function WallView() {
   const [historyTick, setHistoryTick] = useState(0)
 
   /**
-   * The workspace's walls, tagged with the workspace they were read for. Without
-   * the tag, the moment after switching workspaces still holds the old
-   * workspace's active wall id, and the first load opens a wall this workspace
-   * does not have.
+   * Tagged with the workspace it was read for: otherwise the moment after a
+   * switch still holds the old active wall id and opens the wrong wall.
    */
   const [index, setIndex] = useState<{ context: string; value: WallIndex } | null>(null)
   const [wallMenuOpen, setWallMenuOpen] = useState(false)
@@ -137,27 +124,18 @@ export default function WallView() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
   /**
-   * What a drag actually moves. Not the same as the selection: dragging a frame
-   * takes its contents with it, and the contents are decided once when the drag
-   * starts rather than every frame, otherwise an item would join the drag the
-   * moment the frame swept over it.
+   * What a drag moves, not the selection, since a frame brings its contents.
+   * Decided once at drag start, or items would join as the frame swept over them.
    */
   const movingRef = useRef<Set<string>>(new Set())
   /** A right-press in flight: becomes a menu on release if it barely moved. */
   const rightPressRef = useRef<{ clientX: number; clientY: number; itemId: string | null; at: { x: number; y: number }; moved: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  /**
-   * Documents that have just been deleted. Switching away from a wall flushes
-   * it on the way out, and without this that flush writes a deleted wall
-   * straight back.
-   */
+  /** Just-deleted docs. The flush on the way out would otherwise restore them. */
   const discardedRef = useRef<Set<string>>(new Set())
   const railHoverRef = useRef<{ overRail: boolean; columnId: string | null }>({ overRail: false, columnId: null })
   const railResizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
-  /**
-   * Resolves an item to whatever it is called. Held in a ref because the
-   * export callback is created long before the lookup maps exist further down.
-   */
+  /** In a ref because the export callback is created before the lookup maps. */
   const labelRef = useRef<(item: WallItem) => string | undefined>(() => undefined)
   const docRef = useRef(doc)
   docRef.current = doc
@@ -192,19 +170,16 @@ export default function WallView() {
     Promise.all([
       // Notes are not per-workspace, so they are offered whole.
       window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[]),
-      // The rail is the board, so it has to be the board's own columns rather
-      // than a list of whatever statuses happen to be in use.
+      // The board's own columns, not whatever statuses happen to be in use.
       loadBoardConfig(activeContext).catch(() => null)
     ]).then(([noteList, config]) => {
       if (cancelled) return
       setNotes(noteList ?? [])
-      // Falls back to the standard columns rather than to none: with no
-      // columns every card is an orphan, which reads as a broken board.
+      // Not none: with no columns every card is an orphan and the board looks broken.
       setColumns(config?.columns ?? DEFAULT_COLUMNS)
     })
 
-    // A card moved from the rail, from the board, or by a peer all arrive the
-    // same way. Without this the rail keeps showing the column a card left.
+    // Rail, board and peer moves all arrive this way; without it the rail goes stale.
     const onMutation = (e: Event): void => {
       const type = (e as CustomEvent<{ type?: string }>).detail?.type ?? ''
       if (type === 'createItem' || type === 'updateItem' || type === 'deleteItem') void readCards()
@@ -271,12 +246,8 @@ export default function WallView() {
   }, [docKey])
 
   /**
-   * An MCP client writes the wall document straight from the main process, so
-   * the open view knows nothing about it until it reads again.
-   *
-   * Skipped mid-gesture on purpose: replacing the document under a drag or an
-   * open editor would throw away what the user is in the middle of doing, which
-   * is worse than being briefly out of date.
+   * MCP writes the doc from the main process, so the open view has to re-read.
+   * Skipped mid-gesture. Being briefly stale beats losing a drag in progress.
    */
   useEffect(() => {
     if (!docKey) return
@@ -304,17 +275,15 @@ export default function WallView() {
   }, [activeContext])
 
   const addWall = useCallback(() => {
-    // Built from the loaded index rather than a fresh one, so a workspace whose
-    // index has not arrived yet cannot start a second, competing list.
+    // From the loaded index, so a slow load cannot start a competing list.
     if (!wallIndex) return
     commitIndex(createWall(wallIndex).index)
     setWallMenuOpen(false)
   }, [wallIndex, commitIndex])
 
   /**
-   * The reverse direction: a card dragged off the wall and onto a column moves
-   * for real. Position on the wall still means nothing, but a drop onto a
-   * named column is not a position, it is an instruction.
+   * The reverse direction. Position on the wall means nothing, but a drop onto
+   * a named column is an instruction, so it moves the card for real.
    */
   const handOffToColumn = async (columnId: string): Promise<void> => {
     const refs = docRef.current.items
@@ -333,8 +302,7 @@ export default function WallView() {
     }
 
     try {
-      // One at a time: each write fires the mutation event the rest of the app
-      // listens on, and a batch would have to reproduce all of that.
+      // One at a time. Each write fires the mutation event the app listens on.
       for (const move of plan) {
         await window.electronAPI.db.updateItem(move.id, { status: move.status, position: move.position })
       }
@@ -364,17 +332,12 @@ export default function WallView() {
 
     const key = wallDocKey(activeContext, pendingDelete.id)
     discardedRef.current.add(key)
-    // Removed before the switch: moving off this wall flushes it on the way
-    // out, and that write would otherwise land after the delete.
+    // Before the switch: the flush on the way out would land after the delete.
     await deleteWallDoc(key)
     commitIndex(next)
   }, [pendingDelete, wallIndex, activeContext, commitIndex])
 
-  /**
-   * `record: false` is for the frames of a drag. Recording each one would make
-   * a single gesture take fifty presses of undo to reverse, so the whole drag
-   * is recorded once when the pointer comes up.
-   */
+  /** `record: false` for drag frames. The whole gesture is one undo step. */
   const setItems = useCallback((items: WallItem[], { record = true } = {}) => {
     historyRef.current = record
       ? pushHistory(historyRef.current, items)
@@ -443,11 +406,7 @@ export default function WallView() {
     setItems(items.map(i => (ids.has(i.id) ? { ...i, locked: lock ? true : undefined } : i)))
   }, [setItems])
 
-  /**
-   * Results are placed in a row beneath the source rather than on top of it,
-   * so four PBR maps arrive as a strip you can read instead of a stack you have
-   * to pull apart.
-   */
+  /** In a row below the source, so four PBR maps are a strip, not a stack. */
   const placeDerived = useCallback((source: WallItem, made: { filename: string; label: string; width: number; height: number }[]) => {
     const items = [...docRef.current.items]
     const created: WallItem[] = []
@@ -562,10 +521,8 @@ export default function WallView() {
     setMenu(null)
     const target = e.target as HTMLElement
 
-    // A press inside a text field belongs to the text field. Capturing it here
-    // would turn every attempt to select a word into a drag of the whole item,
-    // and the capture has to be skipped as well as the drag, a captured
-    // pointer never reaches the textarea at all.
+    // A press in a text field belongs to it. Capture has to be skipped too.
+    // A captured pointer never reaches the textarea at all.
     if (target.closest('input, textarea, [contenteditable="true"]')) return
 
     const handle = target.closest<HTMLElement>('[data-wall-handle]')
@@ -624,9 +581,8 @@ export default function WallView() {
     setEditingId(null)
 
     const p = screenPoint(e)
-    // The selection as it was when the drag began. Unioning against the live
-    // selection instead would mean an item, once caught, could never be
-    // released by moving the marquee back off it.
+    // The selection as it was at drag start. Unioning against the live one
+    // means an item, once caught, can never be released.
     dragRef.current = { mode: 'marquee', startX: p.x, startY: p.y, base: e.shiftKey ? new Set(selectedRef.current) : new Set() }
     setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
   }
@@ -672,15 +628,13 @@ export default function WallView() {
     const dy = (e.clientY - drag.startY) / cam.zoom
 
     if (drag.mode === 'move') {
-      // Hit-tested against the document rather than the event target: the
-      // pointer is captured by the canvas, so the events keep arriving here
-      // even once the cursor has left it for the rail.
+      // Hit-tested against the document: capture keeps sending us events even
+      // once the cursor has left the canvas for the rail.
       const under = railOpen ? document.elementFromPoint(e.clientX, e.clientY) : null
       const columnId = under?.closest<HTMLElement>('[data-wall-column]')?.dataset.wallColumn ?? null
       const overRail = !!under?.closest('[data-wall-rail]')
       railHoverRef.current = { overRail, columnId }
-      // Set unconditionally: React drops a write of the same value, and
-      // comparing against the rendered one risks missing a change instead.
+      // Unconditional. React drops same-value writes, and comparing risks a miss.
       setDropColumnId(columnId)
 
       const moving = movingRef.current
@@ -728,9 +682,8 @@ export default function WallView() {
     railHoverRef.current = { overRail: false, columnId: null }
     setDropColumnId(null)
 
-    // The rail is beside the canvas, not part of it. An item released over it
-    // goes back where it came from, otherwise it ends up parked off-screen
-    // behind the panel, which reads as having lost it.
+    // The rail is beside the canvas, not part of it. Items released over it go
+    // back, or they end up parked off-screen behind the panel.
     if (drag?.mode === 'move' && hover.overRail) {
       setItems(drag.origin, { record: false })
       if (hover.columnId) void handOffToColumn(hover.columnId)
@@ -884,12 +837,10 @@ export default function WallView() {
   }
 
   const { camera } = doc
-  // 'default' means the theme's own background, so a wall follows light and
-  // dark like everything else until someone deliberately picks a colour.
+  // 'default' follows the theme, until someone picks a colour.
   const custom = doc.background && doc.background !== 'default' ? doc.background : null
   const canvasBackground = custom ?? 'var(--color-background)'
-  // A fixed dot colour disappears on half the palette. Derived from the chosen
-  // background instead, at an opacity that marks the grid without ruling it.
+  // Derived from the background: a fixed dot colour vanishes on half the palette.
   const dotColor = custom
     ? (getTextColorForBackground(custom) === '#ffffff' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)')
     : 'var(--color-surface-offset)'
@@ -961,7 +912,7 @@ export default function WallView() {
         isOpen={pendingDelete !== null}
         title="Delete wall"
         message={`Delete "${pendingDelete?.name ?? ''}" and everything on it?`}
-        warning="Cards and notes placed on it are only removed from the wall, the originals are untouched."
+        warning="Cards and notes placed on it are only removed from the wall. The originals are untouched."
         confirmText="Delete wall"
         isDestructive
         onConfirm={() => void confirmDeleteWall()}
@@ -1026,8 +977,7 @@ export default function WallView() {
                   ))}
                 </div>
 
-                {/* Any colour at all, since the point of this view is that it
-                    imposes nothing. */}
+                {/* Any colour. This view imposes nothing. */}
                 <label style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                   marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)'
@@ -1068,7 +1018,7 @@ export default function WallView() {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {activeWall?.name ?? '…'}
             </span>
-            {/* Only a hint that there is a choice; one wall is still a list of one. */}
+            {/* Just a hint that there is a choice. */}
             <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
           </button>
 
@@ -1155,8 +1105,7 @@ export default function WallView() {
                         <Pencil size={12} />
                       </button>
 
-                      {/* Hidden rather than disabled on the last wall: an always-greyed
-                          button reads as broken, and the rule never changes. */}
+                      {/* Hidden, not disabled. An always-greyed button reads as broken. */}
                       {wallIndex.walls.length > 1 && (
                         <button
                           onClick={() => { setPendingDelete(w); setWallMenuOpen(false) }}
@@ -1315,8 +1264,7 @@ export default function WallView() {
         />
       </div>
 
-      {/* The rail sits beside the canvas rather than over it: dragging a card
-          from one to the other should be a straight line, not a hover. */}
+      {/* Beside the canvas, not over it. The drag should be a straight line. */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {railOpen && (
           <>
@@ -1391,16 +1339,14 @@ export default function WallView() {
           }}
           onDragOver={e => {
             e.preventDefault()
-            // Copy, not move: the card stays on the board. What lands here is a
-            // reference to it.
+          // Copy, not move. The card stays on the board.
             if (e.dataTransfer.types.includes(WALL_DRAG_MIME)) e.dataTransfer.dropEffect = 'copy'
           }}
           onDrop={e => {
             e.preventDefault()
             const at = toWallPoint(screenPoint(e), docRef.current.camera)
             const dragged = decodeWallDrag(e.dataTransfer.getData(WALL_DRAG_MIME))
-            // Dropped where the cursor was, which is the entire point of dragging
-            // it rather than picking it from a list.
+          // Where the cursor was. The whole point of dragging rather than picking.
             if (dragged) { addItem(dragged.kind, { ref: dragged.ref }, at); return }
             void placeImageFiles(Array.from(e.dataTransfer.files ?? []), at)
           }}
@@ -1430,7 +1376,7 @@ export default function WallView() {
               <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>An empty wall</span>
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)', maxWidth: '440px', lineHeight: 1.6 }}>
                 Double-click anywhere for a sticky note, drop images straight on, or place cards
-                from the board. Nothing snaps and nothing sorts, put things where you want them.
+                from the board. Nothing snaps and nothing sorts. Put things where you want them.
               </span>
             </div>
           )}

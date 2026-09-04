@@ -1,19 +1,8 @@
 /**
- * A bounded undo/redo stack.
+ * A bounded undo/redo stack. Generic so it can be tested without a canvas.
  *
- * Written generically because the Wall is not the only thing that will want
- * one, and because keeping it separate from the Wall's model means the history
- * rules can be tested without constructing a canvas.
- *
- * Two decisions worth stating:
- *
- * **A new edit clears the future.** Branching histories are a research project;
- * every tool the user has ever used discards the redo stack on a fresh edit, so
- * doing anything cleverer would be surprising rather than powerful.
- *
- * **The stack is capped.** A canvas edit holds every item, so an uncapped
- * history of a large wall is a slow memory leak that only shows up after an
- * hour of work, which is exactly when losing it hurts most.
+ * A new edit clears the redo stack, like every tool anyone has used. Capped
+ * because each canvas entry holds every item. Uncapped is a slow leak.
  */
 
 export interface History<T> {
@@ -29,13 +18,7 @@ export function initHistory<T>(present: T): History<T> {
   return { past: [], present, future: [] }
 }
 
-/**
- * Records a new state.
- *
- * `equals` lets the caller skip no-op edits, dragging an item and putting it
- * back should not cost an undo step, and without this every pointer-move frame
- * would become one.
- */
+/** `equals` skips no-op edits, so a drag does not cost an undo step per frame. */
 export function pushHistory<T>(
   history: History<T>,
   next: T,
@@ -79,13 +62,7 @@ export function redo<T>(history: History<T>): History<T> {
   }
 }
 
-/**
- * Replaces the present without recording a step.
- *
- * For changes that are not the user's edits, a document arriving from disk, or
- * a card being renamed elsewhere, which should not become something the user
- * can "undo".
- */
+/** For changes the user did not make. A load, or a rename from elsewhere. */
 export function replacePresent<T>(history: History<T>, present: T): History<T> {
   return { ...history, present }
 }

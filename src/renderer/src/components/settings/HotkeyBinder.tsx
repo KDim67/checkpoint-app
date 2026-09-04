@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useToast } from '../ui/Toast'
+import { useAiEnabled } from '../../lib/useAiEnabled'
 import { AlertTriangle, Keyboard } from 'lucide-react'
 import {
   APP_SHORTCUTS,
@@ -31,7 +32,7 @@ const FORBIDDEN_SHORTCUTS = [
   'Alt+F4', 'Ctrl+Alt+Delete'
 ]
 
-/** Which list a recording is for, the two are bound and stored separately. */
+/** Which list a recording is for. The two are bound and stored separately. */
 type RecordingTarget = { scope: 'global' | 'app'; id: string }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -179,6 +180,7 @@ function ActionButton({
 
 export default function HotkeyBinder() {
   const { toast } = useToast()
+  const aiEnabled = useAiEnabled()
   const [engineEnabled, setEngineEnabled] = useState(false)
   const [bindings, setBindings] = useState<Record<string, string>>({
     hud_toggle: 'Ctrl+Shift+Space',
@@ -248,7 +250,7 @@ export default function HotkeyBinder() {
       }
       const next = { ...appBindings, [recording.id]: combo }
       setAppBindings(next)
-      // Applied immediately, these are in-window listeners, so unlike the
+      // Applied immediately. These are in-window listeners, so unlike the
       // global hotkeys there is nothing to register with the OS.
       saveBindings(next).catch(err => console.error('Failed to save shortcuts:', err))
     }
@@ -366,7 +368,7 @@ export default function HotkeyBinder() {
           Fire only while the Checkpoint window has focus, and are ignored while typing. Changes apply immediately.
         </span>
 
-        {APP_SHORTCUTS.map(shortcut => (
+        {APP_SHORTCUTS.filter(s => s.action.kind !== 'toggleAiPanel' || aiEnabled).map(shortcut => (
           <ShortcutRow
             key={shortcut.id}
             label={shortcut.label}

@@ -1,20 +1,13 @@
 /**
- * Rewind: what you were doing the last time you worked on this card.
+ * Rewind: what you were doing last time you worked on this card. The join is in
+ * `shared/rewind.ts`; this only presents it.
  *
- * The join lives in `shared/rewind.ts`; this only presents it. Two things drive
- * the layout:
+ * Observations sit above the evidence, because the useful part is the sentence
+ * handing back a fact you had forgotten, not the list of commits. The evidence
+ * is grouped and collapsed with counts, since dumping forty window titles is
+ * the same as showing nothing.
  *
- * The reading comes first. Anyone can show a list of commits, the useful part
- * is the sentence that hands back a fact you had forgotten ("the last thing you
- * copied looks like an error"), so the observations sit above the evidence
- * rather than under it.
- *
- * The evidence is grouped and collapsed. A sitting can involve forty window
- * titles and a dozen copies; dumping them is the same as showing nothing. Each
- * group states its count so the size is legible before it is opened.
- *
- * Nothing here claims certainty. The heading says "around then", because window
- * activity is recorded per workspace and only inferred onto a card.
+ * The heading says "around then": this is inferred, not certain.
  */
 
 import React, { useEffect, useState } from 'react'
@@ -145,7 +138,7 @@ export default function RewindPanel({ item }: { item: Item }) {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // Keyed on the id alone, deliberately. `item` is a new object on every
-    // edit, and Rewind describes the past, refetching five streams because the
+    // edit, and Rewind describes the past. Refetching five streams because the
     // user typed a character in the title would be work for an answer that
     // cannot have changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps

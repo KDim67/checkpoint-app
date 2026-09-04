@@ -1,6 +1,6 @@
 // Specialized AI "skill" role profiles. Selecting a skill injects an
 // additional, focused system-prompt fragment that biases the assistant's
-// tone, priorities, and output format toward that workflow, without
+// tone, priorities, and output format toward that workflow. Without
 // losing any of the base Checkpoint action-block capabilities.
 
 export interface AiSkill {
@@ -29,14 +29,14 @@ export const AI_SKILLS: AiSkill[] = [
     cardTemplate: {
       defaultPriority: 2,
       defaultTags: ['narrative', 'story'],
-      bodyHint: 'Narrative / story element, describe the scene, character arc, or lore detail.'
+      bodyHint: 'Narrative / story element. Describe the scene, character arc, or lore detail.'
     },
     systemPrompt: `ACTIVE SKILL: Game Dev Narrative Specialist.
 You are now focused on narrative design: lore, characters, branching dialogue, stories, and quest structure.
 
 ██ NARRATIVE CORE RULES ██
 1. NEVER output Kanban board cards, task lists, or BATCH JSON format. The user is building branching story nodes, not project boards.
-2. For ANY request to "generate a story", "write dialogue", "create a quest", or "design a narrative path", you MUST output the story structure using the \`\`\`json:create_dialogue_tree format, immediately, with no preamble.
+2. For ANY request to "generate a story", "write dialogue", "create a quest", or "design a narrative path", you MUST output the story structure using the \`\`\`json:create_dialogue_tree format. Immediately, with no preamble.
 3. Every dialogue tree MUST satisfy ALL of these structural rules:
    - A top-level "startNode" field pointing to the first node's exact id.
    - Every node has: "id" (unique string), "speaker" (NPC name), "text" (dialogue line), "choices" (array, may be empty for terminal nodes).
@@ -56,7 +56,7 @@ You are now focused on narrative design: lore, characters, branching dialogue, s
     cardTemplate: {
       defaultPriority: 2,
       defaultTags: [],
-      bodyHint: 'Actionable task, describe what needs to be done and the definition of done.'
+      bodyHint: 'Actionable task. Describe what needs to be done and the definition of done.'
     },
     systemPrompt: `ACTIVE SKILL: Kanban Architect.
 You are now focused on project/workflow structure: columns, WIP limits, task breakdown, and prioritization.
@@ -75,7 +75,7 @@ You are now focused on project/workflow structure: columns, WIP limits, task bre
     cardTemplate: {
       defaultPriority: 2,
       defaultTags: ['implementation'],
-      bodyHint: 'Implementation step, describe what to build, why it matters, and the expected outcome.'
+      bodyHint: 'Implementation step. Describe what to build, why it matters, and the expected outcome.'
     },
     systemPrompt: `ACTIVE SKILL: Implementation Planner.
 You are now focused on producing structured implementation plans for features, systems, or refactors.

@@ -22,8 +22,8 @@ import { SyncService } from './syncService'
 import { getStartupSettings } from './tray'
 
 // Pure constants with no dependencies of their own, so importing them
-// statically does not defeat the dynamic `import('./mcpServer')` calls below, 
-// those exist to keep the MCP SDK, which drags in express and hono, out of the
+// statically does not defeat the dynamic `import('./mcpServer')` calls below.
+// Those exist to keep the MCP SDK, which drags in express and hono, out of the
 // startup chunk on the majority of launches where the server is switched off.
 import { MCP_DEFAULT_PORT, WEBHOOK_DEFAULT_PORT } from '../shared/ports'
 import type { WidgetPosition } from './widget'
@@ -66,7 +66,7 @@ protocol.registerSchemesAsPrivileged([
 
 // Windows notification identity, BEFORE app.whenReady()
 // Windows takes the name and icon shown on a toast from the AppUserModelID, not
-// from the app, without this, every notification is headed "electron.app.Electron".
+// from the app. Without this, every notification is headed "electron.app.Electron".
 // The value must match electron-builder's appId, because the installer registers
 // the Start Menu shortcut under it and that shortcut is what Windows reads the
 // display name and icon from.
@@ -190,7 +190,7 @@ const DEFAULT_BOUNDS: WindowBounds = { width: 1280, height: 800 }
 
 /**
  * Restores the saved bounds, but only if the window would still land on a
- * connected display, otherwise unplugging a second monitor strands the app
+ * connected display. Otherwise unplugging a second monitor strands the app
  * off-screen with no way to drag it back (the titlebar is custom).
  */
 function loadWindowBounds(): WindowBounds {
@@ -284,7 +284,7 @@ function createWindow(): void {
     }
   })
 
-  // Reveal the window once it can paint, eliminates the white flash. This is
+  // Reveal the window once it can paint. Eliminates the white flash. This is
   // guarded and backed by `did-finish-load` plus a safety timeout so a slow or
   // racy dev server (where `ready-to-show` may never fire after a failed initial
   // load) can never leave us with only a detached DevTools window and no app.
@@ -317,7 +317,7 @@ function createWindow(): void {
     try {
       // Read at the moment of closing rather than cached, so toggling the
       // setting takes effect without a restart. Statically imported because the
-      // main bundle is ESM, a require() here would throw, and this catch would
+      // main bundle is ESM. A require() here would throw, and this catch would
       // swallow it, leaving close-to-tray silently dead.
       const settings = getStartupSettings()
       closeToTray = settings.closeToTray && settings.showTrayIcon
@@ -330,7 +330,7 @@ function createWindow(): void {
     }
   })
 
-  // Null reference on close, allows V8 garbage collection of the window
+  // Null reference on close. Allows V8 garbage collection of the window
   mainWindow.on('closed', () => {
     mainWindow = null
     // Quit the app when the main window is closed on non-macOS platforms
@@ -358,7 +358,7 @@ function createWindow(): void {
       }
     })
 
-    // Retry loading if the dev server is not warm yet, stored handle cancels on success.
+    // Retry loading if the dev server is not warm yet. Stored handle cancels on success.
     let failRetryTimeout: NodeJS.Timeout | null = null
     mainWindow.webContents.on('did-finish-load', () => {
       if (failRetryTimeout) { clearTimeout(failRetryTimeout); failRetryTimeout = null }
@@ -509,7 +509,7 @@ function registerIpcHandlers(): void {
     return true
   })
 
-  // Reliable structured generation (board / plan / dialogue), request/response,
+  // Reliable structured generation (board / plan / dialogue). Request/response,
   // not streamed. Uses tool-calling / JSON-schema when the endpoint supports it.
   ipcMain.handle(IpcChannels.AI_GENERATE_STRUCTURED, async (_event, params: unknown) => {
     if (structuredAbortController) {
@@ -1456,7 +1456,7 @@ function registerIpcHandlers(): void {
 app.whenReady().then(async () => {
   // The database opens before the window because createWindow restores the
   // saved bounds through getSetting. initDb is synchronous, and the window is
-  // created hidden regardless, it is not revealed until ready-to-show, which
+  // created hidden regardless. It is not revealed until ready-to-show, which
   // waits on the renderer bundle and dwarfs the cost of opening SQLite.
   const { initDb, registerDbHandlers } = await import('./db')
   const db = initDb(app.getPath('userData'))
@@ -1654,7 +1654,7 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize Backup Vaulting:', err)
   }
 
-  // Clipboard Watcher, record the capture, then push a change event so the
+  // Clipboard Watcher. Record the capture, then push a change event so the
   // renderer refreshes instantly instead of waiting on a slow poll. Only starts
   // when the Clipboard feature is on; setSetting flips it live after that.
   const { configureClipboardWatcher, setClipboardCaptureEnabled } = await import('./clipboardWatcher')
@@ -1726,7 +1726,7 @@ app.whenReady().then(async () => {
     console.error('Failed to restore desktop widget:', err)
   }
 
-  // Phase 17, Start Webhook Gateway if enabled
+  // Phase 17. Start Webhook Gateway if enabled
   try {
     const { getSetting } = await import('./db')
     const featureWebhook = getSetting<string>('feature_webhook', 'true')
@@ -1740,7 +1740,7 @@ app.whenReady().then(async () => {
     console.error('Failed to auto-start Webhook Gateway:', err)
   }
 
-  // MCP server, off unless explicitly enabled, since it exposes read/write
+  // MCP server. Off unless explicitly enabled, since it exposes read/write
   // access to every workspace.
   try {
     const { getSetting } = await import('./db')
@@ -1760,7 +1760,7 @@ app.whenReady().then(async () => {
     console.error('Failed to auto-start MCP server:', err)
   }
 
-  // Phase 21, Start Passive Activity Tracker if enabled
+  // Phase 21. Start Passive Activity Tracker if enabled
   try {
     const { initializeActivityTracker } = await import('./tracker')
     initializeActivityTracker()

@@ -1,22 +1,15 @@
 /**
- * Which settings are allowed to travel between paired machines.
+ * Which settings may travel between paired machines. Two reasons to hold one
+ * back, kept apart because they fail differently:
  *
- * Two separate reasons to hold a key back, kept separate because they fail
- * differently:
+ * - Sensitive. Keys and provider config. Matched broadly, on substrings.
+ * - Machine-local. Paths, geometry, ports. Nothing leaks, but the other end
+ *   adopts settings describing hardware it does not have.
  *
- * - **Sensitive**, API keys and provider config. Leaking these is a security
- *   problem, so the rules here are deliberately broad and match on substrings.
- * - **Machine-local**, paths, window geometry, listening ports, OS launch
- *   integration. Nothing leaks, but the receiving machine adopts settings that
- *   describe hardware it doesn't have: a laptop pointed at the desktop's backup
- *   directory, or a window restored onto a monitor that isn't there.
- *
- * Pure, and in shared/, so the same rules apply on send and on receive. Receive
- * matters as much as send: a peer running an older build still ships these keys,
- * and filtering only outbound would let its settings overwrite ours.
+ * Applied on receive as well as send: an older peer still ships these keys.
  */
 
-/** Keys that must never leave this machine, credentials and provider config. */
+/** Keys that must never leave this machine. Credentials and provider config. */
 export function isSensitiveSettingKey(key: string): boolean {
   const k = key.toLowerCase()
   return (
@@ -35,11 +28,8 @@ export function isSensitiveSettingKey(key: string): boolean {
 }
 
 /**
- * Keys that describe *this* machine rather than the user's preferences.
- *
- * Named explicitly rather than inferred, so adding a genuinely shareable setting
- * never needs a second thought. The suffix rules below are the safety net for
- * keys added later that follow the same shape.
+ * Named explicitly, so adding a shareable setting never needs a second thought.
+ * The suffix rules below catch later keys of the same shape.
  */
 const MACHINE_LOCAL_KEYS = new Set([
   'backup_path',        // a directory that exists on one machine
@@ -54,7 +44,7 @@ const MACHINE_LOCAL_KEYS = new Set([
 /**
  * Shapes that are machine-local by construction. A key ending in _path names a
  * filesystem location, _port a socket to bind, _bounds/_position a place on a
- * screen, none of which survive the trip to different hardware.
+ * screen. None of which survive the trip to different hardware.
  */
 const MACHINE_LOCAL_SUFFIXES = ['_path', '_port', '_bounds', '_position']
 
@@ -62,7 +52,7 @@ const MACHINE_LOCAL_SUFFIXES = ['_path', '_port', '_bounds', '_position']
  * Families whose key ends in a name the user chose, so the suffix rules can't
  * be trusted on them: a context called "port" would produce kanban_board_port
  * and be mistaken for a socket. These are per-workspace board configuration and
- * are meant to travel, see shared/boardModel.
+ * are meant to travel. See shared/boardModel.
  */
 const CONTEXT_SCOPED_PREFIXES = [
   'kanban_',

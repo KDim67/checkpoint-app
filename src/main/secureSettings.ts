@@ -5,7 +5,7 @@ import { safeStorage } from 'electron'
  *
  * Cloud provider keys (OpenAI, Groq, OpenRouter, Gemini…) used to sit in the
  * settings table as plaintext, which meant anything able to read checkpoint.db
- *, including the rolling gzip backups the vault writes, could lift a live
+ * (including the rolling gzip backups the vault writes) could lift a live
  * billable credential. These two keys are encrypted with the OS keychain
  * (DPAPI on Windows, Keychain on macOS, libsecret on Linux) via safeStorage.
  */
@@ -43,13 +43,13 @@ export function secretSettingKeys(): string[] {
 
 /**
  * Encrypts a serialized setting value. If the OS has no usable keyring we store
- * plaintext rather than refusing the write, losing the user's configured key
+ * plaintext rather than refusing the write. Losing the user's configured key
  * is a worse outcome than storing it the way it was already being stored.
  */
 export function encryptSecret(serialized: string): string {
   try {
     if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[secureSettings] OS encryption unavailable, storing credential as plaintext')
+      console.warn('[secureSettings] OS encryption unavailable: storing credential as plaintext')
       return serialized
     }
     return ENVELOPE_PREFIX + safeStorage.encryptString(serialized).toString('base64')

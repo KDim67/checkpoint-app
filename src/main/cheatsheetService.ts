@@ -309,7 +309,7 @@ export async function getCheatsheetRelevant(name: string, query: string, maxChar
 
   // No usable query → return the beginning of the document (usually the summary).
   if (queryTokens.length === 0) {
-    return `${full.slice(0, maxChars).trim()}\n\n[… document truncated, ask about a specific topic to surface deeper sections …]`
+    return `${full.slice(0, maxChars).trim()}\n\n[… document truncated. Ask about a specific topic to surface deeper sections …]`
   }
 
   // IDF over chunks

@@ -171,7 +171,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     const newNodes: GraphNode[] = notes.map((note, i) => {
       const prev = existing.get(note.title)
       if (prev) return prev
-      // Spawn brand-new nodes on a ring around the center (deterministic, no RNG)
+      // Spawn brand-new nodes on a ring around the center (deterministic: no RNG)
       const angle = (i / Math.max(1, notes.length)) * Math.PI * 2
       const radius = 25 + (i % 4) * 12
       return {

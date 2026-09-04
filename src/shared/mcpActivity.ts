@@ -1,17 +1,13 @@
 /**
- * The record of what an external agent did through the MCP server.
+ * What an external agent did through the MCP server. Without this, cards just
+ * appeared on a board with nothing to say where they came from.
  *
- * The server exposes seven write tools and, until now, kept no trace of any of
- * them: cards appeared on a board with nothing to say where they came from. An
- * entry is one tool call, a sentence describing it, and, where the change can
- * be expressed in reverse, the actions that would put things back.
+ * An entry is one tool call, a sentence describing it, and where the change can
+ * be reversed, the actions that put it back.
  *
- * Undo is stored as data rather than reconstructed later on purpose. The state
- * needed to reverse a call only exists at the moment of the call: the prior
- * field values, the note's previous contents, the inverse column operations.
- * Anything derived afterwards would be guessing at what used to be true.
- *
- * Pure, and in shared/, so the tests reach it without an Electron process.
+ * Undo is stored rather than reconstructed later: the state needed to reverse a
+ * call only exists at the moment of the call. Deriving it afterwards would be
+ * guessing at what used to be true.
  */
 
 /** A single reversing step. An entry's undo is an ordered list of these. */
@@ -54,7 +50,7 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '')
  * Narrows one stored action, or returns null if it is not one we can run.
  *
  * These rows are replayed against the database, so an unrecognised or
- * half-formed action must be dropped rather than attempted, a `delete_item`
+ * half-formed action must be dropped rather than attempted. A `delete_item`
  * with no id would otherwise reach the delete path with an empty string.
  */
 export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
@@ -103,7 +99,7 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
  * Parses a stored undo payload.
  *
  * Returns null when nothing usable survives, which the UI reads as "this one
- * cannot be undone", better than offering a button that would half-work. A
+ * cannot be undone". Better than offering a button that would half-work. A
  * partially valid list is also rejected: running some of the steps would leave
  * the workspace in a state neither before nor after the original call.
  */

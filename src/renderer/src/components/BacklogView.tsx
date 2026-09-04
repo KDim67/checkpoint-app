@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2, Repeat } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
+import { useAiEnabled } from '../lib/useAiEnabled'
 import type { Item, Tag as TagType } from '../../../shared/types'
 import BacklogFilters from './backlog/BacklogFilters'
 import BacklogTable from './backlog/BacklogTable'
@@ -56,6 +57,7 @@ export default function BacklogView() {
   const [totalTasks, setTotalTasks] = useState(0)
   const [workflowColumns, setWorkflowColumns] = useState<WorkflowColumn[]>([])
   const [showStandupModal, setShowStandupModal] = useState(false)
+  const aiEnabled = useAiEnabled()
   const [allTags, setAllTags] = useState<TagType[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -226,7 +228,7 @@ export default function BacklogView() {
       const params = activeView
         ? {
             ...toQueryParams(activeView, Date.now()),
-            // The search box stays live on top of a view, narrowing a view is
+            // The search box stays live on top of a view. Narrowing a view is
             // a normal thing to want, and it does not change what the view is.
             ...(debouncedQuery ? { query: debouncedQuery } : {}),
             sortBy,
@@ -372,7 +374,7 @@ export default function BacklogView() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Archived task browser, lets people find and restore (or permanently delete) tasks
+  // Archived task browser. Lets people find and restore (or permanently delete) tasks
   // that were removed via bulk delete, since the toast "Undo" only lasts a few seconds.
   const [showArchive, setShowArchive] = useState(false)
   const [archivedTasks, setArchivedTasks] = useState<Item[]>([])
@@ -515,7 +517,7 @@ export default function BacklogView() {
       toast(`Exported ${selectedItems.length} tasks to markdown file`)
       setSelectedIds([])
     } else {
-      toast('Export failed, file could not be saved', { type: 'error' })
+      toast('Export failed: file could not be saved', { type: 'error' })
     }
   }
 
@@ -625,7 +627,7 @@ export default function BacklogView() {
         </div>
 
         <div className="row">
-          <button
+          {aiEnabled && <button
             onClick={() => setShowStandupModal(true)}
             style={{
               background: 'var(--color-surface-2)',
@@ -655,7 +657,7 @@ export default function BacklogView() {
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
             </svg>
             AI Standup
-          </button>
+          </button>}
 
           <button
             onClick={() => setShowArchive(true)}

@@ -125,7 +125,7 @@ export default function FocusTimerEngine(): null {
         category: 'focus',
         title: isFocus ? 'Focus interval complete 🧠' : 'Break complete ☕',
         body: isFocus
-          ? 'Nice work, time to log a quick retrospective.'
+          ? 'Nice work. Time to log a quick retrospective.'
           : 'Ready to start another focus interval when you are.'
       })
       // Notifications are not essential, never let this break the timer.
@@ -165,7 +165,7 @@ export default function FocusTimerEngine(): null {
       }
 
       // Timer hit zero. focusFinish() nulls focusEndAt, so the guard above
-      // short-circuits every later tick, no re-entry flag needed.
+      // short-circuits every later tick. No re-entry flag needed.
       const settings = state.focusSettings
       const isFocus = isFocusInterval(state.focusPreset)
       state.focusFinish()
@@ -177,7 +177,7 @@ export default function FocusTimerEngine(): null {
         state.focusSetStep('retro')
         toast('Focus interval complete! Time for a quick retrospective.', { type: 'success' })
       } else {
-        // Breaks just end, no retrospective needed, hand control back to setup
+        // Breaks just end. No retrospective needed, hand control back to setup
         // with the mode reset to Focus so the next round is one click away.
         state.focusSetStep('setup')
         state.focusSetPreset('focus')
@@ -187,7 +187,7 @@ export default function FocusTimerEngine(): null {
         // the point of routing there.
         if (settings.autoStartNext) {
           state.focusStart(durationMsFor(settings, 'focus'))
-          toast('Break complete, next focus interval started.', { type: 'info' })
+          toast('Break complete: next focus interval started.', { type: 'info' })
         } else {
           toast('Break complete! Ready for another focus interval whenever you are.', {
             type: 'info'

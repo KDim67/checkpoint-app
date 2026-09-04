@@ -5,7 +5,7 @@ import { recordTombstone } from './db'
 import { getConfigDir, getNotesDir, ensureDir, resolveSafePath as resolveInDir } from './paths'
 
 /**
- * Initializes the notes directory, idempotent and fast after first call.
+ * Initializes the notes directory. Idempotent and fast after first call.
  */
 let _notesFsReady = false
 export function initNotesFs(): void {

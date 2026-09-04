@@ -1,14 +1,10 @@
 /**
- * One item on the Wall.
+ * One item on the Wall. Split from the canvas, which is about camera, pointer
+ * maths and persistence; the two change for different reasons.
  *
- * Split from the canvas because the canvas is about camera, pointer maths and
- * persistence, and this is about how five unrelated things happen to look. The
- * two change for entirely different reasons.
- *
- * The card case is the one that matters: it renders from the *live* item passed
- * in, never from anything stored on the wall. A card whose title changed on the
- * board changes here, and a card that was deleted says so instead of silently
- * showing stale text.
+ * The card case matters most: it renders from the live item passed in, never
+ * from anything stored on the wall, so a retitled card follows and a deleted
+ * one says so instead of showing stale text.
  */
 
 import React from 'react'
@@ -108,7 +104,7 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
 
   // Frame
   // Drawn as an outline with the label above it, so whatever it groups stays
-  // fully visible, a frame is an annotation, not a container.
+  // fully visible. A frame is an annotation, not a container.
   if (item.kind === 'frame') {
     const stroke = item.color || 'var(--color-surface-elevated)'
     return (

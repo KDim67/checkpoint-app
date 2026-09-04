@@ -1,20 +1,11 @@
 /**
- * Reading a board exported from another app.
+ * Reading a board exported from another app. Parsing only: the caller writes
+ * the config and creates items through the ordinary paths, so an imported
+ * workspace is an ordinary one the moment it exists.
  *
- * Checkpoint could already import its own export format, which is no help to
- * anyone arriving from somewhere else, the thing that actually stops people
- * moving in is retyping a board by hand.
- *
- * Pure: parsing only. The caller writes the board configuration and creates the
- * items through the ordinary paths, so an imported workspace is an ordinary one
- * the moment it exists.
- *
- * A note on what is *not* dropped. Trello's export marks archived lists and
- * cards with `closed: true`, and it is tempting to skip them. They are the
- * user's data, and silently losing them during a migration is the worst way to
- * find out an importer is lossy, so archived cards arrive archived, which
- * Checkpoint already has a place for, and archived lists are reported rather
- * than ignored.
+ * Nothing is silently dropped. Trello marks archived lists and cards
+ * `closed: true`; those cards arrive archived and those lists are reported,
+ * because a migration that quietly loses data is the worst kind of importer.
  */
 
 import type { ItemPriority } from './types'
@@ -83,7 +74,7 @@ function str(v: unknown): string {
 /**
  * Column ids follow the same rule the board templates use, so an imported
  * column and a hand-made one of the same name agree. Two lists can share a
- * name, though, and a duplicate id would silently merge them, hence the
+ * name, though, and a duplicate id would silently merge them. Hence the
  * uniqueness pass.
  */
 function columnId(name: string, taken: Set<string>): string {
@@ -169,7 +160,7 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
     const archived = card.closed === true
     const mapped = listToColumn.get(str(card.idList))
     // A card whose list was archived has nowhere to land. Rather than dropping
-    // it, it goes to the first column, visible, and therefore fixable.
+    // it, it goes to the first column. Visible, and therefore fixable.
     if (!mapped && !archived) orphaned++
     const status = archived ? 'archived' : (mapped ?? columns[0].id)
 

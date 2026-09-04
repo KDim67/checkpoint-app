@@ -49,7 +49,7 @@ export default function SettingsSection({
         gap: 'var(--space-3)',
         background: 'var(--color-surface-2)',
         // The header paints its own background, so without matching corners it
-        // squared off the card's rounded top, the notch visible at every
+        // squared off the card's rounded top. The notch visible at every
         // section's top-left and top-right. Radii are inset by the parent's 1px
         // border so the two curves sit concentric instead of leaving a hairline.
         // `overflow: hidden` on the card would also fix it, but would clip the

@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 // The plugins directory is derived from app.getPath('home'), so the electron
-// stub is pointed at a throwaway directory per test. Everything else, the
-// require, the metadata read, the load and unload, is the real code path.
+// stub is pointed at a throwaway directory per test. Everything else. The
+// require, the metadata read, the load and unload. Is the real code path.
 
 let home: string
 
@@ -69,7 +69,7 @@ describe('scanPlugins', () => {
   it('still lists a file it cannot make sense of, by filename', async () => {
     // The trade for not executing anything while listing: a syntax error can no
     // longer be detected here, because detecting it meant running the file. It
-    // surfaces at load time instead, with a real message, see the loadPlugin
+    // surfaces at load time instead, with a real message. See the loadPlugin
     // test below.
     writePlugin('broken.js', 'this is not javascript {{{')
     const { scanPlugins } = await import('../src/main/pluginRegistry')

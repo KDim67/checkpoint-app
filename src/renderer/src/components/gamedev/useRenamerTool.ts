@@ -83,7 +83,7 @@ export function useRenamerTool() {
     e.preventDefault()
     setIsDragOver(false)
     if (e.dataTransfer.files) {
-      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
       const dropped = Array.from(e.dataTransfer.files).map(f => ({
         name: f.name,
         path: window.electronAPI.app.getPathForFile(f),

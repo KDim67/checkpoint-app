@@ -64,17 +64,13 @@ export default function ItemDetailPanel() {
       try {
         // Load Kanban columns for the active workspace.
         //
-        // This read used to target a key called 'kanban_columns', with no
-        // workspace suffix, which nothing has ever written, in any commit. So
-        // it always fell through to the hardcoded list below, whose ids
-        // ('backlog', 'todo') do not exist on any real board: the actual
-        // defaults are open / in_progress / in_review / done.
+        // This used to read 'kanban_columns', a key with no workspace suffix
+        // that nothing has ever written, so it always fell through to the
+        // hardcoded ids below ('backlog', 'todo') which exist on no real board.
         //
-        // The damage was not cosmetic. A card with status 'open' matched no
-        // <option>, so the select displayed "Backlog" regardless of its real
-        // status, and choosing an option wrote a status no column owns, 
-        // removing the card from the board with no error and no undo. Custom
-        // columns never appeared here at all.
+        // Not cosmetic: a card with status 'open' matched no <option>, so the
+        // select showed "Backlog" whatever the real status, and picking one
+        // wrote a status no column owns, dropping the card off the board.
         const { columns: boardColumns } = await loadBoardConfig(activeContext)
         setColumns(boardColumns.map(c => ({ id: c.id, name: c.name })))
 

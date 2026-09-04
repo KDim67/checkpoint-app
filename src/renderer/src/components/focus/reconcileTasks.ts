@@ -1,18 +1,14 @@
 import type { Item } from '../../../../shared/types'
 
 /**
- * Reconciles the focus session's selected tasks against what is actually in the
- * database.
+ * Reconciles a focus session's selected tasks against the database.
  *
- * The selection is a snapshot of whole `Item` objects taken when the user picks
- * tasks, and it lives in the global store so a running session survives
- * navigating away. Nothing used to reconcile it, so deleting one of those cards
- * from the Kanban board left it sitting in the session list: clicking it called
- * updateItem on an id that no longer existed, which throws `Item not found`, so
- * the task could never be ticked off and never went away.
+ * The selection is a snapshot of whole `Item` objects held in the store, and
+ * nothing used to reconcile it. Deleting one of those cards left it in the
+ * session list, where clicking it threw `Item not found`, so it could never be
+ * ticked off and never went away.
  *
- * Dropping vanished tasks and refreshing the survivors' fields is the whole
- * repair, kept pure so it can be tested without a database or a React tree.
+ * Dropping the vanished and refreshing the survivors is the whole repair.
  */
 export function reconcileSelectedTasks(selected: Item[], live: Item[]): Item[] {
   if (selected.length === 0) return selected

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
 import { useAppStore, type ActiveView } from './store/appStore'
+import { useAiEnabled } from './lib/useAiEnabled'
 import { Sidebar } from './components/Sidebar'
 import { ToastProvider } from './components/ui/Toast'
 import ErrorBoundary from './components/ui/ErrorBoundary'
@@ -257,6 +258,7 @@ function PanelTab({
 }
 
 function RightPanel() {
+  const aiEnabled = useAiEnabled()
   const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
   const rightPanelContent = useAppStore(s => s.rightPanelContent)
   const setRightPanelContent = useAppStore(s => s.setRightPanelContent)
@@ -275,7 +277,7 @@ function RightPanel() {
   const [isResizing, setIsResizing] = useState(false)
 
   const panelTabs: { id: PanelTabId; label: string }[] = [
-    { id: 'ai-chat', label: 'AI Assistant' },
+    ...(aiEnabled ? [{ id: 'ai-chat' as PanelTabId, label: 'AI Assistant' }] : []),
     { id: 'git', label: 'Git' },
     ...(selectedItemId ? [{ id: 'item-detail' as PanelTabId, label: 'Detail' }] : [])
   ]
@@ -404,7 +406,12 @@ function RightPanel() {
           >
             <ErrorBoundary label="This panel" resetKey={rightPanelContent ?? ''}>
               <Suspense fallback={<div className="skeleton" style={{ margin: 'var(--space-4)', height: '64px', borderRadius: 'var(--radius-md)' }} />}>
-                {rightPanelContent === 'ai-chat' && <AiStreamPanel />}
+                {rightPanelContent === 'ai-chat' && aiEnabled && <AiStreamPanel />}
+                {rightPanelContent === 'ai-chat' && !aiEnabled && (
+                  <p style={{ padding: 'var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+                    The assistant is switched off in Settings, Features.
+                  </p>
+                )}
                 {rightPanelContent === 'git' && <GitPanel />}
                 {rightPanelContent === 'item-detail' && <ItemDetailPanel />}
               </Suspense>
@@ -497,6 +504,10 @@ export default function App() {
   const setContextsList = useAppStore(s => s.setContextsList)
   const setContext = useAppStore(s => s.setContext)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
+  // The shortcut handler binds once, so it reads the flag through a ref.
+  const appAiEnabled = useAiEnabled()
+  const aiEnabledRef = useRef(appAiEnabled)
+  aiEnabledRef.current = appAiEnabled
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -567,7 +578,7 @@ export default function App() {
 
   // Opens the lightbox when an image is clicked directly. Runs in the capture
   // phase and swallows the event, so it has to bow out whenever the image is
-  // standing in for a control, a card, button or link, otherwise clicking a
+  // standing in for a control (a card, button or link), otherwise clicking a
   // card's thumbnail zooms the image instead of opening the card.
   useEffect(() => {
     const handleImageClick = (e: MouseEvent) => {
@@ -596,7 +607,7 @@ export default function App() {
 
   // Bootstrap: load available contexts from DB on mount.
   // An explicitly-set "default context" (Settings → General) wins over the
-  // last-active one, previously that setting was saved but never read.
+  // last-active one. Previously that setting was saved but never read.
   const loadContexts = useCallback(async () => {
     try {
       const contexts = await window.electronAPI.db.getContexts()
@@ -631,7 +642,7 @@ export default function App() {
         }
       }
     } catch {
-      // DB not yet initialized, use defaults
+      // DB not yet initialized. Use defaults
     }
   }, [setAvailableContexts, setContextsList, setContext])
 
@@ -672,7 +683,7 @@ export default function App() {
       }
     }).catch(console.error)
 
-    // Apply the persisted interface theme, previously saved by Settings but
+    // Apply the persisted interface theme. Previously saved by Settings but
     // never read on boot, so the app silently reset to dark every launch.
     window.electronAPI.db.getSetting('app_theme').then((t) => {
       if (!t) return
@@ -684,7 +695,7 @@ export default function App() {
       }
     }).catch(console.error)
 
-    // Apply the persisted font scale, previously only applied once the
+    // Apply the persisted font scale. Previously only applied once the
     // Appearance settings tab was opened.
     window.electronAPI.db.getSetting('appearance_font_size').then((fs) => {
       if (fs === 'small' || fs === 'medium' || fs === 'large') {
@@ -756,7 +767,7 @@ export default function App() {
           setView(shortcut.action.view)
           break
         case 'toggleAiPanel':
-          toggleRightPanel('ai-chat')
+          if (aiEnabledRef.current) toggleRightPanel('ai-chat')
           break
         case 'openSettings':
           setView('settings')
@@ -854,7 +865,7 @@ export default function App() {
   )
 }
 
-// Root router, selects between standalone shells and the full app
+// Root router. Selects between standalone shells and the full app
 // This is what main.tsx should render (or App can be renamed; kept as default
 // export for back-compat and the router wraps it).
 export function AppRouter() {

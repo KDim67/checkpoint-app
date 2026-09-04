@@ -3,7 +3,7 @@ import { RotateCcw, History } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import type { McpActivityEntry } from '../../../../shared/mcpActivity'
 
-/** Coarse on purpose, the useful question is "was this just now, or last week?". */
+/** Coarse on purpose. The useful question is "was this just now, or last week?". */
 function relativeTime(ms: number, now: number): string {
   const secs = Math.max(0, Math.round((now - ms) / 1000))
   if (secs < 60) return 'just now'

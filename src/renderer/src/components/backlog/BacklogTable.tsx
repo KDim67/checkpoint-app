@@ -285,8 +285,8 @@ export default function BacklogTable({
     }
   }
 
-  // Visual order of selectable rows as currently rendered (respects grouping/collapse), 
-  // used for shift-click ranges so they select what the user actually sees, not the
+  // Visual order of selectable rows as currently rendered (respects grouping/collapse).
+  // Used for shift-click ranges so they select what the user actually sees, not the
   // underlying unsorted `items` array order.
   const visibleItemIds = useMemo(
     () => flatRows.filter((r): r is Extract<DisplayRow, { type: 'row' }> => r.type === 'row').map((r) => r.item.id),

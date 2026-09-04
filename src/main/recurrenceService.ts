@@ -1,14 +1,9 @@
 /**
- * Materialises recurring work into real items.
+ * Materialises recurring work into real items. At most one unfinished instance
+ * per recurrence, so a daily task left for a month gives one card, not thirty.
  *
- * The rule is: **at most one unfinished instance per recurrence**. A daily task
- * left alone for a month produces one card, not thirty, the next occurrence is
- * only created once the previous one is done or archived. That is what keeps the
- * items table bounded without giving up the history of each completion.
- *
- * Scheduled the same way backups are (see backupVault.initializeBackupScheduler):
- * a sweep at startup, then an hourly check. A recurrence is not a reminder, so
- * being an hour late to create tomorrow's card costs nothing.
+ * Scheduled like backups (see backupVault.initializeBackupScheduler): a sweep at
+ * startup, then hourly. A recurrence is not a reminder, so an hour late is fine.
  */
 
 import { v4 as uuidv4 } from 'uuid'
@@ -66,7 +61,7 @@ export interface CreateRecurrenceInput {
 /**
  * Stores a new recurrence and works out when it should first fire.
  *
- * Returns null when the rule cannot be understood, better than accepting it and
+ * Returns null when the rule cannot be understood. Better than accepting it and
  * producing work at an unpredictable time.
  */
 export function createRecurrence(input: CreateRecurrenceInput): RecurrenceRow | null {
@@ -76,7 +71,7 @@ export function createRecurrence(input: CreateRecurrenceInput): RecurrenceRow | 
   const now = Date.now()
   // A rule starting in the future waits for that moment. One whose start has
   // already passed is due immediately, not at its next future occurrence, which
-  // would mean creating a daily task today and seeing nothing until tomorrow, 
+  // would mean creating a daily task today and seeing nothing until tomorrow,
   // and not backfilled, which would spawn every occurrence it ever missed.
   // A rule whose window has already closed is stored inactive.
   const nextDue =
@@ -167,16 +162,12 @@ export function materialiseDueRecurrences(now = Date.now()): number {
 }
 
 /**
- * Advances a rule whose instance was just completed.
+ * Advances a rule whose instance was just completed, but only when it is
+ * already overdue. The sweep skips an open instance without advancing next_due,
+ * so a daily task ignored since Monday is still due Tuesday when ticked off on
+ * Thursday, and its replacement should appear at once.
  *
- * Only fires when the rule is already overdue, which is the case that matters:
- * while an instance sits open the sweep skips it *without* advancing next_due,
- * so a daily task ignored since Monday is still due Tuesday when it is finally
- * ticked off on Thursday, and the replacement should appear at once rather than
- * up to an hour later.
- *
- * Completing an instance that is merely on schedule creates nothing, because the
- * next occurrence genuinely is not due yet.
+ * Completing one that is merely on schedule creates nothing.
  */
 export function onInstanceClosed(recurrenceId: string, now = Date.now()): void {
   const row = getRecurrenceById(recurrenceId)

@@ -1,21 +1,10 @@
 /**
- * The assistant's vocabulary for board configuration.
+ * The assistant's vocabulary for board configuration. Everything the config UI
+ * can do, the AI can do too.
  *
- * Until now the AI could create cards, and could create columns only while
- * generating a whole board from scratch. Its entire repertoire for an existing
- * board was six card operations, so "cap Review at three and make Done green"
- * was not expressible. These operations close that gap: everything the
- * configuration UI can do, the assistant can now do too.
- *
- * Two properties matter more than the op list itself:
- *
- *  - **Every operation computes its own inverse before it is applied.** Changes
- *    land immediately, the way card edits already do, and undo is a single
- *    click rather than a manual repair.
- *  - **Applying is pure.** `applyConfigOps` only transforms a document; the
- *    side effects it implies (moving the cards out of a deleted column) are
- *    returned as instructions for the caller to carry out. That keeps the
- *    interesting logic testable without a database.
+ * Each op computes its own inverse before it is applied, so undo is one click.
+ * And `applyConfigOps` is pure: side effects like rehoming a deleted column's
+ * cards come back as instructions, which keeps it testable without a database.
  */
 
 import {
@@ -77,7 +66,7 @@ export interface ApplyResult {
   /**
    * Card reassignments the caller must perform. Deleting a column would
    * otherwise strand its cards under a status no column claims, so they move
-   * to the first surviving column, the same rule the board's own delete uses.
+   * to the first surviving column. The same rule the board's own delete uses.
    */
   cardMoves: { fromColumn: string; toColumn: string }[]
 }
@@ -223,7 +212,7 @@ function columnId(name: string): string {
 /**
  * The full prior state of a column, captured for the inverse.
  *
- * Every field is stated explicitly, including the ones that were absent, 
+ * Every field is stated explicitly, including the ones that were absent:
  * `color: ''` rather than `color: undefined`. An undefined field means "leave
  * alone" to the applier, so an inverse built from undefineds could never undo
  * the *addition* of a colour to a column that had none.
@@ -331,7 +320,7 @@ export function applyConfigOps(config: BoardConfig, operations: ConfigOperation[
           break
         }
         if (next.columns.length <= 1) {
-          skipped.push(`Cannot delete "${col.name}", a board needs at least one column`)
+          skipped.push(`Cannot delete "${col.name}": a board needs at least one column`)
           break
         }
         const at = next.columns.findIndex(c => c.id === col.id)

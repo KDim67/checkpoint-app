@@ -47,7 +47,7 @@ export function useUpscalerTool(isActive: boolean) {
       toast('Invalid File: Please drop an image file.', { type: 'error' })
       return
     }
-    // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+    // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
     const path = window.electronAPI.app.getPathForFile(file)
     const reader = new FileReader()
     reader.onload = (event) => {
@@ -95,7 +95,7 @@ export function useUpscalerTool(isActive: boolean) {
         rctx.clearRect(0, 0, result.width, result.height)
         rctx.drawImage(img, 0, 0, result.width, result.height)
       } else {
-        // EPX family, operate on the raw RGBA buffer via the shared pure cores
+        // EPX family. Operate on the raw RGBA buffer via the shared pure cores
         const tmp = document.createElement('canvas')
         tmp.width = w
         tmp.height = h

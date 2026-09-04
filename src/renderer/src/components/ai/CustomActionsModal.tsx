@@ -69,7 +69,7 @@ export default function CustomActionsModal({
               {/* Existing actions */}
               {customActions.length === 0 ? (
                 <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-3)' }}>
-                  No custom actions yet. Save the prompts you find yourself retyping, they'll appear in the ＋ menu.
+                  No custom actions yet. Save the prompts you find yourself retyping. They'll appear in the ＋ menu.
                 </div>
               ) : (
                 customActions.map(a => (

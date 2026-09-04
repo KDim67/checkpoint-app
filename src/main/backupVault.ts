@@ -243,7 +243,7 @@ export function initializeBackupScheduler(): void {
     checkAndRunTimedBackup()
   }, checkInterval)
 
-  // Run initial check after a brief delay, stored so it can be cancelled on early quit
+  // Run initial check after a brief delay. Stored so it can be cancelled on early quit
   initialCheckTimer = setTimeout(() => {
     initialCheckTimer = null
     checkAndRunTimedBackup()

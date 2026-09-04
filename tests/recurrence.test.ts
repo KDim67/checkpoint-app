@@ -59,7 +59,7 @@ describe('normalizeRule', () => {
   })
 })
 
-describe('nextOccurrence, daily', () => {
+describe('nextOccurrence: daily', () => {
   it('returns the start when it is still ahead', () => {
     const r = rule({ startAt: at(2026, 6, 1) })
     expect(show(nextOccurrence(r, at(2026, 5, 1)))).toBe(show(at(2026, 6, 1)))
@@ -98,7 +98,7 @@ describe('nextOccurrence, daily', () => {
   })
 })
 
-describe('nextOccurrence, weekly', () => {
+describe('nextOccurrence: weekly', () => {
   it('repeats on the start weekday when none are named', () => {
     const r = rule({ freq: 'weekly', startAt: at(2026, 1, 1) })
     const next = nextOccurrence(r, at(2026, 1, 1))
@@ -130,7 +130,7 @@ describe('nextOccurrence, weekly', () => {
   })
 })
 
-describe('nextOccurrence, monthly', () => {
+describe('nextOccurrence: monthly', () => {
   it('keeps the same day each month', () => {
     const r = rule({ freq: 'monthly', startAt: at(2026, 1, 15) })
     expect(show(nextOccurrence(r, at(2026, 1, 15)))).toBe(show(at(2026, 2, 15)))
@@ -169,7 +169,7 @@ describe('nextOccurrence, monthly', () => {
   })
 })
 
-describe('nextOccurrence, termination', () => {
+describe('nextOccurrence: termination', () => {
   it('never returns a time at or before the cutoff', () => {
     for (const freq of ['daily', 'weekly', 'monthly'] as const) {
       const r = rule({ freq, startAt: at(2020, 1, 1) })

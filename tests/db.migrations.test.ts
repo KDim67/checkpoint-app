@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { initDb, closeDb, getDb, searchItems } from '../src/main/db'
 
-// These run the real initDb, real SCHEMA_SQL, real legacy-CHECK rebuild, real
-// user_version ladder, against a throwaway file in the OS temp directory. The
+// These run the real initDb. Real SCHEMA_SQL, real legacy-CHECK rebuild, real
+// user_version ladder. Against a throwaway file in the OS temp directory. The
 // user's own database is never opened.
 //
 // `better-sqlite3` is aliased to a node:sqlite facade (see vitest.config.ts),
@@ -258,7 +258,7 @@ describe('upgrading a legacy database', () => {
 
   // Known defect
   // items_fts is an external-content FTS5 table. Creating it over a populated
-  // items table leaves the index empty, nothing backfills it, so every item a
+  // items table leaves the index empty. Nothing backfills it, so every item a
   // user wrote before upgrading to the search build is invisible to search, with
   // no error anywhere to suggest the results are incomplete.
   it('can still find items that predate the full-text index', () => {

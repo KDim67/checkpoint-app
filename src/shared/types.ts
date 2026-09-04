@@ -51,7 +51,7 @@ export interface AppSetting {
 
 export type MemoryCategory = 'semantic' | 'episodic' | 'working'
 
-/** A row of `ai_memories`, what the assistant has remembered about a workspace. */
+/** A row of `ai_memories`. What the assistant has remembered about a workspace. */
 export interface AiMemory {
   id: string
   context: string
@@ -93,8 +93,8 @@ export interface ContextExport {
   item_tags: { item_id: string; tag_id: string }[]
   relations: Relation[]
   /**
-   * The workspace's own settings, board columns, background, swimlanes,
-   * backlog layout and every wall, keyed as stored, with values as stored.
+   * The workspace's own settings. Board columns, background, swimlanes,
+   * backlog layout and every wall. Keyed as stored, with values as stored.
    *
    * Absent in a version 1 export, which is why it is optional: those files
    * still import, they just arrive with default columns the way they always
@@ -103,7 +103,7 @@ export interface ContextExport {
   settings?: Record<string, string>
 }
 
-/** A row of `sync_tombstones`, a deletion, so peers can replay it. */
+/** A row of `sync_tombstones`. A deletion, so peers can replay it. */
 export interface SyncTombstone {
   id: string
   table_name: string
@@ -114,7 +114,7 @@ export interface SyncTombstone {
  * The whole database as it travels between paired machines.
  *
  * Every field is the table verbatim. `app_settings` has already been filtered
- * by `shared/syncSettings` before it gets here, credentials and machine-local
+ * by `shared/syncSettings` before it gets here. Credentials and machine-local
  * rows never reach this shape.
  */
 export interface SyncPayload {
@@ -155,7 +155,7 @@ export interface PaginatedResult<T> {
 
 // AI
 
-/** Multimodal content part (OpenAI-compatible), used for vision-model image input. */
+/** Multimodal content part (OpenAI-compatible). Used for vision-model image input. */
 export type AiContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }

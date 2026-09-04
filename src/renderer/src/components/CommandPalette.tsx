@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, CornerDownLeft, FileText } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
+import { useAiEnabled } from '../lib/useAiEnabled'
 import { rankCommands } from '../../../shared/commandMatch'
 import { buildCommands, type Command } from '../lib/commands'
 import { VIEW_FEATURES } from '../lib/features'
@@ -21,6 +22,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const setRightPanelContent = useAppStore(s => s.setRightPanelContent)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
+  const aiEnabled = useAiEnabled()
   const activeContext = useAppStore(s => s.activeContext)
   const availableContexts = useAppStore(s => s.availableContexts)
 
@@ -83,6 +85,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         setSettingsTab,
         setRightPanelContent,
         toggleRightPanel,
+        aiEnabled,
         contexts: availableContexts,
         activeContext,
         enabledViews,
@@ -93,7 +96,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
           setView('backlog')
         }
       }),
-    [setView, setContext, setSettingsTab, setRightPanelContent, toggleRightPanel, availableContexts, activeContext, enabledViews, savedViews, setPendingViewId]
+    [setView, setContext, setSettingsTab, setRightPanelContent, toggleRightPanel, availableContexts, activeContext, enabledViews, savedViews, setPendingViewId, aiEnabled]
   )
 
   const results = useMemo(() => rankCommands(commands, query), [commands, query])

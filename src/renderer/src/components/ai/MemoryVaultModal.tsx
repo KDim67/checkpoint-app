@@ -1,16 +1,11 @@
 /**
- * The memory vault modal.
+ * The memory vault modal. Lifted out of AiStreamPanel unchanged, down to the
+ * JSX indentation, which is why it still opens with the same constant tables
+ * rather than a tidier arrangement.
  *
- * Lifted out of AiStreamPanel unchanged, down to the indentation of its JSX. It
- * was an inline IIFE, `{showMemoryPanel && (() => { … })()}`, which is why the
- * component below still opens with the same constant tables and derived lists
- * rather than a tidier arrangement: keeping the body byte-identical is what
- * makes the move reviewable.
- *
- * All state lives in useMemoryVault and arrives as one `vault` prop, the same
- * shape the Game Dev panels take a `tool` prop. It must not move in here: this
- * modal unmounts whenever it is closed, and the chat stream writes to the vault
- * while it is shut.
+ * State lives in useMemoryVault and arrives as one `vault` prop. It must not
+ * move in here: this modal unmounts when closed, and the chat stream writes to
+ * the vault while it is shut.
  */
 
 import React from 'react'
@@ -435,7 +430,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                         </div>
                       </div>
 
-                      {/* Content, editable or read-only */}
+                      {/* Content. Editable or read-only */}
                       {editingMemoryId === mem.id ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <textarea

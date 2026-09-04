@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
 import { X, Tag, Link2, Sparkles, Check, CheckSquare, Trash2, FilePlus, Paperclip, Clock, Layers } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
+import { useAiEnabled } from '../../lib/useAiEnabled'
 import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
@@ -25,6 +26,7 @@ type EditorMode = 'edit' | 'preview' | 'split'
 export default function CardDetailModal({ cardId, initialCard, columns, onClose, onUpdate, isReadOnly = false }: CardDetailModalProps) {
   const selectItem = useAppStore(s => s.selectItem)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
+  const aiEnabled = useAiEnabled()
   const activeContext = useAppStore(s => s.activeContext)
 
   const [card, setCard] = useState<Item | null>(null)
@@ -268,7 +270,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
       const name = file.name
-      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
       const path = window.electronAPI.app.getPathForFile(file)
       const isImage = file.type.startsWith('image/')
       
@@ -454,7 +456,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           </div>
 
           <div className="row">
-            <button
+            {aiEnabled && <button
               onClick={handleAiAssist}
               style={{
                 background: 'var(--color-secondary-muted)',
@@ -481,7 +483,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             >
               <Sparkles size={16} fill="currentColor" />
               <span>AI Assist</span>
-            </button>
+            </button>}
 
             <button
               onClick={onClose}
@@ -1694,7 +1696,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </div>
           </div>
 
-          {/* Rewind, what the user was doing the last time this card was
+          {/* Rewind. What the user was doing the last time this card was
               worked on. Sits with the historical material rather than above the
               description, which every card has and most cards edit. */}
           {card && (

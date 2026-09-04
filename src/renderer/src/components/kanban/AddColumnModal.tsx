@@ -161,7 +161,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           />
         </div>
 
-        {/* Definition of done, shown on the column name's tooltip, and the
+        {/* Definition of done. Shown on the column name's tooltip, and the
             field the assistant fills in when it designs a workflow. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
           <label htmlFor="col-desc-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>

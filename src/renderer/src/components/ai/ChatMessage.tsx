@@ -52,12 +52,12 @@ interface ChatMessageProps {
   isCopied?: boolean
   isStreaming?: boolean
   hasRevertAction?: boolean
-  /** The panel's global streaming flag, compared by React.memo so committed
+  /** The panel's global streaming flag. Compared by React.memo so committed
    *  messages re-render (fresh handler closures) when streaming toggles. */
   actionsLocked?: boolean
 }
 
-// Global execution & caching locks, prevent duplicate DB calls and React Strict Mode double-fires
+// Global execution & caching locks. Prevent duplicate DB calls and React Strict Mode double-fires
 const executedActionSignaturesSet = new Set<string>()
 const createdItemsCacheMap = new Map<string, { item: Item; tags: Tag[] }>()
 const createdColsCacheMap = new Map<string, ColumnConfig>()
@@ -122,7 +122,7 @@ function faultTolerantParseJSON(jsonStr: string): unknown {
   }
 }
 
-/** Message text from a thrown value, `catch` binds `unknown`, and an IPC
+/** Message text from a thrown value: `catch` binds `unknown`, and an IPC
  *  rejection is not always an Error. */
 function errorText(err: unknown): string {
   const message = asObject(err)?.message
@@ -205,7 +205,7 @@ function toWipLimit(raw: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-// Batch board parser, handles every format the AI might produce
+// Batch board parser. Handles every format the AI might produce
 
 function parseBatchBoardJson(jsonString: string): BatchBoard | null {
   const parsed = faultTolerantParseJSON(jsonString)
@@ -325,7 +325,7 @@ function parseBatchBoardJson(jsonString: string): BatchBoard | null {
 }
 
 // The confirmation row shows either the PROPOSED columns (before execution) or
-// the ones actually written to the setting, this is the overlap it renders.
+// the ones actually written to the setting. This is the overlap it renders.
 type ShownColumn = { name: string; color?: string }
 
 function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
@@ -350,9 +350,9 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
 
         const validContext = activeContext || 'default'
 
-        // 1. Create Columns (locked: prevents a concurrent column writer, 
+        // 1. Create Columns (locked: prevents a concurrent column writer,
         //    e.g. the Kanban view's own "bootstrap default columns" path, or
-        //    another action block in the same message, from reading the
+        //    another action block in the same message. From reading the
         //    same stale column list and clobbering this write or creating a
         //    second column with the same name).
         const { createdCols, colsList, reusedCols } = await withLock(boardConfigLockKey(validContext), async () => {
@@ -363,7 +363,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           const config = await readBoardConfigUnlocked(validContext)
           const colsList: ColumnConfig[] = [...config.columns]
 
-          // Track only columns we actually create, reused ones aren't "added".
+          // Track only columns we actually create. Reused ones aren't "added".
           const createdCols: ColumnConfig[] = []
           let reusedCols = 0
           for (const col of batchData.columns) {
@@ -382,7 +382,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
 
         // 2. Create Cards (locked: prevents two concurrent creators from
         //    both seeing "no existing card with this title" and inserting
-        //    duplicates, a classic check-then-act race).
+        //    duplicates. A classic check-then-act race).
         const { newCards, skippedCards } = await withLock(`kanban-cards:${validContext}`, async () => {
           const existingItemsRes = await window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
           // Exclude archived cards: the archive bin is invisible to the AI, so a
@@ -416,7 +416,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           }
 
           // Position base: explicit ascending positions keep the batch in order
-          // AND fix a real bug, omitting position let the IPC validator default
+          // AND fix a real bug. Omitting position let the IPC validator default
           // it to 0, pinning every AI card above user cards and making them
           // impossible to reorder (midpoint of two 0-positions is still 0).
           const posBase = Date.now()
@@ -424,7 +424,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           for (const card of batchData.cards) {
             const existing = existingCardsList.find(ci => ci.title.trim().toLowerCase() === card.title.trim().toLowerCase())
             if (existing) {
-              // Already on the board (or a duplicate within this batch), don't recreate.
+              // Already on the board (or a duplicate within this batch). Don't recreate.
               skippedCards++
               continue
             }
@@ -542,7 +542,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
 
       {nothingNew ? (
         <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-          Everything requested was already on the board, nothing new to add.
+          Everything requested was already on the board. Nothing new to add.
         </div>
       ) : (
       <div style={{ fontSize: '11px', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '200px', overflowY: 'auto', overflowX: 'hidden' }}>
@@ -634,7 +634,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
   const operations = normalized?.operations || []
   // dedupeKey (the message timestamp) scopes idempotency to THIS message:
   // remounts of the same message replay, but asking for the same edit again
-  // in a NEW message must execute again, repeating a request is the most
+  // in a NEW message must execute again. Repeating a request is the most
   // natural user reaction when something didn't work.
   const signature = operations.length
     ? `update::${activeContext || 'default'}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target}:${opSignatureValue(o)}`).join('|')}`
@@ -646,7 +646,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
       try {
         if (operations.length === 0 || !signature) return
         if (executedActionSignaturesSet.has(signature)) {
-          // Already executed (e.g. reloaded saved chat / remount), replay the
+          // Already executed (e.g. reloaded saved chat / remount). Replay the
           // REAL recorded outcome, never a fabricated "all applied" summary.
           const recorded = executedUpdateOutcomesMap.get(signature)
           if (isMounted) {
@@ -666,7 +666,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
             window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
           ])
           // Kept separate on purpose: the Kanban board renders ONLY 'card'
-          // items, so board edits must prefer cards, a Backlog task with the
+          // items, so board edits must prefer cards. A Backlog task with the
           // same title must never shadow the visible card (that "moved"
           // something invisible and left the board looking untouched).
           const cardItems = (cardsRes?.items || []).filter(i => i.status !== 'archived')
@@ -696,7 +696,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
           // Exact title match first; fall back to a UNIQUE prefix/containment
           // match (card title contains the query) so a slightly-shortened title
           // still resolves. The reverse direction (query contains title) is
-          // deliberately NOT allowed, it let short junk titles hijack edits.
+          // deliberately NOT allowed. It let short junk titles hijack edits.
           const findIn = (list: Item[], q: string): Item | undefined => {
             const exact = list.find(i => i.title.trim().toLowerCase() === q)
             if (exact) return exact
@@ -729,7 +729,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
             const item = findCard(op.target, cardsOnly)
             if (!item) {
               if (isColumnName(op.target)) {
-                notFound.push(`"${op.target}" is a column, not a card, specify which card to ${op.op === 'move' ? 'move' : 'edit'}`)
+                notFound.push(`"${op.target}" is a column, not a card: specify which card to ${op.op === 'move' ? 'move' : 'edit'}`)
               } else if (cardsOnly && findCard(op.target, false)) {
                 notFound.push(`"${op.target}" is a Backlog task, not a board card, only cards appear in Kanban columns`)
               } else {
@@ -738,14 +738,14 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
               continue
             }
             // Even with a loose match: never edit a card when the stated target
-            // is actually a column name, that's a confused instruction.
+            // is actually a column name. That's a confused instruction.
             if (isColumnName(op.target) && item.title.trim().toLowerCase() !== op.target.trim().toLowerCase()) {
-              notFound.push(`"${op.target}" is a column, not a card, specify which card to ${op.op === 'move' ? 'move' : 'edit'}`)
+              notFound.push(`"${op.target}" is a column, not a card: specify which card to ${op.op === 'move' ? 'move' : 'edit'}`)
               continue
             }
 
-            // One failing operation must never abort the rest of the batch, 
-            // report it honestly and keep going.
+            // One failing operation must never abort the rest of the batch.
+            // Report it honestly and keep going.
             try {
               if (op.op === 'move') {
                 const col = resolveCol(op.toColumn || '')
@@ -773,7 +773,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
                 applied.push(`Updated description of "${item.title}"`)
               } else if (op.op === 'set_due_date') {
                 const dueMs = op.due ? Date.parse(op.due) : null
-                if (op.due && Number.isNaN(dueMs)) { failed.push(`set due date "${item.title}", unparseable date "${op.due}"`); continue }
+                if (op.due && Number.isNaN(dueMs)) { failed.push(`set due date "${item.title}": unparseable date "${op.due}"`); continue }
                 if ((item.due_at ?? null) === dueMs) { noops++; continue }
                 await window.electronAPI.db.updateItem(item.id, { due_at: dueMs })
                 inverse.push({ id: item.id, patch: { due_at: item.due_at ?? null } })
@@ -802,16 +802,16 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
           return { applied, notFound, failed, noops, inverse }
         })
 
-        // Record the truth for future remounts BEFORE any state updates, 
-        // a replay must show what actually happened, not what was requested.
+        // Record the truth for future remounts BEFORE any state updates.
+        // A replay must show what actually happened, not what was requested.
         executedUpdateOutcomesMap.set(signature, outcome)
 
         window.dispatchEvent(new CustomEvent('kanban-refresh'))
         window.dispatchEvent(new CustomEvent('item-updated'))
         if (isMounted) setResult(outcome)
       } catch (err) {
-        // A crashed run must not fake "previously applied" on remount, 
-        // release the signature so a retry (or remount) re-executes honestly.
+        // A crashed run must not fake "previously applied" on remount.
+        // Release the signature so a retry (or remount) re-executes honestly.
         executedActionSignaturesSet.delete(signature)
         if (isMounted) setError(errorText(err))
       }
@@ -922,7 +922,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
           )}
           {result?.replayed && appliedList.length === 0 && notFound.length === 0 && failedList.length === 0 && (
             <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>
-              This edit ran in an earlier session, no record of applied changes is available.
+              This edit ran in an earlier session. No record of applied changes is available.
             </div>
           )}
         </div>
@@ -1248,7 +1248,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
             body,
             status: finalStatus,
             priority,
-            // Explicit position, omitting it defaults to 0 in the IPC validator,
+            // Explicit position. Omitting it defaults to 0 in the IPC validator,
             // pinning the card above everything and breaking drag-reordering.
             position: Date.now(),
             due_at: null,
@@ -1621,7 +1621,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
   // A non-object (the model answered with an array) still renders the plan
   // shell with zero steps; only `null` reaches the bail-out further down.
   const root = asObject(parsed) ?? {}
-  // Field-for-field with what the block declares, no alias widening, so a step
+  // Field-for-field with what the block declares. No alias widening, so a step
   // that rendered blank before still renders blank.
   const planTitle = str(root.title)
   const planOverview = str(root.overview)
@@ -1812,7 +1812,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
         </div>
       )}
 
-      {/* Step List, Phase 1: clickable toggles */}
+      {/* Step List. Phase 1: clickable toggles */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
         {steps.map((s, idx) => {
           const isApproved = stepApprovals[idx] !== false
@@ -2485,7 +2485,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
   if (message.role === 'system') return null // Do not render system instructions in bubbles
 
   return (
-    // Timestamp/copy reveal is pure CSS (.chat-msg-row:hover), a state-driven
+    // Timestamp/copy reveal is pure CSS (.chat-msg-row:hover). A state-driven
     // hover re-rendered the whole message subtree (ReactMarkdown + action
     // blocks) on every mouse crossing, which made the chat visibly stutter.
     <div
@@ -2796,7 +2796,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
               urlTransform={url => url}
               components={{
                 a({ href, children }) {
-                  // Internal card reference, open the card's detail panel
+                  // Internal card reference. Open the card's detail panel
                   if (href && href.startsWith('#card:')) {
                     const cardId = href.slice(6)
                     return (
@@ -2829,7 +2829,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                   const lang = match ? match[1] : ''
                   const rawContent = String(children)
 
-                  // Step 1: Explicit language tag wins, use the rich single-block UIs
+                  // Step 1: Explicit language tag wins. Use the rich single-block UIs
                   // Checked before update_board: "configure_board" contains
                   // neither substring, but keeping the more specific tag first
                   // keeps the ordering obvious if either name ever changes.
@@ -2854,7 +2854,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     return <CreateDialogueTreeActionBlock jsonString={rawContent} />
                   }
 
-                  // Step 2: Generic JSON, try batch (handles all AI output formats)
+                  // Step 2: Generic JSON. Try batch (handles all AI output formats)
                   if (lang === 'json' || lang === 'create_batch' || lang === 'batch' || lang === '') {
                     const batch = parseBatchBoardJson(rawContent)
                     if (batch && (batch.columns.length > 0 || batch.cards.length > 0)) {
@@ -2862,7 +2862,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     }
                   }
 
-                  // Step 3: Unlabelled fenced block, try all parsers as a last resort
+                  // Step 3: Unlabelled fenced block. Try all parsers as a last resort
                   if (!lang || lang === 'json') {
                     const normCard = normalizeCardJson(rawContent)
                     if (normCard) return <CreateTaskActionBlock jsonString={rawContent} />

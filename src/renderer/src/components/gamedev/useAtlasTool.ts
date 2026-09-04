@@ -6,7 +6,7 @@ import { errorMessage } from '../../../../shared/errors'
 /**
  * Atlas Forge: folder selection, bin packing, and PNG/JSON export.
  *
- * A hook rather than state inside AtlasPanel, the panel unmounts on tab
+ * A hook rather than state inside AtlasPanel. The panel unmounts on tab
  * switch, which would discard a packed sheet.
  */
 export function useAtlasTool() {

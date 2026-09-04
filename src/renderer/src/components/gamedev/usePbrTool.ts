@@ -86,7 +86,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
 
     setIsProcessing(true)
     try {
-      // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
       const path = window.electronAPI.app.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {
@@ -119,7 +119,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     }
   }, [])
 
-  // Sobel-based real-time 2D pixel calculations, delegates to shared computePbrMaps()
+  // Sobel-based real-time 2D pixel calculations. Delegates to shared computePbrMaps()
   const processTextures = useCallback(() => {
     const img = originalImageRef.current
     if (!img) return
@@ -161,7 +161,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     if (threeTexturesRef.current.aoMap) threeTexturesRef.current.aoMap.needsUpdate = true
   }, [normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight])
 
-  // Full-resolution export, also delegates to computePbrMaps() for identical output
+  // Full-resolution export. Also delegates to computePbrMaps() for identical output
   const handleExport = useCallback(async () => {
     const img = originalImageRef.current
     if (!img || !albedoPath) return

@@ -162,7 +162,7 @@ const CONFIG_SCHEMA = {
     message: { type: 'string', description: 'One friendly sentence summarizing what changed.' },
     operations: {
       type: 'array',
-      description: 'Changes to the board CONFIGURATION, columns, background, swimlanes, card fields. Not card contents.',
+      description: 'Changes to the board CONFIGURATION: columns, background, swimlanes, card fields, not card contents.',
       items: {
         type: 'object',
         properties: {
@@ -341,7 +341,7 @@ export function isAbortError(err: unknown): boolean {
 }
 
 /**
- * Errors that won't change across methods, bail out immediately and let the
+ * Errors that won't change across methods. Bail out immediately and let the
  * caller fall back to streaming (which surfaces a humanized message). Auth
  * failures and 404s (missing model / wrong URL) affect every method equally.
  */
@@ -357,7 +357,7 @@ export function isFatalError(err: unknown): boolean {
  */
 function buildRepairPrompt(kind: AiStructuredKind, problem: string): string {
   return `Your previous reply could not be used: ${problem}.
-Reply again with ONLY the corrected JSON object, no prose, no markdown fences, no apology.
+Reply again with ONLY the corrected JSON object. No prose, no markdown fences, no apology.
 ${SCHEMA_HINTS[kind]}`
 }
 
@@ -459,7 +459,7 @@ const ATTEMPTS: Record<Method, typeof attemptTools> = {
 //
 // A 2B model can reliably emit one small object. It cannot reliably emit a
 // board of a dozen cards, each with a status, a priority and coloured tags, in
-// a single response, it truncates, drops required keys, or abandons JSON
+// a single response. It truncates, drops required keys, or abandons JSON
 // partway. Splitting the work into an outline pass plus one small pass per item
 // trades several cheap round-trips for an answer that actually validates.
 
@@ -468,7 +468,7 @@ const BATCH_ITEM_CAP = 8
 
 const OUTLINE_HINT = `Respond with ONLY this JSON object and nothing else:
 { "message": "one short sentence", "titles": ["First item", "Second item"] }
-Titles only, no descriptions, no nested objects.`
+Titles only. No descriptions, no nested objects.`
 
 interface BatchContext {
   client: OpenAI
@@ -525,7 +525,7 @@ ${hint}` }
 /**
  * Board and plan in outline-then-detail passes. Dialogue is deliberately absent:
  * its nodes reference each other by id, so generating them independently would
- * produce dangling targets, exactly the failure the schema exists to prevent.
+ * produce dangling targets. Exactly the failure the schema exists to prevent.
  */
 async function generateBatched(
   ctx: BatchContext,
@@ -600,7 +600,7 @@ export async function generateStructured(
   const budget = TIER_BUDGETS[caps.tier]
 
   // Start from what the model is known to support rather than always probing
-  // tool calling first, a tiny model fails that twice before reaching prose,
+  // tool calling first. A tiny model fails that twice before reaching prose,
   // and each failure is a full round-trip on the slowest hardware in the range.
   if (budget.batchStructured && (kind === 'board' || kind === 'plan')) {
     try {
@@ -654,7 +654,7 @@ export async function generateStructured(
       } catch (err) {
         if (isAbortError(err)) return { ok: false, error: 'aborted' }
         lastError = humanizeAiError(err, { model, baseURL })
-        // Auth / not-found errors won't change across methods, stop and fall back.
+        // Auth / not-found errors won't change across methods. Stop and fall back.
         if (isFatalError(err)) return { ok: false, error: lastError }
         // Anything else: stop repairing this method and let the ladder continue.
         break

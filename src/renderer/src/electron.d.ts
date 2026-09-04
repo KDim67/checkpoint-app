@@ -5,9 +5,9 @@
  * re-declared here. This file used to carry a ~300-line hand-written mirror of
  * `src/preload/index.ts`, which drifted: `db.renameContext` shipped in the
  * preload but never made it into the mirror, so every call site failed to
- * typecheck against an API that was present at runtime. The reverse, a typed
- * method the preload never implements, would have typechecked cleanly and
- * thrown at runtime. Deriving the type removes both failure modes.
+ * typecheck against an API that was present at runtime. The reverse case, a
+ * typed method the preload never implements, would have typechecked cleanly
+ * and thrown at runtime. Deriving the type removes both failure modes.
  */
 import type { ElectronAPI } from '../../preload'
 

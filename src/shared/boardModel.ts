@@ -1,18 +1,11 @@
 /**
- * The Kanban board configuration model, types, defaults, normalisation and
- * legacy migration. Pure: no I/O, no `window`, no database.
+ * The Kanban board configuration model. Pure: no I/O, no `window`, no database.
  *
- * It lives in `shared/` because three places need it and they cannot import
- * each other. The renderer persists it through IPC (`lib/boardConfig.ts`), the
- * assistant's action blocks transform it (`lib/boardConfigOps.ts`), and the MCP
- * server in the main process both reads and writes it, and `tsconfig.node.json`
- * covers only `src/main`, `src/preload` and `src/shared`, so main cannot reach
- * into the renderer.
+ * In `shared/` because the renderer, the AI action blocks and the MCP server
+ * all need it and main cannot import from the renderer.
  *
- * Everything is one versioned document per workspace. `app_settings` rows are
- * already part of the P2P sync payload and are not caught by the sensitive-key
- * filter, so board configuration follows a workspace between machines with no
- * extra plumbing.
+ * One versioned document per workspace, stored in `app_settings`, so it syncs
+ * between machines with no extra plumbing.
  */
 
 export interface ColumnConfig {
@@ -25,7 +18,7 @@ export interface ColumnConfig {
   collapsed?: boolean
   /** Ordering within the column. 'manual' preserves drag order. */
   sort?: ColumnSort
-  /** Short policy note, a definition of done, surfaced on hover. */
+  /** Short policy note. A definition of done, surfaced on hover. */
   description?: string
 }
 
@@ -49,7 +42,7 @@ export interface BoardConfig {
   columns: ColumnConfig[]
   /** Columns removed from the board but recoverable from the archive bin. */
   archivedColumns: ColumnConfig[]
-  /** Preset id, hex colour, CSS gradient, or image url, as the picker writes it. */
+  /** Preset id, hex colour, CSS gradient, or image url. As the picker writes it. */
   background: string
   swimlanes: boolean
   cardDisplay: CardDisplay
@@ -88,7 +81,7 @@ export const legacyColumnsKey = (context: string): string => `kanban_columns_${c
 export const legacyBackgroundKey = (context: string): string => `kanban_bg_${context}`
 export const legacyArchivedKey = (context: string): string => `kanban_archived_columns_${context}`
 /**
- * The fourth legacy key. It was missed when board configuration was unified, 
+ * The fourth legacy key. It was missed when board configuration was unified:
  * migrateLegacy hardcoded `swimlanes: false`, so anyone with priority
  * swimlanes enabled had the preference silently reset on their first load
  * after that change, with the old row left orphaned in the settings table.
@@ -157,7 +150,7 @@ export function normalizeColumn(raw: unknown, index: number): ColumnConfig | nul
 
 /**
  * Produces a valid config from anything. A partial, stale or corrupted document
- * degrades to defaults rather than throwing, this runs on every board load, and
+ * degrades to defaults rather than throwing. This runs on every board load, and
  * a bad settings row must not be able to take the board down.
  */
 export function normalizeBoardConfig(raw: unknown): BoardConfig {
@@ -217,7 +210,7 @@ export function normalizeBoardConfig(raw: unknown): BoardConfig {
  *
  * The legacy column key is double-encoded: the call site ran JSON.stringify and
  * setSetting stringified the result again, so a read yields a JSON *string*
- * rather than an array. Both shapes are accepted, a value that is already an
+ * rather than an array. Both shapes are accepted. A value that is already an
  * array is used directly, so this is safe to run against either.
  */
 function decodeLegacyList(raw: unknown): unknown {

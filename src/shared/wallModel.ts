@@ -1,29 +1,17 @@
 /**
- * The Wall: a freeform canvas per workspace.
+ * The Wall: a freeform canvas per workspace. Nothing snaps, sorts or has a
+ * status, so the model stays dumb. Coordinates, sizes, colours, paint order.
  *
- * Everything else in Checkpoint imposes a shape, columns, a list, a timeline.
- * The Wall imposes none. Nothing snaps, nothing sorts, nothing has a status,
- * and an item is wherever you put it. That is the whole point, so this model
- * stays deliberately dumb: coordinates, sizes, colours, and paint order.
+ * A card here is a reference, never a copy. It stores an id, so the card always
+ * renders live instead of going stale.
  *
- * One decision matters more than the rest. **A card on the Wall is a reference,
- * never a copy.** It stores the item's id and nothing else, so the card renders
- * with its real title, status, tags and due date, and editing it anywhere
- * changes it everywhere. A canvas full of stale duplicates would be worse than
- * no canvas at all, which is what every sticky-note tool ends up being.
- *
- * Pure, and hand-normalised in the same style as `boardModel.ts`: this document
- * is user data that survives across versions, so every field has to survive
- * being absent, wrong, or written by an older build.
+ * Hand-normalised like `boardModel.ts`: this is user data that outlives builds.
  */
 
 /**
- * `note` is a sticky note, paper, written on the wall itself. `doc` is a real
- * note from the Notes view, referenced by title.
- *
- * They are not named the other way round, however much `sticky`/`note` would
- * read better: walls already exist that store sticky notes as `note`, and no
- * migration could tell an old sticky from a new document after a rename.
+ * `note` is a sticky note, `doc` a real note from the Notes view. Yes,
+ * `sticky`/`note` would read better, but walls already store stickies as
+ * `note` and no migration could tell the two apart after a rename.
  */
 export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame'
 
@@ -107,12 +95,9 @@ export const WALL_COLORS = [
 export const DEFAULT_CAMERA: WallCamera = { x: 0, y: 0, zoom: 1 }
 
 /**
- * A workspace can hold several walls, and the first one keeps the original
- * single-wall key so walls made before that was true are still found.
- *
- * Later walls are keyed by their own id rather than by workspace-and-id: a
- * workspace name is free text, so `wall_${context}_${id}` would collide with a
- * workspace named after another workspace's wall.
+ * The first wall keeps the original single-wall key so old walls are still
+ * found. Later ones are keyed by id alone. Workspace names are free text, so
+ * `wall_${context}_${id}` could collide with another workspace's wall.
  */
 export const DEFAULT_WALL_ID = 'main'
 export const DEFAULT_WALL_NAME = 'Wall'
@@ -178,7 +163,7 @@ export function normalizeCamera(raw: unknown): WallCamera {
 }
 
 /**
- * Accepts anything, a parsed document, a JSON string, undefined, an older
+ * Accepts anything. A parsed document, a JSON string, undefined, an older
  * shape, and returns a wall that will render.
  */
 export function normalizeWallDoc(raw: unknown): WallDoc {
@@ -242,11 +227,8 @@ export function boundsOf(items: WallItem[]): Bounds | null {
 }
 
 /**
- * A camera that frames everything, with breathing room.
- *
- * Used by "fit to content", which is the way back when you have panned into
- * empty space, on an infinite canvas with no scrollbars, being lost is the
- * one failure the user cannot get out of on their own.
+ * Frames everything, with breathing room. This is "fit to content". The way
+ * back from panning into empty space, which has no scrollbars to rescue you.
  */
 export function fitCamera(
   items: WallItem[],
@@ -345,12 +327,8 @@ export function rectFromPoints(a: { x: number; y: number }, b: { x: number; y: n
 }
 
 /**
- * Ids of items the marquee touches.
- *
- * Intersection rather than containment: having to fully enclose a large frame
- * to select it means zooming out first, and every tool that gets this wrong
- * feels broken. Locked items are skipped, being unselectable is what locked
- * means.
+ * Intersection, not containment. Needing to enclose a big frame means zooming
+ * out first, which feels broken. Locked items skipped; that is what locked is.
  */
 export function itemsInRect(items: WallItem[], rect: Rect): string[] {
   const right = rect.x + rect.width
@@ -378,11 +356,8 @@ export function patchItems(
 }
 
 /**
- * Copies items, offset so the duplicates are visibly separate from the
- * originals rather than exactly on top of them.
- *
- * Returns the new items only; the caller appends and selects them, so a
- * duplicate can be dragged away immediately.
+ * Offset so duplicates are not exactly on top of the originals. Returns only
+ * the new items. The caller appends and selects them.
  */
 export function duplicateItems(
   items: WallItem[],
@@ -416,15 +391,10 @@ export function snap(value: number, grid: number): number {
 export const SNAP_GRID = 24
 
 /**
- * The topmost item containing a wall point, or null.
+ * Topmost item under a wall point. Needed because pointer capture retargets the
+ * following click/dblclick to the viewport, so `event.target` lies.
  *
- * Needed because the canvas takes pointer capture while dragging, and a
- * captured pointer retargets the click and dblclick that follow to the
- * capturing element, so `event.target` reports the viewport rather than the
- * item that was actually under the cursor. Coordinates do not lie.
- *
- * Hit-testing uses the unrotated box. A rotated item is therefore slightly
- * generous at its corners, which is the harmless direction to be wrong in.
+ * Uses the unrotated box, so rotated items are a little generous at the corners.
  */
 export function itemAtPoint(items: WallItem[], point: { x: number; y: number }): WallItem | null {
   let hit: WallItem | null = null
@@ -451,11 +421,8 @@ export function cameraCentredOn(
 }
 
 /**
- * Text to match an item against when searching.
- *
- * A card's or note's own title lives on the referenced record, not on the wall
- * item, so the caller resolves those and passes them in, the model has no way
- * to look them up and should not pretend otherwise.
+ * Titles live on the referenced record, not the wall item, so the caller
+ * resolves them and passes them in.
  */
 export function searchableText(item: WallItem, resolvedTitle?: string): string {
   return [item.text ?? '', resolvedTitle ?? ''].join(' ').trim().toLowerCase()
@@ -560,20 +527,11 @@ export function setActiveWall(index: WallIndex, id: string): WallIndex {
 // Frames as containers
 
 /**
- * What a frame holds: every item whose centre falls inside it.
+ * What a frame holds. Items whose centre is inside it. Centre, not full
+ * enclosure, or a frame quietly drops things at its border.
  *
- * Centre rather than full containment, because a sticky note pushed half over
- * a frame's edge still reads as being in that frame, and requiring full
- * enclosure would make a frame quietly drop things at its border.
- *
- * Locked items are excluded. Locked means pinned in place, and a background
- * reference image is exactly the thing someone locks and then draws a frame
- * over.
- *
- * Rotation is ignored: containment is tested against the unrotated rectangle.
- * A rotated frame is rare, and the alternative, a rotated hit test, would
- * make which items belong to a frame depend on an angle nobody is thinking
- * about while dragging it.
+ * Locked items excluded (a locked background image is the usual case), and
+ * rotation ignored: the unrotated rect is what gets tested.
  */
 export function itemsInFrame(items: WallItem[], frame: WallItem): string[] {
   if (frame.kind !== 'frame') return []
@@ -591,12 +549,8 @@ export function itemsInFrame(items: WallItem[], frame: WallItem): string[] {
 }
 
 /**
- * The set that should actually move, given what is selected: a frame brings its
- * contents with it.
- *
- * Repeated until nothing new is added, so a frame inside a frame comes along
- * too. The loop terminates because the set only ever grows and is bounded by
- * the number of items.
+ * What actually moves: a frame brings its contents. Loops until nothing new is
+ * added so nested frames follow. Terminates because the set only grows.
  */
 export function withFrameContents(items: WallItem[], ids: Set<string>): Set<string> {
   const out = new Set(ids)

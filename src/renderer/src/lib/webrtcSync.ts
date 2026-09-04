@@ -108,7 +108,7 @@ export class WebRTCSyncCoordinator {
           // the console and swallowed, so the host sat on "Host active..."
           // forever while the user assumed it was still connecting.
           this.options.onError(
-            new Error('Could not read the incoming offer, the peer entered a different passcode.')
+            new Error('Could not read the incoming offer: the peer entered a different passcode.')
           )
           return
         }
@@ -187,7 +187,7 @@ export class WebRTCSyncCoordinator {
           sdp = JSON.parse(decryptedAnswer).sdp
         } catch {
           this.options.onError(
-            new Error('Could not read the host reply, check that both sides use the same passcode.')
+            new Error('Could not read the host reply: check that both sides use the same passcode.')
           )
           return
         }
@@ -442,7 +442,7 @@ export class WebRTCSyncCoordinator {
 
   /**
    * Ends the session cleanly. The final message has to reach the wire before
-   * the connection closes, close() discards whatever is still buffered, so
+   * the connection closes: close() discards whatever is still buffered, so
    * signalling completion and tearing down in the same breath meant the peer
    * frequently never learned the sync had finished.
    */

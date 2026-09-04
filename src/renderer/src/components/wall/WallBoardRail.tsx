@@ -1,18 +1,10 @@
 /**
- * The board, as a rail beside the Wall.
+ * The board as a rail beside the Wall. Not a second board, but a source and
+ * a destination showing only what those two jobs need.
  *
- * Deliberately not a second board. It is a source and a destination, and it
- * shows only what those two jobs need: which column a card is in, what it is
- * called, and whether it is already on the wall. Anything more and the rail
- * starts competing with the view it was meant to feed.
- *
- * Two details are load-bearing:
- *
- * - **A card already on the wall is dimmed, not hidden.** The picker hides them,
- *   because a picker is for finding one thing. A rail is a copy of the board,
- *   and a board with cards missing from it is a board that lies.
- * - **Columns are drop targets, cards are not.** Dropping between two cards
- *   would mean the rail had to own ordering, and ordering belongs to the board.
+ * Cards already on the wall are dimmed, not hidden: a board with cards missing
+ * is a board that lies. Columns are drop targets and cards are not, because
+ * ordering belongs to the board.
  */
 
 import React from 'react'
@@ -134,8 +126,7 @@ export default function WallBoardRail({
         )}
 
         {tab === 'board' && groups.map(group => {
-          // Orphans have no column to be handed back to, so the group is shown
-          // but is not a target.
+          // Orphans have no column to hand back to, so they show but stay inert.
           const droppable = group.column.id !== ORPHAN_COLUMN_ID
           const isTarget = droppable && dropColumnId === group.column.id
 
@@ -187,7 +178,7 @@ export default function WallBoardRail({
                       e.dataTransfer.setData(WALL_DRAG_MIME, encodeWallDrag({ kind: 'card', ref: card.id }))
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
-                    title={onWall ? `${card.title}, already on this wall` : card.title}
+                    title={onWall ? `${card.title} (already on this wall)` : card.title}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                       padding: 'var(--space-2)', marginBottom: '4px',
@@ -263,7 +254,7 @@ export default function WallBoardRail({
         })}
       </div>
 
-      {/* Said once, at the bottom, rather than as a tooltip nobody hovers for. */}
+      {/* Said once here rather than in a tooltip nobody hovers for. */}
       <p style={{
         padding: 'var(--space-2) var(--space-3)', margin: 0,
         borderTop: '1px solid var(--color-surface-offset)',

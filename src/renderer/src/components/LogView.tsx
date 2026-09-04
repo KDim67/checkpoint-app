@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import LogVirtualList from './log/LogVirtualList'
 import LogInput from './log/LogInput'
 import { useAppStore } from '../store/appStore'
+import { useAiEnabled } from '../lib/useAiEnabled'
 import type { Item } from '../../../shared/types'
 import Skeleton from './ui/Skeleton'
 import EmptyState from './ui/EmptyState'
@@ -15,6 +16,7 @@ export default function LogView() {
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(true)
   const [showStandupModal, setShowStandupModal] = useState(false)
+  const aiEnabled = useAiEnabled()
   const [searchQuery, setSearchQuery] = useState('')
 
   const activeContext = useAppStore(s => s.activeContext)
@@ -427,7 +429,7 @@ export default function LogView() {
             {searchQuery ? `${displayedItems.length} of ${items.length}` : `${items.length} log${items.length === 1 ? '' : 's'}`}
           </span>
 
-          <button
+          {aiEnabled && <button
             onClick={() => setShowStandupModal(true)}
             style={{
               background: 'var(--color-secondary-muted)',
@@ -451,7 +453,7 @@ export default function LogView() {
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
             </svg>
             AI Standup
-          </button>
+          </button>}
         </div>
       </header>
 

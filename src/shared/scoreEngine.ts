@@ -110,9 +110,9 @@ export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): F
       ? `Runs natively on GPU (${specs.gpuName || 'GPU'}) at ${bestVariantName.toUpperCase()} quantization with sufficient VRAM headroom.`
       : `GPU-capable at ${bestVariantName.toUpperCase()} but with less than 10% VRAM headroom. Performance may vary under load.`
   } else if (canOffload) {
-    reason = `Insufficient VRAM for full GPU inference. Model will run with CPU offloading, expect 3–8x slower generation.`
+    reason = `Insufficient VRAM for full GPU inference. Model will run with CPU offloading. Expect 3–8x slower generation.`
   } else {
-    reason = `No usable GPU memory detected. Model will run on the CPU at ${bestVariantName.toUpperCase()}, expect 3–8x slower generation.`
+    reason = `No usable GPU memory detected. Model will run on the CPU at ${bestVariantName.toUpperCase()}. Expect 3–8x slower generation.`
   }
 
   return {

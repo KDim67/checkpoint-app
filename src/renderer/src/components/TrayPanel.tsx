@@ -56,7 +56,7 @@ export default function TrayPanel(): React.JSX.Element {
     // The window is reused between openings, so a mount-only read would be stale
     // the second time it is shown.
     window.addEventListener('focus', load)
-    // Counts move while the panel is open, a card completed in the main window,
+    // Counts move while the panel is open. A card completed in the main window,
     // or an agent writing over MCP, and the switches are also shown in Settings.
     const stopData = window.electronAPI.mcp.onDataChanged(load)
     const stopStartup = window.electronAPI.tray.onStartupChanged(setStartup)
@@ -81,7 +81,7 @@ export default function TrayPanel(): React.JSX.Element {
   const toggle = async (key: keyof StartupSettings): Promise<void> => {
     const next = { ...startup, [key]: !startup[key] }
     setStartup(next)
-    // Main reconciles, turning the tray icon off forces the other two off, so
+    // Main reconciles (turning the tray icon off forces the other two off), so
     // its answer is authoritative, not the optimistic value above.
     setStartup(await window.electronAPI.tray.setStartup(next))
   }

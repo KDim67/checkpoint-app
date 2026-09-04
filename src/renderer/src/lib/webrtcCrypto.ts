@@ -50,16 +50,11 @@ export async function deriveKey(passcode: string, salt: string): Promise<CryptoK
 /**
  * Derives the public signaling topic from the pairing code.
  *
- * ntfy.sh topics are public and unauthenticated: anyone who knows the topic
- * name can read everything posted to it. The previous scheme used the pairing
- * code *as* the topic (`checkpoint-sync-123456`), which published the very
- * secret the payload encryption depended on, the ciphertext and its key
- * material travelled together, so the encryption bought nothing at all, and
- * the entire 6-digit space could simply be subscribed to.
+ * ntfy.sh topics are public, and the old scheme used the pairing code as the
+ * topic, publishing the very secret the encryption depended on. Ciphertext and
+ * key material travelled together, and the whole 6-digit space was subscribable.
  *
- * Hashing means the topic still identifies the rendezvous point for both
- * peers, but observing it no longer reveals the code, so an eavesdropper is
- * left having to break the KDF above.
+ * Hashing keeps the rendezvous point without revealing the code.
  */
 export async function deriveTopic(passcode: string, salt: string): Promise<string> {
   const digest = await window.crypto.subtle.digest(

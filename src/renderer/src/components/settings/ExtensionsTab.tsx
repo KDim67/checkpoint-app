@@ -97,7 +97,7 @@ export default function ExtensionsTab() {
       }}>
         <ShieldAlert size={16} style={{ color: 'var(--color-warning)', flexShrink: 0, marginTop: '1px' }} />
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 'var(--leading-relaxed)' }}>
-          A plugin runs inside Checkpoint with the same access the app has, your
+          A plugin runs inside Checkpoint with the same access the app has. Your
           files, your database and the network. Only enable code you have read or
           trust. Nothing here is sandboxed.
         </div>

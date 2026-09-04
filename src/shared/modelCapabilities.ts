@@ -7,9 +7,9 @@
 // /models listing) and only fall back to parsing the name when nothing answers.
 
 /**
- * Coarse size bands. Everything that scales with model strength, how much
+ * Coarse size bands. Everything that scales with model strength. How much
  * context to spend, how terse the prompt must be, how hard to push structured
- * output, keys off the tier rather than off a raw parameter count.
+ * output. Keys off the tier rather than off a raw parameter count.
  */
 export type ModelTier = 'tiny' | 'small' | 'mid' | 'large' | 'frontier'
 
@@ -67,7 +67,7 @@ export function demoteTier(tier: ModelTier, steps = 1): ModelTier {
 }
 
 /**
- * Heavy quantization costs real capability, a Q2 70B follows a schema worse
+ * Heavy quantization costs real capability. A Q2 70B follows a schema worse
  * than a Q8 32B, so it drops a band. Q4 and above is the common case and is
  * left alone.
  */
@@ -106,8 +106,8 @@ export function parseParamsFromName(modelName: string): number | null {
 
 /**
  * Families whose names carry no parameter count. Only consulted when the name
- * has no "<n>b" and no curated entry matched, so "gpt-4o-mini" is unaffected, 
- * it matches the curated gpt-4o row first.
+ * has no "<n>b" and no curated entry matched, so "gpt-4o-mini" is unaffected.
+ * It matches the curated gpt-4o row first.
  */
 const NAME_SIZE_HINTS: Array<{ re: RegExp; paramsB: number }> = [
   { re: /phi-?4/i, paramsB: 14 },

@@ -4,7 +4,7 @@ import { getBoolSetting } from '../lib/settings'
 import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
 
-// Icons (SVG inline, no icon-lib dependency)
+// Icons (SVG inline: no icon-lib dependency)
 
 function IconLog(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -445,8 +445,8 @@ export function Sidebar() {
   return (
     <div
       ref={sidebarRef}
-      // Named so the first-run tour can spotlight the whole rail at once, 
-      // the workspace switcher and the view icons are one idea to a newcomer.
+      // Named so the first-run tour can spotlight the whole rail at once.
+      // The workspace switcher and the view icons are one idea to a newcomer.
       id="app-sidebar"
       style={{
         width: '56px',
@@ -566,7 +566,7 @@ export function Sidebar() {
                   transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
                 }}
               >
-                {/* Active indicator, left border dot */}
+                {/* Active indicator. Left border dot */}
                 {isActive && (
                   <span style={{
                     position: 'absolute',
@@ -581,7 +581,7 @@ export function Sidebar() {
                 )}
                 <Icon />
 
-                {/* Running-timer indicator, visible from any view, so a session
+                {/* Running-timer indicator. Visible from any view, so a session
                     never silently ticks away unnoticed while you work elsewhere */}
                 {view === 'focus' && focusIsRunning && !isActive && (
                   <span

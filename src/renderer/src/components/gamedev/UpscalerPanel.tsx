@@ -98,14 +98,14 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                 }}
               >
                 <optgroup label="Edge-smart (EPX / AdvMAME)">
-                  <option value="scale2x">Scale2x, smoothed edges, 2×</option>
-                  <option value="scale3x">Scale3x, smoothed edges, 3×</option>
-                  <option value="scale4x">Scale4x, smoothed edges, 4×</option>
+                  <option value="scale2x">Scale2x. Smoothed edges, 2×</option>
+                  <option value="scale3x">Scale3x. Smoothed edges, 3×</option>
+                  <option value="scale4x">Scale4x. Smoothed edges, 4×</option>
                 </optgroup>
                 <optgroup label="Crisp (Nearest Neighbor)">
-                  <option value="nearest2x">Nearest 2×, exact pixels</option>
-                  <option value="nearest4x">Nearest 4×, exact pixels</option>
-                  <option value="nearest8x">Nearest 8×, exact pixels</option>
+                  <option value="nearest2x">Nearest 2×. Exact pixels</option>
+                  <option value="nearest4x">Nearest 4×. Exact pixels</option>
+                  <option value="nearest8x">Nearest 8×. Exact pixels</option>
                 </optgroup>
               </select>
               <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>
@@ -150,7 +150,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               </div>
             </div>
 
-            {/* Viewport canvas, accepts drag & drop */}
+            {/* Viewport canvas. Accepts drag & drop */}
             <div
               onDragOver={e => e.preventDefault()}
               onDrop={handleUpscaleDrop}
@@ -191,7 +191,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                   </button>
                 </div>
               ) : (
-                // imageRendering: pixelated, without it the browser's smooth
+                // imageRendering: pixelated. Without it the browser's smooth
                 // downscale blurs the crisp result, defeating the whole tool
                 <canvas
                   ref={upscalePreviewCanvasRef}

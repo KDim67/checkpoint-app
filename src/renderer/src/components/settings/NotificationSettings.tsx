@@ -185,7 +185,7 @@ export default function NotificationSettings(): React.JSX.Element {
               })
               // Saying why nothing appeared beats leaving the user guessing
               // whether the feature or the OS is at fault.
-              toast(fired ? 'Sent' : 'Suppressed, check the switches and quiet hours above')
+              toast(fired ? 'Sent' : 'Suppressed: check the switches and quiet hours above')
             }}
           >
             Test

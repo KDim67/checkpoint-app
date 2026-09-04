@@ -20,14 +20,11 @@ function getThemePath(): string {
 }
 
 /**
- * The CSS the engine should currently be applying, or '' when it should apply
- * none.
+ * The CSS the engine should be applying, or '' for none.
  *
- * Pulled out of enableCustomizer because a broadcast is only heard by windows
- * that already exist and have already subscribed. At startup neither is true, 
- * the engine initialises before React mounts, so the stored theme was being
- * sent to nobody and the app painted its defaults. Renderers now ask for this on
- * mount, which works no matter the ordering.
+ * Split from enableCustomizer because a broadcast only reaches windows that
+ * already exist and subscribed, and at startup neither is true. Renderers pull
+ * this on mount instead, which works whatever the ordering.
  */
 export function resolveThemeCss(): string {
   try {
@@ -195,7 +192,7 @@ function handleFileChange(filePath: string): void {
   if (filePath === themePath) {
     try {
       const css = readFileSync(filePath, 'utf8')
-      console.log(`[customizer] theme.css file changed, broadcasting ${css.length} bytes`)
+      console.log(`[customizer] theme.css file changed: broadcasting ${css.length} bytes`)
       broadcastTheme(css)
       updateTitleBarOverlay(parseVarsFromCss(css))
     } catch (err) {
@@ -212,7 +209,7 @@ function handleFileChange(filePath: string): void {
       const rawPlugins = getSetting<string>('customizer_active_plugins', '[]')
       const activePlugins: string[] = JSON.parse(rawPlugins)
       if (activePlugins.includes(filename)) {
-        console.log(`[customizer] Active plugin file changed, reloading: ${filename}`)
+        console.log(`[customizer] Active plugin file changed: reloading: ${filename}`)
         unloadPlugin(filename)
         loadPlugin(filename)
       }

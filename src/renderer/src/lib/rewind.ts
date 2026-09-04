@@ -1,15 +1,11 @@
 /**
- * Gathering the five streams Rewind joins.
+ * Gathers the five streams Rewind joins.
  *
- * The order matters and is not arbitrary: the focus sessions have to be read
- * first, because they define the span everything else is filtered to. Only
- * once there is a sitting is it worth asking the tracker, the clipboard and git
- * for anything, and the tracker query is time-ranged, so it does the narrowing
- * in SQL rather than shipping every row to the renderer.
+ * Focus sessions come first: they define the span everything else is filtered
+ * to, and the tracker query is time-ranged so it narrows in SQL.
  *
- * Every stream is optional. The tracker is a feature the user can switch off,
- * a workspace may have no git path, and clipboard capture is its own toggle.
- * A missing stream means a thinner reconstruction, never a failure.
+ * Every stream is optional. The tracker, git and clipboard capture can each be
+ * off, and a missing one means a thinner reconstruction, never a failure.
  */
 
 import {
@@ -44,7 +40,7 @@ export async function loadRewind(item: Item): Promise<RewindResult> {
   const sessions = await window.electronAPI.db.getFocusSessions(item.context).catch(() => [])
 
   // No sitting means nothing to filter the other streams to, so they are never
-  // queried, the panel shows its empty state instead.
+  // queried. The panel shows its empty state instead.
   const sitting = lastSittingFor(sessions, item.id)
   if (!sitting) {
     return {

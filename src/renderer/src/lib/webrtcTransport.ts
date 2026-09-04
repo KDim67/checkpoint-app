@@ -1,22 +1,15 @@
 /**
- * Framing and flow control for RTCDataChannel.
+ * Framing and flow control for RTCDataChannel. Two hard limits make a naive
+ * `channel.send(JSON.stringify(msg))` unsafe, and both were hit in practice:
  *
- * Two hard limits make a naive `channel.send(JSON.stringify(msg))` unsafe, and
- * both were being hit in practice:
+ *  1. SCTP caps one message at 256 KB. Exceeding it is not a catchable error:
+ *     it raises `Failure to send data` and tears the connection down. The
+ *     database payload passes that on any non-trivial install.
+ *  2. The send queue is bounded at 16 MB. Overrunning it throws "send queue is
+ *     full" and messages are then lost silently: 389 of 400 chunks arrived.
  *
- *  1. SCTP caps a single message at 256 KB (measured: `pc.sctp.maxMessageSize`
- *     is exactly 262144 in Electron 33). Exceeding it does not throw a catchable
- *     per-message error, it raises `Failure to send data` on the channel and
- *     tears the connection down. The database payload is a dump of eight tables
- *     and passes that ceiling on any non-trivial install.
- *
- *  2. The send queue is bounded (16 MB in Chromium). Pushing chunks in a tight
- *     loop overruns it and `send()` throws "send queue is full", after which
- *     messages are silently lost, a measured 389 of 400 chunks arrived.
- *
- * Everything here exists to keep callers away from both. Send through
- * `sendFramed`, receive through `FrameAssembler`, and neither limit is
- * reachable from application code.
+ * Send through `sendFramed`, receive through `FrameAssembler`, and neither
+ * limit is reachable from application code.
  */
 
 /**
@@ -172,15 +165,13 @@ export async function flushChannel(channel: RTCDataChannel, timeoutMs = 5000): P
 }
 
 /**
- * Resolves when ICE gathering finishes, or after `timeoutMs` with whatever
- * candidates were collected.
+ * Resolves when ICE gathering finishes, or after `timeoutMs` with whatever was
+ * collected.
  *
- * The previous code keyed the entire handshake off a single null-candidate
- * `onicecandidate` event. When gathering stalls, STUN unreachable, no network,
- * a restrictive firewall, that event never arrives, so the SDP was never
- * published and the UI sat on its spinner indefinitely with nothing logged.
- * Timing out and proceeding with host-only candidates at least lets a
- * same-network pairing succeed, and lets everything else fail visibly.
+ * The handshake used to key off a single null-candidate `onicecandidate`. When
+ * gathering stalls (STUN unreachable, no network, a strict firewall) that event
+ * never arrives, so the SDP was never published and the spinner span forever.
+ * Host-only candidates at least let a same-network pairing succeed.
  */
 export function waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 8000): Promise<void> {
   if (pc.iceGatheringState === 'complete') return Promise.resolve()
@@ -203,15 +194,12 @@ export function waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 8000): Pr
 }
 
 /**
- * ICE servers for both coordinators.
+ * ICE servers for both coordinators. STUN only.
  *
- * NOTE: STUN only. STUN lets two peers behind ordinary NATs find each other,
- * but it cannot help when either side is behind a symmetric NAT (common on
- * mobile tethering and corporate networks), those pairings need a TURN relay
- * to carry the traffic, and there is no public TURN service to point at.
- * Without one, a meaningful share of internet pairings simply cannot connect;
- * `onConnectionFailed` below is what turns that into a visible error rather
- * than a hang.
+ * STUN cannot help when either side is behind a symmetric NAT (common on mobile
+ * tethering and corporate networks). Those need a TURN relay and there is no
+ * public one to point at, so a share of internet pairings cannot connect.
+ * `onConnectionFailed` makes that visible instead of a hang.
  */
 export const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },

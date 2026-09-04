@@ -123,7 +123,7 @@ export async function loadProviders(): Promise<{ providers: AiProvider[]; active
   }
 
   // Sanitize names: the display appends "(local)/(cloud)", so a stored name must
-  // not already carry that suffix (early builds did, "LM Studio (local) (local)").
+  // not already carry that suffix (early builds did: "LM Studio (local) (local)").
   let namesFixed = false
   providers = providers.map(p => {
     const clean = (p.name || '').replace(/\s*\((?:local|cloud)\)\s*$/i, '').trim() || 'Provider'

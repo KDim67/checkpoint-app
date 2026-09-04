@@ -34,7 +34,7 @@ export default function StartupSettings(): React.JSX.Element {
     const next = { ...settings, [key]: value }
     setSettings(next)
     try {
-      // Main reconciles, turning the tray icon off forces the dependent options
+      // Main reconciles. Turning the tray icon off forces the dependent options
       // off, so its answer replaces the optimistic one rather than sitting
       // beside it.
       setSettings(await window.electronAPI.tray.setStartup(next))

@@ -112,7 +112,7 @@ describe('BulkUpdateSchema', () => {
 
 describe('search and task query schemas', () => {
   it('pages search results from zero and tasks from one', () => {
-    // The two schemas disagree on the base index on purpose, searchItems
+    // The two schemas disagree on the base index on purpose: searchItems
     // computes OFFSET page * pageSize, queryTasks computes (page - 1) * pageSize.
     expect(SearchQuerySchema.parse({ query: 'x' })).toMatchObject({ page: 0, pageSize: 20 })
     expect(TaskQueryParamsSchema.parse({})).toMatchObject({ page: 1, pageSize: 50 })

@@ -76,7 +76,7 @@ describe('toQueryParams', () => {
   })
 
   it('drops empty arrays rather than sending them as filters', () => {
-    // An empty status array would otherwise mean "status IN ()", no rows.
+    // An empty status array would otherwise mean "status IN ()". No rows.
     const params = toQueryParams(view({ status: [], priority: [], tagIds: [] }), now)
     expect(params).toEqual({})
   })

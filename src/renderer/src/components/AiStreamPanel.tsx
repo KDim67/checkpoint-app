@@ -54,7 +54,7 @@ const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
 const STORAGE_KEY_WORKSPACE_FOLDER = 'checkpoint_ai_workspace_folder'
 
-// Dedicated stream channel, keeps this panel's stream isolated from other
+// Dedicated stream channel. Keeps this panel's stream isolated from other
 // consumers (e.g. the Standup Translator) so both can run concurrently.
 const ASSISTANT_STREAM_ID = 'assistant'
 
@@ -280,7 +280,7 @@ export default function AiStreamPanel() {
         if (Array.isArray(parsed)) {
           setCustomActions(parsed.filter(a => a && a.id && a.label && a.prompt))
         }
-      } catch { /* corrupted setting, start fresh */ }
+      } catch { /* corrupted setting. Start fresh */ }
     }).catch(() => {})
   }, [])
 
@@ -414,7 +414,7 @@ export default function AiStreamPanel() {
     scrollToBottom(messageAdded)
   }, [messages, streamingText])
 
-  // Esc anywhere stops an in-flight generation, the input is disabled while
+  // Esc anywhere stops an in-flight generation. The input is disabled while
   // streaming, so a keyboard-only user otherwise has no way to abort.
   useEffect(() => {
     if (!isStreaming) return
@@ -656,7 +656,7 @@ export default function AiStreamPanel() {
 
     // 2. Delete columns with matching names in this context
     if (columnNames.length > 0) {
-      // The unified board document, not the legacy column key, that key stopped
+      // The unified board document, not the legacy column key. That key stopped
       // being written when board configuration was unified, so reverting against
       // it both read and wrote a snapshot the board no longer looks at.
       const { columns } = await loadBoardConfig(validContext)
@@ -730,7 +730,7 @@ export default function AiStreamPanel() {
       const remainingText = parts.slice(1).join(' ').trim()
 
       if (cmd === '/clear') {
-        // Full reset (same as New Chat), also clears the action caches so
+        // Full reset (same as New Chat). Also clears the action caches so
         // previously created card titles can be recreated in the fresh thread.
         handleNewChat()
         setInputValue('')
@@ -753,12 +753,12 @@ export default function AiStreamPanel() {
           role: 'assistant',
           content: `### 🤖 Checkpoint AI Slash Commands\n\n` +
             `Use the following slash commands to quickly trigger active skills or workspace tools:\n\n` +
-            `* **\`\/clear\`**, Clears the current chat thread.\n` +
-            `* **\`\/mem\`** or **\`\/memory\`**, Opens the **Memory Vault** overlay.\n` +
-            `* **\`\/narrative [query]\`**, Switches active skill to **Narrative Specialist** (submits optional query).\n` +
-            `* **\`\/kanban [query]\`**, Switches active skill to **Kanban Architect** (submits optional query).\n` +
-            `* **\`\/plan\`** or **\`\/planner [query]\`**, Switches active skill to **Implementation Planner** (submits optional query).\n` +
-            `* **\`\/help\`**, Displays this command help menu.`,
+            `* **\`\/clear\`**. Clears the current chat thread.\n` +
+            `* **\`\/mem\`** or **\`\/memory\`**. Opens the **Memory Vault** overlay.\n` +
+            `* **\`\/narrative [query]\`**. Switches active skill to **Narrative Specialist** (submits optional query).\n` +
+            `* **\`\/kanban [query]\`**. Switches active skill to **Kanban Architect** (submits optional query).\n` +
+            `* **\`\/plan\`** or **\`\/planner [query]\`**. Switches active skill to **Implementation Planner** (submits optional query).\n` +
+            `* **\`\/help\`**. Displays this command help menu.`,
           timestamp: Date.now()
         }
         setMessages(prev => [...prev, userMsg, helpMsg])
@@ -838,7 +838,7 @@ export default function AiStreamPanel() {
         const text = lastUserMsg?.content || ''
 
         // Discovered from the endpoint rather than guessed from the model
-        // name, the old check read '72b'.includes('2b') as true and drove a
+        // name. The old check read '72b'.includes('2b') as true and drove a
         // 72B model with a 2B model's budgets.
         const caps = modelCapsRef.current
         const budget = TIER_BUDGETS[caps.tier]
@@ -858,7 +858,7 @@ export default function AiStreamPanel() {
           }
         ]
 
-        // Ground all date/deadline reasoning, models have no clock of their
+        // Ground all date/deadline reasoning. Models have no clock of their
         // own, so "Friday", "next week" and "overdue" are meaningless without this.
         systemPrompt.push({
           role: 'system',
@@ -920,7 +920,7 @@ export default function AiStreamPanel() {
           })
         }
 
-        // Workspace codebase index injection, grouped by top-level folder and file-type buckets
+        // Workspace codebase index injection. Grouped by top-level folder and file-type buckets
         // so the model understands project structure, not just a flat list of filenames.
         if (workspaceFolder && workspaceFiles.length > 0) {
           systemPrompt.push({
@@ -996,7 +996,7 @@ export default function AiStreamPanel() {
       // plan or dialogue block; clear create-requests still trigger via the base classifier.
       const lastUserContent = prunedHistory[prunedHistory.length - 1]?.content || ''
       let intent = classifyIntent(lastUserContent, activeSkillId)
-      // An explicit quick-action intent is authoritative, a "Do NOT output JSON"
+      // An explicit quick-action intent is authoritative. A "Do NOT output JSON"
       // analyze prompt must never be mis-read as a create request, and vice versa.
       if (lastUserMsg?.intentHint === 'analyze') intent = 'converse'
       else if (lastUserMsg?.intentHint === 'create') intent = 'create_items'
@@ -1022,7 +1022,7 @@ export default function AiStreamPanel() {
             temperature
           })
 
-          // Respect an in-flight user abort, don't post or fall back.
+          // Respect an in-flight user abort. Don't post or fall back.
           if (isAbortedRef.current) {
             isAbortedRef.current = false
             setStreamingText('')
@@ -1138,13 +1138,13 @@ export default function AiStreamPanel() {
   }
 
   // Memory panel
-  // Load memories whenever the panel opens (from ANY entry point, the button,
+  // Load memories whenever the panel opens (from ANY entry point: the button,
   // the /mem command, or the "N recalled" chip) and whenever the workspace
   // changes while it's open. This is what keeps the panel in sync with the
   // Settings memory vault instead of showing a stale/empty count.
 
   /**
-   * Background memory consolidation, fires after each AI turn.
+   * Background memory consolidation. Fires after each AI turn.
    * Uses a secondary AI call to extract key facts from the last exchange.
    * Runs silently without blocking the UI.
    */
@@ -1169,7 +1169,7 @@ export default function AiStreamPanel() {
 
       setMemoryConsolidating(true)
 
-      // Runs entirely in the main process now, see memoryService.consolidateFromExchange.
+      // Runs entirely in the main process now. See memoryService.consolidateFromExchange.
       // (Constructing the OpenAI client here in the renderer never worked: the SDK refuses
       // to initialize in a browser-like context, which Electron's renderer is, so this used
       // to throw immediately and get swallowed by the catch below. No memories were ever
@@ -1261,7 +1261,7 @@ export default function AiStreamPanel() {
             <select
               value={activeProviderId}
               onChange={e => handleSwitchProvider(e.target.value)}
-              title="Switch AI provider, add/edit profiles in Settings → AI"
+              title="Switch AI provider. Add/edit profiles in Settings → AI"
               style={{
                 background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
                 color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '3px 8px',
@@ -1314,7 +1314,7 @@ export default function AiStreamPanel() {
 
         <ModelCapabilityBar caps={modelCaps} onRefresh={refreshModelCaps} />
 
-        {/* Row 1b: Workspace / Context Selection, the board the AI reads & writes */}
+        {/* Row 1b: Workspace / Context Selection. The board the AI reads & writes */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
             Workspace
@@ -1363,7 +1363,7 @@ export default function AiStreamPanel() {
               }}
               onMouseEnter={e => { if (!workspaceFolder) e.currentTarget.style.color = 'var(--color-secondary)' }}
               onMouseLeave={e => { if (!workspaceFolder) e.currentTarget.style.color = 'var(--color-text-muted)' }}
-              title={workspaceFolder ? `Workspace imported: ${workspaceFolder} (${workspaceFiles.length} files), click to re-import` : 'Import a project folder for codebase context'}
+              title={workspaceFolder ? `Workspace imported: ${workspaceFolder} (${workspaceFiles.length} files). Click to re-import` : 'Import a project folder for codebase context'}
             >
               {workspaceIndexing ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <FolderOpen size={13} />}
             </button>
@@ -1515,12 +1515,12 @@ export default function AiStreamPanel() {
               </div>
             </div>
 
-            {/* Example chips, make the invisible feature surface visible */}
+            {/* Example chips. Make the invisible feature surface visible */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', maxWidth: '340px' }}>
               {[
                 { label: '🗂 Set up a board for my project', action: () => handleSubmitWithText('Design a Kanban board for this project: propose the workflow COLUMNS (each with a fitting color) and seed each column with a few well-scoped starter cards (with tags and priorities).', { displayContent: 'Set up a board', intentHint: 'create' }) },
                 { label: '✅ Move finished cards to Done', action: () => handleSubmitWithText('Move every card that is clearly finished to the Done column.') },
-                { label: '💡 What should I work on next?', action: () => handleSubmitWithText('Review my current board and tell me what to work on next and why. Do NOT output JSON, give a prioritized, reasoned plain-text list.', { displayContent: 'What should I work on next?', intentHint: 'analyze' }) },
+                { label: '💡 What should I work on next?', action: () => handleSubmitWithText('Review my current board and tell me what to work on next and why. Do NOT output JSON: give a prioritized, reasoned plain-text list.', { displayContent: 'What should I work on next?', intentHint: 'analyze' }) },
                 { label: '📎 @-mention notes, files & PDFs', action: () => setInputValue('@') }
               ].map(chip => (
                 <button
@@ -1570,7 +1570,7 @@ export default function AiStreamPanel() {
               onRevert={handleRevert}
               onCopy={handleCopyMessage}
               isCopied={copiedMsgIndex === index}
-              // Committed messages are final, the blinking cursor belongs ONLY to
+              // Committed messages are final. The blinking cursor belongs ONLY to
               // the live streaming preview below, never to already-written messages.
               isStreaming={false}
               hasRevertAction={hasRevertAction}

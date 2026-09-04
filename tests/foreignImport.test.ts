@@ -40,7 +40,7 @@ describe('detectImportSource', () => {
   })
 
   it("does not claim Checkpoint's own export", () => {
-    // Its shape is { context, items, tags }, neither lists nor cards.
+    // Its shape is { context, items, tags }. Neither lists nor cards.
     expect(detectImportSource({ context: 'work', items: [], tags: [] })).toBeNull()
   })
 

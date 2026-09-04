@@ -122,7 +122,7 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
   const handleLutExport = useCallback(async () => {
     setIsLutSaving(true)
     try {
-      // Re-use the shared utility, output is pixel-perfect identical to the preview
+      // Re-use the shared utility. Output is pixel-perfect identical to the preview
       const d = buildLutData({
         exposure:    lutExposure,
         brightness:  lutBrightness,
@@ -138,11 +138,11 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
 
       const base64Data = exportCanvas.toDataURL('image/png')
       // Anchor the export next to whichever asset is loaded in a sibling tool.
-      // No silent fallback directory, exporting somewhere the user never
+      // No silent fallback directory. Exporting somewhere the user never
       // chose is worse than asking them to load an asset first.
       const basePath = sourcePath
       if (!basePath) {
-        toast('Load an image in any texture tool first, the LUT is saved next to that asset.', { type: 'warning' })
+        toast('Load an image in any texture tool first: the LUT is saved next to that asset.', { type: 'warning' })
         return
       }
 

@@ -1,16 +1,10 @@
 /**
- * Subtasks as rows rather than markdown checkboxes.
+ * Subtasks as rows, not `- [ ]` lines in a body. Those could not be counted,
+ * rolled up, or handed to an agent.
  *
- * They used to live as `- [ ]` lines inside a task's body, which meant they
- * could not be counted, rolled up into progress, or handed to an agent as
- * separate work, the things a subtask is for.
- *
- * They are deliberately **their own lightweight table, not full items**. Making
- * each subtask an item would have given them tags and due dates for free, but
- * every existing query, the board, the backlog table, task counts, search, 
- * would then have needed to learn to exclude them, and each place that forgot
- * would quietly show subtasks as top-level work. A small table costs those
- * features and touches nothing else.
+ * Their own small table rather than full items: items would bring tags and due
+ * dates for free, but every existing query would have to learn to exclude them,
+ * and anything that forgot would show subtasks as top-level work.
  */
 
 export interface Subtask {
@@ -69,7 +63,7 @@ export function normalizeSubtasks(raw: unknown): Subtask[] {
  * Position for a new subtask appended to a list.
  *
  * Spaced by 1000 so a later insertion between two neighbours has room without
- * renumbering the whole list, the same trick the board uses for cards.
+ * renumbering the whole list. The same trick the board uses for cards.
  */
 export function nextPosition(existing: Subtask[]): number {
   if (existing.length === 0) return 1000
@@ -87,15 +81,12 @@ export interface ParsedChecklist {
 }
 
 /**
- * Pulls markdown checkboxes out of a body.
+ * Pulls markdown checkboxes out of a body, so `- [ ]` lines people already
+ * wrote can become real subtasks. Offered, never applied automatically:
+ * rewriting someone's note unasked is data loss with extra steps.
  *
- * Exists so the subtasks people already wrote as `- [ ]` lines can become real
- * ones instead of being stranded. The conversion is offered rather than applied
- * automatically: rewriting someone's note without asking is not a migration, it
- * is data loss with extra steps.
- *
- * Lines whose text is empty are left alone, `- [ ]` on its own is more likely
- * a template the user is about to fill in than a subtask named "".
+ * Empty lines are skipped, since a bare `- [ ]` is usually a template about to
+ * be filled in rather than a subtask named "".
  */
 export function parseChecklist(body: string): ParsedChecklist {
   const items: { title: string; done: boolean }[] = []

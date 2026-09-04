@@ -3,7 +3,7 @@
  *
  * WHY this exists: better-sqlite3 in this repo is compiled against Electron's
  * Node ABI (see the `electron-rebuild` postinstall). Plain Node, which is what
- * Vitest runs on, cannot dlopen it, and rebuilding it for Node would leave the
+ * Vitest runs on. Cannot dlopen it, and rebuilding it for Node would leave the
  * shipped app unable to open its own database. `node:sqlite` links the same
  * SQLite engine (3.53, FTS5 included) and is already available on the Node 24
  * this project runs, so the migration code under test executes against a real

@@ -1,13 +1,12 @@
 /**
- * Applying the user's theme in a window that is not the main one.
+ * Applies the user's theme in a window that is not the main one.
  *
- * The tray panel, the widget and the quick-capture HUD are each their own
- * renderer instance loading the same bundle at a different hash. None of them
- * runs App's startup effect, so without this they paint with the defaults from
- * index.css, the shipped dark palette, however the app itself is themed.
+ * The tray panel, widget and quick-capture HUD are each their own renderer and
+ * none runs App's startup effect, so without this they paint index.css defaults
+ * whatever the app is themed.
  *
- * Two things have to be applied, and missing either leaves the window looking
- * half-right: the light/dark attribute, and the customization engine's CSS.
+ * Both halves are needed or the window looks half-right: the light/dark
+ * attribute, and the customization engine's CSS.
  */
 
 const STYLE_ELEMENT_ID = 'user-theme'

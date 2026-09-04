@@ -83,7 +83,7 @@ function parseInput(input: string): ParsedResult {
   text = text.replace(/#([a-zA-Z0-9_-]+)\b/g, '')
 
   // 5. Parse the due date last, so it only ever sees what the other rules left
-  //    behind, otherwise a tag like #tuesday would be read as a weekday.
+  //    behind. Otherwise a tag like #tuesday would be read as a weekday.
   const dated = parseNaturalDate(text.replace(/\s+/g, ' ').trim())
   const cleanedText = dated.cleanedText
 

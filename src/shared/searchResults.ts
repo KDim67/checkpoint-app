@@ -1,14 +1,10 @@
 /**
- * Merging of results from the four things Checkpoint can search.
+ * Merges results from the four things Checkpoint can search.
  *
- * Items, notes and cheatsheets each have their own index and their own idea of
- * relevance, and those scores are not comparable, FTS5 ranks a card against
- * other cards, not against a note. Rather than inventing a cross-source score
- * that would pretend otherwise, results are interleaved round-robin, which keeps
- * every source visible: twenty matching cards must not bury the one note that
- * was actually being looked for.
- *
- * Pure, and in shared/, so the ordering rule can be tested directly.
+ * Each source has its own index and its own idea of relevance, and FTS5 ranks a
+ * card against other cards, not against a note. Rather than invent a
+ * cross-source score, results interleave round-robin: twenty matching cards
+ * must not bury the one note being looked for.
  */
 
 export type SearchHitKind = 'card' | 'task' | 'log' | 'note' | 'cheatsheet'
@@ -18,7 +14,7 @@ export interface SearchHit {
   id: string
   kind: SearchHitKind
   title: string
-  /** A snippet or the workspace name, whatever helps tell two hits apart. */
+  /** A snippet or the workspace name. Whatever helps tell two hits apart. */
   subtitle?: string
   /** Carried through for the click handler; shape depends on the kind. */
   target?: string

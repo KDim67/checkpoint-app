@@ -1,14 +1,9 @@
 /**
  * Everything the user attached, fetched and turned into system messages.
  *
- * Cheatsheets, notes and workspace files are read over IPC and injected ahead
- * of the conversation. It was ~100 lines in the middle of runChatStream, which
- * buried the one thing worth noticing: each source has a size budget, and those
- * budgets are what stop a single attached PDF from evicting the entire
- * conversation from the context window.
- *
- * The blocks are moved verbatim; only the budget arithmetic is pulled out, so
- * it can be tested.
+ * The part worth noticing is that each source has a size budget, which is what
+ * stops one attached PDF evicting the whole conversation from the context
+ * window. Blocks moved verbatim; only the budget arithmetic is pulled out.
  */
 
 import type { Message } from './types'
@@ -114,7 +109,7 @@ export async function gatherAttachmentMessages({
     }
   }
 
-  // Attached NOTES (from the Notes feature), full content, size-capped
+  // Attached NOTES (from the Notes feature). Full content, size-capped
   if (allActiveNotes.size > 0) {
     const perNoteCap = noteCap(isSmallModel)
     let notesText = ''
@@ -130,11 +125,11 @@ export async function gatherAttachmentMessages({
     if (notesText) {
       apiMessages.push({
         role: 'system',
-        content: `USER'S PROJECT NOTES (attached by the user, you HAVE their full content below):${notesText}`
+        content: `USER'S PROJECT NOTES (attached by the user: you HAVE their full content below):${notesText}`
       })
     }
   } else if (text.length > 12) {
-    // Auto-recall: no notes attached, surface the 2 most relevant note
+    // Auto-recall: no notes attached. Surface the 2 most relevant note
     // snippets so lore/design decisions written in Notes stay consistent.
     try {
       const hits = await window.electronAPI.notes.searchNotes(text)
@@ -143,13 +138,13 @@ export async function gatherAttachmentMessages({
         const recall = top.map(h => `- Note "${h.title}": …${h.snippet.trim().slice(0, 280)}…`).join('\n')
         apiMessages.push({
           role: 'system',
-          content: `RELEVANT PROJECT NOTES (auto-recalled snippets, the user can attach the full note with @):\n${recall}`
+          content: `RELEVANT PROJECT NOTES (auto-recalled snippets: the user can attach the full note with @):\n${recall}`
         })
       }
     } catch { /* auto-recall is best-effort */ }
   }
 
-  // Attached WORKSPACE FILES, actual source contents, size-capped
+  // Attached WORKSPACE FILES. Actual source contents, size-capped
   if (allActiveFiles.size > 0 && workspaceFolder) {
     const perFileCap = fileCap(isSmallModel)
     let filesText = ''
@@ -165,7 +160,7 @@ export async function gatherAttachmentMessages({
     if (filesText) {
       apiMessages.push({
         role: 'system',
-        content: `WORKSPACE SOURCE FILES (attached by the user, you HAVE their contents below):${filesText}`
+        content: `WORKSPACE SOURCE FILES (attached by the user: you HAVE their contents below):${filesText}`
       })
     }
   }

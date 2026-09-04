@@ -12,7 +12,7 @@ let stmtActivityAllocation: Database.Statement
 let initialized = false
 
 // Every query uses the `(? IS NULL OR context = ?)` idiom so a NULL context means
-// "across all workspaces" and a concrete value scopes to that workspace, the
+// "across all workspaces" and a concrete value scopes to that workspace. The
 // header now truthfully reflects the active context instead of always showing
 // global data.
 function initStatements(): void {
@@ -79,7 +79,7 @@ function initStatements(): void {
     LIMIT 10
   `)
 
-  // Activity allocation is intentionally cross-workspace, it compares where time
+  // Activity allocation is intentionally cross-workspace. It compares where time
   // goes across all contexts, so it is not scoped to the selected one.
   stmtActivityAllocation = db.prepare(`
     SELECT context, SUM(duration_ms) / 60000.0 as durationMins

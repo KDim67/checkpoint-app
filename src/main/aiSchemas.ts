@@ -1,16 +1,12 @@
 import { z } from 'zod'
 import type { AiStructuredKind } from '../shared/types'
 
-// Runtime validation for structured AI output.
+// Runtime validation for structured AI output. The generator used to accept
+// anything that parsed, so `{}` counted as success and the renderer silently
+// produced nothing.
 //
-// The generator used to accept anything that parsed as an object, so a model
-// answering `{}` or `{"cards": "soon"}` counted as success and the renderer
-// silently produced nothing. These mirror the JSON schemas sent to the model
-// and are what decides whether a generation actually worked.
-//
-// Deliberately lenient about extra keys and about types a small model tends to
-// fumble, a priority arriving as "2" instead of 2 is a formatting slip, not a
-// failed generation, so it is coerced rather than rejected.
+// Lenient about extra keys and about types a small model fumbles: a priority
+// arriving as "2" is a formatting slip, not a failed generation.
 
 /** Small models frequently emit numbers as strings. */
 const looseInt = z.union([z.number(), z.string()]).transform(v => {
@@ -113,7 +109,7 @@ export const UpdateResult = z.object({
 /**
  * Board *configuration* changes, as distinct from card edits.
  *
- * Deliberately loose about which fields accompany which op, the renderer's
+ * Deliberately loose about which fields accompany which op. The renderer's
  * normalizer decides what a given op can actually use, and rejecting a whole
  * generation because the model attached a stray key to one operation would
  * throw away the other nine.

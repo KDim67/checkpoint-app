@@ -3,7 +3,7 @@
 // The model's structured JSON (from ai.generateStructured) is guaranteed to be
 // valid, but a small model may still omit tags, colors, or good priorities.
 // These helpers guarantee a visually rich, consistent result regardless of the
-// model's capability, every column gets a color, every card gets 1-3 colored
+// model's capability. Every column gets a color, every card gets 1-3 colored
 // tags, and package the result into the exact fenced-block format the existing
 // ChatMessage executor understands.
 
@@ -135,7 +135,7 @@ function normalizeTags(raw: unknown, title: string, body: string): Tag[] {
     }
   }
 
-  // Guarantee at least one tag, infer from content, else a sensible default.
+  // Guarantee at least one tag. Infer from content, else a sensible default.
   if (out.length === 0) {
     const inferred = inferTags(title, body)
     if (inferred.length > 0) inferred.forEach(t => add(t))
@@ -258,7 +258,7 @@ export type BoardOp = 'move' | 'set_priority' | 'retitle' | 'update_body' | 'arc
 
 /**
  * A validated board edit. Modelled as a discriminated union so each variant
- * carries exactly the field it needs, the executor then reads `op.toColumn`
+ * carries exactly the field it needs. The executor then reads `op.toColumn`
  * or `op.priority` without re-checking for undefined, which is what the
  * optional-field version forced it to paper over with casts.
  */

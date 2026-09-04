@@ -1,19 +1,16 @@
 /**
- * The events plugins can react to.
+ * The events plugins can react to. They used to get `app`, `BrowserWindow`, an
+ * IPC channel and a logger: everything needed to run code at startup, nothing
+ * to run it in response to anything.
  *
- * Plugins were previously given `app`, `BrowserWindow`, an IPC channel and a
- * logger, everything needed to run code at startup and nothing to run it *in
- * response to* anything. A plugin that cannot observe the app can only poke at
- * Electron internals, which is both useless and the least safe thing it could do.
- *
- * The set is deliberately small and describes user-meaningful moments rather
- * than internal calls, so it can stay stable while the code underneath changes.
+ * A small set naming user-meaningful moments rather than internal calls, so it
+ * stays stable while the code underneath changes.
  */
 
 import type { Item } from '../shared/types'
 
 export interface PluginEventMap {
-  /** A card, task or log entry was created, by anyone, UI, agent or webhook. */
+  /** A card, task or log entry was created, by anyone. UI, agent or webhook. */
   'item:created': { item: Item }
   /** An item moved into a finished state. */
   'item:completed': { item: Item }
