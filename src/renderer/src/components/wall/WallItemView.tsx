@@ -233,7 +233,10 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
   if (item.kind === 'image') {
     return (
       <img
-        src={`checkpoint-media://${item.ref}`}
+        // Asks for a copy sized for the box rather than the original, which
+        // Chromium would decode at full resolution however small it is drawn.
+        // Doubled so it still holds up zoomed in a little. See mediaPreview.ts.
+        src={`checkpoint-media://${item.ref}?w=${Math.round(item.width * 2)}`}
         alt={item.text || 'Wall image'}
         draggable={false}
         // Off the main thread: decoding a large photo synchronously stalls the

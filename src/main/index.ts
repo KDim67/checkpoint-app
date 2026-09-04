@@ -1502,6 +1502,7 @@ app.whenReady().then(async () => {
   // Register checkpoint-media protocol handler and ensure its directory exists
   try {
     const { ensureMediaDir } = await import('./mediaService')
+    const { ensurePreview, previewWidthFor } = await import('./mediaPreview')
     const { getMediaDir } = await import('./paths')
     ensureMediaDir()
     protocol.handle('checkpoint-media', async (request) => {
@@ -1520,6 +1521,14 @@ app.whenReady().then(async () => {
 
         if (!existsSync(filePath)) {
           return new Response('File Not Found', { status: 404 })
+        }
+
+        // `?w=` asks for a display-sized copy. Callers that leave it off, such
+        // as an export or a note, still get the original bytes.
+        const wanted = Number(url.searchParams.get('w'))
+        if (Number.isFinite(wanted) && wanted > 0) {
+          const preview = ensurePreview(filePath, previewWidthFor(wanted))
+          if (preview) return net.fetch(pathToFileURL(preview).toString())
         }
 
         return net.fetch(pathToFileURL(filePath).toString())

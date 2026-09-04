@@ -23,6 +23,15 @@ export function getMediaDir(): string {
   return join(getConfigDir(), 'media')
 }
 
+/**
+ * Derived files, safe to delete at any time: scaled copies of media images.
+ * Kept out of the media folder so the orphan prune never reports them and the
+ * user never mistakes one for something they added.
+ */
+export function getPreviewCacheDir(): string {
+  return join(getConfigDir(), 'cache', 'previews')
+}
+
 export function getPluginsDir(): string {
   return join(getConfigDir(), 'plugins')
 }
