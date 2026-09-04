@@ -780,7 +780,10 @@ export default function WallView() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const el = document.activeElement
+      // contenteditable included now that bare letters arm a tool: typing "a"
+      // into text must not switch to the arrow.
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+      if (el instanceof HTMLElement && el.isContentEditable) return
 
       const mod = e.ctrlKey || e.metaKey
       if (mod && e.key.toLowerCase() === 'z') {
@@ -788,6 +791,15 @@ export default function WallView() {
         applyHistory(e.shiftKey ? redo(historyRef.current) : undo(historyRef.current))
         return
       }
+      // V, P and A, as every canvas tool binds them. Bare keys, so they stay
+      // out of the way of the app's own Ctrl shortcuts.
+      if (!mod && !e.altKey) {
+        const key = e.key.toLowerCase()
+        if (key === 'v') { setTool('select'); setArrowFrom(null); return }
+        if (key === 'p') { setTool('pen'); setArrowFrom(null); return }
+        if (key === 'a') { setTool('arrow'); setArrowFrom(null); return }
+      }
+
       if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return }
       if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault()
@@ -967,6 +979,13 @@ export default function WallView() {
       }
     : null
 
+  /**
+   * `.btn-icon:hover` already paints `--color-surface-offset`, so an active
+   * state that only did the same was indistinguishable from hovering. Active is
+   * now the accent colour plus an underline: legible without relying on colour,
+   * which matters most for the pen and arrow, where being wrong about which
+   * tool is armed changes what a click does.
+   */
   const toolButton = (
     label: string,
     icon: React.ReactNode,
@@ -982,12 +1001,24 @@ export default function WallView() {
       disabled={opts.disabled}
       className="btn-icon"
       style={{
+        position: 'relative',
         width: '30px', height: '30px',
-        background: opts.active ? 'var(--color-surface-offset)' : undefined,
-        opacity: opts.disabled ? 0.4 : 1
+        background: opts.active ? 'var(--color-secondary-muted)' : undefined,
+        color: opts.active ? 'var(--color-secondary)' : undefined,
+        opacity: opts.disabled ? 0.4 : 1,
+        cursor: opts.disabled ? 'not-allowed' : 'pointer'
       }}
     >
       {icon}
+      {opts.active && (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute', left: '6px', right: '6px', bottom: '3px', height: '2px',
+            borderRadius: '999px', background: 'var(--color-secondary)'
+          }}
+        />
+      )}
     </button>
   )
 
@@ -1233,45 +1264,6 @@ export default function WallView() {
         {toolButton('Draw', <PenLine size={14} />, () => setTool(t => (t === 'pen' ? 'select' : 'pen')), { active: tool === 'pen' })}
         {toolButton('Connect two items', <Spline size={14} />, () => { setArrowFrom(null); setTool(t => (t === 'arrow' ? 'select' : 'arrow')) }, { active: tool === 'arrow' })}
 
-        {/* Only while a tool that draws is chosen: a palette with nothing to
-            colour is a row of buttons that appear to do nothing. */}
-        {tool !== 'select' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 var(--space-1)' }}>
-            {WALL_COLORS.map(color => (
-              <button
-                key={color}
-                onClick={() => setPenColor(color)}
-                title={color}
-                aria-label={`Ink ${color}`}
-                aria-pressed={penColor === color}
-                style={{
-                  width: '16px', height: '16px', borderRadius: '50%', cursor: 'pointer',
-                  background: color,
-                  border: penColor === color ? '2px solid var(--color-text-base)' : '1px solid var(--color-surface-offset)'
-                }}
-              />
-            ))}
-            {STROKE_WIDTHS.map(width => (
-              <button
-                key={width}
-                onClick={() => setPenWidth(width)}
-                title={`${width}px`}
-                aria-label={`Stroke ${width}`}
-                aria-pressed={penWidth === width}
-                style={{
-                  width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: penWidth === width ? 'var(--color-surface-offset)' : 'none',
-                  border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer'
-                }}
-              >
-                <span style={{ width: `${width + 4}px`, height: `${width}px`, borderRadius: '999px', background: 'var(--color-text-muted)' }} />
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
-
         {toolButton('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
         {toolButton('Text', <Type size={14} />, () => addItem('text'))}
         {toolButton('Frame', <Square size={14} />, () => addItem('frame'))}
@@ -1292,9 +1284,14 @@ export default function WallView() {
         </span>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', position: 'relative' }}>
-          {/* Stated rather than left to be discovered: neither is guessable. */}
-          <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
-            Drag to select · Right-drag to pan · Right-click for more
+          {/* Says what the armed tool does rather than everything at once. The
+              old line wrapped to two rows and was ignored either way. */}
+          <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+            {tool === 'pen'
+              ? 'Drag to draw · Esc to stop'
+              : tool === 'arrow'
+                ? (arrowFrom ? 'Now click the item to point at' : 'Click an item to start from')
+                : 'Drag to select · Right-drag to pan'}
           </span>
 
           <div style={{ position: 'relative' }}>
@@ -1551,7 +1548,9 @@ export default function WallView() {
                     // ones: a photo can be tens of megapixels behind a 280px box.
                     willChange: item.kind === 'image' ? 'transform' : undefined,
                     cursor: item.locked ? 'default' : 'grab',
-                    outline: isSelected ? '2px solid var(--color-secondary)' : 'none',
+                    outline: arrowFrom === item.id
+                      ? '2px dashed var(--color-secondary)'
+                      : isSelected ? '2px solid var(--color-secondary)' : 'none',
                     outlineOffset: '2px'
                   }}
                 >
@@ -1726,7 +1725,69 @@ export default function WallView() {
             )
           })()}
 
-          {busy && (
+          {tool !== 'select' && (
+          <div
+            role="group"
+            aria-label="Ink colour and width"
+            style={{
+              position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)',
+              zIndex: 20, display: 'flex', flexDirection: 'column', gap: '6px',
+              padding: 'var(--space-2)',
+              background: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
+            {WALL_COLORS.map(color => (
+              <button
+                key={color}
+                onClick={() => setPenColor(color)}
+                title={color}
+                aria-label={`Ink ${color}`}
+                aria-pressed={penColor === color}
+                style={{
+                  // 24px of target around a 16px dot: the swatches were
+                  // pixel-hunting at their old size.
+                  width: '24px', height: '24px', padding: 0, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'none', border: 'none', borderRadius: 'var(--radius-sm)'
+                }}
+              >
+                <span style={{
+                  width: '16px', height: '16px', borderRadius: '50%', background: color,
+                  boxShadow: penColor === color
+                    ? '0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--color-secondary)'
+                    : 'inset 0 0 0 1px rgba(0,0,0,0.25)'
+                }} />
+              </button>
+            ))}
+
+            <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
+
+            {STROKE_WIDTHS.map(width => (
+              <button
+                key={width}
+                onClick={() => setPenWidth(width)}
+                title={`${width}px`}
+                aria-label={`Stroke width ${width}`}
+                aria-pressed={penWidth === width}
+                style={{
+                  width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: penWidth === width ? 'var(--color-secondary-muted)' : 'none',
+                  border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer'
+                }}
+              >
+                <span style={{
+                  width: `${width + 6}px`, height: `${width}px`, borderRadius: '999px',
+                  background: penWidth === width ? 'var(--color-secondary)' : 'var(--color-text-muted)'
+                }} />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {busy && (
             <div
               aria-live="polite"
               style={{
