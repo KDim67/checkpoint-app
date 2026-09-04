@@ -19,7 +19,7 @@ import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
   Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  ChevronDown, Pencil, PanelLeft, Paintbrush, Check
+  ChevronDown, Pencil, PanelRight, Paintbrush, Check
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -928,7 +928,7 @@ export default function WallView() {
       }}>
         {tool(
           railOpen ? 'Hide the board' : 'Show the board beside the wall',
-          <PanelLeft size={14} />,
+          <PanelRight size={14} />,
           toggleRail,
           { active: railOpen }
         )}
@@ -1266,46 +1266,6 @@ export default function WallView() {
 
       {/* Beside the canvas, not over it. The drag should be a straight line. */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {railOpen && (
-          <>
-            <WallBoardRail
-              width={railWidth}
-              tab={railTab}
-              onTabChange={setRailTab}
-              groups={filterGroups(groupCardsByColumn(cards, columns), railQuery)}
-              notes={notes}
-              placed={placed}
-              query={railQuery}
-              onQueryChange={setRailQuery}
-              dropColumnId={dropColumnId}
-              onClose={toggleRail}
-            />
-
-            <div
-              onPointerDown={e => {
-                ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                railResizeRef.current = { startX: e.clientX, startWidth: railWidth }
-              }}
-              onPointerMove={e => {
-                const resize = railResizeRef.current
-                if (resize) setRailWidth(clampRail(resize.startWidth + (e.clientX - resize.startX)))
-              }}
-              onPointerUp={e => {
-                if (!railResizeRef.current) return
-                railResizeRef.current = null
-                try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
-                void setNumberSetting(RAIL_WIDTH_KEY, railWidth)
-              }}
-              role="separator"
-              aria-label="Resize the board panel"
-              style={{
-                width: '5px', flexShrink: 0, cursor: 'col-resize',
-                background: 'var(--color-surface-offset)'
-              }}
-            />
-          </>
-        )}
-
         {/* Canvas */}
         <div
           ref={viewportRef}
@@ -1546,7 +1506,7 @@ export default function WallView() {
                 }}
                 title="Click to jump"
                 style={{
-                  position: 'absolute', left: 'var(--space-3)', bottom: 'var(--space-3)',
+                  position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
                   width: `${W}px`, height: `${H}px`, zIndex: 20, cursor: 'pointer',
                   background: 'var(--color-surface-1)',
                   border: '1px solid var(--color-surface-offset)',
@@ -1598,6 +1558,48 @@ export default function WallView() {
             </div>
           )}
         </div>
+
+        {railOpen && (
+          <>
+            <div
+              onPointerDown={e => {
+                ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+                railResizeRef.current = { startX: e.clientX, startWidth: railWidth }
+              }}
+              onPointerMove={e => {
+                const resize = railResizeRef.current
+                // Inverted: the handle is on the rail's left edge now, so
+                // dragging left has to widen it rather than shrink it.
+                if (resize) setRailWidth(clampRail(resize.startWidth - (e.clientX - resize.startX)))
+              }}
+              onPointerUp={e => {
+                if (!railResizeRef.current) return
+                railResizeRef.current = null
+                try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
+                void setNumberSetting(RAIL_WIDTH_KEY, railWidth)
+              }}
+              role="separator"
+              aria-label="Resize the board panel"
+              style={{
+                width: '5px', flexShrink: 0, cursor: 'col-resize',
+                background: 'var(--color-surface-offset)'
+              }}
+            />
+
+            <WallBoardRail
+              width={railWidth}
+              tab={railTab}
+              onTabChange={setRailTab}
+              groups={filterGroups(groupCardsByColumn(cards, columns), railQuery)}
+              notes={notes}
+              placed={placed}
+              query={railQuery}
+              onQueryChange={setRailQuery}
+              dropColumnId={dropColumnId}
+              onClose={toggleRail}
+            />
+          </>
+        )}
       </div>
 
       {menu && (

@@ -8,7 +8,7 @@
  */
 
 import React from 'react'
-import { Search, X, PanelLeftClose } from 'lucide-react'
+import { Search, X, PanelRightClose } from 'lucide-react'
 import { PRIORITY_COLORS } from '../../lib/priority'
 import {
   encodeWallDrag, ORPHAN_COLUMN_ID, WALL_DRAG_MIME, type BoardGroup
@@ -62,7 +62,7 @@ export default function WallBoardRail({
         width: `${width}px`, flexShrink: 0,
         display: 'flex', flexDirection: 'column', minHeight: 0,
         background: 'var(--color-surface-1)',
-        borderRight: '1px solid var(--color-surface-offset)'
+        borderLeft: '1px solid var(--color-surface-offset)'
       }}
     >
       <div style={{
@@ -76,7 +76,7 @@ export default function WallBoardRail({
           Board
         </span>
         <button onClick={onClose} title="Hide the board" aria-label="Hide the board" className="btn-icon" style={{ width: '24px', height: '24px' }}>
-          <PanelLeftClose size={13} />
+          <PanelRightClose size={13} />
         </button>
       </div>
 
