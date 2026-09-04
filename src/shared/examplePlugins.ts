@@ -1,14 +1,10 @@
 /**
- * Example plugins shipped with the app.
+ * Example plugins shipped with the app. Installed on request, never silently.
+ * Writing executable files into someone's plugins folder behind their back sits
+ * badly next to the "only enable code you trust" warning on the same screen.
  *
- * They are **installed on request, never silently**. Writing executable files
- * into someone's plugins folder behind their back would sit badly next to the
- * warning on that same screen telling them to only enable code they trust, and
- * an example the user has read and chosen to enable teaches the API far better
- * than one that simply appeared.
- *
- * Each is a real, useful plugin rather than a hello-world: between them they
- * exercise every part of the API, so the folder doubles as the documentation.
+ * Each is a real plugin, not a hello-world, and between them they cover the
+ * whole API, so the folder doubles as the documentation.
  */
 
 export interface ExamplePlugin {
@@ -23,7 +19,7 @@ export const EXAMPLE_PLUGINS: ExamplePlugin[] = [
     filename: 'daily-summary.js',
     name: 'Daily Summary',
     description: 'Writes a log entry each day listing what you finished, and notifies you.',
-    source: `// Daily Summary, records what you completed, once per day.
+    source: `// Daily Summary: records what you completed, once per day.
 //
 // Shows: events, items.create, storage (for the "once per day" guard) and notify.
 
@@ -80,7 +76,7 @@ module.exports = {
     filename: 'auto-tagger.js',
     name: 'Auto Tagger',
     description: 'Flags newly created cards whose title suggests a bug, so nothing urgent is missed.',
-    source: `// Auto Tagger, raises the priority of cards that look urgent.
+    source: `// Auto Tagger: raises the priority of cards that look urgent.
 //
 // Shows: events, items.update and reading the payload.
 
@@ -113,7 +109,7 @@ module.exports = {
     filename: 'standup-reminder.js',
     name: 'Standup Reminder',
     description: 'Reminds you once each weekday morning, listing what is still open.',
-    source: `// Standup Reminder, a weekday nudge with your open count.
+    source: `// Standup Reminder: a weekday nudge with your open count.
 //
 // Shows: items.query, notify, storage and a plain interval with cleanup.
 
@@ -153,7 +149,7 @@ module.exports = {
   },
 
   onUnload() {
-    // A timer is not tracked by the host, this one has to clean up after
+    // A timer is not tracked by the host. This one has to clean up after
     // itself, or it would keep firing after the plugin is disabled.
     if (this._timer) clearInterval(this._timer)
   }

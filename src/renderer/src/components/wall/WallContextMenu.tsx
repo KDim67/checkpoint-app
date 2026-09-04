@@ -1,14 +1,10 @@
 /**
- * Right-click menus for the Wall.
+ * Right-click menus for the Wall. Two, not one: an item menu is about that
+ * item, a canvas menu about that spot, and sharing one would leave half the
+ * entries disabled at any moment, which reads as broken.
  *
- * Two menus rather than one: right-clicking an item is about *that item*, and
- * right-clicking the canvas is about *this spot*. Sharing one menu would mean
- * half its entries were disabled at any moment, which reads as broken rather
- * than contextual.
- *
- * Positioned in screen coordinates and flipped near the edges, because a menu
- * that opens off-screen is a dead end, the user has already committed to the
- * click by the time they find out.
+ * Screen coordinates, flipped near the edges. A menu that opens off-screen is a
+ * dead end by the time the user finds out.
  */
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'

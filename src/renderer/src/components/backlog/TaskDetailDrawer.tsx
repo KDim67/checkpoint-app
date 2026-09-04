@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
 import { X, Tag, Link2, Sparkles, Check, CheckSquare, Square, Plus } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
+import { useAiEnabled } from '../../lib/useAiEnabled'
 import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
 import {
   parseChecklist,
@@ -35,6 +36,7 @@ function legacyChecklistOf(markdown: string): { title: string; done: boolean }[]
 export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }: TaskDetailDrawerProps) {
   const selectItem = useAppStore(s => s.selectItem)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
+  const aiEnabled = useAiEnabled()
   const activeContext = useAppStore(s => s.activeContext)
 
   const [task, setTask] = useState<Item | null>(null)
@@ -45,7 +47,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   // Estimates: parsed from metadata.estimate
   const [estimate, setEstimate] = useState<number | ''>('')
 
-  // Subtasks, rows in their own table, not checkboxes in the body.
+  // Subtasks. Rows in their own table, not checkboxes in the body.
   const [newSubtaskText, setNewSubtaskText] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
 
@@ -369,7 +371,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           </div>
 
           <div className="row">
-            <button
+            {aiEnabled && <button
               onClick={handleAiAssist}
               style={{
                 background: 'var(--color-secondary-muted)',
@@ -396,7 +398,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             >
               <Sparkles size={16} fill="currentColor" />
               <span>AI Assist</span>
-            </button>
+            </button>}
 
             <button
               onClick={onClose}

@@ -25,7 +25,7 @@ interface ChatInputProps {
   /** User-defined saved prompts, shown in the ＋ menu. */
   customActions?: CustomQuickAction[]
   onManageCustomActions?: () => void
-  /** Whether the selected model accepts image input, gates attach & paste. */
+  /** Whether the selected model accepts image input. Gates attach & paste. */
   visionCapable?: boolean
 }
 
@@ -83,19 +83,19 @@ const CREATE_ACTIONS: QuickAction[] = [
 const ANALYZE_ACTIONS: QuickAction[] = [
   {
     icon: FileText, label: 'Summarize progress',
-    prompt: 'Summarize all my tasks and current board progress in detail. Do NOT output any JSON blocks, return a plain markdown summary.'
+    prompt: 'Summarize all my tasks and current board progress in detail. Do NOT output any JSON blocks. Return a plain markdown summary.'
   },
   {
     icon: ArrowUpDown, label: 'Prioritize backlog',
-    prompt: 'Review my current board and tell me what to work on next and why. Do NOT output JSON, give a prioritized, reasoned plain-text list.'
+    prompt: 'Review my current board and tell me what to work on next and why. Do NOT output JSON. Give a prioritized, reasoned plain-text list.'
   },
   {
     icon: ShieldAlert, label: 'Find risks & gaps',
-    prompt: 'Audit my board for risks, blockers, and missing work (testing, edge cases, docs, polish). Do NOT output JSON, return a plain-text findings list grouped by theme.'
+    prompt: 'Audit my board for risks, blockers, and missing work (testing, edge cases, docs, polish). Do NOT output JSON. Return a plain-text findings list grouped by theme.'
   },
   {
     icon: Sparkles, label: 'Explain workspace',
-    prompt: 'Explain the current state of my project and active tasks. Do NOT output JSON, return a plain markdown description.'
+    prompt: 'Explain the current state of my project and active tasks. Do NOT output JSON. Return a plain markdown description.'
   }
 ]
 
@@ -446,8 +446,8 @@ export default function ChatInput({
     mentionQuery === null ? true : n.toLowerCase().includes(mentionQuery)
   ).slice(0, 6)
 
-  // Workspace files only appear once the user starts typing a query, 
-  // an unfiltered list of hundreds of files is pure noise.
+  // Workspace files only appear once the user starts typing a query.
+  // An unfiltered list of hundreds of files is pure noise.
   const filteredFiles = (mentionQuery && mentionQuery.length >= 1)
     ? workspaceFiles.filter(f =>
         f.name.toLowerCase().includes(mentionQuery) ||
@@ -520,7 +520,7 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Mentions Auto-complete Popover, cheatsheets, notes and workspace files */}
+      {/* Mentions Auto-complete Popover. Cheatsheets, notes and workspace files */}
       {mentionQuery !== null && hasMentionResults && (
         <div
           style={{
@@ -809,7 +809,7 @@ export default function ChatInput({
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 title={visionCapable
-                  ? 'Attach an image, you can also paste one directly into the input.'
+                  ? 'Attach an image. You can also paste one directly into the input.'
                   : 'The selected model does not support images. Switch to a vision model (llava, moondream, gpt-4o, gemini…).'}
               >
                 <ImageIcon size={13} style={{ color: visionCapable ? '#f472b6' : 'var(--color-text-faint)' }} />

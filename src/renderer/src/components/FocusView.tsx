@@ -43,7 +43,7 @@ export default function FocusView() {
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
 
-  // Timer engine state, lives in the global store (see FocusTimerEngine,
+  // Timer engine state. Lives in the global store (see FocusTimerEngine,
   // mounted at the app root) so a running session survives navigating away
   // from this view entirely, instead of silently resetting.
   const step = useAppStore(s => s.focusStep)
@@ -193,7 +193,7 @@ export default function FocusView() {
 
   const handleSkipTimer = () => {
     // End the current interval early and move straight to its natural
-    // next step, a retrospective for focus intervals, or just back to
+    // next step. A retrospective for focus intervals, or just back to
     // setup for breaks (mirrors the automatic-completion behavior).
     const isFocus = preset === 'focus'
     focusFinish()
@@ -286,7 +286,7 @@ export default function FocusView() {
 
   // Quick-add a task directly from the Focus setup screen
   // Previously the only way to get a task into Focus Mode was to leave this
-  // view, create it in Backlog/Kanban, then come back, a real friction point
+  // view, create it in Backlog/Kanban, then come back. A real friction point
   // for a "jot it down and get back to focusing" workflow.
   const handleQuickAddTask = async () => {
     const title = quickAddText.trim()
@@ -320,7 +320,7 @@ export default function FocusView() {
 
   // Save Retrospective Row & Log
   // Shared persistence step used by both "Save & Log Session" and
-  // "Save & Take a Break", previously the break shortcut skipped saving
+  // "Save & Take a Break". Previously the break shortcut skipped saving
   // entirely, silently losing the retrospective.
   const persistRetrospective = async (): Promise<boolean> => {
     try {
@@ -392,7 +392,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
     const ok = await persistRetrospective()
     if (!ok) return
     toast('Session retrospective saved to log feed', { type: 'success' })
-    // Reset back to setup, stay on Focus so the user can chain straight
+    // Reset back to setup. Stay on Focus so the user can chain straight
     // into a break or another round without losing their place.
     focusExitToSetup()
     loadFocusData()
@@ -423,7 +423,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
   const handleStartBreak = async (breakPreset: Extract<TimerPreset, 'short-break' | 'long-break'>) => {
     const ok = await persistRetrospective()
     if (!ok) return
-    toast('Session saved, enjoy your break', { type: 'success' })
+    toast('Session saved: enjoy your break', { type: 'success' })
     focusSetSelectedTasks([])
     focusSetPreset(breakPreset)
     focusStart(durationMsFor(focusSettings, breakPreset))
@@ -435,7 +435,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
     return durationMs > 0 ? (timeLeftMs / durationMs) * 100 : 0
   }, [timeLeftMs, durationMs])
 
-  // Projected clock time this interval will finish at, helps plan around it.
+  // Projected clock time this interval will finish at. Helps plan around it.
   const projectedEnd = useMemo(() => {
     if (!isRunning) return null
     return new Date(Date.now() + timeLeftMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1059,7 +1059,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
           >
             {/* Header Row: Preset pills, cycle dots & Cancel button */}
             <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-4)' }}>
-              {/* Preset mode pills, locked while running to avoid accidentally nuking progress */}
+              {/* Preset mode pills. Locked while running to avoid accidentally nuking progress */}
               <div
                 style={{ display: 'flex', gap: '6px', background: 'var(--color-surface-2)', padding: '3px', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-surface-offset)', opacity: isRunning ? 0.5 : 1 }}
                 title={isRunning ? 'Pause the timer to switch modes' : undefined}
@@ -1269,7 +1269,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
               </button>
             </div>
 
-            {/* Distraction tally, a Pomodoro staple: acknowledge the interruption,
+            {/* Distraction tally. A Pomodoro staple: acknowledge the interruption,
                 keep working, review the count in the retro. Focus intervals only. */}
             {preset === 'focus' && (
               <button
@@ -1298,7 +1298,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
               </button>
             )}
 
-            {/* Focus Targets checklist, hidden for breaks, since there are no tasks to work a break */}
+            {/* Focus Targets checklist. Hidden for breaks, since there are no tasks to work a break */}
             {preset === 'focus' && (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -1413,7 +1413,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
               ))}
             </div>
 
-            {/* Long-break cadence nudge, surfaces the classic 4-interval rule */}
+            {/* Long-break cadence nudge. Surfaces the classic 4-interval rule */}
             {longBreakDue && (
               <div style={{
                 display: 'flex',
@@ -1428,7 +1428,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
                 fontWeight: 'var(--weight-medium)'
               }}>
                 <Coffee size={15} />
-                Nice streak, you&rsquo;ve completed {cyclesCompleted} focus intervals. A long break is recommended.
+                Nice streak. You&rsquo;ve completed {cyclesCompleted} focus intervals. A long break is recommended.
               </div>
             )}
 

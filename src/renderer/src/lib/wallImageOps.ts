@@ -1,13 +1,8 @@
 /**
- * Running the app's texture tooling on an image sitting on the Wall.
+ * Runs the app's texture tooling on an image sitting on the Wall.
  *
- * The algorithms are not new, `imageProcessing.ts` already computes PBR maps,
- * scales pixel art and extracts palettes, all as pure functions over raw RGBA.
- * What was missing is the plumbing: getting pixels out of an image the Wall is
- * displaying, and getting a result back in as a new image.
- *
- * This is the part no other canvas can copy, because no other canvas ships a
- * texture pipeline to plumb into.
+ * `imageProcessing.ts` already has the algorithms; this is just the plumbing
+ * between them and a wall image.
  */
 
 import { computePbrMaps, extractPalette, scale2xData, scale3xData } from './imageProcessing'
@@ -28,12 +23,9 @@ export interface Pixels {
 }
 
 /**
- * Reads a wall image back into pixels.
- *
- * The image is already decoded and on screen, but its pixels are not reachable
- * from the DOM node, so it is drawn once into an offscreen canvas. Images are
- * served from the custom `checkpoint-media://` protocol, which is same-origin
- * enough that the canvas does not become tainted.
+ * Reads a wall image back into pixels via an offscreen canvas. The DOM node
+ * does not expose them. `checkpoint-media://` is same-origin enough not to
+ * taint the canvas.
  */
 export function loadPixels(filename: string): Promise<Pixels> {
   return new Promise((resolve, reject) => {
@@ -64,8 +56,7 @@ export async function savePixels(pixels: Pixels): Promise<string> {
   canvas.height = pixels.height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not write the image.')
-  // Built through the context rather than `new ImageData(...)`: the constructor
-  // insists on a buffer type narrower than what the pure image functions return.
+  // Via the context, not `new ImageData(...)`. That wants a narrower buffer type.
   const image = ctx.createImageData(pixels.width, pixels.height)
   image.data.set(pixels.data)
   ctx.putImageData(image, 0, 0)
@@ -85,11 +76,8 @@ export interface DerivedImage {
 }
 
 /**
- * Height, normal, roughness and ambient occlusion, as four new images.
- *
- * All four are returned rather than offering a choice: they are generated in
- * one pass anyway, and a material is the set of them, picking one at a time
- * would mean running the whole computation four times.
+ * Height, normal, roughness and AO. All four, because one pass produces them
+ * all and a material is the set.
  */
 export async function derivePbrMaps(filename: string): Promise<DerivedImage[]> {
   const { data, width, height } = await loadPixels(filename)

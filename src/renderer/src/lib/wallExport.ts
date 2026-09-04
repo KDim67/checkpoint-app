@@ -1,16 +1,9 @@
 /**
- * Exporting a Wall as a PNG.
+ * Exports a Wall as a PNG by redrawing it onto a canvas. Rasterising the HTML
+ * would mean a DOM-to-image dependency.
  *
- * The wall is HTML, and there is no way to rasterise HTML from a renderer
- * without pulling in a DOM-to-image library. So this redraws the wall onto a
- * canvas instead: the same coordinates, the same colours, the real images.
- *
- * That makes it a *rendering* rather than a screenshot, and the difference is
- * worth being honest about, text wraps by a simpler rule here than the
- * browser's, and card tiles are drawn as their title and status rather than
- * their full styling. For a moodboard shared with someone else, which is what
- * the export is for, that is close enough. For pixel fidelity it is not, and no
- * amount of effort short of a real rasteriser would make it so.
+ * So it is a rendering, not a screenshot: text wraps by a simpler rule and
+ * cards are drawn as title plus status. Fine for a moodboard, not pixel-exact.
  */
 
 import { boundsOf, inPaintOrder, type WallItem } from '../../../shared/wallModel'
@@ -39,7 +32,7 @@ function loadImage(filename: string): Promise<HTMLImageElement | null> {
   })
 }
 
-/** Greedy wrap. Good enough for a note; not the browser's algorithm. */
+/** Greedy wrap. Good enough for a note, not the browser's algorithm. */
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
   for (const paragraph of text.split('\n')) {
@@ -58,9 +51,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
   return lines
 }
 
-/**
- * Draws the wall and returns a PNG blob, or null when there is nothing to draw.
- */
+/** Null when there is nothing to draw. */
 export async function exportWallToPng(
   items: WallItem[],
   ctxInfo: ExportContext
@@ -80,8 +71,7 @@ export async function exportWallToPng(
   ctx.fillStyle = ctxInfo.background
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  // Everything is drawn in wall coordinates, shifted so the content starts at
-  // the margin, the same translation the camera would apply.
+  // Wall coordinates, shifted to the margin. The translation the camera applies.
   ctx.translate(MARGIN - bounds.minX, MARGIN - bounds.minY)
 
   for (const item of inPaintOrder(items)) {
@@ -115,7 +105,7 @@ export async function exportWallToPng(
       ctx.font = '600 13px sans-serif'
       ctx.fillText(item.text || 'Frame', item.x, item.y - 6)
     } else {
-      // Cards and notes: a tile with whatever the thing is actually called.
+      // Cards and notes: a tile with whatever the thing is called.
       ctx.fillStyle = ctxInfo.surfaceColor
       ctx.fillRect(item.x, item.y, item.width, item.height)
       ctx.strokeStyle = item.color || ctxInfo.borderColor

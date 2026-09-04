@@ -52,7 +52,7 @@ const FeedIcon = () => (
   </svg>
 )
 
-// Dedicated stream channel, isolates this modal's stream from the AI panel's.
+// Dedicated stream channel. Isolates this modal's stream from the AI panel's.
 const STANDUP_STREAM_ID = 'standup'
 
 const SYSTEM_PROMPT = `You are a professional Agile Scrum Master and an Executive AI Summarizer.
@@ -200,7 +200,7 @@ export default function StandupTranslatorView({
     loadAiConfig()
   }, [isOpen])
 
-  // 3. Register IPC Streaming listeners, scoped to the dedicated 'standup'
+  // 3. Register IPC Streaming listeners. Scoped to the dedicated 'standup'
   //    stream channel, so this modal and the AI Assistant panel can stream at
   //    the same time without intercepting each other's chunks.
   useEffect(() => {

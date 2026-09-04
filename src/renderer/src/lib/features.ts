@@ -4,7 +4,7 @@ import { getBoolSetting, setBoolSetting, getStringSetting } from './settings'
 /**
  * The per-view feature flags, in sidebar order.
  *
- * This list used to be maintained by hand in three places, App's redirect
+ * This list used to be maintained by hand in three places. App's redirect
  * guard, the Sidebar, and the settings toggle center, which is how
  * gamedev_helpers ended up with a different setting-key shape and a different
  * default from every other view.
@@ -30,7 +30,35 @@ export const VIEW_FEATURES: ViewFeature[] = [
   { view: 'gamedev',     key: 'feature_gamedev_helpers',  label: 'Game Development Helpers', defaultOn: false }
 ]
 
+/**
+ * The assistant and everything that reaches it. Off means the app makes no
+ * model calls at all: none of the AI services run on a timer, so removing the
+ * entry points removes the whole of it.
+ *
+ * Nothing is deleted. Saved chats, memories and provider keys stay on disk and
+ * come back if it is switched on again.
+ */
+export const AI_FEATURE_KEY = 'feature_ai'
+
+export async function readAiEnabled(): Promise<boolean> {
+  return getBoolSetting(AI_FEATURE_KEY, true)
+}
+
+export async function setAiEnabled(enabled: boolean): Promise<void> {
+  await setBoolSetting(AI_FEATURE_KEY, enabled)
+  window.dispatchEvent(new CustomEvent('settings-update-features'))
+}
+
 export type ViewEnabledMap = Record<ActiveView, boolean>
+
+/**
+ * The Cookbook is a library of assistant prompts, so it follows the AI switch
+ * rather than its own. Applied here so the sidebar, the redirect guard and the
+ * command palette all inherit it from the one read they already do.
+ */
+export function applyAiGate(map: ViewEnabledMap, aiEnabled: boolean): ViewEnabledMap {
+  return aiEnabled ? map : { ...map, cookbook: false }
+}
 
 /** Optimistic default used before the first read resolves, so nav never flickers. */
 export function defaultViewEnabledMap(): ViewEnabledMap {
@@ -41,13 +69,14 @@ export function defaultViewEnabledMap(): ViewEnabledMap {
 }
 
 export async function readViewFeatures(): Promise<ViewEnabledMap> {
-  const entries = await Promise.all(
-    VIEW_FEATURES.map(async f => [f.view, await getBoolSetting(f.key, f.defaultOn)] as const)
-  )
+  const [entries, aiEnabled] = await Promise.all([
+    Promise.all(VIEW_FEATURES.map(async f => [f.view, await getBoolSetting(f.key, f.defaultOn)] as const)),
+    readAiEnabled()
+  ])
   const map = Object.fromEntries(entries) as ViewEnabledMap
-  // Settings has no flag, it is the screen you turn the others off from.
+  // Settings has no flag. It is the screen you turn the others off from.
   map.settings = true
-  return map
+  return applyAiGate(map, aiEnabled)
 }
 
 export async function setViewFeature(key: string, enabled: boolean): Promise<void> {
@@ -55,7 +84,7 @@ export async function setViewFeature(key: string, enabled: boolean): Promise<voi
   window.dispatchEvent(new CustomEvent('settings-update-features'))
 }
 
-/** First enabled view in sidebar order, where to land when the current one is disabled. */
+/** First enabled view in sidebar order. Where to land when the current one is disabled. */
 export function firstEnabledView(enabled: ViewEnabledMap): ActiveView {
   return VIEW_FEATURES.find(f => enabled[f.view])?.view ?? 'settings'
 }

@@ -1,14 +1,10 @@
 /**
- * Reading a plugin's name and version without running it.
+ * Reads a plugin's name and version without running it. The registry used to
+ * `require()` every file just to list them, including disabled ones, which
+ * made the off switch meaningless.
  *
- * The registry used to `require()` every file in the plugins folder just to read
- * its metadata block, including plugins the user had switched **off**. Opening
- * the Extensions tab therefore executed the top-level code of every plugin
- * present, disabled or not, which makes the off switch meaningless.
- *
- * Listing is a read, so this parses the source as text. It is deliberately
- * best-effort: the values are only ever displayed, so a plugin whose metadata
- * cannot be read is shown by filename rather than executed to find out.
+ * Parses the source as text, best-effort: the values are only displayed, so an
+ * unreadable one is shown by filename rather than executed to find out.
  */
 
 export interface PluginMetadata {

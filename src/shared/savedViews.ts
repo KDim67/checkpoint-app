@@ -1,14 +1,11 @@
 /**
  * Named filters over the task list.
  *
- * The one decision that matters: a view stores **intent, not resolved dates**.
- * "Overdue" saved on Monday has to still mean overdue on Friday, so the due
- * filter is kept as a word and turned into a range at query time. Storing the
- * computed timestamps would produce a view that silently rots, still returning
- * results, just the wrong ones, which is the worst kind of wrong.
+ * A view stores intent, not resolved dates: "overdue" saved on Monday still
+ * means overdue on Friday. Storing timestamps gives a view that rots quietly,
+ * still returning results, just the wrong ones.
  *
- * Pure, and in shared/, because both the renderer and the MCP server need to
- * turn a view into the same query.
+ * In shared/ so the renderer and MCP build the same query.
  */
 
 import type { TaskQueryParams } from './types'
@@ -55,7 +52,7 @@ const endOfDay = (now: number): number => {
  *
  * Returns the fields to merge into a query. `overdue` deliberately excludes
  * today's not-yet-passed work by ending at the current instant rather than at
- * midnight, something due at 5pm is not overdue at 9am.
+ * midnight. Something due at 5pm is not overdue at 9am.
  */
 export function resolveDueRange(
   due: DueFilter,

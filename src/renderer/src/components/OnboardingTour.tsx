@@ -1,20 +1,14 @@
 /**
- * The first-run tour.
+ * The first-run tour. The app opens onto fourteen views with nothing to orient
+ * anyone, and its two best features (the palette and quick capture) are
+ * invisible unless you already know the keys.
  *
- * Checkpoint opens onto fourteen views and around thirty services with nothing
- * to orient a new user, and its two best features, the command palette and
- * quick capture, are invisible unless you already know the keys.
+ * Steps that can point at something do: a spotlight cuts a hole in a dimming
+ * layer over the real element, so the tour explains the interface rather than a
+ * picture of it. The rest render centred.
  *
- * Steps that can point at something do. A spotlight cuts a hole in a dimming
- * layer over the real element and glides between targets, so the tour explains
- * the actual interface rather than a picture of it. Steps with nothing to point
- * at (the welcome, the workspace form, the keyboard shortcuts) render centred.
- *
- * Two things the targeting has to survive:
- *   - Nav items are filtered by `enabledViews`, so a target may genuinely not
- *     exist. A missing target falls back to the centred layout rather than
- *     spotlighting the top-left corner.
- *   - The window can resize mid-tour, so the measurement re-runs.
+ * Targeting has to survive a nav item hidden by `enabledViews` (falls back to
+ * centred) and a window resize mid-tour (re-measures).
  */
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -41,7 +35,7 @@ const STEPS: Step[] = [
   {
     id: 'welcome',
     title: 'Welcome to Checkpoint',
-    body: 'A board, a backlog, notes, a focus timer, clipboard history and an AI assistant, in one place, organised by workspace. Everything stays on this machine: no account, no cloud, no sign-in.'
+    body: 'A board, a backlog, notes, a focus timer, clipboard history and an AI assistant. In one place, organised by workspace. Everything stays on this machine: no account, no cloud, no sign-in.'
   },
   {
     // Second, not last. This is the most useful thing in the tour, and anything
@@ -58,7 +52,7 @@ const STEPS: Step[] = [
   {
     id: 'sidebar',
     title: 'Your workspaces and views',
-    body: 'The badge at the top switches between workspaces, each has its own board, notes and history. Below it is every view: board, backlog, notes, the Wall, focus timer, clipboard, analytics. Hover any icon for its name.',
+    body: 'The badge at the top switches between workspaces. Each has its own board, notes and history. Below it is every view: board, backlog, notes, the Wall, focus timer, clipboard, analytics. Hover any icon for its name.',
     target: '#app-sidebar'
   },
   {
@@ -219,7 +213,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
       {/* The dimming layer
           With no target this is a plain scrim. With one, the scrim is the
           9999px shadow spread around a transparent box, which is what cuts the
-          hole. Only this element's own box changes between steps, it is out of
+          hole. Only this element's own box changes between steps. It is out of
           flow with no children, so animating its geometry cannot reflow the
           document beneath it. */}
       <div
@@ -332,7 +326,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               <>
                 <Check size={22} style={{ color: 'var(--color-secondary)' }} />
                 <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
-                  That’s it, that is how you reach anything.
+                  That’s it. That is how you reach anything.
                 </span>
               </>
             ) : (

@@ -142,9 +142,9 @@ export function deleteMemory(id: string): boolean {
 
 /**
  * 3-Tier Semantic Vector Memory Search using TF-IDF cosine similarity.
- * Tier 1, Pinned (semantic): always surfaced first
- * Tier 2, Semantic: project facts, lore, rules, high weight
- * Tier 3, Episodic: past decisions, milestones
+ * Tier 1. Pinned (semantic): always surfaced first
+ * Tier 2. Semantic: project facts, lore, rules, high weight
+ * Tier 3. Episodic: past decisions, milestones
  * Working memories excluded from recall (they are session-only scratchpads)
  */
 export function searchMemories(query: string, context: string = 'default', limit: number = 8): AiMemory[] {

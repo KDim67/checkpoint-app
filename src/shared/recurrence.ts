@@ -1,17 +1,12 @@
 /**
- * Recurrence rules and the date maths behind them.
+ * Recurrence rules and their date maths.
  *
- * The materialisation strategy is the important decision here, so it is worth
- * stating: a recurrence is a **template**, and at most **one unfinished instance
- * exists at a time**. When that instance is completed or its due date passes,
- * the next one is created. Generating a year of occurrences up front would grow
- * the items table without bound and fill the board with work that is not due
- * yet; rescheduling a single row instead would lose the history of having done
- * it eight times. One-at-a-time keeps both properties.
+ * A recurrence is a template with at most one unfinished instance at a time;
+ * the next appears when that one is done or overdue. Generating a year ahead
+ * floods the board, and rescheduling one row loses the history.
  *
- * All arithmetic is in local time, deliberately. "Every Tuesday at 9am" means
- * 9am where the user is, and must keep meaning that across a daylight-saving
- * change, which fixed millisecond offsets do not survive.
+ * Local time throughout: "every Tuesday at 9am" has to survive a DST change,
+ * which fixed millisecond offsets do not.
  */
 
 export type Frequency = 'daily' | 'weekly' | 'monthly'

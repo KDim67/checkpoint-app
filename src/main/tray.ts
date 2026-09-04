@@ -1,14 +1,11 @@
 /**
  * The system-tray icon and its panel.
  *
- * The panel is a small frameless BrowserWindow loading the renderer at `#tray`,
- * not a native `Menu`. A native menu is drawn by Windows and cannot be styled,
- * so it would sit beside a heavily themed app looking like part of a different
- * one, and it could not show live counts or a toggle. This follows the pattern
- * the widget and the quick-capture HUD already use.
+ * The panel is a frameless BrowserWindow at `#tray`, not a native `Menu`:
+ * Windows draws those and they cannot be styled, show live counts, or hold a
+ * toggle. Same pattern as the widget and the quick-capture HUD.
  *
- * The cost is that positioning and dismissal become ours to handle, which is
- * what most of this file is.
+ * The cost is that positioning and dismissal are ours, which is most of this file.
  */
 
 import { app, BrowserWindow, Tray, nativeImage, screen } from 'electron'
@@ -48,7 +45,7 @@ export function getStartupSettings(): StartupSettings {
 /**
  * Stores settings and applies the ones the OS owns.
  *
- * `openAtLogin` is not a value we keep, it is a Windows registry entry that
+ * `openAtLogin` is not a value we keep. It is a Windows registry entry that
  * Electron manages, so it is written through rather than merely recorded, or the
  * checkbox would drift from what actually happens at login.
  */
@@ -88,7 +85,7 @@ function panelPosition(): { x: number; y: number } {
   const bounds = tray?.getBounds()
   const cursor = screen.getCursorScreenPoint()
   // getBounds is empty on some Windows configurations, so the cursor is the
-  // fallback, the click that opened this happened at it.
+  // fallback. The click that opened this happened at it.
   const anchor = bounds && bounds.width > 0 ? bounds : { x: cursor.x, y: cursor.y, width: 0, height: 0 }
   const display = screen.getDisplayNearestPoint({ x: anchor.x, y: anchor.y })
   const area = display.workArea
@@ -121,7 +118,7 @@ function createPanel(): BrowserWindow {
     movable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    // Focusable so blur can dismiss it, an unfocusable panel would have to be
+    // Focusable so blur can dismiss it. An unfocusable panel would have to be
     // closed some other way, and there is nothing obvious to click.
     focusable: true,
     webPreferences: {
@@ -200,7 +197,7 @@ export function createTray(): void {
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.setToolTip('Checkpoint')
 
-  // Left-click goes straight to the app, right-click opens the panel, the
+  // Left-click goes straight to the app, right-click opens the panel. The
   // convention Windows users already have from everything else in the tray.
   tray.on('click', () => showMainWindow())
   tray.on('double-click', () => showMainWindow())

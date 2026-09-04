@@ -1,13 +1,9 @@
 /**
  * Everything the assistant says to the model before the user's own words.
  *
- * These blocks were inline in runChatStream, which meant the prompt contract, 
- * which column ids are legal, which titles are forbidden, which of the seven
- * board operations exist, could only be checked by reading a 550-line function
- * and trusting it. They are pure functions here so that contract can be tested.
- *
- * Every string is moved verbatim. A reworded prompt is a behaviour change, and
- * this refactor is not the place for one.
+ * Inline in runChatStream these were unreadable, so the prompt contract could
+ * only be checked by trusting a 550-line function. Pure here, so it can be
+ * tested. Strings are verbatim: a reworded prompt is a behaviour change.
  */
 
 import { PALETTE_HINT } from './boardEnrich'
@@ -23,7 +19,7 @@ export function buildBasePrompt(isSmallModel: boolean): string {
     ? `You are Checkpoint AI, a helpful project assistant with DIRECT WRITE ACCESS to the user's Kanban board. Anything you create is added to the board automatically.
 
 WHEN CREATING CARDS:
-- Give every card a clear title, a concrete one-line body, a priority (1=Low, 2=Medium, 3=High), and 1-3 short tags, each tag with a hex color.
+- Give every card a clear title, a concrete one-line body, a priority (1=Low, 2=Medium, 3=High), and 1-3 short tags, each with a hex color.
 - Reuse existing columns when they fit; only add a new column for a genuinely new stage.
 - Never duplicate a card title that already exists on the board.
 - ${PALETTE_HINT}
@@ -43,16 +39,16 @@ Otherwise, answer the user's question in friendly plain text.`
 1. AUDIT first: read the live board state below (columns + card titles) before creating anything.
 2. NO DUPLICATES: never create a card whose title matches or heavily overlaps an existing one.
 3. REUSE COLUMNS: if the existing columns fit, place cards in them and DO NOT create columns. Only introduce a column for a genuinely new workflow stage.
-4. QUALITY over quantity: propose essential, high-impact, well-scoped cards (3-6 by default, or the number requested), no filler.
+4. QUALITY over quantity: propose essential, high-impact, well-scoped cards (3-6 by default, or the number requested). No filler.
 5. BE CREATIVE & VISUAL: give every card a fitting priority (1-3) and 1-3 topical tags, each with a hex color. Give any new column a fitting hex color. ${PALETTE_HINT}
-6. When creation is justified, just do it, don't ask permission or explain first.
+6. When creation is justified, just do it. Don't ask permission or explain first.
 
 ██ WHEN CONVERSING ██
 - For questions, explanations, audits, or advice: reply in friendly natural-language text. Do NOT emit JSON action blocks unless the user asked to create/add something.
 - "Cards" and "Columns" are Checkpoint Kanban items (not playing cards).
 
 ██ FORMAT (only when creating) ██
-- Batch (preferred for cards): \`\`\`json { "cards": [ { "title", "body", "status", "priority", "tags": [{ "name", "color" }] } ], "columns": [ { "name", "color", "colorMode": "header" } ] } \`\`\`, omit "columns" unless adding new stages.
+- Batch (preferred for cards): \`\`\`json { "cards": [ { "title", "body", "status", "priority", "tags": [{ "name", "color" }] } ], "columns": [ { "name", "color", "colorMode": "header" } ] } \`\`\`. Omit "columns" unless adding new stages.
 - Implementation plan: \`\`\`json:create_plan { "title", "overview", "steps": [{ "title", "details", "status": "pending" }] } \`\`\`
 - Branching dialogue: \`\`\`json:create_dialogue_tree { "startNode", "nodes": [{ "id", "speaker", "text", "choices": [{ "text", "target" }] }] } \`\`\`
 - Valid JSON only: no trailing commas, no comments. priority is 1|2|3. colors are hex like "#a855f7". status is an existing column name or id.`
@@ -108,7 +104,7 @@ export function buildBoardState(
   const liveBoardStateText = [
     `CURRENT LIVE KANBAN BOARD STATE (Context: ${validContext})`,
     '',
-    `VALID COLUMN IDs, use ONLY these exact strings in any "status" field:`,
+    `VALID COLUMN IDs. Use ONLY these exact strings in any "status" field:`,
     validColIds,
     '',
     `CARDS PER COLUMN:`,
@@ -135,7 +131,7 @@ export function buildMemoryBlock(
 }
 
 /**
- * The imported codebase, grouped by top-level folder and file type, structure
+ * The imported codebase, grouped by top-level folder and file type. Structure
  * rather than a flat list of names, which a model cannot reason about.
  */
 export function buildWorkspaceIndex(
@@ -218,7 +214,7 @@ export function buildStructuredInstruction(
   wantsCols: boolean
 ): string {
   const columnGuidance = wantsCols
-    ? `The user is asking about BOARD STRUCTURE, include a "columns" array of the workflow stages (each with a name and a hex color), and place the cards into those columns. Design a sensible pipeline (e.g. Backlog → In Progress → Review → Done) if none fits.`
+    ? `The user is asking about BOARD STRUCTURE. Include a "columns" array of the workflow stages (each with a name and a hex color), and place the cards into those columns. Design a sensible pipeline (e.g. Backlog → In Progress → Review → Done) if none fits.`
     : `Reuse existing columns when they fit; only add columns for genuinely new stages.`
   const instruction = structuredKind === 'board'
     ? `Create the requested board items now. FIRST read the CURRENT LIVE KANBAN BOARD STATE above: do NOT create any card whose title matches or closely overlaps one already on the board (see the FORBIDDEN DUPLICATE TITLES list), only propose genuinely new, non-duplicate work. Give EVERY card a fitting priority (1-3) and 1-3 topical tags, each with a hex color. ${columnGuidance} ${PALETTE_HINT}`
@@ -291,14 +287,14 @@ Output a \`\`\`json:create_plan block RIGHT NOW.
 → After the plan block, ONE brief paragraph on tradeoffs. STOP. Do not ask about Kanban export or next steps.`
       break
     case 'create_items':
-      enforcementContent = `⚡ ACTION REQUIRED, OUTPUT JSON BLOCKS NOW ⚡
+      enforcementContent = `⚡ ACTION REQUIRED. OUTPUT JSON BLOCKS NOW ⚡
 → Use ONLY the column IDs listed in VALID COLUMN IDs above in any "status" field. Never invent IDs.
 → Check FORBIDDEN DUPLICATE TITLES above, never repeat any of those exact titles.
 → Immediately output a \`\`\`json batch block with REAL, specific, unique content.
 → DO NOT explain first. DO NOT ask for permission. DO NOT produce vague placeholder titles. CREATE IT.`
       break
     case 'update_items':
-      enforcementContent = `⚡ BOARD EDIT REQUIRED, OUTPUT AN update_board BLOCK NOW ⚡
+      enforcementContent = `⚡ BOARD EDIT REQUIRED. OUTPUT AN update_board BLOCK NOW ⚡
 Output a \`\`\`json:update_board block of this shape:
 { "operations": [ { "op": "move", "target": "Exact Existing Card Title", "toColumn": "Done" } ] }
 → op is one of: move | set_priority | retitle | update_body | archive.
@@ -307,7 +303,7 @@ Output a \`\`\`json:update_board block of this shape:
 → Only the operations the user asked for. DO NOT create new cards.`
       break
     case 'configure_board':
-      enforcementContent = `⚙️ BOARD SETTINGS CHANGE REQUIRED, OUTPUT A configure_board BLOCK NOW ⚙️
+      enforcementContent = `⚙️ BOARD SETTINGS CHANGE REQUIRED. OUTPUT A configure_board BLOCK NOW ⚙️
 Output a \`\`\`json:configure_board block of this shape:
 { "operations": [ { "op": "update_column", "target": "Review", "wipLimit": 3, "color": "#f59e0b" } ] }
 → op is one of: add_column | update_column | delete_column | reorder_columns | set_background | set_swimlanes | set_card_display.
@@ -321,7 +317,7 @@ Output a \`\`\`json:configure_board block of this shape:
 → Only the operations the user asked for. Then ONE short sentence confirming what changed.`
       break
     default: // 'converse'
-      enforcementContent = `💬 GENERAL CONVERSATION, DO NOT OUTPUT JSON BLOCKS 💬
+      enforcementContent = `💬 GENERAL CONVERSATION. DO NOT OUTPUT JSON BLOCKS 💬
 → DO NOT output any \`\`\`json structures, plan blocks, or dialogue trees.
 → Respond in natural, friendly plain text only.
 → Answer their question clearly, referencing the live board state or recalled memories where relevant.`

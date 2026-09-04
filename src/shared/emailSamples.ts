@@ -1,11 +1,9 @@
 /**
- * The user's saved email drafts, used to teach the model their writing voice.
+ * Saved email drafts, used to teach the model the user's writing voice.
  *
- * These lived in localStorage alone for a long time, then gained a database
- * write without the reader following, so a restored or synced database held
- * the samples while the panel that needed them saw nothing. The parsing and
- * formatting are here, pure, so the settings screen that writes them and the
- * chat panel that reads them can't drift apart again.
+ * They once lived in localStorage, then gained a database write the reader
+ * never followed, so a synced database held samples the panel could not see.
+ * Parsing and formatting live here so the writer and reader cannot drift again.
  */
 
 export interface EmailSample {
@@ -18,7 +16,7 @@ export interface EmailSample {
 export const MAX_EMAIL_SAMPLES = 5
 
 /**
- * Accepts anything, a parsed JSON blob, a half-written row, undefined, and
+ * Accepts anything (a parsed JSON blob, a half-written row, undefined) and
  * returns samples that are safe to render and to put in a prompt. Rows without
  * a body are dropped rather than repaired: an empty sample teaches nothing and
  * only costs prompt tokens.

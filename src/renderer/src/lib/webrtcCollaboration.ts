@@ -33,7 +33,7 @@ interface CollabOptions {
   /**
    * Asked before the host's board replaces the local one. Joining wipes every
    * card and task in the target context, so this is the user's only chance to
-   * stop it, returning false aborts the join with the local board intact.
+   * stop it. Returning false aborts the join with the local board intact.
    */
   onConfirmBaseline: (info: { context: string; incomingItems: number }) => Promise<boolean>
 }
@@ -100,7 +100,7 @@ export class WebRTCCollaborationCoordinator {
           sdp = JSON.parse(decryptedOffer).sdp
         } catch {
           this.options.onError(
-            new Error('Could not read the incoming offer, the peer entered a different passcode.')
+            new Error('Could not read the incoming offer: the peer entered a different passcode.')
           )
           return
         }
@@ -169,7 +169,7 @@ export class WebRTCCollaborationCoordinator {
           sdp = JSON.parse(decryptedAnswer).sdp
         } catch {
           this.options.onError(
-            new Error('Could not read the host reply, check that both sides use the same passcode.')
+            new Error('Could not read the host reply: check that both sides use the same passcode.')
           )
           return
         }
@@ -287,7 +287,7 @@ export class WebRTCCollaborationCoordinator {
     // Only this session's workspace goes over the wire.
     //
     // Create and update events carry the whole item, so the workspace is on
-    // `detail.item.context`. A delete has no item, it is gone, so the
+    // `detail.item.context`. A delete has no item (it is gone), so the
     // preload attaches the context it read just before deleting. Without that
     // this check simply did not apply to deletes, and deleting anything in any
     // other workspace was broadcast to the peer.
@@ -324,14 +324,14 @@ export class WebRTCCollaborationCoordinator {
       case 'board-baseline': {
         // applyBoardBaseline deletes every card and task in the target context
         // before seeding the host's. That is unrecoverable, and it used to run
-        // the instant the channel opened, a user joining a session while
+        // the instant the channel opened. A user joining a session while
         // holding their own board of the same name simply lost it. Ask first.
         const accepted = await this.options.onConfirmBaseline({
           context: msg.context,
           incomingItems: msg.items.length
         })
         if (!accepted) {
-          this.options.onProgress('Join cancelled, your local board was left untouched.')
+          this.options.onProgress('Join cancelled: your local board was left untouched.')
           this.cleanup()
           this.options.onDisconnect()
           break

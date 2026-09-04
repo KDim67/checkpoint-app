@@ -1,15 +1,9 @@
 /**
- * Named theme presets for the customization engine.
+ * Named theme presets. The engine stored one set of overrides, so trying a new
+ * look meant destroying the one you had.
  *
- * The engine stored exactly one set of overrides, so trying a different look
- * meant destroying the one you had. A preset is that same variable map with a
- * name attached, which is why this file carries no persistence of its own, the
- * renderer writes presets to `customizer_theme_presets` the way it writes every
- * other setting, and applying one goes through the existing
- * `customizer.updateTheme` IPC.
- *
- * Pure on purpose: it sits in shared/ so the unit tests can reach it without an
- * Electron process, the same reason boardModel.ts lives here.
+ * A preset is that same variable map with a name, which is why there is no
+ * persistence here: the renderer stores them like any other setting.
  */
 
 import { lighten, readableForegroundOn } from './color'
@@ -58,7 +52,7 @@ export interface ThemePreset {
 
 /**
  * Opacity suffixes for the tints the picker derives rather than asking for.
- * 0x26/255 is about 15% and 0x1a/255 about 10%, the values the colour handler
+ * 0x26/255 is about 15% and 0x1a/255 about 10%. The values the colour handler
  * already used inline. Named here so the preset path and the picker cannot
  * drift apart.
  */
@@ -70,14 +64,11 @@ const HOVER_LIGHTEN = 0.1
 
 /**
  * Expands a variable map with everything derived from primary and secondary.
+ * Call it before handing variables to the engine: a preset storing its own
+ * derivatives would keep stale values after the rule changed.
  *
- * Callers must apply this before handing variables to the engine. A preset that
- * stored its own derivatives would be one more thing to keep in sync, and one
- * saved before the rule changed would quietly keep the old values.
- *
- * `--color-primary-hover` and `--color-text-inverted` are here because neither
- * was ever overridden: a custom primary kept the stock blue hover, and the text
- * on a secondary-coloured button stayed white however light that colour got.
+ * Hover and inverted-text are here because neither was ever overridden, so a
+ * custom primary kept the stock blue hover.
  */
 export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
   const primary = vars['--color-primary']
@@ -95,22 +86,14 @@ export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
 }
 
 /**
- * Presets that ship with the app.
+ * The presets that ship. No copy of DEFAULT_THEME here, since "Reset to
+ * Defaults" already covers going back.
  *
- * Deliberately not a copy of DEFAULT_THEME, "Reset to Defaults" already covers
- * going back, so a preset that only restored the brand would be a second button
- * for a control that exists.
+ * Eight light and eight dark, chosen to span lighting conditions rather than to
+ * collect hues. Ink is for OLED, where true black costs no backlight.
  *
- * The set is chosen to span lighting conditions rather than to collect hues:
- * eight light themes, Paper, Clay, Beige, Sakura and Cherry Cream for warm,
- * Sage for green, Daylight for cool, Fog for neutral, and eight darks: cool
- * Midnight, warm Ember, red Cherry, green Forest, violet Amethyst, teal Ocean,
- * vivid Neon, and Ink for OLED panels where a true black costs no backlight.
- *
- * Every one is held to the same readability bar as the shipped palette, body
- * text above 7:1 on its own surfaces, accents above 4.5:1, and the test in
- * tests/themePresets.ts enforces it, so none of them can ship unreadable. Clay's
- * accent and Paper's were both darkened to clear it.
+ * All held to the shipped palette's readability bar (body above 7:1, accents
+ * above 4.5:1) and tests/themePresets.ts enforces it.
  */
 export const BUILT_IN_PRESETS: ThemePreset[] = [
   {
@@ -493,7 +476,7 @@ export function presetMatches(preset: ThemePreset, vars: ThemeVariables): boolea
  * Builds a preset from the current variables.
  *
  * `existing` is used both to reject a duplicate name and to settle the id, so
- * two presets saved in the same millisecond cannot collide, the timestamp alone
+ * two presets saved in the same millisecond cannot collide. The timestamp alone
  * could, and the id is what delete and rename address.
  */
 export function createPreset(

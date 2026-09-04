@@ -1,15 +1,12 @@
 /**
- * widget.ts, Phase 9 Desktop Widget
+ * A transparent, frameless, always-on-top summary overlay. Windows only,
+ * returns null elsewhere.
  *
- * Creates a transparent, frameless, always-on-top BrowserWindow that displays
- * a live summary overlay. Windows-only, returns null on other platforms.
- *
- * The three widget_* settings are read here rather than only in the settings
- * panel that writes them. Previously nothing in main consulted them, so the
- * window was recreated bottom-right at full opacity every launch, and, because
- * nothing restored it at startup either, the settings toggle inverted: the
- * panel painted the switch ON from the stored flag while no window existed, so
- * the next click, meaning \"off\", ran a blind flip that created one.
+ * The three widget_* settings are read here, not just in the panel that writes
+ * them. Nothing in main used to consult them, so the window came back
+ * bottom-right at full opacity every launch, and since nothing restored it at
+ * startup the toggle inverted: the panel painted the switch ON from the stored
+ * flag with no window present, so the next click ran a blind flip that made one.
  */
 
 import { BrowserWindow, screen } from 'electron'
@@ -110,7 +107,7 @@ export function createWidget(): BrowserWindow | null {
 
 /**
  * Applies an explicit desired state. Idempotent, unlike the blind flip this
- * replaced, the caller knows whether the user asked for the widget, and the
+ * replaced. The caller knows whether the user asked for the widget, and the
  * window can be absent for reasons the caller cannot see (a previous launch,
  * a non-Windows platform), so a flip and the switch drift apart.
  */

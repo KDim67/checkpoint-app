@@ -415,7 +415,7 @@ describe('itemAtPoint', () => {
     expect(itemAtPoint([item({ id: 'a', x: 0, y: 0, width: 100, height: 100 })], { x: 100, y: 100 })?.id).toBe('a')
   })
 
-  it('finds locked items too, they can still be right-clicked to unlock', () => {
+  it('finds locked items too, since they can still be right-clicked to unlock', () => {
     expect(itemAtPoint([item({ id: 'l', locked: true, width: 100, height: 100 })], { x: 10, y: 10 })?.id).toBe('l')
   })
 })

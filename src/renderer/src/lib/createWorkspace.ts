@@ -1,7 +1,7 @@
 /**
  * Creating a workspace from a project template.
  *
- * Two places do this, the context manager in Settings and the first-run
+ * Two places do this. The context manager in Settings and the first-run
  * panel, and they must produce the same thing, so the scaffolding lives here
  * rather than in either of them.
  *
@@ -27,7 +27,7 @@ export function slugifyWorkspace(name: string): string {
 /**
  * Writes the template's board and seeds its cards for an existing workspace
  * slug. Returns a one-line summary for a toast, or '' when the template id is
- * unknown, an unrecognised template should leave a usable empty workspace
+ * unknown. An unrecognised template should leave a usable empty workspace
  * rather than fail the whole creation.
  */
 export async function applyProjectTemplate(slug: string, templateId: string): Promise<string> {

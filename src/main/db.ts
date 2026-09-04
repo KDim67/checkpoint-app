@@ -1,11 +1,11 @@
 /**
- * SQLite Database Layer, Checkpoint
+ * SQLite Database Layer. Checkpoint
  *
  * Uses better-sqlite3 (synchronous API, native C++ module).
  * Must be rebuilt for Electron's Node ABI via electron-rebuild (postinstall script).
  *
  * All db.prepare() calls happen once at initDb() time, stored as module-level
- * prepared statements. Query functions call .run()/.get()/.all() on them, 
+ * prepared statements. Query functions call .run()/.get()/.all() on them,
  * never call db.prepare() inside a per-call function.
  */
 
@@ -56,7 +56,7 @@ import type {
 
 export let dbInstance: Database.Database | null = null
 
-// Statement cache, reuse compiled SQL across calls
+// Statement cache. Reuse compiled SQL across calls
 // Keyed by the exact SQL string. Avoids re-parsing the same SQL on hot paths
 // (updateItem, searchItems, queryTasks, analytics, applyRemoteMutationTx, etc.)
 const _stmtCache = new Map<string, Database.Statement>()
@@ -102,14 +102,14 @@ const CURRENT_VERSION = 9
  * columns store the column id in status, so ANY move to a non-default column
  * (including the built-in "in_review") failed with SQLITE_CONSTRAINT_CHECK on
  * those databases. SQLite cannot drop a CHECK, so the table is rebuilt once,
- * detected via sqlite_master (safe on fresh databases, no-op).
+ * detected via sqlite_master (safe on fresh databases: no-op).
  */
 function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
   const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'items'`).get() as { sql?: string } | undefined
   const tableSql = row?.sql || ''
   if (!/status[^,]*CHECK\s*\(/i.test(tableSql)) return
 
-  console.log('[db] Legacy items.status CHECK constraint detected, rebuilding table')
+  console.log('[db] Legacy items.status CHECK constraint detected: rebuilding table')
   // FK enforcement must be off during the rebuild or DROP TABLE would cascade
   // into item_tags/relations. The pragma is a no-op inside a transaction, so
   // it is toggled outside and the rebuild wrapped in its own transaction.
@@ -144,7 +144,7 @@ function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
         ${ITEMS_FTS_TRIGGERS_SQL}
       `)
     })()
-    console.log('[db] items table rebuilt, custom column statuses now accepted')
+    console.log('[db] items table rebuilt: custom column statuses now accepted')
   } finally {
     db.pragma('foreign_keys = ON')
   }
@@ -593,14 +593,12 @@ export function initDb(dataPath: string): Database.Database {
 }
 
 /**
- * Re-writes credential settings that predate at-rest encryption.
+ * Re-writes credential settings that predate at-rest encryption, so an existing
+ * install does not keep its provider keys in plaintext forever. Runs every boot,
+ * no-op once the rows carry an envelope.
  *
- * Without this, an existing install keeps its provider keys in plaintext
- * forever unless the user happens to re-save them in AI Settings. Runs on every
- * boot but is a no-op once the rows carry an envelope. Deliberately does not
- * use setSetting(): the prepared statements are in place by now, but the
- * side-effects that function fires (titlebar sync, clipboard watcher) have no
- * business running during init.
+ * Not via setSetting(): its side effects (titlebar sync, clipboard watcher) have
+ * no business running during init.
  */
 function encryptLegacyPlaintextSecrets(db: Database.Database): void {
   try {
@@ -723,7 +721,7 @@ export function createItem(
   })()
 
   const created = { ...item, tags: tagIds.length ? (stmtGetTagsForItem.all(id) as Tag[]) : [] }
-  // Emitted for every creation path, the UI, an agent over MCP, a webhook, 
+  // Emitted for every creation path (the UI, an agent over MCP, a webhook),
   // because a plugin cares that a card appeared, not who typed it.
   emitPluginEvent('item:created', { item: created })
   return created
@@ -792,7 +790,7 @@ let onRecurrenceInstanceClosed: ((recurrenceId: string) => void) | null = null
  * Called when an item belonging to a recurrence reaches a finished state.
  *
  * Wired up from index.ts. Without it the next occurrence would still appear, but
- * only on the next hourly sweep, completing today's task should offer
+ * only on the next hourly sweep. Completing today's task should offer
  * tomorrow's straight away.
  */
 export function setRecurrenceInstanceClosedHandler(
@@ -926,7 +924,7 @@ export function applyRemoteMutationTx(mutation: RemoteMutation): void {
     db.prepare('DELETE FROM relations WHERE id = ?').run(id)
   } else if (type === 'bulkUpdateItems') {
     // Built from whichever fields the patch actually carries, matching the
-    // local handler for the same payload, a fixed SET clause would write nulls
+    // local handler for the same payload. A fixed SET clause would write nulls
     // over the fields the user did not touch.
     const { ids, patch } = mutation.payload
     const setFields: string[] = []
@@ -953,7 +951,7 @@ export function applyRemoteMutationTx(mutation: RemoteMutation): void {
     })()
   } else if (type === 'rebalancePositions') {
     const { context, status } = mutation
-    // Call directly, we are already inside db.ts so no import needed
+    // Call directly. We are already inside db.ts so no import needed
     rebalancePositions(db, context, status)
   }
 }

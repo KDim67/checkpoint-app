@@ -8,10 +8,8 @@ import {
 } from '../src/shared/collabProtocol'
 import type { Item } from '../src/shared/types'
 
-// The only place another machine's data becomes this machine's rows. Two things
-// have to hold at once: everything a genuine peer sends must survive unchanged,
-// and nothing that would corrupt a row may get through. A normalizer that is
-// stricter than the sender breaks collaboration instead of protecting it.
+// Two things have to hold at once: a genuine peer's messages survive unchanged,
+// and nothing that would corrupt a row gets through.
 
 const item = (over: Partial<Item> = {}): Item => ({
   id: 'i1',

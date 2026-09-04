@@ -1,21 +1,14 @@
 /**
- * Model Context Protocol server for Checkpoint.
+ * Model Context Protocol server. Exposes workspaces, cards, tasks, notes and
+ * board config to MCP clients over loopback while the app runs.
  *
- * Exposes workspaces, cards, tasks, notes and board configuration to MCP
- * clients over a loopback HTTP endpoint, for reading and writing, while the app
- * is running.
+ * In main out of necessity: better-sqlite3 is built against Electron's ABI, so
+ * plain Node cannot open checkpoint.db (it fails with ERR_DLOPEN_FAILED). It
+ * also means every tool goes through the same `db.ts` functions the app uses.
  *
- * It lives in the main process out of necessity rather than preference:
- * better-sqlite3 is compiled against Electron's ABI, so a plain Node process
- * cannot open checkpoint.db at all (verified, it fails with ERR_DLOPEN_FAILED).
- * Hosting here also means every tool calls the same `db.ts` functions the app
- * itself uses, inheriting their validation, sync tombstones and position
- * rebalancing instead of reimplementing them against raw SQL.
- *
- * Deliberately a separate server from the webhook gateway: the gateway is
- * unauthenticated with a wildcard CORS policy, which is defensible for a
- * write-only "append a log line" endpoint and completely wrong for a surface
- * that can read every note.
+ * Separate from the webhook gateway, which is unauthenticated with wildcard
+ * CORS. Defensible for "append a log line", wrong for something that reads
+ * every note.
  */
 
 import http from 'http'
@@ -118,8 +111,8 @@ export function setMcpDataChangedHandler(fn: (() => void) | null): void {
  * Returns the bearer token, generating one on first use.
  *
  * The key is registered in secureSettings' SECRET_SETTING_KEYS, so it is
- * encrypted at rest by the OS keychain exactly like the AI provider keys, 
- * a token granting full read/write over someone's workspace should not sit in
+ * encrypted at rest by the OS keychain exactly like the AI provider keys.
+ * A token granting full read/write over someone's workspace should not sit in
  * plaintext next to them.
  */
 export function getOrCreateMcpToken(): string {
@@ -149,7 +142,7 @@ function hostnameOf(headerValue: string | undefined): string {
 
 /**
  * Defence in depth against DNS rebinding. The bearer token is the primary
- * control, the classic attack targets *unauthenticated* localhost servers, and
+ * control. The classic attack targets *unauthenticated* localhost servers, and
  * a page cannot read a token it was never given, but a page should not get as
  * far as presenting credentials in the first place.
  *
@@ -240,7 +233,7 @@ function summarizeItem(item: Item): Record<string, unknown> {
  * memoryService prepares its statements in initMemoryIpc() at app boot and
  * getMemories() dereferences them without checking, so calling it before that
  * has run throws on an undefined statement. That should never happen in the
- * packaged app, boot order puts memory init first, but a failed init would
+ * packaged app (boot order puts memory init first), but a failed init would
  * otherwise surface to an agent as an opaque crash rather than a usable answer.
  */
 function withMemoryStore(fn: () => { content: { type: 'text'; text: string }[] }): {
@@ -488,7 +481,7 @@ function buildMcpServer(): McpServer {
     'place_on_wall',
     {
       description:
-        "Put something on a wall. 'note' is a sticky note and 'text' a bare label, both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. x and y are where the item is CENTRED, not its top-left corner, so the coordinates that come back are offset by half its size. Both are optional and default to the origin.",
+        "Put something on a wall. 'note' is a sticky note and 'text' a bare label; both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. x and y are where the item is CENTRED, not its top-left corner, so the coordinates that come back are offset by half its size. Both are optional and default to the origin.",
       inputSchema: {
         context,
         wall_id: z.string().optional(),
@@ -745,7 +738,7 @@ function buildMcpServer(): McpServer {
         applied.summary.length > 0
           ? `Board: ${applied.summary.join('; ')}`
           : 'Board configuration changed',
-        // Cards moved off a deleted column are not restored by the inverse, the
+        // Cards moved off a deleted column are not restored by the inverse. The
         // column comes back, but which cards sat in it is not recoverable from
         // the config alone, so undo is only offered when nothing moved.
         applied.inverse.length > 0 && movedCards === 0
@@ -758,7 +751,7 @@ function buildMcpServer(): McpServer {
         skipped: unusable > 0
           ? [
               ...applied.skipped,
-              `${unusable} operation${unusable === 1 ? '' : 's'} could not be read, check the fields that op requires.`
+              `${unusable} operation${unusable === 1 ? '' : 's'} could not be read. Check the fields that op requires.`
             ]
           : applied.skipped,
         movedCards,
@@ -846,7 +839,7 @@ function buildMcpServer(): McpServer {
 
   mcp.registerTool(
     'list_views',
-    { description: 'List saved task views, named filters like "Overdue" or "High priority".' },
+    { description: 'List saved task views. Named filters like "Overdue" or "High priority".' },
     async () => {
       const stored = getSetting<unknown>('saved_views', null)
       const views = [...BUILT_IN_VIEWS, ...normalizeSavedViews(stored)]
@@ -978,7 +971,7 @@ function buildMcpServer(): McpServer {
     {
       description:
         'Create a markdown note, or replace the whole content of an existing one. ' +
-        'Writing to a title that already exists overwrites it, read_note first if the current content matters.',
+        'Writing to a title that already exists overwrites it. Read_note first if the current content matters.',
       inputSchema: {
         title: z.string(),
         content: z.string(),
@@ -1218,7 +1211,7 @@ function buildMcpServer(): McpServer {
     {
       description:
         'Archive an item, removing it from the board while keeping it recoverable. ' +
-        'This is the safe alternative to deletion, nothing is destroyed.',
+        'This is the safe alternative to deletion. Nothing is destroyed.',
       inputSchema: { id: z.string() }
     },
     async ({ id }) => {

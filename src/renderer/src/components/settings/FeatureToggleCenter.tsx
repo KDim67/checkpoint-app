@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid } from 'lucide-react'
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
-import { VIEW_FEATURES, setViewFeature } from '../../lib/features'
+import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature } from '../../lib/features'
 import { getBoolSetting } from '../../lib/settings'
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
 
@@ -186,8 +186,8 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
 
 /**
  * Copy is written by hand, so a view can be added to VIEW_FEATURES without one.
- * That used to read `undefined.key` and crash the whole Settings screen, 
- * losing every other toggle because one description was missing. A view with no
+ * That used to read `undefined.key` and crash the whole Settings screen.
+ * Losing every other toggle because one description was missing. A view with no
  * copy now renders with its own label instead.
  */
 const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = VIEW_FEATURES.map(feature => {
@@ -208,7 +208,75 @@ const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = VIEW_FEATURES.map(feature => {
   }
 })
 
-const TOGGLE_CONFIGS = [...BACKGROUND_CONFIGS, ...SIDEBAR_VIEW_CONFIGS]
+/**
+ * The assistant and everything that reaches it. Its own section because it is
+ * not one view and not a background server: it cuts across the panel, the
+ * Cookbook, the card and task buttons, Ask AI, and AI Standup.
+ */
+const AI_CONFIG: ToggleConfig = {
+  key: AI_FEATURE_KEY,
+  icon: <Sparkles size={16} />,
+  title: 'AI Assistant',
+  description: 'The assistant panel and every entry point into it: the Cookbook, AI Standup, AI Assist on a card, and Ask AI on a cheatsheet.',
+  warning: 'Disabled. No model is contacted and no AI controls are shown. Saved chats, memories and provider keys are kept.',
+  getState: () => readAiEnabled(),
+  toggle: (active: boolean) => setAiEnabled(active)
+}
+
+const TOGGLE_CONFIGS = [AI_CONFIG, ...BACKGROUND_CONFIGS, ...SIDEBAR_VIEW_CONFIGS]
+
+/** One toggle and its copy. Extracted because both sections drew it verbatim. */
+function FeatureRow({ cfg, on, busy, onChange }: {
+  cfg: ToggleConfig
+  on: boolean
+  busy: boolean
+  onChange: (value: boolean) => void
+}): React.JSX.Element {
+  return (
+    <RowBetween>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
+        <span style={{
+          color: on ? 'var(--color-secondary)' : 'var(--color-text-faint)',
+          marginTop: '2px',
+          flexShrink: 0,
+          transition: 'color 150ms ease'
+        }}>
+          {cfg.icon}
+        </span>
+        <div>
+          <div style={{
+            fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--weight-medium)',
+            color: 'var(--color-text-base)'
+          }}>
+            {cfg.title}
+          </div>
+          <div style={{
+            fontSize: 'var(--text-xs)',
+            color: 'var(--color-text-faint)',
+            marginTop: '2px',
+            lineHeight: 1.5
+          }}>
+            {cfg.description}
+          </div>
+          {!on && (
+            <div style={{
+              fontSize: '11px',
+              color: 'var(--color-warning)',
+              marginTop: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              ⚡ {cfg.warning}
+            </div>
+          )}
+        </div>
+      </div>
+      <ToggleSwitch checked={on} onChange={onChange} disabled={busy} label={cfg.title} />
+    </RowBetween>
+  )
+}
 
 export default function FeatureToggleCenter() {
   const [states, setStates] = useState<Record<string, boolean>>({})
@@ -252,6 +320,27 @@ export default function FeatureToggleCenter() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div>
+        <div style={{
+          fontSize: '11px',
+          fontWeight: 'var(--weight-bold)',
+          color: 'var(--color-secondary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          marginBottom: 'var(--space-3)'
+        }}>
+          Assistant
+        </div>
+        <FeatureRow
+          cfg={AI_CONFIG}
+          on={states[AI_CONFIG.key] ?? false}
+          busy={toggling === AI_CONFIG.key}
+          onChange={v => handleToggle(AI_CONFIG, v)}
+        />
+      </div>
+
+      <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: 'var(--space-2) 0' }} />
+
       {/* Background Subsystems Section */}
       <div>
         <div style={{
@@ -268,53 +357,12 @@ export default function FeatureToggleCenter() {
           {BACKGROUND_CONFIGS.map((cfg, i) => (
             <React.Fragment key={cfg.key}>
               {i > 0 && <Divider />}
-              <RowBetween>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
-                  <span style={{
-                    color: states[cfg.key] ? 'var(--color-secondary)' : 'var(--color-text-faint)',
-                    marginTop: '2px',
-                    flexShrink: 0,
-                    transition: 'color 150ms ease'
-                  }}>
-                    {cfg.icon}
-                  </span>
-                  <div>
-                    <div style={{
-                      fontSize: 'var(--text-sm)',
-                      fontWeight: 'var(--weight-medium)',
-                      color: 'var(--color-text-base)'
-                    }}>
-                      {cfg.title}
-                    </div>
-                    <div style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-faint)',
-                      marginTop: '2px',
-                      lineHeight: 1.5
-                    }}>
-                      {cfg.description}
-                    </div>
-                    {!states[cfg.key] && (
-                      <div style={{
-                        fontSize: '11px',
-                        color: 'var(--color-warning)',
-                        marginTop: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        ⚡ {cfg.warning}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <ToggleSwitch
-                  checked={states[cfg.key] ?? false}
-                  onChange={v => handleToggle(cfg, v)}
-                  disabled={toggling === cfg.key}
-                  label={cfg.title}
-                />
-              </RowBetween>
+              <FeatureRow
+                cfg={cfg}
+                on={states[cfg.key] ?? false}
+                busy={toggling === cfg.key}
+                onChange={v => handleToggle(cfg, v)}
+              />
             </React.Fragment>
           ))}
         </div>
@@ -338,53 +386,12 @@ export default function FeatureToggleCenter() {
           {SIDEBAR_VIEW_CONFIGS.map((cfg, i) => (
             <React.Fragment key={cfg.key}>
               {i > 0 && <Divider />}
-              <RowBetween>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
-                  <span style={{
-                    color: states[cfg.key] ? 'var(--color-secondary)' : 'var(--color-text-faint)',
-                    marginTop: '2px',
-                    flexShrink: 0,
-                    transition: 'color 150ms ease'
-                  }}>
-                    {cfg.icon}
-                  </span>
-                  <div>
-                    <div style={{
-                      fontSize: 'var(--text-sm)',
-                      fontWeight: 'var(--weight-medium)',
-                      color: 'var(--color-text-base)'
-                    }}>
-                      {cfg.title}
-                    </div>
-                    <div style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-faint)',
-                      marginTop: '2px',
-                      lineHeight: 1.5
-                    }}>
-                      {cfg.description}
-                    </div>
-                    {!states[cfg.key] && (
-                      <div style={{
-                        fontSize: '11px',
-                        color: 'var(--color-warning)',
-                        marginTop: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        ⚡ {cfg.warning}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <ToggleSwitch
-                  checked={states[cfg.key] ?? false}
-                  onChange={v => handleToggle(cfg, v)}
-                  disabled={toggling === cfg.key}
-                  label={cfg.title}
-                />
-              </RowBetween>
+              <FeatureRow
+                cfg={cfg}
+                on={states[cfg.key] ?? false}
+                busy={toggling === cfg.key}
+                onChange={v => handleToggle(cfg, v)}
+              />
             </React.Fragment>
           ))}
         </div>

@@ -28,17 +28,13 @@ const loadedPlugins = new Map<string, {
 }>()
 
 /**
- * What a plugin is handed on load.
+ * What a plugin is handed on load. Everything routes through the functions the
+ * app itself uses, so a plugin inherits their validation, sync tombstones and
+ * notification policy.
  *
- * Everything routes through the same functions the app itself uses, so a plugin
- * inherits their validation, their sync tombstones and their notification
- * policy rather than reaching past them into the database.
- *
- * The class is named for what it tracks, not for isolation it does not provide:
- * a plugin is required into the main process and can ignore all of this. What it
- * genuinely guarantees is teardown, every subscription made through the API is
- * recorded and undone on unload, which is what makes enable/disable and hot
- * reload work rather than leaking a handler per cycle.
+ * It is named for what it tracks, not for isolation it does not provide: a
+ * plugin runs in main and can ignore all of this. What it does guarantee is
+ * teardown, which is what makes enable/disable and hot reload work.
  */
 class PluginSandbox {
   private ipcHandlers: string[] = []
@@ -156,7 +152,7 @@ export function scanPlugins(activeFilenames: string[]): PluginInfo[] {
 
     try {
       // Read, do not require. This previously executed every file in the folder
-      //, including plugins the user had switched off, just to read three
+      // including plugins the user had switched off, just to read three
       // strings, which made the off switch meaningless.
       const source = readFileSync(join(dir, filename), 'utf8')
       const metadata = parsePluginMetadata(source)

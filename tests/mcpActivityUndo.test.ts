@@ -18,7 +18,7 @@ import { listMcpActivity, recordMcpActivity, undoMcpActivity } from '../src/main
 
 // The real record → list → undo path against a real database, rather than only
 // the normalizer. Undo replays actions against live rows, so the risk worth
-// covering is what those replays actually do, deleting the wrong id, or running
+// covering is what those replays actually do. Deleting the wrong id, or running
 // twice. See tests/db.migrations.test.ts for what the node:sqlite stand-in does
 // and does not cover.
 

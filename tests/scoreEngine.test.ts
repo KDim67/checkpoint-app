@@ -68,7 +68,7 @@ describe('calculateFitResult', () => {
   it('demands 10 percent VRAM headroom before calling a model GPU-native', () => {
     const board = model({ q8: variant('q8', 8, 10) })
 
-    // Exactly the requirement is not enough, the headroom rule needs 11 GB.
+    // Exactly the requirement is not enough. The headroom rule needs 11 GB.
     const justShort = calculateFitResult(specs({ ramGb: 32, vramGb: 10 }), board)
     const justEnough = calculateFitResult(specs({ ramGb: 32, vramGb: 11 }), board)
 

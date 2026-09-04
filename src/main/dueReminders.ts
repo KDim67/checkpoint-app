@@ -1,14 +1,11 @@
 /**
- * Reminders for work that has reached its due date.
+ * Reminders for work that has reached its due date. `due_at` was stored and
+ * displayed from the start with nothing ever firing on it, which made the field
+ * look like a promise the app did not keep.
  *
- * `due_at` has been stored and displayed since the beginning and nothing has
- * ever fired on it, the field looked like a promise the app did not keep. This
- * closes that, using the shared notification layer so it obeys quiet hours and,
- * critically, says each thing once.
- *
- * It runs in main rather than the renderer because the web Notification API only
- * works while a window exists, and a due-date reminder that needs the app
- * focused to fire is not a reminder.
+ * Goes through the shared notification layer, so it obeys quiet hours and says
+ * each thing once. In main, because a reminder needing the app focused to fire
+ * is not a reminder.
  */
 
 import { getDb } from './db'
@@ -38,7 +35,7 @@ interface DueRow {
  * Notifies about everything due. Returns how many reminders fired.
  *
  * The query deliberately excludes finished work and anything overdue by more
- * than a week, on first run after this ships, a database with months of stale
+ * than a week. On first run after this ships, a database with months of stale
  * due dates would otherwise produce a wall of notifications at once.
  */
 export function checkDueItems(now = Date.now()): number {

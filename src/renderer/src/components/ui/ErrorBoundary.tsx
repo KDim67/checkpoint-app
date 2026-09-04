@@ -7,7 +7,7 @@ interface ErrorBoundaryProps {
   label?: string
   /**
    * Changing this clears a caught error. Pass the active view id so navigating
-   * away from a broken view recovers on its own, without it, one bad render
+   * away from a broken view recovers on its own. Without it, one bad render
    * would leave the boundary stuck showing the fallback for the rest of the
    * session even after the user moved somewhere else entirely.
    */

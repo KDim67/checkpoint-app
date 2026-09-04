@@ -1,6 +1,6 @@
 /**
  * Pixel and packing routines behind the Game Dev tools. Pure functions over
- * raw pixel buffers, extracted from GameDevView so the view holds UI rather
+ * raw pixel buffers. Extracted from GameDevView so the view holds UI rather
  * than image maths, and so they can be exercised without mounting a canvas.
  */
 
@@ -49,7 +49,7 @@ export interface PbrParams {
 
 /**
  * Computes Height, Normal, Roughness and Ambient Occlusion map data from a source
- * RGBA pixel buffer using a Sobel-filter approach. Pure function, no canvas or DOM
+ * RGBA pixel buffer using a Sobel-filter approach. Pure function. No canvas or DOM
  * dependencies, so it is safe to call from both the live-preview path and the
  * full-resolution export path without duplicating the loop.
  */
@@ -113,7 +113,7 @@ export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, par
 }
 
 // Pixel-art scaling cores (EPX / AdvMAME family)
-// Pure functions over raw RGBA buffers, shared by the live preview and the
+// Pure functions over raw RGBA buffers. Shared by the live preview and the
 // export path, and composable (Scale4x = Scale2x applied twice).
 
 /** Read a pixel as a packed 32-bit RGBA value with clamped border reads. */
@@ -256,15 +256,12 @@ export function buildLutData(params: LutParams) {
 /**
  * The dominant colours of an image, most common first.
  *
- * Colours are bucketed by their top four bits per channel before counting.
- * Counting exact RGB values would return sixteen imperceptibly different
- * browns from a photograph and call them a palette; bucketing groups shades
- * that read as one colour, then each bucket reports the average of what landed
- * in it so the result is a real colour from the image rather than the corner of
- * its bucket.
+ * Bucketed by the top four bits per channel: counting exact RGB would return
+ * sixteen identical-looking browns and call it a palette. Each bucket reports
+ * the average of what landed in it, so the result is a colour from the image
+ * rather than the corner of a bucket.
  *
- * Nearly transparent pixels are skipped, the background of a cut-out sprite is
- * not one of its colours.
+ * Nearly transparent pixels are skipped: a cut-out's background is not a colour.
  */
 export function extractPalette(src: Uint8ClampedArray, count = 6): string[] {
   const buckets = new Map<number, { n: number; r: number; g: number; b: number }>()

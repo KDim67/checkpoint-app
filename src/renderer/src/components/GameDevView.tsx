@@ -86,7 +86,7 @@ export default function GameDevView() {
           Game Development Workspace
         </h2>
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-          Texture authoring, sprite pipeline and narrative tools, all processing runs locally.
+          Texture authoring, sprite pipeline and narrative tools. All processing runs locally.
         </p>
       </div>
 

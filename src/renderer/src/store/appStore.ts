@@ -145,7 +145,7 @@ export const useAppStore = create<AppState>()(
         state.activeView = view
       })
       // Remembered so "Start on: Last used" can restore it next launch.
-      // Settings is deliberately not recorded, nobody wants to boot into it.
+      // Settings is deliberately not recorded. Nobody wants to boot into it.
       if (view !== 'settings') {
         window.electronAPI.db.setSetting('last_active_view', view).catch(err => {
           console.error('Failed to save last_active_view setting:', err)

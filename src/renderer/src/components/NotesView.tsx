@@ -35,7 +35,7 @@ export default function NotesView(): React.JSX.Element {
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState<string | null>(null)
   const [pins, setPins] = useState<string[]>(prefs.getPins())
   // The graph has always existed, but only as a 220px thumbnail in the info
-  // panel, too small to trace a link through, which is the point of having one.
+  // panel. Too small to trace a link through, which is the point of having one.
   // This opens the same component at a size you can actually read.
   const [graphExpanded, setGraphExpanded] = useState(false)
   const [sort, setSort] = useState<SortKey>(prefs.getSort())
@@ -434,7 +434,7 @@ export default function NotesView(): React.JSX.Element {
             </div>
 
             <div style={{ flex: 1, minHeight: 0 }}>
-              {/* The same component, it sizes to its container, so the physics
+              {/* The same component. It sizes to its container, so the physics
                   and the click-to-open behaviour are identical at both sizes. */}
               <GraphView
                 notes={notes}

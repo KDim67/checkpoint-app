@@ -3,6 +3,7 @@ import { Plus, Search, FileText, Trash2, Edit3, UploadCloud, X, BookOpen, Extern
 import { useToast } from './ui/Toast'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { useAppStore } from '../store/appStore'
+import { useAiEnabled } from '../lib/useAiEnabled'
 import { errorMessage } from '../../../shared/errors'
 
 interface CheatsheetFile {
@@ -30,6 +31,7 @@ const SORT_LABELS: Record<SortMode, { label: string; icon: React.ReactNode }> = 
 export default function CheatsheetsView() {
   const { toast } = useToast()
   const setRightPanelContent = useAppStore(s => s.setRightPanelContent)
+  const aiEnabled = useAiEnabled()
 
   const [cheatsheets, setCheatsheets] = useState<CheatsheetFile[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -84,7 +86,7 @@ export default function CheatsheetsView() {
       try {
         const parsed = JSON.parse(raw)
         if (Array.isArray(parsed)) setPinned(parsed.filter(p => typeof p === 'string'))
-      } catch { /* corrupt setting, ignore */ }
+      } catch { /* corrupt setting. Ignore */ }
     }).catch(() => {})
   }, [loadCheatsheets])
 
@@ -207,7 +209,7 @@ export default function CheatsheetsView() {
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('checkpoint-ai-attach-cheatsheet', { detail: { name: sheetName } }))
     }, 150)
-    toast(`Attached "${sheetName.replace(/\.pdf$/i, '')}", ask away!`, { type: 'success' })
+    toast(`Attached "${sheetName.replace(/\.pdf$/i, '')}": ask away!`, { type: 'success' })
   }
 
   // Open a content-search hit: select the sheet in TEXT mode with the query
@@ -281,7 +283,7 @@ export default function CheatsheetsView() {
 
     for (const pdf of pdfs) {
       try {
-        // Electron ≥32: File.path no longer exists, resolve via preload webUtils
+        // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
         const filePath = window.electronAPI.app.getPathForFile(pdf)
         if (filePath) {
           await window.electronAPI.cheatsheets.add(filePath)
@@ -923,16 +925,16 @@ export default function CheatsheetsView() {
                     className={`viewer-toolbar-btn ${viewMode === 'text' ? 'mode-active' : ''}`}
                     style={{ border: 'none' }}
                     onClick={() => setViewMode('text')}
-                    title="Extracted text, searchable and copyable"
+                    title="Extracted text. Searchable and copyable"
                   >
                     <FileType2 size={12} /> Text
                   </button>
                 </div>
 
-                <button className="viewer-toolbar-btn primary" onClick={() => handleAskAi(selectedPdf.name)} title="Attach to the AI Assistant and ask questions about it">
+                {aiEnabled && <button className="viewer-toolbar-btn primary" onClick={() => handleAskAi(selectedPdf.name)} title="Attach to the AI Assistant and ask questions about it">
                   <Sparkles size={12} />
                   Ask AI
-                </button>
+                </button>}
 
                 <button className="viewer-toolbar-btn" onClick={handleOpenExternal}>
                   <ExternalLink size={12} />

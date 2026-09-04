@@ -116,7 +116,7 @@ export function startAiStream(
         model: params.model,
         // AiChatMessage permits multimodal parts on any role for simplicity;
         // in practice only user messages carry image parts, which matches the
-        // OpenAI wire format, hence the narrowing cast.
+        // OpenAI wire format. Hence the narrowing cast.
         messages: params.messages as OpenAI.Chat.ChatCompletionMessageParam[],
         stream: true,
         // Ask for real token counts. Endpoints that do not know the option
@@ -189,14 +189,12 @@ export function startAiStream(
 }
 
 /**
- * Non-streaming completion for background/internal tasks (e.g. memory consolidation,
- * summarization) that need a single text result rather than a live stream.
+ * Non-streaming completion for background work (memory consolidation,
+ * summarisation) that wants one text result rather than a stream.
  *
- * IMPORTANT: this, like startAiStream, must run in the MAIN process. The OpenAI SDK
- * refuses to construct a client inside a browser-like context (Electron's renderer
- * counts as one: window/document/navigator are all present there), and the renderer
- * is also where a user-supplied cloud API key would otherwise be exposed. Keeping every
- * model call here, behind IPC, is what makes it safe to add more background AI features.
+ * Must run in MAIN, like startAiStream: the OpenAI SDK refuses to construct a
+ * client in a browser-like context, and the renderer is where a cloud API key
+ * would be exposed.
  */
 export async function runCompletion(params: {
   model: string

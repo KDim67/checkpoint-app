@@ -23,11 +23,9 @@ const FORMULA_LEADERS = ['=', '+', '-', '@', '\t', '\r']
 /**
  * Escapes one CSV field per RFC 4180, and defuses spreadsheet formulas.
  *
- * The formula guard matters more here than in most exports: cards can be written
- * by webhooks and by external agents over MCP, so a title is not necessarily
- * something the user typed. A field opening with `=` would otherwise execute on
- * open in Excel. The leading apostrophe is visible in the cell, which is the
- * accepted trade for not running arbitrary formulas.
+ * Cards can be written by webhooks and by agents over MCP, so a title is not
+ * necessarily something the user typed, and a field opening with `=` would run
+ * on open in Excel. The visible leading apostrophe is the accepted trade.
  */
 export function escapeCsvField(value: unknown): string {
   let text = value === null || value === undefined ? '' : String(value)

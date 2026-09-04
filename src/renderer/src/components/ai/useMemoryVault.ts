@@ -1,19 +1,12 @@
 /**
- * The assistant's memory vault: its state, its loader, and its CRUD.
+ * The memory vault's state, loader and CRUD. Same pattern as GameDevView: a
+ * hook called unconditionally, paired with a panel taking its return as a prop.
  *
- * Follows the pattern GameDevView uses, a hook called unconditionally from the
- * parent, paired with a panel that takes the hook's return as one prop. The
- * state cannot live inside the modal: the modal renders as
- * `{showMemoryPanel && (…)}` and so unmounts every time it is closed, and the
- * chat stream writes to this state while the modal is shut.
+ * The state cannot live in the modal, which unmounts whenever it is closed
+ * while the chat stream keeps writing to it. That is also why the setters are
+ * returned: consolidation runs after each AI turn and reaches back in here.
  *
- * That last part is why the setters are returned rather than kept private.
- * Memory consolidation runs after each AI turn, it flips `memoryConsolidating`
- * and refreshes `memories`, but only when the vault happens to be open, so it
- * stays in the panel next to the stream and reaches back in through here.
- *
- * Names are deliberately unchanged from when this lived inline, so the move is
- * verifiable by inspection rather than by trusting a rename.
+ * Names are unchanged from when this was inline, so the move is verifiable.
  */
 
 import { useEffect, useState } from 'react'

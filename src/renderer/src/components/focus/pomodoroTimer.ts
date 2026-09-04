@@ -1,6 +1,6 @@
 export type TimerPreset = 'focus' | 'short-break' | 'long-break'
 
-/** What the setup screen can have selected, a preset, or a hand-typed length. */
+/** What the setup screen can have selected. A preset, or a hand-typed length. */
 export type TimerMode = TimerPreset | 'custom'
 
 /**

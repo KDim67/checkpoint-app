@@ -244,7 +244,7 @@ export class SyncService {
     const item_tags = db.prepare('SELECT * FROM item_tags').all() as SyncPayload['item_tags']
     const relations = db.prepare('SELECT * FROM relations').all() as SyncPayload['relations']
     
-    // Drops credentials and anything that describes this machine, see shared/syncSettings.
+    // Drops credentials and anything that describes this machine. See shared/syncSettings.
     const rawSettings = db.prepare('SELECT * FROM app_settings').all() as { key: string, value: string }[]
     const app_settings = filterSyncableSettings(rawSettings)
     

@@ -2,7 +2,7 @@
  * How Checkpoint behaves around the system tray and at login.
  *
  * Kept pure and shared so the settings panel, the tray itself and the window's
- * close handler all read the same shape, three places that each have their own
+ * close handler all read the same shape. Three places that each have their own
  * idea of "minimise to tray" is how an app ends up quitting when you asked it to
  * hide.
  */

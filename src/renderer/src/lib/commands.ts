@@ -1,13 +1,9 @@
 /**
- * What the command palette can do.
+ * What the command palette can do. One authored list, not a registry views push
+ * into: views unmount as you navigate, so a push-based registry would only hold
+ * commands for wherever you already are.
  *
- * One authored list rather than a registry the views push into. Views mount and
- * unmount as you navigate, so a push-based registry would only ever contain the
- * commands for wherever you already are, precisely the commands you least need
- * a palette to reach. Everything here is driven through the store or the IPC
- * bridge, both of which are available whatever is on screen.
- *
- * Order is meaningful: `rankCommands` preserves it for an empty query, so the
+ * Order is meaningful. `rankCommands` keeps it for an empty query, so the
  * palette opens on navigation rather than on whatever sorts first.
  */
 
@@ -16,7 +12,7 @@ import type { ActiveView, SettingsTab } from '../store/appStore'
 import type { SavedView } from '../../../shared/savedViews'
 
 export interface Command extends CommandLike {
-  /** Shown on the right of the row, a shortcut hint or the current value. */
+  /** Shown on the right of the row. A shortcut hint or the current value. */
   hint?: string
   run: () => void | Promise<void>
 }
@@ -33,6 +29,8 @@ export interface CommandContext {
   activeContext: string
   /** Views the user has switched off are not offered. */
   enabledViews: Partial<Record<ActiveView, boolean>>
+  /** With AI off, the assistant panel and its settings tab are not commands. */
+  aiEnabled: boolean
   /** Saved filters, offered as commands so a view is one keystroke away. */
   savedViews: SavedView[]
   applyView: (id: string) => void
@@ -109,14 +107,17 @@ export function buildCommands(ctx: CommandContext): Command[] {
     })
   }
 
-  commands.push(
-    {
+  if (ctx.aiEnabled) {
+    commands.push({
       id: 'panel:ai',
       label: 'Toggle AI Assistant',
       group: 'Panels',
       keywords: ['chat', 'assistant'],
       run: () => ctx.toggleRightPanel('ai-chat')
-    },
+    })
+  }
+
+  commands.push(
     {
       id: 'panel:git',
       label: 'Toggle Git Panel',
@@ -147,6 +148,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
   )
 
   for (const { tab, label, keywords } of SETTINGS_TABS) {
+    if (tab === 'ai' && !ctx.aiEnabled) continue
     commands.push({
       id: `settings:${tab}`,
       label: `Settings: ${label}`,
@@ -160,7 +162,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
   }
 
   // Also offered from Settings → About, but that is the last tab of a settings
-  // screen, nobody looking for the tour finds it there. The palette is where
+  // screen. Nobody looking for the tour finds it there. The palette is where
   // someone actually asks for something by name.
   commands.push({
     id: 'help:tour',

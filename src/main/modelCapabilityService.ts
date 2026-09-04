@@ -25,7 +25,7 @@ const CACHE_SETTING_KEY = 'ai_model_capabilities'
 
 /**
  * Fallbacks from a failed probe are held here for the session only. Persisting
- * them would let one blip, Ollama not up yet at launch, freeze a guessed
+ * them would let one blip (Ollama not up yet at launch) freeze a guessed
  * profile forever, while re-probing on every message would pay the timeout
  * repeatedly against an endpoint that is genuinely down.
  */

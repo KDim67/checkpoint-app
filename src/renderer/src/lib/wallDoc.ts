@@ -1,13 +1,10 @@
 /**
- * Reading and writing a workspace's walls.
+ * Reading and writing a workspace's walls. Mirrors `lib/boardConfig.ts`. Pure
+ * model there, IPC here. Writes are debounced: a drag changes position every
+ * frame.
  *
- * Mirrors `lib/boardConfig.ts`: the model is shared and pure, this half is the
- * IPC-backed load and save. Writes are debounced because dragging a sticky note
- * produces a position change on every animation frame, and persisting each one
- * would be thousands of database writes for a single gesture.
- *
- * Everything here takes a storage key rather than a workspace, because a
- * workspace now has several walls and the caller is the one that knows which.
+ * Takes a storage key, not a workspace: a workspace has several walls now and
+ * the caller knows which.
  */
 
 import {
@@ -23,8 +20,7 @@ export async function loadWallDoc(key: string): Promise<WallDoc> {
     const stored = await window.electronAPI.db.getSetting(key)
     return normalizeWallDoc(stored)
   } catch (err) {
-    // An unreadable wall yields an empty one rather than a broken view; the
-    // stored value is left alone so nothing is destroyed by a bad read.
+    // Empty wall beats a broken view. The stored value is left alone.
     console.error('[wall] could not load:', err)
     return normalizeWallDoc(null)
   }
@@ -41,8 +37,8 @@ export function saveWallDoc(key: string, doc: WallDoc): void {
     key,
     setTimeout(() => {
       timers.delete(key)
-      // Passed as an object: setSetting serialises once, and double-encoding is
-      // the bug the board's own persistence layer had to be rescued from.
+      // An object, not a string: setSetting serialises, and double-encoding bit
+      // the board's persistence once already.
       window.electronAPI.db
         .setSetting(key, normalizeWallDoc(doc))
         .catch(err => console.error('[wall] could not save:', err))
@@ -64,10 +60,7 @@ export async function flushWallDoc(key: string, doc: WallDoc): Promise<void> {
   }
 }
 
-/**
- * Drops a wall's document. The pending write is cancelled first, or a debounced
- * save from the last edit would land after the delete and resurrect it.
- */
+/** Cancels the pending write first, or a debounced save resurrects the wall. */
 export async function deleteWallDoc(key: string): Promise<void> {
   const existing = timers.get(key)
   if (existing) {
@@ -91,9 +84,8 @@ export async function loadWallIndex(context: string): Promise<WallIndex> {
 }
 
 /**
- * Written straight through rather than debounced: the index changes only when
- * a wall is created, renamed, deleted or switched to, and losing any of those
- * to a crash would strand a wall's contents.
+ * Not debounced: the index only changes on create/rename/delete/switch, and
+ * losing one of those to a crash strands a wall's contents.
  */
 export async function saveWallIndex(context: string, index: WallIndex): Promise<void> {
   try {

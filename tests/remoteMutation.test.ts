@@ -8,9 +8,8 @@ import {
 import { normalizeRemoteMutation } from '../src/shared/collabProtocol'
 import type { Item } from '../src/shared/types'
 
-// A peer's mutation, applied to a real database. The normalizer decides what is
-// allowed through; this decides what actually lands in the rows, which is the
-// half a pure test cannot reach.
+// A peer's mutation against a real database. What actually lands in the rows,
+// which a pure test cannot reach.
 
 let dir: string
 

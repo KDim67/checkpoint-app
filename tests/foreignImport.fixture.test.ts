@@ -42,7 +42,7 @@ describe('a whole Trello export', () => {
   })
 
   it('keeps every card, including the archived and the orphaned one', () => {
-    // Ten cards in, ten cards out, nothing silently lost in migration.
+    // Ten cards in, ten cards out. Nothing silently lost in migration.
     expect(parsed.cards).toHaveLength(10)
   })
 

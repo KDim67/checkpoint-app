@@ -1,13 +1,10 @@
 /**
  * The assistant panel's pure logic: token estimation, history pruning, intent
- * classification, skill detection and response parsing.
+ * classification, skill detection, response parsing.
  *
- * Split out of AiStreamPanel.tsx, where it sat above a 3,600-line component and
- * could not be tested without rendering one. Nothing here touches React, the
- * DOM or IPC, every function is input in, value out, which is what makes the
- * regex-heavy parts (classifyIntent especially) worth pinning down in tests.
- *
- * Moved verbatim. Behaviour is unchanged by construction.
+ * Split out of a 3,600-line component so the regex-heavy parts (classifyIntent
+ * especially) can be tested. Nothing here touches React, the DOM or IPC.
+ * Moved verbatim, so behaviour is unchanged by construction.
  */
 
 import { detectVisionFromName } from '../../../../shared/modelCapabilities'
@@ -60,7 +57,7 @@ export function parseThinkingAndContent(text: string) {
   return { thinking, content }
 }
 
-// Rough, fast token estimate, no tokenizer dependency.
+// Rough, fast token estimate. No tokenizer dependency.
 //
 // A flat 4 chars/token holds for Latin prose but understates CJK badly: those
 // codepoints cost roughly a token each, so a Chinese conversation was reported
@@ -103,14 +100,14 @@ export function pruneHistory(history: Message[], maxHistoryTokens: number): Mess
   return pruned
 }
 
-// Semantic intent classifier, replaces the fragile keyword-heuristic approach.
+// Semantic intent classifier. Replaces the fragile keyword-heuristic approach.
 // Returns what action type the model should take, factoring in the active skill.
 // Defaults to 'converse' to prevent hallucination when intent is ambiguous.
 export function classifyIntent(text: string, activeSkillId: string | null): IntentType {
   const lower = text.toLowerCase().trim()
 
   // Board CONFIGURATION signals (columns, background, swimlanes, card fields).
-  // Checked before card editing because the two share verbs, "set", "change",
+  // Checked before card editing because the two share verbs. "Set", "change",
   // "rename", and only the noun distinguishes "rename the card" from "rename
   // the column". The column/board nouns are therefore required here.
   if (
@@ -124,7 +121,7 @@ export function classifyIntent(text: string, activeSkillId: string | null): Inte
     /\bcards?\b[\s\S]{0,20}\b(fields?|face)\b/.test(lower)
   ) return 'configure_board'
 
-  // Board EDITING signals (existing cards), checked before creation so
+  // Board EDITING signals (existing cards). Checked before creation so
   // "move X to done" never reads as a create request. High-precision patterns.
   if (
     /\b(move|put|shift|transfer)\b[\s\S]{0,60}\b(to|into|in)\b[\s\S]{0,40}\b(column|done|progress|review|backlog|lane|stage)\b/.test(lower) ||
@@ -167,7 +164,7 @@ export function classifyIntent(text: string, activeSkillId: string | null): Inte
   return 'converse'
 }
 
-// Automatic skill recall, infers which specialized skill best fits the message
+// Automatic skill recall. Infers which specialized skill best fits the message
 // so the user never has to manually pick one (they still can, to pin it).
 export function detectSkill(text: string): string | null {
   const t = (text || '').toLowerCase()

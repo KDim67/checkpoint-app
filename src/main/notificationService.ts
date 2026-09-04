@@ -1,15 +1,9 @@
 /**
- * The one place a notification is raised.
+ * The one place a notification is raised. Everything goes through `notify`,
+ * which applies the user's policy and remembers what it has already said.
  *
- * Before this, three call sites each did their own thing through two different
- * APIs, Electron's Notification in main, the web one in the renderer, with no
- * setting to turn any of them off. Everything now goes through `notify`, which
- * applies the user's policy and remembers what it has already said.
- *
- * The dedupe memory is **persisted**, not held in a variable. Checkpoint is
- * restarted most days, and an in-memory map would re-announce every overdue task
- * on every launch, which is precisely the behaviour that makes people turn
- * notifications off.
+ * The dedupe memory is persisted, not a variable: the app restarts most days,
+ * and an in-memory map re-announces every overdue task on every launch.
  */
 
 import { Notification, BrowserWindow, nativeImage } from 'electron'
@@ -33,7 +27,7 @@ export const POLICY_SETTING_KEY = 'notification_policy'
  * unpackaged run would otherwise show no logo at all. PNG rather than the .ico,
  * which Windows toasts render inconsistently.
  *
- * Resolved once, the file does not change while the app is running, and reading
+ * Resolved once. The file does not change while the app is running, and reading
  * it per notification would be work for nothing.
  */
 const NOTIFICATION_ICON = nativeImage.createFromPath(

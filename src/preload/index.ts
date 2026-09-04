@@ -53,7 +53,7 @@ interface SyncFileEntry {
 }
 
 /**
- * Secure IPC bridge, exposes a typed API surface to the renderer.
+ * Secure IPC bridge. Exposes a typed API surface to the renderer.
  *
  * CRITICAL PATTERN: Every ipcRenderer.on() subscription MUST return an
  * explicit cleanup/unsubscribe function. React components call this in their
@@ -84,7 +84,7 @@ const api = {
       ipcRenderer.invoke(IpcChannels.APP_SAVE_BINARY_FILE, defaultName, data, extension),
     showItemInFolder: (filePath: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, filePath),
-    // Electron ≥32 removed File.path from renderer File objects, this is the
+    // Electron ≥32 removed File.path from renderer File objects. This is the
     // only sanctioned way to resolve the absolute path of a dropped file.
     getPathForFile: (file: File): string => {
       try {
@@ -310,7 +310,7 @@ const api = {
     listModels: (): Promise<{ ok: boolean; models: string[]; error?: string }> =>
       ipcRenderer.invoke(IpcChannels.AI_LIST_MODELS),
 
-    // Returns an unsubscribe function, MUST be called on component unmount
+    // Returns an unsubscribe function. MUST be called on component unmount
     onChunk: (callback: (chunk: string, streamId?: string) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, chunk: string, streamId?: string) => callback(chunk, streamId)
       ipcRenderer.on(IpcChannels.AI_CHUNK, handler)
@@ -509,7 +509,7 @@ const api = {
       byTitle: Array<{ windowTitle: string; processName: string; durationMs: number }>
     }> => {
       // The TRACKER_GET_STATS handler wraps its result in handleSafe's
-      // { success, data } envelope, unwrap it here so callers get the stats
+      // { success, data } envelope. Unwrap it here so callers get the stats
       // object directly (matching the db.* methods and this return type).
       const res = await ipcRenderer.invoke(IpcChannels.TRACKER_GET_STATS, context, start, end)
       if (!res.success) throw new Error(res.error)
@@ -828,6 +828,6 @@ contextBridge.exposeInMainWorld('electronAPI', api)
 /**
  * The renderer's view of the bridge is derived from the bridge itself, so the
  * two can never disagree. Adding a method here is all it takes for the
- * renderer to see it, there is no second declaration to keep in sync.
+ * renderer to see it. There is no second declaration to keep in sync.
  */
 export type ElectronAPI = typeof api

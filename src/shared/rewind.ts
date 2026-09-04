@@ -1,20 +1,13 @@
 /**
- * Reconstructing what you were doing the last time you worked on something.
+ * Reconstructs what you were doing last time you worked on something. The app
+ * already records focus sessions, windows, clipboard, commits and board moves
+ * separately. This is the join.
  *
- * Checkpoint already records five things separately and joins none of them:
- * which tasks a focus session covered, which windows were open and for how
- * long, what was copied, what was committed, and how a card moved. Each is
- * timestamped and sits in the same local database. This is the join.
+ * It is inference, not fact: window activity is per workspace, never per card.
+ * So everything is scoped to a sitting. A span anchored by focus sessions that
+ * named the card, and never claims more than that.
  *
- * **Attribution here is inference, not fact.** Window activity is recorded per
- * workspace, never per card, the honest link is "you had this card selected in
- * a focus session, and here is what else happened during it". Everything below
- * is therefore scoped to a *sitting*: a span of time anchored by focus sessions
- * that named the card. Presenting it as anything more certain would be worse
- * than presenting nothing, because a confident wrong answer costs more to
- * unpick than a blank panel.
- *
- * Pure. No IPC, no dates beyond arithmetic on numbers the caller supplies.
+ * Pure: no IPC, no dates beyond arithmetic on what the caller passes in.
  */
 
 import type { ClipboardItem, FocusSession, GitCommit, Item } from './types'
@@ -48,7 +41,7 @@ export const SITTING_GAP_MS = 90 * 60 * 1000 // 90 minutes
 export interface RewindInput {
   item: Pick<Item, 'id' | 'title' | 'status' | 'updated_at' | 'metadata'>
   sessions: FocusSession[]
-  /** Already narrowed to the sitting by the caller, the tracker query is ranged. */
+  /** Already narrowed to the sitting by the caller. The tracker query is ranged. */
   windows: { windowTitle: string; processName: string; durationMs: number }[]
   clipboard: ClipboardItem[]
   commits: GitCommit[]
@@ -127,11 +120,9 @@ export function sessionsForItem(sessions: FocusSession[], itemId: string): Focus
 }
 
 /**
- * Groups sessions into sittings.
- *
- * `completed_at` is when a session *ended*, so a session's span runs backwards
- * from it by its own duration, otherwise a 50-minute session looks like an
- * instant, and the window activity during it falls outside the span entirely.
+ * `completed_at` is when a session ended, so its span runs backwards by its own
+ * duration. Otherwise a 50-minute session looks instant and the window
+ * activity during it falls outside.
  */
 export function clusterSittings(sessions: FocusSession[], gapMs = SITTING_GAP_MS): Sitting[] {
   const ordered = [...sessions].sort((a, b) => a.completed_at - b.completed_at)
@@ -228,13 +219,7 @@ export function daysBetween(from: number, to: number): number {
   return Math.max(0, Math.floor((to - from) / 86_400_000))
 }
 
-/**
- * Observations drawn from the evidence.
- *
- * Every one is phrased as something that happened, not as a diagnosis. The
- * point is to hand back a fact the user had forgotten, and let them draw the
- * conclusion.
- */
+/** Phrased as what happened, not as a diagnosis. The user draws the conclusion. */
 export function detectSignals(
   input: RewindInput,
   sitting: Sitting,
@@ -335,7 +320,7 @@ export function buildRewind(input: RewindInput, gapMs = SITTING_GAP_MS): Rewind 
   }
 }
 
-/** "1h 45m", "22m", "40s", the shortest form that is still accurate. */
+/** "1h 45m", "22m", "40s". The shortest form that is still accurate. */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return '0s'
   const totalMinutes = Math.floor(ms / 60000)

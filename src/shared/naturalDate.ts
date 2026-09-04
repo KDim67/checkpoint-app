@@ -1,18 +1,13 @@
 /**
- * Dates written the way people type them.
+ * Dates written the way people type them. Quick capture already handled
+ * `- task`, `#tag`, `@context` and `!priority`; the due date was the one thing
+ * left to set by hand, which defeats a capture bar.
  *
- * Quick capture already understood `- task`, `#tag`, `@context` and `!priority`;
- * a due date was the one thing you still had to go and set by hand afterwards,
- * which defeats the point of a capture bar.
+ * A small, predictable grammar rather than a date library. Everything it knows
+ * is in RECOGNISED below: matching more than the user expects silently dates
+ * things that were never meant to be dated.
  *
- * Deliberately a small, predictable grammar rather than a general date library.
- * Everything it recognises is listed in RECOGNISED below and can be explained in
- * one line, a parser that quietly matches more than the user expects is worse
- * than one that matches less, because it silently dates things that were not
- * meant to be dated.
- *
- * All arithmetic is local time, for the same reason the recurrence rules are:
- * "tomorrow 3pm" means 3pm where the person typing it is sitting.
+ * Local time, like the recurrence rules. "Tomorrow 3pm" means 3pm where they are.
  */
 
 export interface ParsedDate {
@@ -157,7 +152,7 @@ const tidy = (text: string): string => text.replace(/\s{2,}/g, ' ').trim()
 /**
  * Pulls a due date out of free text.
  *
- * A time on its own is accepted and taken to mean today, "review notes at 4pm"
+ * A time on its own is accepted and taken to mean today. "Review notes at 4pm"
  * is a complete thought. If that moment has already passed, it rolls to
  * tomorrow, because nobody sets a reminder for the past.
  */

@@ -4,7 +4,7 @@
  * Nothing under test calls into Electron; the imports exist only because
  * src/main modules sit next to IPC registration in the same files. These
  * members are the ones reached at import time or by `registerDbHandlers`,
- * and they record nothing, a test that genuinely needed Electron behaviour
+ * and they record nothing. A test that genuinely needed Electron behaviour
  * would be testing the wrong layer.
  */
 

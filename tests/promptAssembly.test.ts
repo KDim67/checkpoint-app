@@ -142,7 +142,7 @@ describe('buildWorkspaceIndex', () => {
   it('caps the listing for the model tier but still reports the real total', () => {
     const text = buildWorkspaceIndex('C:/proj', files, 1)
     expect(text).not.toContain('docs/')
-    // The count is of everything indexed, not of what fitted, otherwise the
+    // The count is of everything indexed, not of what fitted. Otherwise the
     // model is told the project is smaller than it is.
     expect(text).toContain('Total files: 4')
   })

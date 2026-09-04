@@ -46,7 +46,7 @@ function Badge({ children, color }: { children: React.ReactNode; color?: string 
 /**
  * Shows what the assistant believes the selected model can do, and where that
  * belief came from. Previously all of this was guessed silently from the model
- * name, so a wrong guess was invisible, "name" or "default" as the source is
+ * name, so a wrong guess was invisible. "Name" or "default" as the source is
  * the cue to hit refresh or correct the endpoint.
  */
 export default function ModelCapabilityBar({
@@ -61,8 +61,8 @@ export default function ModelCapabilityBar({
   const sourceLabel =
     caps.source === 'endpoint' ? 'reported by the endpoint'
     : caps.source === 'curated' ? 'from the built-in table for this model family'
-    : caps.source === 'name' ? 'inferred from the model name, may be wrong'
-    : 'fallback defaults, the endpoint did not answer'
+    : caps.source === 'name' ? 'inferred from the model name. May be wrong'
+    : 'fallback defaults, because the endpoint did not answer'
 
   return (
     <div className="row" style={{ gap: 'var(--space-1)', flexWrap: 'wrap' }}>

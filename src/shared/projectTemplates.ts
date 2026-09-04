@@ -1,17 +1,10 @@
 /**
- * Starting points for a new workspace.
+ * Starting points for a new workspace: columns, their WIP limits and
+ * definitions of done, and the first cards worth having.
  *
- * Cards and notes already have templates; a project did not, so every new
- * workspace opened onto the same four generic columns and an empty board. A
- * project template describes the whole starting shape, the columns, their WIP
- * limits and definitions of done, and the first cards worth having, so the
- * board is usable before the first card is typed.
- *
- * Pure, and in shared/, because the settings screen creates workspaces from
- * these and the MCP server can offer the same list to the assistant. Nothing
- * here touches the database: the builders return plain descriptions that the
- * caller writes through the normal board-config and item paths, so a templated
- * workspace is indistinguishable from a hand-built one afterwards.
+ * Nothing here touches the database. The builders return plain descriptions the
+ * caller writes through the normal paths, so a templated workspace is
+ * indistinguishable from a hand-built one.
  */
 
 import type { ColumnConfig } from './boardModel'
@@ -19,7 +12,7 @@ import type { ItemPriority } from './types'
 
 export interface TemplateColumn {
   name: string
-  /** Null, or absent, means no limit, same convention as ColumnConfig. */
+  /** Null, or absent, means no limit. Same convention as ColumnConfig. */
   wipLimit?: number | null
   /** Definition of done, surfaced on hover in the board header. */
   description?: string
@@ -130,7 +123,7 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
         title: 'Decide the art direction',
         column: 'Art',
         priority: 2,
-        body: 'Pick a constraint, palette, resolution, silhouette, and hold to it.'
+        body: 'Pick a constraint (palette, resolution, silhouette) and hold to it.'
       },
       {
         title: 'Reserve the last day for submission',
@@ -279,7 +272,7 @@ export interface TemplateCardDraft {
  * Positions are spaced the same way the board spaces them by hand (1000 apart),
  * so the first drag between two seeded cards has room to land. A card naming a
  * column the template doesn't define falls back to the first column rather than
- * being dropped, a template with a typo should still produce a usable board.
+ * being dropped. A template with a typo should still produce a usable board.
  */
 export function buildTemplateCards(
   template: ProjectTemplate,

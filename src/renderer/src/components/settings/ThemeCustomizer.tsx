@@ -76,8 +76,8 @@ export default function ThemeCustomizer() {
    * The single path from a variable change to the engine.
    *
    * The derived tints are expanded here rather than folded into state, so the
-   * colour picker, the font select and a preset all produce the same result, 
-   * previously only the picker derived them, which meant applying a saved set
+   * colour picker, the font select and a preset all produce the same result.
+   * Previously only the picker derived them, which meant applying a saved set
    * of variables left the old primary and secondary tints in place.
    */
   const applyVars = async (next: ThemeVariables) => {

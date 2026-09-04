@@ -2,7 +2,7 @@
 //
 // Everything the AI emits arrives as untyped JSON, so the honest shape at the
 // edge is `unknown`. These narrowing helpers are the ONLY sanctioned way to
-// reach into it, a cast would assert a shape the model never promised, and
+// reach into it. A cast would assert a shape the model never promised, and
 // this code writes straight to the user's database.
 //
 // The interfaces below describe what a normalizer PRODUCES, not what the model
@@ -23,7 +23,7 @@ export function toColorMode(raw: unknown): ColumnConfig['colorMode'] {
   return raw === 'full' ? 'full' : 'header'
 }
 
-/** A JSON object after narrowing, the only shape worth indexing into. */
+/** A JSON object after narrowing. The only shape worth indexing into. */
 export type JsonObject = Record<string, unknown>
 
 export function asObject(v: unknown): JsonObject | null {
@@ -42,7 +42,7 @@ export function str(v: unknown, fallback = ''): string {
  * A priority the database will actually accept.
  *
  * `items.priority` is `CHECK(priority IN (0,1,2,3))` and the IPC schema matches
- * it with bare literals, no coercion. So the `"3"` a small model routinely
+ * it with bare literals. No coercion. So the `"3"` a small model routinely
  * emits, or a made-up `5`, does not degrade: it rejects the entire card write.
  * Anything unusable falls back to the same default the callers already used.
  */
@@ -72,7 +72,7 @@ export function tagColorOf(raw: unknown, fallback: string): string {
 
 // Normalizer outputs
 
-/** A single card block after `normalizeCardJson`. Tags stay raw, they are only
+/** A single card block after `normalizeCardJson`. Tags stay raw. They are only
  *  resolved against the tag table at execution time. */
 export interface ParsedCardJson {
   title: string

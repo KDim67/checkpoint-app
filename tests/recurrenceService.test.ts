@@ -141,7 +141,7 @@ describe('materialising', () => {
 describe('completing an instance', () => {
   it('creates nothing when the next occurrence is not due yet', () => {
     // Wired the way index.ts wires it. Finishing today's task on time must not
-    // immediately produce tomorrow's, it would sit on the board a day early.
+    // immediately produce tomorrow's. It would sit on the board a day early.
     setRecurrenceInstanceClosedHandler(onInstanceClosed)
 
     daily(Date.now() - 2 * DAY)

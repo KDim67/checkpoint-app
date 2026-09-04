@@ -1,13 +1,10 @@
 /**
- * Default localhost ports for Checkpoint's background servers.
+ * Default localhost ports for the background servers. Both sides of the IPC
+ * boundary need them, and a default that disagrees with itself is invisible
+ * until something stops working.
  *
- * Collected here because each of these is needed on both sides of the IPC
- * boundary, main starts the server, the renderer's settings UI toggles it, 
- * and a default that disagrees with itself is invisible until something stops
- * working. The webhook gateway had exactly that: main defaulted to 9988 while
- * the Features toggle passed a hardcoded 9374, so the first time anyone touched
- * that switch the gateway silently moved, and any external script posting to
- * the documented port stopped being delivered with no error anywhere.
+ * The webhook gateway had exactly that: main said 9988, the Features toggle
+ * said 9374, so flipping the switch silently moved it.
  */
 
 /** Local HTTP gateway for external automation (git hooks, build scripts). */

@@ -30,7 +30,7 @@ type ContentKind = 'link' | 'email' | 'color' | 'number' | 'code' | 'text'
 interface ContentMeta {
   kind: ContentKind
   label: string
-  accent: string // badge/strip accent, for colors this is the colour itself
+  accent: string // badge/strip accent. For colors this is the colour itself
 }
 
 function looksLikeCode(text: string): boolean {
@@ -222,7 +222,7 @@ export default function ClipboardView() {
   }
 
   // Create a new pinned snippet. Unlike copying, saving a snippet should NOT
-  // clobber whatever is currently on the OS clipboard, it's saved for later.
+  // clobber whatever is currently on the OS clipboard. It's saved for later.
   const handleCreateSnippet = async (e: React.FormEvent) => {
     e.preventDefault()
     const contentTrimmed = newContent.trim()
