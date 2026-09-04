@@ -199,6 +199,9 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
         src={`checkpoint-media://${item.ref}`}
         alt={item.text || 'Wall image'}
         draggable={false}
+        // Off the main thread: decoding a large photo synchronously stalls the
+        // frame it lands on, which is felt as a hitch mid-drag.
+        decoding="async"
         style={{
           ...base,
           objectFit: 'cover',
