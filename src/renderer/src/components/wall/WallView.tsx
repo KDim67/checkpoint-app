@@ -19,7 +19,7 @@ import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
   Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  ChevronDown, Pencil, PanelRight, Paintbrush, Check, PenLine, Spline, MousePointer2
+  ChevronDown, Pencil, PanelRight, Paintbrush, PenLine, Spline, MousePointer2
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -45,6 +45,7 @@ import { errorMessage } from '../../../../shared/errors'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
 import WallContextMenu, { type MenuEntry } from './WallContextMenu'
+import WallColorPicker from './WallColorPicker'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import WallBoardRail, { type RailTab } from './WallBoardRail'
 import {
@@ -1114,48 +1115,14 @@ export default function WallView() {
                   borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
                 }}
               >
-                <button
-                  onClick={() => { setBackground('default'); setBgOpen(false) }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
-                    background: 'none', border: 'none', cursor: 'pointer', marginBottom: 'var(--space-2)',
-                    padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
-                    color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)'
-                  }}
-                >
-                  {!custom && <Check size={12} />}
-                  Follow the theme
-                </button>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                  {WALL_COLORS.map(color => (
-                    <button
-                      key={color}
-                      onClick={() => { setBackground(color); setBgOpen(false) }}
-                      title={color}
-                      aria-label={`Background ${color}`}
-                      style={{
-                        height: '26px', background: color, cursor: 'pointer',
-                        border: custom === color ? '2px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
-                        borderRadius: 'var(--radius-sm)'
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {/* Any colour. This view imposes nothing. */}
-                <label style={{
-                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                  marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)'
-                }}>
-                  <input
-                    type="color"
-                    value={custom ?? '#111318'}
-                    onChange={e => setBackground(e.target.value)}
-                    style={{ width: '26px', height: '26px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
-                  />
-                  Custom
-                </label>
+                <WallColorPicker
+                  colors={WALL_COLORS}
+                  value={custom ?? undefined}
+                  onChange={setBackground}
+                  columns={4}
+                  defaultLabel="Follow the theme"
+                  onDefault={() => { setBackground('default'); setBgOpen(false) }}
+                />
               </div>
             </>
           )}
@@ -1747,18 +1714,14 @@ export default function WallView() {
               boxShadow: 'var(--shadow-lg)',
               zIndex: 15
             }}>
-              {WALL_COLORS.slice(0, 6).map(c => (
-                <button
-                  key={c}
-                  onClick={() => setItems(patchItems(doc.items, selectedIds, { color: c }))}
-                  aria-label={`Colour ${c}`}
-                  style={{
-                    width: '16px', height: '16px', borderRadius: '3px', background: c,
-                    border: single?.color === c ? '2px solid var(--color-text-base)' : '1px solid rgba(0,0,0,0.25)',
-                    cursor: 'pointer', padding: 0
-                  }}
-                />
-              ))}
+              {/* The whole palette, not six of eight, and a custom slot: the
+                  toolbar quietly offered fewer colours than the pen did. */}
+              <WallColorPicker
+                colors={WALL_COLORS}
+                value={single?.color}
+                onChange={c => setItems(patchItems(doc.items, selectedIds, { color: c }))}
+                columns={WALL_COLORS.length + 1}
+              />
               <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
               {toolButton('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
               {toolButton('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
@@ -1861,29 +1824,12 @@ export default function WallView() {
               boxShadow: 'var(--shadow-lg)'
             }}
           >
-            {WALL_COLORS.map(color => (
-              <button
-                key={color}
-                onClick={() => setPenColor(color)}
-                title={color}
-                aria-label={`Ink ${color}`}
-                aria-pressed={penColor === color}
-                style={{
-                  // 24px of target around a 16px dot: the swatches were
-                  // pixel-hunting at their old size.
-                  width: '24px', height: '24px', padding: 0, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'none', border: 'none', borderRadius: 'var(--radius-sm)'
-                }}
-              >
-                <span style={{
-                  width: '16px', height: '16px', borderRadius: '50%', background: color,
-                  boxShadow: penColor === color
-                    ? '0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--color-secondary)'
-                    : 'inset 0 0 0 1px rgba(0,0,0,0.25)'
-                }} />
-              </button>
-            ))}
+            <WallColorPicker
+              colors={WALL_COLORS}
+              value={penColor}
+              onChange={setPenColor}
+              columns={1}
+            />
 
             <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
 
