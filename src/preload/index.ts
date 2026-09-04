@@ -5,6 +5,7 @@ import type { McpActivityEntry } from '../shared/mcpActivity'
 import type { RecurrenceSummary } from '../shared/recurrence'
 import type { NotificationCategory, NotificationPolicy } from '../shared/notificationPolicy'
 import type { Subtask } from '../shared/subtasks'
+import type { RemoteMutation } from '../shared/collabProtocol'
 import type { StartupSettings } from '../shared/startupSettings'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type { ImportedBoard } from '../shared/foreignImport'
@@ -817,7 +818,7 @@ const api = {
       relations: Relation[]
     ): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.SYNC_APPLY_BOARD_BASELINE, context, items, tags, itemTags, relations),
-    applyRemoteMutation: (mutation: any): Promise<void> =>
+    applyRemoteMutation: (mutation: RemoteMutation): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.SYNC_APPLY_REMOTE_MUTATION, mutation)
   }
 }
