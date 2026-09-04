@@ -9,6 +9,7 @@ import {
   arrowHeadInset,
   pruneArrows,
   boundsOf,
+  midpointAlong,
   normalizeWallItem,
   ARROW_SHAPES,
   ARROW_LINES,
@@ -412,5 +413,54 @@ describe('what a loose end does to the wall bounds', () => {
 
   it('is still null for a wall with nothing on it', () => {
     expect(boundsOf([])).toBeNull()
+  })
+})
+
+describe('where a label sits on the line', () => {
+  it('is halfway along a straight one', () => {
+    expect(arrowGeometry(left, right, 'straight').mid).toEqual({ x: 150, y: 50 })
+  })
+
+  it('is on the curve, not on the chord under it', () => {
+    const g = arrowGeometry(left, right, 'curved')
+    expect(Math.abs(g.mid.y - 50)).toBeGreaterThan(5)
+    expect(distanceToPolyline(g.mid, g.polyline)).toBeLessThan(1)
+  })
+
+  it('is halfway by length along an elbow, not halfway by corner', () => {
+    const g = arrowGeometry(left, box({ id: 'd', x: 300, y: 300 }), 'elbow')
+    expect(distanceToPolyline(g.mid, g.polyline)).toBeLessThan(1)
+  })
+
+  it('does not move when a head is added or taken away', () => {
+    // Otherwise a label already placed would shift the moment the style
+    // changed, which reads as the app losing track of it.
+    const plain = arrowGeometry(left, right, 'curved')
+    const trimmed = arrowGeometry(left, right, 'curved', { start: 18, end: 18 })
+    expect(trimmed.mid).toEqual(plain.mid)
+  })
+})
+
+describe('finding the middle of a run of segments', () => {
+  it('splits a single leg in half', () => {
+    expect(midpointAlong([{ x: 0, y: 0 }, { x: 10, y: 0 }])).toEqual({ x: 5, y: 0 })
+  })
+
+  it('measures by length, so a long leg carries the middle', () => {
+    // Halfway by index would land on the corner; halfway by length is 5 along
+    // the long leg.
+    const mid = midpointAlong([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 2 }])
+    expect(mid.x).toBeCloseTo(6)
+    expect(mid.y).toBe(0)
+  })
+
+  it('survives every point being in the same place', () => {
+    const mid = midpointAlong([{ x: 3, y: 4 }, { x: 3, y: 4 }])
+    expect(mid).toEqual({ x: 3, y: 4 })
+  })
+
+  it('has an answer for one point, and for none', () => {
+    expect(midpointAlong([{ x: 7, y: 8 }])).toEqual({ x: 7, y: 8 })
+    expect(midpointAlong([])).toEqual({ x: 0, y: 0 })
   })
 })
