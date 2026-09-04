@@ -12,6 +12,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check } from 'lucide-react'
 import { getTextColorForBackground } from '../../lib/contrast'
 import ColorField from '../ui/ColorField'
@@ -41,18 +42,25 @@ export default function WallColorPicker({
   /**
    * Where to draw the panel, in viewport coordinates.
    *
-   * Fixed rather than absolute because the pen palette scrolls: an absolutely
-   * positioned panel was a child of that scroller, so it could not escape it
-   * and only ever produced scrollbars.
+   * The panel goes in a portal on `document.body` rather than next to the
+   * swatch. `position: fixed` is not enough: the pen palette is centred with a
+   * transform, and a transform makes an element the containing block for fixed
+   * descendants, so the panel was still trapped inside a scroller that clipped
+   * it. All the user saw was the palette growing scrollbars.
    */
   const [customAt, setCustomAt] = useState<{ left: number; top: number } | null>(null)
   const customRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const customOpen = customAt !== null
 
   useEffect(() => {
     if (!customOpen) return
     const onDown = (e: PointerEvent): void => {
-      if (!customRef.current?.contains(e.target as Node)) setCustomAt(null)
+      // The panel is not a DOM child of the swatch any more, so it needs its
+      // own check or the first click inside it would close it.
+      const target = e.target as Node
+      if (customRef.current?.contains(target) || panelRef.current?.contains(target)) return
+      setCustomAt(null)
     }
     const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setCustomAt(null) }
     document.addEventListener('pointerdown', onDown)
@@ -129,10 +137,10 @@ export default function WallColorPicker({
                 if (customOpen) { setCustomAt(null); return }
                 const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
                 // Kept inside the window: the panel is 220 by 210 or so, and
-                // near a bottom corner it would otherwise open off-screen.
+                // near an edge it would otherwise open off-screen.
                 setCustomAt({
-                  left: Math.min(box.right + 10, window.innerWidth - 232),
-                  top: Math.min(box.top, window.innerHeight - 232)
+                  left: Math.max(8, Math.min(box.right + 10, window.innerWidth - 232)),
+                  top: Math.max(8, Math.min(box.top, window.innerHeight - 232))
                 })
               }}
               title="Any colour"
@@ -160,17 +168,24 @@ export default function WallColorPicker({
               }} />
             </button>
 
-            {customAt && (
-              <div style={{
-                position: 'fixed', left: `${customAt.left}px`, top: `${customAt.top}px`, zIndex: 60,
-                padding: 'var(--space-3)',
-                background: 'var(--color-surface-elevated)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-lg)'
-              }}>
+            {customAt && createPortal(
+              // Still tagged, because React sends events up the tree it was
+              // written in: a click here reaches the Wall's canvas handlers.
+              <div
+                ref={panelRef}
+                data-wall-ui
+                style={{
+                  position: 'fixed', left: `${customAt.left}px`, top: `${customAt.top}px`, zIndex: 60,
+                  padding: 'var(--space-3)',
+                  background: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--color-surface-offset)',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: 'var(--shadow-lg)'
+                }}
+              >
                 <ColorField value={isCustom && value ? value : colors[0]} onChange={onChange} />
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         )}

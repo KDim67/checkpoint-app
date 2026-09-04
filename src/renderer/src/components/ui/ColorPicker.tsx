@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import ColorField from './ColorField'
 
 export interface ColorPickerProps {
@@ -25,20 +26,23 @@ export default function ColorPicker({
   const inputRef = useRef<HTMLInputElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
   /**
-   * Viewport coordinates for the panel, so it is not clipped by whatever it
-   * sits in. Several callers put this inside a scrolling modal or settings
-   * pane, where an absolutely positioned panel cannot escape.
+   * Viewport coordinates for the panel, which goes in a portal on
+   * `document.body`. Several callers put this inside a scrolling modal or
+   * settings pane, and `position: fixed` alone is not enough to get out of one:
+   * any transformed ancestor becomes the containing block for it.
    */
   const [openAt, setOpenAt] = useState<{ left: number; top: number } | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const open = openAt !== null
 
-  // Closes on a click anywhere else. The panel is absolutely positioned inside
-  // whatever opened it, so a full-screen backdrop would sit above that caller's
-  // own controls.
+  // Closes on a click anywhere else, rather than behind a full-screen backdrop
+  // that would sit above the caller's own controls.
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent): void => {
-      if (!anchorRef.current?.contains(e.target as Node)) setOpenAt(null)
+      const target = e.target as Node
+      if (anchorRef.current?.contains(target) || panelRef.current?.contains(target)) return
+      setOpenAt(null)
     }
     const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpenAt(null) }
     document.addEventListener('pointerdown', onDown)
@@ -110,8 +114,9 @@ export default function ColorPicker({
           }}
         />
 
-        {openAt && (
+        {openAt && createPortal(
           <div
+            ref={panelRef}
             style={{
               position: 'fixed', left: `${openAt.left}px`, top: `${openAt.top}px`, zIndex: 60,
               padding: 'var(--space-3)',
@@ -122,7 +127,8 @@ export default function ColorPicker({
             }}
           >
             <ColorField value={validHex} onChange={handleLiveInput} onCommit={handleCommit} />
-          </div>
+          </div>,
+          document.body
         )}
       </div>
       {showHexInput && (
