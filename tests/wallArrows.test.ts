@@ -5,6 +5,9 @@ import {
   arrowHeadPoints,
   roundedPath,
   distanceToPolyline,
+  arrowAnchors,
+  arrowHeadInset,
+  pruneArrows,
   normalizeWallItem,
   ARROW_SHAPES,
   ARROW_LINES,
@@ -234,5 +237,152 @@ describe('reading a styled arrow back', () => {
     for (const list of [ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES]) {
       expect(new Set(list).size).toBe(list.length)
     }
+  })
+})
+
+describe('stopping the line behind its head', () => {
+  it('leaves the real endpoints alone, so the head still lands on the box', () => {
+    const g = arrowGeometry(left, right, 'straight', { end: 20 })
+    expect(g.end).toEqual({ x: 200, y: 50 })
+  })
+
+  it('draws short of the endpoint by the amount asked for', () => {
+    const g = arrowGeometry(left, right, 'straight', { end: 20 })
+    expect(g.polyline[1]).toEqual({ x: 180, y: 50 })
+    expect(g.d).toBe('M100,50L180,50')
+  })
+
+  it('trims the near end too, for a connector with a head at both', () => {
+    const g = arrowGeometry(left, right, 'straight', { start: 10, end: 10 })
+    expect(g.polyline[0].x).toBeCloseTo(110)
+    expect(g.polyline[1].x).toBeCloseTo(190)
+  })
+
+  it('refuses to eat more of the line than there is', () => {
+    // Two items nearly touching leave a few pixels. Taking a whole head off
+    // each end of that would draw the line backwards.
+    const g = arrowGeometry(left, box({ id: 'close', x: 104, y: 0 }), 'straight', { start: 500, end: 500 })
+    expect(g.polyline[0].x).toBeLessThanOrEqual(g.polyline[1].x)
+  })
+
+  it('follows the tangent on a curve, not the chord', () => {
+    const g = arrowGeometry(left, right, 'curved', { end: 20 })
+    const drawnEnd = g.polyline[g.polyline.length - 1]
+    // Pulled back along the curve's own direction, so it leaves the tip at an
+    // angle rather than sliding straight back along the chord.
+    expect(Math.abs(drawnEnd.y - g.end.y)).toBeGreaterThan(0.5)
+  })
+
+  it('shortens only the last leg of an elbow', () => {
+    const plain = arrowGeometry(left, box({ id: 'd', x: 300, y: 300 }), 'elbow')
+    const trimmed = arrowGeometry(left, box({ id: 'd', x: 300, y: 300 }), 'elbow', { end: 15 })
+    expect(trimmed.polyline).toHaveLength(plain.polyline.length)
+    expect(trimmed.polyline[0]).toEqual(plain.polyline[0])
+    expect(trimmed.polyline[2]).toEqual(plain.polyline[2])
+    expect(trimmed.polyline[3]).not.toEqual(plain.polyline[3])
+  })
+
+  it('changes nothing when nothing is asked for', () => {
+    expect(arrowGeometry(left, right, 'curved', {})).toEqual(arrowGeometry(left, right, 'curved'))
+  })
+})
+
+describe('the arrowhead itself', () => {
+  it('has a notched back rather than being a flat triangle', () => {
+    // Four points: tip, barb, notch, barb. A flat back reads as a triangle
+    // balanced on the line rather than as a head.
+    expect(arrowHeadPoints({ x: 0, y: 0 }, 0, 4).split(' ')).toHaveLength(4)
+  })
+
+  it('keeps the notch between the tip and the barbs', () => {
+    const [tip, barb, notch] = arrowHeadPoints({ x: 0, y: 0 }, 0, 4)
+      .split(' ')
+      .map(p => p.split(',').map(Number))
+    expect(tip[0]).toBe(0)
+    expect(notch[0]).toBeGreaterThan(barb[0])
+    expect(notch[0]).toBeLessThan(tip[0])
+  })
+
+  it('insets the line by less than the head is long, so no gap opens up', () => {
+    const points = arrowHeadPoints({ x: 0, y: 0 }, 0, 4).split(' ').map(p => Number(p.split(',')[0]))
+    const length = Math.abs(Math.min(...points))
+    expect(arrowHeadInset(4)).toBeLessThan(length)
+    expect(arrowHeadInset(4)).toBeGreaterThan(0)
+  })
+
+  it('grows its inset with the stroke, like the head does', () => {
+    expect(arrowHeadInset(8)).toBeGreaterThan(arrowHeadInset(2))
+  })
+})
+
+describe('an end attached to nothing', () => {
+  const anchored = box({ id: 'anchored', x: 0, y: 0 })
+  const byId = new Map([[anchored.id, anchored]])
+
+  it('resolves a loose end to the point it was left at', () => {
+    const arrow = box({ id: 'arrow', kind: 'arrow', from: 'anchored', toPoint: { x: 400, y: 300 } })
+    const ends = arrowAnchors(arrow, byId)!
+    expect(ends.to.x).toBe(400)
+    expect(ends.to.y).toBe(300)
+  })
+
+  it('draws to the point exactly, since a point has no edge to stop at', () => {
+    const arrow = box({ id: 'arrow', kind: 'arrow', from: 'anchored', toPoint: { x: 400, y: 300 } })
+    const ends = arrowAnchors(arrow, byId)!
+    expect(arrowGeometry(ends.from, ends.to).end).toEqual({ x: 400, y: 300 })
+  })
+
+  it('gives up when an end names an item that has gone', () => {
+    const arrow = box({ id: 'arrow', kind: 'arrow', from: 'anchored', to: 'deleted' })
+    expect(arrowAnchors(arrow, byId)).toBeNull()
+  })
+
+  it('survives the prune on its own', () => {
+    const items: WallItem[] = [
+      anchored,
+      box({ id: 'loose', kind: 'arrow', from: 'anchored', toPoint: { x: 9, y: 9 } })
+    ]
+    expect(pruneArrows(items).map(i => i.id)).toEqual(['anchored', 'loose'])
+  })
+
+  it('still goes when the item at its other end does', () => {
+    const items: WallItem[] = [
+      box({ id: 'loose', kind: 'arrow', from: 'anchored', toPoint: { x: 9, y: 9 } })
+    ]
+    expect(pruneArrows(items)).toEqual([])
+  })
+
+  it('is read back off a document', () => {
+    const item = normalizeWallItem({
+      kind: 'arrow', id: 'x', from: 'a', toPoint: { x: 5, y: 6 },
+      x: 0, y: 0, width: 10, height: 10, z: 1
+    }, 0)
+    expect(item?.toPoint).toEqual({ x: 5, y: 6 })
+  })
+
+  it('is refused when an end has neither an item nor a point', () => {
+    const item = normalizeWallItem({
+      kind: 'arrow', id: 'x', from: 'a', x: 0, y: 0, width: 10, height: 10, z: 1
+    }, 0)
+    expect(item).toBeNull()
+  })
+
+  it('ignores a point with a coordinate that is not a number', () => {
+    const item = normalizeWallItem({
+      kind: 'arrow', id: 'x', from: 'a', to: 'b', toPoint: { x: 'over there', y: 6 },
+      x: 0, y: 0, width: 10, height: 10, z: 1
+    }, 0)
+    expect(item?.toPoint).toBeUndefined()
+  })
+
+  it('lets the item win when a stale point is left behind', () => {
+    // Reattaching writes the item id; a point that survived alongside it must
+    // not quietly override what the end is now tied to.
+    const item = normalizeWallItem({
+      kind: 'arrow', id: 'x', from: 'a', to: 'b', toPoint: { x: 5, y: 6 },
+      x: 0, y: 0, width: 10, height: 10, z: 1
+    }, 0)
+    expect(item?.to).toBe('b')
+    expect(item?.toPoint).toBeUndefined()
   })
 })

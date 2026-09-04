@@ -53,6 +53,12 @@ export interface WallItem {
   from?: string
   to?: string
   /**
+   * Where an end sits when it is attached to nothing, in wall coordinates.
+   * An end has one or the other: an item it follows, or a point it stays at.
+   */
+  fromPoint?: { x: number; y: number }
+  toPoint?: { x: number; y: number }
+  /**
    * How an arrow is drawn. All three are absent at their default, so an arrow
    * saved before styles existed still reads as the plain one it was.
    */
@@ -170,6 +176,15 @@ export const ARROW_HEAD_MODES: readonly ArrowHeads[] = ['end', 'both', 'none']
 /** How hard a smoothed stroke gets smoothed. The pen offers this or nothing. */
 export const SMOOTHING_STRENGTH = 0.9
 
+/** A point off a stored document, or null if either coordinate is unusable. */
+function readPoint(raw: unknown): { x: number; y: number } | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const o = raw as Record<string, unknown>
+  const x = num(o.x, NaN)
+  const y = num(o.y, NaN)
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+}
+
 /**
  * A path is only a path with two points, and an odd-length array means the
  * coordinates have been truncated somewhere, so the pairs cannot be trusted.
@@ -200,7 +215,11 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
 
   const from = str(o.from).trim()
   const to = str(o.to).trim()
-  if (kind === 'arrow' && (!from || !to)) return null
+  const fromPoint = readPoint(o.fromPoint)
+  const toPoint = readPoint(o.toPoint)
+  // Each end needs one anchor or the other. An end with neither cannot be
+  // drawn, and an arrow that cannot be drawn cannot be selected to be deleted.
+  if (kind === 'arrow' && ((!from && !fromPoint) || (!to && !toPoint))) return null
 
   // `true` is what the first version wrote, and the build after it wrote a
   // strength off a dial. Any strength still renders, so nothing already drawn
@@ -237,6 +256,10 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(smooth > 0 ? { smooth } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
+    // The item wins when both are somehow present, so a stale point left over
+    // from a detached end cannot override the thing it was reattached to.
+    ...(!from && fromPoint ? { fromPoint } : {}),
+    ...(!to && toPoint ? { toPoint } : {}),
     // The default is left out, so only an arrow that was actually restyled
     // carries the field.
     ...(arrowShape && arrowShape !== ARROW_SHAPES[0] ? { arrowShape } : {}),
@@ -871,10 +894,39 @@ export function roundedPath(points: Point[], radius: number): string {
   return `${d}L${last.x},${last.y}`
 }
 
+/**
+ * A point wearing an item's clothes, so a loose end goes through exactly the
+ * same geometry as an attached one. A box with no size has its edge at its
+ * centre, which is what a point is.
+ */
+export function pointAnchor(p: Point): WallItem {
+  return { id: '', kind: 'note', x: p.x, y: p.y, width: 0, height: 0, z: 0 }
+}
+
+/**
+ * What an arrow's two ends currently resolve to, or null when one of them
+ * names an item that is no longer there.
+ */
+export function arrowAnchors(
+  arrow: WallItem,
+  byId: Map<string, WallItem>
+): { from: WallItem; to: WallItem } | null {
+  const from = arrow.from ? byId.get(arrow.from) : arrow.fromPoint && pointAnchor(arrow.fromPoint)
+  const to = arrow.to ? byId.get(arrow.to) : arrow.toPoint && pointAnchor(arrow.toPoint)
+  return from && to ? { from, to } : null
+}
+
+/** How much shorter to draw the line at each end than it really is. */
+export interface ArrowTrim {
+  start?: number
+  end?: number
+}
+
 export interface ArrowGeometry {
+  /** Where the connector really begins and ends. The heads go here. */
   start: Point
   end: Point
-  /** The line, as SVG path data. */
+  /** The line, as SVG path data, stopped short by whatever trim was asked for. */
   d: string
   /** Which way a head at the far end points, in radians. */
   endAngle: number
@@ -882,6 +934,20 @@ export interface ArrowGeometry {
   startAngle: number
   /** Straight segments following the line, for hit testing. */
   polyline: Point[]
+}
+
+/**
+ * The trim actually applied, never more than a share of the run.
+ *
+ * Two items almost touching leave a few pixels between them; taking a whole
+ * arrowhead off each end of that would draw the line backwards.
+ */
+function clampTrim(trim: ArrowTrim, start: Point, end: Point): [number, number] {
+  const cap = Math.hypot(end.x - start.x, end.y - start.y) * 0.4
+  return [
+    Math.max(0, Math.min(trim.start ?? 0, cap)),
+    Math.max(0, Math.min(trim.end ?? 0, cap))
+  ]
 }
 
 /** How far a curved connector bows out, as a fraction of its own length. */
@@ -897,7 +963,25 @@ const ELBOW_RADIUS = 12
  * The renderer gets no say in any of it, so the line that is drawn and the
  * line that is clicked are the same line by construction.
  */
-export function arrowGeometry(from: WallItem, to: WallItem, shape: ArrowShape = 'straight'): ArrowGeometry {
+/** Slides a point back along a heading. Used to stop a line behind its head. */
+function pullBack(p: Point, angle: number, by: number): Point {
+  return { x: p.x - by * Math.cos(angle), y: p.y - by * Math.sin(angle) }
+}
+
+/**
+ * Everything needed to draw one connector.
+ *
+ * `trim` shortens the drawn line without moving where the connector actually
+ * starts and ends, so a head sits at the true endpoint while the stroke stops
+ * behind it. Neither trim may eat more than a fraction of the run, or two
+ * items almost touching would produce a line drawn backwards.
+ */
+export function arrowGeometry(
+  from: WallItem,
+  to: WallItem,
+  shape: ArrowShape = 'straight',
+  trim: ArrowTrim = {}
+): ArrowGeometry {
   if (shape === 'elbow') {
     const a = centreOf(from)
     const b = centreOf(to)
@@ -915,14 +999,20 @@ export function arrowGeometry(from: WallItem, to: WallItem, shape: ArrowShape = 
 
     const forward = positive ? 0 : Math.PI
     const endAngle = horizontal ? forward : (positive ? Math.PI / 2 : -Math.PI / 2)
+    const startAngle = endAngle + Math.PI
+
+    const [ts, te] = clampTrim(trim, start, end)
+    const drawn = [...corners]
+    drawn[0] = pullBack(start, startAngle, ts)
+    drawn[drawn.length - 1] = pullBack(end, endAngle, te)
 
     return {
       start,
       end,
-      d: roundedPath(corners, ELBOW_RADIUS),
+      d: roundedPath(drawn, ELBOW_RADIUS),
       endAngle,
-      startAngle: endAngle + Math.PI,
-      polyline: corners
+      startAngle,
+      polyline: drawn
     }
   }
 
@@ -940,6 +1030,17 @@ export function arrowGeometry(from: WallItem, to: WallItem, shape: ArrowShape = 
       y: (start.y + end.y) / 2 + (dx / length) * bow
     }
 
+    // The tangent at either end of a quadratic points away from the control.
+    const endAngle = Math.atan2(end.y - control.y, end.x - control.x)
+    const startAngle = Math.atan2(start.y - control.y, start.x - control.x)
+
+    const [ts, te] = clampTrim(trim, start, end)
+    // Pulled back along the tangent, keeping the same control point. The curve
+    // stops a little early rather than being re-solved, which at the few pixels
+    // a head needs is not a difference anyone can see.
+    const drawnStart = pullBack(start, startAngle, ts)
+    const drawnEnd = pullBack(end, endAngle, te)
+
     // Sampled rather than solved: a handful of points is close enough to click
     // and avoids a quadratic root-finder living in a hit test.
     const polyline: Point[] = []
@@ -948,30 +1049,33 @@ export function arrowGeometry(from: WallItem, to: WallItem, shape: ArrowShape = 
       const t = i / steps
       const u = 1 - t
       polyline.push({
-        x: u * u * start.x + 2 * u * t * control.x + t * t * end.x,
-        y: u * u * start.y + 2 * u * t * control.y + t * t * end.y
+        x: u * u * drawnStart.x + 2 * u * t * control.x + t * t * drawnEnd.x,
+        y: u * u * drawnStart.y + 2 * u * t * control.y + t * t * drawnEnd.y
       })
     }
 
     return {
       start,
       end,
-      d: `M${start.x},${start.y}Q${control.x},${control.y} ${end.x},${end.y}`,
-      // The tangent at either end of a quadratic points away from the control.
-      endAngle: Math.atan2(end.y - control.y, end.x - control.x),
-      startAngle: Math.atan2(start.y - control.y, start.x - control.x),
+      d: `M${drawnStart.x},${drawnStart.y}Q${control.x},${control.y} ${drawnEnd.x},${drawnEnd.y}`,
+      endAngle,
+      startAngle,
       polyline
     }
   }
 
   const angle = Math.atan2(end.y - start.y, end.x - start.x)
+  const [ts, te] = clampTrim(trim, start, end)
+  const drawnStart = pullBack(start, angle + Math.PI, ts)
+  const drawnEnd = pullBack(end, angle, te)
+
   return {
     start,
     end,
-    d: `M${start.x},${start.y}L${end.x},${end.y}`,
+    d: `M${drawnStart.x},${drawnStart.y}L${drawnEnd.x},${drawnEnd.y}`,
     endAngle: angle,
     startAngle: angle + Math.PI,
-    polyline: [start, end]
+    polyline: [drawnStart, drawnEnd]
   }
 }
 
@@ -990,13 +1094,39 @@ export function arrowDash(line: ArrowLine, strokeWidth: number): string | undefi
   return undefined
 }
 
-/** The three points of an arrowhead pointing along `angle`. */
+/** How long a head is, tip to barb. */
+function headSize(strokeWidth: number): number {
+  return 9 + Math.max(1, strokeWidth) * 2.4
+}
+
+/**
+ * How far back the line should stop.
+ *
+ * The notch, not the barbs: the line runs into the head far enough that a
+ * thick round-capped stroke leaves no gap, without filling the notch in and
+ * turning the head back into a plain triangle.
+ */
+export function arrowHeadInset(strokeWidth: number): number {
+  return headSize(strokeWidth) * NOTCH
+}
+
+/** How far the back of the head dips towards the tip, as a fraction of it. */
+const NOTCH = 0.72
+
+/**
+ * An arrowhead pointing along `angle`: a tip, two barbs and a notched back.
+ *
+ * The notch is what stops it reading as a triangle balanced on the end of a
+ * line, which is what it looked like at the thicker stroke widths.
+ */
 export function arrowHeadPoints(tip: Point, angle: number, strokeWidth: number): string {
-  const size = 10 + Math.max(1, strokeWidth) * 2
-  const spread = 0.4
+  const size = headSize(strokeWidth)
+  const spread = 0.46
+  const back = size * NOTCH
   return [
     `${tip.x},${tip.y}`,
     `${tip.x - size * Math.cos(angle - spread)},${tip.y - size * Math.sin(angle - spread)}`,
+    `${tip.x - back * Math.cos(angle)},${tip.y - back * Math.sin(angle)}`,
     `${tip.x - size * Math.cos(angle + spread)},${tip.y - size * Math.sin(angle + spread)}`
   ].join(' ')
 }
@@ -1007,8 +1137,13 @@ export function arrowHeadPoints(tip: Point, angle: number, strokeWidth: number):
  */
 export function pruneArrows(items: WallItem[]): WallItem[] {
   const present = new Set(items.filter(i => i.kind !== 'arrow').map(i => i.id))
+  // An end pinned to a point survives on its own. Only an end that named an
+  // item which has since gone takes its arrow with it.
+  const anchored = (id: string | undefined, point: unknown): boolean =>
+    id ? present.has(id) : !!point
+
   return items.filter(i =>
-    i.kind !== 'arrow' || (present.has(i.from ?? '') && present.has(i.to ?? ''))
+    i.kind !== 'arrow' || (anchored(i.from, i.fromPoint) && anchored(i.to, i.toPoint))
   )
 }
 
