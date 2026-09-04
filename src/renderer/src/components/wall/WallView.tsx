@@ -554,6 +554,12 @@ export default function WallView() {
     // A captured pointer never reaches the textarea at all.
     if (target.closest('input, textarea, [contenteditable="true"]')) return
 
+    // Same for the panels floating over the canvas. They are children of it, so
+    // without this the canvas takes the pointer first: in pen mode that starts
+    // a stroke, and either way capture retargets the click away from the button
+    // that was pressed, which is why the ink palette could not be clicked.
+    if (target.closest('[data-wall-ui]')) return
+
     const handle = target.closest<HTMLElement>('[data-wall-handle]')
     const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -970,14 +976,29 @@ export default function WallView() {
   const undoable = canUndo(historyRef.current)
   const redoable = canRedo(historyRef.current)
 
-  // Floating toolbar position, in screen space above the selection.
+  /**
+   * Where the selection's toolbar goes, in screen space.
+   *
+   * Above the selection normally, below it when there is no room. The canvas
+   * clips its overflow, so an unclamped toolbar simply vanished whenever the
+   * selected item was near the top edge. Horizontal is clamped too, since the
+   * toolbar is centre-anchored and would otherwise hang off either side.
+   */
   const selectionBounds = boundsOf(selectedItems)
-  const floatingPos = selectionBounds && !editingId
-    ? {
-        left: (selectionBounds.minX + (selectionBounds.maxX - selectionBounds.minX) / 2) * camera.zoom + camera.x,
-        top: selectionBounds.minY * camera.zoom + camera.y - 44
-      }
-    : null
+  const floatingPos = ((): { left: number; top: number } | null => {
+    if (!selectionBounds || editingId) return null
+
+    const centreX = (selectionBounds.minX + (selectionBounds.maxX - selectionBounds.minX) / 2) * camera.zoom + camera.x
+    const above = selectionBounds.minY * camera.zoom + camera.y - 44
+    const below = selectionBounds.maxY * camera.zoom + camera.y + 12
+
+    const rect = viewportRef.current?.getBoundingClientRect()
+    const halfWidth = 110
+    return {
+      left: rect ? Math.min(Math.max(centreX, halfWidth), rect.width - halfWidth) : centreX,
+      top: above < 4 ? below : above
+    }
+  })()
 
   /**
    * `.btn-icon:hover` already paints `--color-surface-offset`, so an active
@@ -1279,9 +1300,22 @@ export default function WallView() {
         {toolButton('Fit to content', <Maximize2 size={14} />, fitToContent, { disabled: doc.items.length === 0 })}
         {toolButton('Export as PNG', <Download size={14} />, () => void exportPng(), { disabled: doc.items.length === 0 })}
 
-        <span style={{ fontSize: '11px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', minWidth: '42px' }}>
+        {/* A number you cannot act on is a label pretending to be a control.
+            Clicking it is the fastest way back from a zoom you regret. */}
+        <button
+          onClick={() => setCamera({ ...docRef.current.camera, zoom: 1 })}
+          title="Reset zoom to 100%"
+          aria-label="Reset zoom to 100 percent"
+          disabled={Math.round(camera.zoom * 100) === 100}
+          style={{
+            fontSize: '11px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)',
+            minWidth: '46px', height: '24px', padding: '0 var(--space-1)',
+            background: 'none', border: 'none', borderRadius: 'var(--radius-sm)',
+            cursor: Math.round(camera.zoom * 100) === 100 ? 'default' : 'pointer'
+          }}
+        >
           {Math.round(camera.zoom * 100)}%
-        </span>
+        </button>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', position: 'relative' }}>
           {/* Says what the armed tool does rather than everything at once. The
@@ -1352,7 +1386,7 @@ export default function WallView() {
         </div>
 
         {picker && (
-          <div style={{
+          <div data-wall-ui style={{
             position: 'absolute', top: '100%', left: 'var(--space-3)', zIndex: 20,
             marginTop: '4px', width: '300px', maxHeight: '340px', overflowY: 'auto',
             background: 'var(--color-surface-elevated)', border: '1px solid var(--color-surface-offset)',
@@ -1615,7 +1649,7 @@ export default function WallView() {
 
           {/* Controls for the current selection, floated above it. */}
           {floatingPos && selectedItems.length > 0 && (
-            <div style={{
+            <div data-wall-ui style={{
               position: 'absolute',
               left: `${floatingPos.left}px`, top: `${floatingPos.top}px`,
               transform: 'translateX(-50%)',
@@ -1689,6 +1723,7 @@ export default function WallView() {
                     y: rect.height / 2 - wy * docRef.current.camera.zoom
                   })
                 }}
+                data-wall-ui
                 title="Click to jump"
                 style={{
                   position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
@@ -1727,6 +1762,7 @@ export default function WallView() {
 
           {tool !== 'select' && (
           <div
+            data-wall-ui
             role="group"
             aria-label="Ink colour and width"
             style={{
