@@ -30,6 +30,27 @@ interface FileMetadata {
 // coordinator describe the same wire format.
 type DatabasePayload = SyncPayload
 
+/**
+ * Wrong codes tolerated from one address before it is ignored. Low enough that
+ * guessing a six-digit code is hopeless, high enough to survive a typo.
+ */
+const MAX_AUTH_ATTEMPTS = 5
+
+/**
+ * Compares two hex digests without leaking where they first differ.
+ *
+ * `===` on a secret returns as soon as it finds a mismatch, so how long it
+ * took is a measurement of how much of the digest was right. Over a LAN the
+ * signal is buried in jitter, but the constant-time comparison is free.
+ */
+export function sameSecret(a: string, b: string): boolean {
+  const left = Buffer.from(a, 'hex')
+  const right = Buffer.from(b, 'hex')
+  // timingSafeEqual throws on a length mismatch, which is itself a leak, so
+  // the length is checked first and a mismatch simply fails.
+  return left.length === right.length && crypto.timingSafeEqual(left, right)
+}
+
 export class SyncService {
   private tcpServer: net.Server | null = null
   private udpSocket: dgram.Socket | null = null
@@ -39,6 +60,8 @@ export class SyncService {
   private tcpPort = DEFAULT_TCP_PORT
   private udpPort = DEFAULT_UDP_PORT
   private pairingCode = ''
+  /** Wrong codes per remote address, cleared when the host restarts. */
+  private failedAttempts = new Map<string, number>()
   private isServerActive = false
   private syncProgress = ''
   private isSyncing = false
@@ -90,6 +113,9 @@ export class SyncService {
 
     this.tcpPort = port
     this.pairingCode = this.generatePairingCode()
+    // A new code means a clean slate: whoever was blocked was guessing at a
+    // code that no longer exists.
+    this.failedAttempts.clear()
     this.syncProgress = 'Host started. Waiting for connections...'
     
     // Start TCP Server
@@ -407,6 +433,18 @@ export class SyncService {
   // TCP Client connection sync process
   private handleClientConnection(socket: net.Socket): void {
     console.log(`[SyncService] Client connected from ${socket.remoteAddress}`)
+
+    // A wrong code closes the socket, but nothing stopped the caller opening
+    // another one. Six digits is a million guesses, which is an afternoon's
+    // work on a shared network. After a handful of failures an address is not
+    // talked to again until the host is restarted with a fresh code.
+    const origin = socket.remoteAddress ?? 'unknown'
+    if ((this.failedAttempts.get(origin) ?? 0) >= MAX_AUTH_ATTEMPTS) {
+      this.syncProgress = `Refused ${origin}: too many failed codes.`
+      socket.destroy()
+      return
+    }
+
     // Track socket so stopHost() can force-close it immediately
     this.clientSockets.add(socket)
     socket.once('close', () => this.clientSockets.delete(socket))
@@ -436,14 +474,19 @@ export class SyncService {
               .update(salt)
               .digest('hex')
 
-            if (clientHash === expectedHash) {
+            if (sameSecret(clientHash, expectedHash)) {
               authenticated = true
+              this.failedAttempts.delete(origin)
               socket.write('auth-success\n')
               this.syncProgress = 'Authenticated successfully. Exchanging index...'
             } else {
+              const failures = (this.failedAttempts.get(origin) ?? 0) + 1
+              this.failedAttempts.set(origin, failures)
               socket.write('auth-failed\n')
               socket.destroy()
-              this.syncProgress = 'Authentication failed: invalid code.'
+              this.syncProgress = failures >= MAX_AUTH_ATTEMPTS
+                ? `Authentication failed. ${origin} is now blocked until the host restarts.`
+                : 'Authentication failed: invalid code.'
               this.isSyncing = false
             }
           }
