@@ -813,6 +813,12 @@ export default function WallView() {
         return
       }
       if (e.key === 'Escape') {
+        // Every open panel, not just the canvas state. A popover you can open
+        // with the keyboard and only close with the mouse is a trap.
+        setWallMenuOpen(false)
+        setRenaming(null)
+        setBgOpen(false)
+        setPicker(null)
         setTool('select')
         setArrowFrom(null)
         setSelectedIds(new Set())
@@ -1188,7 +1194,13 @@ export default function WallView() {
                         autoFocus
                         value={renaming.draft}
                         onChange={e => setRenaming({ id: w.id, draft: e.target.value })}
-                        onBlur={() => setRenaming(null)}
+                        // Commits rather than discards. Clicking away after
+                        // typing a name is not a request to throw it away, and
+                        // it happened silently.
+                        onBlur={() => {
+                          commitIndex(renameWall(wallIndex, w.id, renaming.draft))
+                          setRenaming(null)
+                        }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             commitIndex(renameWall(wallIndex, w.id, renaming.draft))
@@ -1604,29 +1616,61 @@ export default function WallView() {
                     </div>
                   )}
 
+                  {/* A locked item ignores every press. Without a marker that
+                      reads as the app being broken rather than as a choice. */}
+                  {item.locked && (
+                    <span
+                      title="Locked. Right-click to unlock."
+                      style={{
+                        position: 'absolute', right: '-6px', top: '-6px',
+                        width: '18px', height: '18px', borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'var(--color-surface-elevated)',
+                        border: '1px solid var(--color-surface-offset)',
+                        color: 'var(--color-text-faint)', pointerEvents: 'none'
+                      }}
+                    >
+                      <Lock size={10} />
+                    </span>
+                  )}
+
                   {/* Handles only for a single unlocked selection: dragging one
                       corner of five items has no obvious meaning. */}
                   {isSelected && single?.id === item.id && !item.locked && (
                     <>
+                      {/* A 22px grab area around a 12px dot. The handle used
+                          to be exactly as big as it looked, which made resizing
+                          a matter of hitting a 12px corner. */}
                       <div
                         data-wall-handle="se"
                         style={{
-                          position: 'absolute', right: '-6px', bottom: '-6px', width: '12px', height: '12px',
-                          background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
-                          borderRadius: '2px', cursor: 'nwse-resize'
+                          position: 'absolute', right: '-11px', bottom: '-11px', width: '22px', height: '22px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'nwse-resize'
                         }}
-                      />
+                      >
+                        <span style={{
+                          width: '12px', height: '12px',
+                          background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
+                          borderRadius: '2px'
+                        }} />
+                      </div>
                       <div
                         data-wall-handle="rotate"
                         title="Drag to rotate, hold Shift for 15° steps"
                         style={{
-                          position: 'absolute', left: '50%', top: '-26px', transform: 'translateX(-50%)',
-                          width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'var(--color-surface-1)', border: '1px solid var(--color-secondary)',
-                          borderRadius: '50%', cursor: 'grab', color: 'var(--color-secondary)'
+                          position: 'absolute', left: '50%', top: '-30px', transform: 'translateX(-50%)',
+                          width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'grab'
                         }}
                       >
-                        <RotateCw size={9} />
+                        <span style={{
+                          width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'var(--color-surface-1)', border: '1px solid var(--color-secondary)',
+                          borderRadius: '50%', color: 'var(--color-secondary)'
+                        }}>
+                          <RotateCw size={9} />
+                        </span>
                       </div>
                     </>
                   )}
