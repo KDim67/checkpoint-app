@@ -129,3 +129,19 @@ Activate the clipboard manager using the global hotkey shortcut **Ctrl + Shift +
 - **Graphics & PBR Map Preview**: Three.js
 - **IPC Safety**: Zod validated payloads at main/renderer boundary
 - **Packaging**: electron-builder (ASAR enabled, C++ module unpacking)
+
+### A note on `dependencies` vs `devDependencies`
+
+Only packages the **main process** loads at runtime belong in `dependencies`:
+`@modelcontextprotocol/sdk`, `better-sqlite3`, `chokidar`, `openai`,
+`pdf-parse`, `systeminformation`, `uuid` and `zod`.
+
+Everything the renderer uses (React, Three.js, Mermaid, Lucide, dnd-kit, the
+fonts) is a **devDependency**, because Vite bundles it into `out/renderer`
+during the build. electron-builder packs `dependencies` into the installer as
+real `node_modules`, so a renderer library listed there ships a second copy of
+itself. Doing that cost 105 MB of installer before it was noticed.
+
+If you add a package, ask which process loads it. To check, build and grep the
+output for the import: a package that never appears in `out/main` or
+`out/preload` does not belong in `dependencies`.
