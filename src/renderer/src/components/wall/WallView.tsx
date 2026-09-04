@@ -66,22 +66,6 @@ const RAIL_OPEN_KEY = 'wallview_rail_open'
 const RAIL_WIDTH_KEY = 'wallview_rail_width'
 const SMOOTHING_KEY = 'wallview_pen_smoothing'
 
-/** The small heading above each group in the pen panel. */
-const caption: React.CSSProperties = {
-  fontSize: '9px',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: 'var(--color-text-faint)',
-  marginBottom: '2px'
-}
-
-/** One group in the pen panel: a caption and whatever it labels. */
-const group: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column'
-}
-
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
 const CLICK_SLOP = 4
@@ -1846,90 +1830,69 @@ export default function WallView() {
               aria-label="Pen settings"
               style={{
                 position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)',
-                zIndex: 20, display: 'flex', flexDirection: 'column', gap: 'var(--space-4)',
-                padding: 'var(--space-3)', width: '124px', boxSizing: 'border-box',
-                // Only scrolls if the window is genuinely too short for it. In
-                // three columns it fits, so the bars normally never appear.
+                zIndex: 20, display: 'flex', flexDirection: 'column', gap: '6px',
+                padding: 'var(--space-2)',
+                // A single column is tall, so it gets a ceiling rather than
+                // running off the bottom of a short window.
                 maxHeight: 'calc(100% - var(--space-6))', overflowY: 'auto', overflowX: 'hidden',
                 background: 'var(--color-surface-elevated)',
                 border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg, 10px)',
+                borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-lg)'
               }}
             >
-              <div style={group}>
-              <span style={caption}>Ink</span>
               <WallColorPicker
                 colors={WALL_COLORS}
                 value={penColor}
                 onChange={setPenColor}
-                columns={3}
+                columns={1}
               />
-              </div>
 
-              <div style={group}>
-              <span style={caption}>Width</span>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {STROKE_WIDTHS.map(width => (
-                  <button
-                    key={width}
-                    onClick={() => setPenWidth(width)}
-                    title={`${width}px`}
-                    aria-label={`Stroke width ${width}`}
-                    aria-pressed={penWidth === width}
-                    style={{
-                      width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: penWidth === width ? 'var(--color-secondary-muted)' : 'none',
-                      border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                      transition: 'background var(--duration-fast) var(--ease-default)'
-                    }}
-                  >
-                    <span style={{
-                      width: `${width + 6}px`, height: `${width}px`, borderRadius: '999px',
-                      background: penWidth === width ? 'var(--color-secondary)' : 'var(--color-text-muted)'
-                    }} />
-                  </button>
-                ))}
-              </div>
-              </div>
+              <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
 
-              {/* Two segments rather than a switch, so it lines up with the
-                  widths above and keeps the panel the same height either way. */}
-              <div style={group}>
-              <span style={caption}>Smoothing</span>
-              <div
-                role="group"
+              {STROKE_WIDTHS.map(width => (
+                <button
+                  key={width}
+                  onClick={() => setPenWidth(width)}
+                  title={`${width}px`}
+                  aria-label={`Stroke width ${width}`}
+                  aria-pressed={penWidth === width}
+                  style={{
+                    // 26 to match the swatches above it, so the strip has one edge.
+                    width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: penWidth === width ? 'var(--color-secondary-muted)' : 'none',
+                    border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                    transition: 'background var(--duration-fast) var(--ease-default)'
+                  }}
+                >
+                  <span style={{
+                    width: `${width + 6}px`, height: `${width}px`, borderRadius: '999px',
+                    background: penWidth === width ? 'var(--color-secondary)' : 'var(--color-text-muted)'
+                  }} />
+                </button>
+              ))}
+
+              <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
+
+              <button
+                onClick={() => {
+                  const next = !smoothing
+                  setSmoothing(next)
+                  void setNumberSetting(SMOOTHING_KEY, next ? SMOOTHING_STRENGTH : 0)
+                }}
+                title={smoothing ? 'Smoothing on' : 'Smoothing off'}
+                aria-label="Smooth strokes"
+                aria-pressed={smoothing}
                 style={{
-                  display: 'flex', padding: '2px', gap: '2px',
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)'
+                  width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: smoothing ? 'var(--color-secondary-muted)' : 'none',
+                  color: smoothing ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                  border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                  transition: 'background var(--duration-fast) var(--ease-default)'
                 }}
               >
-                {[false, true].map(on => (
-                  <button
-                    key={String(on)}
-                    onClick={() => {
-                      setSmoothing(on)
-                      void setNumberSetting(SMOOTHING_KEY, on ? SMOOTHING_STRENGTH : 0)
-                    }}
-                    title={on ? 'Smoothing on' : 'Smoothing off'}
-                    aria-label={on ? 'Smoothing on' : 'Smoothing off'}
-                    aria-pressed={smoothing === on}
-                    style={{
-                      flex: 1, minWidth: 0, height: '20px', padding: 0,
-                      fontSize: '9px', fontWeight: smoothing === on ? 700 : 500,
-                      background: smoothing === on ? 'var(--color-secondary)' : 'transparent',
-                      color: smoothing === on ? 'var(--color-surface-1)' : 'var(--color-text-muted)',
-                      border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                      transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
-                    }}
-                  >
-                    {on ? 'On' : 'Off'}
-                  </button>
-                ))}
-              </div>
-              </div>
+                <Spline size={13} />
+              </button>
             </div>
           )}
 

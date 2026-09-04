@@ -6,9 +6,9 @@
  * They had drifted to different sizes, different selected states and, in one
  * case, no custom colour at all.
  *
- * The custom swatch is a native colour input wearing a swatch: the OS picker is
- * better than anything worth hand-building, and this keeps it looking like the
- * rest of the row.
+ * The custom swatch opens the app's own picker. It used to open the OS one,
+ * which on Windows is a white system panel with nothing to do with the theme
+ * around it.
  */
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -26,7 +26,7 @@ interface Props {
   /** Offers "no colour of its own", for the background's follow-the-theme case. */
   defaultLabel?: string
   onDefault?: () => void
-  /** Offers any colour at all through the OS picker. */
+  /** Offers any colour at all, through the app's own picker. */
   allowCustom?: boolean
 }
 
