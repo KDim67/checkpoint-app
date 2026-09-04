@@ -13,6 +13,7 @@ import {
   onConnectionFailed,
   ICE_SERVERS
 } from './webrtcTransport'
+import { normalizeCollabMessage, type CollabMessage } from '../../../shared/collabProtocol'
 
 interface CollabOptions {
   pairingCode: string
@@ -302,10 +303,22 @@ export class WebRTCCollaborationCoordinator {
     })
   }
 
-  // Handle incoming messages
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async handleIncomingMessage(msg: any): Promise<void> {
+  /**
+   * Everything a peer sends arrives here, and nothing else does. The argument
+   * is `unknown` on purpose: what came off the wire is only a message once it
+   * has been through the normalizer.
+   */
+  private async handleIncomingMessage(raw: unknown): Promise<void> {
     if (!this.dataChannel) return
+
+    const msg = normalizeCollabMessage(raw)
+    if (!msg) {
+      // Not applied and not fatal. A peer on a different build sending
+      // something this one does not know is the ordinary case, and dropping the
+      // session over it would be worse than ignoring the message.
+      console.warn('[Collab Coordinator] Ignored a message this build does not understand.')
+      return
+    }
 
     switch (msg.type) {
       case 'board-baseline': {
@@ -315,7 +328,7 @@ export class WebRTCCollaborationCoordinator {
         // holding their own board of the same name simply lost it. Ask first.
         const accepted = await this.options.onConfirmBaseline({
           context: msg.context,
-          incomingItems: Array.isArray(msg.items) ? msg.items.length : 0
+          incomingItems: msg.items.length
         })
         if (!accepted) {
           this.options.onProgress('Join cancelled, your local board was left untouched.')
@@ -370,8 +383,7 @@ export class WebRTCCollaborationCoordinator {
    * A board baseline exceeds the 256 KB single-message ceiling on any board of
    * real size, so everything goes through the framing transport.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async send(msg: any): Promise<void> {
+  private async send(msg: CollabMessage): Promise<void> {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') return
     await sendFramed(this.dataChannel, msg)
   }

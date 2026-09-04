@@ -1272,14 +1272,40 @@ function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle(IpcChannels.SYNC_APPLY_BOARD_BASELINE, async (_event, context: string, items: any[], tags: any[], itemTags: any[], relations: any[]) => {
+// Both of these carry another machine's data into prepared statements. The
+  // renderer validates it on arrival, and it is validated again here: the rows
+  // reach SQL through this handler, and trusting the caller because the caller
+  // is usually our own renderer is how a validator ends up being skipped.
+  ipcMain.handle(IpcChannels.SYNC_APPLY_BOARD_BASELINE, async (
+    _event,
+    context: unknown,
+    items: unknown,
+    tags: unknown,
+    itemTags: unknown,
+    relations: unknown
+  ) => {
     const { applyBoardBaselineTx } = await import('./db')
-    return applyBoardBaselineTx(context, items, tags, itemTags, relations)
+    const { normalizeCollabMessage } = await import('../shared/collabProtocol')
+    const baseline = normalizeCollabMessage({ type: 'board-baseline', context, items, tags, itemTags, relations })
+    if (!baseline || baseline.type !== 'board-baseline') return
+    return applyBoardBaselineTx(
+      baseline.context,
+      baseline.items,
+      baseline.tags,
+      baseline.itemTags,
+      baseline.relations
+    )
   })
 
-  ipcMain.handle(IpcChannels.SYNC_APPLY_REMOTE_MUTATION, async (_event, mutation: any) => {
+  ipcMain.handle(IpcChannels.SYNC_APPLY_REMOTE_MUTATION, async (_event, mutation: unknown) => {
     const { applyRemoteMutationTx } = await import('./db')
-    return applyRemoteMutationTx(mutation)
+    const { normalizeRemoteMutation } = await import('../shared/collabProtocol')
+    const safe = normalizeRemoteMutation(mutation)
+    if (!safe) {
+      console.warn('[sync] Dropped a remote mutation this build cannot apply.')
+      return
+    }
+    return applyRemoteMutationTx(safe)
   })
 
   ipcMain.handle(IpcChannels.CHEATSHEETS_GET_RELEVANT, async (_event, name: string, query: string, maxChars?: number) => {

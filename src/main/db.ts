@@ -27,6 +27,7 @@ import {
 } from './validation'
 import { IpcChannels } from '../shared/ipcChannels'
 import { contextSettingKeys, remapContextSettings } from '../shared/contextSettings'
+import type { RemoteMutation } from '../shared/collabProtocol'
 import { wallIndexKey } from '../shared/wallModel'
 import { updateNativeTitleBarFromSettings } from './titleBarSync'
 import {
@@ -862,16 +863,12 @@ export function applyBoardBaselineTx(
   })()
 }
 
-export type RemoteMutation =
-  | { type: 'createItem' | 'updateItem'; item: Item; tagIds?: string[] }
-  | { type: 'deleteItem'; id: string }
-  | { type: 'createTag' | 'updateTag'; tag: Tag }
-  | { type: 'deleteTag'; id: string }
-  | { type: 'createRelation'; relation: Relation }
-  | { type: 'deleteRelation'; id: string }
-  | { type: 'bulkUpdateItems'; payload: { updates: { id: string; position: number; status: string }[] } }
-  | { type: 'bulkDeleteItems'; ids: string[] }
-  | { type: 'rebalancePositions'; context: string; status: string }
+/**
+ * Re-exported rather than declared here: the renderer needs this type to talk
+ * to a peer, and it cannot import from the main process. The definition and its
+ * validator live together in shared/collabProtocol.ts.
+ */
+export type { RemoteMutation }
 
 export function applyRemoteMutationTx(mutation: RemoteMutation): void {
   const db = getDb()
@@ -928,13 +925,24 @@ export function applyRemoteMutationTx(mutation: RemoteMutation): void {
     const { id } = mutation
     db.prepare('DELETE FROM relations WHERE id = ?').run(id)
   } else if (type === 'bulkUpdateItems') {
-    const { payload } = mutation
-    db.transaction(() => {
-      const stmt = db.prepare('UPDATE items SET position = ?, status = ?, updated_at = ? WHERE id = ?')
-      for (const u of payload.updates) {
-        stmt.run(u.position, u.status, Date.now(), u.id)
-      }
-    })()
+    // Built from whichever fields the patch actually carries, matching the
+    // local handler for the same payload, a fixed SET clause would write nulls
+    // over the fields the user did not touch.
+    const { ids, patch } = mutation.payload
+    const setFields: string[] = []
+    const params: Record<string, unknown> = { updated_at: Date.now() }
+
+    if (patch.status !== undefined) { setFields.push('status = @status'); params.status = patch.status }
+    if (patch.priority !== undefined) { setFields.push('priority = @priority'); params.priority = patch.priority }
+    if (patch.context !== undefined) { setFields.push('context = @context'); params.context = patch.context }
+
+    if (setFields.length > 0) {
+      setFields.push('updated_at = @updated_at')
+      const stmt = db.prepare(`UPDATE items SET ${setFields.join(', ')} WHERE id = @id`)
+      db.transaction(() => {
+        for (const id of ids) stmt.run({ ...params, id })
+      })()
+    }
   } else if (type === 'bulkDeleteItems') {
     const { ids } = mutation
     db.transaction(() => {
