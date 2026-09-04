@@ -1546,7 +1546,7 @@ export default function WallView() {
                 }}
                 title="Click to jump"
                 style={{
-                  position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
+                  position: 'absolute', left: 'var(--space-3)', bottom: 'var(--space-3)',
                   width: `${W}px`, height: `${H}px`, zIndex: 20, cursor: 'pointer',
                   background: 'var(--color-surface-1)',
                   border: '1px solid var(--color-surface-offset)',
