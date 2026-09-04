@@ -40,6 +40,12 @@ export interface WallItem {
   points?: number[]
   strokeWidth?: number
   /**
+   * Whether this stroke is drawn as curves. Stored per stroke rather than read
+   * from the live setting, so turning smoothing off later does not go back and
+   * change every line already on the wall.
+   */
+  smooth?: boolean
+  /**
    * An arrow's ends, as item ids. An arrow is not positioned: it is redrawn
    * from whatever the two items are doing, so it follows them for free and
    * cannot drift out of step with what it is pointing at.
@@ -188,6 +194,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(str(o.color) ? { color: str(o.color) } : {}),
     ...(points ? { points } : {}),
     ...(num(o.strokeWidth, 0) > 0 ? { strokeWidth: num(o.strokeWidth, STROKE_WIDTHS[1]) } : {}),
+    ...(o.smooth === true ? { smooth: true } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
@@ -664,16 +671,33 @@ export function inkFromPath(
   }
 }
 
-/** The `d` of an ink stroke, with the box scaled to whatever size it now is. */
+/**
+ * The `d` of an ink stroke, in the box coordinates the SVG scales.
+ *
+ * Smoothed strokes curve through the midpoint of each pair of samples, using
+ * the sample itself as the control point. Pointer samples are noisy and evenly
+ * spaced, so this is enough to take the hand-shake out without the line
+ * drifting away from where it was drawn.
+ */
 export function inkPath(item: WallItem): string {
-  const points = item.points ?? []
-  if (points.length < 4) return ''
+  const p = item.points ?? []
+  if (p.length < 4) return ''
 
-  return points.reduce((d, value, i) => {
-    if (i % 2 !== 0) return d
-    const command = i === 0 ? 'M' : 'L'
-    return `${d}${command}${value.toFixed(1)},${points[i + 1].toFixed(1)}`
-  }, '')
+  if (!item.smooth || p.length < 8) {
+    return p.reduce((d, value, i) => {
+      if (i % 2 !== 0) return d
+      return `${d}${i === 0 ? 'M' : 'L'}${value.toFixed(1)},${p[i + 1].toFixed(1)}`
+    }, '')
+  }
+
+  let d = `M${p[0].toFixed(1)},${p[1].toFixed(1)}`
+  for (let i = 2; i < p.length - 2; i += 2) {
+    const midX = (p[i] + p[i + 2]) / 2
+    const midY = (p[i + 1] + p[i + 3]) / 2
+    d += `Q${p[i].toFixed(1)},${p[i + 1].toFixed(1)} ${midX.toFixed(1)},${midY.toFixed(1)}`
+  }
+  // The last sample is joined straight, since it has no successor to average.
+  return `${d}L${p[p.length - 2].toFixed(1)},${p[p.length - 1].toFixed(1)}`
 }
 
 export interface Point { x: number; y: number }

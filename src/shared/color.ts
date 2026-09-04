@@ -58,3 +58,59 @@ export function lighten(hex: string, amount: number): string {
   if (!rgb) return hex
   return '#' + rgb.map(c => toHex(c + (255 - c) * amount)).join('')
 }
+
+// HSV, for a picker with a saturation square and a hue bar
+
+export interface Hsv { h: number; s: number; v: number }
+
+/** Null for anything unparseable, so a caller can keep its previous colour. */
+export function hexToHsv(hex: string): Hsv | null {
+  const rgb = parseHex(hex)
+  if (!rgb) return null
+
+  const [r, g, b] = rgb.map(v => v / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const delta = max - min
+
+  let h = 0
+  if (delta !== 0) {
+    if (max === r) h = ((g - b) / delta) % 6
+    else if (max === g) h = (b - r) / delta + 2
+    else h = (r - g) / delta + 4
+    h *= 60
+    if (h < 0) h += 360
+  }
+
+  return { h, s: max === 0 ? 0 : delta / max, v: max }
+}
+
+export function hsvToHex({ h, s, v }: Hsv): string {
+  // Normalised first, not just for the sector: a negative hue otherwise drives
+  // `x` negative and the channel renders as "-ff".
+  const hue = ((h % 360) + 360) % 360
+
+  const c = v * s
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1))
+  const m = v - c
+
+  const sector = Math.floor(hue / 60)
+  const [r, g, b] = (
+    sector === 0 ? [c, x, 0] :
+    sector === 1 ? [x, c, 0] :
+    sector === 2 ? [0, c, x] :
+    sector === 3 ? [0, x, c] :
+    sector === 4 ? [x, 0, c] :
+    [c, 0, x]
+  )
+
+  const channel = (n: number): string =>
+    Math.round((n + m) * 255).toString(16).padStart(2, '0')
+
+  return `#${channel(r)}${channel(g)}${channel(b)}`
+}
+
+/** True for the `#rrggbb` the pickers emit, so a half-typed hex is not applied. */
+export function isHex(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value.trim())
+}

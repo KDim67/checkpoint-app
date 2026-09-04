@@ -191,3 +191,46 @@ describe('an arrow has no box, and nothing should pretend it does', () => {
     expect(itemAtPoint([arrow], { x: 0, y: 0 })).toBeNull()
   })
 })
+
+describe('stroke smoothing', () => {
+  const many = (n: number): number[] =>
+    Array.from({ length: n * 2 }, (_, i) => (i % 2 === 0 ? i * 3 : (i % 4 === 0 ? 0 : 6)))
+
+  it('draws straight segments when it is off', () => {
+    const d = inkPath(item({ kind: 'ink', points: many(6) }))
+    expect(d).toContain('L')
+    expect(d).not.toContain('Q')
+  })
+
+  it('draws curves when it is on', () => {
+    const d = inkPath(item({ kind: 'ink', points: many(6), smooth: true }))
+    expect(d).toContain('Q')
+  })
+
+  it('starts at the first sample and ends at the last, either way', () => {
+    // Smoothing must not move where the stroke begins or ends, or a line drawn
+    // to touch something would stop short of it.
+    const points = many(8)
+    const smooth = inkPath(item({ kind: 'ink', points, smooth: true }))
+    const last = `${points[points.length - 2].toFixed(1)},${points[points.length - 1].toFixed(1)}`
+    expect(smooth.startsWith(`M${points[0].toFixed(1)},${points[1].toFixed(1)}`)).toBe(true)
+    expect(smooth.endsWith(`L${last}`)).toBe(true)
+  })
+
+  it('leaves a very short stroke straight, having nothing to smooth', () => {
+    const d = inkPath(item({ kind: 'ink', points: [0, 0, 5, 5, 10, 0], smooth: true }))
+    expect(d).not.toContain('Q')
+  })
+
+  it('is remembered per stroke, not read from a live setting', () => {
+    // Otherwise switching the toggle would redraw every line already on the wall.
+    const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: true }
+    expect(normalizeWallItem(raw, 0)?.smooth).toBe(true)
+    expect(normalizeWallItem({ ...raw, smooth: false }, 0)?.smooth).toBeUndefined()
+  })
+
+  it('carries the flag from the pen that drew it', () => {
+    const ink = inkFromPath([{ x: 0, y: 0 }, { x: 5, y: 5 }], [], { smooth: true })!
+    expect(ink.smooth).toBe(true)
+  })
+})

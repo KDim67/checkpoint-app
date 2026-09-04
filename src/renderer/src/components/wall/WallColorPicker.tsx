@@ -11,9 +11,10 @@
  * rest of the row.
  */
 
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import { getTextColorForBackground } from '../../lib/contrast'
+import ColorField from '../ui/ColorField'
 
 interface Props {
   colors: string[]
@@ -37,6 +38,17 @@ export default function WallColorPicker({
   colors, value, onChange, columns = 4, defaultLabel, onDefault, allowCustom = true
 }: Props): React.JSX.Element {
   const isCustom = !!value && !colors.includes(value)
+  const [customOpen, setCustomOpen] = useState(false)
+  const customRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!customOpen) return
+    const onDown = (e: PointerEvent): void => {
+      if (!customRef.current?.contains(e.target as Node)) setCustomOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [customOpen])
 
   const swatch = (color: string, selected: boolean, label: string, onClick: () => void): React.JSX.Element => (
     <button
@@ -98,34 +110,47 @@ export default function WallColorPicker({
         {colors.map(color => swatch(color, value === color, color, () => onChange(color)))}
 
         {allowCustom && (
-          <label
-            title="Any colour"
-            style={{
-              width: `${TARGET}px`, height: `${TARGET}px`, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'
-            }}
-          >
-            <span style={{
-              width: `${DOT}px`, height: `${DOT}px`, borderRadius: '50%',
-              // The colour wheel says "anything", which a single sample cannot.
-              background: isCustom
-                ? value
-                : `conic-gradient(${[...colors, colors[0]].join(', ')})`,
-              boxShadow: isCustom
-                ? '0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--color-secondary)'
-                : 'inset 0 0 0 1px rgba(0,0,0,0.28)',
-              transition: 'box-shadow var(--duration-fast) var(--ease-default)'
-            }} />
-            <input
-              type="color"
-              value={value && /^#[0-9a-f]{6}$/i.test(value) ? value : '#f6c453'}
-              onChange={e => onChange(e.target.value)}
+          <div ref={customRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setCustomOpen(o => !o)}
+              title="Any colour"
               aria-label="Custom colour"
-              // Covers the swatch so the whole circle opens the OS picker, while
-              // the styled span is what is actually seen.
-              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', border: 'none', padding: 0 }}
-            />
-          </label>
+              aria-expanded={customOpen}
+              style={{
+                width: `${TARGET}px`, height: `${TARGET}px`, padding: 0, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'none', border: 'none', borderRadius: 'var(--radius-sm)',
+                transition: 'transform var(--duration-fast) var(--ease-default)'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'none' }}
+            >
+              <span style={{
+                width: `${DOT}px`, height: `${DOT}px`, borderRadius: '50%',
+                // The colour wheel says "anything", which a single sample cannot.
+                background: isCustom
+                  ? value
+                  : `conic-gradient(${[...colors, colors[0]].join(', ')})`,
+                boxShadow: isCustom
+                  ? '0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--color-secondary)'
+                  : 'inset 0 0 0 1px rgba(0,0,0,0.28)',
+                transition: 'box-shadow var(--duration-fast) var(--ease-default)'
+              }} />
+            </button>
+
+            {customOpen && (
+              <div style={{
+                position: 'absolute', top: 0, left: `${TARGET + 10}px`, zIndex: 60,
+                padding: 'var(--space-3)',
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-surface-offset)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-lg)'
+              }}>
+                <ColorField value={isCustom && value ? value : colors[0]} onChange={onChange} />
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

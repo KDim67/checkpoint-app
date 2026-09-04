@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import ColorField from './ColorField'
 
 export interface ColorPickerProps {
   value: string
@@ -22,6 +23,25 @@ export default function ColorPicker({
   onLiveDomUpdate
 }: ColorPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+
+  // Closes on a click anywhere else. The panel is absolutely positioned inside
+  // whatever opened it, so a full-screen backdrop would sit above that caller's
+  // own controls.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: PointerEvent): void => {
+      if (!anchorRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
   const isSelfUpdateRef = useRef(false)
   const [hex, setHex] = useState(value || '#3b82f6')
 
@@ -59,24 +79,39 @@ export default function ColorPicker({
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-      <input
-        ref={inputRef}
-        type="color"
-        defaultValue={validHex}
-        onInput={e => handleLiveInput((e.target as HTMLInputElement).value)}
-        onBlur={e => handleCommit((e.target as HTMLInputElement).value)}
-        style={{
-          width: `${swatchSize}px`,
-          height: `${swatchSize}px`,
-          padding: 0,
-          border: '1px solid var(--color-surface-offset)',
-          borderRadius: '4px',
-          background: 'transparent',
-          cursor: 'pointer',
-          flexShrink: 0
-        }}
-        title={title}
-      />
+      <div ref={anchorRef} style={{ position: 'relative', flexShrink: 0 }}>
+        <button
+          onClick={() => setOpen(o => !o)}
+          title={title}
+          aria-label={title}
+          aria-expanded={open}
+          style={{
+            width: `${swatchSize}px`,
+            height: `${swatchSize}px`,
+            padding: 0,
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: '4px',
+            background: validHex,
+            cursor: 'pointer',
+            display: 'block'
+          }}
+        />
+
+        {open && (
+          <div
+            style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 60,
+              padding: 'var(--space-3)',
+              background: 'var(--color-surface-elevated)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+          >
+            <ColorField value={validHex} onChange={handleLiveInput} onCommit={handleCommit} />
+          </div>
+        )}
+      </div>
       {showHexInput && (
         <input
           type="text"
