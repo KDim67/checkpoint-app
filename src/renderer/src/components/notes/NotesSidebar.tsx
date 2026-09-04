@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
   Plus, Search, Hash, Pin, PinOff, CalendarDays, ChevronDown,
-  Clock, ArrowDownAZ, HardDrive, X, Loader2
+  Clock, ArrowDownAZ, HardDrive, X, Loader2, FolderInput
 } from 'lucide-react'
 import type { NoteMetadata } from '../../../../shared/types'
 import { NOTE_TEMPLATES, formatRelativeTime, type SortKey } from './notesUtils'
@@ -29,6 +29,7 @@ interface NotesSidebarProps {
   onTogglePin: (title: string) => void
   onCreate: (templateId?: string) => void
   onDaily: () => void
+  onImportVault: () => void
 }
 
 const SORTS: { key: SortKey; label: string; icon: React.ReactNode }[] = [
@@ -41,7 +42,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
   const {
     items, allTags, totalCount, activeTitle, pinned, loading, searching,
     searchQuery, onSearchChange, sort, onSortChange, selectedTag, onSelectTag,
-    onSelect, onTogglePin, onCreate, onDaily
+    onSelect, onTogglePin, onCreate, onDaily, onImportVault
   } = props
 
   const [templateMenu, setTemplateMenu] = useState(false)
@@ -74,14 +75,24 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
               {totalCount}
             </span>
           </span>
-          <button
-            className="notes-icon-btn"
-            title="Open today's daily note"
-            aria-label="Open today's daily note"
-            onClick={onDaily}
-          >
-            <CalendarDays size={15} />
-          </button>
+          <div style={{ display: 'flex', gap: '2px' }}>
+            <button
+              className="notes-icon-btn"
+              title="Import an Obsidian vault"
+              aria-label="Import an Obsidian vault"
+              onClick={onImportVault}
+            >
+              <FolderInput size={15} />
+            </button>
+            <button
+              className="notes-icon-btn"
+              title="Open today's daily note"
+              aria-label="Open today's daily note"
+              onClick={onDaily}
+            >
+              <CalendarDays size={15} />
+            </button>
+          </div>
         </div>
 
         {/* New note split-button */}

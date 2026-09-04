@@ -38,6 +38,7 @@ export const enum IpcChannels {
   NOTES_WRITE            = 'notes:write',
   NOTES_DELETE           = 'notes:delete',
   NOTES_SEARCH           = 'notes:search',
+  NOTES_IMPORT_VAULT     = 'notes:importVault',
 
   // Git Integration
   GIT_CHECK              = 'git:check',

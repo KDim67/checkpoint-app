@@ -243,6 +243,31 @@ export default function NotesView(): React.JSX.Element {
     toast('Note created', { type: 'success' })
   }, [flushPending, uniqueTitle, createNote, toast])
 
+  /**
+   * A vault is a folder of Markdown, which is what Checkpoint's notes already
+   * are, so this copies rather than converting into some other shape. Whatever
+   * could not come across word for word is reported instead of being hidden.
+   */
+  const handleImportVault = useCallback(async () => {
+    const res = await window.electronAPI.notes.importVault()
+    if (res.cancelled) return
+    if (!res.success || !res.result) {
+      toast(res.error || 'Could not read that vault', { type: 'error' })
+      return
+    }
+
+    const { notesImported, attachmentsCopied, notes: caveats } = res.result
+    await loadNotesList()
+
+    const attachments = attachmentsCopied > 0
+      ? ` and ${attachmentsCopied} attachment${attachmentsCopied === 1 ? '' : 's'}`
+      : ''
+    toast(`Imported ${notesImported} note${notesImported === 1 ? '' : 's'}${attachments} from ${res.vault}`, { type: 'success' })
+    // One toast per caveat rather than a wall of text, and only when there is
+    // something the user would want to know about.
+    for (const caveat of caveats) toast(caveat, { type: 'info' })
+  }, [loadNotesList, toast])
+
   const handleDailyNote = useCallback(async () => {
     await flushPending()
     const title = isoDate()
@@ -465,6 +490,7 @@ export default function NotesView(): React.JSX.Element {
         onTogglePin={togglePin}
         onCreate={handleCreate}
         onDaily={handleDailyNote}
+        onImportVault={handleImportVault}
       />
 
       {/* COLUMN 2: EDITOR / PREVIEW */}
