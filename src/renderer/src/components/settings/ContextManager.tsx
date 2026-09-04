@@ -718,7 +718,7 @@ export default function ContextManager() {
             onClick={handleImportStart}
           >
             <Upload size={14} />
-            Import a workspace or Trello board
+            Import a workspace, Trello board or Todoist project
           </button>
         </div>
       )}
@@ -815,7 +815,7 @@ export default function ContextManager() {
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
               {importBoard ? (
                 <>
-                  From <strong>Trello</strong>: <strong>{importBoard.columns.length}</strong> columns
+                  From <strong>{importBoard.source === 'todoist' ? 'Todoist' : 'Trello'}</strong>: <strong>{importBoard.columns.length}</strong> columns
                   and <strong>{importBoard.cards.length}</strong> cards.
                   {importBoard.notes.length > 0 && (
                     <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: '2px' }}>

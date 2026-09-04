@@ -1,5 +1,5 @@
 import { app, BrowserWindow, nativeImage, ipcMain, Menu, shell, globalShortcut, dialog, clipboard, protocol, net, screen } from 'electron'
-import path, { join, relative, isAbsolute } from 'path'
+import path, { join, relative, isAbsolute, basename, extname } from 'path'
 import fs, { writeFileSync, existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { IpcChannels } from '../shared/ipcChannels'
@@ -655,6 +655,28 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.NOTES_SEARCH, async (_event, query: string) => {
     const { searchNotes } = await import('./notesFsService')
     return searchNotes(query)
+  })
+
+  // A vault is a folder, not a file, so this picks a directory rather than
+  // going through the workspace import.
+  ipcMain.handle(IpcChannels.NOTES_IMPORT_VAULT, async () => {
+    try {
+      const window = BrowserWindow.getFocusedWindow()
+      if (!window) return { success: false, error: 'No active window' }
+
+      const { filePaths } = await dialog.showOpenDialog(window, {
+        title: 'Choose an Obsidian vault',
+        properties: ['openDirectory']
+      })
+      if (!filePaths || filePaths.length === 0) return { success: false, cancelled: true }
+
+      const { importObsidianVault, vaultName } = await import('./obsidianService')
+      const result = importObsidianVault(filePaths[0])
+      return { success: true, vault: vaultName(filePaths[0]), result }
+    } catch (err) {
+      console.error('Failed to import an Obsidian vault:', err)
+      return { success: false, error: errorMessage(err) }
+    }
   })
 
   // Git Integration Handlers
@@ -1576,7 +1598,7 @@ app.whenReady().then(async () => {
 
       const { filePaths } = await dialog.showOpenDialog(window, {
         title: 'Import a workspace',
-        filters: [{ name: 'Checkpoint or Trello export (JSON)', extensions: ['json'] }],
+        filters: [{ name: 'Checkpoint, Trello or Todoist export', extensions: ['json', 'csv'] }],
         properties: ['openFile']
       })
 
@@ -1584,6 +1606,20 @@ app.whenReady().then(async () => {
 
       const filePath = filePaths[0]
       const raw = fs.readFileSync(filePath, 'utf8')
+      const {
+        parseForeignBoard, parseTodoistCsv, isTodoistCsv
+      } = await import('../shared/foreignImport')
+
+      // Todoist's own "export as template" writes a CSV, which is the only
+      // route out of Todoist that does not need an API token.
+      if (isTodoistCsv(raw)) {
+        // A template export carries no project name, so the file's own name
+        // stands in. It is what Todoist names the download.
+        const fromCsv = parseTodoistCsv(raw, basename(filePath, extname(filePath)))
+        if (fromCsv) return { success: true, foreign: fromCsv }
+        return { success: false, error: 'That Todoist export has no tasks in it.' }
+      }
+
       const parsed = JSON.parse(raw)
 
       // Checkpoint's own export.
@@ -1594,13 +1630,12 @@ app.whenReady().then(async () => {
       // Otherwise it may be an export from somewhere else. Recognised here
       // rather than in the renderer so the file is classified where it is read,
       // and the renderer only ever sees a shape it already understands.
-      const { parseForeignBoard } = await import('../shared/foreignImport')
       const foreign = parseForeignBoard(parsed)
       if (foreign) return { success: true, foreign }
 
       return {
         success: false,
-        error: 'Not a Checkpoint or Trello export. Trello boards export from Board menu → Print, export and share → Export as JSON.'
+        error: 'Not a Checkpoint, Trello or Todoist export. Trello: Board menu → Print, export and share → Export as JSON. Todoist: project menu → Export as template → CSV.'
       }
     } catch (err) {
       console.error('Failed to import workspace context:', err)

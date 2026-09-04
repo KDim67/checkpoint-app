@@ -9,6 +9,7 @@ import type { RemoteMutation } from '../shared/collabProtocol'
 import type { StartupSettings } from '../shared/startupSettings'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type { ImportedBoard } from '../shared/foreignImport'
+import type { VaultImportResult } from '../shared/obsidianImport'
 import type {
   Item,
   Tag,
@@ -608,7 +609,14 @@ const api = {
     deleteNote: (title: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.NOTES_DELETE, title),
     searchNotes: (query: string): Promise<NoteSearchResult[]> =>
-      ipcRenderer.invoke(IpcChannels.NOTES_SEARCH, query)
+      ipcRenderer.invoke(IpcChannels.NOTES_SEARCH, query),
+    importVault: (): Promise<{
+      success: boolean
+      cancelled?: boolean
+      error?: string
+      vault?: string
+      result?: VaultImportResult
+    }> => ipcRenderer.invoke(IpcChannels.NOTES_IMPORT_VAULT)
   },
 
   git: {
