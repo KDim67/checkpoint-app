@@ -101,8 +101,11 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
             onDrop={handlePbrDrop}
             onClick={handleBrowseClick}
             style={{
-              flex: 1,
-              minHeight: '300px',
+              // Not flex: 1. The drop target grew to whatever height was
+              // going, which on a tall window left a nine hundred pixel dashed
+              // box with a small label adrift in the middle of it.
+              minHeight: '260px',
+              maxHeight: '420px',
               border: '2px dashed var(--color-surface-offset)',
               borderRadius: 'var(--radius-lg)',
               display: 'flex',
@@ -148,6 +151,11 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   </span>
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
                     or click to browse local files (.png, .jpg, .jpeg, .tga, .bmp)
+                  </span>
+                  {/* What comes back. An empty drop target says what to put in
+                      and never said what you get out. */}
+                  <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', marginTop: 'var(--space-2)' }}>
+                    Returns Normal, Height, Roughness and Ambient Occlusion, previewed on a 3D model
                   </span>
                 </div>
               </>

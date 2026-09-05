@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react'
-import { GitFork, Grid, Layers, Maximize2, Palette, Repeat, Scissors, Sliders, Sparkles } from 'lucide-react'
 import { useToast } from './ui/Toast'
 import { loadBoardConfig } from '../lib/boardConfig'
 import { useAppStore } from '../store/appStore'
@@ -22,10 +21,14 @@ import { useAtlasTool } from './gamedev/useAtlasTool'
 import { useSeamlessTool } from './gamedev/useSeamlessTool'
 import { usePbrTool } from './gamedev/usePbrTool'
 import type { GameDevTab } from './gamedev/types'
+import GameDevLauncher from './gamedev/GameDevLauncher'
+import ToolSwitcher from './gamedev/ToolSwitcher'
 
 export default function GameDevView() {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState<GameDevTab>('pbr')
+  // null is the launcher. The workspace opens there rather than dropping
+  // someone into one of ten tools they did not choose.
+  const [activeTab, setActiveTab] = useState<GameDevTab | null>(null)
 
   const paletteTool = usePaletteTool()
   const renamerTool = useRenamerTool()
@@ -80,15 +83,18 @@ export default function GameDevView() {
       fontFamily: 'var(--font-sans)',
       boxSizing: 'border-box'
     }}>
-      {/* Header */}
-      <div>
-        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
-          Game Development Workspace
-        </h2>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-          Texture authoring, sprite pipeline and narrative tools. All processing runs locally.
-        </p>
-      </div>
+      {/* Header. Only on the launcher: inside a tool the switcher says where
+          you are, and repeating the title pushed the tool itself down. */}
+      {!activeTab && (
+        <div>
+          <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
+            Game Development Workspace
+          </h2>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+            Texture authoring, sprite pipeline and narrative tools. All processing runs locally.
+          </p>
+        </div>
+      )}
 
       {/* Grouped tool navigation */}
       <style>{`
@@ -141,70 +147,9 @@ export default function GameDevView() {
           margin-top: 2px;
         }
       `}</style>
-      <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-        {([
-          {
-            group: 'Textures',
-            tools: [
-              { id: 'pbr' as const,      label: 'PBR Maps',       icon: <Sparkles size={14} /> },
-              { id: 'seamless' as const, label: 'Seamless Tiler', icon: <Repeat size={14} /> },
-              { id: 'upscaler' as const, label: 'Pixel Upscaler', icon: <Maximize2 size={14} /> },
-              { id: 'lut' as const,      label: 'LUT Grader',     icon: <Sliders size={14} /> }
-            ]
-          },
-          {
-            group: 'Sprites',
-            tools: [
-              { id: 'atlas' as const,  label: 'Atlas Packer',  icon: <Grid size={14} /> },
-              { id: 'slicer' as const, label: 'Sprite Slicer', icon: <Scissors size={14} /> }
-            ]
-          },
-          {
-            group: 'Pipeline',
-            tools: [
-              { id: 'renamer' as const,  label: 'Batch Renamer',  icon: <Layers size={14} /> },
-              { id: 'dialogue' as const, label: 'Dialogue Flow',  icon: <GitFork size={14} /> },
-              { id: 'palette' as const,  label: 'Shader Palette', icon: <Palette size={14} /> }
-            ]
-          }
-        ]).map(section => (
-          <div
-            key={section.group}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '6px 8px 8px'
-            }}
-          >
-            <span style={{
-              fontSize: '9px',
-              fontWeight: 'var(--weight-bold)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.07em',
-              color: 'var(--color-text-faint)',
-              padding: '0 6px'
-            }}>
-              {section.group}
-            </span>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {section.tools.map(tool => (
-                <button
-                  key={tool.id}
-                  onClick={() => setActiveTab(tool.id)}
-                  className={`gamedev-tab-btn ${activeTab === tool.id ? 'active' : ''}`}
-                >
-                  {tool.icon}
-                  <span>{tool.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+{activeTab && <ToolSwitcher activeTab={activeTab} onPick={setActiveTab} onHome={() => setActiveTab(null)} />}
+
+      {!activeTab && <GameDevLauncher onPick={setActiveTab} />}
 
       {/* Tab Panels */}
       <div style={{ flex: 1, minHeight: 0 }}>
