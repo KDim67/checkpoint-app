@@ -74,16 +74,36 @@ function prepareOnce(db: Database.Database, sql: string): Database.Statement {
  * then close. Must be called during app shutdown (will-quit handler).
  */
 export function closeDb(): void {
-  if (dbInstance) {
-    try {
-      dbInstance.pragma('wal_checkpoint(TRUNCATE)') // flush WAL → main db file
-      dbInstance.close()
-    } catch (err) {
-      console.error('[db] Error closing database:', err)
-    } finally {
-      dbInstance = null
-      _stmtCache.clear()
-    }
+  if (!dbInstance) return
+
+  // Separately, because a checkpoint that throws must not skip the close. It
+  // used to share a try block with it, so a database that could not be flushed
+  // was also never closed, and the file stayed locked for the rest of the
+  // process's life.
+  try {
+    dbInstance.pragma('wal_checkpoint(TRUNCATE)') // flush WAL → main db file
+  } catch (err) {
+    console.error('[db] Could not checkpoint before closing:', err)
+  }
+  discardDb()
+}
+
+/**
+ * Closes the handle and flushes nothing.
+ *
+ * For a database that could not be read: there is nothing worth checkpointing,
+ * and on Windows the file cannot be moved out of the way while this process
+ * still holds it open.
+ */
+export function discardDb(): void {
+  if (!dbInstance) return
+  try {
+    dbInstance.close()
+  } catch (err) {
+    console.error('[db] Error closing database:', err)
+  } finally {
+    dbInstance = null
+    _stmtCache.clear()
   }
 }
 

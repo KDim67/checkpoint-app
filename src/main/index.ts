@@ -1494,7 +1494,54 @@ app.whenReady().then(async () => {
   // created hidden regardless. It is not revealed until ready-to-show, which
   // waits on the renderer bundle and dwarfs the cost of opening SQLite.
   const { initDb, registerDbHandlers } = await import('./db')
-  const db = initDb(app.getPath('userData'))
+
+  /**
+   * A database that will not open used to take the window with it: the throw
+   * landed before createWindow, so the app started and drew nothing at all.
+   * Now the unreadable file is moved aside, kept, and said out loud.
+   */
+  let db: Awaited<ReturnType<typeof initDb>>
+  const userData = app.getPath('userData')
+  try {
+    db = initDb(userData)
+  } catch (err) {
+    console.error('[main] The database would not open:', err)
+    const { quarantineDatabase, recoveryMessage, stampFor } = await import('./dbRecovery')
+    const { getBackupDir } = await import('./backupVault')
+    const { discardDb } = await import('./db')
+
+    // SQLite opens a file lazily, so the handle is live even though the first
+    // read threw. Windows will not rename a file this process still holds, and
+    // without the rename there is nowhere for a fresh database to go.
+    discardDb()
+
+    try {
+      const { movedTo } = quarantineDatabase(join(userData, 'checkpoint.db'), stampFor(Date.now()))
+      db = initDb(userData)
+      // After the window, so the dialog has something to sit in front of and
+      // the app is usable the moment the message is dismissed.
+      createWindow()
+      dialog.showMessageBox({
+        type: 'warning',
+        title: 'Checkpoint started with an empty database',
+        message: 'Your database could not be opened',
+        detail: recoveryMessage(movedTo, getBackupDir()),
+        buttons: ['OK']
+      }).catch(() => {})
+      registerIpcHandlers()
+      registerDbHandlers(db)
+      return
+    } catch (fatal) {
+      // The second failure is not the file, so a third attempt would fail too.
+      console.error('[main] Could not start even with a fresh database:', fatal)
+      dialog.showErrorBox(
+        'Checkpoint cannot start',
+        'The database could not be opened or recreated. Check that the disk is writable and not full, then try again.'
+      )
+      app.quit()
+      return
+    }
+  }
 
   createWindow()
   registerIpcHandlers()
