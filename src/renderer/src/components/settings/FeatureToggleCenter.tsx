@@ -222,8 +222,10 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
   'feature_view_clipboard': {
     key: 'view_clipboard',
     icon: <Clipboard size={16} />,
-    description: 'Monitors, saves, and lets you query clipboard copy-paste events.',
-    warning: 'Disabling hides the Clipboard tab on the left navigation bar.'
+    description: 'Records every text copy you make, so you can search back through them.',
+    warning: 'Everything copied is stored as plain text in the local database and in backups, '
+      + 'including anything pasted from a password manager. Windows does not tell the app '
+      + 'which copies were meant to be secret. Disabling stops the recording and hides the tab.'
   },
   'feature_view_analytics': {
     key: 'view_analytics',
