@@ -1545,6 +1545,9 @@ app.whenReady().then(async () => {
       }).catch(() => {})
       registerIpcHandlers()
       registerDbHandlers(db)
+
+  // Last, and only when packaged. Nothing else waits on it.
+  void import('./updater').then(({ initializeUpdater }) => initializeUpdater())
       return
     } catch (fatal) {
       // The second failure is not the file, so a third attempt would fail too.
@@ -1639,6 +1642,10 @@ app.whenReady().then(async () => {
   }
 
   registerDbHandlers(db)
+
+  // Last, and only when packaged. Nothing else waits on it, and the updater
+  // starts at most once however many times this is reached.
+  void import('./updater').then(({ initializeUpdater }) => initializeUpdater())
 
   // Context Export
   ipcMain.handle(IpcChannels.DB_EXPORT_CONTEXT, async (_event, context: string, contextName: string) => {

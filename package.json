@@ -2,6 +2,16 @@
   "name": "checkpoint-app",
   "version": "1.0.0",
   "description": "Checkpoint Developer Scratchpad",
+  "license": "MIT",
+  "author": "Dimitrios Koutsompinas",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KDim67/checkpoint-app.git"
+  },
+  "homepage": "https://github.com/KDim67/checkpoint-app#readme",
+  "bugs": {
+    "url": "https://github.com/KDim67/checkpoint-app/issues"
+  },
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
@@ -22,6 +32,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "12.11.1",
     "chokidar": "3.6.0",
+    "electron-updater": "^6.8.9",
     "openai": "4.104.0",
     "pdf-parse": "^2.4.5",
     "systeminformation": "^5.31.7",

@@ -62,6 +62,23 @@ npm run package
 
 ---
 
+## Licence
+
+MIT. See [LICENSE](LICENSE).
+
+Checkpoint bundles a number of open-source packages, all of them permissive
+(MIT, ISC, BSD, and the SIL Open Font Licence for the two bundled typefaces).
+Their notices ship with the app in `resources/THIRD-PARTY-LICENSES.txt`, which
+is generated from the dependency tree:
+
+```bash
+node scripts/third-party-licences.mjs
+```
+
+Re-run it whenever dependencies change. It walks `dependencies` plus the
+libraries Vite bundles into the renderer, because those ship inside the
+installer even though they are devDependencies.
+
 ## Where your data lives
 
 Everything is on your machine. There is no account and nothing is uploaded.
