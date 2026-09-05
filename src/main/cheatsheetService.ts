@@ -1,4 +1,33 @@
 import { app, dialog } from 'electron'
+
+/**
+ * pdf-parse, as far as this file is concerned.
+ *
+ * It ships no type declarations and has changed shape across major versions:
+ * newer builds export a `PDFParse` class returning pages, older ones export a
+ * function returning one blob of text, and either can sit on `default` or on
+ * the module itself. All four arrangements are described here so the reader
+ * below can tell them apart honestly rather than being cast into one of them.
+ */
+interface PdfParseResult {
+  text?: string
+  pages?: Array<{ text?: string }>
+}
+
+interface PdfParseInstance {
+  load(): Promise<void>
+  getText(): Promise<PdfParseResult | string>
+}
+
+interface PdfParseClass {
+  new (data: Uint8Array): PdfParseInstance
+  prototype?: { load?: unknown }
+}
+
+type PdfParseFunction = (data: Buffer) => Promise<PdfParseResult | undefined>
+
+/** Whatever the import turned out to be, before it has been told apart. */
+type PdfParseExport = Record<string, unknown> | PdfParseClass | PdfParseFunction | undefined
 import { join, basename, extname } from 'path'
 import { existsSync, promises as fs } from 'fs'
 
@@ -170,7 +199,7 @@ export async function getCheatsheetText(name: string): Promise<string> {
   } catch { /* fall through to parse */ }
 
   const origWarn = console.warn
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     if (typeof args[0] === 'string' && args[0].includes('standardFontDataUrl')) return
     origWarn(...args)
   }
@@ -179,22 +208,33 @@ export async function getCheatsheetText(name: string): Promise<string> {
   try {
     const dataBuffer = await fs.readFile(filePath)
     const uint8 = new Uint8Array(dataBuffer)
-    const pdfModule: any = await import('pdf-parse')
-    const PDFParseClass = pdfModule.PDFParse || pdfModule.default?.PDFParse || pdfModule.default || pdfModule
+    // pdf-parse ships no types and its default export moved between major
+    // versions, so both shapes are declared rather than guessed at.
+    const pdfModule = await import('pdf-parse') as unknown as Record<string, unknown>
+    const asRecord = (v: unknown): Record<string, unknown> | undefined =>
+      v && typeof v === 'object' ? v as Record<string, unknown> : undefined
 
-    if (typeof PDFParseClass === 'function' && PDFParseClass.prototype?.load) {
-      const parser = new PDFParseClass(uint8)
+    const PDFParseClass: PdfParseExport =
+      (pdfModule.PDFParse as PdfParseExport)
+      ?? (asRecord(pdfModule.default)?.PDFParse as PdfParseExport)
+      ?? (pdfModule.default as PdfParseExport)
+      ?? pdfModule
+
+    // The class form announces itself by having load() on its prototype; the
+    // function form is called directly.
+    if (typeof PDFParseClass === 'function' && (PDFParseClass as PdfParseClass).prototype?.load) {
+      const parser = new (PDFParseClass as PdfParseClass)(uint8)
       await parser.load()
       const res = await parser.getText()
-      if (res && Array.isArray(res.pages)) {
-        text = res.pages.map((p: any) => p.text || '').join('\n\n')
-      } else if (typeof res === 'string') {
+      if (typeof res === 'string') {
         text = res
+      } else if (res && Array.isArray(res.pages)) {
+        text = res.pages.map(p => p.text || '').join('\n\n')
       } else if (res?.text) {
         text = res.text
       }
     } else if (typeof PDFParseClass === 'function') {
-      const res = await PDFParseClass(dataBuffer)
+      const res = await (PDFParseClass as PdfParseFunction)(dataBuffer)
       text = res?.text || ''
     }
   } catch (err) {

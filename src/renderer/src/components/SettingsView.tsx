@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import type { AiMemory } from '../../../shared/types'
 import { useConfirm } from './ui/ConfirmDialog'
 import {
   Settings,
@@ -350,7 +351,7 @@ function WidgetSettings() {
 
 function MemoryVaultManager() {
   const activeContext = useAppStore(s => s.activeContext)
-  const [memories, setMemories] = useState<any[]>([])
+  const [memories, setMemories] = useState<AiMemory[]>([])
   const [newKey, setNewKey] = useState('')
   const [newContent, setNewContent] = useState('')
   const [loading, setLoading] = useState(true)

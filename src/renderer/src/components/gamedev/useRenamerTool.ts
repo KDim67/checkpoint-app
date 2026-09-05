@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import type { RenamerPreset, RenamerSuffixPreset } from './types'
 import { useToast } from '../ui/Toast'
 import type { AssetFile } from './types'
 
@@ -12,9 +13,9 @@ export function useRenamerTool() {
   const { toast } = useToast()
 
   const [files, setFiles] = useState<AssetFile[]>([])
-  const [renamerPreset, setRenamerPreset] = useState<'none' | 'texture' | 'mesh' | 'audio'>('none')
+  const [renamerPreset, setRenamerPreset] = useState<RenamerPreset>('none')
 
-  const [renamerSuffixPreset, setRenamerSuffixPreset] = useState<'none' | 'diffuse' | 'normal'>('none')
+  const [renamerSuffixPreset, setRenamerSuffixPreset] = useState<RenamerSuffixPreset>('none')
   const [searchStr, setSearchStr] = useState('')
   const [replaceStr, setReplaceStr] = useState('')
   const [customPrefix, setCustomPrefix] = useState('')

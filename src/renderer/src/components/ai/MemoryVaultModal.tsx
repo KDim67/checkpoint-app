@@ -9,6 +9,7 @@
  */
 
 import React from 'react'
+import type { MemoryCategory } from '../../../../shared/memoryActions'
 import { Brain, X, Plus, Search, Pin, Trash2, Edit2, RefreshCw } from 'lucide-react'
 import type { MemoryVault } from './useMemoryVault'
 
@@ -245,7 +246,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                     />
                     <select
                       value={newMemoryCategory}
-                      onChange={e => setNewMemoryCategory(e.target.value as any)}
+                      onChange={e => setNewMemoryCategory(e.target.value as MemoryCategory)}
                       style={{
                         background: 'var(--color-surface-2)',
                         border: '1px solid rgba(168,85,247,0.3)',

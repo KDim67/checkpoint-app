@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
+import type { ContextEntry } from './store/appStore'
 import { useAppStore, type ActiveView } from './store/appStore'
 import { useAiEnabled } from './lib/useAiEnabled'
 import { Sidebar } from './components/Sidebar'
@@ -621,7 +622,9 @@ export default function App() {
         setAvailableContexts(contexts)
 
         const rawList = await window.electronAPI.db.getSetting('contexts_list') as string | null
-        let list: any[] = []
+        // Written by this app, but it is JSON off disk and a hand-edited
+        // settings row is still a possibility.
+        let list: ContextEntry[] = []
         if (rawList) {
           try {
             list = JSON.parse(rawList)

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '../ui/Toast'
-import type { DialogueNode } from './types'
+import { normalizeDialogueNodes, type DialogueNode } from './types'
+
+/** Raised by the AI panel when it has a dialogue tree to hand over. */
+const AI_DIALOGUE_EVENT = 'ai-load-dialogue-tree'
 
 /**
  * Dialogue Quest Flow state, editing operations, and the Mermaid compilation.
@@ -26,22 +29,23 @@ export function useDialogueTool(onActivate: () => void) {
   const [dialogueChoiceInputs, setDialogueChoiceInputs] = useState<Record<string, { text: string; nextId: string }>>({})
 
   useEffect(() => {
-    const handleAiDialogueLoad = (evt: CustomEvent) => {
-      const detail = evt.detail
-      if (detail && Array.isArray(detail.nodes)) {
-        const formatted = detail.nodes.map((n: any) => ({
-          id: n.id || `node_${Math.random().toString(36).substr(2, 5)}`,
-          speaker: n.speaker || 'NPC',
-          text: n.text || '',
-          choices: Array.isArray(n.choices) ? n.choices.map((c: any) => ({ text: c.text, nextId: c.target || c.nextId || '' })) : []
-        }))
-        setDialogueNodes(formatted)
-        onActivate()
-        toast('Loaded AI Dialogue Quest Tree into Workspace!', { type: 'success' })
-      }
+    const handleAiDialogueLoad = (evt: Event): void => {
+      const detail = (evt as CustomEvent<{ nodes?: unknown }>).detail
+      const nodes = normalizeDialogueNodes(
+        detail?.nodes,
+        () => `node_${Math.random().toString(36).slice(2, 7)}`
+      )
+      if (nodes.length === 0) return
+
+      setDialogueNodes(nodes)
+      onActivate()
+      toast('Loaded AI Dialogue Quest Tree into Workspace!', { type: 'success' })
     }
-    window.addEventListener('ai-load-dialogue-tree' as any, handleAiDialogueLoad)
-    return () => window.removeEventListener('ai-load-dialogue-tree' as any, handleAiDialogueLoad)
+
+    // A custom event name is not in WindowEventMap, so the listener is typed
+    // as the plain Event it really receives and narrowed inside.
+    window.addEventListener(AI_DIALOGUE_EVENT, handleAiDialogueLoad)
+    return () => window.removeEventListener(AI_DIALOGUE_EVENT, handleAiDialogueLoad)
   }, [toast, onActivate])
 
   // Tab 3: Dialogue Editor Logic

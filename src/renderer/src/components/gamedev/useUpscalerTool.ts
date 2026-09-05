@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import type { UpscaleAlgorithm } from './types'
 import { useToast } from '../ui/Toast'
 import { scale2xData, scale3xData } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
@@ -16,7 +17,7 @@ export function useUpscalerTool(isActive: boolean) {
   // Tab 10: Pixel Art Upscaler State
   const [upscalePath, setUpscalePath] = useState<string | null>(null)
   const [upscaleUrl, setUpscaleUrl] = useState<string | null>(null)
-  const [upscaleAlgorithm, setUpscaleAlgorithm] = useState<'nearest2x' | 'nearest4x' | 'nearest8x' | 'scale2x' | 'scale3x' | 'scale4x'>('scale2x')
+  const [upscaleAlgorithm, setUpscaleAlgorithm] = useState<UpscaleAlgorithm>('scale2x')
   const [upscaleExportedPath, setUpscaleExportedPath] = useState<string | null>(null)
   const [isUpscaleSaving, setIsUpscaleSaving] = useState(false)
   const [upscaleDims, setUpscaleDims] = useState<{ w: number; h: number; ow: number; oh: number } | null>(null)

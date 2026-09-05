@@ -1,4 +1,5 @@
 import React from 'react'
+import type { UpscaleAlgorithm } from './types'
 import { CheckCircle, Download, Loader, Maximize2, Plus, Settings } from 'lucide-react'
 import type { UpscalerTool } from './useUpscalerTool'
 
@@ -84,7 +85,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               </span>
               <select
                 value={upscaleAlgorithm}
-                onChange={e => setUpscaleAlgorithm(e.target.value as any)}
+                onChange={e => setUpscaleAlgorithm(e.target.value as UpscaleAlgorithm)}
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',

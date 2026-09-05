@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import type { AtlasMaxSize } from './types'
 import { useToast } from '../ui/Toast'
 import { BinaryTreePacker } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
@@ -9,6 +10,38 @@ import { errorMessage } from '../../../../shared/errors'
  * A hook rather than state inside AtlasPanel. The panel unmounts on tab
  * switch, which would discard a packed sheet.
  */
+/**
+ * One sprite on its way into the atlas: where it was cropped from, how big it
+ * was before trimming, and where the packer decided to put it.
+ */
+export interface AtlasBlock {
+  name: string
+  path: string
+  img: HTMLImageElement
+  /** Placed size, the trimmed frame plus padding on every side. */
+  w: number
+  h: number
+  /** The used region within the source image, after transparent edges are cut. */
+  frameX: number
+  frameY: number
+  frameW: number
+  frameH: number
+  originalW: number
+  originalH: number
+  trimmed: boolean
+  /** Where the packer put it, or null when it did not fit at all. */
+  fit: { x: number; y: number } | null
+}
+
+/** A frame in the exported JSON, in the shape TexturePacker writes. */
+export interface AtlasFrame {
+  frame: { x: number; y: number; w: number; h: number }
+  rotated: boolean
+  trimmed: boolean
+  spriteSourceSize: { x: number; y: number; w: number; h: number }
+  sourceSize: { w: number; h: number }
+}
+
 export function useAtlasTool() {
   const { toast } = useToast()
 
@@ -16,13 +49,13 @@ export function useAtlasTool() {
   const [atlasFolderPath, setAtlasFolderPath] = useState<string | null>(null)
   const [atlasSprites, setAtlasSprites] = useState<Array<{ name: string; path: string; dataUrl: string }>>([])
   const [atlasPadding, setAtlasPadding] = useState(2)
-  const [atlasMaxSize, setAtlasMaxSize] = useState<1024 | 2048 | 4096>(2048)
+  const [atlasMaxSize, setAtlasMaxSize] = useState<AtlasMaxSize>(2048)
   const [atlasAutoTrim, setAtlasAutoTrim] = useState(true)
   const [isAtlasPacking, setIsAtlasPacking] = useState(false)
   const [isAtlasSaving, setIsAtlasSaving] = useState(false)
   const [atlasExportedPng, setAtlasExportedPng] = useState<string | null>(null)
   const [atlasExportedJson, setAtlasExportedJson] = useState<string | null>(null)
-  const [atlasLayout, setAtlasLayout] = useState<{ size: number; blocks: any[] } | null>(null)
+  const [atlasLayout, setAtlasLayout] = useState<{ size: number; blocks: AtlasBlock[] } | null>(null)
   const atlasPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
 
@@ -82,7 +115,9 @@ export function useAtlasTool() {
       }
 
       // 2. Compute trimmed bounds and packing blocks
-      const blocks = loaded.map(({ name, path, img }) => {
+      // Annotated, or the literal below narrows fit to null and the packer
+      // cannot write a position into it.
+      const blocks: AtlasBlock[] = loaded.map(({ name, path, img }) => {
         let trimmed = false
         let frameX = 0, frameY = 0, frameW = img.width, frameH = img.height
 
@@ -117,7 +152,7 @@ export function useAtlasTool() {
           originalW: img.width,
           originalH: img.height,
           trimmed,
-          fit: null as any
+          fit: null
         }
       })
 
@@ -233,7 +268,7 @@ export function useAtlasTool() {
       const ctx = exportCanvas.getContext('2d')
       if (!ctx) throw new Error('Could not create export canvas context')
 
-      atlasLayout.blocks.forEach((block: any) => {
+      atlasLayout.blocks.forEach((block: AtlasBlock) => {
         if (!block.fit) return
         ctx.drawImage(
           block.img,
@@ -242,8 +277,8 @@ export function useAtlasTool() {
         )
       })
 
-      const frames: Record<string, any> = {}
-      atlasLayout.blocks.forEach((block: any) => {
+      const frames: Record<string, AtlasFrame> = {}
+      atlasLayout.blocks.forEach((block: AtlasBlock) => {
         if (!block.fit) return
         frames[block.name] = {
           frame: {

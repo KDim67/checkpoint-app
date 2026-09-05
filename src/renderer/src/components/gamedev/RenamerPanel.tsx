@@ -1,4 +1,5 @@
 import React from 'react'
+import type { RenamerPreset, RenamerSuffixPreset } from './types'
 import { Info, Trash2, RefreshCw, CheckCircle, Layers } from 'lucide-react'
 import type { RenamerTool } from './useRenamerTool'
 
@@ -61,7 +62,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Asset Type Prefix (Unity/Unreal)</label>
               <select
                 value={renamerPreset}
-                onChange={e => setRenamerPreset(e.target.value as any)}
+                onChange={e => setRenamerPreset(e.target.value as RenamerPreset)}
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',
@@ -83,7 +84,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Texture Map Suffix</label>
               <select
                 value={renamerSuffixPreset}
-                onChange={e => setRenamerSuffixPreset(e.target.value as any)}
+                onChange={e => setRenamerSuffixPreset(e.target.value as RenamerSuffixPreset)}
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',
