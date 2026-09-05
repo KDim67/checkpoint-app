@@ -1,0 +1,53 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to a branch cancels the run still going for the first one.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # Windows only, because Windows is what Checkpoint ships on and what
+    # `npm run package` builds against. The other two targets in
+    # electron-builder.yml are untested ground; running checks on them here
+    # would report on a build nobody installs.
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The test harness uses node:sqlite's backup(), which is why the bar
+          # is this high. Same figure as engines.node in package.json.
+          node-version: 24
+          cache: npm
+
+      # ci, not install: it installs exactly what the lockfile says and fails
+      # if package.json and the lock have drifted apart.
+      #
+      # --ignore-scripts skips the postinstall that rebuilds better-sqlite3
+      # against Electron's ABI. None of the four checks below need it: the
+      # tests run against a node:sqlite stub, and the build only bundles. This
+      # was measured, not assumed, on a clean checkout.
+      #
+      # Skipping it also sidesteps npm 11's install-script approval prompt,
+      # which otherwise leaves better-sqlite3, electron and esbuild silently
+      # unbuilt on a fresh runner. A native toolchain failing here would block
+      # every pull request over something no check actually looks at.
+      - name: Install
+        run: npm ci --ignore-scripts
+
+      # typecheck, lint, tests, build. The same one command the readme asks
+      # contributors to run before opening a pull request.
+      - name: Verify
+        run: npm run verify
