@@ -237,6 +237,8 @@ export default function WallView() {
   const zoomCommitRef = useRef<number | null>(null)
   /** The items while a move is in flight, ahead of the ones in state. */
   const liveItemsRef = useRef<WallItem[] | null>(null)
+  /** The marquee as drawn, ahead of the one in state. */
+  const marqueeRectRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   useEffect(() => () => {
     if (zoomCommitRef.current !== null) window.clearTimeout(zoomCommitRef.current)
   }, [])
@@ -882,7 +884,7 @@ export default function WallView() {
       const item = byId.get(id)
       const el = viewport.querySelector<HTMLElement>(`[data-wall-item="${id}"]`)
       if (!item || !el) return
-      el.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`
+      el.style.transform = `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`
     })
 
     // An arrow has no position of its own. One on a moving item is redrawn
@@ -989,11 +991,24 @@ export default function WallView() {
 
     if (drag.mode === 'marquee') {
       const p = screenPoint(e)
-      setMarquee(rectFromPoints({ x: drag.startX, y: drag.startY }, p))
+      // Drawn by hand: through state the box re-rendered the wall on every
+      // frame of the sweep. The state set at the press only makes it exist.
+      const box = rectFromPoints({ x: drag.startX, y: drag.startY }, p)
+      marqueeRectRef.current = box
+      const el = viewportRef.current?.querySelector<HTMLElement>('[data-wall-marquee]')
+      if (el) {
+        el.style.left = `${box.x}px`
+        el.style.top = `${box.y}px`
+        el.style.width = `${box.width}px`
+        el.style.height = `${box.height}px`
+      }
       const a = toWallPoint({ x: drag.startX, y: drag.startY }, cam)
       const b = toWallPoint(p, cam)
       const hit = itemsInRect(docRef.current.items, rectFromPoints(a, b))
-      setSelectedIds(new Set([...drag.base, ...hit]))
+      const next = new Set([...drag.base, ...hit])
+      // Only a change in what is caught is worth a render.
+      const current = selectedRef.current
+      if (next.size !== current.size || [...next].some(id => !current.has(id))) setSelectedIds(next)
       return
     }
 
@@ -1096,6 +1111,7 @@ export default function WallView() {
     setArrowEndHover(null)
     const drag = dragRef.current
     dragRef.current = null
+    marqueeRectRef.current = null
     setMarquee(null)
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
 
@@ -2092,7 +2108,11 @@ export default function WallView() {
                     // translate, not left/top. Moving an item this way costs no
                     // layout, and a layout here repaints the whole canvas layer,
                     // which means resampling every image on the wall per frame.
-                    transform: `translate3d(${item.x}px, ${item.y}px, 0)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`,
+                    // The 2D form, not translate3d: the 3D one gave every item
+                    // a compositor layer of its own, and with hundreds of them
+                    // each render paid to work out the overlaps between them
+                    // all, which is what made a click on a full board stall.
+                    transform: `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`,
                     // Images get their own compositor layer so a repaint of the
                     // canvas does not re-rasterise them. They are the expensive
                     // ones: a photo can be tens of megapixels behind a 280px box.
@@ -2240,7 +2260,7 @@ export default function WallView() {
                   onDoubleClick={e => { e.stopPropagation(); setEditingId(arrow.id) }}
                   style={{
                     position: 'absolute', left: 0, top: 0,
-                    transform: `translate3d(${mid.x}px, ${mid.y}px, 0) translate(-50%, -50%)`,
+                    transform: `translate(${mid.x}px, ${mid.y}px) translate(-50%, -50%)`,
                     maxWidth: '220px',
                     padding: '2px 6px',
                     background: 'var(--color-surface-1)',
@@ -2324,16 +2344,21 @@ export default function WallView() {
           })()}
 
           {/* Marquee, drawn in screen space so it does not scale with the camera. */}
-          {marquee && (
-            <div style={{
-              position: 'absolute',
-              left: `${marquee.x}px`, top: `${marquee.y}px`,
-              width: `${marquee.width}px`, height: `${marquee.height}px`,
-              border: '1px solid var(--color-secondary)',
-              background: 'var(--color-secondary-muted)',
-              pointerEvents: 'none'
-            }} />
-          )}
+          {marquee && (() => {
+            // The box drawn by hand is ahead of the one in state, and a render
+            // mid-sweep must not shrink it back to where the press was.
+            const box = marqueeRectRef.current ?? marquee
+            return (
+              <div data-wall-marquee style={{
+                position: 'absolute',
+                left: `${box.x}px`, top: `${box.y}px`,
+                width: `${box.width}px`, height: `${box.height}px`,
+                border: '1px solid var(--color-secondary)',
+                background: 'var(--color-secondary-muted)',
+                pointerEvents: 'none'
+              }} />
+            )
+          })()}
 
           {/* Controls for the current selection, floated above it. */}
           {floatingPos && selectedItems.length > 0 && (
