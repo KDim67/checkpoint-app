@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in Checkpoint does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One thing before you start: **check what is on screen**. A screenshot of
+        Checkpoint shows real note titles, task names and workspace names, and
+        this is a public repository.
+
+  - type: input
+    id: version
+    attributes:
+      label: Checkpoint version
+      description: Settings, then About.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Leave this blank if it only happens now and then.
+      value: |
+        1.
+        2.
+        3.
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Anything in the console
+      description: >
+        Ctrl+Shift+I opens developer tools, and the Console tab usually holds
+        the real error. Optional, but it is often the whole answer.
+      render: text

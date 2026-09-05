@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest something Checkpoint should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing up front: Checkpoint is local-first and works offline.
+        Anything that needs an account, or a server run by someone else, is
+        unlikely to land however good the idea is.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        The problem rather than the solution. What does the app make awkward
+        today, and what were you in the middle of when you noticed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you had in mind
+      description: Optional. A rough shape is fine.
