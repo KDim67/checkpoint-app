@@ -239,6 +239,10 @@ export default function WallView() {
   const liveItemsRef = useRef<WallItem[] | null>(null)
   /** The marquee as drawn, ahead of the one in state. */
   const marqueeRectRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
+  /** What the sweep has caught so far, ahead of the selection in state. */
+  const marqueeSelRef = useRef<Set<string> | null>(null)
+  /** What the sweep has actually drawn, so a frame only writes the difference. */
+  const paintedSelRef = useRef<Set<string> | null>(null)
   useEffect(() => () => {
     if (zoomCommitRef.current !== null) window.clearTimeout(zoomCommitRef.current)
   }, [])
@@ -844,7 +848,11 @@ export default function WallView() {
     const p = screenPoint(e)
     // The selection as it was at drag start. Unioning against the live one
     // means an item, once caught, can never be released.
-    dragRef.current = { mode: 'marquee', startX: p.x, startY: p.y, base: e.shiftKey ? new Set(selectedRef.current) : new Set() }
+    const base = e.shiftKey ? new Set(selectedRef.current) : new Set<string>()
+    dragRef.current = { mode: 'marquee', startX: p.x, startY: p.y, base }
+    // What is on screen once the clear above has rendered, so the first frame
+    // of the sweep knows what it is starting from.
+    paintedSelRef.current = new Set(base)
     setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
   }
 
@@ -873,6 +881,33 @@ export default function WallView() {
       view.style.width = `${(vw / cam.zoom) * k}px`
       view.style.height = `${(vh / cam.zoom) * k}px`
     }
+  }
+
+  /**
+   * The outline an item wears. Shared so the sweep below and the render can
+   * never disagree about what an item should be wearing.
+   */
+  const outlineFor = (id: string, selected: boolean): string =>
+    arrowDrag?.overId === id || arrowEndHover === id
+      ? '3px solid var(--color-secondary)'
+      : arrowFrom === id
+        ? '2px dashed var(--color-secondary)'
+        : selected ? '2px solid var(--color-secondary)' : 'none'
+
+  /** Outlines what a sweep has caught, without going through React. */
+  const paintSelection = (next: Set<string>, all = false): void => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const painted = paintedSelRef.current
+    const touched = all || !painted
+      ? docRef.current.items.map(i => i.id)
+      : [...new Set([...painted, ...next])].filter(id => painted.has(id) !== next.has(id))
+
+    touched.forEach(id => {
+      const el = viewport.querySelector<HTMLElement>(`[data-wall-item="${id}"]`)
+      if (el) el.style.outline = outlineFor(id, next.has(id))
+    })
+    paintedSelRef.current = new Set(next)
   }
 
   /** Moves items, and the arrows on them, by hand without going through React. */
@@ -917,6 +952,9 @@ export default function WallView() {
   // hand. Drawn again before that frame is shown.
   useLayoutEffect(() => {
     if (liveItemsRef.current) paintItems(liveItemsRef.current, movingRef.current)
+    // The render wrote the selection as it stands in state, which is behind the
+    // sweep. Every item, since which ones the render touched is not knowable.
+    if (marqueeSelRef.current) paintSelection(marqueeSelRef.current, true)
   })
 
   /**
@@ -1006,10 +1044,12 @@ export default function WallView() {
       const a = toWallPoint({ x: drag.startX, y: drag.startY }, cam)
       const b = toWallPoint(p, cam)
       const hit = itemsInRect(docRef.current.items, rectFromPoints(a, b))
+      // Painted by hand and committed on release. Through state, every frame
+      // re-rendered the outline and the handles of every item the box crossed,
+      // which on a wide sweep was the last thing still costing a stutter.
       const next = new Set([...drag.base, ...hit])
-      // Only a change in what is caught is worth a render.
-      const current = selectedRef.current
-      if (next.size !== current.size || [...next].some(id => !current.has(id))) setSelectedIds(next)
+      paintSelection(next)
+      marqueeSelRef.current = next
       return
     }
 
@@ -1112,6 +1152,13 @@ export default function WallView() {
     setArrowEndHover(null)
     const drag = dragRef.current
     dragRef.current = null
+    // A sweep that never moved committed nothing: the press already set the
+    // selection it wanted.
+    const swept = marqueeSelRef.current
+    marqueeSelRef.current = null
+    paintedSelRef.current = null
+    if (swept) setSelectedIds(swept)
+
     marqueeRectRef.current = null
     setMarquee(null)
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
@@ -2108,13 +2155,7 @@ export default function WallView() {
                   editing={editingId === item.id}
                   connectable={tool === 'select' && !item.locked && item.kind !== 'frame'}
                   showHandles={isSelected && single?.id === item.id && !item.locked}
-                  outline={
-                    arrowDrag?.overId === item.id || arrowEndHover === item.id
-                      ? '3px solid var(--color-secondary)'
-                      : arrowFrom === item.id
-                        ? '2px dashed var(--color-secondary)'
-                        : isSelected ? '2px solid var(--color-secondary)' : 'none'
-                  }
+                  outline={outlineFor(item.id, isSelected)}
                   onTextChange={onItemTextChange}
                   onFinishEditing={onItemFinishEditing}
                 />
