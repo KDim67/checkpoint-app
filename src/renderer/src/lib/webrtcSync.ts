@@ -11,7 +11,7 @@ import {
   flushChannel,
   waitForIceGathering,
   onConnectionFailed,
-  ICE_SERVERS
+  iceServers
 } from './webrtcTransport'
 
 interface FileMetadata {
@@ -70,7 +70,7 @@ export class WebRTCSyncCoordinator {
 
   /** Wires the failure paths every peer connection needs. */
   private newPeerConnection(): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const pc = new RTCPeerConnection({ iceServers: iceServers() })
     onConnectionFailed(pc, reason => {
       if (!this.finished) this.options.onError(new Error(reason))
     })

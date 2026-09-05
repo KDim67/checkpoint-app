@@ -12,6 +12,14 @@
  * limit is reachable from application code.
  */
 
+import { STUN_SERVERS, turnIceServer, type IceServer } from '../../../shared/iceConfig'
+import { getStringSetting } from './settings'
+
+/** Where a user's own relay is kept. Never synced, and encrypted at rest. */
+export const TURN_URL_KEY = 'turn_url'
+export const TURN_USERNAME_KEY = 'turn_username'
+export const TURN_CREDENTIAL_KEY = 'turn_credential'
+
 /**
  * Payload bytes per frame. Well under the 256 KB ceiling so the JSON envelope,
  * the relative path and base64 expansion all still fit with room to spare.
@@ -201,10 +209,37 @@ export function waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 8000): Pr
  * public one to point at, so a share of internet pairings cannot connect.
  * `onConnectionFailed` makes that visible instead of a hang.
  */
-export const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' }
-]
+/**
+ * Cached, because `new RTCPeerConnection` happens in synchronous code and
+ * reading a setting is a round trip through IPC. Refreshed at startup and
+ * whenever the user saves the form.
+ */
+let relay: IceServer | null = null
+
+/** Reads the configured relay into the cache. Safe to call repeatedly. */
+export async function refreshTurnServer(): Promise<void> {
+  try {
+    relay = turnIceServer({
+      url: await getStringSetting(TURN_URL_KEY, ''),
+      username: await getStringSetting(TURN_USERNAME_KEY, ''),
+      credential: await getStringSetting(TURN_CREDENTIAL_KEY, '')
+    })
+  } catch (err) {
+    // A relay that cannot be read is the same as not having one: STUN still
+    // works for most pairs, and failing to connect is better than failing to
+    // start.
+    console.error('[webrtc] Could not read the relay settings:', err)
+    relay = null
+  }
+}
+
+/**
+ * What to hand a peer connection. STUN always; a relay only if the user has
+ * configured one, since none ships with the app.
+ */
+export function iceServers(): RTCIceServer[] {
+  return (relay ? [...STUN_SERVERS, relay] : [...STUN_SERVERS]) as RTCIceServer[]
+}
 
 /**
  * Invokes `handler` when the peer connection reaches a terminal failure state.

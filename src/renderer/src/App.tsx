@@ -266,6 +266,12 @@ function RightPanel() {
 
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
 
+  // Loaded once at startup: a peer connection is built in synchronous code
+  // and cannot wait on a setting, so the transport keeps a cached copy.
+  useEffect(() => {
+    void import('./lib/webrtcTransport').then(({ refreshTurnServer }) => refreshTurnServer())
+  }, [])
+
   useEffect(() => {
     getNumberSetting('right_panel_width', DEFAULT_PANEL_WIDTH)
       .then(w => setPanelWidth(clampPanelWidth(w)))
