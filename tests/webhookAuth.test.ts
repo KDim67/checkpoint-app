@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { initDb, closeDb, getSetting, setSetting } from '../src/main/db'
 import { ensureWebhookToken, offeredToken, tokenMatches, WEBHOOK_TOKEN_KEY } from '../src/main/webhookAuth'
+import { isSecretSetting, secretSettingKeys } from '../src/main/secureSettings'
 
 // The gateway is an HTTP server on the loopback interface, and the loopback
 // interface is reachable from any browser page. The token is the only thing
@@ -121,5 +122,24 @@ describe('checking an offered token', () => {
 
   it('rejects a longer string that starts with the real one', () => {
     expect(tokenMatches(real + 'extra', real)).toBe(false)
+  })
+})
+
+describe('how the token is stored', () => {
+  it('is treated as a secret, so it is encrypted at rest', () => {
+    // It sits in the same file and the same rolling backups as the provider
+    // keys, and it grants writes over HTTP to whoever reads it.
+    expect(isSecretSetting(WEBHOOK_TOKEN_KEY)).toBe(true)
+  })
+
+  it('is in the list the boot migration walks, so existing installs catch up', () => {
+    expect(secretSettingKeys()).toContain(WEBHOOK_TOKEN_KEY)
+  })
+
+  it('sits alongside the other credential of its kind', () => {
+    // mcp_auth_token was encrypted for exactly this reason; the two should not
+    // drift apart.
+    expect(isSecretSetting('mcp_auth_token')).toBe(true)
+    expect(isSecretSetting('ai_api_key')).toBe(true)
   })
 })

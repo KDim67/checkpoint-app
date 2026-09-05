@@ -17,8 +17,15 @@ import { safeStorage } from 'electron'
  */
 // `mcp_auth_token` grants full read/write over every workspace to whoever holds
 // it, so it is encrypted at rest alongside the provider keys rather than
-// sitting in plaintext next to them.
-const SECRET_SETTING_KEYS = new Set(['ai_api_key', 'ai_providers', 'mcp_auth_token'])
+// sitting in plaintext next to them. `webhook_token` is the same bargain in a
+// smaller form: it lets its holder create items over HTTP, and it sits in the
+// same file and the same backups.
+const SECRET_SETTING_KEYS = new Set([
+  'ai_api_key',
+  'ai_providers',
+  'mcp_auth_token',
+  'webhook_token'
+])
 
 /**
  * Marks an encrypted payload. Deliberately not valid JSON: every plaintext
