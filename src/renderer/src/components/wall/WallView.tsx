@@ -125,7 +125,16 @@ type Drag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
   | { mode: 'move'; startX: number; startY: number; origin: WallItem[]; moved: boolean }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
-  | { mode: 'arrow'; fromId: string; startX: number; startY: number; moved: boolean; overId: string | null }
+  | {
+      mode: 'arrow'
+      fromId: string
+      startX: number
+      startY: number
+      moved: boolean
+      overId: string | null
+      /** Started from a hover handle rather than the arrow tool. */
+      viaHandle?: boolean
+    }
   | { mode: 'arrowEnd'; id: string; end: 'start' | 'end' }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
   | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
@@ -683,6 +692,22 @@ export default function WallView() {
       return
     }
 
+    // A connection handle, which sits on an item and so has to be checked
+    // before the item does. Same drag as the arrow tool runs, so everything
+    // downstream, the preview, the snapping, the styles, is already there.
+    const connectHandle = target.closest<HTMLElement>('[data-wall-connect]')
+    if (connectHandle && e.button === 0) {
+      const fromId = connectHandle.dataset.wallConnect
+      if (fromId) {
+        dragRef.current = {
+          mode: 'arrow', fromId,
+          startX: e.clientX, startY: e.clientY, moved: false, overId: null, viaHandle: true
+        }
+        setArrowDrag({ fromId, at: toWallPoint(screenPoint(e), docRef.current.camera), overId: null })
+        return
+      }
+    }
+
     // An end handle is grabbed before anything else on the canvas: it sits over
     // the item it is attached to, and the item would otherwise win.
     const endHandle = target.closest<HTMLElement>('[data-arrow-handle]')
@@ -939,6 +964,10 @@ export default function WallView() {
         setArrowFrom(null)
         return
       }
+
+      // A handle press that never moved is a misfire, not the first half of a
+      // gesture: there is no mode to be left waiting in.
+      if (drag.viaHandle) return
 
       // Never moved, so it was a click. Pick a source, then a target, which is
       // the easier gesture when the two items nearly touch.
@@ -1930,6 +1959,35 @@ export default function WallView() {
                     >
                       <Lock size={10} />
                     </span>
+                  )}
+
+                  {/* Drag one of these to any other item to connect the two.
+                      Only in select mode: the pen and the arrow already own
+                      the whole gesture, and a locked item connects to nothing. */}
+                  {tool === 'select' && !item.locked && item.kind !== 'frame' && (
+                    <>
+                      {([
+                        ['top', { left: '50%', top: '-13px', marginLeft: '-9px' }],
+                        ['right', { right: '-13px', top: '50%', marginTop: '-9px' }],
+                        ['bottom', { left: '50%', bottom: '-13px', marginLeft: '-9px' }],
+                        ['left', { left: '-13px', top: '50%', marginTop: '-9px' }]
+                      ] as const).map(([side, position]) => (
+                        <div
+                          key={side}
+                          className="wall-connect"
+                          data-wall-connect={item.id}
+                          title="Drag to connect this to something"
+                          style={{
+                            position: 'absolute', ...position,
+                            width: '18px', height: '18px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'crosshair', zIndex: 3
+                          }}
+                        >
+                          <span className="wall-connect-dot" style={{ width: '10px', height: '10px' }} />
+                        </div>
+                      ))}
+                    </>
                   )}
 
                   {/* Handles only for a single unlocked selection: dragging one

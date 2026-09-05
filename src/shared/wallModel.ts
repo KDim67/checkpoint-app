@@ -727,6 +727,61 @@ const INK_PAD = 8
  * so the stroke moves and resizes like any other item with no special cases.
  * Null when the path is a single point, which is a click and not a stroke.
  */
+/**
+ * How far a sample may sit from the line between its neighbours before it is
+ * worth keeping. In wall units, and well under a stroke's own width, so the
+ * line that is drawn does not change shape.
+ */
+export const SIMPLIFY_TOLERANCE = 0.7
+
+/**
+ * Ramer-Douglas-Peucker: drops the samples a stroke does not need.
+ *
+ * A pointer emits a sample every few milliseconds, so a single confident
+ * gesture arrives as hundreds of points sitting almost exactly on top of one
+ * another. They cost nothing to draw but everything is stored: the wall
+ * document is JSON in a settings row, it is synced between machines, and it is
+ * exported. A drawing session used to add tens of thousands of numbers to it.
+ *
+ * The first and last points are always kept, so a line drawn to touch
+ * something still touches it.
+ */
+export function simplifyPath(points: Point[], tolerance = SIMPLIFY_TOLERANCE): Point[] {
+  if (points.length < 3) return points
+
+  const keep = new Array<boolean>(points.length).fill(false)
+  keep[0] = true
+  keep[points.length - 1] = true
+
+  // Iterative rather than recursive: a long stroke is thousands of points and
+  // the recursion depth follows the data.
+  const stack: Array<[number, number]> = [[0, points.length - 1]]
+
+  while (stack.length > 0) {
+    const [first, last] = stack.pop()!
+    if (last <= first + 1) continue
+
+    let furthest = -1
+    let worst = tolerance
+
+    for (let i = first + 1; i < last; i++) {
+      const distance = distanceToSegment(points[i], points[first], points[last])
+      if (distance > worst) {
+        worst = distance
+        furthest = i
+      }
+    }
+
+    // Nothing strays far enough, so everything between the ends goes.
+    if (furthest === -1) continue
+
+    keep[furthest] = true
+    stack.push([first, furthest], [furthest, last])
+  }
+
+  return points.filter((_, i) => keep[i])
+}
+
 export function inkFromPath(
   path: { x: number; y: number }[],
   items: WallItem[],
@@ -734,8 +789,12 @@ export function inkFromPath(
 ): WallItem | null {
   if (path.length < 2) return null
 
-  const xs = path.map(p => p.x)
-  const ys = path.map(p => p.y)
+  // Thinned before the box is measured, so a sample dropped at the very edge
+  // cannot leave the box larger than the stroke inside it.
+  const simplified = simplifyPath(path)
+
+  const xs = simplified.map(p => p.x)
+  const ys = simplified.map(p => p.y)
   const minX = Math.min(...xs) - INK_PAD
   const minY = Math.min(...ys) - INK_PAD
   const width = Math.max(...xs) + INK_PAD - minX
@@ -750,7 +809,7 @@ export function inkFromPath(
     // legitimate stroke and its box is genuinely only as tall as the pad.
     width,
     height,
-    points: path.flatMap(p => [p.x - minX, p.y - minY]),
+    points: simplified.flatMap(p => [p.x - minX, p.y - minY]),
     z: topZ(items),
     ...extra
   }
