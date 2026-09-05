@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { copyrightYears, COPYRIGHT_HOLDER } from '../../../../shared/licence'
 import { ExternalLink, FolderOpen, Info, PlayCircle } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
@@ -177,7 +178,7 @@ export default function AboutPanel() {
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--color-surface-offset)'
       }}>
-        <strong>MIT License</strong>. Copyright © 2025 Checkpoint Contributors.
+        <strong>MIT License</strong>. Copyright © {copyrightYears(new Date().getFullYear())} {COPYRIGHT_HOLDER}.
         Permission is hereby granted, free of charge, to any person obtaining a copy
         of this software to use, copy, modify, merge, publish, distribute, sublicense,
         and/or sell copies of the Software, subject to the conditions of the MIT license.
