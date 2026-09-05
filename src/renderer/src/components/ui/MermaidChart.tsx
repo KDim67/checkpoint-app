@@ -1,13 +1,26 @@
 import React, { useState, useEffect, useId } from 'react'
 import mermaid from 'mermaid'
+import { themeToken, useThemeVersion } from '../../lib/themeTokens'
 
-// Mermaid keeps global config, so this runs once for the whole app. The colours
-// are literals because mermaid resolves them at render time outside the DOM,
-// where var(--token) has nothing to resolve against.
-try {
-  mermaid.initialize({
+/**
+ * Mermaid's settings, rebuilt from the theme every time a diagram is drawn.
+ *
+ * These colours used to be literals, on the correct observation that mermaid
+ * resolves them outside the DOM where var(--token) means nothing. The cost was
+ * that every diagram in the app stayed the default dark blue whatever theme was
+ * selected. Reading the tokens off the document first answers both.
+ */
+function mermaidConfig() {
+  const surface = themeToken('--color-surface-1', '#1b1f30')
+  const canvas = themeToken('--color-surface-2', '#131622')
+  const text = themeToken('--color-text-base', '#f1f5f9')
+  const border = themeToken('--color-surface-offset', '#24293f')
+
+  return {
     startOnLoad: false,
-    theme: 'dark',
+    // 'base' is the theme that honours themeVariables. 'dark' lays its own
+    // palette over the top and ignores most of what it is handed.
+    theme: 'base' as const,
     /**
      * Diagrams are rendered with `dangerouslySetInnerHTML`, and the text they
      * are built from is not always the user's own: a ```mermaid fence can
@@ -20,17 +33,23 @@ try {
      * that HTML markup inside a node label shows as text, which is the right
      * trade for markup nobody in this app writes on purpose.
      */
-    securityLevel: 'strict',
+    securityLevel: 'strict' as const,
     themeVariables: {
-      background: '#131622',
-      primaryColor: '#1e45fc',
-      secondaryColor: '#cdf12b',
-      lineColor: '#535e85',
-      textColor: '#f1f5f9'
+      background: canvas,
+      primaryColor: surface,
+      primaryTextColor: text,
+      primaryBorderColor: border,
+      secondaryColor: themeToken('--color-secondary', '#cdf12b'),
+      tertiaryColor: canvas,
+      lineColor: themeToken('--color-text-faint', '#535e85'),
+      textColor: text,
+      mainBkg: surface,
+      nodeBorder: border,
+      nodeTextColor: text,
+      edgeLabelBackground: canvas,
+      fontFamily: themeToken('--font-sans', 'system-ui, sans-serif')
     }
-  })
-} catch (err) {
-  console.error('Failed to initialize mermaid:', err)
+  }
 }
 
 interface MermaidChartProps {
@@ -57,6 +76,8 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
   // CSS selector, where the colons are invalid.
   const elementId = `mermaid-${reactId.replace(/:/g, '')}`
 
+  const themeVersion = useThemeVersion()
+
   // Only the code someone has stopped typing gets rendered.
   const [settledCode, setSettledCode] = useState(code)
   useEffect(() => {
@@ -69,6 +90,9 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
 
     const renderChart = async (): Promise<void> => {
       try {
+        // Global config, so it is set immediately before the render that needs
+        // it rather than once at import.
+        mermaid.initialize(mermaidConfig())
         const { svg: renderedSvg } = await mermaid.render(elementId, settledCode)
         if (isMounted) {
           setSvg(renderedSvg)
@@ -88,7 +112,7 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
     return () => {
       isMounted = false
     }
-  }, [settledCode, elementId])
+  }, [settledCode, elementId, themeVersion])
 
   // A diagram that rendered once stays on screen while the next version is
   // broken. Replacing a working picture with a stack trace on the way to the

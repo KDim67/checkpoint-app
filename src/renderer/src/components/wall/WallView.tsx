@@ -223,6 +223,15 @@ export default function WallView() {
   const pendingMoveRef = useRef<{ clientX: number; clientY: number; shiftKey: boolean } | null>(null)
   const moveFrameRef = useRef<number | null>(null)
   /**
+   * The camera while a pan is in flight, ahead of the one in state.
+   *
+   * A pan moves no item. It only changes where the whole board is drawn, and
+   * every layer that has to move is one element with one transform. Putting it
+   * through state re-rendered every card, note, image and arrow on the wall for
+   * a change that moved none of them, which is what a full board felt like.
+   */
+  const panCameraRef = useRef<WallCamera | null>(null)
+  /**
    * What a drag moves, not the selection, since a frame brings its contents.
    * Decided once at drag start, or items would join as the frame swept over them.
    */
@@ -802,6 +811,31 @@ export default function WallView() {
     setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
   }
 
+  /** Moves the view by hand, without going through React. */
+  const paintCamera = (cam: WallCamera): void => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    const transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.zoom})`
+    viewport.querySelectorAll<HTMLElement>('[data-wall-camera-layer]').forEach(layer => {
+      layer.style.transform = transform
+    })
+    viewport.style.backgroundPosition = `${cam.x}px ${cam.y}px`
+
+    // The minimap's window onto the wall, kept in step so it does not sit still
+    // through the pan and then jump at the end. Its scale and offsets cannot
+    // change while a pan runs, so they ride along on the element itself.
+    const view = viewport.querySelector<HTMLElement>('[data-wall-minimap-view]')
+    const geom = view?.dataset.geom?.split(',').map(Number)
+    if (view && geom && geom.length === 5 && geom.every(Number.isFinite)) {
+      const [k, ox, oy, vw, vh] = geom
+      view.style.left = `${(-cam.x / cam.zoom) * k + ox}px`
+      view.style.top = `${(-cam.y / cam.zoom) * k + oy}px`
+      view.style.width = `${(vw / cam.zoom) * k}px`
+      view.style.height = `${(vh / cam.zoom) * k}px`
+    }
+  }
+
   /**
    * One drag frame's worth of work. Takes bare numbers rather than the event so
    * the handler below can hold on to a position and replay it later.
@@ -817,7 +851,11 @@ export default function WallView() {
         const travelled = Math.hypot(e.clientX - press.clientX, e.clientY - press.clientY)
         if (travelled > CLICK_SLOP) press.moved = true
       }
-      setCamera({ ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) })
+      // Painted here and committed once on release. Zoom cannot change while a
+      // pan is running, so the one in hand is still current.
+      const panned = { ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) }
+      panCameraRef.current = panned
+      paintCamera(panned)
       return
     }
 
@@ -959,6 +997,14 @@ export default function WallView() {
       if (pending && dragRef.current) applyPointerMove(pending)
     }
     pendingMoveRef.current = null
+
+    // A pan was drawn by hand while it ran. This is where it becomes state, and
+    // the render that follows writes back the values already on screen.
+    if (panCameraRef.current) {
+      const settled = panCameraRef.current
+      panCameraRef.current = null
+      setCamera(settled)
+    }
 
     setArrowEndHover(null)
     const drag = dragRef.current
@@ -1218,7 +1264,10 @@ export default function WallView() {
     ]
   }
 
-  const { camera } = doc
+  // Not doc.camera directly: while a pan is in flight the live one is in the
+  // ref, and a render triggered by something else entirely still has to agree
+  // with what has already been painted.
+  const camera = panCameraRef.current ?? doc.camera
   // 'default' follows the theme, until someone picks a colour.
   const custom = doc.background && doc.background !== 'default' ? doc.background : null
   const canvasBackground = custom ?? 'var(--color-background)'
@@ -1831,7 +1880,7 @@ export default function WallView() {
             </div>
           )}
 
-          <div style={{
+          <div data-wall-camera-layer style={{
             position: 'absolute', top: 0, left: 0,
             transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
             transformOrigin: '0 0'
@@ -2076,7 +2125,7 @@ export default function WallView() {
 
           {/* Labels, above the lines and the items so they stay readable.
               An arrow's label lives in `text`, the same field a frame's does. */}
-          <div style={{
+          <div data-wall-camera-layer style={{
             position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
             transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
             transformOrigin: '0 0', zIndex: 5, pointerEvents: 'none'
@@ -2151,7 +2200,7 @@ export default function WallView() {
             const ring = 2 / camera.zoom
 
             return (
-              <div style={{
+              <div data-wall-camera-layer style={{
                 position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
                 transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
                 transformOrigin: '0 0', zIndex: 6
@@ -2304,14 +2353,20 @@ export default function WallView() {
                     }}
                   />
                 ))}
-                <div style={{
-                  position: 'absolute',
-                  left: `${viewX}px`, top: `${viewY}px`,
-                  width: `${viewW}px`, height: `${viewH}px`,
-                  border: '1px solid var(--color-secondary)',
-                  background: 'var(--color-secondary-muted)',
-                  pointerEvents: 'none'
-                }} />
+                <div
+                  data-wall-minimap-view
+                  // Scale, offsets and the size of the viewport, so a pan can
+                  // move this without recomputing the whole map.
+                  data-geom={`${k},${ox},${oy},${rect.width},${rect.height}`}
+                  style={{
+                    position: 'absolute',
+                    left: `${viewX}px`, top: `${viewY}px`,
+                    width: `${viewW}px`, height: `${viewH}px`,
+                    border: '1px solid var(--color-secondary)',
+                    background: 'var(--color-secondary-muted)',
+                    pointerEvents: 'none'
+                  }}
+                />
               </div>
             )
           })()}

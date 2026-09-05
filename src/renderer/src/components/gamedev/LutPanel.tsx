@@ -223,8 +223,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    opacity: isLutSaving ? 0.7 : 1,
-                    boxShadow: '0 4px 12px rgba(0, 200, 100, 0.3)'
+                    opacity: isLutSaving ? 0.7 : 1
                   }}
                 >
                   {isLutSaving ? (
