@@ -739,3 +739,29 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 .chat-msg-row .msg-meta-row.force-visible {
   border-top-color: rgba(255, 255, 255, 0.06);
 }
+
+/* Wall: connection handles
+   Drag one to run a connector to another item without leaving the select
+   tool. Hidden until the item is hovered, and done in CSS rather than React
+   state so moving the pointer across a busy wall does not re-render it. */
+.wall-connect {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+
+[data-wall-item]:hover .wall-connect {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wall-connect-dot {
+  background: var(--color-surface-1);
+  border: 2px solid var(--color-secondary);
+  border-radius: 50%;
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+.wall-connect:hover .wall-connect-dot {
+  transform: scale(1.35);
+}
