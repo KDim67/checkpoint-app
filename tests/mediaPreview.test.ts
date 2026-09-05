@@ -7,7 +7,9 @@ import {
   previewWidthFor,
   previewFilename,
   ensurePreview,
-  isPreviewOf
+  isPreviewOf,
+  warmPreviews,
+  EAGER_WIDTHS
 } from '../src/main/mediaPreview'
 
 describe('choosing a preview width', () => {
@@ -85,5 +87,29 @@ describe('recognising a cached copy', () => {
     expect(isPreviewOf('abc.png', 'abc@notawidth.png')).toBe(false)
     expect(isPreviewOf('abc.png', 'abc@.png')).toBe(false)
     expect(isPreviewOf('abc.png', 'abc.png')).toBe(false)
+  })
+})
+
+describe('warming previews when an image arrives', () => {
+  it('builds the widths a new image is actually asked for', () => {
+    // The Wall requests twice an item's box, and an item starts at 280 wide.
+    expect(EAGER_WIDTHS).toContain(previewWidthFor(280 * 2))
+  })
+
+  it('leaves the largest for someone who actually enlarges one', () => {
+    // 1920 costs as much as the other two together and most images never
+    // reach a box that wants it.
+    expect(EAGER_WIDTHS).not.toContain(1920)
+    expect(PREVIEW_WIDTHS).toContain(1920)
+  })
+
+  it('only warms widths the ladder can serve', () => {
+    for (const width of EAGER_WIDTHS) expect(PREVIEW_WIDTHS).toContain(width)
+  })
+
+  it('does not throw on a file it cannot read', () => {
+    // Nothing depends on warming having worked: the protocol handler still
+    // builds whatever is missing on demand.
+    expect(() => warmPreviews(join(tmpdir(), 'checkpoint-no-such-image.png'))).not.toThrow()
   })
 })

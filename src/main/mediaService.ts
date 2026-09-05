@@ -3,7 +3,7 @@ import { existsSync, readdirSync, writeFileSync, copyFileSync, statSync, unlinkS
 import type Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb } from './db'
-import { removePreviewsFor } from './mediaPreview'
+import { removePreviewsFor, warmPreviews } from './mediaPreview'
 import { getMediaDir, getNotesDir, ensureDir } from './paths'
 
 export function ensureMediaDir(): void {
@@ -21,6 +21,8 @@ export function saveBufferToMedia(buffer: Buffer, extension: string): string {
   const filename = `${uuidv4()}${cleanExt}`
   const filePath = join(getMediaDir(), filename)
   writeFileSync(filePath, buffer)
+  // Scaled now rather than the first time it is looked at. See warmPreviews.
+  warmPreviews(filePath)
   return filename
 }
 
@@ -42,6 +44,7 @@ export function saveFilesToMedia(filePaths: string[]): Array<{ originalPath: str
     
     try {
       copyFileSync(srcPath, destPath)
+      warmPreviews(destPath)
       results.push({
         originalPath: srcPath,
         filename
