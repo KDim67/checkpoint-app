@@ -765,3 +765,44 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 .wall-connect:hover .wall-connect-dot {
   transform: scale(1.35);
 }
+
+/* Kanban header: what gives way as the bar narrows
+   Container queries rather than media queries, because the bar's width is not
+   the window's: the sidebar and the AI panel both take from it, so the same
+   window can be wide with plenty of room or wide with none.
+
+   A container query measures the CONTENT box, so with 24px of padding a side
+   these fire 48px before the bar looks that wide. The numbers below are
+   content-box widths and were measured, not guessed: the buttons need 710px
+   with their labels and 302px without, and the title, chip and count together
+   need 406px.
+
+   The order things go in is deliberate. Labels have icons and tooltips behind
+   them. The count is a nicety. The title is how you know where you are, so it
+   goes last, and the workspace chip never goes at all: it truncates instead. */
+.kanban-header {
+  container-type: inline-size;
+  container-name: kanban-header;
+}
+
+/* 710 + 406 = 1116, so labels go the moment they no longer fit alongside
+   everything on the left. */
+@container kanban-header (max-width: 1120px) {
+  .kanban-btn-label {
+    display: none;
+  }
+}
+
+/* Icons only leaves 302 for the buttons; below this the left side would have
+   to start truncating to fit. */
+@container kanban-header (max-width: 700px) {
+  .kanban-card-count {
+    display: none;
+  }
+}
+
+@container kanban-header (max-width: 600px) {
+  .kanban-header-title {
+    display: none;
+  }
+}

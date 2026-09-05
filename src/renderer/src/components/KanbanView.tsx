@@ -1197,23 +1197,32 @@ export default function KanbanView() {
       overflow: 'hidden'
     }}>
       {/* Header Bar */}
-      <header style={{
-        height: '52px',
+      <header className="kanban-header" style={{
+        // Not a fixed height. Everything inside is nowrap now, so it never
+        // needs to grow, but a hard 52px was what let the wrapped text spill
+        // out of the bar rather than being clipped by it.
+        minHeight: '52px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 'var(--space-3)',
         padding: '0 var(--space-6)',
         borderBottom: '1px solid var(--color-surface-offset)',
         background: 'var(--color-surface-1)',
         flexShrink: 0
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <h1 style={{
+        {/* minWidth 0 so this side is what gives way when the bar is narrow.
+            Without it a flex child refuses to shrink below its content and
+            pushes the buttons off the right edge instead. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+          <h1 className="kanban-header-title" style={{
             fontSize: 'var(--text-base)',
             fontWeight: 'var(--weight-semibold)',
             color: 'var(--color-text-base)',
             margin: 0,
-            letterSpacing: 'var(--tracking-tight)'
+            letterSpacing: 'var(--tracking-tight)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
           }}>
             Kanban Board
           </h1>
@@ -1232,7 +1241,12 @@ export default function KanbanView() {
                 transition: 'background var(--duration-fast), border-color var(--duration-fast)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '4px',
+                // A workspace can be called anything. Truncated rather than
+                // wrapped, which turned a chip into a three-line block.
+                maxWidth: '190px',
+                minWidth: 0,
+                whiteSpace: 'nowrap'
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.background = 'var(--color-surface-offset)'
@@ -1241,8 +1255,10 @@ export default function KanbanView() {
                 e.currentTarget.style.background = 'var(--color-surface-2)'
               }}
             >
-              #{contextsList.find(c => c.slug === activeContext)?.name || activeContext}
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                #{contextsList.find(c => c.slug === activeContext)?.name || activeContext}
+              </span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}>
                 <path d="m6 9 6 6 6-6"/>
               </svg>
             </button>
@@ -1333,15 +1349,19 @@ export default function KanbanView() {
               </div>
             )}
           </div>
-          <span style={{
+          <span className="kanban-card-count" style={{
             fontSize: 'var(--text-xs)',
-            color: 'var(--color-text-faint)'
+            color: 'var(--color-text-faint)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
           }}>
             {cards.filter(c => c.status !== 'archived').length} active card{cards.filter(c => c.status !== 'archived').length !== 1 ? 's' : ''}
           </span>
         </div>
 
-        <div className="row">
+        {/* Never shrinks. A button pushed past the right edge is a button
+            nobody can press, and New Card was going over it. */}
+        <div className="row" style={{ flexShrink: 0 }}>
           {/* P2P Board Collaboration Share */}
           <div style={{ position: 'relative' }} ref={collabPopoverRef}>
             <HeaderBtn
@@ -2777,7 +2797,9 @@ function HeaderBtn({
       }}
     >
       {icon}
-      {children}
+      {/* Hidden by a container query when the bar is narrow, leaving the
+          icon and the title tooltip. See .kanban-btn-label in index.css. */}
+      <span className="kanban-btn-label">{children}</span>
     </button>
   )
 }
