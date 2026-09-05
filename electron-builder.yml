@@ -39,10 +39,25 @@ asar: true
 asarUnpack:
   - "**/*.node"
 
+# Languages
+# Electron ships a .pak per locale, 55 of them and 41 MB, and Checkpoint has no
+# translations to go with any of them. Chromium falls back to en-US for the few
+# strings it owns, such as the context menu on a text field.
+electronLanguages:
+  - en-US
+
 # Compression
 # LZMA (level 9) gives the smallest possible installer. Slower to build
 # but dramatically smaller download size for end users.
 compression: maximum
+
+# Artifact naming
+# No spaces. The default is "${productName} Setup ${version}.${ext}", which
+# produces a local file with spaces while latest.yml records the name GitHub
+# will give the uploaded asset. The two agreeing is what makes an update
+# download work, and the surest way for them to agree is to leave nothing to
+# sanitise.
+artifactName: ${name}-${version}-${os}-${arch}.${ext}
 
 # Windows Installer
 win:

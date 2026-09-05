@@ -28,7 +28,17 @@ export async function initializeUpdater(): Promise<void> {
   started = true
 
   try {
-    const { autoUpdater } = await import('electron-updater')
+    // electron-updater is CommonJS. Bundled into an ESM main process its
+    // exports arrive under .default, so destructuring the namespace directly
+    // yields undefined and every line below it throws. Both shapes are read,
+    // because which one turns up depends on the bundler's interop.
+    const mod = await import('electron-updater')
+    const interop = mod as unknown as { autoUpdater?: typeof mod.autoUpdater; default?: { autoUpdater?: typeof mod.autoUpdater } }
+    const autoUpdater = interop.autoUpdater ?? interop.default?.autoUpdater
+    if (!autoUpdater) {
+      console.error('[updater] electron-updater did not export autoUpdater')
+      return
+    }
 
     autoUpdater.autoDownload = true
     // Applied on quit rather than by restarting underneath someone.
