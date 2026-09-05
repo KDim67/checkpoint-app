@@ -12,6 +12,9 @@
   "bugs": {
     "url": "https://github.com/KDim67/checkpoint-app/issues"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
