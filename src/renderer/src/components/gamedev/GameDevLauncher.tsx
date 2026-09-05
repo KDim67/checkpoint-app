@@ -16,7 +16,13 @@ interface Props {
  */
 export default function GameDevLauncher({ onPick }: Props) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+    // Capped and centred. Left to fill the window the grid reserved a column
+    // for every 240px going, so on a wide monitor ten cards sat in the first
+    // four of seven tracks and the rest of the row was held empty.
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 'var(--space-6)',
+      width: '100%', maxWidth: 'var(--gamedev-launcher-max)', margin: '0 auto'
+    }}>
       <style>{`
         .gamedev-launch-card {
           display: flex;
@@ -30,6 +36,7 @@ export default function GameDevLauncher({ onPick }: Props) {
           border-radius: var(--radius-lg);
           cursor: pointer;
           font-family: inherit;
+          min-height: 132px;
           transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
         }
         .gamedev-launch-card:hover {
@@ -51,6 +58,22 @@ export default function GameDevLauncher({ onPick }: Props) {
           background: var(--color-secondary-muted);
           color: var(--color-secondary);
         }
+        /* A fixed count rather than auto-fill, which reserved a track for every
+           240px the window had going and left most of a wide row empty. */
+        .gamedev-launcher-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: var(--space-3);
+        }
+        @media (max-width: 1100px) {
+          .gamedev-launcher-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (max-width: 820px) {
+          .gamedev-launcher-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 560px) {
+          .gamedev-launcher-grid { grid-template-columns: 1fr; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .gamedev-launch-card { transition: none; }
           .gamedev-launch-card:hover { transform: none; }
@@ -69,11 +92,7 @@ export default function GameDevLauncher({ onPick }: Props) {
           }}>
             {section.group}
           </h3>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-            gap: 'var(--space-3)'
-          }}>
+          <div className="gamedev-launcher-grid">
             {section.tools.map(tool => (
               <button
                 key={tool.id}

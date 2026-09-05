@@ -86,7 +86,7 @@ export default function GameDevView() {
       {/* Header. Only on the launcher: inside a tool the switcher says where
           you are, and repeating the title pushed the tool itself down. */}
       {!activeTab && (
-        <div>
+        <div style={{ width: '100%', maxWidth: 'var(--gamedev-launcher-max)', margin: '0 auto' }}>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
             Game Development Workspace
           </h2>
