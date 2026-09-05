@@ -10,7 +10,7 @@ import {
 } from './pluginRegistry'
 import { getConfigDir, getPluginsDir } from './paths'
 import { getSetting } from './db'
-import { updateNativeTitleBarFromSettings } from './titleBarSync'
+import { updateNativeTitleBarFromSettings, paintTitleBarOverlay } from './titleBarSync'
 
 let watcher: import('chokidar').FSWatcher | null = null
 let isEngineRunning = false
@@ -68,17 +68,10 @@ export function parseVarsFromCss(css: string): Record<string, string> {
  * Updates the native title bar controls overlay colors dynamically on Windows.
  */
 export function updateTitleBarOverlay(vars: Record<string, string>): void {
-  const color = vars['--color-background'] || '#0b0c10'
-  const symbolColor = vars['--color-text-base'] || '#f1f5f9'
-  BrowserWindow.getAllWindows().forEach(win => {
-    if (!win.isDestroyed() && typeof win.setTitleBarOverlay === 'function') {
-      try {
-        win.setTitleBarOverlay({ color, symbolColor })
-      } catch (err) {
-        console.error('[customizer] Failed to update title bar overlay:', err)
-      }
-    }
-  })
+  paintTitleBarOverlay(
+    vars['--color-background'] || '#0b0c10',
+    vars['--color-text-base'] || '#f1f5f9'
+  )
 }
 
 /**
