@@ -79,8 +79,14 @@ npm run build     # compile without packaging
 npm run package   # build an installer into dist/
 ```
 
-`better-sqlite3` is a native module and is rebuilt for Electron on install, so
-the first `npm install` takes a minute.
+The first `npm install` takes a few minutes: it downloads Electron itself and
+rebuilds `better-sqlite3`, a native module, against it.
+
+Both of those happen in `postinstall` rather than being left to npm. npm 11
+blocks a dependency's own install scripts until you approve them, which meant a
+fresh clone finished with no Electron binary and a `npm run dev` that could not
+start. Running it ourselves sidesteps the question, and it costs nothing when
+the binary is already there.
 
 ## Things worth knowing
 
