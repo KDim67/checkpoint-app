@@ -261,7 +261,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
 
                 {upscaleExportedPath && (
                   <div style={{
-                    background: 'rgba(0, 255, 128, 0.05)',
+                    background: 'var(--color-success-muted)',
                     border: '1px solid rgba(0, 255, 128, 0.2)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-2) var(--space-3)',

@@ -57,7 +57,7 @@ export default function PalettePanel({
           onClick={addColorToPalette}
           style={{
             background: 'var(--color-secondary)',
-            color: 'white',
+            color: 'var(--color-text-inverted)',
             border: 'none',
             padding: 'var(--space-1.5) var(--space-4)',
             borderRadius: 'var(--radius-md)',

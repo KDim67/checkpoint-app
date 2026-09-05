@@ -402,10 +402,10 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     onClick={handleSeamlessExport}
                     disabled={isSeamlessSaving}
                     style={{
-                      background: 'var(--color-primary)',
+                      background: 'var(--color-secondary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
-                      color: 'white',
+                      color: 'var(--color-text-inverted)',
                       fontWeight: 'var(--weight-semibold)',
                       padding: '10px 20px',
                       cursor: 'pointer',
