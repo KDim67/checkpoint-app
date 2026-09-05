@@ -77,9 +77,24 @@ win:
 
 nsis:
   # Install UX
-  oneClick: false                         # show the full setup wizard
-  allowToChangeInstallationDirectory: true # let users pick their install path
-  allowElevation: true                    # request elevation only during install/uninstall
+  # One click. Double-click the download, watch a short progress window, and
+  # the app opens. No wizard, no Next, no folder to choose. It is what Discord,
+  # Obsidian and Figma do, and it is what people now expect a small desktop app
+  # to do.
+  #
+  # There is a real trade here: nobody can pick an install directory any more.
+  # Per-user is what makes that acceptable, since the app lands somewhere the
+  # user already owns rather than in Program Files.
+  oneClick: true
+
+  # Installs to %LOCALAPPDATA%\Programs, which the user can write to, so there
+  # is no UAC prompt at any point. A machine-wide install would need one on
+  # every install, update and uninstall.
+  perMachine: false
+
+  # Opens as soon as it is done. With no wizard there is no final page to put a
+  # "launch now" tick on, so this is the only way it ever opens itself.
+  runAfterFinish: true
 
   # Shortcuts
   createDesktopShortcut: true
@@ -87,6 +102,8 @@ nsis:
   shortcutName: "Checkpoint"             # label shown on desktop & start menu
 
   # Branding
+  # In one-click mode the header icon is the whole of the installer's face:
+  # there is no sidebar image and no header band to fill.
   installerIcon: resources/icon.ico
   uninstallerIcon: resources/icon.ico
   installerHeaderIcon: resources/icon.ico
