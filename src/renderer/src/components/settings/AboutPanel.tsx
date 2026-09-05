@@ -152,7 +152,7 @@ export default function AboutPanel() {
         <button
           className="btn-secondary"
           style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-          onClick={() => window.electronAPI.app.openExternal('https://github.com/checkpoint-app/checkpoint/releases')}
+          onClick={() => window.electronAPI.app.openExternal('https://github.com/KDim67/checkpoint-app/releases')}
         >
           <ExternalLink size={13} />
           Check for Updates
@@ -160,7 +160,7 @@ export default function AboutPanel() {
         <button
           className="btn-secondary"
           style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-          onClick={() => window.electronAPI.app.openExternal('https://github.com/checkpoint-app/checkpoint')}
+          onClick={() => window.electronAPI.app.openExternal('https://github.com/KDim67/checkpoint-app')}
         >
           <Info size={13} />
           GitHub Repository

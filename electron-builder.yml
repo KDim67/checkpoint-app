@@ -3,6 +3,19 @@ appId: com.checkpoint.app
 productName: Checkpoint
 copyright: "Copyright © 2026 Checkpoint"
 
+# Updates
+# Straight at this repository's releases. No token is needed or wanted: the
+# repository is public, and electron-updater against a private one would want
+# a GH_TOKEN compiled into the shipped app.
+#
+# Publishing a release needs GH_TOKEN in the *build* environment only, and the
+# version in package.json must be bumped or the updater sees nothing new.
+publish:
+  provider: github
+  owner: KDim67
+  repo: checkpoint-app
+  releaseType: release
+
 # Output & Resources
 directories:
   output: dist

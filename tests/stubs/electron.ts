@@ -19,6 +19,11 @@ export const nativeTheme = {
 }
 
 export const app = {
+  /**
+   * A test run is not a packaged app, which is what the updater checks before
+   * it will talk to GitHub at all.
+   */
+  isPackaged: false,
   getPath(name: string): string {
     return `/tmp/checkpoint-test/${name}`
   },
