@@ -11,7 +11,7 @@ import {
   FrameAssembler,
   waitForIceGathering,
   onConnectionFailed,
-  ICE_SERVERS
+  iceServers
 } from './webrtcTransport'
 import { normalizeCollabMessage, type CollabMessage } from '../../../shared/collabProtocol'
 
@@ -74,7 +74,7 @@ export class WebRTCCollaborationCoordinator {
 
   /** Wires the failure paths every peer connection needs. */
   private newPeerConnection(): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const pc = new RTCPeerConnection({ iceServers: iceServers() })
     onConnectionFailed(pc, reason => this.options.onError(new Error(reason)))
     return pc
   }

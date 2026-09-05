@@ -24,7 +24,9 @@ const SECRET_SETTING_KEYS = new Set([
   'ai_api_key',
   'ai_providers',
   'mcp_auth_token',
-  'webhook_token'
+  'webhook_token',
+  // A TURN relay's password. Someone else's bandwidth, billed to the user.
+  'turn_credential'
 ])
 
 /**

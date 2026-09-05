@@ -3,6 +3,7 @@ import { Wifi, Globe, Play, Loader2, RefreshCw, Terminal } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import { WebRTCSyncCoordinator } from '../../lib/webrtcSync'
 import ModalShell from '../ui/ModalShell'
+import TurnRelaySettings from './TurnRelaySettings'
 import { errorMessage } from '../../../../shared/errors'
 
 interface Peer {
@@ -581,6 +582,8 @@ export default function SyncSettings() {
           </p>
         </div>
       )}
+
+      <TurnRelaySettings />
 
       {peerToPair && (
         <ModalShell label="Enter pairing passcode" onClose={() => setPeerToPair(null)} width="320px">
