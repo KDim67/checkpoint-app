@@ -143,6 +143,9 @@ type Drag =
 
 interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
+/** How long the wheel has to be still before the zoom it drew becomes state. */
+const ZOOM_SETTLE_MS = 150
+
 export default function WallView() {
   const activeContext = useAppStore(s => s.activeContext)
   const selectItem = useAppStore(s => s.selectItem)
@@ -231,6 +234,10 @@ export default function WallView() {
    * a change that moved none of them, which is what a full board felt like.
    */
   const panCameraRef = useRef<WallCamera | null>(null)
+  const zoomCommitRef = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (zoomCommitRef.current !== null) window.clearTimeout(zoomCommitRef.current)
+  }, [])
   /**
    * What a drag moves, not the selection, since a frame brings its contents.
    * Decided once at drag start, or items would join as the frame swept over them.
@@ -489,6 +496,8 @@ export default function WallView() {
   }, [write])
 
   const setCamera = useCallback((camera: WallCamera) => {
+    // Whatever was drawn by hand is now behind what is being committed.
+    panCameraRef.current = null
     write({ ...docRef.current, camera })
   }, [write])
 
@@ -607,15 +616,28 @@ export default function WallView() {
     return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : { x: 0, y: 0 }
   }
 
-  const onWheel = useCallback((e: React.WheelEvent) => {
+  const onWheel = (e: React.WheelEvent) => {
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return
-    setCamera(zoomAt(
-      docRef.current.camera,
+    // Drawn by hand like a pan, for the same reason. A wheel sends a notch
+    // every few milliseconds, and each one used to write the whole document
+    // and re-render every item on the wall. Zoomed from the live camera, not
+    // the one in state, or every notch in a burst would start from the same
+    // place and only the last would count.
+    const zoomed = zoomAt(
+      panCameraRef.current ?? docRef.current.camera,
       { x: e.clientX - rect.left, y: e.clientY - rect.top },
       e.deltaY < 0 ? 1.1 : 1 / 1.1
-    ))
-  }, [setCamera])
+    )
+    panCameraRef.current = zoomed
+    paintCamera(zoomed)
+    if (zoomCommitRef.current !== null) window.clearTimeout(zoomCommitRef.current)
+    zoomCommitRef.current = window.setTimeout(() => {
+      zoomCommitRef.current = null
+      // A drag that ended in the meantime has committed it already.
+      if (panCameraRef.current) setCamera(panCameraRef.current)
+    }, ZOOM_SETTLE_MS)
+  }
 
   /** Centres one item without changing zoom, and selects it so it stands out. */
   const jumpTo = useCallback((item: WallItem) => {
@@ -698,7 +720,7 @@ export default function WallView() {
     // Right button: pan from anywhere. Whether this turns out to be a menu
     // instead is decided on release, by how far it travelled.
     if (e.button === 2) {
-      const cam = docRef.current.camera
+      const cam = panCameraRef.current ?? docRef.current.camera
       rightPressRef.current = {
         clientX: e.clientX,
         clientY: e.clientY,
@@ -821,6 +843,7 @@ export default function WallView() {
       layer.style.transform = transform
     })
     viewport.style.backgroundPosition = `${cam.x}px ${cam.y}px`
+    viewport.style.backgroundSize = `${24 * cam.zoom}px ${24 * cam.zoom}px`
 
     // The minimap's window onto the wall, kept in step so it does not sit still
     // through the pan and then jump at the end. Its scale and offsets cannot
@@ -843,7 +866,8 @@ export default function WallView() {
   const applyPointerMove = (e: { clientX: number; clientY: number; shiftKey: boolean }) => {
     const drag = dragRef.current
     if (!drag) return
-    const cam = docRef.current.camera
+    // The live camera: a zoom drawn moments ago may not be state yet.
+    const cam = panCameraRef.current ?? docRef.current.camera
 
     if (drag.mode === 'pan') {
       const press = rightPressRef.current
