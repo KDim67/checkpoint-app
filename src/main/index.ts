@@ -1782,7 +1782,13 @@ app.whenReady().then(async () => {
     recordClipboardCopy(text)
     mainWindow?.webContents.send(IpcChannels.CLIPBOARD_HISTORY_CHANGED)
   })
-  setClipboardCaptureEnabled(getSetting<string>('feature_view_clipboard', 'true') !== 'false')
+  // Off until switched on. Recording every copy is not something to start
+  // doing to someone who has not asked for it.
+  //
+  // Anyone who turned it on keeps it: their row says 'true'. Anyone who never
+  // touched the switch stops recording, which is the point, since they never
+  // chose to start. Nothing already captured is deleted either way.
+  setClipboardCaptureEnabled(getSetting<string>('feature_view_clipboard', 'false') === 'true')
 
   // Load customization engine if enabled
   try {
