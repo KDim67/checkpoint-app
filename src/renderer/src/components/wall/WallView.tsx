@@ -14,7 +14,7 @@
  *   further was a pan.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
@@ -235,6 +235,8 @@ export default function WallView() {
    */
   const panCameraRef = useRef<WallCamera | null>(null)
   const zoomCommitRef = useRef<number | null>(null)
+  /** The items while a move is in flight, ahead of the ones in state. */
+  const liveItemsRef = useRef<WallItem[] | null>(null)
   useEffect(() => () => {
     if (zoomCommitRef.current !== null) window.clearTimeout(zoomCommitRef.current)
   }, [])
@@ -870,6 +872,50 @@ export default function WallView() {
     }
   }
 
+  /** Moves items, and the arrows on them, by hand without going through React. */
+  const paintItems = (items: WallItem[], ids: Set<string>): void => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const byId = new Map(items.map(i => [i.id, i]))
+
+    ids.forEach(id => {
+      const item = byId.get(id)
+      const el = viewport.querySelector<HTMLElement>(`[data-wall-item="${id}"]`)
+      if (!item || !el) return
+      el.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`
+    })
+
+    // An arrow has no position of its own. One on a moving item is redrawn
+    // from wherever both its ends now are, the same way the render draws it.
+    items.forEach(arrow => {
+      if (arrow.kind !== 'arrow') return
+      if (![arrow.from, arrow.to].some(end => end !== undefined && ids.has(end))) return
+      const g = viewport.querySelector<SVGGElement>(`[data-wall-arrow="${arrow.id}"]`)
+      const ends = arrowAnchors(arrow, byId)
+      if (!g || !ends) return
+
+      const width = arrow.strokeWidth ?? 2
+      const heads = arrow.arrowHeads ?? ARROW_HEAD_MODES[0]
+      const inset = arrowHeadInset(width)
+      const geo = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0], {
+        end: heads !== 'none' ? inset : 0,
+        start: heads === 'both' ? inset : 0
+      })
+      g.querySelector('path')?.setAttribute('d', geo.d)
+      // In the order the render puts them: the end head first, then the start.
+      const [endHead, startHead] = Array.from(g.querySelectorAll('polygon'))
+      endHead?.setAttribute('points', arrowHeadPoints(geo.end, geo.endAngle, width))
+      startHead?.setAttribute('points', arrowHeadPoints(geo.start, geo.startAngle, width))
+    })
+  }
+
+  // A render in the middle of a move, from the rail lighting up under the
+  // pointer say, writes the positions in state back over the ones drawn by
+  // hand. Drawn again before that frame is shown.
+  useLayoutEffect(() => {
+    if (liveItemsRef.current) paintItems(liveItemsRef.current, movingRef.current)
+  })
+
   /**
    * One drag frame's worth of work. Takes bare numbers rather than the event so
    * the handler below can hold on to a position and replay it later.
@@ -984,12 +1030,13 @@ export default function WallView() {
 
       const moving = movingRef.current
       const moved = moveItems(drag.origin, moving, dx, dy)
-      setItems(
-        snapping
-          ? moved.map(i => (moving.has(i.id) ? { ...i, x: snap(i.x, SNAP_GRID), y: snap(i.y, SNAP_GRID) } : i))
-          : moved,
-        { record: false }
-      )
+      const live = snapping
+        ? moved.map(i => (moving.has(i.id) ? { ...i, x: snap(i.x, SNAP_GRID), y: snap(i.y, SNAP_GRID) } : i))
+        : moved
+      // Drawn by hand and committed on release, like a pan. Through state,
+      // every frame re-rendered the wall to move a few items across it.
+      liveItemsRef.current = live
+      paintItems(live, moving)
     } else {
       setItems(
         docRef.current.items.map(i =>
@@ -1040,6 +1087,11 @@ export default function WallView() {
       panCameraRef.current = null
       setCamera(settled)
     }
+    // Same for a move. Through setItems, so the history sees what it used to
+    // see from the frames, a replaced present, before the push below.
+    const movedItems = liveItemsRef.current
+    liveItemsRef.current = null
+    if (movedItems) setItems(movedItems, { record: false })
 
     setArrowEndHover(null)
     const drag = dragRef.current
@@ -1129,7 +1181,7 @@ export default function WallView() {
     // A move that never passed the threshold changed nothing worth recording.
     if (drag?.mode === 'move' && !drag.moved) return
     if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'arrowEnd')) {
-      historyRef.current = pushHistory(historyRef.current, docRef.current.items)
+      historyRef.current = pushHistory(historyRef.current, movedItems ?? docRef.current.items)
       setHistoryTick(t => t + 1)
     }
   }
@@ -1951,7 +2003,7 @@ export default function WallView() {
                 })
 
                 return (
-                  <g key={arrow.id} opacity={selected ? 1 : 0.85}>
+                  <g key={arrow.id} data-wall-arrow={arrow.id} opacity={selected ? 1 : 0.85}>
                     <path
                       d={g.d}
                       fill="none"
