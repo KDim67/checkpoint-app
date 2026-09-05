@@ -23,7 +23,9 @@ export const VIEW_FEATURES: ViewFeature[] = [
   { view: 'focus',       key: 'feature_view_focus',       label: 'Focus Timer & Pomodoro',   defaultOn: true },
   { view: 'notes',       key: 'feature_view_notes',       label: 'Obsidian-Style Notes',     defaultOn: true },
   { view: 'wall',        key: 'feature_view_wall',        label: 'Wall (freeform canvas)',   defaultOn: true },
-  { view: 'clipboard',   key: 'feature_view_clipboard',   label: 'Clipboard History Vault',  defaultOn: true },
+  // The only view that is off by default: turning it on starts recording
+  // everything copied, which is a choice rather than a default.
+  { view: 'clipboard',   key: 'feature_view_clipboard',   label: 'Clipboard History Vault',  defaultOn: false },
   { view: 'analytics',   key: 'feature_view_analytics',   label: 'Time & App Analytics',     defaultOn: true },
   { view: 'cookbook',    key: 'feature_view_cookbook',    label: 'AI Assistant Cookbook',    defaultOn: true },
   { view: 'cheatsheets', key: 'feature_view_cheatsheets', label: 'Quick Cheatsheets & PDFs', defaultOn: true },

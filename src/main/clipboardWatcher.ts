@@ -1,4 +1,5 @@
 import { clipboard } from 'electron'
+import { looksLikeSecret } from '../shared/clipboardPrivacy'
 
 let lastText = ''
 let intervalId: NodeJS.Timeout | null = null
@@ -30,8 +31,12 @@ export function startClipboardWatcher(recordCopyFn?: (text: string) => void): vo
     try {
       const currentText = clipboard.readText()
       if (currentText && currentText.trim().length > 0 && currentText !== lastText) {
+        // Noted as seen either way, or a skipped secret would be re-examined
+        // every second until something else is copied.
         lastText = currentText
-        recordCopy?.(currentText)
+        // Windows will not tell us which copies were meant to be secret, so
+        // this guesses. See shared/clipboardPrivacy for what that costs.
+        if (!looksLikeSecret(currentText)) recordCopy?.(currentText)
       }
     } catch (err) {
       console.error('Error reading system clipboard:', err)
