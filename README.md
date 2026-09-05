@@ -62,6 +62,28 @@ npm run package
 
 ---
 
+## Where your data lives
+
+Everything is on your machine. There is no account and nothing is uploaded.
+
+It sits in two places, which is worth knowing before you back anything up or
+uninstall:
+
+| What | Windows | macOS / Linux |
+| --- | --- | --- |
+| Database (items, tags, settings, clipboard) | `%APPDATA%\checkpoint-app\checkpoint.db` | `~/.config/checkpoint-app/checkpoint.db` |
+| Automatic backups | `%APPDATA%\checkpoint-app\backups\` | `~/.config/checkpoint-app/backups/` |
+| Notes, media, plugins, theme | `%USERPROFILE%\.config\checkpoint\` | `~/.config/checkpoint/` |
+
+The database folder is named `checkpoint-app` rather than `Checkpoint`
+because Electron derives it from the package name. It looks like a mistake and
+is not one to fix: renaming it would point an updated app at an empty folder
+and every existing install would appear to have lost everything.
+
+**Uninstalling leaves all of it in place**, on purpose. Reinstalling picks up
+exactly where you left off. To remove your data as well, delete both folders
+by hand after uninstalling.
+
 ## Configuration & Customization Guides
 
 ### 1. Custom AI Endpoint & Workspace
