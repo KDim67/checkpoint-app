@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateFitResult } from '../src/shared/scoreEngine'
+import { calculateFitResult, USABLE_RAM_FRACTION } from '../src/shared/scoreEngine'
 import type { HardwareSpecs, CatalogModel, ModelVariant, QuantizationLevel } from '../src/shared/types'
 
 function specs(overrides: Partial<HardwareSpecs> = {}): HardwareSpecs {
@@ -126,5 +126,25 @@ describe('calculateFitResult', () => {
       model({ q4: variant('q4', 8, 5), q8: variant('q8', 12, 10) })
     )
     expect(result.reason).not.toMatch(/Runs natively on GPU/)
+  })
+
+  // The Cookbook prints this fraction at the user as "a model can use about
+  // N GB of it". If the engine and the constant ever part company, that line
+  // becomes a lie, so pin the constant to what the engine actually does.
+  it('applies exactly the RAM fraction it exports', () => {
+    const ramGb = 32
+    const budget = ramGb * USABLE_RAM_FRACTION
+
+    const atBudget = calculateFitResult(
+      specs({ ramGb, vramGb: 48 }),
+      model({ q4: variant('q4', budget, 4) })
+    )
+    expect(atBudget.status).not.toBe('not_recommended')
+
+    const overBudget = calculateFitResult(
+      specs({ ramGb, vramGb: 48 }),
+      model({ q4: variant('q4', budget + 0.1, 4) })
+    )
+    expect(overBudget.status).toBe('not_recommended')
   })
 })

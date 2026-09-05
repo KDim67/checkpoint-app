@@ -12,10 +12,11 @@ import {
   Info,
   Search,
   Trash2,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react'
 import catalogData from '../../../shared/catalog.json'
-import { calculateFitResult } from '../../../shared/scoreEngine'
+import { calculateFitResult, USABLE_RAM_FRACTION } from '../../../shared/scoreEngine'
 import type { CatalogModel, HardwareSpecs, OllamaStatus, PullProgressEvent } from '../../../shared/cookbookTypes'
 import Skeleton from './ui/Skeleton'
 import EmptyState from './ui/EmptyState'
@@ -43,11 +44,110 @@ const CAP_META: Record<string, { label: string; color: string }> = {
   embedding: { label: 'Embedding', color: '#f59e0b' }
 }
 
+/** process.platform reads as developer output. Nobody runs "win32". */
+function formatPlatform(platform: string): string {
+  if (platform === 'win32') return 'Windows'
+  if (platform === 'darwin') return 'macOS'
+  if (platform === 'linux') return 'Linux'
+  return platform
+}
+
 function formatContext(tokens?: number): string {
   if (!tokens) return ''
   if (tokens >= 1000) return `${Math.round(tokens / 1024)}K ctx`
   return `${tokens} ctx`
 }
+
+/**
+ * One tile in the hardware strip. There are three of them and they only ever
+ * differed by their contents, which is what made the strip three copies of the
+ * same forty lines.
+ */
+function SpecCard({ icon, label, value, detail }: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  detail: string
+}) {
+  return (
+    <div
+      style={{
+        background: 'var(--color-surface-1)',
+        border: '1px solid var(--color-surface-offset)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-4)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-4)'
+      }}
+    >
+      <div
+        style={{
+          color: 'var(--color-text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--color-surface-2)',
+          width: '40px',
+          height: '40px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--color-surface-offset)',
+          flexShrink: 0
+        }}
+      >
+        {icon}
+      </div>
+      {/* minWidth 0 or the truncation below never happens: a flex child will
+          not shrink past its own content without it, and a GPU name is long. */}
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 'var(--text-2xs)',
+            fontWeight: 'var(--weight-bold)',
+            color: 'var(--color-text-muted)',
+            letterSpacing: 'var(--tracking-wide)',
+            textTransform: 'uppercase'
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--weight-semibold)',
+            color: 'var(--color-text-base)',
+            marginTop: 'var(--space-1)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+          title={value}
+        >
+          {value}
+        </div>
+        <div
+          style={{
+            fontSize: 'var(--text-2xs)',
+            color: 'var(--color-text-muted)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+          title={detail}
+        >
+          {detail}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Above this, a model is big enough to compete for video memory with whatever
+ * else is open. Four billion parameters is roughly where a quantised model
+ * stops fitting comfortably alongside a game engine on an ordinary card.
+ */
+const SAFE_MODE_MAX_PARAMS = 4
 
 export default function CookbookView() {
   const { toast } = useToast()
@@ -62,7 +162,7 @@ export default function CookbookView() {
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null)
   const [loadingOllama, setLoadingOllama] = useState(true)
 
-  const [unitySafeMode, setUnitySafeMode] = useState(false)
+  const [safeMode, setSafeMode] = useState(false)
 
   // Active pull state tracking
   const [pullingModelTag, setPullingModelTag] = useState<string | null>(null)
@@ -109,10 +209,10 @@ export default function CookbookView() {
       try {
         const val = await window.electronAPI.db.getSetting('unitySafeMode')
         if (val !== null && val !== undefined) {
-          setUnitySafeMode(val === true || val === 'true')
+          setSafeMode(val === true || val === 'true')
         }
       } catch (err) {
-        console.error('Failed to load unitySafeMode setting:', err)
+        console.error('Failed to load the safe mode setting:', err)
       }
     }
     loadSafeModeSetting()
@@ -155,15 +255,23 @@ export default function CookbookView() {
   }, [])
 
   const handleToggleSafeMode = async (newValue: boolean) => {
-    setUnitySafeMode(newValue)
+    setSafeMode(newValue)
     try {
       await window.electronAPI.db.setSetting('unitySafeMode', newValue)
     } catch (err) {
-      console.error('Failed to save unitySafeMode setting:', err)
+      console.error('Failed to save the safe mode setting:', err)
     }
   }
 
-  const handleInstall = async (modelTag: string) => {
+  const handleInstall = async (modelTag: string, warning?: string) => {
+    if (warning) {
+      const ok = await confirm({
+        title: 'Install anyway?',
+        message: warning + ' You can install it regardless, but expect it to be slow, or to fail to load at all.',
+        confirmText: 'Install anyway'
+      })
+      if (!ok) return
+    }
     setPullError(null)
     updatePullingModel(modelTag)
     setPullPercent(0)
@@ -227,9 +335,13 @@ export default function CookbookView() {
   }
 
   const catalogModels: CatalogModel[] = catalogData as CatalogModel[]
-  const filteredModels = catalogModels
+
+  // Safe mode is applied separately from everything else so the count of what
+  // it took away can be shown. Folding it in with the rest left the catalog
+  // saying "no models match your search" about models that matched perfectly
+  // well and were simply too big to list.
+  const matchingModels = catalogModels
     .filter((m) => {
-      if (unitySafeMode && m.parameters > 4) return false
       if (capFilter === 'tiny') {
         if (m.parameters > 3) return false
       } else if (capFilter !== 'all') {
@@ -246,6 +358,11 @@ export default function CookbookView() {
       }
       return true
     })
+
+  const filteredModels = (safeMode
+    ? matchingModels.filter(m => m.parameters <= SAFE_MODE_MAX_PARAMS)
+    : matchingModels
+  )
     .sort((a, b) => {
       if (sortBy === 'params_asc') return a.parameters - b.parameters
       if (sortBy === 'params_desc') return b.parameters - a.parameters
@@ -255,6 +372,9 @@ export default function CookbookView() {
       if (fb !== fa) return fb - fa
       return a.parameters - b.parameters
     })
+
+  /** How many of the matches safe mode is holding back. */
+  const hiddenBySafeMode = matchingModels.length - filteredModels.length
 
   const localModels = ollamaStatus?.localModels || []
 
@@ -284,7 +404,7 @@ export default function CookbookView() {
           AI Cookbook
         </h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-          Discover, optimize, and install local models tailored for your workstation hardware.
+          Find a local model that will actually run on this machine, and install it without leaving the app.
         </p>
       </div>
 
@@ -304,180 +424,26 @@ export default function CookbookView() {
           </>
         ) : specs ? (
           <>
-            {/* CPU Spec Panel */}
-            <div
-              style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-4)',
-                boxShadow: 'none'
-              }}
-            >
-              <div
-                style={{
-                  color: 'var(--color-text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'var(--color-surface-2)',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-surface-offset)'
-                }}
-              >
-                <Cpu size={20} />
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontSize: 'var(--text-2xs)',
-                    fontWeight: 'var(--weight-bold)',
-                    color: 'var(--color-text-muted)',
-                    letterSpacing: 'var(--tracking-wide)',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  CPU PROFILER
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: 'var(--weight-semibold)',
-                    color: 'var(--color-text-base)',
-                    marginTop: 'var(--space-1)'
-                  }}
-                >
-                  {specs.cpuCores} Cores / {specs.cpuThreads} Threads
-                </div>
-                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>
-                  Platform: {specs.platform}
-                </div>
-              </div>
-            </div>
-
-            {/* RAM Spec Panel */}
-            <div
-              style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-4)',
-                boxShadow: 'none'
-              }}
-            >
-              <div
-                style={{
-                  color: 'var(--color-text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'var(--color-surface-2)',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-surface-offset)'
-                }}
-              >
-                <Database size={20} />
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontSize: 'var(--text-2xs)',
-                    fontWeight: 'var(--weight-bold)',
-                    color: 'var(--color-text-muted)',
-                    letterSpacing: 'var(--tracking-wide)',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  SYSTEM RAM
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: 'var(--weight-semibold)',
-                    color: 'var(--color-text-base)',
-                    marginTop: 'var(--space-1)'
-                  }}
-                >
-                  {specs.ramGb.toFixed(1)} GB Installed
-                </div>
-                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>
-                  App Limit: {(specs.ramGb * 0.75).toFixed(1)} GB (75% Max)
-                </div>
-              </div>
-            </div>
-
-            {/* GPU Spec Panel */}
-            <div
-              style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-4)',
-                boxShadow: 'none'
-              }}
-            >
-              <div
-                style={{
-                  color: 'var(--color-text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'var(--color-surface-2)',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-surface-offset)'
-                }}
-              >
-                <Layers size={20} />
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontSize: 'var(--text-2xs)',
-                    fontWeight: 'var(--weight-bold)',
-                    color: 'var(--color-text-muted)',
-                    letterSpacing: 'var(--tracking-wide)',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  GRAPHICS SPEC
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: 'var(--weight-semibold)',
-                    color: 'var(--color-text-base)',
-                    marginTop: 'var(--space-1)',
-                    maxWidth: '220px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                  title={specs.gpuName || 'Unknown GPU'}
-                >
-                  {specs.gpuName || 'No GPU Detected'}
-                </div>
-                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>
-                  {specs.vramGb > 0
-                    ? `${specs.vramGb.toFixed(1)} GB VRAM (${specs.gpuVendor.toUpperCase()})`
-                    : 'Using system RAM (CPU only)'}
-                </div>
-              </div>
-            </div>
+            <SpecCard
+              icon={<Cpu size={20} />}
+              label="Processor"
+              value={`${specs.cpuCores} cores / ${specs.cpuThreads} threads`}
+              detail={formatPlatform(specs.platform)}
+            />
+            <SpecCard
+              icon={<Database size={20} />}
+              label="Memory"
+              value={`${specs.ramGb.toFixed(1)} GB installed`}
+              detail={`A model can use about ${(specs.ramGb * USABLE_RAM_FRACTION).toFixed(1)} GB of it`}
+            />
+            <SpecCard
+              icon={<Layers size={20} />}
+              label="Graphics"
+              value={specs.gpuName || 'No GPU detected'}
+              detail={specs.vramGb > 0
+                ? `${specs.vramGb.toFixed(1)} GB VRAM (${specs.gpuVendor.toUpperCase()})`
+                : 'Falls back to system memory and the CPU'}
+            />
           </>
         ) : (
           <div
@@ -491,7 +457,8 @@ export default function CookbookView() {
               gridColumn: '1 / -1'
             }}
           >
-            Failed to gather system specifications.
+            Could not read this machine's hardware. The catalog below still works,
+            but nothing can be scored against your specs until this succeeds.
           </div>
         )}
       </div>
@@ -513,16 +480,20 @@ export default function CookbookView() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flex: 1 }}>
           <button
-            onClick={() => handleToggleSafeMode(!unitySafeMode)}
+            onClick={() => handleToggleSafeMode(!safeMode)}
+            role="switch"
+            aria-checked={safeMode}
+            aria-label="Safe Mode"
             style={{
               position: 'relative',
+              flexShrink: 0,
               display: 'inline-flex',
               height: '24px',
               width: '44px',
               alignItems: 'center',
               borderRadius: '9999px',
               transition: 'background-color 200ms var(--ease-default)',
-              backgroundColor: unitySafeMode ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
+              backgroundColor: safeMode ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
               border: '1px solid var(--color-surface-offset)',
               cursor: 'pointer',
               outline: 'none',
@@ -536,12 +507,14 @@ export default function CookbookView() {
                 width: '16px',
                 borderRadius: '50%',
                 transition: 'transform 200ms var(--ease-default), background-color 200ms var(--ease-default)',
-                transform: unitySafeMode ? 'translateX(24px)' : 'translateX(4px)',
-                backgroundColor: unitySafeMode ? 'var(--color-text-inverted)' : 'var(--color-text-muted)'
+                transform: safeMode ? 'translateX(24px)' : 'translateX(4px)',
+                backgroundColor: safeMode ? 'var(--color-text-inverted)' : 'var(--color-text-muted)'
               }}
             />
           </button>
-          <div>
+          {/* The words are the bigger target, so they toggle it too. Hanging
+              this off the row instead would fire twice on the switch itself. */}
+          <div onClick={() => handleToggleSafeMode(!safeMode)} style={{ cursor: 'pointer', userSelect: 'none' }}>
             <div
               style={{
                 fontSize: 'var(--text-sm)',
@@ -549,10 +522,11 @@ export default function CookbookView() {
                 color: 'var(--color-text-base)'
               }}
             >
-              Unity-Safe Mode
+              Safe Mode
             </div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-              Filters out models larger than 4B parameters to prevent VRAM competition with the Unity Editor.
+              Hides models over {SAFE_MODE_MAX_PARAMS}B parameters, so a large one cannot take the
+              video memory your engine or editor is already using.
             </div>
           </div>
         </div>
@@ -628,7 +602,7 @@ export default function CookbookView() {
             </div>
           </div>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 'var(--leading-normal)' }}>
-            Ollama is required to manage local LLM downloads and execution. Install the official Ollama desktop utility to proceed.
+            Checkpoint uses Ollama to download and run models on your machine. Install it, then come back and hit refresh.
           </p>
           <button
             onClick={() => handleOpenExternal(ollamaStatus.downloadUrl)}
@@ -737,23 +711,42 @@ export default function CookbookView() {
               margin: 0
             }}
           >
-            Workstation Model Catalog
+            Model Catalog
           </h2>
           {/* Search Input */}
-          <div style={{ position: 'relative', width: '240px' }}>
+          <div style={{ position: 'relative', width: '240px', maxWidth: '100%' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-faint)' }} />
             <input
               type="text"
               placeholder="Search models..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') setSearchQuery('') }}
+              spellCheck={false}
               className="input-base"
               style={{
                 paddingLeft: '32px',
+                paddingRight: searchQuery ? '28px' : undefined,
                 height: '32px',
                 fontSize: 'var(--text-xs)'
               }}
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+                aria-label="Clear search"
+                style={{
+                  position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'transparent', border: 'none', padding: '2px', display: 'flex',
+                  color: 'var(--color-text-faint)', cursor: 'pointer'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-base)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-faint)' }}
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -780,7 +773,10 @@ export default function CookbookView() {
             })}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>{filteredModels.length} models</span>
+            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+              {filteredModels.length} model{filteredModels.length === 1 ? '' : 's'}
+              {hiddenBySafeMode > 0 && `, ${hiddenBySafeMode} hidden by Safe Mode`}
+            </span>
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as 'fit' | 'params_asc' | 'params_desc')}
@@ -796,8 +792,12 @@ export default function CookbookView() {
         {filteredModels.length === 0 ? (
           <EmptyState
             icon={<Sparkles size={28} />}
-            title="No models match your search"
-            description="Try a different name, family (e.g. Llama, Mistral) or use case."
+            title={hiddenBySafeMode > 0 ? 'Safe Mode is hiding every match' : 'No models match your search'}
+            description={hiddenBySafeMode > 0
+              ? `${hiddenBySafeMode} model${hiddenBySafeMode === 1 ? '' : 's'} match, and all of them are over ${SAFE_MODE_MAX_PARAMS}B parameters.`
+              : 'Try a different name, family (e.g. Llama, Mistral) or use case.'}
+            actionLabel={hiddenBySafeMode > 0 ? 'Turn off Safe Mode' : undefined}
+            onActionClick={hiddenBySafeMode > 0 ? () => handleToggleSafeMode(false) : undefined}
             style={{
               height: 'auto',
               border: '1px dashed var(--color-surface-offset)',
@@ -828,6 +828,7 @@ export default function CookbookView() {
             })
 
             const isPullingThis = pullingModelTag === variant.ollamaTag
+            const poorFit = fitResult?.status === 'not_recommended'
 
             // Determine Fit Colors and Labels
             let fitColor = 'var(--color-text-muted)'
@@ -1028,19 +1029,19 @@ export default function CookbookView() {
                   }}
                 >
                   <div>
-                    <div style={{ color: 'var(--color-text-muted)' }}>RAM Req</div>
+                    <div style={{ color: 'var(--color-text-muted)' }}>RAM</div>
                     <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
                       {variant.ramRequiredGb} GB
                     </div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--color-text-muted)' }}>VRAM Req</div>
+                    <div style={{ color: 'var(--color-text-muted)' }}>VRAM</div>
                     <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
                       {variant.vramRequiredGb > 0 ? `${variant.vramRequiredGb} GB` : 'None'}
                     </div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--color-text-muted)' }}>Disk Size</div>
+                    <div style={{ color: 'var(--color-text-muted)' }}>Disk</div>
                     <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
                       {variant.fileSizeGb} GB
                     </div>
@@ -1057,7 +1058,12 @@ export default function CookbookView() {
                       fontSize: 'var(--text-2xs)'
                     }}
                   >
-                    <span style={{ color: 'var(--color-text-muted)' }}>Recommended Quant:</span>
+                    <span
+                      style={{ color: 'var(--color-text-muted)', cursor: 'help' }}
+                      title="Quantisation. A lower number is a smaller download that uses less memory, at some cost to quality."
+                    >
+                      Recommended quant:
+                    </span>
                     <span
                       style={{
                         fontWeight: 'var(--weight-semibold)',
@@ -1122,7 +1128,7 @@ export default function CookbookView() {
                       </div>
                     </div>
                   ) : pullingModelTag ? (
-                    /* Queue Locked / Installer Busy */
+                    /* Ollama pulls one model at a time. */
                     <button
                       disabled
                       style={{
@@ -1141,7 +1147,7 @@ export default function CookbookView() {
                         gap: 'var(--space-2)'
                       }}
                     >
-                      Queue Locked
+                      Another model is downloading
                     </button>
                   ) : isInstalled ? (
                     /* Already Installed */
@@ -1166,44 +1172,22 @@ export default function CookbookView() {
                       <CheckCircle size={14} />
                       Installed
                     </button>
-                  ) : fitResult?.status === 'not_recommended' ? (
-                    /* Hardware Insufficient */
-                    <button
-                      disabled
-                      style={{
-                        width: '100%',
-                        background: 'var(--color-surface-2)',
-                        border: '1px solid var(--color-surface-offset)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: 'var(--space-2)',
-                        color: 'var(--color-text-faint)',
-                        fontSize: 'var(--text-xs)',
-                        fontWeight: 'var(--weight-semibold)',
-                        cursor: 'not-allowed',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 'var(--space-2)'
-                      }}
-                    >
-                      <Info size={14} />
-                      Hardware Insufficient
-                    </button>
                   ) : (
-                    /* Download / Install Button */
+                    /* Install. A poor fit still installs, behind a confirm. */
                     <button
-                      onClick={() => handleInstall(variant.ollamaTag)}
+                      onClick={() => handleInstall(variant.ollamaTag, poorFit ? fitResult?.reason : undefined)}
                       disabled={ollamaStatus ? !ollamaStatus.running : true}
+                      title={ollamaStatus?.running ? undefined : 'Ollama is not running'}
                       style={{
                         width: '100%',
-                        background: 'var(--color-primary)',
-                        border: 'none',
+                        background: poorFit ? 'transparent' : 'var(--color-primary)',
+                        border: poorFit ? '1px solid var(--color-warning)' : 'none',
                         borderRadius: 'var(--radius-md)',
                         padding: 'var(--space-2)',
-                        color: '#ffffff',
+                        color: poorFit ? 'var(--color-warning)' : '#ffffff',
                         fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-semibold)',
-                        cursor: 'pointer',
+                        cursor: ollamaStatus?.running ? 'pointer' : 'not-allowed',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1211,8 +1195,8 @@ export default function CookbookView() {
                         opacity: ollamaStatus?.running ? 1 : 0.6
                       }}
                     >
-                      <Download size={14} />
-                      Download & Install
+                      {poorFit ? <Info size={14} /> : <Download size={14} />}
+                      {poorFit ? 'Install anyway' : 'Download & Install'}
                     </button>
                   )}
                 </div>
