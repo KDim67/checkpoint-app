@@ -24,7 +24,7 @@
     "preview": "electron-vite preview",
     "prepackage": "npm run verify",
     "package": "electron-builder --config electron-builder.yml",
-    "postinstall": "electron-rebuild",
+    "postinstall": "node node_modules/electron/install.js && electron-rebuild",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run",
