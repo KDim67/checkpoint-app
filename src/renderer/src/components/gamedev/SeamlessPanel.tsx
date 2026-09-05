@@ -378,7 +378,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     Original
                   </button>
                 </div>
-                <canvas ref={seamlessTilingCanvasRef} style={{ width: '100%', height: '100%', maxWidth: '500px', maxHeight: '500px', objectFit: 'contain', background: '#0b0c10', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+                <canvas ref={seamlessTilingCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
               </div>
 
               {/* Export Trigger Block */}
@@ -402,7 +402,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     onClick={handleSeamlessExport}
                     disabled={isSeamlessSaving}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-primary) 0%, #0055ff 100%)',
+                      background: 'var(--color-primary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'white',
@@ -413,7 +413,6 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       alignItems: 'center',
                       gap: '6px',
                       opacity: isSeamlessSaving ? 0.7 : 1,
-                      boxShadow: '0 4px 12px rgba(30, 69, 252, 0.3)'
                     }}
                   >
                     {isSeamlessSaving ? (

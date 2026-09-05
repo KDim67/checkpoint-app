@@ -3,6 +3,50 @@ import { Box, CheckCircle, Download, Loader, RefreshCw, Settings, Sparkles } fro
 import { useAppStore } from '../../store/appStore'
 import type { PbrTool } from './usePbrTool'
 
+/** Shared by every map tile, so the sizing is fixed in one place. */
+const MAP_MEDIA: React.CSSProperties = {
+  maxWidth: '100%',
+  maxHeight: '100%',
+  display: 'block'
+}
+
+/**
+ * One map in the grid. There are five, and they differed only by their label
+ * and whether they draw into an image or a canvas.
+ */
+function MapPreview({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+      background: 'var(--color-surface-1)',
+      border: '1px solid var(--color-surface-offset)',
+      borderRadius: 'var(--radius-md)',
+      padding: 'var(--space-3)'
+    }}>
+      <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+        {label}
+      </span>
+      {/* Square, and sized from the column it sits in. The box used to be a
+          grid row stretched to the full height of the panel while the map
+          inside it was capped at 160px, which left each map adrift in the
+          middle of a mostly empty rectangle. */}
+      <div style={{
+        aspectRatio: '1',
+        background: 'var(--color-background)',
+        borderRadius: 'var(--radius-sm)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden'
+      }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDone: (cardId: string) => Promise<void> }) {
   const {
     setAlbedoPath,
@@ -359,48 +403,31 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
                 gap: 'var(--space-3)',
+                // Rows take the height their contents need. Without this the
+                // grid divides the panel between them however tall that is.
+                alignContent: 'start',
                 overflowY: 'auto'
               }}>
                 
-                {/* Albedo Thumbnail */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>Albedo (Base Color)</span>
-                  <div style={{ flex: 1, minHeight: '160px', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <img src={albedoUrl || undefined} style={{ maxWidth: '100%', maxHeight: '160px', objectFit: 'contain' }} alt="Albedo" />
-                  </div>
-                </div>
+                <MapPreview label="Albedo (Base Color)">
+                  <img src={albedoUrl || undefined} style={MAP_MEDIA} alt="Albedo" />
+                </MapPreview>
 
-                {/* Normal Map Thumbnail */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>Normal Map</span>
-                  <div style={{ flex: 1, minHeight: '160px', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <canvas ref={normalCanvasRef} style={{ maxWidth: '100%', maxHeight: '160px', display: 'block', objectFit: 'contain' }} />
-                  </div>
-                </div>
+                <MapPreview label="Normal Map">
+                  <canvas ref={normalCanvasRef} style={MAP_MEDIA} />
+                </MapPreview>
 
-                {/* Height Map Thumbnail */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>Height Map (Displacement)</span>
-                  <div style={{ flex: 1, minHeight: '160px', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <canvas ref={heightCanvasRef} style={{ maxWidth: '100%', maxHeight: '160px', display: 'block', objectFit: 'contain' }} />
-                  </div>
-                </div>
+                <MapPreview label="Height Map (Displacement)">
+                  <canvas ref={heightCanvasRef} style={MAP_MEDIA} />
+                </MapPreview>
 
-                {/* Roughness Map Thumbnail */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>Roughness Map</span>
-                  <div style={{ flex: 1, minHeight: '160px', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <canvas ref={roughnessCanvasRef} style={{ maxWidth: '100%', maxHeight: '160px', display: 'block', objectFit: 'contain' }} />
-                  </div>
-                </div>
+                <MapPreview label="Roughness Map">
+                  <canvas ref={roughnessCanvasRef} style={MAP_MEDIA} />
+                </MapPreview>
 
-                {/* AO Map Thumbnail */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>Ambient Occlusion (AO)</span>
-                  <div style={{ flex: 1, minHeight: '160px', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                    <canvas ref={aoCanvasRef} style={{ maxWidth: '100%', maxHeight: '160px', display: 'block', objectFit: 'contain' }} />
-                  </div>
-                </div>
+                <MapPreview label="Ambient Occlusion (AO)">
+                  <canvas ref={aoCanvasRef} style={MAP_MEDIA} />
+                </MapPreview>
               </div>
 
               {/* Export Trigger Block */}
@@ -424,7 +451,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     onClick={handleExport}
                     disabled={isSaving}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-primary) 0%, #0055ff 100%)',
+                      background: 'var(--color-primary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'white',
@@ -435,7 +462,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                       alignItems: 'center',
                       gap: '6px',
                       opacity: isSaving ? 0.7 : 1,
-                      boxShadow: '0 4px 12px rgba(30, 69, 252, 0.3)'
                     }}
                   >
                     {isSaving ? (

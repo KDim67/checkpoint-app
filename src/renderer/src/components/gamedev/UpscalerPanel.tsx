@@ -177,7 +177,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                   <button
                     onClick={handleSelectUpscaleFile}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-primary) 0%, #0055ff 100%)',
+                      background: 'var(--color-primary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'white',
@@ -185,7 +185,6 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                       fontSize: 'var(--text-xs)',
                       padding: '10px 20px',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(30, 69, 252, 0.3)'
                     }}
                   >
                     Choose Image
@@ -203,7 +202,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                     maxHeight: '520px',
                     objectFit: 'contain',
                     imageRendering: 'pixelated',
-                    background: '#0b0c10',
+                    background: 'var(--color-background)',
                     borderRadius: 'var(--radius-md)',
                     boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
                   }}
@@ -233,7 +232,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                     onClick={handleUpscaleExport}
                     disabled={isUpscaleSaving}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-secondary) 0%, #00aa55 100%)',
+                      background: 'var(--color-secondary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'var(--color-text-inverted)',
@@ -244,7 +243,6 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                       alignItems: 'center',
                       gap: '6px',
                       opacity: isUpscaleSaving ? 0.7 : 1,
-                      boxShadow: '0 4px 12px rgba(0, 200, 100, 0.3)'
                     }}
                   >
                     {isUpscaleSaving ? (
