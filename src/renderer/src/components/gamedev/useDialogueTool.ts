@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useToast } from '../ui/Toast'
 import { normalizeDialogueNodes, type DialogueNode } from './types'
+import { themeToken, useThemeVersion } from '../../lib/themeTokens'
 
 /** Raised by the AI panel when it has a dialogue tree to hand over. */
 const AI_DIALOGUE_EVENT = 'ai-load-dialogue-tree'
@@ -14,6 +15,21 @@ const AI_DIALOGUE_EVENT = 'ai-load-dialogue-tree'
  */
 export function useDialogueTool(onActivate: () => void) {
   const { toast } = useToast()
+  // Re-renders when the theme changes, so the colours below are read again.
+  useThemeVersion()
+
+  /**
+   * The one node that has to look different from the rest, in the current
+   * theme's colours.
+   *
+   * Built out here rather than inside the memo below so it can be a real
+   * dependency. A bare version counter would work at runtime and read to
+   * everyone, eslint included, as a dependency that does nothing.
+   */
+  const rootClassDef =
+    `  classDef root fill:${themeToken('--color-secondary-muted', '#202510')}` +
+    `,stroke:${themeToken('--color-secondary', '#cdf12b')}` +
+    `,color:${themeToken('--color-secondary', '#cdf12b')};\n\n`
 
   // Tab 3: Dialogue Quest Flow State
   const [dialogueNodes, setDialogueNodes] = useState<DialogueNode[]>([
@@ -101,9 +117,11 @@ export function useDialogueTool(onActivate: () => void) {
 
   const compiledMermaid = useMemo(() => {
     let code = 'graph TD\n'
-    code += '  %% Theme configurations\n'
-    code += '  classDef default fill:#1b1f30,stroke:#24293f,color:#f1f5f9;\n'
-    code += '  classDef root fill:#202510,stroke:#cdf12b,color:#cdf12b;\n\n'
+    // No classDef for ordinary nodes. One used to be written here in the dark
+    // theme's own colours, which overrode whatever theme was actually selected
+    // and left every dialogue node navy on a warm board. MermaidChart hands
+    // mermaid the live theme now, so left alone they follow it.
+    code += rootClassDef
 
     dialogueNodes.forEach(node => {
       const label = `"${node.speaker || 'Narrator'}:\\n${(node.text || '').replace(/"/g, "'")}"`
@@ -117,7 +135,7 @@ export function useDialogueTool(onActivate: () => void) {
       })
     })
     return code
-  }, [dialogueNodes])
+  }, [dialogueNodes, rootClassDef])
 
   return {
     dialogueNodes,
