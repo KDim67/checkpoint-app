@@ -1,0 +1,125 @@
+import { describe, it, expect } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { initDb, closeDb, getSetting, setSetting } from '../src/main/db'
+import { ensureWebhookToken, offeredToken, tokenMatches, WEBHOOK_TOKEN_KEY } from '../src/main/webhookAuth'
+
+// The gateway is an HTTP server on the loopback interface, and the loopback
+// interface is reachable from any browser page. The token is the only thing
+// between a website and the user's database, so it gets pinned down here.
+
+let dir: string
+
+const setup = (): void => {
+  dir = mkdtempSync(join(tmpdir(), 'checkpoint-webhook-'))
+  initDb(dir)
+}
+const teardown = (): void => {
+  closeDb()
+  rmSync(dir, { recursive: true, force: true })
+}
+
+describe('the webhook token', () => {
+  it('is made on first use and kept afterwards', () => {
+    setup()
+    try {
+      const first = ensureWebhookToken()
+      expect(first).toMatch(/^[0-9a-f]{48}$/)
+      // A token that changed on every call would break every script that
+      // stored it the moment the app restarted.
+      expect(ensureWebhookToken()).toBe(first)
+      expect(getSetting(WEBHOOK_TOKEN_KEY, '')).toBe(first)
+    } finally {
+      teardown()
+    }
+  })
+
+  it('is long enough not to be guessed', () => {
+    setup()
+    try {
+      // 24 random bytes. Anything short enough to brute force over HTTP would
+      // be no better than the nothing that was there before.
+      expect(Buffer.from(ensureWebhookToken(), 'hex')).toHaveLength(24)
+    } finally {
+      teardown()
+    }
+  })
+
+  it('differs between installs', () => {
+    setup()
+    const a = ensureWebhookToken()
+    teardown()
+
+    setup()
+    const b = ensureWebhookToken()
+    teardown()
+
+    expect(a).not.toBe(b)
+  })
+
+  it('replaces a stored value too short to be one of ours', () => {
+    setup()
+    try {
+      // A truncated or hand-edited setting must not become a weak token that
+      // the gateway then accepts forever.
+      setSetting(WEBHOOK_TOKEN_KEY, 'short')
+      const fixed = ensureWebhookToken()
+      expect(fixed).not.toBe('short')
+      expect(fixed.length).toBeGreaterThanOrEqual(32)
+    } finally {
+      teardown()
+    }
+  })
+})
+
+describe('reading the token off a request', () => {
+  it('accepts the documented Bearer form', () => {
+    expect(offeredToken('Bearer abc123')).toBe('abc123')
+  })
+
+  it('accepts it however the caller cased the scheme', () => {
+    expect(offeredToken('bearer abc123')).toBe('abc123')
+    expect(offeredToken('BEARER abc123')).toBe('abc123')
+  })
+
+  it('accepts a bare token, since plenty of tools send one', () => {
+    expect(offeredToken('abc123')).toBe('abc123')
+  })
+
+  it('is not confused by surrounding whitespace', () => {
+    expect(offeredToken('  Bearer   abc123  ')).toBe('abc123')
+  })
+
+  it('reads a missing header as no token rather than crashing', () => {
+    expect(offeredToken(undefined)).toBe('')
+    expect(offeredToken('')).toBe('')
+  })
+})
+
+describe('checking an offered token', () => {
+  const real = 'a'.repeat(48)
+
+  it('accepts the real one', () => {
+    expect(tokenMatches(real, real)).toBe(true)
+  })
+
+  it('rejects a different one of the same length', () => {
+    expect(tokenMatches('b'.repeat(48), real)).toBe(false)
+  })
+
+  it('rejects an empty offer, which is what no header produces', () => {
+    expect(tokenMatches('', real)).toBe(false)
+  })
+
+  it('rejects a prefix of the real one without throwing', () => {
+    // timingSafeEqual throws on a length mismatch, and a throw in the request
+    // handler would let anyone stop the gateway by sending a short string.
+    expect(() => tokenMatches(real.slice(0, 10), real)).not.toThrow()
+    expect(tokenMatches(real.slice(0, 10), real)).toBe(false)
+  })
+
+  it('rejects a longer string that starts with the real one', () => {
+    expect(tokenMatches(real + 'extra', real)).toBe(false)
+  })
+})

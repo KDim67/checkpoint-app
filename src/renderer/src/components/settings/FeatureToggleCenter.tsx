@@ -15,12 +15,79 @@ interface ToggleConfig {
   toggle: (active: boolean) => Promise<void>
 }
 
+/**
+ * The gateway's shared secret, with the call that uses it.
+ *
+ * Shown rather than hidden: the port is on the loopback interface, which any
+ * browser page can reach, so the token is the only thing separating the user's
+ * database from any website they happen to have open. Anyone whose scripts
+ * posted to this before needs to find it, and this is where they look.
+ */
+function WebhookToken(): React.JSX.Element | null {
+  const [token, setToken] = useState<string>('')
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    window.electronAPI.db.getSetting('webhook_token').then(value => {
+      if (!cancelled) setToken(typeof value === 'string' ? value : '')
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  if (!token) return null
+
+  const example = `curl -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \\
+  -d '{"context":"work","title":"Hello"}' http://127.0.0.1:${WEBHOOK_DEFAULT_PORT}/api/v1/log`
+
+  return (
+    <div style={{
+      margin: '0 0 var(--space-2) 34px',
+      padding: 'var(--space-2) var(--space-3)',
+      background: 'var(--color-surface-2)',
+      border: '1px solid var(--color-surface-offset)',
+      borderRadius: 'var(--radius-sm)'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '4px' }}>
+        <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Required token
+        </span>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(token).then(() => {
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1500)
+            }).catch(() => {})
+          }}
+          style={{
+            fontSize: '10px', padding: '1px 6px', cursor: 'pointer',
+            background: 'none', color: 'var(--color-secondary)',
+            border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)'
+          }}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <code style={{
+        display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10px',
+        color: 'var(--color-text-muted)', wordBreak: 'break-all', marginBottom: '6px'
+      }}>
+        {token}
+      </code>
+      <pre style={{
+        margin: 0, fontFamily: 'var(--font-mono)', fontSize: '10px',
+        color: 'var(--color-text-faint)', whiteSpace: 'pre-wrap', wordBreak: 'break-all'
+      }}>{example}</pre>
+    </div>
+  )
+}
+
 const BACKGROUND_CONFIGS: ToggleConfig[] = [
   {
     key: 'webhook',
     icon: <Webhook size={16} />,
     title: 'Local Webhook Gateway',
-    description: 'Receives events from external tools via a local HTTP port.',
+    description: 'Receives events from external tools via a local HTTP port. Requires the token below.',
     warning: 'Disabling closes the active socket immediately (server.close()).',
     getState: async () => {
       const v = await window.electronAPI.db.getSetting('feature_webhook')
@@ -363,6 +430,7 @@ export default function FeatureToggleCenter() {
                 busy={toggling === cfg.key}
                 onChange={v => handleToggle(cfg, v)}
               />
+              {cfg.key === 'webhook' && states.webhook && <WebhookToken />}
             </React.Fragment>
           ))}
         </div>
