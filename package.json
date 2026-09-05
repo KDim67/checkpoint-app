@@ -63,7 +63,7 @@
     "@vitejs/plugin-react": "4.7.0",
     "autoprefixer": "10.5.0",
     "date-fns": "^4.4.0",
-    "electron": "33.4.11",
+    "electron": "42.11.2",
     "electron-builder": "25.1.8",
     "electron-vite": "3.1.0",
     "eslint": "9.39.4",
