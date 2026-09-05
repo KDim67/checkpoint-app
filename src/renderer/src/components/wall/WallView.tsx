@@ -27,7 +27,7 @@ import {
   bringToFront, boundsOf, createWallItem, duplicateItems, fitCamera, inPaintOrder,
   itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
-  snap, SNAP_GRID, toWallPoint, WALL_COLORS, zoomAt,
+  snap, SNAP_GRID, gridSpacing, toWallPoint, WALL_COLORS, zoomAt,
   createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
   arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset,
   distanceToPolyline, inkFromPath, pruneArrows,
@@ -858,7 +858,8 @@ export default function WallView() {
       layer.style.transform = transform
     })
     viewport.style.backgroundPosition = `${cam.x}px ${cam.y}px`
-    viewport.style.backgroundSize = `${24 * cam.zoom}px ${24 * cam.zoom}px`
+    const dots = gridSpacing(cam.zoom)
+    viewport.style.backgroundSize = `${dots}px ${dots}px`
 
     // The minimap's window onto the wall, kept in step so it does not sit still
     // through the pan and then jump at the end. Its scale and offsets cannot
@@ -1956,7 +1957,7 @@ export default function WallView() {
             cursor: tool === 'pen' ? 'crosshair' : tool === 'arrow' ? 'copy' : undefined,
             background: canvasBackground,
             backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
-            backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
+            backgroundSize: `${gridSpacing(camera.zoom)}px ${gridSpacing(camera.zoom)}px`,
             backgroundPosition: `${camera.x}px ${camera.y}px`
           }}
         >

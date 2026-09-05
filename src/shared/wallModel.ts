@@ -530,6 +530,24 @@ export function snap(value: number, grid: number): number {
 
 export const SNAP_GRID = 24
 
+/** Dots closer together than this stop reading as dots. */
+export const MIN_GRID_PX = 12
+
+/**
+ * The spacing to draw the background dots at, in screen pixels.
+ *
+ * The step doubles instead of the spacing shrinking without limit. Zoomed all
+ * the way out the plain grid lands under five pixels apart, which Chromium
+ * paints as a flat tint rather than as dots, and in patches that disagree with
+ * each other along its tile boundaries.
+ */
+export function gridSpacing(zoom: number): number {
+  if (!(zoom > 0)) return SNAP_GRID
+  let step = SNAP_GRID
+  while (step * zoom < MIN_GRID_PX) step *= 2
+  return step * zoom
+}
+
 /**
  * Topmost item under a wall point. Needed because pointer capture retargets the
  * following click/dblclick to the viewport, so `event.target` lies.
