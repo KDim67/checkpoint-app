@@ -4,7 +4,7 @@ import zlib from 'zlib'
 import { pipeline } from 'stream/promises'
 import { app } from 'electron'
 import Database from 'better-sqlite3'
-import { getDb, getSetting, setSetting, initDb } from './db'
+import { getDb, getSetting, setSetting, initDb, discardDb } from './db'
 
 let backupTimer: NodeJS.Timeout | null = null
 let initialCheckTimer: NodeJS.Timeout | null = null
@@ -49,22 +49,54 @@ export function getBackupDir(): string {
   return defaultDir
 }
 
+/**
+ * What a file in the vault is.
+ *
+ * `scheduled` is the rolling automatic snapshot. `preRestore` is the copy taken
+ * of the live database immediately before a restore overwrites it, so a restore
+ * chosen by mistake can be undone.
+ */
+export type BackupKind = 'scheduled' | 'preRestore'
+
+const PREFIXES: Record<BackupKind, string> = {
+  scheduled: 'backup_',
+  preRestore: 'pre_restore_'
+}
+
+/** Reads a vault filename, or null when it is not one of ours. */
+export function parseBackupName(filename: string): { kind: BackupKind; timestamp: number } | null {
+  if (!filename.endsWith('.db.gz')) return null
+  for (const [kind, prefix] of Object.entries(PREFIXES) as [BackupKind, string][]) {
+    if (!filename.startsWith(prefix)) continue
+    const digits = filename.slice(prefix.length, -'.db.gz'.length)
+    if (!/^\d+$/.test(digits)) return null
+    return { kind, timestamp: parseInt(digits, 10) }
+  }
+  return null
+}
+
+/**
+ * Trims each kind to `maxCount` separately.
+ *
+ * Pre-restore copies used to match neither the listing nor this, so every
+ * restore left a full compressed database behind that nothing would ever show
+ * or remove. A few restores and the vault quietly outgrew the data it guards.
+ */
 async function pruneBackups(backupDir: string, maxCount: number): Promise<void> {
   try {
-    const files = fs.readdirSync(backupDir)
-      .filter(f => f.startsWith('backup_') && f.endsWith('.db.gz'))
-      .map(f => {
-        const match = f.match(/^backup_(\d+)\.db\.gz$/)
-        return {
-          filename: f,
-          timestamp: match ? parseInt(match[1], 10) : 0
-        }
-      })
-      .sort((a, b) => a.timestamp - b.timestamp) // Oldest first
+    const byKind = new Map<BackupKind, { filename: string; timestamp: number }[]>()
+    for (const filename of fs.readdirSync(backupDir)) {
+      const parsed = parseBackupName(filename)
+      if (!parsed) continue
+      const list = byKind.get(parsed.kind) ?? []
+      list.push({ filename, timestamp: parsed.timestamp })
+      byKind.set(parsed.kind, list)
+    }
 
-    if (files.length > maxCount) {
-      const toPrune = files.slice(0, files.length - maxCount)
-      for (const f of toPrune) {
+    for (const files of byKind.values()) {
+      files.sort((a, b) => a.timestamp - b.timestamp) // Oldest first
+      if (files.length <= maxCount) continue
+      for (const f of files.slice(0, files.length - maxCount)) {
         fs.unlinkSync(join(backupDir, f.filename))
       }
     }
@@ -166,9 +198,15 @@ export async function runRestore(filename: string): Promise<void> {
       }
     }
 
-    // 4. Close database connection
-    const currentDb = getDb()
-    currentDb.close()
+    // 4. Close the connection through db.ts, not by reaching for the handle.
+    //
+    // db.ts caches prepared statements keyed by SQL, compiled against whichever
+    // connection was open at the time. Closing the raw handle left every one of
+    // them pointing at a dead connection while `dbInstance` still looked live,
+    // so after a restore the search, task, analytics and update paths all threw
+    // "The database connection is not open" until the app was restarted.
+    // discardDb drops the cache along with the connection.
+    discardDb()
 
     // 5. Delete WAL/SHM journaling state files to prevent locks
     if (fs.existsSync(primaryWalFile)) fs.unlinkSync(primaryWalFile)
@@ -190,23 +228,31 @@ export async function runRestore(filename: string): Promise<void> {
   }
 }
 
-export function listCompletedBackups(): { filename: string; timestamp: number; size: number }[] {
+export function listCompletedBackups(): {
+  filename: string
+  timestamp: number
+  size: number
+  kind: BackupKind
+}[] {
   const backupDir = getBackupDir()
   try {
     if (!fs.existsSync(backupDir)) return []
 
+    // Pre-restore copies are listed too. Taking one and then hiding it meant
+    // the safety net existed on disk and nowhere the user could reach it.
     return fs.readdirSync(backupDir)
-      .filter(f => f.startsWith('backup_') && f.endsWith('.db.gz'))
-      .map(f => {
-        const filePath = join(backupDir, f)
-        const stats = fs.statSync(filePath)
-        const match = f.match(/^backup_(\d+)\.db\.gz$/)
+      .map(filename => {
+        const parsed = parseBackupName(filename)
+        if (!parsed) return null
+        const stats = fs.statSync(join(backupDir, filename))
         return {
-          filename: f,
-          timestamp: match ? parseInt(match[1], 10) : stats.mtimeMs,
-          size: stats.size
+          filename,
+          timestamp: parsed.timestamp || stats.mtimeMs,
+          size: stats.size,
+          kind: parsed.kind
         }
       })
+      .filter((b): b is { filename: string; timestamp: number; size: number; kind: BackupKind } => b !== null)
       .sort((a, b) => b.timestamp - a.timestamp) // Newest first
   } catch (err) {
     console.error('Failed to list backups:', err)

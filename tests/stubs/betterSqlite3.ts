@@ -15,7 +15,7 @@
  * call quietly did nothing.
  */
 
-import { DatabaseSync, type StatementSync, type SQLInputValue } from 'node:sqlite'
+import { DatabaseSync, backup, type StatementSync, type SQLInputValue } from 'node:sqlite'
 
 type Row = Record<string, unknown>
 
@@ -91,6 +91,16 @@ export default class DatabaseFacade {
         throw err
       }
     }
+  }
+
+  /**
+   * better-sqlite3 puts backup on the instance; node:sqlite exports it as a
+   * function over the same SQLite online-backup API. Both return a promise
+   * that settles when the copy is complete, so the backup vault and its
+   * restore path can be exercised for real rather than mocked.
+   */
+  backup(destination: string): Promise<void> {
+    return backup(this.#db, destination).then(() => undefined)
   }
 
   close(): void {

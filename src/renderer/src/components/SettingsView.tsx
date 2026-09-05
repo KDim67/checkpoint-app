@@ -1330,7 +1330,12 @@ function BackupSettings() {
   const [interval, setIntervalVal] = useState('daily')
   const [maxCount, setMaxCount] = useState(10)
   const [customPath, setCustomPath] = useState('')
-  const [backups, setBackups] = useState<{ filename: string; timestamp: number; size: number }[]>([])
+  const [backups, setBackups] = useState<{
+    filename: string
+    timestamp: number
+    size: number
+    kind?: 'scheduled' | 'preRestore'
+  }[]>([])
 
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
@@ -1612,6 +1617,23 @@ function BackupSettings() {
                     <tr key={b.filename} style={{ borderBottom: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)' }}>
                       <td style={{ padding: 'var(--space-2.5) var(--space-4)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
                         {b.filename}
+                        {b.kind === 'preRestore' && (
+                          <span
+                            title="Taken automatically just before a restore, so the restore can be undone."
+                            style={{
+                              marginLeft: 'var(--space-2)',
+                              padding: '1px 6px',
+                              borderRadius: 'var(--radius-full, 999px)',
+                              background: 'var(--color-surface-2)',
+                              color: 'var(--color-text-muted)',
+                              fontFamily: 'var(--font-sans)',
+                              fontSize: '9px',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            before a restore
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: 'var(--space-2.5) var(--space-4)', color: 'var(--color-text-muted)' }}>
                         {new Date(b.timestamp).toLocaleString()}
