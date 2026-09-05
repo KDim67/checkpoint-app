@@ -2,8 +2,8 @@
 
 A local-first desktop workspace for keeping track of what you're doing.
 
-I built this because I got tired of having twenty things open during a game dev
-session. A board in one app, notes in another, a scratchpad in a third, some
+I built this because I got tired of juggling many different apps during a game
+dev session. A board in one, notes in another, a scratchpad in a third, some
 texture utility in a fourth, a browser tab for the palette I picked last week.
 Checkpoint is all of that in one window, on my machine, with no account.
 
