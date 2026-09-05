@@ -1,3 +1,4 @@
+import type React from 'react'
 import type { ActiveView } from '../store/appStore'
 import { getStringSetting, setStringSetting } from './settings'
 
@@ -19,9 +20,18 @@ export interface AppShortcut {
 }
 
 /**
- * Defaults match the bindings that were hardcoded in App: Ctrl+1..8 in this
- * order, plus Ctrl+L and Ctrl+comma. Changing the order would silently remap
- * every existing user's muscle memory.
+ * The digits run down the sidebar: first view is Ctrl+1, tenth is Ctrl+0.
+ *
+ * That rule is the point. Wall used to be Ctrl+9 while sitting sixth, because
+ * when it was added it took the next free digit rather than renumbering the
+ * views below it, and every view added afterwards would have made the list
+ * less predictable still. Following the order costs a remap once; not
+ * following it costs a little more confusion with every release.
+ *
+ * There are eleven views and ten digits, so the last one gets a letter.
+ *
+ * A remap only reaches people who never changed their shortcuts: loadBindings
+ * merges a saved binding over the default, so anything customised is kept.
  */
 export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_log',         label: 'Go to Log',         defaultCombo: 'Ctrl+1', action: { kind: 'view', view: 'log' } },
@@ -29,12 +39,13 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_backlog',     label: 'Go to Backlog',     defaultCombo: 'Ctrl+3', action: { kind: 'view', view: 'backlog' } },
   { id: 'view_focus',       label: 'Go to Focus',       defaultCombo: 'Ctrl+4', action: { kind: 'view', view: 'focus' } },
   { id: 'view_notes',       label: 'Go to Notes',       defaultCombo: 'Ctrl+5', action: { kind: 'view', view: 'notes' } },
-  { id: 'view_wall',        label: 'Go to Wall',        defaultCombo: 'Ctrl+9', action: { kind: 'view', view: 'wall' } },
-  { id: 'view_clipboard',   label: 'Go to Clipboard',   defaultCombo: 'Ctrl+6', action: { kind: 'view', view: 'clipboard' } },
-  { id: 'view_cookbook',    label: 'Go to Cookbook',    defaultCombo: 'Ctrl+7', action: { kind: 'view', view: 'cookbook' } },
-  { id: 'view_analytics',   label: 'Go to Analytics',   defaultCombo: 'Ctrl+8', action: { kind: 'view', view: 'analytics' } },
-  { id: 'view_cheatsheets', label: 'Go to Cheatsheets', defaultCombo: '',       action: { kind: 'view', view: 'cheatsheets' } },
-  { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: '',       action: { kind: 'view', view: 'gamedev' } },
+  { id: 'view_wall',        label: 'Go to Wall',        defaultCombo: 'Ctrl+6', action: { kind: 'view', view: 'wall' } },
+  { id: 'view_clipboard',   label: 'Go to Clipboard',   defaultCombo: 'Ctrl+7', action: { kind: 'view', view: 'clipboard' } },
+  { id: 'view_cookbook',    label: 'Go to Cookbook',    defaultCombo: 'Ctrl+8', action: { kind: 'view', view: 'cookbook' } },
+  { id: 'view_analytics',   label: 'Go to Analytics',   defaultCombo: 'Ctrl+9', action: { kind: 'view', view: 'analytics' } },
+  { id: 'view_cheatsheets', label: 'Go to Cheatsheets', defaultCombo: 'Ctrl+0', action: { kind: 'view', view: 'cheatsheets' } },
+  // The eleventh view, and the digits are gone. G for Game Dev.
+  { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+G', action: { kind: 'view', view: 'gamedev' } },
   { id: 'toggle_ai_panel',  label: 'Toggle AI panel',   defaultCombo: 'Ctrl+L', action: { kind: 'toggleAiPanel' } },
   { id: 'open_settings',    label: 'Open Settings',     defaultCombo: 'Ctrl+,', action: { kind: 'openSettings' } }
 ]
