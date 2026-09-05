@@ -18,7 +18,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
-  Grid3x3, RotateCw, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
+  Grid3x3, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
   ChevronDown, Pencil, PanelRight, Paintbrush, PenLine, Spline, MousePointer2
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
@@ -46,7 +46,7 @@ import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImage
 import { exportWallToPng } from '../../lib/wallExport'
 import { errorMessage } from '../../../../shared/errors'
 import type { Item, NoteMetadata } from '../../../../shared/types'
-import WallItemView from './WallItemView'
+import WallItemLayer from './WallItemLayer'
 import WallContextMenu, { type MenuEntry } from './WallContextMenu'
 import WallColorPicker from './WallColorPicker'
 import ConfirmDialog from '../ui/ConfirmDialog'
@@ -2098,140 +2098,25 @@ export default function WallView() {
             {inPaintOrder(doc.items).filter(i => i.kind !== 'arrow').map(item => {
               const isSelected = selectedIds.has(item.id)
               return (
-                <div
+                <WallItemLayer
                   key={item.id}
-                  data-wall-item={item.id}
-                  style={{
-                    position: 'absolute',
-                    left: 0, top: 0,
-                    width: `${item.width}px`, height: `${item.height}px`,
-                    // translate, not left/top. Moving an item this way costs no
-                    // layout, and a layout here repaints the whole canvas layer,
-                    // which means resampling every image on the wall per frame.
-                    // The 2D form, not translate3d: the 3D one gave every item
-                    // a compositor layer of its own, and with hundreds of them
-                    // each render paid to work out the overlaps between them
-                    // all, which is what made a click on a full board stall.
-                    transform: `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`,
-                    // Images get their own compositor layer so a repaint of the
-                    // canvas does not re-rasterise them. They are the expensive
-                    // ones: a photo can be tens of megapixels behind a 280px box.
-                    willChange: item.kind === 'image' ? 'transform' : undefined,
-                    // Ink lets presses through: only its stroke takes them.
-                    pointerEvents: item.kind === 'ink' ? 'none' : undefined,
-                    cursor: item.locked ? 'default' : 'grab',
-                    outline: arrowDrag?.overId === item.id || arrowEndHover === item.id
+                  item={item}
+                  card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
+                  note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
+                  selected={isSelected}
+                  editing={editingId === item.id}
+                  connectable={tool === 'select' && !item.locked && item.kind !== 'frame'}
+                  showHandles={isSelected && single?.id === item.id && !item.locked}
+                  outline={
+                    arrowDrag?.overId === item.id || arrowEndHover === item.id
                       ? '3px solid var(--color-secondary)'
                       : arrowFrom === item.id
                         ? '2px dashed var(--color-secondary)'
-                        : isSelected ? '2px solid var(--color-secondary)' : 'none',
-                    outlineOffset: '2px'
-                  }}
-                >
-                  <WallItemView
-                    item={item}
-                    card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
-                    note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
-                    selected={isSelected}
-                    editing={editingId === item.id}
-                    onTextChange={onItemTextChange}
-                    onFinishEditing={onItemFinishEditing}
-                  />
-
-                  {item.locked && isSelected && (
-                    <div style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>
-                      <Lock size={12} />
-                    </div>
-                  )}
-
-                  {/* A locked item ignores every press. Without a marker that
-                      reads as the app being broken rather than as a choice. */}
-                  {item.locked && (
-                    <span
-                      title="Locked. Right-click to unlock."
-                      style={{
-                        position: 'absolute', right: '-6px', top: '-6px',
-                        width: '18px', height: '18px', borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'var(--color-surface-elevated)',
-                        border: '1px solid var(--color-surface-offset)',
-                        color: 'var(--color-text-faint)', pointerEvents: 'none'
-                      }}
-                    >
-                      <Lock size={10} />
-                    </span>
-                  )}
-
-                  {/* Drag one of these to any other item to connect the two.
-                      Only in select mode: the pen and the arrow already own
-                      the whole gesture, and a locked item connects to nothing. */}
-                  {tool === 'select' && !item.locked && item.kind !== 'frame' && (
-                    <>
-                      {([
-                        ['top', { left: '50%', top: '-13px', marginLeft: '-9px' }],
-                        ['right', { right: '-13px', top: '50%', marginTop: '-9px' }],
-                        ['bottom', { left: '50%', bottom: '-13px', marginLeft: '-9px' }],
-                        ['left', { left: '-13px', top: '50%', marginTop: '-9px' }]
-                      ] as const).map(([side, position]) => (
-                        <div
-                          key={side}
-                          className="wall-connect"
-                          data-wall-connect={item.id}
-                          title="Drag to connect this to something"
-                          style={{
-                            position: 'absolute', ...position,
-                            width: '18px', height: '18px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'crosshair', zIndex: 3
-                          }}
-                        >
-                          <span className="wall-connect-dot" style={{ width: '10px', height: '10px' }} />
-                        </div>
-                      ))}
-                    </>
-                  )}
-
-                  {/* Handles only for a single unlocked selection: dragging one
-                      corner of five items has no obvious meaning. */}
-                  {isSelected && single?.id === item.id && !item.locked && (
-                    <>
-                      {/* A 22px grab area around a 12px dot. The handle used
-                          to be exactly as big as it looked, which made resizing
-                          a matter of hitting a 12px corner. */}
-                      <div
-                        data-wall-handle="se"
-                        style={{
-                          position: 'absolute', right: '-11px', bottom: '-11px', width: '22px', height: '22px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'nwse-resize'
-                        }}
-                      >
-                        <span style={{
-                          width: '12px', height: '12px',
-                          background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
-                          borderRadius: '2px'
-                        }} />
-                      </div>
-                      <div
-                        data-wall-handle="rotate"
-                        title="Drag to rotate, hold Shift for 15° steps"
-                        style={{
-                          position: 'absolute', left: '50%', top: '-30px', transform: 'translateX(-50%)',
-                          width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'grab'
-                        }}
-                      >
-                        <span style={{
-                          width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'var(--color-surface-1)', border: '1px solid var(--color-secondary)',
-                          borderRadius: '50%', color: 'var(--color-secondary)'
-                        }}>
-                          <RotateCw size={9} />
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
+                        : isSelected ? '2px solid var(--color-secondary)' : 'none'
+                  }
+                  onTextChange={onItemTextChange}
+                  onFinishEditing={onItemFinishEditing}
+                />
               )
             })}
           </div>
