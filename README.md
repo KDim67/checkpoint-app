@@ -27,7 +27,7 @@ The ultimate local-first developer productivity desktop suite. Designed for solo
 - **Local Webhook Gateway**: Node-native HTTP socket gateway (default port `9988`) allowing external IDE post-build scripts, Git hooks, and automation to write tasks and logs programmatically via cURL.
 
 ### System & Customization
-- **Hot-Reload Customization & Extensions**: Modify CSS variables dynamically in a live Theme Customizer. Scan and hot-load/unload sandboxed JavaScript plugins from the local plugins folder on the fly.
+- **Hot-Reload Customization & Extensions**: Modify CSS variables dynamically in a live Theme Customizer. Scan and hot-load/unload JavaScript plugins from the local plugins folder on the fly. Plugins run with full access to the app and the machine, so treat one like any script you choose to run.
 - **Zero-Config Backup Vaulting**: Online backup scheduler that creates transactionally consistent SQLite copies without locking DB activity. Compresses backups into rolling gzip archives (retaining the last 10 snapshots) with diagnostic verification and restoration support.
 
 ---
@@ -125,7 +125,10 @@ Checkpoint supports custom JS plugins loaded dynamically:
 2. Place the script into the `plugins/` directory:
    - **Windows**: `C:\Users\<username>\.config\checkpoint\plugins\my-plugin.js`
    - **macOS/Linux**: `~/.config/checkpoint/plugins/my-plugin.js`
-3. The customizer will watch this folder, load plugins sandboxed, and dynamically execute/unregister their hooks.
+3. The customizer watches this folder, loads plugins, and executes and unregisters their hooks on the fly.
+   **Plugins are not sandboxed.** A plugin runs in the main process with the same
+   access the app has: your database, your files, the network. Only install one you
+   would be willing to run as a plain script.
 
 ### 4. Windows Desktop Widget
 Toggle the widget via **Settings** -> **Widget** section (Windows only).
