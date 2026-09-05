@@ -155,7 +155,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
             {/* Reality Check Warnings */}
             {atlasSprites.length > 150 && (
               <div style={{
-                background: 'rgba(255, 170, 0, 0.1)',
+                background: 'var(--color-warning-muted)',
                 border: '1px solid rgba(255, 170, 0, 0.3)',
                 borderRadius: 'var(--radius-md)',
                 padding: 'var(--space-2) var(--space-3)',
@@ -299,7 +299,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 {/* Saved file notification info */}
                 {atlasExportedPng && (
                   <div style={{
-                    background: 'rgba(0, 255, 128, 0.05)',
+                    background: 'var(--color-success-muted)',
                     border: '1px solid rgba(0, 255, 128, 0.2)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-2) var(--space-3)',

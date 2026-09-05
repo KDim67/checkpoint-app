@@ -114,7 +114,7 @@ export default function DialoguePanel({
             onClick={addDialogueNode}
             style={{
               background: 'var(--color-secondary)',
-              color: 'white',
+              color: 'var(--color-text-inverted)',
               border: 'none',
               padding: 'var(--space-2)',
               borderRadius: 'var(--radius-md)',

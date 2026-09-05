@@ -178,7 +178,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     onClick={() => setShape(prev => prev === 'sphere' ? 'cube' : prev === 'cube' ? 'plane' : 'sphere')}
                     title="Cycle preview mesh: sphere → cube → plane"
                     style={{
-                      background: 'rgba(19, 22, 34, 0.8)',
+                      background: 'var(--color-surface-1)',
                       border: '1px solid var(--color-surface-offset)',
                       borderRadius: 'var(--radius-sm)',
                       color: 'var(--color-text-base)',
@@ -198,7 +198,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   <button
                     onClick={() => setRotate(prev => !prev)}
                     style={{
-                      background: 'rgba(19, 22, 34, 0.8)',
+                      background: 'var(--color-surface-1)',
                       border: '1px solid var(--color-surface-offset)',
                       borderRadius: 'var(--radius-sm)',
                       color: rotate ? 'var(--color-secondary)' : 'var(--color-text-base)',
@@ -451,10 +451,10 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     onClick={handleExport}
                     disabled={isSaving}
                     style={{
-                      background: 'var(--color-primary)',
+                      background: 'var(--color-secondary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
-                      color: 'white',
+                      color: 'var(--color-text-inverted)',
                       fontWeight: 'var(--weight-semibold)',
                       padding: '10px 20px',
                       cursor: 'pointer',

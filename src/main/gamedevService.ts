@@ -11,14 +11,34 @@ export interface RenameResult {
 }
 
 /**
+ * Two paths that mean the same file. Windows filenames are case-insensitive, so
+ * renaming `sprite.png` to `Sprite.png` is a real rename onto itself and must
+ * not be mistaken for a collision.
+ */
+function sameFile(a: string, b: string): boolean {
+  return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b
+}
+
+/**
  * Safely renames a batch of files on disk.
  * Validates that all paths are absolute and the source files exist.
+ *
+ * Nothing here overwrites. `rename` replaces the destination without a word on
+ * both Windows and POSIX, and this tool runs over asset folders where the name
+ * it is about to produce very often already exists: running the Unity texture
+ * preset twice turns `sprite.png` into `T_sprite.png` both times, and the second
+ * run used to destroy the first.
+ *
+ * A batch that would swap two names (a to b while b goes to c) is refused
+ * rather than reordered. Refusing costs a second run; guessing costs a file.
  */
 export async function batchRenameFiles(
   files: Array<{ oldPath: string; newPath: string }>
 ): Promise<RenameResult> {
   let renamedCount = 0
   const errors: Array<{ oldPath: string; newPath: string; error: string }> = []
+  /** Destinations already spoken for by an earlier entry in this same batch. */
+  const claimed = new Set<string>()
 
   for (const { oldPath, newPath } of files) {
     try {
@@ -31,7 +51,18 @@ export async function batchRenameFiles(
       if (!existsSync(oldPath)) {
         throw new Error(`Source file does not exist: ${oldPath}`)
       }
+
+      const claimKey = process.platform === 'win32' ? newPath.toLowerCase() : newPath
+      if (claimed.has(claimKey)) {
+        throw new Error(`Another file in this batch is already becoming ${newPath}`)
+      }
+      // Renaming a file onto its own name is a no-op, not a collision.
+      if (!sameFile(oldPath, newPath) && existsSync(newPath)) {
+        throw new Error(`Something already exists at ${newPath}`)
+      }
+
       await rename(oldPath, newPath)
+      claimed.add(claimKey)
       renamedCount++
     } catch (err) {
       console.error(`Failed to rename ${oldPath} to ${newPath}:`, err)

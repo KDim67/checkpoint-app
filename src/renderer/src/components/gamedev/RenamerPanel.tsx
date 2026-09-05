@@ -1,7 +1,12 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import type { RenamerPreset, RenamerSuffixPreset } from './types'
 import { Info, Trash2, RefreshCw, CheckCircle, Layers } from 'lucide-react'
 import type { RenamerTool } from './useRenamerTool'
+
+/** The folder a file sits in, with its trailing separator. */
+function folderOf(path: string): string {
+  return path.slice(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')) + 1)
+}
 
 export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
   const {
@@ -34,6 +39,25 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
     handleFileSelect,
     handleApplyRename
   } = tool
+
+  /**
+   * How many files are headed for each name, keyed by folder so two files of
+   * the same name in different folders are not a clash.
+   *
+   * Renaming two files onto one name destroys one of them. The main process
+   * refuses that batch outright, and this is so the refusal is not the first
+   * anyone hears of it: the clash is visible in the list before Apply.
+   */
+  const targetCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    files.forEach((file, idx) => {
+      const key = (folderOf(file.path) + getNewName(file.name, idx)).toLowerCase()
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    })
+    return counts
+  }, [files, getNewName])
+
+  const clashCount = [...targetCounts.values()].filter(n => n > 1).length
 
   return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
@@ -311,7 +335,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                 disabled={renaming}
                 style={{
                   background: 'var(--color-secondary)',
-                  color: 'white',
+                  color: 'var(--color-text-inverted)',
                   border: 'none',
                   padding: 'var(--space-1.5) var(--space-4)',
                   borderRadius: 'var(--radius-md)',
@@ -329,10 +353,25 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               </button>
             </div>
 
+            {clashCount > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                background: 'var(--color-warning-muted)', border: '1px solid var(--color-warning)',
+                color: 'var(--color-warning)', borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-xs)',
+                marginBottom: 'var(--space-2)'
+              }}>
+                {clashCount === 1
+                  ? 'One name is wanted by more than one file. Those files are skipped.'
+                  : `${clashCount} names are wanted by more than one file. Those files are skipped.`}
+              </div>
+            )}
+
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '300px' }}>
               {files.map((file, idx) => {
                 const newName = getNewName(file.name, idx)
                 const isChanged = newName !== file.name
+                const clashes = (targetCounts.get((folderOf(file.path) + newName).toLowerCase()) ?? 0) > 1
                 return (
                   <div key={idx} style={{
                     display: 'grid',
@@ -340,7 +379,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                     alignItems: 'center',
                     gap: 'var(--space-3)',
                     padding: 'var(--space-2)',
-                    background: 'var(--color-surface-2)',
+                    background: clashes ? 'var(--color-warning-muted)' : 'var(--color-surface-2)',
+                    border: clashes ? '1px solid var(--color-warning)' : '1px solid transparent',
                     borderRadius: 'var(--radius-sm)',
                     fontSize: 'var(--text-xs)'
                   }}>
@@ -353,9 +393,17 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       fontWeight: isChanged ? 'var(--weight-semibold)' : 'var(--weight-normal)',
-                      color: isChanged ? 'var(--color-secondary)' : 'var(--color-text-base)'
+                      color: clashes ? 'var(--color-warning)' : isChanged ? 'var(--color-secondary)' : 'var(--color-text-base)'
                     }}>
                       {newName}
+                      {clashes && (
+                        <span
+                          style={{ color: 'var(--color-warning)', marginLeft: '6px', fontSize: '10px' }}
+                          title="Another file in this batch would take this name. Renaming both would destroy one, so this is skipped."
+                        >
+                          Name clash
+                        </span>
+                      )}
                       {file.status === 'success' && <CheckCircle size={12} style={{ color: 'var(--color-success)', marginLeft: '6px', display: 'inline' }} />}
                       {file.status === 'error' && (
                         <span style={{ color: 'var(--color-error)', marginLeft: '6px', fontSize: '10px' }} title={file.error}>
