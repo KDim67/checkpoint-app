@@ -501,6 +501,17 @@ export default function WallView() {
     write({ ...docRef.current, camera })
   }, [write])
 
+  // Stable, so the memo on WallItemView holds. Made inline in the item loop
+  // these were new functions every render, which changed every item's props
+  // every frame and re-rendered the whole wall to move one card.
+  const onItemTextChange = useCallback((id: string, text: string) => {
+    setItems(patchItems(docRef.current.items, new Set([id]), { text }), { record: false })
+  }, [setItems])
+  const onItemFinishEditing = useCallback(() => {
+    setEditingId(null)
+    setItems(docRef.current.items)
+  }, [setItems])
+
   const applyHistory = useCallback((next: History<WallItem[]>) => {
     historyRef.current = next
     setHistoryTick(t => t + 1)
@@ -2051,8 +2062,8 @@ export default function WallView() {
                     note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
                     selected={isSelected}
                     editing={editingId === item.id}
-                    onTextChange={text => setItems(patchItems(docRef.current.items, new Set([item.id]), { text }), { record: false })}
-                    onFinishEditing={() => { setEditingId(null); setItems(docRef.current.items) }}
+                    onTextChange={onItemTextChange}
+                    onFinishEditing={onItemFinishEditing}
                   />
 
                   {item.locked && isSelected && (

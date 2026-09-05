@@ -23,11 +23,11 @@ interface Props {
   selected: boolean
   /** Editing is driven by the canvas so only one item edits at a time. */
   editing: boolean
-  onTextChange: (text: string) => void
+  onTextChange: (id: string, text: string) => void
   onFinishEditing: () => void
 }
 
-export default function WallItemView({ item, card, note, selected, editing, onTextChange, onFinishEditing }: Props) {
+function WallItemView({ item, card, note, selected, editing, onTextChange, onFinishEditing }: Props) {
   const base: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -51,7 +51,7 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
           <textarea
             autoFocus
             value={item.text ?? ''}
-            onChange={e => onTextChange(e.target.value)}
+            onChange={e => onTextChange(item.id, e.target.value)}
             onBlur={onFinishEditing}
             onKeyDown={e => { if (e.key === 'Escape') onFinishEditing() }}
             style={{
@@ -80,7 +80,7 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
           <input
             autoFocus
             value={item.text ?? ''}
-            onChange={e => onTextChange(e.target.value)}
+            onChange={e => onTextChange(item.id, e.target.value)}
             onBlur={onFinishEditing}
             onKeyDown={e => { if (e.key === 'Escape' || e.key === 'Enter') onFinishEditing() }}
             style={{
@@ -117,7 +117,7 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
             <input
               autoFocus
               value={item.text ?? ''}
-              onChange={e => onTextChange(e.target.value)}
+              onChange={e => onTextChange(item.id, e.target.value)}
               onBlur={onFinishEditing}
               onKeyDown={e => { if (e.key === 'Escape' || e.key === 'Enter') onFinishEditing() }}
               style={{
@@ -319,3 +319,8 @@ export default function WallItemView({ item, card, note, selected, editing, onTe
     </div>
   )
 }
+
+// Memoised because moving one item re-renders the wall. The unmoved items are
+// handed the same objects again, so with this they are skipped, and a drag
+// costs the items it moves rather than every card, note and stroke on screen.
+export default React.memo(WallItemView)
