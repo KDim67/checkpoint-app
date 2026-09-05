@@ -4,8 +4,24 @@
  * than image maths, and so they can be exercised without mounting a canvas.
  */
 
+/**
+ * One free rectangle in the atlas, and the two it becomes once something is
+ * placed in it. The tree is recursive, so the node type has to be too.
+ */
+export interface PackerNode {
+  x: number
+  y: number
+  w: number
+  h: number
+  used: boolean
+  /** The space to the right of what was placed here. */
+  right?: PackerNode
+  /** The space below it. */
+  down?: PackerNode
+}
+
 export class BinaryTreePacker {
-  root: { x: number; y: number; w: number; h: number; used: boolean; right?: any; down?: any }
+  root: PackerNode
 
   constructor(w: number, h: number) {
     this.root = { x: 0, y: 0, w, h, used: false }
@@ -19,16 +35,20 @@ export class BinaryTreePacker {
     return null
   }
 
-  findNode(node: any, w: number, h: number): any {
+  // Undefined rather than a node once a branch runs out, which is why this
+  // takes one: the recursive calls below hand it `right` and `down`, and a
+  // used leaf has neither until it is split.
+  findNode(node: PackerNode | undefined, w: number, h: number): PackerNode | null {
+    if (!node) return null
     if (node.used) {
-      return this.findNode(node.right, w, h) || this.findNode(node.down, w, h)
+      return this.findNode(node.right, w, h) ?? this.findNode(node.down, w, h)
     } else if (w <= node.w && h <= node.h) {
       return node
     }
     return null
   }
 
-  splitNode(node: any, w: number, h: number): any {
+  splitNode(node: PackerNode, w: number, h: number): PackerNode {
     node.used = true
     node.down = { x: node.x, y: node.y + h, w: node.w, h: node.h - h, used: false }
     node.right = { x: node.x + w, y: node.y, w: node.w - w, h, used: false }

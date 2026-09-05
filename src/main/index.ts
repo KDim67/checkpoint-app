@@ -3,7 +3,7 @@ import path, { join, relative, isAbsolute, basename, extname } from 'path'
 import fs, { writeFileSync, existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { IpcChannels } from '../shared/ipcChannels'
-import type { ShortcutMap } from '../shared/types'
+import type { ContextExport, ShortcutMap, SyncPayload } from '../shared/types'
 import { getSetting, setSetting, closeDb } from './db'
 import { enableHud, disableHud } from './hud'
 import { initTitleBarSync, updateNativeTitleBarFromSettings } from './titleBarSync'
@@ -1284,7 +1284,7 @@ function registerIpcHandlers(): void {
     return syncService.getDatabasePayload()
   })
 
-  ipcMain.handle(IpcChannels.SYNC_APPLY_DB_PAYLOAD, (_event, payload: any) => {
+  ipcMain.handle(IpcChannels.SYNC_APPLY_DB_PAYLOAD, (_event, payload: SyncPayload) => {
     return syncService.applyDatabasePayload(payload)
   })
 
@@ -1368,7 +1368,7 @@ function registerIpcHandlers(): void {
     return searchCheatsheets(typeof query === 'string' ? query : '')
   })
 
-  ipcMain.handle(IpcChannels.GAMEDEV_BATCH_RENAME, async (_event, files: any) => {
+  ipcMain.handle(IpcChannels.GAMEDEV_BATCH_RENAME, async (_event, files: Array<{ oldPath: string; newPath: string }>) => {
     try {
       return await batchRenameFiles(files)
     } catch (err) {
@@ -1395,7 +1395,10 @@ function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle(IpcChannels.GAMEDEV_SAVE_MAPS, async (_event, params: { albedoPath: string; maps: any }) => {
+  ipcMain.handle(IpcChannels.GAMEDEV_SAVE_MAPS, async (
+    _event,
+    params: { albedoPath: string; maps: { normal?: string; height?: string; roughness?: string; ao?: string } }
+  ) => {
     try {
       return await savePbrMaps(params.albedoPath, params.maps)
     } catch (err) {
@@ -1726,7 +1729,7 @@ app.whenReady().then(async () => {
   })
 
   // Context Import Data Insertion
-  ipcMain.handle(IpcChannels.DB_IMPORT_CONTEXT_DATA, async (_event, newContextSlug: string, data: any) => {
+  ipcMain.handle(IpcChannels.DB_IMPORT_CONTEXT_DATA, async (_event, newContextSlug: string, data: ContextExport) => {
     try {
       const { importContextData } = await import('./db')
       importContextData(db, newContextSlug, data)

@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron'
+import { normalizeMemoryActions, type MemoryAction } from '../shared/memoryActions'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb } from './db'
 import type Database from 'better-sqlite3'
@@ -251,13 +252,10 @@ export function batchSaveMemories(
 /**
  * Sequential processing of AI-directed memory adjustments (save, update, delete).
  */
-export function processMemoryActions(
-  actions: Array<{ action: 'save' | 'update' | 'delete'; category?: 'semantic' | 'episodic' | 'working'; memory_key: string; content?: string }>,
-  context: string
-): void {
+export function processMemoryActions(actions: MemoryAction[], context: string): void {
   for (const item of actions) {
     try {
-      const key = item.memory_key.trim().toLowerCase().slice(0, 120)
+      const key = item.memory_key
       if (item.action === 'delete') {
         stmtActionDelete.run(context, key)
       } else if (item.action === 'update' && item.content) {
@@ -338,10 +336,11 @@ Return [] if all memories are clean and relevant.`
       jsonString = arrayMatch[0]
     }
 
-    let actions: any[] = []
+    // Normalised, not merely parsed. These actions delete and rewrite rows,
+    // and what comes back is a model's guess at a shape.
+    let actions: MemoryAction[] = []
     try {
-      const parsed = JSON.parse(jsonString)
-      if (Array.isArray(parsed)) actions = parsed
+      actions = normalizeMemoryActions(JSON.parse(jsonString))
     } catch {
       return existingMems
     }
@@ -428,10 +427,11 @@ Keep keys concise (under 60 chars), content brief (under 300 chars). Return [] i
       jsonString = arrayMatch[0]
     }
 
-    let actions: any[] = []
+    // Normalised, not merely parsed. These actions delete and rewrite rows,
+    // and what comes back is a model's guess at a shape.
+    let actions: MemoryAction[] = []
     try {
-      const parsed = JSON.parse(jsonString)
-      if (Array.isArray(parsed)) actions = parsed
+      actions = normalizeMemoryActions(JSON.parse(jsonString))
     } catch {
       return []
     }

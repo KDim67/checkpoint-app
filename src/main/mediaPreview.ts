@@ -22,6 +22,38 @@ import { getPreviewCacheDir, ensureDir } from './paths'
  */
 export const PREVIEW_WIDTHS = [480, 960, 1920]
 
+/**
+ * Widths worth building the moment an image is added.
+ *
+ * The Wall asks for twice an item's box, and an item starts at 280 wide, so
+ * 960 covers a freshly dropped image and 480 covers one shrunk down. 1920 is
+ * left for the first time somebody actually enlarges one: building it costs as
+ * much as the other two together and most images are never made that big.
+ */
+export const EAGER_WIDTHS = [480, 960]
+
+/**
+ * Builds the previews a new image is most likely to be asked for.
+ *
+ * Scaling is synchronous and Chromium's decoder is only available in the main
+ * process, so this cost has to be paid there. What it does not have to do is
+ * arrive unannounced: doing it here means it lands while the user is already
+ * waiting for a file they just dropped, rather than freezing the app a day
+ * later when they open the wall it is on.
+ *
+ * Failures are ignored on purpose. Nothing depends on this having run; the
+ * protocol handler still builds what is missing on demand.
+ */
+export function warmPreviews(sourcePath: string): void {
+  for (const width of EAGER_WIDTHS) {
+    try {
+      ensurePreview(sourcePath, width)
+    } catch (err) {
+      console.error(`[mediaPreview] Could not pre-scale ${sourcePath} at ${width}:`, err)
+    }
+  }
+}
+
 /** The smallest cached width that still covers `wanted`. */
 export function previewWidthFor(wanted: number): number {
   return PREVIEW_WIDTHS.find(w => w >= wanted) ?? PREVIEW_WIDTHS[PREVIEW_WIDTHS.length - 1]
