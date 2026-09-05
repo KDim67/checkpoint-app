@@ -148,7 +148,7 @@ export default function CookbookModal({
                   Catalog Models
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(catalogData as any[]).map(cat => {
+                  {catalogData.map(cat => {
                     const q4Tag = cat.variants?.q4?.ollamaTag || cat.id
                     const effectiveModels = Array.from(new Set([...localModels, ...(selectedModel ? [selectedModel] : [])]))
                     const isInstalled = effectiveModels.some(lm => {

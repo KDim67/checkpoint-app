@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import type { ContextExport } from '../../../../shared/types'
 import { Plus, Trash2, Edit2, ChevronUp, ChevronDown, AlertTriangle, Download, Upload } from 'lucide-react'
 import { Divider, RowBetween } from './SettingsSection'
 import { useAppStore } from '../../store/appStore'
@@ -48,7 +49,7 @@ export default function ContextManager() {
   const [creating, setCreating] = useState(false)
 
   // State for Import Modal
-  const [importPayload, setImportPayload] = useState<any | null>(null)
+  const [importPayload, setImportPayload] = useState<ContextExport | null>(null)
   /** Set instead of importPayload when the file came from another app. */
   const [importBoard, setImportBoard] = useState<ImportedBoard | null>(null)
   const [importing, setImporting] = useState(false)
@@ -826,7 +827,7 @@ export default function ContextManager() {
                   )}
                 </>
               ) : (
-                <>Contains: <strong>{importPayload.items?.length || 0}</strong> items, <strong>{importPayload.tags?.length || 0}</strong> tags, and <strong>{importPayload.relations?.length || 0}</strong> relations.</>
+                <>Contains: <strong>{importPayload?.items?.length || 0}</strong> items, <strong>{importPayload?.tags?.length || 0}</strong> tags, and <strong>{importPayload?.relations?.length || 0}</strong> relations.</>
               )}
             </div>
           </div>

@@ -220,13 +220,16 @@ export function getAIEntitiesFromMessage(content: string): { cardTitles: string[
       if (parsed && typeof parsed === 'object') {
         // 1. Batch format
         if (Array.isArray(parsed.cards)) {
-          parsed.cards.forEach((c: any) => {
-            if (c && c.title) cardTitles.push(c.title.trim())
+          // Model output, so every field is checked rather than assumed.
+          parsed.cards.forEach((c: unknown) => {
+            const title = (c as { title?: unknown })?.title
+            if (typeof title === 'string' && title.trim()) cardTitles.push(title.trim())
           })
         }
         if (Array.isArray(parsed.columns)) {
-          parsed.columns.forEach((col: any) => {
-            if (col && col.name) columnNames.push(col.name.trim())
+          parsed.columns.forEach((col: unknown) => {
+            const name = (col as { name?: unknown })?.name
+            if (typeof name === 'string' && name.trim()) columnNames.push(name.trim())
           })
         }
 

@@ -39,11 +39,12 @@ module.exports = [
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      // Deliberately a warning, not an error. This was set to 'error' while the
-      // codebase carried ~226 violations, which meant `npm run lint` could never
-      // pass and so nobody ran it. A warning keeps them all visible and lets the
-      // gate go green on everything else; burn them down and raise this back.
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // An error again. It was a warning while the codebase carried ~226 of
+      // them, because 'error' meant `npm run lint` could never pass and so
+      // nobody ran it. They are gone now, bar one documented disable in the
+      // collaboration transport, so the gate holds the line rather than
+      // counting the damage.
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'warn'
     }
   },

@@ -9,7 +9,7 @@
 import { PALETTE_HINT } from './boardEnrich'
 import { getSkillById } from './skills'
 import type { ColumnConfig } from '../../../../shared/boardModel'
-import type { Item } from '../../../../shared/types'
+import type { Item, Tag } from '../../../../shared/types'
 import type { IntentType, WorkspaceFileInfo } from './types'
 import { detectSkill, estimateTokens } from './aiHelpers'
 
@@ -83,7 +83,7 @@ export function buildBoardState(
     if (colCards.length > 0) {
       cardListText = colCards.map(c => {
         const bodySnippet = c.body ? `, "${c.body.slice(0, 120).replace(/\n/g, ' ')}"` : ''
-        const tagsText = c.tags && c.tags.length > 0 ? ` [Tags: ${c.tags.map((t: any) => t.name).join(', ')}]` : ''
+        const tagsText = c.tags && c.tags.length > 0 ? ` [Tags: ${c.tags.map((t: Tag) => t.name).join(', ')}]` : ''
         const dueText = c.due_at ? ` (Due: ${new Date(c.due_at).toISOString().slice(0, 10)})` : ''
         return `    • "${c.title}" (Priority: ${c.priority === 3 ? 'High' : c.priority === 2 ? 'Med' : 'Low'})${dueText}${tagsText}${bodySnippet}`
       }).join('\n')
@@ -98,7 +98,7 @@ export function buildBoardState(
 
   // FORBIDDEN DUPLICATE TITLES as a bullet list (easier to match than CSV)
   const forbiddenTitles = allItems.length > 0
-    ? allItems.map((i: any) => `  • ${i.title}`).join('\n')
+    ? allItems.map((i: Item) => `  • ${i.title}`).join('\n')
     : '  (none yet)'
 
   const liveBoardStateText = [

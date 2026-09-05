@@ -1,4 +1,27 @@
 import React, { useRef, useEffect, useState } from 'react'
+
+/**
+ * The slice of the Web Speech API this uses. Declared here because the draft
+ * spec is not in lib.dom and Chromium still ships it prefixed.
+ */
+interface SpeechRecognitionResultEvent {
+  resultIndex: number
+  results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }>
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onstart: (() => void) | null
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null
+  onerror: ((event: unknown) => void) | null
+  onend: (() => void) | null
+  start(): void
+  stop(): void
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
 import { Send, Square, Plus, Mail, Sparkles, FileText, X, BookOpen, Mic, LayoutGrid, ListTree, ArrowUpDown, ShieldAlert, Image as ImageIcon, Settings2, FileCode } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
 import { useToast } from '../ui/Toast'
@@ -151,7 +174,13 @@ export default function ChatInput({
   ]
 
   const handleToggleListening = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    // Not in lib.dom: the Web Speech API is still a draft, and Chromium
+    // exposes it under the webkit prefix.
+    const w = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionConstructor
+      webkitSpeechRecognition?: SpeechRecognitionConstructor
+    }
+    const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition
     if (!SpeechRecognition) {
       toast('Speech recognition is not supported in this environment.', { type: 'warning' })
       return
@@ -168,7 +197,7 @@ export default function ChatInput({
       recognition.onstart = () => setIsListening(true)
       recognition.onend = () => setIsListening(false)
       recognition.onerror = () => setIsListening(false)
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionResultEvent) => {
         const transcript = event.results[0][0].transcript
         if (transcript) {
           onChange(value ? `${value} ${transcript}` : transcript)

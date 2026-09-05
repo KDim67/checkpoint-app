@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import type { Tag } from '../../../shared/types'
 import {
   DndContext,
   DragEndEvent,
@@ -104,7 +105,25 @@ const customCollisionDetection: CollisionDetection = (args) => {
 // re-renders just because it received a freshly-allocated [] each render.
 const EMPTY_ITEMS: Item[] = []
 
-function areSortableColumnPropsEqual(prev: any, next: any) {
+interface SortableColumnProps {
+  col: ColumnConfig
+  cards: Item[]
+  onRename: (id: string, name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full') => void
+  onDelete: (id: string) => void
+  onCardClick: (id: string) => void
+  onCardDelete: (id: string) => void
+  onCardConvertToTask: (id: string) => void
+  onAddCard: (colId: string) => void
+  onCardUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
+  onClearColumn?: (columnId: string) => void
+  onArchiveColumn?: (columnId: string) => void
+  isReadOnly?: boolean
+  onToggleCollapse?: (columnId: string) => void
+  onSetSort?: (columnId: string, sort: ColumnSort) => void
+  cardDisplay?: CardDisplay
+}
+
+function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableColumnProps) {
   if (prev.isReadOnly !== next.isReadOnly) return false
   if (
     prev.col.id !== next.col.id ||
@@ -137,23 +156,7 @@ const SortableColumn = React.memo(function SortableColumn({
   onToggleCollapse,
   onSetSort,
   cardDisplay
-}: {
-  col: ColumnConfig
-  cards: Item[]
-  onRename: (id: string, name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full') => void
-  onDelete: (id: string) => void
-  onCardClick: (id: string) => void
-  onCardDelete: (id: string) => void
-  onCardConvertToTask: (id: string) => void
-  onAddCard: (colId: string) => void
-  onCardUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
-  onClearColumn?: (columnId: string) => void
-  onArchiveColumn?: (columnId: string) => void
-  isReadOnly?: boolean
-  onToggleCollapse?: (columnId: string) => void
-  onSetSort?: (columnId: string, sort: ColumnSort) => void
-  cardDisplay?: CardDisplay
-}) {
+}: SortableColumnProps) {
   const {
     attributes,
     listeners,
@@ -315,7 +318,7 @@ export default function KanbanView() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [filterPriority, setFilterPriority] = useState<number>(-1)
   const [filterTagId, setFilterTagId] = useState<string>('all')
-  const [allTags, setAllTags] = useState<any[]>([])
+  const [allTags, setAllTags] = useState<Tag[]>([])
 
   const [archivedColumns, setArchivedColumns] = useState<ColumnConfig[]>([])
   const [showArchiveBin, setShowArchiveBin] = useState(false)

@@ -1,4 +1,5 @@
 import React from 'react'
+import type { AtlasMaxSize } from './types'
 import { AlertTriangle, Box, CheckCircle, Download, Grid, Loader, Plus, Settings } from 'lucide-react'
 import type { AtlasTool } from './useAtlasTool'
 
@@ -112,7 +113,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 </span>
                 <select
                   value={atlasMaxSize}
-                  onChange={e => setAtlasMaxSize(parseInt(e.target.value) as any)}
+                  onChange={e => setAtlasMaxSize(parseInt(e.target.value) as AtlasMaxSize)}
                   style={{
                     background: 'var(--color-surface-2)',
                     border: '1px solid var(--color-surface-offset)',
