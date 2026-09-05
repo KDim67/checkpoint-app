@@ -20,23 +20,27 @@ export function ensurePluginsDir(): void {
   ensureDir(getPluginsDir())
 }
 
-// Keep track of loaded plugin runtimes and sandboxes
+// Keep track of loaded plugins and what each one registered
 const loadedPlugins = new Map<string, {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   exports: any
-  sandbox: PluginSandbox
+  lifecycle: PluginLifecycle
 }>()
 
 /**
- * What a plugin is handed on load. Everything routes through the functions the
- * app itself uses, so a plugin inherits their validation, sync tombstones and
- * notification policy.
+ * Tracks what one plugin registered, so all of it can be undone.
  *
- * It is named for what it tracks, not for isolation it does not provide: a
- * plugin runs in main and can ignore all of this. What it does guarantee is
- * teardown, which is what makes enable/disable and hot reload work.
+ * Named for the one thing it guarantees. It used to be called PluginSandbox,
+ * which read as a security boundary and is not one: a plugin is `require`d
+ * into the main process and can reach the database, the filesystem and the
+ * network whatever this hands it. What it does provide is teardown, which is
+ * what makes enable, disable and hot reload work.
+ *
+ * The API itself routes through the functions the app uses, so a plugin that
+ * chooses to use it inherits their validation, sync tombstones and
+ * notification policy.
  */
-class PluginSandbox {
+class PluginLifecycle {
   private ipcHandlers: string[] = []
   private unsubscribers: (() => void)[] = []
 
@@ -204,13 +208,13 @@ export function loadPlugin(filename: string): PluginLoadResult {
     delete require.cache[require.resolve(fullPath)]
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const plugin = require(fullPath)
-    const sandbox = new PluginSandbox(filename)
+    const lifecycle = new PluginLifecycle(filename)
 
     if (typeof plugin.onLoad === 'function') {
-      plugin.onLoad(sandbox.getAPI())
+      plugin.onLoad(lifecycle.getAPI())
     }
 
-    loadedPlugins.set(filename, { exports: plugin, sandbox })
+    loadedPlugins.set(filename, { exports: plugin, lifecycle })
     console.log(`[PluginRegistry] Successfully loaded extension: ${filename}`)
     return { ok: true }
   } catch (err) {
@@ -244,7 +248,7 @@ export function unloadPlugin(filename: string): void {
   }
 
   // Clean up registered IPC handlers
-  active.sandbox.cleanup()
+  active.lifecycle.cleanup()
 
   // Purge Node require cache
   try {

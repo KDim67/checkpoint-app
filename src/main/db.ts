@@ -1020,15 +1020,29 @@ export function deleteTag(id: string): void {
  * still syncs and still shows up in a settings dump; a deleted wall should
  * leave nothing behind.
  */
+/**
+ * Whether a settings statement can actually be run right now.
+ *
+ * Checking the statement alone was not enough. It is still there after the
+ * connection closes, only finalized, so a read during shutdown threw
+ * "statement has been finalized" instead of falling back to the default the
+ * comment promised. `dbInstance` is the thing that says whether there is a
+ * database, so it is what gets asked.
+ */
+function settingsReady(stmt: Database.Statement | undefined): boolean {
+  return !!dbInstance && !!stmt
+}
+
 export function deleteSetting(key: string): void {
-  if (!stmtDeleteSetting) return
+  if (!settingsReady(stmtDeleteSetting)) return
   stmtDeleteSetting.run(key)
 }
 
 export function getSetting<T>(key: string, defaultValue: T): T {
-  // The prepared statements only exist after initDb. Anything reading a setting
-  // during startup gets the default rather than a crash on an undefined stmt.
-  if (!stmtGetSetting) return defaultValue
+  // Before initDb and after the connection closes, a read gets the default
+  // rather than a crash. Both happen: settings are read during startup, and
+  // during the shutdown that runs after closeDb.
+  if (!settingsReady(stmtGetSetting)) return defaultValue
   const row = stmtGetSetting.get(key) as { value: string } | undefined
   if (!row) return defaultValue
   const serialized = isSecretSetting(key) ? decryptSecret(row.value) : row.value
@@ -1040,8 +1054,8 @@ export function getSetting<T>(key: string, defaultValue: T): T {
 }
 
 export function setSetting(key: string, value: unknown): void {
-  if (!stmtSetSetting) {
-    console.error('[db] Dropped setting write before initDb:', key)
+  if (!settingsReady(stmtSetSetting)) {
+    console.error('[db] Dropped setting write with no open database:', key)
     return
   }
   const serialized = JSON.stringify(value)

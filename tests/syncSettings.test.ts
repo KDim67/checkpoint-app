@@ -149,3 +149,57 @@ describe('secrets the app has actually created', () => {
     }
   })
 })
+
+describe('a key nobody has thought about', () => {
+  it('does not sync, which is the point of the allowlist', () => {
+    // The old denylist matched substrings, so anything not resembling a known
+    // credential travelled. These are the shapes that used to slip through.
+    for (const key of ['github_pat', 'license_key', 'stripe_customer', 'device_fingerprint']) {
+      expect(isSyncableSettingKey(key)).toBe(false)
+    }
+  })
+
+  it('does not sync even when it sounds harmless', () => {
+    expect(isSyncableSettingKey('some_future_preference')).toBe(false)
+  })
+
+  it('is the default for anything at all', () => {
+    expect(isSyncableSettingKey('')).toBe(false)
+    expect(isSyncableSettingKey('x')).toBe(false)
+  })
+})
+
+describe('the settings that were syncing before the allowlist', () => {
+  // Pinned so converting the filter did not quietly stop something travelling.
+  it.each([
+    'active_context', 'app_theme', 'appearance_compact', 'appearance_font_size',
+    'backup_interval', 'backup_max_count', 'cheatsheet_pins', 'contexts_list',
+    'customizer_active_plugins', 'customizer_enabled', 'customizer_shortcuts',
+    'customizer_theme_vars', 'default_context', 'feature_backup', 'feature_hud',
+    'feature_mcp', 'feature_tracker', 'feature_webhook', 'focus_auto_start_next',
+    'focus_chime_enabled', 'focus_chime_volume', 'focus_long_break_interval',
+    'focus_notifications_enabled', 'last_active_view', 'right_panel_width',
+    'saved_views', 'start_view', 'unitySafeMode', 'widget_enabled', 'widget_opacity'
+  ])('still carries %s', key => {
+    expect(isSyncableSettingKey(key)).toBe(true)
+  })
+
+  it.each([
+    'kanban_board_work', 'kanban_columns_work', 'backlog_columns_layout_work',
+    'wall_work', 'wall_doc_abc123', 'wall_index_work',
+    'wallview_rail_open', 'wallview_pen_smoothing',
+    'feature_view_kanban', 'feature_view_wall'
+  ])('still carries the family key %s', key => {
+    expect(isSyncableSettingKey(key)).toBe(true)
+  })
+})
+
+describe('clipboard recording is not something to switch on remotely', () => {
+  it('never travels, even though every other view toggle does', () => {
+    // That switch decides whether copies are written to the database, not
+    // whether a tab is visible. Syncing it on would start recording on a
+    // machine whose owner never asked.
+    expect(isSyncableSettingKey('feature_view_clipboard')).toBe(false)
+    expect(isSyncableSettingKey('feature_view_analytics')).toBe(true)
+  })
+})
