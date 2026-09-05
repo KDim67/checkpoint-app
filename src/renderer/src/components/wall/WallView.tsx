@@ -214,6 +214,15 @@ export default function WallView() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
   /**
+   * The newest pointer position, and the frame that will apply it.
+   *
+   * A pointer reports far faster than the screen paints. A 1000 Hz mouse fires
+   * roughly sixteen moves per frame, and each one re-rendered every item on the
+   * wall; fifteen of those renders were painted over before anyone saw them.
+   */
+  const pendingMoveRef = useRef<{ clientX: number; clientY: number; shiftKey: boolean } | null>(null)
+  const moveFrameRef = useRef<number | null>(null)
+  /**
    * What a drag moves, not the selection, since a frame brings its contents.
    * Decided once at drag start, or items would join as the frame swept over them.
    */
@@ -793,7 +802,11 @@ export default function WallView() {
     setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
   }
 
-  const onPointerMove = (e: React.PointerEvent) => {
+  /**
+   * One drag frame's worth of work. Takes bare numbers rather than the event so
+   * the handler below can hold on to a position and replay it later.
+   */
+  const applyPointerMove = (e: { clientX: number; clientY: number; shiftKey: boolean }) => {
     const drag = dragRef.current
     if (!drag) return
     const cam = docRef.current.camera
@@ -920,7 +933,33 @@ export default function WallView() {
     }
   }
 
+  /**
+   * Keeps only the newest position and lets the frame apply it. Everything the
+   * pointer reports in between lands on a screen that has not repainted yet.
+   */
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    pendingMoveRef.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey }
+    if (moveFrameRef.current !== null) return
+    moveFrameRef.current = requestAnimationFrame(() => {
+      moveFrameRef.current = null
+      const next = pendingMoveRef.current
+      // The drag can end between the event and the frame it asked for.
+      if (next && dragRef.current) applyPointerMove(next)
+    })
+  }
+
   const endDrag = (e: React.PointerEvent) => {
+    // Run the frame that has not fired yet, or the drop lands wherever the
+    // pointer was up to sixteen milliseconds ago instead of where it let go.
+    if (moveFrameRef.current !== null) {
+      cancelAnimationFrame(moveFrameRef.current)
+      moveFrameRef.current = null
+      const pending = pendingMoveRef.current
+      if (pending && dragRef.current) applyPointerMove(pending)
+    }
+    pendingMoveRef.current = null
+
     setArrowEndHover(null)
     const drag = dragRef.current
     dragRef.current = null

@@ -39,6 +39,16 @@ interface MermaidChartProps {
   style?: React.CSSProperties
 }
 
+/**
+ * How long the code has to stop changing before it is worth rendering.
+ *
+ * The note preview re-renders on every keystroke, so a diagram being typed
+ * arrives here character by character. Half of those are not valid mermaid, and
+ * each one used to be rendered, fail, and log. Typing `B[Next]` reported a parse
+ * error on every character before the closing bracket landed.
+ */
+const SETTLE_MS = 300
+
 export default function MermaidChart({ code, style }: MermaidChartProps): React.JSX.Element {
   const [svg, setSvg] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
@@ -47,16 +57,26 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
   // CSS selector, where the colons are invalid.
   const elementId = `mermaid-${reactId.replace(/:/g, '')}`
 
+  // Only the code someone has stopped typing gets rendered.
+  const [settledCode, setSettledCode] = useState(code)
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledCode(code), SETTLE_MS)
+    return () => clearTimeout(timer)
+  }, [code])
+
   useEffect(() => {
     let isMounted = true
-    setError(null)
 
     const renderChart = async (): Promise<void> => {
       try {
-        const { svg: renderedSvg } = await mermaid.render(elementId, code)
-        if (isMounted) setSvg(renderedSvg)
+        const { svg: renderedSvg } = await mermaid.render(elementId, settledCode)
+        if (isMounted) {
+          setSvg(renderedSvg)
+          setError(null)
+        }
       } catch (err) {
-        console.error('Mermaid render error:', err)
+        // Not logged. A diagram in progress fails here as a matter of course,
+        // and the message below says so on screen where it belongs.
         if (isMounted) {
           const errMsg = err instanceof Error ? err.message : String(err)
           setError(errMsg || 'Failed to render Mermaid chart')
@@ -64,11 +84,47 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
       }
     }
 
-    renderChart()
+    if (settledCode.trim()) renderChart()
     return () => {
       isMounted = false
     }
-  }, [code, elementId])
+  }, [settledCode, elementId])
+
+  // A diagram that rendered once stays on screen while the next version is
+  // broken. Replacing a working picture with a stack trace on the way to the
+  // next working picture is the wrong thing to show someone mid-edit.
+  if (error && svg) {
+    return (
+      <div style={{ position: 'relative' }}>
+        <div
+          dangerouslySetInnerHTML={{ __html: svg }}
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            background: 'var(--color-surface-2)',
+            padding: 'var(--space-4)',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--color-warning)',
+            overflowX: 'auto',
+            opacity: 0.55,
+            ...style
+          }}
+        />
+        <div
+          title={error}
+          style={{
+            position: 'absolute', top: 'var(--space-2)', right: 'var(--space-2)',
+            background: 'var(--color-warning-muted)', color: 'var(--color-warning)',
+            border: '1px solid var(--color-warning)', borderRadius: 'var(--radius-full)',
+            padding: '2px 10px', fontSize: 'var(--text-2xs)',
+            fontWeight: 'var(--weight-semibold)', cursor: 'help'
+          }}
+        >
+          Showing the last version that parsed
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (
