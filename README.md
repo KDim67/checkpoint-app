@@ -49,8 +49,11 @@ Everything runs on your machine. No account, no telemetry, nothing is uploaded.
 Grab the installer from
 [Releases](https://github.com/KDim67/checkpoint-app/releases).
 
-It isn't code-signed, so Windows SmartScreen will warn you the first time.
-More info → Run anyway.
+Run it and it installs itself, no wizard. It goes in your user folder, so
+Windows won't ask for admin rights, and it opens when it's done.
+
+It isn't code-signed, so SmartScreen will warn you the first time. More info →
+Run anyway.
 
 Checkpoint updates itself quietly in the background from that same Releases
 page, and swaps the new version in the next time you close it.
