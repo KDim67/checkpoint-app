@@ -52,8 +52,11 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
             onDrop={handleSeamlessDrop}
             onClick={handleSeamlessBrowseClick}
             style={{
-              flex: 1,
-              minHeight: '300px',
+              // Not flex: 1. The drop target grew to whatever height was
+              // going, which on a tall window left a nine hundred pixel dashed
+              // box with a small label adrift in the middle of it.
+              minHeight: '260px',
+              maxHeight: '420px',
               border: '2px dashed var(--color-surface-offset)',
               borderRadius: 'var(--radius-lg)',
               display: 'flex',
