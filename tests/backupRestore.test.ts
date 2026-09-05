@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { rmSync, existsSync, mkdirSync } from 'node:fs'
+import { rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { initDb, discardDb, getDb, createItem, searchItems, getSetting, setSetting } from '../src/main/db'
 import { runBackup, runRestore, listCompletedBackups, getBackupDir, parseBackupName } from '../src/main/backupVault'
 
@@ -143,5 +144,42 @@ describe('what the vault keeps', () => {
     const safety = listCompletedBackups().filter(b => b.kind === 'preRestore')
     expect(safety.length).toBeGreaterThan(0)
     expect(safety.length).toBeLessThanOrEqual(3)
+  })
+})
+
+describe('a backup that did not finish', () => {
+  it('is not mistaken for one that did', () => {
+    // compressFile writes to <name>.partial and renames only once the file is
+    // whole, so anything still wearing that suffix is incomplete.
+    expect(parseBackupName('backup_1700000000000.db.gz.partial')).toBeNull()
+    expect(parseBackupName('pre_restore_1700000000000.db.gz.partial')).toBeNull()
+  })
+
+  it('is neither listed nor counted against retention', async () => {
+    initDb(dataPath)
+    addItem('something worth keeping')
+    await runBackup()
+
+    const dir = getBackupDir()
+    const listedBefore = listCompletedBackups().length
+
+    // A partial left behind by a full disk or a killed process.
+    writeFileSync(join(dir, `backup_${Date.now() + 1000}.db.gz.partial`), 'truncated rubbish')
+
+    // It must not appear as a restorable backup, and must not push a real one
+    // out of the vault by taking up a retention slot.
+    expect(listCompletedBackups().length).toBe(listedBefore)
+    expect(listCompletedBackups().every(b => b.filename.endsWith('.db.gz'))).toBe(true)
+  })
+
+  it('leaves the real backup restorable alongside it', async () => {
+    initDb(dataPath)
+    addItem('the good copy')
+    await runBackup()
+    writeFileSync(join(getBackupDir(), 'backup_9999999999999.db.gz.partial'), 'rubbish')
+
+    const good = listCompletedBackups().filter(b => b.kind === 'scheduled')[0]
+    await runRestore(good.filename)
+    expect(search('good')).toBe(1)
   })
 })
