@@ -7,12 +7,18 @@ import type { HardwareSpecs, CatalogModel, FitResult, QuantizationLevel, FitStat
  * CRITICAL: This is a pure logic file. Do not import any Node.js core libraries (fs, os, etc.)
  * so that Vite can load it directly in the React frontend.
  */
+/**
+ * How much of the installed RAM a model is allowed to claim. The rest belongs
+ * to the operating system and to whatever else the machine is running.
+ */
+export const USABLE_RAM_FRACTION = 0.75
+
 export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): FitResult {
   const quantizations: QuantizationLevel[] = ['q4', 'q8', 'f16']
   let bestVariantName: QuantizationLevel | undefined = undefined
 
   // 1. Determine best candidate variant fitting in RAM (needs 25% headroom for OS)
-  const maxAvailableRam = specs.ramGb * 0.75
+  const maxAvailableRam = specs.ramGb * USABLE_RAM_FRACTION
   for (const q of quantizations) {
     const variant = model.variants[q]
     if (variant && variant.ramRequiredGb <= maxAvailableRam) {
