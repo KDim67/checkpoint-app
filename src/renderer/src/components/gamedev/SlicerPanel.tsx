@@ -178,7 +178,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                   {slicerPath ? `${slicedFrames.length} Slices Identified` : 'Idle - Please load image'}
                 </span>
                 {slicerPath && sliceMode === 'grid' && slicerDims && (slicerDims.w % sliceCellW > 0 || slicerDims.h % sliceCellH > 0) && (
-                  <span style={{ fontSize: '10px', color: '#ffbb00', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--color-warning)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertTriangle size={11} />
                     {slicerDims.w % sliceCellW}px width, {slicerDims.h % sliceCellH}px height remainder discarded.
                   </span>
@@ -208,7 +208,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                   <button
                     onClick={handleSelectSlicerFile}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-primary) 0%, #0055ff 100%)',
+                      background: 'var(--color-primary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'white',
@@ -216,7 +216,6 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                       fontSize: 'var(--text-xs)',
                       padding: '10px 20px',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(30, 69, 252, 0.3)'
                     }}
                   >
                     Choose Image
@@ -228,7 +227,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Slicing texture regions...</span>
                 </div>
               ) : (
-                <canvas ref={slicerPreviewCanvasRef} style={{ width: '100%', height: '100%', maxWidth: '500px', maxHeight: '500px', objectFit: 'contain', background: '#0b0c10', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+                <canvas ref={slicerPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
               )}
             </div>
 
@@ -254,7 +253,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                     onClick={handleSlicerExport}
                     disabled={isSlicerSaving}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-secondary) 0%, #00aa55 100%)',
+                      background: 'var(--color-secondary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'var(--color-text-inverted)',
@@ -265,7 +264,6 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                       alignItems: 'center',
                       gap: '6px',
                       opacity: isSlicerSaving ? 0.7 : 1,
-                      boxShadow: '0 4px 12px rgba(0, 200, 100, 0.3)'
                     }}
                   >
                     {isSlicerSaving ? (

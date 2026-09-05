@@ -160,7 +160,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 borderRadius: 'var(--radius-md)',
                 padding: 'var(--space-2) var(--space-3)',
                 fontSize: '10px',
-                color: '#ffbb00',
+                color: 'var(--color-warning)',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '6px',
@@ -224,7 +224,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                   <button
                     onClick={handleSelectAtlasFolder}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-primary) 0%, #0055ff 100%)',
+                      background: 'var(--color-primary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'white',
@@ -232,7 +232,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                       fontSize: 'var(--text-xs)',
                       padding: '10px 20px',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(30, 69, 252, 0.3)'
                     }}
                   >
                     Choose Folder
@@ -244,7 +243,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Calculating optimum packing layout...</span>
                 </div>
               ) : (
-                <canvas ref={atlasPreviewCanvasRef} style={{ width: '100%', height: '100%', maxWidth: '500px', maxHeight: '500px', objectFit: 'contain', background: '#0b0c10', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+                <canvas ref={atlasPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
               )}
             </div>
 
@@ -270,7 +269,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                     onClick={handleAtlasExport}
                     disabled={isAtlasSaving}
                     style={{
-                      background: 'linear-gradient(135deg, var(--color-secondary) 0%, #00aa55 100%)',
+                      background: 'var(--color-secondary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
                       color: 'var(--color-text-inverted)',
@@ -281,7 +280,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                       alignItems: 'center',
                       gap: '6px',
                       opacity: isAtlasSaving ? 0.7 : 1,
-                      boxShadow: '0 4px 12px rgba(0, 200, 100, 0.3)'
                     }}
                   >
                     {isAtlasSaving ? (

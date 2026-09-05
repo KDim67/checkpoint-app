@@ -189,7 +189,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               padding: 'var(--space-4)',
               overflow: 'hidden'
             }}>
-              <canvas ref={lutPreviewCanvasRef} style={{ width: '100%', height: '100%', maxWidth: '512px', maxHeight: '272px', objectFit: 'contain', background: '#0b0c10', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+              <canvas ref={lutPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '272px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
             </div>
 
             {/* Export LUT Strip */}
@@ -213,7 +213,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                   onClick={handleLutExport}
                   disabled={isLutSaving}
                   style={{
-                    background: 'linear-gradient(135deg, var(--color-secondary) 0%, #00aa55 100%)',
+                    background: 'var(--color-secondary)',
                     border: 'none',
                     borderRadius: 'var(--radius-md)',
                     color: 'var(--color-text-inverted)',
