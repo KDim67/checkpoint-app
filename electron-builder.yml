@@ -1,7 +1,9 @@
 # Application Identity
 appId: com.checkpoint.app
 productName: Checkpoint
-copyright: "Copyright © 2026 Checkpoint"
+# Windows reads this straight into the exe and installer file properties, so
+# it has to name the same holder and year as LICENSE. Kept in step by a test.
+copyright: "Copyright © 2026 Dimitrios Koutsompinas"
 
 # Updates
 # Straight at this repository's releases. No token is needed or wanted: the

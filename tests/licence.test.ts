@@ -49,12 +49,20 @@ describe('agreement with the LICENSE file', () => {
 })
 
 describe('agreement with what ships in the installer', () => {
-  it('uses the same holder and year in the packaged metadata', () => {
+  // This used to check the year alone, which is how the config came to name
+  // "Checkpoint" as the copyright holder while LICENSE, the About panel and
+  // the licence module all named a person. The holder was the half that went
+  // wrong, so it is the half worth asserting.
+  it('names the same holder in the packaged metadata', () => {
     // electron-builder bakes this into the exe properties, where nobody looks
     // until it is wrong.
-    const config = readFileSync('electron-builder.yml', 'utf8')
-    const match = /^copyright:\s*"(.+)"$/m.exec(config)
+    const match = /^copyright:\s*"(.+)"$/m.exec(readFileSync('electron-builder.yml', 'utf8'))
     expect(match, 'electron-builder.yml has no copyright line').not.toBeNull()
+    expect(match![1]).toContain(COPYRIGHT_HOLDER)
+  })
+
+  it('starts from the same year in the packaged metadata', () => {
+    const match = /^copyright:\s*"(.+)"$/m.exec(readFileSync('electron-builder.yml', 'utf8'))
     expect(match![1]).toContain(String(COPYRIGHT_FROM))
   })
 })
