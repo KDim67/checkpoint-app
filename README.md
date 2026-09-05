@@ -96,12 +96,22 @@ Toggle the widget via **Settings** -> **Widget** section (Windows only).
 
 ### 5. Webhook Gateway
 The gateway spins up a local Node-native HTTP server (default port: `9988`, auto-increments if port is in use).
+
+**Every request needs a token.** Find it under **Settings → Features → Local
+Webhook Gateway**, where it can be copied. It is generated once and kept.
+
+The token is not optional and not decoration. The gateway listens on the
+loopback interface, and loopback is reachable from any page in any browser the
+user has open, so without a secret any website could write rows into the
+database. Requests without a valid token get `401`.
+
 - **Endpoints**:
   - `POST http://localhost:9988/api/v1/log` (inserts scratchpad entry)
   - `POST http://localhost:9988/api/v1/task` (inserts task backlog card)
 - **cURL Example**:
   ```bash
   curl -X POST http://localhost:9988/api/v1/log \
+    -H "Authorization: Bearer <your-token>" \
     -H "Content-Type: application/json" \
     -d '{
       "context": "unity-project",
@@ -110,6 +120,9 @@ The gateway spins up a local Node-native HTTP server (default port: `9988`, auto
       "priority": 1
     }'
   ```
+
+The gateway sends no CORS headers, so it cannot be called from a browser page
+at all. That is deliberate: the callers this is for are scripts and CI jobs.
 
 ### 6. Quick HUD (Spotlight Search)
 Activate the quick HUD using the global hotkey shortcut **Ctrl + Shift + Space** (Windows). This brings up a fast input command panel to query logs, view tasks, and capture notes instantly from anywhere on your workstation. Customize your preferred hotkeys under **Settings** -> **Shortcuts**.

@@ -3,6 +3,7 @@ import { notify } from './notificationService'
 import { Socket } from 'net'
 import { z } from 'zod'
 import { getDb, createItem } from './db'
+import { ensureWebhookToken, offeredToken, tokenMatches } from './webhookAuth'
 import { mainWindow } from './index'
 import { IpcChannels } from '../shared/ipcChannels'
 
@@ -49,17 +50,11 @@ export function startWebhookServer(requestedPort: number): Promise<number> {
       const server = http.createServer(async (req, res) => {
         const { method, url } = req
 
-        // Enable CORS
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-        if (method === 'OPTIONS') {
-          res.writeHead(200)
-          res.end()
-          return
-        }
-
+        // Deliberately no CORS headers. A webhook caller is a script, a CI job
+        // or curl, none of which need them; a browser does, and a browser is
+        // exactly what should not be able to reach this. Without the wildcard
+        // that used to be here, a cross-origin page cannot read the response,
+        // and the Authorization header below forces a preflight it cannot pass.
         if (method !== 'POST') {
           res.writeHead(405, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ success: false, error: 'Method Not Allowed' }))
@@ -69,6 +64,17 @@ export function startWebhookServer(requestedPort: number): Promise<number> {
         if (url !== '/api/v1/log' && url !== '/webhook/log' && url !== '/api/v1/task') {
           res.writeHead(404, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ success: false, error: 'Endpoint Not Found' }))
+          return
+        }
+
+        // Checked after the route so an unauthenticated caller cannot map the
+        // endpoints by watching which ones answer differently.
+        if (!tokenMatches(offeredToken(req.headers.authorization), ensureWebhookToken())) {
+          res.writeHead(401, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({
+            success: false,
+            error: 'Missing or invalid token. Settings, Features, Local Webhook Gateway shows it.'
+          }))
           return
         }
 
