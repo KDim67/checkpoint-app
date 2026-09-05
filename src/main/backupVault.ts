@@ -10,11 +10,31 @@ let backupTimer: NodeJS.Timeout | null = null
 let initialCheckTimer: NodeJS.Timeout | null = null
 let isBackingUp = false
 
+/**
+ * Compresses to a scratch name and moves it into place only once it is whole.
+ *
+ * Writing straight to the final name meant a failure part way through, a full
+ * disk or a killed process, left a truncated file wearing a real backup's name.
+ * It listed as a backup, it counted against the retention cap, and so it could
+ * push a good backup out of the vault. A rename within one directory is atomic,
+ * so a file under the final name is now always a complete one.
+ */
 async function compressFile(sourcePath: string, destinationPath: string): Promise<void> {
-  const sourceStream = fs.createReadStream(sourcePath)
-  const destStream = fs.createWriteStream(destinationPath)
-  const gzip = zlib.createGzip()
-  await pipeline(sourceStream, gzip, destStream)
+  const partial = `${destinationPath}.partial`
+  try {
+    const sourceStream = fs.createReadStream(sourcePath)
+    const destStream = fs.createWriteStream(partial)
+    const gzip = zlib.createGzip()
+    await pipeline(sourceStream, gzip, destStream)
+    fs.renameSync(partial, destinationPath)
+  } catch (err) {
+    try {
+      if (fs.existsSync(partial)) fs.unlinkSync(partial)
+    } catch (cleanupErr) {
+      console.error('Failed to remove a partial backup:', cleanupErr)
+    }
+    throw err
+  }
 }
 
 async function decompressFile(sourcePath: string, destinationPath: string): Promise<void> {
