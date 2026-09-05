@@ -88,6 +88,21 @@ let mainWindow: BrowserWindow | null = null
 let activeClipboardHotkey = ''
 
 // Single Instance Lock
+/**
+ * Last resort, armed before anything else runs.
+ *
+ * Electron's default for an uncaught exception is to tear the process down,
+ * which for a local-first app means whatever was in flight is gone with no
+ * message at all. Logged and survived instead: one broken feature beats a
+ * window that vanishes.
+ */
+process.on('uncaughtException', err => {
+  console.error('[main] uncaught exception:', err)
+})
+process.on('unhandledRejection', reason => {
+  console.error('[main] unhandled rejection:', reason)
+})
+
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
   app.quit()
@@ -1892,20 +1907,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', (e) => {
-  /**
- * Last resort. Electron's default for an uncaught exception is to tear the
- * process down, which for a local-first app means the user loses whatever was
- * in flight with no message at all. Logged and survived instead: a broken
- * feature is better than a vanished window.
- */
-process.on('uncaughtException', err => {
-  console.error('[main] uncaught exception:', err)
-})
-process.on('unhandledRejection', reason => {
-  console.error('[main] unhandled rejection:', reason)
-})
-
-// Prevent immediate termination so we can perform async cleanup
+  // Prevent immediate termination so we can perform async cleanup
   e.preventDefault()
 
   globalShortcut.unregisterAll()

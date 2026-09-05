@@ -117,3 +117,35 @@ describe('filterSyncableSettings', () => {
     expect(filterSyncableSettings([])).toEqual([])
   })
 })
+
+describe('secrets the app has actually created', () => {
+  // Named keys, not shapes. The sensitive rule is a denylist of substrings, so
+  // a real key is the only thing that proves a real secret stays home.
+  const SECRETS = [
+    'webhook_token',      // grants write access to the database over HTTP
+    'mcp_auth_token',     // grants full read/write over every workspace
+    'ai_api_key',
+    'ai_provider_preset',
+    'sync_pairing_code'
+  ]
+
+  it.each(SECRETS)('never sends %s to a paired machine', key => {
+    expect(isSyncableSettingKey(key)).toBe(false)
+  })
+
+  it('drops them from a payload even when a peer sends them back', () => {
+    // The filter runs on receive too, because an older peer still ships these.
+    const rows = [
+      { key: 'webhook_token', value: 'secret' },
+      { key: 'mcp_auth_token', value: 'secret' },
+      { key: 'kanban_board_work', value: '{}' }
+    ]
+    expect(filterSyncableSettings(rows).map(r => r.key)).toEqual(['kanban_board_work'])
+  })
+
+  it('still lets the workspace shape through, which is the point of syncing', () => {
+    for (const key of ['kanban_board_work', 'backlog_columns_layout_work', 'wall_work']) {
+      expect(isSyncableSettingKey(key)).toBe(true)
+    }
+  })
+})
