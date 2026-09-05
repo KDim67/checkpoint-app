@@ -1883,7 +1883,13 @@ export default function WallView() {
           <div data-wall-camera-layer style={{
             position: 'absolute', top: 0, left: 0,
             transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-            transformOrigin: '0 0'
+            transformOrigin: '0 0',
+            // Promoted up front. A plain 2D transform is not given its own
+            // compositor layer, so the first frame of a pan repainted the whole
+            // board on the main thread; only then did Chromium notice the
+            // transform was moving and promote it, which is why a pan used to
+            // stall once at the start and run smoothly ever after.
+            willChange: 'transform',
           }}>
             {/* One layer for every arrow. They have no box of their own: each
                 is redrawn from wherever its two items currently are. */}
@@ -2128,7 +2134,8 @@ export default function WallView() {
           <div data-wall-camera-layer style={{
             position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
             transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-            transformOrigin: '0 0', zIndex: 5, pointerEvents: 'none'
+            transformOrigin: '0 0', zIndex: 5, pointerEvents: 'none',
+            willChange: 'transform'
           }}>
             {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
               const editing = editingId === arrow.id
@@ -2203,7 +2210,8 @@ export default function WallView() {
               <div data-wall-camera-layer style={{
                 position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
                 transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-                transformOrigin: '0 0', zIndex: 6
+                transformOrigin: '0 0', zIndex: 6,
+                willChange: 'transform'
               }}>
                 {([['start', g.start], ['end', g.end]] as const).map(([which, at]) => (
                   <div
