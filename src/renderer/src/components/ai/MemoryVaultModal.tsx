@@ -121,7 +121,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                     <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
                       Context: {activeContext}
                     </span>
-                    <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--color-accent-ai)', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
                       {memories.length} memories
                     </span>
                   </div>
@@ -282,7 +282,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                       onClick={handleAddMemory}
                       disabled={!newMemoryKey.trim() || !newMemoryContent.trim()}
                       style={{
-                        background: newMemoryKey.trim() && newMemoryContent.trim() ? '#a855f7' : 'var(--color-surface-offset)',
+                        background: newMemoryKey.trim() && newMemoryContent.trim() ? 'var(--color-accent-ai)' : 'var(--color-surface-offset)',
                         border: 'none',
                         // Disabled, the fill is a plain surface rather than the
                         // purple, and white on it did not survive light mode.
@@ -459,7 +459,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                             >Cancel</button>
                             <button
                               onClick={() => handleSaveEditMemory(mem.id)}
-                              style={{ background: '#3b82f6', border: 'none', color: 'var(--color-on-accent)', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                              style={{ background: 'var(--color-primary)', border: 'none', color: 'var(--color-on-accent)', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}
                             >Save</button>
                           </div>
                         </div>

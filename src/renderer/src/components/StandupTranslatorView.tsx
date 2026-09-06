@@ -849,7 +849,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 Report Output
                 {streamingText && !isStreaming && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '9px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#22c55e' }}>
-                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }} />
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-success)' }} />
                     Ready
                   </span>
                 )}
