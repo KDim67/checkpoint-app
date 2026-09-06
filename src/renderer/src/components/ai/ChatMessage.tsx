@@ -584,7 +584,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
           style={{
             background: 'var(--color-secondary)',
             border: 'none',
-            color: '#fff',
+            color: 'var(--color-text-inverted)',
             borderRadius: 'var(--radius-sm)',
             padding: '4px 10px',
             fontSize: '11px',
@@ -948,7 +948,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
         <button
           onClick={() => setView('kanban')}
           style={{
-            background: 'var(--color-secondary)', border: 'none', color: '#fff',
+            background: 'var(--color-secondary)', border: 'none', color: 'var(--color-text-inverted)',
             borderRadius: 'var(--radius-sm)', padding: '4px 10px', fontSize: '11px',
             fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
           }}
@@ -2343,8 +2343,12 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
         <button
           onClick={handleLoadTree}
           style={{
-            background: loaded ? 'rgba(255,255,255,0.1)' : '#9333ea',
-            border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)',
+            // Once loaded this is a plain surface, not a white veil: the veil
+            // was invisible in the light theme, and so was the white on it.
+            background: loaded ? 'var(--color-surface-offset)' : '#9333ea',
+            border: 'none',
+            color: loaded ? 'var(--color-text-muted)' : 'var(--color-on-accent)',
+            borderRadius: 'var(--radius-sm)',
             padding: '4px 12px', fontSize: '10px', fontWeight: 'bold',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
           }}

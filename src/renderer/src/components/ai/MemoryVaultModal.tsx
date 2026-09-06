@@ -283,7 +283,11 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                       disabled={!newMemoryKey.trim() || !newMemoryContent.trim()}
                       style={{
                         background: newMemoryKey.trim() && newMemoryContent.trim() ? '#a855f7' : 'var(--color-surface-offset)',
-                        border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)',
+                        border: 'none',
+                        // Disabled, the fill is a plain surface rather than the
+                        // purple, and white on it did not survive light mode.
+                        color: newMemoryKey.trim() && newMemoryContent.trim() ? 'var(--color-on-accent)' : 'var(--color-text-faint)',
+                        borderRadius: 'var(--radius-sm)',
                         padding: '3px 10px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer'
                       }}
                     >Save Memory</button>
@@ -455,7 +459,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                             >Cancel</button>
                             <button
                               onClick={() => handleSaveEditMemory(mem.id)}
-                              style={{ background: '#3b82f6', border: 'none', color: '#fff', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                              style={{ background: '#3b82f6', border: 'none', color: 'var(--color-on-accent)', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}
                             >Save</button>
                           </div>
                         </div>

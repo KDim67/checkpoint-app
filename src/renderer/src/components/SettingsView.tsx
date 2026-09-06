@@ -406,18 +406,18 @@ function MemoryVaultManager() {
           value={newKey}
           onChange={e => setNewKey(e.target.value)}
           placeholder="Memory Key (e.g. antagonist_name)"
-          style={{ flex: '1 1 180px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', color: '#fff', fontSize: '11px', outline: 'none' }}
+          style={{ flex: '1 1 180px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', color: 'var(--color-text-base)', fontSize: '11px', outline: 'none' }}
         />
         <input
           type="text"
           value={newContent}
           onChange={e => setNewContent(e.target.value)}
           placeholder="Memory Content (e.g. Chronos, master of time loops)"
-          style={{ flex: '2 1 240px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', color: '#fff', fontSize: '11px', outline: 'none' }}
+          style={{ flex: '2 1 240px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', color: 'var(--color-text-base)', fontSize: '11px', outline: 'none' }}
         />
         <button
           onClick={handleAddMemory}
-          style={{ background: 'var(--color-secondary)', border: 'none', color: '#fff', borderRadius: 'var(--radius-sm)', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+          style={{ background: 'var(--color-secondary)', border: 'none', color: 'var(--color-text-inverted)', borderRadius: 'var(--radius-sm)', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
         >
           <Plus size={12} />
           <span>Save Memory</span>
@@ -428,7 +428,7 @@ function MemoryVaultManager() {
         {memories.map(mem => (
           <div key={mem.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: '11px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{mem.memory_key} <span style={{ fontSize: '9px', opacity: 0.6, color: '#fff' }}>({mem.category})</span></div>
+              <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{mem.memory_key} <span style={{ fontSize: '9px', opacity: 0.6, color: 'var(--color-text-muted)' }}>({mem.category})</span></div>
               <div style={{ color: 'var(--color-text-base)' }}>{mem.content}</div>
             </div>
             <button onClick={() => handleDeleteMemory(mem.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>

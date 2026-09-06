@@ -47,6 +47,7 @@ import {
 } from '../lib/boardConfig'
 import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
 import { errorMessage } from '../../../shared/errors'
+import { getTextColorForBackground } from '../lib/contrast'
 
 
 // Re-exported rather than declared: the shape now belongs to lib/boardConfig,
@@ -1729,6 +1730,9 @@ export default function KanbanView() {
                               justifyContent: 'center',
                               fontSize: '10px',
                               fontWeight: 'var(--weight-bold)',
+                              // Not a token. This label sits on whatever image the
+                              // preset carries, not on a theme surface, and the
+                              // shadow below is what makes it legible there.
                               color: '#fff',
                               textShadow: '0 1px 3px rgba(0,0,0,0.8)',
                               textTransform: 'capitalize',
@@ -1756,7 +1760,7 @@ export default function KanbanView() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#fff',
+                        color: getTextColorForBackground(customSolidColor),
                         fontSize: '10px',
                         fontWeight: 'var(--weight-bold)',
                         textShadow: '0 1px 2px rgba(0,0,0,0.6)'
@@ -1829,6 +1833,8 @@ export default function KanbanView() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
+                              // On the gradient itself, which has no single
+                              // colour to pick a readable foreground from.
                               color: '#fff',
                               fontSize: '10px',
                               fontWeight: 'var(--weight-bold)',
@@ -2052,6 +2058,7 @@ export default function KanbanView() {
                         position: 'relative',
                         overflow: 'hidden'
                       }}>
+                        {/* White on its own black scrim, so the theme does not reach it. */}
                         <span style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '9px', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>Preview</span>
                       </div>
                     )}
@@ -2627,7 +2634,7 @@ export default function KanbanView() {
                           </button>
                           <button
                             onClick={handleBulkDeleteArchived}
-                            style={{ background: 'var(--color-error)', border: 'none', color: '#fff', fontSize: '10px', fontWeight: 'var(--weight-bold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
+                            style={{ background: 'var(--color-error)', border: 'none', color: 'var(--color-on-accent)', fontSize: '10px', fontWeight: 'var(--weight-bold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
                           >
                             Delete ({selCount})
                           </button>
@@ -2659,7 +2666,7 @@ export default function KanbanView() {
                                 width: '15px', height: '15px', flexShrink: 0, borderRadius: '4px',
                                 border: `1.5px solid ${selected ? 'var(--color-primary)' : 'var(--color-balance)'}`,
                                 background: selected ? 'var(--color-primary)' : 'transparent',
-                                color: '#fff', fontSize: '10px', lineHeight: '13px', textAlign: 'center', fontWeight: 'bold'
+                                color: 'var(--color-on-accent)', fontSize: '10px', lineHeight: '13px', textAlign: 'center', fontWeight: 'bold'
                               }}
                             >
                               {selected ? '✓' : ''}

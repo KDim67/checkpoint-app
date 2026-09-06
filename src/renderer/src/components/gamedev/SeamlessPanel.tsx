@@ -360,7 +360,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       border: 'none',
                       cursor: 'pointer',
                       background: !seamlessShowOriginal ? 'var(--color-primary)' : 'transparent',
-                      color: !seamlessShowOriginal ? 'var(--color-on-primary)' : 'var(--color-text-muted)'
+                      color: !seamlessShowOriginal ? 'var(--color-on-accent)' : 'var(--color-text-muted)'
                     }}
                   >
                     Result
