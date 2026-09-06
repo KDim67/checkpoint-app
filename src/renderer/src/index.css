@@ -33,6 +33,7 @@
   --color-primary:          #1e45fc;   /* Electric Blue, interactive, links, focus rings */
   --color-primary-hover:    #3559ff;   /* Electric Blue +15% for hover */
   --color-primary-muted:    rgba(30, 69, 252, 0.15); /* 15% opacity, selection bg */
+  --color-on-primary:       #ffffff;   /* Text sitting on --color-primary */
   --color-secondary:        #cdf12b;   /* Volt Lime, active nav, selected states */
   --color-secondary-muted:  rgba(205, 241, 43, 0.1); /* 10% opacity, highlight tint */
   --color-balance:          #535e85;   /* Steel-Slate, neutral midtone, borders */
@@ -191,6 +192,7 @@ html[data-theme="light"] {
   --color-primary:          #2b4ad8;   /* 6.0:1, links, focus rings */
   --color-primary-hover:    #1e3ab8;
   --color-primary-muted:    rgba(43, 74, 216, 0.10);
+  --color-on-primary:       #ffffff;   /* 6.6:1 on the blue above */
   --color-secondary:        #4b7a0f;   /* 4.5:1, lime, not the olive a flat darkening gives */
   --color-secondary-muted:  rgba(132, 204, 22, 0.18);  /* tinted from the BRIGHT lime, not the dark one */
   --color-balance:          #6f7a8c;   /* 3.8:1, borders and neutral marks */
