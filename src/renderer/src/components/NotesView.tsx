@@ -533,7 +533,7 @@ export default function NotesView(): React.JSX.Element {
                   {pendingDeleteTitle === activeNoteTitle ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>Delete?</span>
-                      <button onClick={confirmDeleteNote} style={{ background: 'var(--color-error)', border: 'none', color: '#fff', borderRadius: '4px', padding: '2px 8px', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>Yes</button>
+                      <button onClick={confirmDeleteNote} style={{ background: 'var(--color-error)', border: 'none', color: 'var(--color-on-accent)', borderRadius: '4px', padding: '2px 8px', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>Yes</button>
                       <button onClick={() => setPendingDeleteTitle(null)} style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', borderRadius: '4px', padding: '2px 6px', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>No</button>
                     </span>
                   ) : (

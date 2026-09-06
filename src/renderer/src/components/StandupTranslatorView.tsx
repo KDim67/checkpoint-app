@@ -748,7 +748,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                             borderRadius: 'var(--radius-sm)',
                             border: isSelected ? '1px solid var(--color-primary)' : '1.5px solid var(--color-surface-offset)',
                             background: isSelected ? 'var(--color-primary)' : 'transparent',
-                            color: '#fff',
+                            color: 'var(--color-on-accent)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',

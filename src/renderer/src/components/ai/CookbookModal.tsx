@@ -191,7 +191,7 @@ export default function CookbookModal({
                             <button
                               disabled={isPullingThis}
                               onClick={() => handlePullModel(q4Tag)}
-                              style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              style={{ background: 'var(--color-primary)', color: 'var(--color-on-accent)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                             >
                               {isPullingThis ? <RefreshCw size={10} className="spin" /> : <Download size={10} />}
                               <span>{isPullingThis ? `${pullProgress}%` : 'Download'}</span>
