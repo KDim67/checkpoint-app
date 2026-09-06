@@ -8,14 +8,15 @@ interface Props {
   item: WallItem
   card?: Item
   note?: NoteMetadata
-  selected: boolean
   editing: boolean
   /** Whether the four connect dots are offered on this item. */
   connectable: boolean
   /** Whether the resize and rotate handles are offered on this item. */
   showHandles: boolean
-  /** Already resolved to a CSS value, so the memo below compares a string. */
-  outline: string
+  /** The item an arrow being dragged would land on. */
+  arrowTarget: boolean
+  /** The item an arrow is being dragged from. */
+  arrowFrom: boolean
   onTextChange: (id: string, text: string) => void
   onFinishEditing: () => void
 }
@@ -29,11 +30,18 @@ interface Props {
  * and the resize handles. Rebuilding those for every item on the wall cost
  * around ninety milliseconds a render, so selecting, hovering or drawing
  * anything stuttered even though not one item had actually changed.
+ *
+ * Note what is not a prop: whether the item is selected. WallView writes that
+ * onto the element as data-wall-selected and index.css draws it, so releasing a
+ * marquee over fifty items touches fifty attributes rather than re-rendering
+ * fifty of these.
  */
-function WallItemLayer({ item, card, note, selected, editing, connectable, showHandles, outline, onTextChange, onFinishEditing }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing }: Props) {
   return (
     <div
       data-wall-item={item.id}
+      data-wall-arrow-target={arrowTarget || undefined}
+      data-wall-arrow-from={arrowFrom || undefined}
       style={{
         position: 'absolute',
         left: 0, top: 0,
@@ -53,7 +61,10 @@ function WallItemLayer({ item, card, note, selected, editing, connectable, showH
         // Ink lets presses through: only its stroke takes them.
         pointerEvents: item.kind === 'ink' ? 'none' : undefined,
         cursor: item.locked ? 'default' : 'grab',
-        outline,
+        // The selected outline is in index.css, keyed off data-wall-selected.
+        outline: arrowTarget
+          ? '3px solid var(--color-secondary)'
+          : arrowFrom ? '2px dashed var(--color-secondary)' : undefined,
         outlineOffset: '2px'
       }}
     >
@@ -61,14 +72,13 @@ function WallItemLayer({ item, card, note, selected, editing, connectable, showH
         item={item}
         card={card}
         note={note}
-        selected={selected}
         editing={editing}
         onTextChange={onTextChange}
         onFinishEditing={onFinishEditing}
       />
 
-      {item.locked && selected && (
-        <div style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>
+      {item.locked && (
+        <div className="wall-lock-selected" style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>
           <Lock size={12} />
         </div>
       )}

@@ -521,7 +521,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#c084fc', fontSize: '12px', fontWeight: 'bold', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-accent-ai-soft)', fontSize: '12px', fontWeight: 'bold', minWidth: 0 }}>
           <CheckCircle2 size={15} style={{ flexShrink: 0, opacity: applied ? 1 : 0.45 }} />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {!applied ? 'Adding to board…' : nothingNew ? 'Already up to date' : 'Added to board'}
@@ -549,7 +549,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
         {showCols.map((c, i) => (
           <div key={`c-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: resolveColor(c.color), flexShrink: 0 }} />
-            <span style={{ color: '#60a5fa', flexShrink: 0, fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.03em' }}>Column</span>
+            <span style={{ color: 'var(--color-primary-soft)', flexShrink: 0, fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.03em' }}>Column</span>
             <strong style={{ color: '#93c5fd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{c.name}</strong>
           </div>
         ))}
@@ -1328,7 +1328,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
   }
 
 
-  const priorityColor = data.priority === 3 ? '#ef4444' : data.priority === 2 ? '#eab308' : '#94a3b8'
+  const priorityColor = data.priority === 3 ? '#ef4444' : data.priority === 2 ? '#eab308' : 'var(--color-text-muted)'
   const priorityLabel = data.priority === 3 ? 'High' : data.priority === 2 ? 'Medium' : 'Low'
 
   return (
@@ -1349,7 +1349,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
     >
       {/* Top Header Badge */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.02em', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary-soft)', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.02em', flexShrink: 0 }}>
           <CheckCircle2 size={14} style={{ color: '#3b82f6', flexShrink: 0 }} />
           <span>Added to board</span>
         </div>
@@ -1361,7 +1361,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
               borderRadius: '12px',
               fontWeight: 'bold',
               background: 'rgba(59, 130, 246, 0.15)',
-              color: '#60a5fa',
+              color: 'var(--color-primary-soft)',
               border: '1px solid rgba(59, 130, 246, 0.3)',
               maxWidth: '120px',
               overflow: 'hidden',
@@ -1750,7 +1750,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
         gap: '8px',
         marginBottom: '12px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: phase === 'committed' ? '#4ade80' : '#38bdf8' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: phase === 'committed' ? 'var(--color-success-soft)' : 'var(--color-info)' }}>
           <Sparkles size={14} style={{ flexShrink: 0 }} />
           <span>Implementation Plan</span>
           {phase === 'review' && (
@@ -1759,7 +1759,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
             </span>
           )}
           {phase === 'committed' && (
-            <span style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '9px', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
+            <span style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: 'var(--color-success-soft)', fontSize: '9px', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
               ✓ Committed
             </span>
           )}
@@ -1770,7 +1770,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
             style={{
               background: 'rgba(56, 189, 248, 0.1)',
               border: '1px solid rgba(56, 189, 248, 0.25)',
-              color: '#38bdf8',
+              color: 'var(--color-info)',
               borderRadius: 'var(--radius-sm)',
               padding: '3px 8px',
               fontSize: '10px',
@@ -1785,12 +1785,12 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
             <Layout size={11} /> Expand Plan
           </button>
           {phase === 'review' && (
-            <span style={{ fontSize: '9px', color: '#94a3b8', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               {approvedCount}/{steps.length} approved
             </span>
           )}
           {phase === 'committed' && exportedCount !== null && (
-            <span style={{ fontSize: '9px', color: '#4ade80', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '9px', color: 'var(--color-success-soft)', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               {exportedCount} card{exportedCount !== 1 ? 's' : ''} created
             </span>
           )}
@@ -1801,7 +1801,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9', marginBottom: planOverview ? '6px' : '10px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{planTitle}</div>
       {planOverview && (
         <div style={{
-          fontSize: '11px', color: '#94a3b8', marginBottom: '12px', lineHeight: 1.6,
+          fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '12px', lineHeight: 1.6,
           background: 'rgba(255,255,255,0.03)',
           borderLeft: `2px solid ${phase === 'committed' ? 'rgba(34,197,94,0.4)' : 'rgba(56,189,248,0.4)'}`,
           paddingLeft: '10px', borderRadius: '0 4px 4px 0',
@@ -1833,7 +1833,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
               {/* Toggle indicator */}
               <div style={{
                 width: '16px', height: '16px', borderRadius: '4px', flexShrink: 0, marginTop: '1px',
-                border: `2px solid ${isApproved ? '#38bdf8' : 'rgba(255,255,255,0.2)'}`,
+                border: `2px solid ${isApproved ? 'var(--color-info)' : 'rgba(255,255,255,0.2)'}`,
                 background: isApproved ? 'rgba(56,189,248,0.2)' : 'transparent',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 150ms ease'
@@ -1850,7 +1850,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
                   {s.title}
                 </div>
                 {s.details && (
-                  <div style={{ fontSize: '10px', color: isApproved ? '#94a3b8' : '#475569', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: '10px', color: isApproved ? 'var(--color-text-muted)' : 'var(--color-text-faint)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                     {s.details}
                   </div>
                 )}
@@ -1869,7 +1869,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
           >
-            <FileText size={12} style={{ color: '#38bdf8' }} />
+            <FileText size={12} style={{ color: 'var(--color-info)' }} />
             <span>Save as .md</span>
           </button>
           <button
@@ -1878,7 +1878,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
             style={{
               ...btnBase,
               background: approvedCount === 0 ? 'rgba(255,255,255,0.05)' : '#0284c7',
-              color: approvedCount === 0 ? '#475569' : '#fff',
+              color: approvedCount === 0 ? 'var(--color-text-faint)' : '#fff',
               cursor: approvedCount === 0 ? 'not-allowed' : 'pointer'
             }}
             onMouseEnter={e => { if (approvedCount > 0) (e.currentTarget as HTMLButtonElement).style.background = '#0369a1' }}
@@ -2079,7 +2079,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
                         style={{
                           background: stepApprovals[activeStepIndex] !== false ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
                           border: `1px solid ${stepApprovals[activeStepIndex] !== false ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
-                          color: stepApprovals[activeStepIndex] !== false ? '#4ade80' : '#f87171',
+                          color: stepApprovals[activeStepIndex] !== false ? 'var(--color-success-soft)' : '#f87171',
                           borderRadius: '20px', padding: '6px 14px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
                           display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 150ms ease'
                         }}
@@ -2234,7 +2234,7 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
 
   const iconBtn: React.CSSProperties = {
     background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#94a3b8', borderRadius: 'var(--radius-sm)', padding: '4px 10px',
+    color: 'var(--color-text-muted)', borderRadius: 'var(--radius-sm)', padding: '4px 10px',
     fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: '5px'
   }
@@ -2254,7 +2254,7 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
           <Sparkles size={14} />
           <span>Branching Dialogue &amp; Quest Flow</span>
         </div>
-        <span style={{ fontSize: '10px', color: '#94a3b8', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', padding: '2px 8px', borderRadius: '10px' }}>
+        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', padding: '2px 8px', borderRadius: '10px' }}>
           {nodes.length} node{nodes.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -2272,10 +2272,10 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
               <span style={{
                 fontSize: '9px', background: 'rgba(168,85,247,0.2)',
-                border: '1px solid rgba(168,85,247,0.4)', color: '#c084fc',
+                border: '1px solid rgba(168,85,247,0.4)', color: 'var(--color-accent-ai-soft)',
                 padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold'
               }}>{n.speaker || 'NPC'}</span>
-              <span style={{ fontSize: '9px', color: '#475569', fontFamily: 'var(--font-mono)' }}>id: {n.id}</span>
+              <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>id: {n.id}</span>
             </div>
             {/* Dialogue text */}
             <div style={{ fontSize: '11px', color: '#e4e4e7', lineHeight: 1.5, marginBottom: Array.isArray(n.choices) && n.choices.length > 0 ? '6px' : '0' }}>
@@ -2287,7 +2287,7 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
                 {n.choices.map((c, ci) => (
                   <span key={ci} style={{
                     fontSize: '9px', background: 'rgba(168,85,247,0.1)',
-                    color: '#d8b4fe', padding: '2px 7px', borderRadius: '4px',
+                    color: 'var(--color-accent-ai-soft)', padding: '2px 7px', borderRadius: '4px',
                     border: '1px solid rgba(168,85,247,0.25)',
                     display: 'flex', alignItems: 'center', gap: '4px'
                   }}>
@@ -2573,7 +2573,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 padding: '2px 8px',
                 fontSize: '10px',
                 fontWeight: 'bold',
-                color: '#60a5fa'
+                color: 'var(--color-primary-soft)'
               }}
             >
               <BookOpen size={12} />
@@ -2588,7 +2588,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 background: 'rgba(34, 197, 94, 0.14)', border: '1px solid rgba(34, 197, 94, 0.4)',
                 borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-                fontSize: '10px', fontWeight: 'bold', color: '#4ade80'
+                fontSize: '10px', fontWeight: 'bold', color: 'var(--color-success-soft)'
               }}
             >
               <FileText size={12} />
@@ -2604,7 +2604,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.4)',
                 borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-                fontSize: '10px', fontWeight: 'bold', color: '#38bdf8'
+                fontSize: '10px', fontWeight: 'bold', color: 'var(--color-info)'
               }}
             >
               <FileText size={12} />

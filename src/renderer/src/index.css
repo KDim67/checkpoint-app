@@ -39,6 +39,15 @@
      Named here so it answers to the theme like everything else. */
   --color-accent-ai:        #9333ea;
   --color-accent-ai-hover:  #7c3aed;
+
+  /* Fill colours read as text on a dark surface only once they are lightened,
+     which is why the AI panels had been spelling out their own tints. These are
+     those tints, named: the -soft of a hue is the one to put on a surface, the
+     bare token is the one to fill a shape with. */
+  --color-info:             #38bdf8;   /* sky, a tool running, a stream open */
+  --color-primary-soft:     #60a5fa;
+  --color-success-soft:     #4ade80;
+  --color-accent-ai-soft:   #c084fc;
   --color-secondary:        #cdf12b;   /* Volt Lime, active nav, selected states */
   --color-secondary-muted:  rgba(205, 241, 43, 0.1); /* 10% opacity, highlight tint */
   --color-balance:          #535e85;   /* Steel-Slate, neutral midtone, borders */
@@ -200,6 +209,11 @@ html[data-theme="light"] {
   --color-on-accent:        #ffffff;   /* 6.6:1 on the blue above */
   --color-accent-ai:        #7e22ce;   /* darkened so white on it still reads */
   --color-accent-ai-hover:  #6b21a8;
+  /* Darkened rather than lightened here: the surface underneath is the pale one. */
+  --color-info:             #0369a1;
+  --color-primary-soft:     #1d4ed8;
+  --color-success-soft:     #15803d;
+  --color-accent-ai-soft:   #7e22ce;
   --color-secondary:        #4b7a0f;   /* 4.5:1, lime, not the olive a flat darkening gives */
   --color-secondary-muted:  rgba(132, 204, 22, 0.18);  /* tinted from the BRIGHT lime, not the dark one */
   --color-balance:          #6f7a8c;   /* 3.8:1, borders and neutral marks */
@@ -779,6 +793,25 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 .wall-connect:hover .wall-connect-dot {
   transform: scale(1.35);
 }
+
+/* Wall: what a selected item looks like
+   An attribute rather than a prop, for the same reason as the handles above.
+   Selection used to be passed into each item, so a marquee across fifty of them
+   re-rendered fifty subtrees on the frame it was released. WallView writes this
+   attribute onto the elements that changed instead, which is a handful. */
+[data-wall-item][data-wall-selected] {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+/* Paper resting on the board casts a shadow; paper picked up does not. */
+[data-wall-item][data-wall-selected] .wall-paper {
+  box-shadow: none;
+}
+
+/* Only worth marking on an item you have actually got hold of. */
+.wall-lock-selected { display: none; }
+[data-wall-item][data-wall-selected] .wall-lock-selected { display: block; }
 
 /* Kanban header: what gives way as the bar narrows
    Container queries rather than media queries, because the bar's width is not

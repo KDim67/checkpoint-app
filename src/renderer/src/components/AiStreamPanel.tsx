@@ -1716,7 +1716,7 @@ export default function AiStreamPanel() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '5px',
                 background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.4)',
-                color: '#38bdf8', borderRadius: '999px', padding: '3px 8px 3px 10px',
+                color: 'var(--color-info)', borderRadius: '999px', padding: '3px 8px 3px 10px',
                 fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap'
               }}
             >
@@ -1727,7 +1727,7 @@ export default function AiStreamPanel() {
               <button
                 onClick={handleClearWorkspace}
                 title="Remove imported workspace"
-                style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-info)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
               >
                 <X size={11} />
               </button>
@@ -1741,7 +1741,7 @@ export default function AiStreamPanel() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '5px',
                 background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.4)',
-                color: '#c084fc', borderRadius: '999px', padding: '3px 10px',
+                color: 'var(--color-accent-ai-soft)', borderRadius: '999px', padding: '3px 10px',
                 fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap', cursor: 'pointer'
               }}
             >

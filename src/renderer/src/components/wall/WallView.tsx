@@ -852,7 +852,6 @@ export default function WallView() {
     dragRef.current = { mode: 'marquee', startX: p.x, startY: p.y, base }
     // What is on screen once the clear above has rendered, so the first frame
     // of the sweep knows what it is starting from.
-    paintedSelRef.current = new Set(base)
     setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
   }
 
@@ -884,17 +883,13 @@ export default function WallView() {
   }
 
   /**
-   * The outline an item wears. Shared so the sweep below and the render can
-   * never disagree about what an item should be wearing.
+   * Marks what is selected on the elements themselves.
+   *
+   * Selection is not passed down to the items. It used to be, and releasing a
+   * marquee over fifty of them re-rendered fifty subtrees on that one frame.
+   * Here only the elements whose state actually changed are touched, and
+   * index.css draws the rest.
    */
-  const outlineFor = (id: string, selected: boolean): string =>
-    arrowDrag?.overId === id || arrowEndHover === id
-      ? '3px solid var(--color-secondary)'
-      : arrowFrom === id
-        ? '2px dashed var(--color-secondary)'
-        : selected ? '2px solid var(--color-secondary)' : 'none'
-
-  /** Outlines what a sweep has caught, without going through React. */
   const paintSelection = (next: Set<string>, all = false): void => {
     const viewport = viewportRef.current
     if (!viewport) return
@@ -905,7 +900,9 @@ export default function WallView() {
 
     touched.forEach(id => {
       const el = viewport.querySelector<HTMLElement>(`[data-wall-item="${id}"]`)
-      if (el) el.style.outline = outlineFor(id, next.has(id))
+      if (!el) return
+      if (next.has(id)) el.setAttribute('data-wall-selected', '')
+      else el.removeAttribute('data-wall-selected')
     })
     paintedSelRef.current = new Set(next)
   }
@@ -952,9 +949,10 @@ export default function WallView() {
   // hand. Drawn again before that frame is shown.
   useLayoutEffect(() => {
     if (liveItemsRef.current) paintItems(liveItemsRef.current, movingRef.current)
-    // The render wrote the selection as it stands in state, which is behind the
-    // sweep. Every item, since which ones the render touched is not knowable.
-    if (marqueeSelRef.current) paintSelection(marqueeSelRef.current, true)
+    // A sweep in flight is ahead of the selection in state, so it wins. Items
+    // added or removed by the render itself are covered either way, because
+    // this diffs against what is actually on the elements.
+    paintSelection(marqueeSelRef.current ?? selectedIds)
   })
 
   /**
@@ -1156,7 +1154,6 @@ export default function WallView() {
     // selection it wanted.
     const swept = marqueeSelRef.current
     marqueeSelRef.current = null
-    paintedSelRef.current = null
     if (swept) setSelectedIds(swept)
 
     marqueeRectRef.current = null
@@ -2151,11 +2148,11 @@ export default function WallView() {
                   item={item}
                   card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
                   note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
-                  selected={isSelected}
                   editing={editingId === item.id}
                   connectable={tool === 'select' && !item.locked && item.kind !== 'frame'}
                   showHandles={isSelected && single?.id === item.id && !item.locked}
-                  outline={outlineFor(item.id, isSelected)}
+                  arrowTarget={arrowDrag?.overId === item.id || arrowEndHover === item.id}
+                  arrowFrom={arrowFrom === item.id}
                   onTextChange={onItemTextChange}
                   onFinishEditing={onItemFinishEditing}
                 />
