@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useToast } from './ui/Toast'
 import { loadBoardConfig } from '../lib/boardConfig'
 import { useAppStore } from '../store/appStore'
@@ -21,14 +21,44 @@ import { useAtlasTool } from './gamedev/useAtlasTool'
 import { useSeamlessTool } from './gamedev/useSeamlessTool'
 import { usePbrTool } from './gamedev/usePbrTool'
 import type { GameDevTab } from './gamedev/types'
+import { getStringSetting, setStringSetting } from '../lib/settings'
+import { findTool } from './gamedev/toolCatalogue'
 import GameDevLauncher from './gamedev/GameDevLauncher'
 import ToolSwitcher from './gamedev/ToolSwitcher'
+
+const RECENT_KEY = 'gamedev_recent_tools'
+/** Enough to cover a session's worth of switching without becoming a second menu. */
+const RECENT_MAX = 4
 
 export default function GameDevView() {
   const { toast } = useToast()
   // null is the launcher. The workspace opens there rather than dropping
   // someone into one of ten tools they did not choose.
   const [activeTab, setActiveTab] = useState<GameDevTab | null>(null)
+  const [recent, setRecent] = useState<GameDevTab[]>([])
+
+  useEffect(() => {
+    void getStringSetting(RECENT_KEY, '').then(raw => {
+      // Ids of tools that no longer exist are dropped rather than rendered as
+      // a blank card, which is what a renamed tool would otherwise leave behind.
+      setRecent(raw.split(',').filter(id => findTool(id as GameDevTab)) as GameDevTab[])
+    })
+  }, [])
+
+  /**
+   * Opens a tool and remembers it.
+   *
+   * The launcher costs a click that the old strip of tabs did not, so the tools
+   * someone actually uses come back to the top of it.
+   */
+  const openTool = useCallback((id: GameDevTab) => {
+    setActiveTab(id)
+    setRecent(prev => {
+      const next = [id, ...prev.filter(x => x !== id)].slice(0, RECENT_MAX)
+      void setStringSetting(RECENT_KEY, next.join(','))
+      return next
+    })
+  }, [])
 
   const paletteTool = usePaletteTool()
   const renamerTool = useRenamerTool()
@@ -83,19 +113,6 @@ export default function GameDevView() {
       fontFamily: 'var(--font-sans)',
       boxSizing: 'border-box'
     }}>
-      {/* Header. Only on the launcher: inside a tool the switcher says where
-          you are, and repeating the title pushed the tool itself down. */}
-      {!activeTab && (
-        <div style={{ width: '100%', maxWidth: 'var(--gamedev-launcher-max)', margin: '0 auto' }}>
-          <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
-            Game Development Workspace
-          </h2>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-            Texture authoring, sprite pipeline and narrative tools. All processing runs locally.
-          </p>
-        </div>
-      )}
-
       {/* Grouped tool navigation */}
       <style>{`
         .gamedev-tab-btn {
@@ -147,9 +164,9 @@ export default function GameDevView() {
           margin-top: 2px;
         }
       `}</style>
-{activeTab && <ToolSwitcher activeTab={activeTab} onPick={setActiveTab} onHome={() => setActiveTab(null)} />}
+{activeTab && <ToolSwitcher activeTab={activeTab} onPick={openTool} onHome={() => setActiveTab(null)} />}
 
-      {!activeTab && <GameDevLauncher onPick={setActiveTab} />}
+      {!activeTab && <GameDevLauncher onPick={openTool} recent={recent} />}
 
       {/* Tab Panels */}
       <div style={{ flex: 1, minHeight: 0 }}>

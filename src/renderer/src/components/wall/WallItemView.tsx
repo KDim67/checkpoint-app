@@ -20,14 +20,13 @@ interface Props {
   card?: Item
   /** The real note, for a doc item. */
   note?: NoteMetadata
-  selected: boolean
   /** Editing is driven by the canvas so only one item edits at a time. */
   editing: boolean
   onTextChange: (id: string, text: string) => void
   onFinishEditing: () => void
 }
 
-function WallItemView({ item, card, note, selected, editing, onTextChange, onFinishEditing }: Props) {
+function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing }: Props) {
   const base: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -39,12 +38,12 @@ function WallItemView({ item, card, note, selected, editing, onTextChange, onFin
   if (item.kind === 'note') {
     const bg = item.color || '#f6c453'
     return (
-      <div style={{
+      <div className="wall-paper" style={{
         ...base,
         background: bg,
         borderRadius: '2px',
         // A sticky note reads as paper because of the shadow, not the colour.
-        boxShadow: selected ? 'none' : '0 2px 6px rgba(0,0,0,0.28)',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.28)',
         padding: '12px'
       }}>
         {editing ? (
@@ -162,7 +161,7 @@ function WallItemView({ item, card, note, selected, editing, onTextChange, onFin
       )
     }
     return (
-      <div style={{
+      <div className="wall-paper" style={{
         ...base,
         display: 'flex', flexDirection: 'column', gap: '6px',
         padding: 'var(--space-3)',
@@ -170,7 +169,7 @@ function WallItemView({ item, card, note, selected, editing, onTextChange, onFin
         border: `1px solid ${item.color || 'var(--color-surface-offset)'}`,
         borderLeft: `3px solid ${item.color || 'var(--color-secondary)'}`,
         borderRadius: 'var(--radius-md)',
-        boxShadow: selected ? 'none' : '0 2px 8px rgba(0,0,0,0.25)'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <FileText size={12} style={{ color: 'var(--color-text-faint)', flexShrink: 0 }} />
@@ -232,7 +231,7 @@ function WallItemView({ item, card, note, selected, editing, onTextChange, onFin
 
   if (item.kind === 'image') {
     return (
-      <img
+      <img className="wall-paper"
         // Asks for a copy sized for the box rather than the original, which
         // Chromium would decode at full resolution however small it is drawn.
         // Doubled so it still holds up zoomed in a little. See mediaPreview.ts.
@@ -246,7 +245,7 @@ function WallItemView({ item, card, note, selected, editing, onTextChange, onFin
           ...base,
           objectFit: 'cover',
           borderRadius: 'var(--radius-sm)',
-          boxShadow: selected ? 'none' : '0 2px 8px rgba(0,0,0,0.3)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
           display: 'block'
         }}
       />
@@ -274,7 +273,7 @@ function WallItemView({ item, card, note, selected, editing, onTextChange, onFin
   }
 
   return (
-    <div style={{
+    <div className="wall-paper" style={{
       ...base,
       display: 'flex', flexDirection: 'column', gap: '6px',
       padding: 'var(--space-3)',
@@ -282,7 +281,7 @@ function WallItemView({ item, card, note, selected, editing, onTextChange, onFin
       border: `1px solid ${item.color || 'var(--color-surface-offset)'}`,
       borderLeft: `3px solid ${item.color || 'var(--color-primary)'}`,
       borderRadius: 'var(--radius-md)',
-      boxShadow: selected ? 'none' : '0 2px 8px rgba(0,0,0,0.25)'
+      boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
     }}>
       <span style={{
         fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',

@@ -332,7 +332,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                             fontWeight: 'var(--weight-bold)',
                             flexShrink: 0,
                             letterSpacing: '0.04em',
-                            color: mem.category === 'semantic' ? '#60a5fa' : mem.category === 'episodic' ? '#fbbf24' : '#9ca3af',
+                            color: mem.category === 'semantic' ? 'var(--color-primary-soft)' : mem.category === 'episodic' ? '#fbbf24' : '#9ca3af',
                             background: mem.category === 'semantic' ? 'rgba(59, 130, 246, 0.1)' : mem.category === 'episodic' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(107, 114, 128, 0.1)',
                             border: `1px solid ${mem.category === 'semantic' ? 'rgba(59, 130, 246, 0.2)' : mem.category === 'episodic' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(107, 114, 128, 0.2)'}`,
                             padding: '2px 6px',
@@ -343,7 +343,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                           <span style={{
                             fontSize: '12px',
                             fontWeight: 'var(--weight-semibold)',
-                            color: mem.is_pinned ? '#d8b4fe' : 'var(--color-text-base)',
+                            color: mem.is_pinned ? 'var(--color-accent-ai-soft)' : 'var(--color-text-base)',
                             fontFamily: 'var(--font-mono)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',

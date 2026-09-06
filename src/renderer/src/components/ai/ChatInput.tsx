@@ -572,7 +572,7 @@ export default function ChatInput({
           }}
         >
           {filteredCheatsheets.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: '#60a5fa', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-primary-soft)', textTransform: 'uppercase' }}>
               Cheatsheets
             </div>
           )}
@@ -589,7 +589,7 @@ export default function ChatInput({
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
               onMouseLeave={e => (e.currentTarget.style.background = attachedCheatsheets.includes(cs.name) ? 'var(--color-surface-offset)' : 'transparent')}
             >
-              <BookOpen size={13} style={{ color: '#60a5fa', flexShrink: 0 }} />
+              <BookOpen size={13} style={{ color: 'var(--color-primary-soft)', flexShrink: 0 }} />
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.name}</span>
               {attachedCheatsheets.includes(cs.name) && (
                 <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
@@ -598,7 +598,7 @@ export default function ChatInput({
           ))}
 
           {filteredNotes.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: '#4ade80', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-success-soft)', textTransform: 'uppercase' }}>
               Notes
             </div>
           )}
@@ -615,7 +615,7 @@ export default function ChatInput({
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
               onMouseLeave={e => (e.currentTarget.style.background = attachedNotes.includes(title) ? 'var(--color-surface-offset)' : 'transparent')}
             >
-              <FileText size={13} style={{ color: '#4ade80', flexShrink: 0 }} />
+              <FileText size={13} style={{ color: 'var(--color-success-soft)', flexShrink: 0 }} />
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
               {attachedNotes.includes(title) && (
                 <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
@@ -624,7 +624,7 @@ export default function ChatInput({
           ))}
 
           {filteredFiles.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: '#38bdf8', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-info)', textTransform: 'uppercase' }}>
               Workspace Files
             </div>
           )}
@@ -642,7 +642,7 @@ export default function ChatInput({
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
               onMouseLeave={e => (e.currentTarget.style.background = attachedFiles.includes(f.relativePath) ? 'var(--color-surface-offset)' : 'transparent')}
             >
-              <FileCode size={13} style={{ color: '#38bdf8', flexShrink: 0 }} />
+              <FileCode size={13} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
@@ -769,7 +769,7 @@ export default function ChatInput({
                 onMouseLeave={e => (e.currentTarget.style.background = showCheatsheetSubmenu ? 'var(--color-surface-2)' : 'transparent')}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BookOpen size={13} style={{ color: '#60a5fa' }} />
+                  <BookOpen size={13} style={{ color: 'var(--color-primary-soft)' }} />
                   <span>Attach Cheatsheet...</span>
                 </div>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>({attachedCheatsheets.length})</span>
@@ -1031,14 +1031,14 @@ export default function ChatInput({
               display: 'inline-flex', alignItems: 'center', gap: '5px',
               background: 'rgba(34, 197, 94, 0.14)', border: '1px solid rgba(34, 197, 94, 0.4)',
               borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-              fontSize: '11px', fontWeight: 'bold', color: '#4ade80', alignSelf: 'center', flexShrink: 0
+              fontSize: '11px', fontWeight: 'bold', color: 'var(--color-success-soft)', alignSelf: 'center', flexShrink: 0
             }}
           >
             <FileText size={12} />
             <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
             <button
               onClick={() => setAttachedNotes(attachedNotes.filter(n => n !== title))}
-              style={{ background: 'transparent', border: 'none', color: '#4ade80', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', marginLeft: '2px' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--color-success-soft)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', marginLeft: '2px' }}
               title="Remove note"
             >
               <X size={12} />
@@ -1055,14 +1055,14 @@ export default function ChatInput({
               display: 'inline-flex', alignItems: 'center', gap: '5px',
               background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.4)',
               borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-              fontSize: '11px', fontWeight: 'bold', color: '#38bdf8', alignSelf: 'center', flexShrink: 0
+              fontSize: '11px', fontWeight: 'bold', color: 'var(--color-info)', alignSelf: 'center', flexShrink: 0
             }}
           >
             <FileCode size={12} />
             <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{relPath.split(/[\\/]/).pop()}</span>
             <button
               onClick={() => setAttachedFiles(attachedFiles.filter(f => f !== relPath))}
-              style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', marginLeft: '2px' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--color-info)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', marginLeft: '2px' }}
               title="Remove file"
             >
               <X size={12} />
@@ -1108,7 +1108,7 @@ export default function ChatInput({
               padding: '2px 8px',
               fontSize: '11px',
               fontWeight: 'bold',
-              color: '#60a5fa',
+              color: 'var(--color-primary-soft)',
               alignSelf: 'center',
               flexShrink: 0
             }}
@@ -1120,7 +1120,7 @@ export default function ChatInput({
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#60a5fa',
+                color: 'var(--color-primary-soft)',
                 cursor: 'pointer',
                 padding: 0,
                 display: 'flex',
