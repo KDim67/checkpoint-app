@@ -2033,8 +2033,8 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
                         onClick={(e) => { e.stopPropagation(); toggleStep(idx) }}
                         style={{
                           width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-                          border: `2px solid ${isApproved ? '#22c55e' : 'var(--color-text-faint)'}`,
-                          background: isApproved ? '#22c55e' : 'transparent',
+                          border: `2px solid ${isApproved ? 'var(--color-success)' : 'var(--color-text-faint)'}`,
+                          background: isApproved ? 'var(--color-success)' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           transition: 'all 150ms ease',
                           cursor: 'pointer'
@@ -2306,7 +2306,7 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
       {nodes.length > PREVIEW_LIMIT && (
         <button
           onClick={() => setExpanded(prev => !prev)}
-          style={{ background: 'none', border: 'none', color: '#a855f7', fontSize: '11px', cursor: 'pointer', padding: '2px 0', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--color-accent-ai)', fontSize: '11px', cursor: 'pointer', padding: '2px 0', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
         >
           {expanded
             ? `▲ Collapse (${nodes.length} nodes total)`
@@ -2345,15 +2345,15 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
           style={{
             // Once loaded this is a plain surface, not a white veil: the veil
             // was invisible in the light theme, and so was the white on it.
-            background: loaded ? 'var(--color-surface-offset)' : '#9333ea',
+            background: loaded ? 'var(--color-surface-offset)' : 'var(--color-accent-ai)',
             border: 'none',
             color: loaded ? 'var(--color-text-muted)' : 'var(--color-on-accent)',
             borderRadius: 'var(--radius-sm)',
             padding: '4px 12px', fontSize: '10px', fontWeight: 'bold',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
           }}
-          onMouseEnter={e => { if (!loaded) (e.currentTarget as HTMLButtonElement).style.background = '#7c3aed' }}
-          onMouseLeave={e => { if (!loaded) (e.currentTarget as HTMLButtonElement).style.background = '#9333ea' }}
+          onMouseEnter={e => { if (!loaded) (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-accent-ai-hover)' }}
+          onMouseLeave={e => { if (!loaded) (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-accent-ai)' }}
         >
           <Layout size={11} />
           <span>{loaded ? 'Loaded in Game Dev' : 'Load into Dialogue Builder'}</span>
