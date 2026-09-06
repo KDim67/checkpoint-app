@@ -76,14 +76,32 @@ export interface PbrParams {
 export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, params: PbrParams) {
   const { normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight } = params
 
+  const clamped = (x: number, y: number): number =>
+    (Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x))) * 4
+
   // Luma-weighted grayscale with clamped border reads. Applying the height
   // inversion here keeps height, normal direction, roughness and AO coherent.
-  const getGray = (x: number, y: number): number => {
-    const cx = Math.max(0, Math.min(W - 1, x))
-    const cy = Math.max(0, Math.min(H - 1, y))
-    const i = (cy * W + cx) * 4
+  const grayAt = (x: number, y: number): number => {
+    const i = clamped(x, y)
     const g = (0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]) / 255
     return invertHeight ? 1 - g : g
+  }
+
+  /**
+   * A neighbour's height, faded towards the pixel being shaded as it becomes
+   * transparent.
+   *
+   * A transparent pixel still carries colour, and what it carries is whatever
+   * the exporter left behind, which is almost always black. Reading that as
+   * height put a cliff around the silhouette of every sprite, so a cutout came
+   * back with a hard ridge embossed around its outline. Standing the centre
+   * pixel in for a transparent neighbour makes the slope across that boundary
+   * zero, which is what "there is nothing there" should mean. Fully opaque
+   * pixels take the first branch, so an opaque texture is untouched.
+   */
+  const getGray = (x: number, y: number, centre: number): number => {
+    const a = src[clamped(x, y) + 3] / 255
+    return a >= 1 ? grayAt(x, y) : grayAt(x, y) * a + centre * (1 - a)
   }
 
   const len = W * H * 4
@@ -97,14 +115,18 @@ export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, par
       const i = (y * W + x) * 4
 
       // Height (luminance)
-      const h = getGray(x, y)
+      const h = grayAt(x, y)
       const hByte = Math.round(h * 255)
-      hData[i] = hByte; hData[i + 1] = hByte; hData[i + 2] = hByte; hData[i + 3] = 255
+      // The source alpha rides along, so a cutout stays a cutout and the maps
+      // can be used to mask. They used to come back fully opaque whatever went
+      // in, which turned a sprite's transparent field into solid geometry.
+      const srcA = src[i + 3]
+      hData[i] = hByte; hData[i + 1] = hByte; hData[i + 2] = hByte; hData[i + 3] = srcA
 
       // Sobel 3×3 gradient
-      const h00 = getGray(x - 1, y - 1); const h10 = getGray(x, y - 1); const h20 = getGray(x + 1, y - 1)
-      const h01 = getGray(x - 1, y);                                      const h21 = getGray(x + 1, y)
-      const h02 = getGray(x - 1, y + 1); const h12 = getGray(x, y + 1); const h22 = getGray(x + 1, y + 1)
+      const h00 = getGray(x - 1, y - 1, h); const h10 = getGray(x, y - 1, h); const h20 = getGray(x + 1, y - 1, h)
+      const h01 = getGray(x - 1, y, h);                                        const h21 = getGray(x + 1, y, h)
+      const h02 = getGray(x - 1, y + 1, h); const h12 = getGray(x, y + 1, h); const h22 = getGray(x + 1, y + 1, h)
       const dX = (h20 + 2 * h21 + h22) - (h00 + 2 * h01 + h02)
       const dY = (h02 + 2 * h12 + h22) - (h00 + 2 * h10 + h20)
 
@@ -116,16 +138,16 @@ export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, par
       nData[i]     = Math.round(((nx / mag) * 0.5 + 0.5) * 255)
       nData[i + 1] = Math.round(((ny / mag) * 0.5 + 0.5) * 255)
       nData[i + 2] = Math.round(((nz / mag) * 0.5 + 0.5) * 255)
-      nData[i + 3] = 255
+      nData[i + 3] = srcA
 
       // Roughness (contrast + bias on luminance)
       const rByte = Math.round(Math.max(0, Math.min(1, (h - 0.5) * roughnessContrast + 0.5 + (roughnessBase - 0.5))) * 255)
-      rData[i] = rByte; rData[i + 1] = rByte; rData[i + 2] = rByte; rData[i + 3] = 255
+      rData[i] = rByte; rData[i + 1] = rByte; rData[i + 2] = rByte; rData[i + 3] = srcA
 
       // Ambient Occlusion (gradient magnitude × height)
       const gradMag = Math.sqrt(dX * dX + dY * dY)
       const aoByte = Math.round(Math.max(0, Math.min(1, (1 - gradMag * aoIntensity) * (0.3 + 0.7 * h))) * 255)
-      aData[i] = aoByte; aData[i + 1] = aoByte; aData[i + 2] = aoByte; aData[i + 3] = 255
+      aData[i] = aoByte; aData[i + 1] = aoByte; aData[i + 2] = aoByte; aData[i + 3] = srcA
     }
   }
 
