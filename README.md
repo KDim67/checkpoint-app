@@ -12,13 +12,17 @@ take it.
 
 ## Screenshots
 
-> Drop images into `docs/screenshots/`. See the note in that folder for sizes.
-
-![The main window](docs/screenshots/main.png)
+![The board](docs/screenshots/main.png)
 
 | The Wall | Game dev tools |
 | --- | --- |
 | ![Wall](docs/screenshots/wall.png) | ![Game dev](docs/screenshots/gamedev.png) |
+
+| The daily log | The backlog | The focus timer |
+| --- | --- | --- |
+| ![Log](docs/screenshots/log.png) | ![Backlog](docs/screenshots/backlog.png) | ![Focus](docs/screenshots/focus.png) |
+
+The workspace in these is made up, so nothing in them is anyone's real data.
 
 ## What's in it
 
