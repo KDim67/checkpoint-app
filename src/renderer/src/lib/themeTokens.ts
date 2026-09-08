@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { flattenToHex } from '../../../shared/color'
 
 /**
  * Concrete colours for the things that cannot use CSS custom properties.
@@ -14,6 +15,23 @@ export function themeToken(name: string, fallback: string): string {
   if (typeof document === 'undefined') return fallback
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return value || fallback
+}
+
+/**
+ * The same token as an opaque `#rrggbb`, composited onto `over`.
+ *
+ * Mermaid parses the colours in a `classDef` with its own grammar, and that
+ * grammar has no production for `rgba(...)`: the opening paren ends the value
+ * early and the whole graph fails to compile rather than losing one colour.
+ * `--color-secondary-muted` is translucent in the shipped themes, and every
+ * token is user editable, so any of them can arrive that way.
+ *
+ * Passing the config object to Mermaid is unaffected and still uses
+ * `themeToken`. This is only for colours written into diagram source.
+ */
+export function themeTokenHex(name: string, fallback: string, over: string): string {
+  const flattened = flattenToHex(themeToken(name, fallback), themeToken(over, '#000000'))
+  return flattened ?? fallback
 }
 
 /**

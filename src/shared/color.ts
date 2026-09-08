@@ -114,3 +114,46 @@ export function hsvToHex({ h, s, v }: Hsv): string {
 export function isHex(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value.trim())
 }
+
+// Flattening, for the places that cannot take an alpha channel
+
+/**
+ * Parses the formats a theme token actually carries: `#rgb`, `#rrggbb`,
+ * `rgb(...)` and `rgba(...)`, in the legacy comma form or the space form.
+ * Alpha comes back as 0–1. Null for anything else, so a caller can fall back
+ * rather than pass a value on to something that cannot read it.
+ */
+export function parseColor(value: string): [number, number, number, number] | null {
+  const v = value.trim()
+
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(v)
+  if (short) {
+    const [r, g, b] = short.slice(1, 4).map(c => parseInt(c + c, 16))
+    return [r, g, b, 1]
+  }
+
+  const rgb = parseHex(v)
+  if (rgb) return [rgb[0], rgb[1], rgb[2], 1]
+
+  const fn = /^rgba?\(([^)]*)\)$/i.exec(v)
+  if (!fn) return null
+  const parts = fn[1].split(/[\s,/]+/).filter(Boolean).map(Number)
+  if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null
+
+  const alpha = parts.length > 3 && !Number.isNaN(parts[3]) ? parts[3] : 1
+  return [parts[0], parts[1], parts[2], Math.max(0, Math.min(1, alpha))]
+}
+
+/**
+ * Composites a colour onto an opaque backdrop and returns `#rrggbb`, so a
+ * translucent token survives as the colour it looked like rather than as the
+ * full-strength one underneath it. Null when either input is unparseable.
+ */
+export function flattenToHex(value: string, over: string): string | null {
+  const fg = parseColor(value)
+  const bg = parseColor(over)
+  if (!fg || !bg) return null
+
+  const alpha = fg[3]
+  return '#' + [0, 1, 2].map(i => toHex(fg[i] * alpha + bg[i] * (1 - alpha))).join('')
+}
