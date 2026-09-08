@@ -9,6 +9,9 @@ module.exports = [
       'out/**',
       'dist/**',
       'node_modules/**',
+      // Nested checkouts and tool output land in dot-directories at the root.
+      // The patterns above are anchored to the repo root and do not reach them.
+      '.*/**',
       '*.config.*',
       // `tsc --build` on these composite projects emits .js/.jsx/.d.ts beside
       // the sources. Ignored so a stray build can never turn into lint noise.
