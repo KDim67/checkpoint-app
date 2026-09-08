@@ -55,9 +55,7 @@ src/**/*.d.ts
 !src/renderer/src/vite-env.d.ts
 !src/shared/**/*.d.ts
 
-# Stale self-snapshots and binary twins of documents. These now live outside
-# the repo, in ../checkpoint-archive. The patterns stay so they cannot creep
-# back in, and everything that was tracked is still in git history.
+# Stale self-snapshots and binary twins of documents. These live outside the
+# repo, in ../checkpoint-archive. The patterns stay so they cannot creep back in.
 checkpoint-app*.zip
 *.docx
-
