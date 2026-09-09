@@ -736,16 +736,28 @@ export default function WallView() {
     const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
-    // Right button: pan from anywhere. Whether this turns out to be a menu
-    // instead is decided on release, by how far it travelled.
-    if (e.button === 2) {
+    // Middle or right button: pan from anywhere.
+    //
+    // The right button was the only one for a long time, and it is overloaded:
+    // a press has to wait for the release to learn whether it was a pan or a
+    // request for the context menu. The middle button carries none of that. It
+    // only ever pans, which is what the rest of the desktop does with it, so
+    // it is the safe one to hold down while dragging across a full wall.
+    if (e.button === 1 || e.button === 2) {
       const cam = panCameraRef.current ?? docRef.current.camera
-      rightPressRef.current = {
-        clientX: e.clientX,
-        clientY: e.clientY,
-        itemId: itemEl?.dataset.wallItem ?? null,
-        at: toWallPoint(screenPoint(e), cam),
-        moved: false
+      if (e.button === 2) {
+        rightPressRef.current = {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          itemId: itemEl?.dataset.wallItem ?? null,
+          at: toWallPoint(screenPoint(e), cam),
+          moved: false
+        }
+      } else {
+        // Chromium answers a middle press with autoscroll: a drift anchor that
+        // scrolls the page under the pointer and swallows the drag. Preventing
+        // the default here stops the mousedown that starts it.
+        e.preventDefault()
       }
       dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
       return
@@ -1817,7 +1829,7 @@ export default function WallView() {
               ? 'Drag to draw · Esc to stop'
               : tool === 'arrow'
                 ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another, or to anywhere')
-                : 'Drag to select · Right-drag to pan'}
+                : 'Drag to select · Middle-drag to pan'}
           </span>
 
           <div style={{ position: 'relative' }}>
