@@ -417,6 +417,19 @@ export interface PluginInfo {
 
 export type ShortcutMap = Record<string, string>;
 
+/**
+ * What a manual update check found.
+ *
+ * `unsupported` is a dev run: only the packaged app has a release to compare
+ * itself against. The version on `current` is the one already installed; on
+ * `available` it is the newer one now downloading.
+ */
+export type UpdateCheckResult =
+  | { status: 'unsupported' }
+  | { status: 'current'; version: string }
+  | { status: 'available'; version: string }
+  | { status: 'error'; message: string }
+
 
 
 

@@ -480,6 +480,13 @@ function registerIpcHandlers(): void {
     }
   })
 
+  // Imported here rather than at the top so a dev run never pulls
+  // electron-updater in at all, the same way the startup check does.
+  ipcMain.handle(IpcChannels.APP_CHECK_FOR_UPDATES, async () => {
+    const { checkForUpdatesNow } = await import('./updater')
+    return checkForUpdatesNow()
+  })
+
   // AI Streaming Handlers
   // Each consumer passes a streamId ('assistant', 'standup', …) so multiple
   // features can stream concurrently without cross-talk. Events carry the id
