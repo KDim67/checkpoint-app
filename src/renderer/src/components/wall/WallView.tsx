@@ -177,7 +177,8 @@ const wallShortcutSections = (
       ['Ctrl+Shift+Z', 'Redo'],
       [bindings.wall_duplicate || 'Unbound', 'Duplicate the selection'],
       ['Ctrl+A', 'Select everything unlocked'],
-      ['Delete', 'Remove the selection'],
+      // Both, because the bound one is a preference and Delete is a fact.
+      [bindings.wall_delete ? `${bindings.wall_delete} or Delete` : 'Delete', 'Remove the selection'],
       ['Arrows', `Nudge by ${NUDGE}px`],
       ['Shift+Arrows', `Nudge by ${NUDGE * 5}px`]
     ]
@@ -1425,6 +1426,7 @@ export default function WallView() {
       if (command === 'wall_tool_draw') { setTool('pen'); setArrowFrom(null); return }
       if (command === 'wall_tool_connect') { setTool('arrow'); setArrowFrom(null); return }
       if (command === 'wall_duplicate') { e.preventDefault(); duplicateSelected(); return }
+      if (command === 'wall_delete') { e.preventDefault(); removeSelected(); return }
 
       if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault()
