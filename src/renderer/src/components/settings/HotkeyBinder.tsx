@@ -1,14 +1,27 @@
 import React, { useState, useEffect } from 'react'
 import { useToast } from '../ui/Toast'
 import { useAiEnabled } from '../../lib/useAiEnabled'
+import { getEnumSetting, setStringSetting } from '../../lib/settings'
+import {
+  PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES,
+  type PanButtons, type MenuButton
+} from '../../lib/wallInput'
 import { AlertTriangle, Keyboard } from 'lucide-react'
 import {
   APP_SHORTCUTS,
+  VIEW_SHORTCUTS,
+  SCOPE_LABELS,
   loadBindings,
   saveBindings,
   defaultBindings,
+  loadViewBindings,
+  saveViewBindings,
+  defaultViewBindings,
   comboFromEvent,
-  type ShortcutBindings
+  isReservedCombo,
+  shortcutClash,
+  type ShortcutBindings,
+  type ShortcutScope
 } from '../../lib/shortcuts'
 
 type GlobalAction = 'hud_toggle' | 'clipboard_toggle'
@@ -26,14 +39,73 @@ const ACTION_LABELS: Record<GlobalAction, { label: string; desc: string; default
   }
 }
 
-const FORBIDDEN_SHORTCUTS = [
-  'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+A', 'Ctrl+Z', 'Ctrl+Y', 'Ctrl+S',
-  'Cmd+C', 'Cmd+V', 'Cmd+X', 'Cmd+A', 'Cmd+Z', 'Cmd+Y', 'Cmd+S',
-  'Alt+F4', 'Ctrl+Alt+Delete'
+/**
+ * Which list a recording is for. Three now, stored separately: the OS-level
+ * hotkeys, the in-app ones that work anywhere, and the per-view commands,
+ * where the scope also decides what counts as a collision.
+ */
+type RecordingTarget = { scope: 'global' | 'app' | ShortcutScope; id: string }
+
+const VIEW_SCOPES = [...new Set(VIEW_SHORTCUTS.map(s => s.scope))]
+
+const PAN_CHOICES: { value: PanButtons; label: string }[] = [
+  { value: 'both', label: 'Middle or right button' },
+  { value: 'middle', label: 'Middle button only' },
+  { value: 'right', label: 'Right button only' }
 ]
 
-/** Which list a recording is for. The two are bound and stored separately. */
-type RecordingTarget = { scope: 'global' | 'app'; id: string }
+const MENU_CHOICES: { value: MenuButton; label: string }[] = [
+  { value: 'right', label: 'Right button' },
+  { value: 'middle', label: 'Middle button' },
+  { value: 'none', label: 'No button' }
+]
+
+/** A labelled dropdown, for the settings that pick from a short list. */
+function ChoiceRow<T extends string>({
+  label, desc, value, choices, onChange
+}: {
+  label: string
+  desc: string
+  value: T
+  choices: { value: T; label: string }[]
+  onChange: (next: T) => void
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: 'var(--space-3)',
+      background: 'var(--color-surface-1)',
+      border: '1px solid var(--color-surface-offset)',
+      borderRadius: 'var(--radius-md)'
+    }}>
+      <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
+        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+          {label}
+        </span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{desc}</span>
+      </div>
+      <select
+        value={value}
+        aria-label={label}
+        onChange={e => onChange(e.target.value as T)}
+        style={{
+          background: 'var(--color-surface-2)',
+          border: '1px solid var(--color-surface-offset)',
+          color: 'var(--color-text-base)',
+          borderRadius: '4px',
+          padding: '5px 8px',
+          fontSize: 'var(--text-xs)',
+          minWidth: '170px',
+          outline: 'none'
+        }}
+      >
+        {choices.map(choice => (
+          <option key={choice.value} value={choice.value}>{choice.label}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -187,6 +259,9 @@ export default function HotkeyBinder() {
     clipboard_toggle: 'Ctrl+Shift+V'
   })
   const [appBindings, setAppBindings] = useState<ShortcutBindings>(defaultBindings)
+  const [viewBindings, setViewBindings] = useState<ShortcutBindings>(defaultViewBindings)
+  const [panButtons, setPanButtons] = useState<PanButtons>(PAN_BUTTON_MODES[0])
+  const [menuButton, setMenuButton] = useState<MenuButton>(MENU_BUTTON_MODES[0])
   const [recording, setRecording] = useState<RecordingTarget | null>(null)
   const [collisionWarning, setCollisionWarning] = useState<string | null>(null)
 
@@ -204,6 +279,9 @@ export default function HotkeyBinder() {
         console.error('Failed to load shortcuts:', err)
       }
       setAppBindings(await loadBindings())
+      setViewBindings(await loadViewBindings())
+      setPanButtons(await getEnumSetting(PAN_BUTTONS_KEY, PAN_BUTTON_MODES, PAN_BUTTON_MODES[0]))
+      setMenuButton(await getEnumSetting(MENU_BUTTON_KEY, MENU_BUTTON_MODES, MENU_BUTTON_MODES[0]))
     }
     load().catch(err => console.error('Failed to load shortcuts:', err))
   }, [])
@@ -230,7 +308,7 @@ export default function HotkeyBinder() {
     const combo = comboFromEvent(e)
     if (!combo) return
 
-    if (FORBIDDEN_SHORTCUTS.includes(combo)) {
+    if (isReservedCombo(combo)) {
       setCollisionWarning(`"${combo}" is a reserved system shortcut and cannot be bound.`)
       return
     }
@@ -242,10 +320,12 @@ export default function HotkeyBinder() {
         return
       }
       setBindings(prev => ({ ...prev, [recording.id]: combo }))
-    } else {
-      const clash = APP_SHORTCUTS.find(s => s.id !== recording.id && appBindings[s.id] === combo)
+    } else if (recording.scope === 'app') {
+      // Checked against every view as well: an in-app shortcut fires wherever
+      // you are, so sharing a combo with one would double-fire.
+      const clash = shortcutClash(combo, { id: recording.id, scope: 'global' }, appBindings, viewBindings)
       if (clash) {
-        setCollisionWarning(`"${combo}" is already bound to "${clash.label}".`)
+        setCollisionWarning(`"${combo}" is already bound to "${clash}".`)
         return
       }
       const next = { ...appBindings, [recording.id]: combo }
@@ -253,6 +333,17 @@ export default function HotkeyBinder() {
       // Applied immediately. These are in-window listeners, so unlike the
       // global hotkeys there is nothing to register with the OS.
       saveBindings(next).catch(err => console.error('Failed to save shortcuts:', err))
+    } else {
+      // Only its own view and the app-wide list. Another view's keys are free
+      // to take: the two are never on screen together.
+      const clash = shortcutClash(combo, { id: recording.id, scope: recording.scope }, appBindings, viewBindings)
+      if (clash) {
+        setCollisionWarning(`"${combo}" is already bound to "${clash}".`)
+        return
+      }
+      const next = { ...viewBindings, [recording.id]: combo }
+      setViewBindings(next)
+      saveViewBindings(next).catch(err => console.error('Failed to save view shortcuts:', err))
     }
 
     setRecording(null)
@@ -292,6 +383,15 @@ export default function HotkeyBinder() {
     saveBindings(defaults)
       .then(() => toast('In-app shortcuts reset to defaults'))
       .catch(err => console.error('Failed to reset shortcuts:', err))
+  }
+
+  const handleResetViewDefaults = () => {
+    const defaults = defaultViewBindings()
+    setViewBindings(defaults)
+    setCollisionWarning(null)
+    saveViewBindings(defaults)
+      .then(() => toast('View shortcuts reset to defaults'))
+      .catch(err => console.error('Failed to reset view shortcuts:', err))
   }
 
   return (
@@ -384,6 +484,70 @@ export default function HotkeyBinder() {
             Restore Default Shortcuts
           </ActionButton>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <SectionHeading>View Shortcuts</SectionHeading>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+          Work only while that view is open, so two of them can share a key without clashing.
+          A kanban card also needs to be focused, which Tab does.
+        </span>
+
+        {VIEW_SCOPES.map(scope => (
+          <div key={scope} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <span style={{
+              fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
+              color: 'var(--color-text-muted)'
+            }}>
+              {SCOPE_LABELS[scope]}
+            </span>
+            {VIEW_SHORTCUTS.filter(s => s.scope === scope).map(shortcut => (
+              <ShortcutRow
+                key={shortcut.id}
+                label={shortcut.label}
+                combo={viewBindings[shortcut.id]}
+                isRecording={recording?.scope === scope && recording.id === shortcut.id}
+                onStartRecording={() => startRecording({ scope, id: shortcut.id })}
+                onKeyDown={handleKeyDown}
+              />
+            ))}
+          </div>
+        ))}
+
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+          <ActionButton onClick={handleResetViewDefaults} disabled={recording !== null} variant="secondary">
+            Restore Default View Shortcuts
+          </ActionButton>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <SectionHeading>Mouse</SectionHeading>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+          On the Wall, where the right button both pans and opens the menu. Holding
+          space and dragging with the left button always pans, whatever these say.
+        </span>
+
+        <ChoiceRow
+          label="Pan the wall with"
+          desc="Hold the button down and drag to move the view."
+          value={panButtons}
+          choices={PAN_CHOICES}
+          onChange={next => {
+            setPanButtons(next)
+            void setStringSetting(PAN_BUTTONS_KEY, next)
+          }}
+        />
+        <ChoiceRow
+          label="Open the context menu with"
+          desc="A click that does not move. If this button also pans, a drag pans instead."
+          value={menuButton}
+          choices={MENU_CHOICES}
+          onChange={next => {
+            setMenuButton(next)
+            void setStringSetting(MENU_BUTTON_KEY, next)
+          }}
+        />
       </div>
     </div>
   )

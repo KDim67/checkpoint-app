@@ -7,6 +7,7 @@ import type { Item } from '../../../../shared/types'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { PRIORITY_COLORS } from '../../lib/priority'
 import { DEFAULT_CARD_DISPLAY, type CardDisplay } from '../../lib/boardConfig'
+import { useViewShortcuts } from '../../lib/useViewShortcuts'
 
 interface KanbanCardProps {
   card: Item
@@ -56,6 +57,7 @@ function KanbanCard({
   display = DEFAULT_CARD_DISPLAY
 }: KanbanCardProps) {
   const [hovered, setHovered] = useState(false)
+  const { match: matchKey } = useViewShortcuts('kanban')
 
   const sortable = useSortable({ id: card.id, disabled: isOverlay })
   const {
@@ -139,23 +141,32 @@ function KanbanCard({
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) return
 
-    // Space: Start Pomodoro Focus Session
-    if (e.key === ' ') {
+    // Enter opens the card because Enter activates whatever has focus. That is
+    // a convention rather than a preference, so it stays out of the bindings;
+    // everything below comes from Settings, defaulting to the letters that
+    // were written into this handler before.
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      onClick(card.id)
+      return
+    }
+
+    const command = matchKey(e)
+
+    if (command === 'kanban_focus_session') {
       e.preventDefault()
       useAppStore.getState().setPreselectedTaskId(card.id)
       useAppStore.getState().setView('focus')
       return
     }
 
-    // Enter or e: Open Details Modal
-    if (e.key === 'Enter' || e.key === 'e') {
+    if (command === 'kanban_open_details') {
       e.preventDefault()
       onClick(card.id)
       return
     }
 
-    // d: Toggle Due Date Completed
-    if (e.key === 'd' && card.due_at) {
+    if (command === 'kanban_toggle_due' && card.due_at) {
       e.preventDefault()
       const nextVal = !dueDateCompleted
       const updatedMeta = { ...meta, dueDateCompleted: nextVal }
@@ -165,8 +176,7 @@ function KanbanCard({
       return
     }
 
-    // t: Toggle Template Status
-    if (e.key === 't') {
+    if (command === 'kanban_toggle_template') {
       e.preventDefault()
       const nextVal = !isTemplate
       const updatedMeta = { ...meta, isTemplate: nextVal }
@@ -176,15 +186,13 @@ function KanbanCard({
       return
     }
 
-    // c: Archive (Delete) Card
-    if (e.key === 'c') {
+    if (command === 'kanban_archive') {
       e.preventDefault()
       onDelete(card.id)
       return
     }
 
-    // x: Toggle Done status of card
-    if (e.key === 'x') {
+    if (command === 'kanban_toggle_done') {
       e.preventDefault()
       if (onUpdate) {
         const isCurrentlyDone = card.status === 'done'

@@ -14,6 +14,8 @@ import {
 } from '../lib/focusSettings'
 import { ToggleSwitch } from './settings/SettingsSection'
 import ConfirmDialog from './ui/ConfirmDialog'
+import { isTypingTarget } from '../lib/shortcuts'
+import { useViewShortcuts } from '../lib/useViewShortcuts'
 
 interface SelectedTask {
   id: string
@@ -42,6 +44,7 @@ export default function FocusView() {
   const activeContext = useAppStore(s => s.activeContext)
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
+  const { match: matchKey } = useViewShortcuts('focus')
 
   // Timer engine state. Lives in the global store (see FocusTimerEngine,
   // mounted at the app root) so a running session survives navigating away
@@ -217,29 +220,33 @@ export default function FocusView() {
     loadFocusData()
   }
 
-  // Keyboard shortcut: Space to play/pause while a session is active
+  // Keyboard shortcuts, while a session is running. Which key does what comes
+  // from Settings; the defaults are Space, D and R.
   useEffect(() => {
     if (step !== 'active') return
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
-      const isTyping = target && ['INPUT', 'TEXTAREA'].includes(target.tagName)
-      if (isTyping) return
-      if (e.code === 'Space') {
-        e.preventDefault()
-        handleToggleTimer()
-      } else if ((e.key === 'd' || e.key === 'D') && preset === 'focus') {
-        // Quick-tally an interruption without breaking flow (Pomodoro practice)
-        e.preventDefault()
-        focusLogDistraction()
-      } else if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault()
-        handleResetTimer()
+      if (isTypingTarget(e.target)) return
+      switch (matchKey(e)) {
+        case 'focus_toggle_timer':
+          e.preventDefault()
+          handleToggleTimer()
+          break
+        case 'focus_log_distraction':
+          // Quick-tally an interruption without breaking flow (Pomodoro practice)
+          if (preset !== 'focus') return
+          e.preventDefault()
+          focusLogDistraction()
+          break
+        case 'focus_reset':
+          e.preventDefault()
+          handleResetTimer()
+          break
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, isRunning, preset])
+  }, [step, isRunning, preset, matchKey])
 
   // Task Selection / Inline Completion
   const handleToggleTaskSelection = (task: Item) => {

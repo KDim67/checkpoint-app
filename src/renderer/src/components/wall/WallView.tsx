@@ -57,6 +57,12 @@ import {
 } from '../../../../shared/wallBoard'
 import { loadBoardConfig } from '../../lib/boardConfig'
 import { getBoolSetting, getNumberSetting, getEnumSetting, setBoolSetting, setNumberSetting, setStringSetting } from '../../lib/settings'
+import { VIEW_SHORTCUTS, type ShortcutBindings } from '../../lib/shortcuts'
+import { useViewShortcuts } from '../../lib/useViewShortcuts'
+import {
+  PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES,
+  panButtonLabel, type PanButtons, type MenuButton
+} from '../../lib/wallInput'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
 
@@ -122,6 +128,7 @@ const CLICK_SLOP = 4
  */
 const LOOSE_END_SLOP = 24
 
+
 /**
  * Everything the wall binds, written down somewhere it can be read.
  *
@@ -130,13 +137,19 @@ const LOOSE_END_SLOP = 24
  * pointing at the button, which is the one moment they do not need telling;
  * this is the list you open when you do not know what to point at yet.
  */
-const WALL_SHORTCUTS: { group: string; rows: [string, string][] }[] = [
+const wallShortcutSections = (
+  bindings: ShortcutBindings,
+  panButtons: PanButtons,
+  menuButton: MenuButton
+): { group: string; rows: [string, string][] }[] => [
   {
     group: 'Tools',
+    // Read from the bindings rather than written out, so the sheet cannot
+    // disagree with what the keys actually do once someone changes one.
     rows: [
-      ['V', 'Select'],
-      ['P', 'Draw'],
-      ['A', 'Connect two items'],
+      ...VIEW_SHORTCUTS
+        .filter(s => s.scope === 'wall' && s.id.startsWith('wall_tool_') && bindings[s.id])
+        .map(s => [bindings[s.id], s.label] as [string, string]),
       ['Esc', 'Back to select, and close whatever is open']
     ]
   },
@@ -144,10 +157,14 @@ const WALL_SHORTCUTS: { group: string; rows: [string, string][] }[] = [
     group: 'Mouse',
     rows: [
       // One row, because two rows both reading "Pan the wall" look like a
-      // mistake rather than a choice.
-      ['Middle or right-drag', 'Pan the wall'],
+      // mistake rather than a choice. Both of these follow the settings, so
+      // the sheet cannot end up describing buttons that do something else.
+      [panButtonLabel(panButtons), 'Pan the wall'],
       ['Space + drag', 'Pan without putting the tool down'],
-      ['Right-click', 'Menu for what is under the pointer'],
+      ...(menuButton === 'none'
+        ? []
+        : [[menuButton === 'right' ? 'Right-click' : 'Middle-click',
+            'Menu for what is under the pointer'] as [string, string]]),
       ['Wheel', 'Zoom where the pointer is'],
       ['Double-click', 'New sticky note, or open what was clicked'],
       ['Shift-click', 'Add to or take from the selection']
@@ -158,7 +175,7 @@ const WALL_SHORTCUTS: { group: string; rows: [string, string][] }[] = [
     rows: [
       ['Ctrl+Z', 'Undo'],
       ['Ctrl+Shift+Z', 'Redo'],
-      ['Ctrl+D', 'Duplicate the selection'],
+      [bindings.wall_duplicate || 'Unbound', 'Duplicate the selection'],
       ['Ctrl+A', 'Select everything unlocked'],
       ['Delete', 'Remove the selection'],
       ['Arrows', `Nudge by ${NUDGE}px`],
@@ -276,6 +293,9 @@ export default function WallView() {
    * worth having on top of the two mouse buttons.
    */
   const [spaceHeld, setSpaceHeld] = useState(false)
+  const { bindings: keys, match: matchKey } = useViewShortcuts('wall')
+  const [panButtons, setPanButtons] = useState<PanButtons>(PAN_BUTTON_MODES[0])
+  const [menuButton, setMenuButton] = useState<MenuButton>(MENU_BUTTON_MODES[0])
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
@@ -412,14 +432,18 @@ export default function WallView() {
       getNumberSetting(SMOOTHING_KEY, SMOOTHING_STRENGTH),
       getEnumSetting(ARROW_SHAPE_KEY, ARROW_SHAPES, ARROW_SHAPES[0]),
       getEnumSetting(ARROW_LINE_KEY, ARROW_LINES, ARROW_LINES[0]),
-      getEnumSetting(ARROW_HEADS_KEY, ARROW_HEAD_MODES, ARROW_HEAD_MODES[0])
-    ]).then(([open, width, smooth, shape, line, heads]) => {
+      getEnumSetting(ARROW_HEADS_KEY, ARROW_HEAD_MODES, ARROW_HEAD_MODES[0]),
+      getEnumSetting(PAN_BUTTONS_KEY, PAN_BUTTON_MODES, PAN_BUTTON_MODES[0]),
+      getEnumSetting(MENU_BUTTON_KEY, MENU_BUTTON_MODES, MENU_BUTTON_MODES[0])
+    ]).then(([open, width, smooth, shape, line, heads, pan, menuOn]) => {
       if (cancelled) return
       setRailOpen(open)
       setRailWidth(clampRail(width))
       setArrowShape(shape)
       setArrowLine(line)
       setArrowHeads(heads)
+      setPanButtons(pan)
+      setMenuButton(menuOn)
       // Still kept as a strength so the preference carries over from the build
       // that had a dial. Anything above zero means on.
       setSmoothing(smooth > 0)
@@ -800,16 +824,20 @@ export default function WallView() {
     const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
-    // Middle or right button: pan from anywhere.
+    // The middle and right buttons, whose jobs are a setting.
     //
-    // The right button was the only one for a long time, and it is overloaded:
-    // a press has to wait for the release to learn whether it was a pan or a
-    // request for the context menu. The middle button carries none of that. It
-    // only ever pans, which is what the rest of the desktop does with it, so
-    // it is the safe one to hold down while dragging across a full wall.
-    if (e.button === 1 || e.button === 2) {
+    // Out of the box both pan and the right one also opens the menu, which is
+    // why a right press cannot know what it was until the release tells it how
+    // far it travelled. Anyone who finds that overloading confusing can move
+    // panning to the middle button and leave the right one to the menu.
+    const pressed = e.button === 1 ? 'middle' : e.button === 2 ? 'right' : null
+    if (pressed) {
+      const pans = panButtons === 'both' || panButtons === pressed
+      const menus = menuButton === pressed
+      if (!pans && !menus) return
+
       const cam = panCameraRef.current ?? docRef.current.camera
-      if (e.button === 2) {
+      if (menus) {
         rightPressRef.current = {
           clientX: e.clientX,
           clientY: e.clientY,
@@ -817,13 +845,16 @@ export default function WallView() {
           at: toWallPoint(screenPoint(e), cam),
           moved: false
         }
-      } else {
+      }
+      if (pressed === 'middle') {
         // Chromium answers a middle press with autoscroll: a drift anchor that
         // scrolls the page under the pointer and swallows the drag. Preventing
         // the default here stops the mousedown that starts it.
         e.preventDefault()
       }
-      dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
+      if (pans) {
+        dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
+      }
       return
     }
 
@@ -1051,11 +1082,6 @@ export default function WallView() {
     const cam = panCameraRef.current ?? docRef.current.camera
 
     if (drag.mode === 'pan') {
-      const press = rightPressRef.current
-      if (press && !press.moved) {
-        const travelled = Math.hypot(e.clientX - press.clientX, e.clientY - press.clientY)
-        if (travelled > CLICK_SLOP) press.moved = true
-      }
       // Painted here and committed once on release. Zoom cannot change while a
       // pan is running, so the one in hand is still current.
       const panned = { ...cam, x: drag.camX + (e.clientX - drag.startX), y: drag.camY + (e.clientY - drag.startY) }
@@ -1197,6 +1223,15 @@ export default function WallView() {
    * pointer reports in between lands on a screen that has not repainted yet.
    */
   const onPointerMove = (e: React.PointerEvent) => {
+    // How far a press that might still become a menu has travelled. Tracked
+    // here rather than inside the pan branch, because a button set to open the
+    // menu and nothing else starts no drag at all, and would otherwise answer
+    // a long sweep with a context menu.
+    const press = rightPressRef.current
+    if (press && !press.moved &&
+      Math.hypot(e.clientX - press.clientX, e.clientY - press.clientY) > CLICK_SLOP) {
+      press.moved = true
+    }
     if (!dragRef.current) return
     pendingMoveRef.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey }
     if (moveFrameRef.current !== null) return
@@ -1381,16 +1416,14 @@ export default function WallView() {
         applyHistory(e.shiftKey ? redo(historyRef.current) : undo(historyRef.current))
         return
       }
-      // V, P and A, as every canvas tool binds them. Bare keys, so they stay
-      // out of the way of the app's own Ctrl shortcuts.
-      if (!mod && !e.altKey) {
-        const key = e.key.toLowerCase()
-        if (key === 'v') { setTool('select'); setArrowFrom(null); return }
-        if (key === 'p') { setTool('pen'); setArrowFrom(null); return }
-        if (key === 'a') { setTool('arrow'); setArrowFrom(null); return }
-      }
+      // The tools and duplicate come from the bindings, so Settings can move
+      // them. V, P and A are only the defaults now, not the definition.
+      const command = matchKey(e)
+      if (command === 'wall_tool_select') { setTool('select'); setArrowFrom(null); return }
+      if (command === 'wall_tool_draw') { setTool('pen'); setArrowFrom(null); return }
+      if (command === 'wall_tool_connect') { setTool('arrow'); setArrowFrom(null); return }
+      if (command === 'wall_duplicate') { e.preventDefault(); duplicateSelected(); return }
 
-      if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return }
       if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault()
         setSelectedIds(new Set(docRef.current.items.filter(i => !i.locked).map(i => i.id)))
@@ -1434,7 +1467,7 @@ export default function WallView() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [applyHistory, duplicateSelected, removeSelected, setItems])
+  }, [applyHistory, duplicateSelected, matchKey, removeSelected, setItems])
 
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
@@ -1900,9 +1933,9 @@ export default function WallView() {
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
-        {toolButton('Select', <MousePointer2 size={14} />, () => setTool('select'), { active: tool === 'select', shortcut: 'V' })}
-        {toolButton('Draw', <PenLine size={14} />, () => setTool(t => (t === 'pen' ? 'select' : 'pen')), { active: tool === 'pen', shortcut: 'P' })}
-        {toolButton('Connect two items', <Spline size={14} />, () => { setArrowFrom(null); setTool(t => (t === 'arrow' ? 'select' : 'arrow')) }, { active: tool === 'arrow', shortcut: 'A' })}
+        {toolButton('Select', <MousePointer2 size={14} />, () => setTool('select'), { active: tool === 'select', shortcut: keys.wall_tool_select })}
+        {toolButton('Draw', <PenLine size={14} />, () => setTool(t => (t === 'pen' ? 'select' : 'pen')), { active: tool === 'pen', shortcut: keys.wall_tool_draw })}
+        {toolButton('Connect two items', <Spline size={14} />, () => { setArrowFrom(null); setTool(t => (t === 'arrow' ? 'select' : 'arrow')) }, { active: tool === 'arrow', shortcut: keys.wall_tool_connect })}
 
         {toolButton('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
         {toolButton('Text', <Type size={14} />, () => addItem('text'))}
@@ -1944,7 +1977,7 @@ export default function WallView() {
               ? 'Drag to draw · Esc to stop'
               : tool === 'arrow'
                 ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another, or to anywhere')
-                : 'Drag to select · Space or middle-drag to pan'}
+                : `Drag to select · Space or ${panButtonLabel(panButtons).toLowerCase()} to pan`}
           </span>
 
           <div style={{ position: 'relative' }}>
@@ -2037,10 +2070,10 @@ export default function WallView() {
                   borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
                 }}
               >
-                {WALL_SHORTCUTS.map((section, i) => (
+                {wallShortcutSections(keys, panButtons, menuButton).map((section, i) => (
                   <div
                     key={section.group}
-                    style={{ marginBottom: i === WALL_SHORTCUTS.length - 1 ? 0 : 'var(--space-3)' }}
+                    style={{ marginBottom: i === wallShortcutSections(keys, panButtons, menuButton).length - 1 ? 0 : 'var(--space-3)' }}
                   >
                     <div style={{
                       marginBottom: '2px',
