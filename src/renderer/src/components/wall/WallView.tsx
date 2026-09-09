@@ -61,7 +61,7 @@ import { VIEW_SHORTCUTS, type ShortcutBindings } from '../../lib/shortcuts'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
 import {
   PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES,
-  panButtonLabel, type PanButtons, type MenuButton
+  panButtonLabel, panHintLabel, type PanButtons, type MenuButton
 } from '../../lib/wallInput'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
@@ -293,6 +293,8 @@ export default function WallView() {
    * worth having on top of the two mouse buttons.
    */
   const [spaceHeld, setSpaceHeld] = useState(false)
+  /** The selection toolbar's colour popover. */
+  const [swatchOpen, setSwatchOpen] = useState(false)
   const { bindings: keys, match: matchKey } = useViewShortcuts('wall')
   const [panButtons, setPanButtons] = useState<PanButtons>(PAN_BUTTON_MODES[0])
   const [menuButton, setMenuButton] = useState<MenuButton>(MENU_BUTTON_MODES[0])
@@ -1613,6 +1615,13 @@ export default function WallView() {
    * toolbar is centre-anchored and would otherwise hang off either side.
    */
   const selectionBounds = boundsOf(selectedItems)
+  /**
+   * The selection toolbar's own width, so the clamp below knows what it is
+   * keeping on screen. It changes with the selection: an arrow adds four more
+   * buttons than a sticky note does.
+   */
+  const floatingRef = useRef<HTMLDivElement>(null)
+  const [floatingWidth, setFloatingWidth] = useState(220)
   const floatingPos = ((): { left: number; top: number } | null => {
     if (!selectionBounds || editingId) return null
 
@@ -1621,12 +1630,31 @@ export default function WallView() {
     const below = selectionBounds.maxY * camera.zoom + camera.y + 12
 
     const rect = viewportRef.current?.getBoundingClientRect()
-    const halfWidth = 110
+    // Measured rather than assumed. This was a flat 110, which was already
+    // wrong for the arrow toolbar and stayed wrong: the clamp let a toolbar
+    // wider than 220 hang off the edge it was there to keep it away from.
+    const halfWidth = floatingWidth / 2
     return {
       left: rect ? Math.min(Math.max(centreX, halfWidth), rect.width - halfWidth) : centreX,
       top: above < 4 ? below : above
     }
   })()
+
+  /**
+   * The toolbar's width, read back after it has been laid out.
+   *
+   * Measured rather than counted from the buttons: the arrow controls, the
+   * label button and the colour swatch come and go with what is selected, and
+   * a number kept in step by hand would drift the first time one of them
+   * changed.
+   */
+  useLayoutEffect(() => {
+    const width = floatingRef.current?.offsetWidth
+    if (width && width !== floatingWidth) setFloatingWidth(width)
+  }, [floatingWidth, selectedIds, arrowsSelected, single?.locked, single?.text])
+
+  /** A popover belongs to the selection that opened it. */
+  useEffect(() => { setSwatchOpen(false) }, [selectedIds])
 
   /**
    * `.btn-icon:hover` already paints `--color-surface-offset`, so an active
@@ -1977,7 +2005,7 @@ export default function WallView() {
               ? 'Drag to draw · Esc to stop'
               : tool === 'arrow'
                 ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another, or to anywhere')
-                : `Drag to select · Space or ${panButtonLabel(panButtons).toLowerCase()} to pan`}
+                : `Drag to select · Space or ${panHintLabel(panButtons)} to pan`}
           </span>
 
           <div style={{ position: 'relative' }}>
@@ -2507,7 +2535,7 @@ export default function WallView() {
 
           {/* Controls for the current selection, floated above it. */}
           {floatingPos && selectedItems.length > 0 && (
-            <div data-wall-ui style={{
+            <div ref={floatingRef} data-wall-ui style={{
               position: 'absolute',
               left: `${floatingPos.left}px`, top: `${floatingPos.top}px`,
               transform: 'translateX(-50%)',
@@ -2519,14 +2547,61 @@ export default function WallView() {
               boxShadow: 'var(--shadow-lg)',
               zIndex: 15
             }}>
-              {/* The whole palette, not six of eight, and a custom slot: the
-                  toolbar quietly offered fewer colours than the pen did. */}
-              <WallColorPicker
-                colors={WALL_COLORS}
-                value={single?.color}
-                onChange={c => setItems(patchItems(doc.items, selectedIds, { color: c }))}
-                columns={WALL_COLORS.length + 1}
-              />
+              {/* One swatch, not the whole palette laid out flat.
+
+                  Nine circles and five buttons in a row made this toolbar wider
+                  than most of what it floats over, so it covered the thing you
+                  had just selected. The palette itself has not shrunk back to
+                  the six colours it used to offer: it is all still here, one
+                  click in, which is what the pen palette already does. */}
+              <div data-wall-swatch style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setSwatchOpen(v => !v)}
+                  title="Colour"
+                  aria-label="Colour"
+                  aria-expanded={swatchOpen}
+                  className="btn-icon"
+                  style={{
+                    width: '30px', height: '30px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: swatchOpen ? 'var(--color-surface-offset)' : undefined
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      width: '16px', height: '16px', borderRadius: '50%',
+                      background: single?.color ?? 'transparent',
+                      // Nothing selected has a colour of its own yet, or the
+                      // selection is mixed: an empty ring says so without
+                      // claiming one of the eight.
+                      border: single?.color
+                        ? '1px solid rgba(0, 0, 0, 0.25)'
+                        : '1px dashed var(--color-text-faint)'
+                    }}
+                  />
+                </button>
+
+                {swatchOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 42,
+                    padding: 'var(--space-2)', width: '146px',
+                    background: 'var(--color-surface-elevated)',
+                    border: '1px solid var(--color-surface-offset)',
+                    borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
+                  }}>
+                    <WallColorPicker
+                      colors={WALL_COLORS}
+                      value={single?.color}
+                      onChange={c => {
+                        setItems(patchItems(doc.items, selectedIds, { color: c }))
+                        setSwatchOpen(false)
+                      }}
+                      columns={4}
+                    />
+                  </div>
+                )}
+              </div>
               <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
               {arrowsSelected && arrowStyleButtons(
                 single?.arrowShape ?? ARROW_SHAPES[0],
