@@ -26,3 +26,13 @@ export type MenuButton = (typeof MENU_BUTTON_MODES)[number]
 export function panButtonLabel(mode: PanButtons): string {
   return mode === 'both' ? 'Middle or right-drag' : mode === 'middle' ? 'Middle-drag' : 'Right-drag'
 }
+
+/**
+ * The same thing for the one-line hint in the toolbar, which already has an
+ * "or" in it: "Space or middle or right-drag to pan" is three ors and reads
+ * like a stutter. It names one button, and the shortcut sheet carries the
+ * whole truth.
+ */
+export function panHintLabel(mode: PanButtons): string {
+  return mode === 'right' ? 'right-drag' : 'middle-drag'
+}
