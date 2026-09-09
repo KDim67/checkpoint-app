@@ -19,7 +19,8 @@ import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
   Grid3x3, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  ChevronDown, Pencil, PanelRight, Paintbrush, PenLine, Spline, MousePointer2
+  ChevronDown, Pencil, PanelRight, Paintbrush, PenLine, Spline, MousePointer2,
+  Keyboard
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -121,6 +122,50 @@ const CLICK_SLOP = 4
  */
 const LOOSE_END_SLOP = 24
 
+/**
+ * Everything the wall binds, written down somewhere it can be read.
+ *
+ * V, P and A have switched tools since the tools existed and the first person
+ * to use the wall never found them. A tooltip only reaches someone already
+ * pointing at the button, which is the one moment they do not need telling;
+ * this is the list you open when you do not know what to point at yet.
+ */
+const WALL_SHORTCUTS: { group: string; rows: [string, string][] }[] = [
+  {
+    group: 'Tools',
+    rows: [
+      ['V', 'Select'],
+      ['P', 'Draw'],
+      ['A', 'Connect two items'],
+      ['Esc', 'Back to select, and close whatever is open']
+    ]
+  },
+  {
+    group: 'Mouse',
+    rows: [
+      // One row, because two rows both reading "Pan the wall" look like a
+      // mistake rather than a choice.
+      ['Middle or right-drag', 'Pan the wall'],
+      ['Right-click', 'Menu for what is under the pointer'],
+      ['Wheel', 'Zoom where the pointer is'],
+      ['Double-click', 'New sticky note, or open what was clicked'],
+      ['Shift-click', 'Add to or take from the selection']
+    ]
+  },
+  {
+    group: 'Editing',
+    rows: [
+      ['Ctrl+Z', 'Undo'],
+      ['Ctrl+Shift+Z', 'Redo'],
+      ['Ctrl+D', 'Duplicate the selection'],
+      ['Ctrl+A', 'Select everything unlocked'],
+      ['Delete', 'Remove the selection'],
+      ['Arrows', `Nudge by ${NUDGE}px`],
+      ['Shift+Arrows', `Nudge by ${NUDGE * 5}px`]
+    ]
+  }
+]
+
 type Drag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
   | { mode: 'move'; startX: number; startY: number; origin: WallItem[]; moved: boolean }
@@ -220,6 +265,7 @@ export default function WallView() {
    *  read on every pointer move, and re-rendering on each one would stutter. */
   const [dropColumnId, setDropColumnId] = useState<string | null>(null)
   const [bgOpen, setBgOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
@@ -334,17 +380,18 @@ export default function WallView() {
    * through to whatever it was aimed at, the way WallContextMenu already does.
    */
   useEffect(() => {
-    if (!wallMenuOpen && !bgOpen) return
+    if (!wallMenuOpen && !bgOpen && !shortcutsOpen) return
 
     const onDown = (e: PointerEvent): void => {
       const inside = (e.target as HTMLElement).closest('[data-wall-popover]')?.getAttribute('data-wall-popover')
       if (inside !== 'wall') { setWallMenuOpen(false); setRenaming(null) }
       if (inside !== 'bg') setBgOpen(false)
+      if (inside !== 'keys') setShortcutsOpen(false)
     }
 
     document.addEventListener('pointerdown', onDown)
     return () => document.removeEventListener('pointerdown', onDown)
-  }, [wallMenuOpen, bgOpen])
+  }, [wallMenuOpen, bgOpen, shortcutsOpen])
 
   /** The rail's own state is a preference, not part of any wall. */
   useEffect(() => {
@@ -1309,6 +1356,7 @@ export default function WallView() {
         setWallMenuOpen(false)
         setRenaming(null)
         setBgOpen(false)
+        setShortcutsOpen(false)
         setPicker(null)
         setTool('select')
         setArrowFrom(null)
@@ -1569,13 +1617,19 @@ export default function WallView() {
     label: string,
     icon: React.ReactNode,
     onClick: () => void,
-    opts: { active?: boolean; disabled?: boolean } = {}
-  ): React.JSX.Element => (
+    opts: { active?: boolean; disabled?: boolean; shortcut?: string } = {}
+  ): React.JSX.Element => {
+    // The key rides in the tooltip rather than on the face of the button:
+    // thirty pixels square has room for the icon and nothing else. Anyone who
+    // wants the whole set at once opens the list beside the search box.
+    const described = opts.shortcut ? `${label} (${opts.shortcut})` : label
+    return (
     <button
       key={label}
       onClick={onClick}
-      title={label}
-      aria-label={label}
+      title={described}
+      aria-label={described}
+      aria-keyshortcuts={opts.shortcut}
       aria-pressed={opts.active}
       disabled={opts.disabled}
       className="btn-icon"
@@ -1599,7 +1653,8 @@ export default function WallView() {
         />
       )}
     </button>
-  )
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -1799,9 +1854,9 @@ export default function WallView() {
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
-        {toolButton('Select', <MousePointer2 size={14} />, () => setTool('select'), { active: tool === 'select' })}
-        {toolButton('Draw', <PenLine size={14} />, () => setTool(t => (t === 'pen' ? 'select' : 'pen')), { active: tool === 'pen' })}
-        {toolButton('Connect two items', <Spline size={14} />, () => { setArrowFrom(null); setTool(t => (t === 'arrow' ? 'select' : 'arrow')) }, { active: tool === 'arrow' })}
+        {toolButton('Select', <MousePointer2 size={14} />, () => setTool('select'), { active: tool === 'select', shortcut: 'V' })}
+        {toolButton('Draw', <PenLine size={14} />, () => setTool(t => (t === 'pen' ? 'select' : 'pen')), { active: tool === 'pen', shortcut: 'P' })}
+        {toolButton('Connect two items', <Spline size={14} />, () => { setArrowFrom(null); setTool(t => (t === 'arrow' ? 'select' : 'arrow')) }, { active: tool === 'arrow', shortcut: 'A' })}
 
         {toolButton('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
         {toolButton('Text', <Type size={14} />, () => addItem('text'))}
@@ -1910,6 +1965,67 @@ export default function WallView() {
                   >
                     {labelOf(m) || '(untitled)'}
                   </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div data-wall-popover="keys" style={{ position: 'relative' }}>
+            {toolButton(
+              'Keyboard shortcuts',
+              <Keyboard size={14} />,
+              () => setShortcutsOpen(v => !v),
+              { active: shortcutsOpen }
+            )}
+
+            {shortcutsOpen && (
+              <div
+                role="dialog"
+                aria-label="Keyboard shortcuts"
+                style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 41,
+                  width: '326px', maxHeight: '62vh', overflowY: 'auto',
+                  padding: 'var(--space-3)',
+                  background: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--color-surface-offset)',
+                  borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
+                }}
+              >
+                {WALL_SHORTCUTS.map((section, i) => (
+                  <div
+                    key={section.group}
+                    style={{ marginBottom: i === WALL_SHORTCUTS.length - 1 ? 0 : 'var(--space-3)' }}
+                  >
+                    <div style={{
+                      marginBottom: '2px',
+                      fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em',
+                      color: 'var(--color-text-faint)'
+                    }}>
+                      {section.group}
+                    </div>
+                    {section.rows.map(([keys, what]) => (
+                      <div key={keys} style={{
+                        display: 'flex', alignItems: 'baseline',
+                        justifyContent: 'space-between', gap: 'var(--space-3)',
+                        padding: '2px 0'
+                      }}>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>
+                          {what}
+                        </span>
+                        <kbd style={{
+                          flexShrink: 0, whiteSpace: 'nowrap',
+                          padding: '1px 5px',
+                          background: 'var(--color-surface-2)',
+                          border: '1px solid var(--color-surface-offset)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--color-text-muted)',
+                          fontFamily: 'var(--font-mono)', fontSize: '10px'
+                        }}>
+                          {keys}
+                        </kbd>
+                      </div>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
