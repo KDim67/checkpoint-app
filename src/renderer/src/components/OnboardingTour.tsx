@@ -13,7 +13,6 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Command, Zap, ClipboardList, Check, ArrowRight, ArrowLeft } from 'lucide-react'
-import useEscapeKey from './ui/useEscapeKey'
 import useFocusTrap from './ui/useFocusTrap'
 import { PROJECT_TEMPLATES, DEFAULT_TEMPLATE_ID, describeTemplate } from '../../../shared/projectTemplates'
 
@@ -74,7 +73,11 @@ interface Rect { top: number; left: number; width: number; height: number }
 
 interface Props {
   onCreateWorkspace: (name: string, templateId: string) => Promise<void>
-  onClose: () => void
+  /**
+   * `remember` says whether this was an answer. Done and Skip are; Escape is
+   * not, and asking again next launch is the cheaper of the two mistakes.
+   */
+  onClose: (remember: boolean) => void
 }
 
 export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
@@ -85,6 +88,15 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   const [creating, setCreating] = useState(false)
   const [palettePressed, setPalettePressed] = useState(false)
   const [error, setError] = useState('')
+  /**
+   * The workspace this tour made, once it has made one.
+   *
+   * Without it the step had no memory of having worked: stepping Back landed
+   * on the same form, still holding the name that had just been used, with an
+   * enabled button that could only fail. The way out was to invent a second
+   * name and end up with a workspace nobody wanted.
+   */
+  const [created, setCreated] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
 
@@ -98,7 +110,29 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   const cardRef = useFocusTrap(true, primaryRef)
 
   const step = STEPS[index]
-  useEscapeKey(onClose, true)
+
+  /**
+   * Escape leaves the tour, but not out of a field someone is typing in.
+   *
+   * It used to be a plain window listener, so Escape pressed while naming a
+   * workspace, which is the ordinary way to clear a text field, tore down the
+   * whole tour. Here it empties the field instead, and only a second press,
+   * with the field already empty, leaves.
+   */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      if (e.target === nameRef.current && name !== '') {
+        e.stopPropagation()
+        setName('')
+        setError('')
+        return
+      }
+      onClose(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [name, onClose])
 
   /**
    * Measured in a layout effect so the spotlight is never painted at a stale
@@ -171,6 +205,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
     setError('')
     try {
       await onCreateWorkspace(trimmed, templateId)
+      setCreated(trimmed)
       next()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create the workspace. Try again.')
@@ -200,6 +235,12 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   })()
 
   const isLast = index === STEPS.length - 1
+  /** The workspace step reads as a confirmation once it has been through. */
+  const settled = step.id === 'workspace' && created !== null
+  const heading = settled ? 'Workspace created' : step.title
+  const blurb = settled
+    ? 'That is this step done. Nothing here needs doing twice.'
+    : step.body
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9997 }}>
@@ -256,7 +297,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
         ref={cardRef}
         role="dialog"
         aria-modal="true"
-        aria-label={step.title}
+        aria-label={heading}
         tabIndex={-1}
         style={{
           width: '100%',
@@ -299,10 +340,10 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             color: 'var(--color-text-base)',
             marginBottom: 'var(--space-2)'
           }}>
-            {step.title}
+            {heading}
           </h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-            {step.body}
+            {blurb}
           </p>
         </div>
 
@@ -353,8 +394,33 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           </div>
         )}
 
+        {/* Already done, so the form is a confirmation rather than an offer.
+            Coming back to a live form here could only end in the name being
+            refused or a second workspace nobody asked for. */}
+        {step.id === 'workspace' && created && (
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+              padding: 'var(--space-4)',
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-secondary)',
+              borderRadius: 'var(--radius-md)'
+            }}
+          >
+            <Check size={20} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+                {created} is ready
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+                You are in it now. More workspaces come from the badge at the top of the sidebar.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Workspace form */}
-        {step.id === 'workspace' && (
+        {step.id === 'workspace' && !created && (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
               <label
@@ -470,7 +536,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
           <button
             className="btn-ghost"
-            onClick={index === 0 ? onClose : back}
+            onClick={index === 0 ? () => onClose(true) : back}
             disabled={creating}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', opacity: creating ? 0.5 : 1 }}
           >
@@ -481,7 +547,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             {/* On the form, the secondary action moves past it rather than
                 ending the tour, not wanting a workspace right now is not the
                 same as not wanting the rest. */}
-            {step.id === 'workspace' ? (
+            {settled ? null : step.id === 'workspace' ? (
               <button
                 className="btn-ghost"
                 onClick={next}
@@ -493,7 +559,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             ) : step.id === 'palette' ? null : index > 0 && !isLast ? (
               <button
                 className="btn-ghost"
-                onClick={onClose}
+                onClick={() => onClose(true)}
                 style={{ fontSize: 'var(--text-xs)' }}
               >
                 Skip tour
@@ -511,6 +577,15 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)' }}
               >
                 Skip this <ArrowRight size={13} />
+              </button>
+            ) : settled ? (
+              <button
+                ref={primaryRef}
+                className="btn-primary"
+                onClick={next}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)' }}
+              >
+                Next <ArrowRight size={13} />
               </button>
             ) : step.id === 'workspace' ? (
               <button
@@ -533,7 +608,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               <button
                 ref={primaryRef}
                 className="btn-primary"
-                onClick={onClose}
+                onClick={() => onClose(true)}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)' }}
               >
                 <Check size={13} /> Done

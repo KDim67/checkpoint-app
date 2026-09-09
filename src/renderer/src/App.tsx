@@ -535,9 +535,19 @@ export default function App() {
     return () => { cancelled = true; window.removeEventListener('replay-onboarding', replay) }
   }, [])
 
-  const dismissOnboarding = useCallback(() => {
+  /**
+   * Closes the tour, and decides whether that counts as having seen it.
+   *
+   * Done and Skip are answers, and are remembered. Escape is not: it used to be
+   * recorded the same way, so one stray press on the first screen retired the
+   * tour for good, and the only way back was a button in Settings that a
+   * first-run user has no reason to know exists. It now closes for this session
+   * and offers itself again next launch, which is the cheaper mistake of the
+   * two: seeing the tour twice costs a click, never seeing it costs the app.
+   */
+  const closeOnboarding = useCallback((remember: boolean) => {
     setShowOnboarding(false)
-    setBoolSetting(ONBOARDING_SEEN_KEY, true).catch(() => {})
+    if (remember) setBoolSetting(ONBOARDING_SEEN_KEY, true).catch(() => {})
   }, [])
 
   /**
@@ -576,12 +586,17 @@ export default function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
+        // Not while the tour is up. The tour has its own step for this combo
+        // and swallows it there, but everywhere else this binding still fired
+        // and opened the palette on top of the tour, which sits lower. One
+        // Escape then closed both, on the first screen, for good.
+        if (showOnboarding) return
         setPaletteOpen(open => !open)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [showOnboarding])
 
   // Opens the lightbox when an image is clicked directly. Runs in the capture
   // phase and swallows the event, so it has to bow out whenever the image is
@@ -844,7 +859,7 @@ export default function App() {
           {showOnboarding && (
             <OnboardingTour
               onCreateWorkspace={createOnboardingWorkspace}
-              onClose={dismissOnboarding}
+              onClose={closeOnboarding}
             />
           )}
         </Suspense>
