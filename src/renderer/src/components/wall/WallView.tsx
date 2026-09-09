@@ -164,8 +164,15 @@ export default function WallView() {
   const [menu, setMenu] = useState<Menu | null>(null)
   const [snapping, setSnapping] = useState(false)
   /**
-   * What a left-drag on empty canvas does. Select is the resting state: the pen
-   * and the arrow are modes you enter deliberately and leave with Escape.
+   * What a left-drag on empty canvas does. Select is the resting state, and the
+   * two others differ in how they leave it.
+   *
+   * The arrow is one-shot: drawing one hands the pointer straight back. A
+   * connector is a single deliberate act, and staying armed afterwards meant
+   * the next click on a card started another arrow instead of selecting it,
+   * with nothing on screen saying so. The pen stays armed, because a sketch is
+   * several strokes and re-arming between each of them is the annoying half of
+   * the same trade. Escape still leaves either one.
    */
   const [tool, setTool] = useState<'select' | 'pen' | 'arrow'>('select')
   const [penColor, setPenColor] = useState(WALL_COLORS[0])
@@ -1194,8 +1201,10 @@ export default function WallView() {
       }
 
       if (drag.moved) {
+        let drawn = false
         if (drag.overId) {
           addItem('arrow', { from: drag.fromId, to: drag.overId, ...style })
+          drawn = true
         } else if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > LOOSE_END_SLOP) {
           // Dropped on empty canvas, so the far end stays where it was let go.
           // An arrow pointing at a spot rather than at a thing is a normal
@@ -1205,8 +1214,12 @@ export default function WallView() {
             toPoint: toWallPoint(screenPoint(e), docRef.current.camera),
             ...style
           })
+          drawn = true
         }
         setArrowFrom(null)
+        // A finished arrow hands the pointer back. A slip that drew nothing
+        // does not: the tool is still armed because it was never used.
+        if (drawn) setTool('select')
         return
       }
 
@@ -1219,6 +1232,7 @@ export default function WallView() {
       if (arrowFrom && arrowFrom !== drag.fromId) {
         addItem('arrow', { from: arrowFrom, to: drag.fromId, ...style })
         setArrowFrom(null)
+        setTool('select')
       } else {
         // Clicking the same item again puts it down rather than looping it.
         setArrowFrom(arrowFrom === drag.fromId ? null : drag.fromId)
