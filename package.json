@@ -1,7 +1,7 @@
 {
   "name": "checkpoint-app",
   "version": "1.0.1",
-  "description": "Checkpoint Developer Scratchpad",
+  "description": "A local-first desktop workspace for keeping track of what you're doing.",
   "license": "MIT",
   "author": "Dimitrios Koutsompinas",
   "repository": {

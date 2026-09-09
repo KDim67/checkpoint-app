@@ -154,5 +154,5 @@ linux:
         - x64
   icon: resources/icon.png
   category: Development
-  synopsis: "Checkpoint Developer Scratchpad"
-  description: "A local-first developer dashboard for notes, projects, and game assets."
+  synopsis: "Local-first desktop workspace for keeping track of what you're doing"
+  description: "A local-first desktop workspace for keeping track of what you're doing."

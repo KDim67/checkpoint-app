@@ -108,7 +108,7 @@ export default function AboutPanel() {
             Checkpoint
           </div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
-            Developer productivity workspace
+            A local-first desktop workspace for keeping track of what you’re doing
           </div>
         </div>
       </div>
