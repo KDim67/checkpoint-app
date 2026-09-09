@@ -146,6 +146,7 @@ const WALL_SHORTCUTS: { group: string; rows: [string, string][] }[] = [
       // One row, because two rows both reading "Pan the wall" look like a
       // mistake rather than a choice.
       ['Middle or right-drag', 'Pan the wall'],
+      ['Space + drag', 'Pan without putting the tool down'],
       ['Right-click', 'Menu for what is under the pointer'],
       ['Wheel', 'Zoom where the pointer is'],
       ['Double-click', 'New sticky note, or open what was clicked'],
@@ -266,6 +267,15 @@ export default function WallView() {
   const [dropColumnId, setDropColumnId] = useState<string | null>(null)
   const [bgOpen, setBgOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  /**
+   * Space is down, so the left button pans.
+   *
+   * This is the one pan that does not cost you the tool in your hand: the pen
+   * stays armed while you move the view and carry on drawing. It is also the
+   * first thing anyone who has used a canvas tool tries, which is why it is
+   * worth having on top of the two mouse buttons.
+   */
+  const [spaceHeld, setSpaceHeld] = useState(false)
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<Drag>(null)
@@ -817,6 +827,15 @@ export default function WallView() {
       return
     }
 
+    // Space held turns the left button into a pan as well, checked before
+    // anything that would otherwise claim the press: the point of it is to
+    // move the view without putting the tool down.
+    if (spaceHeld && e.button === 0) {
+      const cam = panCameraRef.current ?? docRef.current.camera
+      dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
+      return
+    }
+
     // A connection handle, which sits on an item and so has to be checked
     // before the item does. Same drag as the arrow tool runs, so everything
     // downstream, the preview, the snapping, the styles, is already there.
@@ -1321,6 +1340,33 @@ export default function WallView() {
   }
 
   // Keyboard
+  useEffect(() => {
+    const down = (e: KeyboardEvent): void => {
+      if (e.code !== 'Space' || e.repeat) return
+      // Space belongs to whatever has focus: it types, and it presses a button
+      // that has been tabbed to. Only a press with nothing focused is a pan.
+      const el = document.activeElement
+      if (el instanceof HTMLElement && el !== document.body &&
+        el.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]')) return
+      // Otherwise the page scrolls under the wall.
+      e.preventDefault()
+      setSpaceHeld(true)
+    }
+    const up = (e: KeyboardEvent): void => { if (e.code === 'Space') setSpaceHeld(false) }
+    // A key held while the window loses focus is never seen to come up, and the
+    // wall would be stuck panning when you came back to it.
+    const clear = (): void => setSpaceHeld(false)
+
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('blur', clear)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', clear)
+    }
+  }, [])
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const el = document.activeElement
@@ -1898,7 +1944,7 @@ export default function WallView() {
               ? 'Drag to draw · Esc to stop'
               : tool === 'arrow'
                 ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another, or to anywhere')
-                : 'Drag to select · Middle-drag to pan'}
+                : 'Drag to select · Space or middle-drag to pan'}
           </span>
 
           <div style={{ position: 'relative' }}>
@@ -2140,7 +2186,7 @@ export default function WallView() {
           }}
           style={{
             flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
-            cursor: tool === 'pen' ? 'crosshair' : tool === 'arrow' ? 'copy' : undefined,
+            cursor: spaceHeld ? 'grab' : tool === 'pen' ? 'crosshair' : tool === 'arrow' ? 'copy' : undefined,
             background: canvasBackground,
             backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
             backgroundSize: `${gridSpacing(camera.zoom)}px ${gridSpacing(camera.zoom)}px`,
