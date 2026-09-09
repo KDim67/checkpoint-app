@@ -14,7 +14,7 @@ import {
   iceServers
 } from './webrtcTransport'
 import { normalizeCollabMessage, type CollabMessage } from '../../../shared/collabProtocol'
-import { readSignalingMessage } from '../../../shared/signalingPayload'
+import { readSignalingMessage, signalingPublishError } from '../../../shared/signalingPayload'
 
 interface CollabOptions {
   pairingCode: string
@@ -130,12 +130,17 @@ export class WebRTCCollaborationCoordinator {
       const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(`https://ntfy.sh/${room}`, {
         method: 'POST',
         headers: { 'Title': 'host-reply' },
         body: encryptedSdp
       })
-      
+      const failure = signalingPublishError(res.status)
+      if (failure) {
+        this.options.onError(new Error(failure))
+        return
+      }
+
       if (this.sse) {
         this.sse.close()
         this.sse = null
@@ -198,11 +203,16 @@ export class WebRTCCollaborationCoordinator {
       const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(`https://ntfy.sh/${room}`, {
         method: 'POST',
         headers: { 'Title': 'client-offer' },
         body: encryptedSdp
       })
+      const failure = signalingPublishError(res.status)
+      if (failure) {
+        this.options.onError(new Error(failure))
+        return
+      }
       this.options.onProgress('Offer sent. Awaiting host pairing...')
     } catch (err) {
       this.options.onError(err)

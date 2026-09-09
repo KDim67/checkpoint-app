@@ -20,6 +20,25 @@ export interface SignalingMessage {
   body: string
 }
 
+/**
+ * Whether a publish to the signalling lobby actually landed, in words the panel
+ * can show. Null means it did.
+ *
+ * Both coordinators used to fire the POST and announce success without looking
+ * at the response, so a rejected publish left the peer waiting on a handshake
+ * that had never been sent, indistinguishable from a peer who had not joined.
+ */
+export function signalingPublishError(status: number): string | null {
+  if (status >= 200 && status < 300) return null
+  if (status === 429) {
+    return 'The signalling server is rate limiting this passcode. Wait a minute, then try again.'
+  }
+  if (status === 413) {
+    return 'The signalling server rejected the connection details as too large.'
+  }
+  return `The signalling server refused the handshake (HTTP ${status}).`
+}
+
 export function readSignalingMessage(raw: string): SignalingMessage | null {
   let parsed: unknown
   try {

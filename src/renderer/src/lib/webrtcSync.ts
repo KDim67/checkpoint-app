@@ -5,7 +5,7 @@
  */
 
 import { deriveKey, deriveTopic, encryptData, decryptData, base64ToBytes, bytesToBase64, SYNC_SALT } from './webrtcCrypto'
-import { readSignalingMessage } from '../../../shared/signalingPayload'
+import { readSignalingMessage, signalingPublishError } from '../../../shared/signalingPayload'
 import {
   sendFramed,
   FrameAssembler,
@@ -142,11 +142,16 @@ export class WebRTCSyncCoordinator {
       const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(`https://ntfy.sh/${room}`, {
         method: 'POST',
         headers: { 'Title': 'host-reply' },
         body: encryptedSdp
       })
+      const failure = signalingPublishError(res.status)
+      if (failure) {
+        this.options.onError(new Error(failure))
+        return
+      }
       this.options.onProgress('Signaling completed. Activating WebRTC data link...')
       
       // Close SSE signaling once handshake completes
@@ -216,11 +221,16 @@ export class WebRTCSyncCoordinator {
       const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(`https://ntfy.sh/${room}`, {
         method: 'POST',
         headers: { 'Title': 'client-offer' },
         body: encryptedSdp
       })
+      const failure = signalingPublishError(res.status)
+      if (failure) {
+        this.options.onError(new Error(failure))
+        return
+      }
       this.options.onProgress('Offer sent. Waiting for peer authorization...')
     } catch (err) {
       this.options.onError(err)
