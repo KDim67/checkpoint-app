@@ -5,6 +5,7 @@
  */
 
 import { deriveKey, deriveTopic, encryptData, decryptData, base64ToBytes, bytesToBase64, SYNC_SALT } from './webrtcCrypto'
+import { readSignalingMessage } from '../../../shared/signalingPayload'
 import {
   sendFramed,
   FrameAssembler,
@@ -87,10 +88,10 @@ export class WebRTCSyncCoordinator {
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
-        const payload = JSON.parse(e.data)
-        // Skip our own replies, ntfy's keepalive/open events, and anything
+        // Skips our own replies, ntfy's keepalive/open events, and anything
         // without a body.
-        if (!payload.text || payload.title === 'host-reply') return
+        const signal = readSignalingMessage(e.data)
+        if (!signal || signal.title === 'host-reply') return
 
         // A second offer arriving while one is already being answered used to
         // overwrite this.pc, orphaning the half-built connection and leaving
@@ -101,7 +102,7 @@ export class WebRTCSyncCoordinator {
 
         let sdp: string
         try {
-          const decryptedOffer = await decryptData(payload.text, this.key)
+          const decryptedOffer = await decryptData(signal.body, this.key)
           sdp = JSON.parse(decryptedOffer).sdp
         } catch {
           // Almost always a mismatched passcode. Previously this was logged to
@@ -173,8 +174,8 @@ export class WebRTCSyncCoordinator {
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
-        const payload = JSON.parse(e.data)
-        if (payload.title !== 'host-reply' || !payload.text) return
+        const signal = readSignalingMessage(e.data)
+        if (!signal || signal.title !== 'host-reply') return
         // Ignore a duplicate answer once negotiation is done; setting a remote
         // description twice throws in the middle of an active connection.
         if (!this.pc || this.pc.signalingState === 'stable') return
@@ -183,7 +184,7 @@ export class WebRTCSyncCoordinator {
 
         let sdp: string
         try {
-          const decryptedAnswer = await decryptData(payload.text, this.key)
+          const decryptedAnswer = await decryptData(signal.body, this.key)
           sdp = JSON.parse(decryptedAnswer).sdp
         } catch {
           this.options.onError(
