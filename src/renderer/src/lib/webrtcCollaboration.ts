@@ -14,6 +14,7 @@ import {
   iceServers
 } from './webrtcTransport'
 import { normalizeCollabMessage, type CollabMessage } from '../../../shared/collabProtocol'
+import { readSignalingMessage } from '../../../shared/signalingPayload'
 
 interface CollabOptions {
   pairingCode: string
@@ -87,8 +88,8 @@ export class WebRTCCollaborationCoordinator {
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
-        const payload = JSON.parse(e.data)
-        if (!payload.text || payload.title === 'host-reply') return
+        const signal = readSignalingMessage(e.data)
+        if (!signal || signal.title === 'host-reply') return
         // A second offer would otherwise overwrite the connection being built.
         if (this.pc) return
 
@@ -96,7 +97,7 @@ export class WebRTCCollaborationCoordinator {
 
         let sdp: string
         try {
-          const decryptedOffer = await decryptData(payload.text, this.key)
+          const decryptedOffer = await decryptData(signal.body, this.key)
           sdp = JSON.parse(decryptedOffer).sdp
         } catch {
           this.options.onError(
@@ -157,15 +158,15 @@ export class WebRTCCollaborationCoordinator {
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
-        const payload = JSON.parse(e.data)
-        if (payload.title !== 'host-reply' || !payload.text) return
+        const signal = readSignalingMessage(e.data)
+        if (!signal || signal.title !== 'host-reply') return
         if (!this.pc || this.pc.signalingState === 'stable') return
 
         this.options.onProgress('Securing collab link...')
 
         let sdp: string
         try {
-          const decryptedAnswer = await decryptData(payload.text, this.key)
+          const decryptedAnswer = await decryptData(signal.body, this.key)
           sdp = JSON.parse(decryptedAnswer).sdp
         } catch {
           this.options.onError(
