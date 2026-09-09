@@ -98,7 +98,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
   {
     group: 'System',
     tabs: [
-      { id: 'hotkeyBinder', label: 'Keyboard Shortcuts', icon: <Keyboard size={14} />, description: 'Rebind the global hotkeys registered by Checkpoint.' },
+      { id: 'hotkeyBinder', label: 'Shortcuts & Mouse', icon: <Keyboard size={14} />, description: 'Rebind the hotkeys, the per-view keys, and what the mouse buttons do.' },
       { id: 'features',     label: 'Features & Plugins', icon: <Zap size={14} />,      description: 'Toggle background subsystems and manage user plugins.' },
       { id: 'notifications', label: 'Notifications',      icon: <Bell size={14} />,     description: 'What Checkpoint tells you about, and when it stays quiet.' },
       { id: 'backup',       label: 'Database Backup',    icon: <Archive size={14} />,  description: 'Automated database snapshots, retention and restore points.' },

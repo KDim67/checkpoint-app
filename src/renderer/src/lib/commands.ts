@@ -55,7 +55,7 @@ const SETTINGS_TABS: { tab: SettingsTab; label: string; keywords?: string[] }[] 
   { tab: 'appearance', label: 'Appearance & Theme', keywords: ['colors', 'theme', 'font', 'presets'] },
   { tab: 'contexts', label: 'Workspaces & Board', keywords: ['contexts', 'columns'] },
   { tab: 'ai', label: 'AI Assistant', keywords: ['model', 'provider', 'api key'] },
-  { tab: 'hotkeyBinder', label: 'Keyboard Shortcuts', keywords: ['keys', 'bindings'] },
+  { tab: 'hotkeyBinder', label: 'Shortcuts & Mouse', keywords: ['keys', 'bindings', 'hotkeys', 'rebind', 'mouse', 'buttons'] },
   { tab: 'features', label: 'Features & Plugins', keywords: ['toggles', 'extensions'] },
   { tab: 'notifications', label: 'Notifications', keywords: ['alerts', 'quiet hours', 'reminders'] },
   { tab: 'backup', label: 'Database Backup', keywords: ['snapshot', 'restore'] },
