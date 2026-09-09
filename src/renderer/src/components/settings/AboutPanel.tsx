@@ -1,8 +1,31 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { copyrightYears, COPYRIGHT_HOLDER } from '../../../../shared/licence'
-import { ExternalLink, FolderOpen, Info, PlayCircle } from 'lucide-react'
+import { errorMessage } from '../../../../shared/errors'
+import type { UpdateCheckResult } from '../../../../shared/types'
+import { FolderOpen, Info, PlayCircle, RefreshCw } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
+
+/** The tone of the status line, so a failure does not read like good news. */
+const UPDATE_TONE: Record<UpdateCheckResult['status'], string> = {
+  unsupported: 'var(--color-text-faint)',
+  current:     'var(--color-text-muted)',
+  available:   'var(--color-success)',
+  error:       'var(--color-error)'
+}
+
+function describeUpdate(result: UpdateCheckResult): string {
+  switch (result.status) {
+    case 'unsupported':
+      return 'Only an installed build updates itself. This one is running from source.'
+    case 'current':
+      return `Checkpoint is up to date at ${result.version}.`
+    case 'available':
+      return `Version ${result.version} is downloading. It installs the next time you close Checkpoint.`
+    case 'error':
+      return result.message
+  }
+}
 
 interface VersionInfo {
   app: string
@@ -34,6 +57,23 @@ export default function AboutPanel() {
       }
     }
     load()
+  }, [])
+
+  const [checking, setChecking] = useState(false)
+  const [update, setUpdate] = useState<UpdateCheckResult | null>(null)
+
+  const checkForUpdates = useCallback(async () => {
+    setChecking(true)
+    setUpdate(null)
+    try {
+      setUpdate(await window.electronAPI.app.checkForUpdates())
+    } catch (err) {
+      // The handler answers with a result rather than throwing, so reaching
+      // here means the channel itself failed.
+      setUpdate({ status: 'error', message: errorMessage(err, 'The check could not run.') })
+    } finally {
+      setChecking(false)
+    }
   }, [])
 
   const versions = [
@@ -149,23 +189,40 @@ export default function AboutPanel() {
       <Divider />
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-        <button
-          className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-          onClick={() => window.electronAPI.app.openExternal('https://github.com/KDim67/checkpoint-app/releases')}
-        >
-          <ExternalLink size={13} />
-          Check for Updates
-        </button>
-        <button
-          className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-          onClick={() => window.electronAPI.app.openExternal('https://github.com/KDim67/checkpoint-app')}
-        >
-          <Info size={13} />
-          GitHub Repository
-        </button>
+      <div>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <button
+            className="btn-secondary"
+            disabled={checking}
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
+            onClick={checkForUpdates}
+          >
+            <RefreshCw size={13} className={checking ? 'animate-spin' : undefined} />
+            {checking ? 'Checking…' : 'Check for Updates'}
+          </button>
+          <button
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
+            onClick={() => window.electronAPI.app.openExternal('https://github.com/KDim67/checkpoint-app')}
+          >
+            <Info size={13} />
+            GitHub Repository
+          </button>
+        </div>
+
+        {update && (
+          <div
+            role="status"
+            style={{
+              marginTop: 'var(--space-3)',
+              fontSize: 'var(--text-xs)',
+              lineHeight: 1.5,
+              color: UPDATE_TONE[update.status]
+            }}
+          >
+            {describeUpdate(update)}
+          </div>
+        )}
       </div>
 
       {/* License notice */}

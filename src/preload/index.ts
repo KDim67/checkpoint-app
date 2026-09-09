@@ -13,6 +13,7 @@ import type { VaultImportResult } from '../shared/obsidianImport'
 import type {
   Item,
   Tag,
+  UpdateCheckResult,
   CreateItemPayload,
   CreateTagPayload,
   PaginatedResult,
@@ -85,6 +86,9 @@ const api = {
       ipcRenderer.invoke(IpcChannels.APP_SAVE_BINARY_FILE, defaultName, data, extension),
     showItemInFolder: (filePath: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, filePath),
+    /** Resolves with what the check found. Failures come back as a result, not a throw. */
+    checkForUpdates: (): Promise<UpdateCheckResult> =>
+      ipcRenderer.invoke(IpcChannels.APP_CHECK_FOR_UPDATES),
     // Electron ≥32 removed File.path from renderer File objects. This is the
     // only sanctioned way to resolve the absolute path of a dropped file.
     getPathForFile: (file: File): string => {

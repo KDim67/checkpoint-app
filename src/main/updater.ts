@@ -1,10 +1,14 @@
 /**
  * Checking GitHub Releases for a newer build.
  *
- * Deliberately quiet. Checkpoint sits open all day beside Unity and JetBrains,
- * so an updater that steals focus or interrupts is worse than one that never
- * runs. Nothing is shown while it works: the download happens in the
- * background and the new version is swapped in the next time the app quits.
+ * The automatic pass is deliberately quiet. Checkpoint sits open all day beside
+ * Unity and JetBrains, so an updater that steals focus or interrupts is worse
+ * than one that never runs. Nothing is shown while it works: the download
+ * happens in the background and the new version is swapped in the next time the
+ * app quits.
+ *
+ * The manual check in Settings is the opposite, and has to be. Someone who
+ * presses a button expects an answer, so that path reports what it found.
  *
  * This needs no token because the repository is public. Against a private one,
  * electron-updater would want a `GH_TOKEN` compiled into the shipped app,
@@ -12,10 +16,35 @@
  */
 
 import { app } from 'electron'
+import { errorMessage } from '../shared/errors'
+import type { UpdateCheckResult } from '../shared/types'
+
+type Updater = typeof import('electron-updater').autoUpdater
 
 /** Only the packaged app updates. A dev run would hit GitHub on every launch. */
 export function shouldCheckForUpdates(): boolean {
   return app.isPackaged
+}
+
+/**
+ * electron-updater is CommonJS. Bundled into an ESM main process its exports
+ * arrive under .default, so destructuring the namespace directly yields
+ * undefined and every line below it throws. Both shapes are read, because which
+ * one turns up depends on the bundler's interop.
+ */
+async function loadAutoUpdater(): Promise<Updater | null> {
+  const mod = await import('electron-updater')
+  const interop = mod as unknown as { autoUpdater?: Updater; default?: { autoUpdater?: Updater } }
+  return interop.autoUpdater ?? interop.default?.autoUpdater ?? null
+}
+
+function configure(autoUpdater: Updater): void {
+  autoUpdater.autoDownload = true
+  // Applied on quit rather than by restarting underneath someone.
+  autoUpdater.autoInstallOnAppQuit = true
+  // The default logger writes to electron-log, which is not a dependency here;
+  // console keeps the messages somewhere without adding one.
+  autoUpdater.logger = console
 }
 
 let started = false
@@ -28,24 +57,12 @@ export async function initializeUpdater(): Promise<void> {
   started = true
 
   try {
-    // electron-updater is CommonJS. Bundled into an ESM main process its
-    // exports arrive under .default, so destructuring the namespace directly
-    // yields undefined and every line below it throws. Both shapes are read,
-    // because which one turns up depends on the bundler's interop.
-    const mod = await import('electron-updater')
-    const interop = mod as unknown as { autoUpdater?: typeof mod.autoUpdater; default?: { autoUpdater?: typeof mod.autoUpdater } }
-    const autoUpdater = interop.autoUpdater ?? interop.default?.autoUpdater
+    const autoUpdater = await loadAutoUpdater()
     if (!autoUpdater) {
       console.error('[updater] electron-updater did not export autoUpdater')
       return
     }
-
-    autoUpdater.autoDownload = true
-    // Applied on quit rather than by restarting underneath someone.
-    autoUpdater.autoInstallOnAppQuit = true
-    // The default logger writes to electron-log, which is not a dependency
-    // here; console keeps the messages somewhere without adding one.
-    autoUpdater.logger = console
+    configure(autoUpdater)
 
     autoUpdater.on('error', err => {
       // An update that cannot be reached is not a problem the user has. No
@@ -60,4 +77,66 @@ export async function initializeUpdater(): Promise<void> {
   } catch (err) {
     console.error('[updater] could not start:', err)
   }
+}
+
+/** A check that cannot finish is reported rather than left spinning. */
+const MANUAL_CHECK_TIMEOUT_MS = 20_000
+
+/**
+ * The Settings button. Resolves with what the check found instead of staying
+ * silent, and never rejects: every failure is a result the panel can render.
+ *
+ * Answered from the events rather than by comparing version strings here,
+ * because electron-updater already knows what counts as newer and a second
+ * opinion in this file would only be a way for the two to disagree.
+ */
+export async function checkForUpdatesNow(): Promise<UpdateCheckResult> {
+  if (!shouldCheckForUpdates()) return { status: 'unsupported' }
+
+  let autoUpdater: Updater | null
+  try {
+    autoUpdater = await loadAutoUpdater()
+  } catch (err) {
+    return { status: 'error', message: errorMessage(err, 'Could not load the updater.') }
+  }
+  if (!autoUpdater) {
+    return { status: 'error', message: 'Could not load the updater.' }
+  }
+  const updater = autoUpdater
+  configure(updater)
+
+  return new Promise<UpdateCheckResult>(resolve => {
+    let settled = false
+
+    const onAvailable = (info: { version: string }): void =>
+      finish({ status: 'available', version: info.version })
+    const onNotAvailable = (info: { version: string }): void =>
+      finish({ status: 'current', version: info.version })
+    const onError = (err: unknown): void =>
+      finish({ status: 'error', message: errorMessage(err, 'Could not reach GitHub.') })
+
+    const timer = setTimeout(
+      () => finish({ status: 'error', message: 'The check timed out.' }),
+      MANUAL_CHECK_TIMEOUT_MS
+    )
+
+    function finish(result: UpdateCheckResult): void {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      // Removed by hand: these are `once` listeners, but only one of the three
+      // fires, and the other two would sit on the emitter until the next check
+      // resolved them against a promise nobody is holding any more.
+      updater.removeListener('update-available', onAvailable)
+      updater.removeListener('update-not-available', onNotAvailable)
+      updater.removeListener('error', onError)
+      resolve(result)
+    }
+
+    updater.once('update-available', onAvailable)
+    updater.once('update-not-available', onNotAvailable)
+    updater.once('error', onError)
+
+    updater.checkForUpdates().catch(onError)
+  })
 }

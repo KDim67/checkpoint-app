@@ -160,6 +160,7 @@ export const enum IpcChannels {
   APP_SAVE_FILE          = 'app:saveFile',
   APP_SAVE_BINARY_FILE    = 'app:saveBinaryFile',
   APP_SHOW_ITEM_IN_FOLDER = 'app:showItemInFolder',
+  APP_CHECK_FOR_UPDATES   = 'app:checkForUpdates',
 
   // Phase 22 Customizer & Extensions
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
