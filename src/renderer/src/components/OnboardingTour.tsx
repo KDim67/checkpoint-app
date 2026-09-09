@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Command, Zap, ClipboardList, Check, ArrowRight, ArrowLeft } from 'lucide-react'
+import { Command, Compass, Zap, ClipboardList, Check, ArrowRight, ArrowLeft } from 'lucide-react'
 import useFocusTrap from './ui/useFocusTrap'
 import { PROJECT_TEMPLATES, DEFAULT_TEMPLATE_ID, describeTemplate } from '../../../shared/projectTemplates'
 
@@ -32,6 +32,12 @@ interface Step {
 
 const STEPS: Step[] = [
   {
+    // A question, not an opening slide.
+    //
+    // The tour used to start on its own, with a small grey Skip beside a large
+    // Get started. That is a choice on paper and an announcement in practice:
+    // the first person to use Checkpoint went through the whole thing without
+    // registering that he had been asked. Both answers now look like answers.
     id: 'welcome',
     title: 'Welcome to Checkpoint',
     body: 'A board, a backlog, notes, a focus timer, clipboard history and an AI assistant. In one place, organised by workspace. Everything stays on this machine: no account, no cloud, no sign-in.'
@@ -316,7 +322,10 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           animation: 'modal-pop-in var(--duration-enter) var(--ease-enter)'
         }}
       >
-        {/* Progress */}
+        {/* Progress, once there is progress to show. The first card is the
+            question of whether to start at all, and a progress bar on it says
+            the answer has already been assumed. */}
+        {index > 0 && (
         <div role="group" aria-label={`Step ${index + 1} of ${STEPS.length}`} style={{ display: 'flex', gap: '4px' }}>
           {STEPS.map((s, i) => (
             <span
@@ -332,6 +341,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             />
           ))}
         </div>
+        )}
 
         <div>
           <h2 style={{
@@ -346,6 +356,27 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             {blurb}
           </p>
         </div>
+
+        {/* The question. Asked out loud rather than implied by the buttons. */}
+        {index === 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+            padding: 'var(--space-3) var(--space-4)',
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-md)'
+          }}>
+            <Compass size={18} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+                Would you like a quick tour?
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+                About a minute. You can leave it at any point, and replay it later from Settings.
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Press the combo */}
         {step.id === 'palette' && (
@@ -534,20 +565,33 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
 
         {/* Controls */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-          <button
-            className="btn-ghost"
-            onClick={index === 0 ? () => onClose(true) : back}
-            disabled={creating}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', opacity: creating ? 0.5 : 1 }}
-          >
-            {index === 0 ? 'Skip' : <><ArrowLeft size={13} /> Back</>}
-          </button>
+          {/* Nothing on the left of the question: both of its answers belong
+              together on the right, at the same weight, or the quiet one reads
+              as a corner to ignore rather than a choice. */}
+          {index === 0 ? <span /> : (
+            <button
+              className="btn-ghost"
+              onClick={back}
+              disabled={creating}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', opacity: creating ? 0.5 : 1 }}
+            >
+              <ArrowLeft size={13} /> Back
+            </button>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             {/* On the form, the secondary action moves past it rather than
                 ending the tour, not wanting a workspace right now is not the
                 same as not wanting the rest. */}
-            {settled ? null : step.id === 'workspace' ? (
+            {index === 0 ? (
+              <button
+                className="btn-secondary"
+                onClick={() => onClose(true)}
+                style={{ fontSize: 'var(--text-xs)' }}
+              >
+                No thanks
+              </button>
+            ) : settled ? null : step.id === 'workspace' ? (
               <button
                 className="btn-ghost"
                 onClick={next}
@@ -620,7 +664,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                 onClick={next}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)' }}
               >
-                {index === 0 ? 'Get started' : 'Next'} <ArrowRight size={13} />
+                {index === 0 ? 'Show me around' : 'Next'} <ArrowRight size={13} />
               </button>
             )}
           </div>
