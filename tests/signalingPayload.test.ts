@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readSignalingMessage } from '../src/shared/signalingPayload'
+import { readSignalingMessage, signalingPublishError } from '../src/shared/signalingPayload'
 
 // These are real frames captured off https://ntfy.sh/<topic>/sse. The body of a
 // published message arrives under `message`; there is no `text` field, which is
@@ -46,5 +46,26 @@ describe('readSignalingMessage', () => {
     const untitled =
       '{"id":"m3","event":"message","topic":"t","message":"BLOB"}'
     expect(readSignalingMessage(untitled)).toEqual({ title: '', body: 'BLOB' })
+  })
+})
+
+// A publish that never landed used to look exactly like a peer who had not
+// joined yet: the panel said the offer was sent and then waited forever.
+describe('signalingPublishError', () => {
+  it('is null for anything the server accepted', () => {
+    for (const ok of [200, 201, 204]) expect(signalingPublishError(ok)).toBeNull()
+  })
+
+  it('names rate limiting, which is what a shared free server does first', () => {
+    expect(signalingPublishError(429)).toMatch(/rate limiting/i)
+  })
+
+  it('names an oversized payload', () => {
+    expect(signalingPublishError(413)).toMatch(/too large/i)
+  })
+
+  it('still reports a status it has no specific wording for', () => {
+    expect(signalingPublishError(500)).toBe('The signalling server refused the handshake (HTTP 500).')
+    expect(signalingPublishError(404)).toContain('404')
   })
 })
