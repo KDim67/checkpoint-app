@@ -424,6 +424,17 @@ export type ShortcutMap = Record<string, string>;
  * itself against. The version on `current` is the one already installed; on
  * `available` it is the newer one now downloading.
  */
+/**
+ * How a background download is getting on.
+ *
+ * Pushed to the renderer but shown nowhere except the About panel: the
+ * automatic pass stays quiet on purpose, and this only answers the question
+ * for somebody who has gone looking for the answer.
+ */
+export type UpdateProgress =
+  | { phase: 'downloading'; version: string; percent: number }
+  | { phase: 'ready'; version: string }
+
 export type UpdateCheckResult =
   | { status: 'unsupported' }
   | { status: 'current'; version: string }

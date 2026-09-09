@@ -15,9 +15,10 @@
  * which would hand every installer read access to the source.
  */
 
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { errorMessage } from '../shared/errors'
-import type { UpdateCheckResult } from '../shared/types'
+import { IpcChannels } from '../shared/ipcChannels'
+import type { UpdateCheckResult, UpdateProgress } from '../shared/types'
 
 type Updater = typeof import('electron-updater').autoUpdater
 
@@ -47,6 +48,33 @@ function configure(autoUpdater: Updater): void {
   autoUpdater.logger = console
 }
 
+/**
+ * The last thing the background download said about itself.
+ *
+ * Kept because the panel that shows it is usually not open when it happens. A
+ * download that finished an hour ago has no more events to send, and without
+ * this the panel would have nothing to say about a version already sitting on
+ * disk waiting for a restart.
+ */
+let progress: UpdateProgress | null = null
+
+export function currentUpdateProgress(): UpdateProgress | null {
+  return progress
+}
+
+/**
+ * Tells every window, which in practice is the About panel and nothing else.
+ * Still no dialog, no toast and no focus stolen: the quiet stance is about not
+ * interrupting, not about withholding, and someone looking at the panel has
+ * asked.
+ */
+function announce(next: UpdateProgress): void {
+  progress = next
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(IpcChannels.APP_UPDATE_PROGRESS, next)
+  }
+}
+
 let started = false
 
 export async function initializeUpdater(): Promise<void> {
@@ -69,8 +97,16 @@ export async function initializeUpdater(): Promise<void> {
       // network, GitHub down, a rate limit: all of them mean "try tomorrow".
       console.error('[updater] check failed:', err)
     })
+    // The download carries no version of its own, so it is remembered from the
+    // event that announced there was one to fetch.
+    let downloading = ''
+    autoUpdater.on('update-available', info => { downloading = info.version })
+    autoUpdater.on('download-progress', p => {
+      announce({ phase: 'downloading', version: downloading, percent: Math.round(p.percent) })
+    })
     autoUpdater.on('update-downloaded', info => {
       console.log(`[updater] ${info.version} is ready and will install on quit`)
+      announce({ phase: 'ready', version: info.version })
     })
 
     await autoUpdater.checkForUpdates()

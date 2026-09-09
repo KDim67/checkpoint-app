@@ -487,6 +487,14 @@ function registerIpcHandlers(): void {
     return checkForUpdatesNow()
   })
 
+  // What the background download is doing right now. Asked once when the panel
+  // opens, because a download that finished before then has no events left to
+  // send and the panel would otherwise show nothing at all.
+  ipcMain.handle(IpcChannels.APP_UPDATE_STATE, async () => {
+    const { currentUpdateProgress } = await import('./updater')
+    return currentUpdateProgress()
+  })
+
   // AI Streaming Handlers
   // Each consumer passes a streamId ('assistant', 'standup', …) so multiple
   // features can stream concurrently without cross-talk. Events carry the id

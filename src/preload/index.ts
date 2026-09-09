@@ -14,6 +14,7 @@ import type {
   Item,
   Tag,
   UpdateCheckResult,
+  UpdateProgress,
   CreateItemPayload,
   CreateTagPayload,
   PaginatedResult,
@@ -89,6 +90,14 @@ const api = {
     /** Resolves with what the check found. Failures come back as a result, not a throw. */
     checkForUpdates: (): Promise<UpdateCheckResult> =>
       ipcRenderer.invoke(IpcChannels.APP_CHECK_FOR_UPDATES),
+    /** Where the background download had got to, or null if none is in flight. */
+    updateState: (): Promise<UpdateProgress | null> =>
+      ipcRenderer.invoke(IpcChannels.APP_UPDATE_STATE),
+    onUpdateProgress: (callback: (progress: UpdateProgress) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, progress: UpdateProgress) => callback(progress)
+      ipcRenderer.on(IpcChannels.APP_UPDATE_PROGRESS, handler)
+      return () => ipcRenderer.removeListener(IpcChannels.APP_UPDATE_PROGRESS, handler)
+    },
     // Electron ≥32 removed File.path from renderer File objects. This is the
     // only sanctioned way to resolve the absolute path of a dropped file.
     getPathForFile: (file: File): string => {
