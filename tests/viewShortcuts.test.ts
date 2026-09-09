@@ -80,6 +80,29 @@ describe('the view shortcut list', () => {
     }
   })
 
+  it('claims none of the keys the views handle unconditionally', () => {
+    // Delete, Backspace, Escape and Enter are dealt with directly, whatever
+    // the bindings say: Escape closes, Enter activates what has focus, and
+    // Delete removes a selection on the wall. Binding a command to one of them
+    // would fire twice, once through the binding and once through the handler
+    // that never consults it.
+    const handledDirectly = ['Delete', 'Backspace', 'Escape', 'Enter', 'Tab']
+    for (const shortcut of VIEW_SHORTCUTS) {
+      expect(handledDirectly, `${shortcut.label} takes a key the view handles on its own`)
+        .not.toContain(shortcut.defaultCombo)
+    }
+  })
+
+  it('does not put duplicate and delete on the same keys', () => {
+    // They act on the same selection and one of them is destructive.
+    const wall = Object.fromEntries(
+      VIEW_SHORTCUTS.filter(s => s.scope === 'wall').map(s => [s.id, s.defaultCombo])
+    )
+    expect(wall.wall_delete).toBeTruthy()
+    expect(wall.wall_duplicate).toBeTruthy()
+    expect(wall.wall_delete).not.toBe(wall.wall_duplicate)
+  })
+
   it('hands back a binding for every id', () => {
     const bindings = defaultViewBindings()
     for (const shortcut of VIEW_SHORTCUTS) {

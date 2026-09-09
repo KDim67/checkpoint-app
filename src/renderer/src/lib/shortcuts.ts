@@ -88,7 +88,15 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   { id: 'wall_tool_select',      label: 'Select',                  scope: 'wall',   defaultCombo: 'V' },
   { id: 'wall_tool_draw',        label: 'Draw',                    scope: 'wall',   defaultCombo: 'P' },
   { id: 'wall_tool_connect',     label: 'Connect two items',       scope: 'wall',   defaultCombo: 'A' },
-  { id: 'wall_duplicate',        label: 'Duplicate the selection', scope: 'wall',   defaultCombo: 'Ctrl+D' },
+  // Delete takes Ctrl+D, so duplicate moves one modifier along. The two sit
+  // next to each other on purpose: they are the same gesture on the same
+  // selection, and a slip in either direction is one Ctrl+Z away, with an Undo
+  // offered in the toast as well.
+  { id: 'wall_duplicate',        label: 'Duplicate the selection', scope: 'wall',   defaultCombo: 'Ctrl+Shift+D' },
+  // The Delete and Backspace keys still remove a selection whatever this says.
+  // Those are what the rest of the desktop uses and are not worth taking away;
+  // this is the binding for anyone who would rather not reach for them.
+  { id: 'wall_delete',           label: 'Delete the selection',    scope: 'wall',   defaultCombo: 'Ctrl+D' },
 
   { id: 'kanban_focus_session',  label: 'Start a focus session',   scope: 'kanban', defaultCombo: 'Space' },
   { id: 'kanban_open_details',   label: 'Open the card',           scope: 'kanban', defaultCombo: 'E' },
