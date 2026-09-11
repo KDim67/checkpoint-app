@@ -109,7 +109,7 @@ const formatColumnLabel = (status: string): string => {
 // Main Component
 
 export default function AnalyticsView() {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -151,7 +151,7 @@ export default function AnalyticsView() {
     try {
       setLoading(true)
       // Scope to the active workspace (null = all) so the dashboard matches its header.
-      const res = await window.electronAPI.analytics.getAnalytics(activeContext === 'all' ? null : activeContext)
+      const res = await window.electronAPI.analytics.getAnalytics(activeWorkspace === 'all' ? null : activeWorkspace)
       setData(res)
       setError(null)
     } catch (err) {
@@ -160,7 +160,7 @@ export default function AnalyticsView() {
     } finally {
       setLoading(false)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   const formatMsToHoursAndMins = (ms: number) => {
     const totalMins = Math.floor(ms / (1000 * 60))
@@ -203,7 +203,7 @@ export default function AnalyticsView() {
       }
 
       const res = await window.electronAPI.tracker.getActivityStats(
-        activeContext === 'all' ? null : activeContext,
+        activeWorkspace === 'all' ? null : activeWorkspace,
         start,
         end
       )
@@ -219,11 +219,11 @@ export default function AnalyticsView() {
     } finally {
       setTimelineLoading(false)
     }
-  }, [timelineRange, activeContext])
+  }, [timelineRange, activeWorkspace])
 
   useEffect(() => {
     fetchData()
-  }, [activeContext, fetchData])
+  }, [activeWorkspace, fetchData])
 
   useEffect(() => {
     if (activeTab === 'timeline') {
@@ -737,9 +737,9 @@ export default function AnalyticsView() {
             Analytics
           </h2>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-            {activeContext === 'all'
+            {activeWorkspace === 'all'
               ? <>Insights across <strong style={{ color: 'var(--color-secondary)' }}>all workspaces</strong></>
-              : <>Insights for workspace <strong style={{ color: 'var(--color-secondary)' }}>{activeContext}</strong></>}
+              : <>Insights for workspace <strong style={{ color: 'var(--color-secondary)' }}>{activeWorkspace}</strong></>}
           </p>
         </div>
         <button

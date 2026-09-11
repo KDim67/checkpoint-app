@@ -3,9 +3,10 @@
  *
  * The automatic pass is deliberately quiet. Checkpoint sits open all day beside
  * Unity and JetBrains, so an updater that steals focus or interrupts is worse
- * than one that never runs. Nothing is shown while it works: the download
- * happens in the background and the new version is swapped in the next time the
- * app quits.
+ * than one that never runs. It never opens a dialog: the download happens in
+ * the background and the new version is swapped in the next time the app quits.
+ * A small titlebar indicator says it is happening, which is a thing you can
+ * ignore, unlike a prompt.
  *
  * The manual check in Settings is the opposite, and has to be. Someone who
  * presses a button expects an answer, so that path reports what it found.
@@ -63,10 +64,15 @@ export function currentUpdateProgress(): UpdateProgress | null {
 }
 
 /**
- * Tells every window, which in practice is the About panel and nothing else.
- * Still no dialog, no toast and no focus stolen: the quiet stance is about not
- * interrupting, not about withholding, and someone looking at the panel has
- * asked.
+ * A number that is safe to divide by. The event shape comes from a dependency,
+ * and an undefined byte count would turn the estimate into NaN on screen.
+ */
+const num = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0)
+
+/**
+ * Tells every window: the titlebar indicator and the About panel. Still no
+ * dialog, no toast and no focus stolen. The quiet stance is about not
+ * interrupting, not about withholding.
  */
 function announce(next: UpdateProgress): void {
   progress = next
@@ -102,7 +108,14 @@ export async function initializeUpdater(): Promise<void> {
     let downloading = ''
     autoUpdater.on('update-available', info => { downloading = info.version })
     autoUpdater.on('download-progress', p => {
-      announce({ phase: 'downloading', version: downloading, percent: Math.round(p.percent) })
+      announce({
+        phase: 'downloading',
+        version: downloading,
+        percent: Math.round(num(p.percent)),
+        transferred: num(p.transferred),
+        total: num(p.total),
+        bytesPerSecond: num(p.bytesPerSecond)
+      })
     })
     autoUpdater.on('update-downloaded', info => {
       console.log(`[updater] ${info.version} is ready and will install on quit`)

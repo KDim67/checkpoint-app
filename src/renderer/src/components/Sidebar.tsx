@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { readViewFeatures, defaultViewEnabledMap, type ViewEnabledMap } from '../lib/features'
 import { getBoolSetting } from '../lib/settings'
+import SharedBadge from './ui/SharedBadge'
 import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
 
@@ -184,16 +185,16 @@ interface ContextPopoverProps {
  * would make the listbox semantics a lie.
  */
 function ContextPopover({ onClose }: ContextPopoverProps) {
-  const activeContext = useAppStore(s => s.activeContext)
-  const availableContexts = useAppStore(s => s.availableContexts)
-  const contextsList = useAppStore(s => s.contextsList)
-  const setContext = useAppStore(s => s.setContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
+  const workspaceList = useAppStore(s => s.workspaceList)
+  const setWorkspace = useAppStore(s => s.setWorkspace)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
 
   const listRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(() => {
-    const i = availableContexts.indexOf(activeContext)
+    const i = availableWorkspaces.indexOf(activeWorkspace)
     return i === -1 ? 0 : i
   })
 
@@ -209,13 +210,13 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
   }, [activeIndex])
 
   const commit = (index: number) => {
-    const ctx = availableContexts[index]
-    if (ctx) setContext(ctx)
+    const ctx = availableWorkspaces[index]
+    if (ctx) setWorkspace(ctx)
     onClose()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const last = availableContexts.length - 1
+    const last = availableWorkspaces.length - 1
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
@@ -262,7 +263,7 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
       }}
     >
       <div id="context-popover-label" className="label-caps" style={{ padding: '6px 12px 4px', letterSpacing: '0.05em' }}>
-        Workspaces / Contexts
+        Workspaces
       </div>
       <div
         ref={listRef}
@@ -274,11 +275,11 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
         style={{ maxHeight: '240px', overflowY: 'auto', outline: 'none' }}
         className="custom-scrollbar"
       >
-        {availableContexts.map((ctx, index) => {
-          const entry = contextsList.find(c => c.slug === ctx)
+        {availableWorkspaces.map((ctx, index) => {
+          const entry = workspaceList.find(c => c.slug === ctx)
           const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\w/g, l => l.toUpperCase())
           const color = entry ? entry.color : 'var(--color-balance)'
-          const isCurrent = ctx === activeContext
+          const isCurrent = ctx === activeWorkspace
           const isActive = index === activeIndex
 
           return (
@@ -313,6 +314,7 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {name}
               </span>
+              {entry?.shared && <SharedBadge />}
             </div>
           )
         })}
@@ -336,12 +338,12 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
         onMouseLeave={e => (e.currentTarget.style.background = 'none')}
         onClick={() => {
           setView('settings')
-          setSettingsTab('contexts')
+          setSettingsTab('workspaces')
           onClose()
         }}
       >
         <IconPlus style={{ opacity: 0.7 }} />
-        Manage / New Context
+        Manage / New Workspace
       </button>
     </div>
   )
@@ -351,8 +353,8 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
 
 export function Sidebar() {
   const activeView = useAppStore(s => s.activeView)
-  const activeContext = useAppStore(s => s.activeContext)
-  const contextsList = useAppStore(s => s.contextsList)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const workspaceList = useAppStore(s => s.workspaceList)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const focusIsRunning = useAppStore(s => s.focusIsRunning)
@@ -430,8 +432,8 @@ export function Sidebar() {
     return () => document.removeEventListener('mousedown', handler)
   }, [contextOpen])
 
-  const activeContextEntry = contextsList.find(c => c.slug === activeContext)
-  const ctxLabel = activeContextEntry ? activeContextEntry.name : activeContext.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const activeContextEntry = workspaceList.find(c => c.slug === activeWorkspace)
+  const ctxLabel = activeContextEntry ? activeContextEntry.name : activeWorkspace.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   const ctxInitial = ctxLabel[0]?.toUpperCase() ?? 'D'
 
   function handleNavClick(view: ActiveView) {
@@ -466,8 +468,8 @@ export function Sidebar() {
       <button
         ref={contextTriggerRef}
         id="context-switcher"
-        title={`Active Context: ${ctxLabel}. Click to view all contexts.`}
-        aria-label={`Active context: ${ctxLabel}. Click to view contexts list.`}
+        title={`Active workspace: ${ctxLabel}. Click to view all workspaces.`}
+        aria-label={`Active workspace: ${ctxLabel}. Click to view the workspace list.`}
         aria-expanded={contextOpen}
         aria-haspopup="listbox"
         onClick={() => setContextOpen(v => !v)}
@@ -608,7 +610,7 @@ export function Sidebar() {
           {syncEnabled && (
             <button
               id="nav-sync-indicator"
-              aria-label="P2P Network Sync Status"
+              aria-label="Device Sync Status"
               onClick={() => {
                 setView('settings')
                 setSettingsTab('sync')

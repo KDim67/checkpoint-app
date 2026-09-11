@@ -5,7 +5,7 @@ import KanbanCard from './KanbanCard'
 import ColorPicker from '../ui/ColorPicker'
 import { Trash2, Edit2, Check, Plus, X, GripVertical, MoreHorizontal, ChevronRight } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
-import type { CardDisplay, ColumnSort } from '../../lib/boardConfig'
+import { sameCardDisplay, type CardDisplay, type ColumnSort } from '../../lib/boardConfig'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { useConfirm } from '../ui/ConfirmDialog'
 
@@ -837,6 +837,11 @@ function AddCardFooter({ onAdd, accentColor, colTextColor, isFullCol }: { onAdd:
 function areKanbanColumnPropsEqual(prev: KanbanColumnProps, next: KanbanColumnProps) {
   if (prev.isReadOnly !== next.isReadOnly) return false
   if (prev.id !== next.id || prev.name !== next.name || prev.wipLimit !== next.wipLimit) return false
+  if (prev.color !== next.color || prev.colorMode !== next.colorMode) return false
+  // The second memo, and it dropped the same props the outer one did.
+  if (prev.collapsed !== next.collapsed) return false
+  if (prev.sort !== next.sort || prev.description !== next.description) return false
+  if (!sameCardDisplay(prev.cardDisplay, next.cardDisplay)) return false
   if (prev.cards.length !== next.cards.length) return false
   for (let i = 0; i < prev.cards.length; i++) {
     if (prev.cards[i] !== next.cards[i]) return false

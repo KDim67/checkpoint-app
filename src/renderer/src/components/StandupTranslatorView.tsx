@@ -98,7 +98,7 @@ export default function StandupTranslatorView({
   onClose,
   onReportPosted
 }: StandupTranslatorViewProps) {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const { toast } = useToast()
 
   // State Management
@@ -131,7 +131,7 @@ export default function StandupTranslatorView({
   const fetchLogs = async () => {
     setLoadingLogs(true)
     try {
-      const res = await window.electronAPI.db.getItems(activeContext, 'log', 1, 500)
+      const res = await window.electronAPI.db.getItems(activeWorkspace, 'log', 1, 500)
       
       const now = Date.now()
       const hoursMs = timeRange * 60 * 60 * 1000
@@ -157,7 +157,7 @@ export default function StandupTranslatorView({
       fetchLogs()
       setStreamingText('')
     }
-  }, [isOpen, timeRange, activeContext])
+  }, [isOpen, timeRange, activeWorkspace])
 
   // 2. Load the active AI provider + models whenever the modal opens, so the
   //    standup uses the same endpoint/model as the assistant. For a local
@@ -388,7 +388,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
 
   const handleSaveToFile = async () => {
     if (!streamingText) return
-    const defaultName = `standup_report_${activeContext}_${new Date().toISOString().slice(0, 10)}.md`
+    const defaultName = `standup_report_${activeWorkspace}_${new Date().toISOString().slice(0, 10)}.md`
     try {
       const success = await window.electronAPI.app.saveFile(defaultName, streamingText)
       if (success) {
@@ -407,7 +407,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
       const title = `AI Daily Standup Report (${style})`
       await window.electronAPI.db.createItem({
         type: 'log',
-        context: activeContext,
+        context: activeWorkspace,
         title,
         body: streamingText,
         status: 'open',
@@ -502,7 +502,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               AI Standup Translator
             </h2>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-              Translate raw notes into structured agile logs for context <strong>#{activeContext}</strong>
+              Translate raw notes into structured agile logs for context <strong>#{activeWorkspace}</strong>
             </span>
           </div>
 

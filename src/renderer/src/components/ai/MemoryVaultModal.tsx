@@ -16,10 +16,10 @@ import type { MemoryVault } from './useMemoryVault'
 interface Props {
   vault: MemoryVault
   /** Shown in the header, so the user knows whose memories these are. */
-  activeContext: string
+  activeWorkspace: string
 }
 
-export default function MemoryVaultModal({ vault, activeContext }: Props) {
+export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
   const {
     setShowMemoryPanel,
     memories,
@@ -119,7 +119,7 @@ export default function MemoryVaultModal({ vault, activeContext }: Props) {
                   {/* Badges */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
-                      Context: {activeContext}
+                      Context: {activeWorkspace}
                     </span>
                     <span style={{ fontSize: '10px', color: 'var(--color-accent-ai)', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
                       {memories.length} memories

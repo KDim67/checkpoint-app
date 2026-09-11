@@ -61,9 +61,9 @@ const ASSISTANT_STREAM_ID = 'assistant'
 export default function AiStreamPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
   const selectItem = useAppStore(s => s.selectItem)
-  const activeContext = useAppStore(s => s.activeContext)
-  const availableContexts = useAppStore(s => s.availableContexts)
-  const setContext = useAppStore(s => s.setContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
+  const setWorkspace = useAppStore(s => s.setWorkspace)
   const { toast } = useToast()
 
   // Chat message history
@@ -231,7 +231,7 @@ export default function AiStreamPanel() {
   const consolidationTurnRef = useRef(0) // Only consolidate every N turns to save API calls
   const auditTurnRef = useRef(0)
 
-  const vault = useMemoryVault({ activeContext, selectedModel, toast })
+  const vault = useMemoryVault({ activeWorkspace, selectedModel, toast })
   // Only what the stream and header still touch; the rest reaches the modal
   // through the vault object itself.
   const {
@@ -318,7 +318,7 @@ export default function AiStreamPanel() {
       try {
         const res = await window.electronAPI.db.searchItems({
           query: selectedItemId,
-          context: activeContext
+          context: activeWorkspace
         })
         const found = res.items.find(i => i.id === selectedItemId)
         if (found) {
@@ -329,7 +329,7 @@ export default function AiStreamPanel() {
       }
     }
     loadContextDetails()
-  }, [selectedItemId, activeContext])
+  }, [selectedItemId, activeWorkspace])
 
   // 2. Load provider profiles + models. Provider-aware: the model list and the
   //    Ollama dropdown only apply to LOCAL endpoints; cloud providers use the
@@ -636,7 +636,7 @@ export default function AiStreamPanel() {
 
   // Snapshots & Board Reversion
   const revertAICreatedEntities = async (cardTitles: string[], columnNames: string[]) => {
-    const validContext = activeContext || 'default'
+    const validContext = activeWorkspace || 'default'
 
     // 1. Delete cards/tasks with matching titles in this context
     if (cardTitles.length > 0) {
@@ -868,7 +868,7 @@ export default function AiStreamPanel() {
         // Scrape live board state (columns, cards) and then retrieve semantic memories.
         // Board state comes FIRST so memories have board context when recalled.
         try {
-          const validContext = activeContext || 'default'
+          const validContext = activeWorkspace || 'default'
           // This list becomes the "VALID COLUMN IDs" the model is told to use,
           // so reading the stale legacy key meant describing a board that no
           // longer existed: columns the user had deleted were still offered,
@@ -1154,7 +1154,7 @@ export default function AiStreamPanel() {
       consolidationTurnRef.current += 1
       if (consolidationTurnRef.current % 2 !== 0) return
 
-      const validContext = activeContext || 'default'
+      const validContext = activeWorkspace || 'default'
       const userTurn = [...currentMessages].reverse().find(m => m.role === 'user')
       const assistantTurn = [...currentMessages].reverse().find(m => m.role === 'assistant')
       if (!userTurn || !assistantTurn) return
@@ -1199,7 +1199,7 @@ export default function AiStreamPanel() {
     } finally {
       setMemoryConsolidating(false)
     }
-  }, [activeContext, selectedModel, showMemoryPanel])
+  }, [activeWorkspace, selectedModel, showMemoryPanel])
 
   // Copy message
   const handleCopyMessage = async (content: string, index: number) => {
@@ -1320,16 +1320,16 @@ export default function AiStreamPanel() {
             Workspace
           </span>
           <select
-            value={activeContext}
-            onChange={e => setContext(e.target.value)}
-            title="Which workspace/context the assistant reads from and creates items in"
+            value={activeWorkspace}
+            onChange={e => setWorkspace(e.target.value)}
+            title="Which workspace the assistant reads from and creates items in"
             style={{
               background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '3px 8px',
               fontSize: '11px', outline: 'none', cursor: 'pointer', flex: 1, minWidth: 0
             }}
           >
-            {(availableContexts.length > 0 ? availableContexts : ['default']).map(ctx => (
+            {(availableWorkspaces.length > 0 ? availableWorkspaces : ['default']).map(ctx => (
               <option key={ctx} value={ctx}>{ctx}</option>
             ))}
           </select>
@@ -1799,7 +1799,7 @@ export default function AiStreamPanel() {
       {/* Saved Chats Drawer Modal */}
       {showSavedChatsModal && <SavedChatsModal savedChats={savedChats} currentChatId={currentChatId} chatSearchQuery={chatSearchQuery} setChatSearchQuery={setChatSearchQuery} editingChatId={editingChatId} setEditingChatId={setEditingChatId} editingTitle={editingTitle} setEditingTitle={setEditingTitle} handleNewChat={handleNewChat} handleLoadChat={handleLoadChat} handleDeleteChat={handleDeleteChat} handleSaveRename={handleSaveRename} setShowSavedChatsModal={setShowSavedChatsModal} />}
       {/* Memory Vault Modal */}
-      {showMemoryPanel && <MemoryVaultModal vault={vault} activeContext={activeContext} />}
+      {showMemoryPanel && <MemoryVaultModal vault={vault} activeWorkspace={activeWorkspace} />}
 
       {/* Styled Revert Confirmation Modal */}
       {revertConfirmData && <RevertConfirmModal revertConfirmData={revertConfirmData} setRevertConfirmData={setRevertConfirmData} revertAICreatedEntities={revertAICreatedEntities} setMessages={setMessages} />}

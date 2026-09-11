@@ -58,12 +58,12 @@ export default function FocusTimerEngine(): null {
   // while the user is on the Kanban board doing the deleting.
   useEffect(() => {
     const reconcile = async (): Promise<void> => {
-      const { focusSelectedTasks, activeContext, focusSetSelectedTasks } = useAppStore.getState()
+      const { focusSelectedTasks, activeWorkspace, focusSetSelectedTasks } = useAppStore.getState()
       if (focusSelectedTasks.length === 0) return
       try {
         const [cards, tasks] = await Promise.all([
-          window.electronAPI.db.getItems(activeContext, 'card', 1, 500),
-          window.electronAPI.db.getItems(activeContext, 'task', 1, 500)
+          window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 500),
+          window.electronAPI.db.getItems(activeWorkspace, 'task', 1, 500)
         ])
         const live = [...cards.items, ...tasks.items]
         const next = reconcileSelectedTasks(focusSelectedTasks, live)

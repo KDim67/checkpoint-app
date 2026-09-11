@@ -18,13 +18,13 @@ interface Props {
 
 export default function CommandPalette({ open, onClose }: Props): React.JSX.Element | null {
   const setView = useAppStore(s => s.setView)
-  const setContext = useAppStore(s => s.setContext)
+  const setWorkspace = useAppStore(s => s.setWorkspace)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const setRightPanelContent = useAppStore(s => s.setRightPanelContent)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const aiEnabled = useAiEnabled()
-  const activeContext = useAppStore(s => s.activeContext)
-  const availableContexts = useAppStore(s => s.availableContexts)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
 
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
@@ -68,26 +68,26 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
 
     let cancelled = false
     const timer = setTimeout(async () => {
-      const found = await searchEverything(q, activeContext)
+      const found = await searchEverything(q, activeWorkspace)
       // Guarded because a slower earlier query can land after a faster later
       // one, which would show results for something no longer typed.
       if (!cancelled) setHits(found)
     }, 140)
 
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [open, query, activeContext])
+  }, [open, query, activeWorkspace])
 
   const commands = useMemo(
     () =>
       buildCommands({
         setView,
-        setContext,
+        setWorkspace,
         setSettingsTab,
         setRightPanelContent,
         toggleRightPanel,
         aiEnabled,
-        contexts: availableContexts,
-        activeContext,
+        workspaces: availableWorkspaces,
+        activeWorkspace,
         enabledViews,
         savedViews,
         applyView: id => {
@@ -96,7 +96,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
           setView('backlog')
         }
       }),
-    [setView, setContext, setSettingsTab, setRightPanelContent, toggleRightPanel, availableContexts, activeContext, enabledViews, savedViews, setPendingViewId, aiEnabled]
+    [setView, setWorkspace, setSettingsTab, setRightPanelContent, toggleRightPanel, availableWorkspaces, activeWorkspace, enabledViews, savedViews, setPendingViewId, aiEnabled]
   )
 
   const results = useMemo(() => rankCommands(commands, query), [commands, query])

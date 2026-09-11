@@ -1,3 +1,4 @@
+import os from 'node:os'
 import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { McpActivityEntry } from '../shared/mcpActivity'
@@ -72,6 +73,19 @@ const api = {
       node: process.versions.node,
       chrome: process.versions.chrome
     },
+    /**
+     * The account name, used to credit card changes when nobody typed one.
+     * Read here rather than over IPC because it cannot change while the app
+     * runs, and a name needed to render a list should not need a round trip.
+     */
+    osUserName: (() => {
+      try {
+        return os.userInfo().username
+      } catch {
+        // Docker and some locked-down accounts have no passwd entry.
+        return ''
+      }
+    })(),
     getVersion: (): Promise<string> =>
       ipcRenderer.invoke(IpcChannels.APP_GET_VERSION),
     getDataPath: (): Promise<string> =>

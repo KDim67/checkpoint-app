@@ -22,7 +22,7 @@ import { loadBoardConfig } from '../lib/boardConfig'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const { toast } = useToast()
 
   const [item, setItem] = useState<Item | null>(null)
@@ -71,7 +71,7 @@ export default function ItemDetailPanel() {
         // Not cosmetic: a card with status 'open' matched no <option>, so the
         // select showed "Backlog" whatever the real status, and picking one
         // wrote a status no column owns, dropping the card off the board.
-        const { columns: boardColumns } = await loadBoardConfig(activeContext)
+        const { columns: boardColumns } = await loadBoardConfig(activeWorkspace)
         setColumns(boardColumns.map(c => ({ id: c.id, name: c.name })))
 
         // Load all tags
@@ -82,7 +82,7 @@ export default function ItemDetailPanel() {
       }
     }
     fetchMetadata()
-  }, [activeContext])
+  }, [activeWorkspace])
 
   // 3. Load item details
   useEffect(() => {
@@ -97,7 +97,7 @@ export default function ItemDetailPanel() {
       try {
         const res = await window.electronAPI.db.searchItems({
           query: selectedItemId,
-          context: activeContext
+          context: activeWorkspace
         })
         const found = res.items.find(i => i.id === selectedItemId)
         if (found) {
@@ -129,7 +129,7 @@ export default function ItemDetailPanel() {
       }
     }
     loadItemDetails()
-  }, [selectedItemId, activeContext])
+  }, [selectedItemId, activeWorkspace])
 
   if (!selectedItemId) {
     return (

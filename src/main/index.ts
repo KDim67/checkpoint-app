@@ -19,7 +19,7 @@ import {
 } from './cheatsheetService'
 import { batchRenameFiles, selectTextureFile, loadTextureFile, savePbrMaps, saveSeamlessTexture, selectFolder, saveSpriteAtlas, saveSlicedSprites, saveLutTexture, saveUpscaledTexture } from './gamedevService'
 import { SyncService } from './syncService'
-import { getStartupSettings } from './tray'
+import { getStartupSettings, launchedMinimised } from './tray'
 
 // Pure constants with no dependencies of their own, so importing them
 // statically does not defeat the dynamic `import('./mcpServer')` calls below.
@@ -308,6 +308,14 @@ function createWindow(): void {
     if (hasShown || !mainWindow || mainWindow.isDestroyed()) return
     hasShown = true
     clearTimeout(revealTimeout)    // cancel safety fallback if an event fires first
+
+    // Loaded but never shown. The tray is the way in.
+    if (launchedMinimised()) {
+      // Maximising a hidden window shows it, so wait for the tray to.
+      if (bounds.maximized) mainWindow.once('show', () => mainWindow?.maximize())
+      return
+    }
+
     if (bounds.maximized) mainWindow.maximize()
     mainWindow.show()
     mainWindow.focus()
@@ -1672,7 +1680,7 @@ app.whenReady().then(async () => {
       if (!window) return { success: false, error: 'No active window' }
 
       const { filePath } = await dialog.showSaveDialog(window, {
-        title: `Export Workspace Context: ${contextName}`,
+        title: `Export Workspace: ${contextName}`,
         defaultPath: `${contextName.toLowerCase()}-workspace.json`,
         filters: [{ name: 'JSON Workspace', extensions: ['json'] }]
       })

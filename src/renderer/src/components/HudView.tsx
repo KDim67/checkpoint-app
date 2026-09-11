@@ -191,7 +191,7 @@ export default function HudView() {
           const contexts = rawContexts ? JSON.parse(rawContexts as string) as Array<{ slug: string }> : []
           const exists = contexts.some(c => c.slug.toLowerCase() === parsed.context.toLowerCase())
           if (!exists) {
-            setError(`Context '@${parsed.context}' does not exist.`)
+            setError(`Workspace '@${parsed.context}' does not exist.`)
             setSubmitting(false)
             return
           }

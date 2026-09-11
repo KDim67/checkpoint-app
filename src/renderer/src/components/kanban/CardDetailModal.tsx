@@ -1,4 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react'
+import KanbanCard from './KanbanCard'
+import type { CardDisplay } from '../../../../shared/boardModel'
+import { cardEdit, type CardSnapshot } from '../../../../shared/cardDraft'
+import {
+  appendCardChanges,
+  changeSentence,
+  describeCardChanges,
+  readCardHistory,
+  visibleCardHistory,
+  type CardChange
+} from '../../../../shared/cardHistory'
+import { DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
@@ -18,16 +30,18 @@ interface CardDetailModalProps {
   columns: Array<{ id: string; name: string }>
   onClose: () => void
   onUpdate: (id: string, patch: Partial<Item>, tagIds?: string[]) => Promise<void>
+  /** The board's own field switches, so the preview shows what the board will. */
+  cardDisplay?: CardDisplay
   isReadOnly?: boolean
 }
 
 type EditorMode = 'edit' | 'preview' | 'split'
 
-export default function CardDetailModal({ cardId, initialCard, columns, onClose, onUpdate, isReadOnly = false }: CardDetailModalProps) {
+export default function CardDetailModal({ cardId, initialCard, columns, onClose, onUpdate, cardDisplay, isReadOnly = false }: CardDetailModalProps) {
   const selectItem = useAppStore(s => s.selectItem)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const aiEnabled = useAiEnabled()
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
 
   const [card, setCard] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,7 +67,9 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const [liveCoverColor, setLiveCoverColor] = useState<string | null>(null)
   const [checklist, setChecklist] = useState<Array<{ id: string; text: string; done: boolean }>>([])
   const [comments, setComments] = useState<Array<{ id: string; user: string; text: string; createdAt: number }>>([])
-  const [activities, setActivities] = useState<Array<{ id: string; text: string; createdAt: number }>>([])
+  const [activities, setActivities] = useState<CardChange[]>([])
+  /** Read once per card open. Whoever is named here is credited with the save. */
+  const [displayName, setDisplayName] = useState('')
   const [attachments, setAttachments] = useState<Array<{ id: string; name: string; path: string; isImage: boolean; createdAt: number }>>([])
   const [isTemplate, setIsTemplate] = useState(false)
   const [dueDateCompleted, setDueDateCompleted] = useState(false)
@@ -87,7 +103,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
       try {
         let found: Item | null = initialCardRef.current || null
         if (!found) {
-          const res = await window.electronAPI.db.getItems(activeContext, 'card', 1, 1000)
+          const res = await window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 1000)
           found = res.items.find(i => i.id === cardId) || null
         }
         if (!found) {
@@ -110,13 +126,35 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           setCover(meta.cover || null)
           setChecklist(meta.checklist || [])
           setComments(meta.comments || [])
-          setActivities(meta.activities || [])
+          setActivities(readCardHistory(meta.activities))
           setAttachments(meta.attachments || [])
           setIsTemplate(meta.isTemplate === true)
           setDueDateCompleted(meta.dueDateCompleted === true)
-          
+
+          // Distinct objects: one tracks what is on disk, the other what is on
+          // screen, and they diverge the moment anything is drafted.
+          savedMetaRef.current = { ...meta }
+          latestMetaRef.current = { ...meta }
+
+          // The baseline every buffered edit is measured against.
+          savedRef.current = {
+            title: found.title.trim(),
+            body: found.body,
+            priority: found.priority,
+            status: found.status,
+            due_at: found.due_at,
+            metadata: found.metadata || '{}',
+            tagIds: found.tags?.map(t => t.id) || []
+          }
+
+
           const tags = await window.electronAPI.db.getTags()
           setAllTags(tags)
+
+          const rawName = await window.electronAPI.db.getSetting(DISPLAY_NAME_KEY)
+          // The account name stands in when the field was never filled, so a
+          // shared board does not fill up with entries credited to nobody.
+          if (active) setDisplayName(resolveAuthor(rawName, window.electronAPI.app.osUserName))
 
           const rels = await window.electronAPI.db.getRelations(cardId)
           setRelations(rels)
@@ -129,7 +167,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     }
     loadDetails()
     return () => { active = false }
-  }, [cardId, activeContext])
+  }, [cardId, activeWorkspace])
 
   // Search for relations
   useEffect(() => {
@@ -142,7 +180,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
       try {
         const res = await window.electronAPI.db.searchItems({
           query: relationSearchQuery,
-          context: activeContext
+          context: activeWorkspace
         })
         // Filter out current card itself
         setRelationSearchResults(res.items.filter(i => i.id !== cardId))
@@ -152,44 +190,154 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     }, 300)
 
     return () => clearTimeout(delayDebounceFn)
-  }, [relationSearchQuery, cardId, activeContext])
+  }, [relationSearchQuery, cardId, activeWorkspace])
 
-  const handleTitleBlur = () => {
-    if (!card || !title.trim() || title === card.title) return
-    onUpdate(card.id, { title: title.trim() })
+  /**
+   * The card as it was last written. Everything buffered is compared against
+   * this to work out whether there is anything to save, and what.
+   */
+  const savedRef = useRef<CardSnapshot | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const current: CardSnapshot | null = card && {
+    title,
+    body,
+    priority: card.priority,
+    status: card.status,
+    due_at: card.due_at,
+    metadata: card.metadata || '{}',
+    tagIds: selectedTagIds
+  }
+  const edit = savedRef.current && current ? cardEdit(savedRef.current, current) : null
+  const dirty = edit?.dirty === true
+
+  /** History says "Moved to In Review", not "moved to in_review". */
+  const columnName = (status: string): string =>
+    columns.find(c => c.id === status)?.name ?? status
+
+  /**
+   * The unsaved card, for the preview. `card` is the working copy and already
+   * carries the buffered status, priority, due date, tags and metadata; only
+   * the two text fields are held separately, so only they have to be laid over.
+   */
+  const previewCard: Item | null = card && {
+    ...card,
+    title: title.trim() || 'Untitled',
+    body
   }
 
-  const handleBodyBlur = () => {
-    if (!card || body === card.body) return
-    onUpdate(card.id, { body })
-    // Sync local state so subsequent blurs don't re-fire with no changes
-    setCard(prev => prev ? { ...prev, body } : null)
+  /**
+   * Ctrl+S, because that is what a buffered editor has always meant. Bound on
+   * the modal rather than globally: it should do nothing when no card is open.
+   *
+   * The handler goes through a ref so the listener is registered once instead
+   * of on every keystroke, while still calling the current closure rather than
+   * one captured on mount.
+   */
+  const saveRef = useRef<() => Promise<void>>(async () => {})
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's') return
+      e.preventDefault()
+      void saveRef.current()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  const handleSave = async () => {
+    const snapshot = current
+    const baseline = savedRef.current
+    // Read-only is a real guard, not just a hidden button: the drawer blocks
+    // the mouse but not the keyboard, and the modal focuses the title field.
+    if (isReadOnly || !card || !edit || !edit.dirty || saving || !snapshot || !baseline) return
+    setSaving(true)
+    try {
+      // The history rides along in the metadata being written, so one save is
+      // one database write and an entry can never describe a change that did
+      // not land. Worked out first, because it changes the metadata the patch
+      // is then built from.
+      const phrases = describeCardChanges(baseline, snapshot, columnName)
+      const history = appendCardChanges(activities, phrases, displayName, Date.now())
+      const written = phrases.length > 0
+        ? { ...snapshot, metadata: JSON.stringify({ ...latestMetaRef.current, activities: history }) }
+        : snapshot
+
+      const write = cardEdit(baseline, written)
+      await onUpdate(card.id, write.patch, write.tagIds)
+
+      if (written !== snapshot) {
+        latestMetaRef.current = { ...latestMetaRef.current, activities: history }
+        setActivities(history)
+      }
+      // Everything buffered has just been written, so the two now agree again.
+      try {
+        savedMetaRef.current = JSON.parse(written.metadata)
+      } catch {
+        savedMetaRef.current = { ...latestMetaRef.current }
+      }
+      // The card object is the working copy, so it already holds the new
+      // values; only the baseline has to move. The title comes from the patch
+      // rather than from the field, because the field may hold whitespace the
+      // patch trimmed off, and a baseline holding it would leave the card
+      // looking permanently unsaved.
+      savedRef.current = { ...written, title: write.patch.title ?? baseline.title }
+      setCard(prev => prev ? { ...prev, ...write.patch } : null)
+      if (write.patch.title) setTitle(write.patch.title)
+    } catch (err) {
+      console.error('Failed to save the card:', err)
+    } finally {
+      setSaving(false)
+    }
   }
+  saveRef.current = handleSave
 
   // Track latest metadata synchronously in memory to avoid race conditions with sequential updates
+  /**
+   * Metadata is tracked twice on purpose.
+   *
+   * `savedMetaRef` is what is actually on disk. `latestMetaRef` is that plus
+   * the edits still waiting for Save. They were one ref, and an immediate
+   * action merged from it, so posting a comment wrote out whatever cover or
+   * template change was sitting unsaved beside it and then moved the baseline
+   * so it counted as saved. Closing no longer discarded it and the history
+   * never mentioned it.
+   */
+  const savedMetaRef = useRef<Record<string, unknown>>({})
   const latestMetaRef = useRef<Record<string, unknown>>({})
-  useEffect(() => {
-    if (card?.metadata) {
-      try {
-        latestMetaRef.current = JSON.parse(card.metadata)
-      } catch {}
-    }
-  }, [card?.metadata])
 
-  // Meta Updates helpers
+  /** Writes something that has already happened, without carrying the drafts with it. */
   const updateMetadata = async (newMetaPatch: Record<string, unknown>) => {
     if (!card) return
-    const mergedMeta = { ...latestMetaRef.current, ...newMetaPatch }
-    latestMetaRef.current = mergedMeta
-    const serialized = JSON.stringify(mergedMeta)
-    
-    setCard(prev => prev ? { ...prev, metadata: serialized } : null)
+    // Built on what is on disk, not on the working copy.
+    const written = { ...savedMetaRef.current, ...newMetaPatch }
+    const serialized = JSON.stringify(written)
+    savedMetaRef.current = written
+
+    // The working copy keeps the drafts and gains the new value.
+    latestMetaRef.current = { ...latestMetaRef.current, ...newMetaPatch }
+    setCard(prev => prev ? { ...prev, metadata: JSON.stringify(latestMetaRef.current) } : null)
+    // The baseline moves to what was written, so this does not read as unsaved.
+    if (savedRef.current) savedRef.current = { ...savedRef.current, metadata: serialized }
+
     await onUpdate(card.id, { metadata: serialized })
   }
 
+  /** The buffered half of metadata: the cover and the template flag. Waits for Save. */
+  const draftMetadata = (newMetaPatch: Record<string, unknown>) => {
+    if (!card) return
+    const mergedMeta = { ...latestMetaRef.current, ...newMetaPatch }
+    latestMetaRef.current = mergedMeta
+    setCard(prev => prev ? { ...prev, metadata: JSON.stringify(mergedMeta) } : null)
+  }
+
+  /**
+   * Logs something that has already been written: a comment, a checklist tick,
+   * an attachment. The buffered field edits are not logged here, because they
+   * have not happened yet; Save records those from what actually changed.
+   */
   const addActivity = (text: string) => {
-    const newAct = { id: `act-${Date.now()}`, text, createdAt: Date.now() }
-    const updated = [newAct, ...activities]
+    const updated = appendCardChanges(activities, [text], displayName, Date.now())
     setActivities(updated)
     updateMetadata({ activities: updated })
   }
@@ -290,21 +438,18 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
   const handleSetCoverImage = (urlOrPath: string) => {
     setCover({ type: 'image', value: urlOrPath })
-    updateMetadata({ cover: { type: 'image', value: urlOrPath } })
-    addActivity(`Set card cover image`)
+    draftMetadata({ cover: { type: 'image', value: urlOrPath } })
   }
 
   const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     if (!card) return
     const priority = parseInt(e.target.value) as Item['priority']
-    onUpdate(card.id, { priority })
     setCard(prev => prev ? { ...prev, priority } : null)
   }
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     if (!card) return
     const status = e.target.value
-    onUpdate(card.id, { status })
     setCard(prev => prev ? { ...prev, status } : null)
   }
 
@@ -312,23 +457,16 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     if (!card) return
     const dateVal = e.target.value
     const due_at = dateVal ? new Date(dateVal).getTime() : null
-    onUpdate(card.id, { due_at })
     setCard(prev => prev ? { ...prev, due_at } : null)
   }
 
-  const handleTagToggle = async (tagId: string) => {
+  const handleTagToggle = (tagId: string) => {
     if (!card) return
-    let updatedTags: string[]
-    if (selectedTagIds.includes(tagId)) {
-      updatedTags = selectedTagIds.filter(id => id !== tagId)
-    } else {
-      updatedTags = [...selectedTagIds, tagId]
-    }
-    
+    const updatedTags = selectedTagIds.includes(tagId)
+      ? selectedTagIds.filter(id => id !== tagId)
+      : [...selectedTagIds, tagId]
+
     setSelectedTagIds(updatedTags)
-    await onUpdate(card.id, {}, updatedTags)
-    
-    // Refresh card tags locally
     const refreshedTags = allTags.filter(t => updatedTags.includes(t.id))
     setCard(prev => prev ? { ...prev, tags: refreshedTags } : null)
   }
@@ -485,8 +623,37 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               <span>AI Assist</span>
             </button>}
 
+            {/* Nothing here is written until this is pressed. It only appears
+                when there is something to write, so a card being read never
+                shows a button that would do nothing. */}
+            {!isReadOnly && dirty && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                title="Save changes (Ctrl+S)"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  background: 'var(--color-secondary)',
+                  border: 'none',
+                  color: 'var(--color-text-inverted)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-2) var(--space-4)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 'var(--weight-semibold)',
+                  cursor: saving ? 'default' : 'pointer',
+                  opacity: saving ? 0.6 : 1
+                }}
+              >
+                <Check size={14} strokeWidth={3} />
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            )}
+
             <button
               onClick={onClose}
+              title={dirty ? 'Close and discard the unsaved changes' : 'Close'}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -540,7 +707,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              onBlur={handleTitleBlur}
               placeholder="Enter card title..."
               style={{
                 width: '100%',
@@ -558,6 +724,34 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               onBlurCapture={e => (e.currentTarget.style.borderBottomColor = 'transparent')}
             />
           </div>
+
+          {/* The card as the board will draw it.
+              The board's own component, not a copy of it: a hand-built
+              imitation would drift the first time either one changed, and the
+              point of a preview is that it cannot be wrong. Inert, at the
+              width a column gives a card. */}
+          {previewCard && (
+            <div>
+              <span className="label-caps" style={{ fontSize: '10px' }}>On The Board</span>
+              {/* inert, not just pointer-events: the card is focusable and
+                  keeps its shortcuts, so tabbing to the preview and pressing
+                  Space jumped the whole app to the Focus view. */}
+              <div
+                ref={node => { node?.setAttribute('inert', '') }}
+                aria-hidden
+                style={{ width: '280px', maxWidth: '100%', marginTop: 'var(--space-2)' }}
+              >
+                <KanbanCard
+                  card={previewCard}
+                  display={cardDisplay}
+                  onClick={() => {}}
+                  onDelete={() => {}}
+                  onConvertToTask={() => {}}
+                  isOverlay
+                />
+              </div>
+            </div>
+          )}
 
           {/* Quick Properties Grid */}
           <div style={{
@@ -647,8 +841,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                       onChange={async (e) => {
                         const val = e.target.checked
                         setDueDateCompleted(val)
-                        updateMetadata({ dueDateCompleted: val })
-                        addActivity(`Marked due date as ${val ? 'completed' : 'incomplete'}`)
+                        draftMetadata({ dueDateCompleted: val })
                       }}
                     />
                     <span>Done</span>
@@ -874,7 +1067,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                       onClick={() => {
                         const nextCover = { ...cover, size: 'header' as const }
                         setCover(nextCover)
-                        updateMetadata({ cover: nextCover })
+                        draftMetadata({ cover: nextCover })
                       }}
                       style={{
                         flex: 1,
@@ -902,7 +1095,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                       onClick={() => {
                         const nextCover = { ...cover, size: 'full' as const }
                         setCover(nextCover)
-                        updateMetadata({ cover: nextCover })
+                        draftMetadata({ cover: nextCover })
                       }}
                       style={{
                         flex: 1,
@@ -936,14 +1129,12 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                           setLiveCoverColor(null)
                           if (color === 'none') {
                             setCover(null)
-                            updateMetadata({ cover: null })
-                            addActivity(`Removed card cover`)
+                            draftMetadata({ cover: null })
                           } else {
                             const size = cover?.size || 'header'
                             const nextCover = { type: 'color' as const, value: color, size }
                             setCover(nextCover)
-                            updateMetadata({ cover: nextCover })
-                            addActivity(`Set card cover color to ${color}`)
+                            draftMetadata({ cover: nextCover })
                           }
                         }}
                         style={{
@@ -979,11 +1170,10 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                         const size = cover?.size || 'header'
                         const nextCover = { type: 'color' as const, value: col, size }
                         setCover(nextCover)
-                        updateMetadata({ cover: nextCover })
-                        addActivity(`Set card cover color to ${col}`)
+                        draftMetadata({ cover: nextCover })
                       } else {
                         setCover(null)
-                        updateMetadata({ cover: null })
+                        draftMetadata({ cover: null })
                       }
                     }}
                     swatchSize={20}
@@ -1007,8 +1197,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                     onChange={async (e) => {
                       const val = e.target.checked
                       setIsTemplate(val)
-                      updateMetadata({ isTemplate: val })
-                      addActivity(`Marked card as ${val ? 'template' : 'regular card'}`)
+                      draftMetadata({ isTemplate: val })
                     }}
                   />
                   <span>Mark as Template</span>
@@ -1061,6 +1250,16 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </div>
             </div>
 
+            {/* Which pane is which. Only in split, and only because an empty
+                card renders an empty preview: without a label the two boxes
+                are indistinguishable until you have typed something. */}
+            {editorMode === 'split' && (
+              <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+                <span className="label-caps" style={{ flex: 1, fontSize: '10px' }}>Markdown</span>
+                <span className="label-caps" style={{ flex: 1, fontSize: '10px' }}>Preview</span>
+              </div>
+            )}
+
             {/* Editor Panes */}
             <div style={{ display: 'flex', flex: 1, gap: 'var(--space-4)', minHeight: '260px' }}>
               {/* Textarea pane */}
@@ -1068,7 +1267,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 <textarea
                   value={body}
                   onChange={e => setBody(e.target.value)}
-                  onBlur={handleBodyBlur}
                   onPaste={async (e) => {
                     const isImage = await handleImagePaste(e, body, setBody)
                     if (isImage) return
@@ -1109,6 +1307,11 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                   fontSize: 'var(--text-sm)',
                   lineHeight: 1.6
                 }} className="markdown-body">
+                  {!body.trim() && (
+                    <span style={{ color: 'var(--color-text-faint)', fontStyle: 'italic' }}>
+                      Nothing to preview yet.
+                    </span>
+                  )}
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     urlTransform={url => url}
@@ -1806,16 +2009,20 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </span>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
-                {activities.map(act => (
+                {visibleCardHistory(activities).map(act => (
                   <div key={act.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '4px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', lineHeight: 1.3 }}>{act.text}</span>
-                    <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
-                      {new Date(act.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', lineHeight: 1.3 }}>
+                      {changeSentence(act)}
                     </span>
+                    {act.at > 0 && (
+                      <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
+                        {new Date(act.at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                      </span>
+                    )}
                   </div>
                 ))}
-                {activities.length === 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No activities logged.</span>
+                {visibleCardHistory(activities).length === 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No changes yet.</span>
                 )}
               </div>
             </div>

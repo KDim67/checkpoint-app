@@ -37,7 +37,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const selectItem = useAppStore(s => s.selectItem)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const aiEnabled = useAiEnabled()
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
 
   const [task, setTask] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
@@ -91,7 +91,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
       try {
         const itemsResult = await window.electronAPI.db.searchItems({
           query: taskId,
-          context: activeContext,
+          context: activeWorkspace,
           type: 'task'
         })
         const found = itemsResult.items.find(i => i.id === taskId)
@@ -129,7 +129,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     }
     loadDetails()
     return () => { active = false }
-  }, [taskId, activeContext])
+  }, [taskId, activeWorkspace])
 
   // Search relation autocomplete
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
       try {
         const res = await window.electronAPI.db.searchItems({
           query: relationSearchQuery,
-          context: activeContext
+          context: activeWorkspace
         })
         setRelationSearchResults(res.items.filter(i => i.id !== taskId))
       } catch (err) {
@@ -151,7 +151,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     }, 300)
 
     return () => clearTimeout(delayDebounceFn)
-  }, [relationSearchQuery, taskId, activeContext])
+  }, [relationSearchQuery, taskId, activeWorkspace])
 
   const handleTitleBlur = () => {
     if (!task || !title.trim() || title === task.title) return
@@ -247,7 +247,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     // in main, and this is the same lookup the drawer opens with.
     const found = await window.electronAPI.db.searchItems({
       query: task.id,
-      context: activeContext,
+      context: activeWorkspace,
       type: 'task'
     })
     const refreshed = found.items.find(i => i.id === task.id)

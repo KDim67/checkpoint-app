@@ -80,9 +80,12 @@ function KanbanCard({
     meta = JSON.parse(card.metadata || '{}')
   } catch {}
 
-  const rawCover = meta.cover || null
+  const rawCover = display.cover ? (meta.cover || null) : null
   let cover = rawCover
-  if (!cover && card.body) {
+  // Gated at the source rather than at each render site: the cover also
+  // decides the card's background and text colour, and a half-hidden cover
+  // would leave a card coloured for a banner that is not there.
+  if (!cover && display.cover && card.body) {
     const imgMatch = card.body.match(/!\[.*?\]\((.*?)\)/)
     if (imgMatch) {
       cover = {
@@ -137,6 +140,12 @@ function KanbanCard({
   const dueDateStr = card.due_at
     ? new Date(card.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     : null
+
+  // Worked out once because the footer has to know whether it will hold
+  // anything before it draws itself. An empty footer is still 20px of gap.
+  const showDue = display.due && Boolean(dueDateStr)
+  const showChecklist = display.checklist && totalChecklist > 0
+  const showTemplate = display.template && isTemplate
 
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) return
@@ -261,7 +270,10 @@ function KanbanCard({
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
-              {/* Quick Completion Checkbox */}
+              {/* Quick Completion Checkbox. Switched off it takes the done
+                  marker with it, which is the point: the keyboard shortcut and
+                  the detail modal still set the status. */}
+              {display.doneCheckbox && (
               <button
                 title={card.status === 'done' ? "Mark as Incomplete (X)" : "Mark as Done (X)"}
                 onClick={async (e) => {
@@ -321,6 +333,7 @@ function KanbanCard({
                   {card.status === 'done' && <Check size={10} color="#fff" strokeWidth={4} />}
                 </div>
               </button>
+              )}
 
               <h4 style={{
                 margin: 0,
@@ -440,7 +453,7 @@ function KanbanCard({
           )}
 
           {/* Footer: due date & checklists */}
-          {(dueDateStr || totalChecklist > 0 || isTemplate) && (
+          {(showDue || showChecklist || showTemplate) && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -450,7 +463,7 @@ function KanbanCard({
               gap: '6px',
               flexWrap: 'wrap'
             }}>
-              {display.due && dueDateStr && (
+              {showDue && (
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -470,7 +483,7 @@ function KanbanCard({
                 </span>
               )}
 
-              {totalChecklist > 0 && (
+              {showChecklist && (
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -490,7 +503,7 @@ function KanbanCard({
                 </span>
               )}
 
-              {isTemplate && (
+              {showTemplate && (
                 <span style={{
                   fontSize: '9px',
                   fontWeight: 'var(--weight-bold)',

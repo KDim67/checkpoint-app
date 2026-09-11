@@ -10,7 +10,7 @@ interface LogVirtualListProps {
   onTogglePin: (id: string, currentPriority: number) => void
   onDelete: (id: string) => void
   onConvertToCard: (id: string, title: string, tagIds: string[]) => void
-  activeContext: string
+  activeWorkspace: string
 }
 
 export default function LogVirtualList({
@@ -20,7 +20,7 @@ export default function LogVirtualList({
   onTogglePin,
   onDelete,
   onConvertToCard,
-  activeContext
+  activeWorkspace
 }: LogVirtualListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -35,7 +35,7 @@ export default function LogVirtualList({
   useEffect(() => {
     // Reset initial scroll flag when context changes
     setHasInitialScrolled(false)
-  }, [activeContext])
+  }, [activeWorkspace])
 
   useEffect(() => {
     if (items.length > 0 && !hasInitialScrolled && containerRef.current) {
@@ -137,10 +137,10 @@ export default function LogVirtualList({
             <Calendar size={18} />
           </div>
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
-            Beginning of Context History
+            Beginning of Workspace History
           </span>
           <span style={{ fontSize: 'var(--text-xs)', maxWidth: '320px' }}>
-            This is the very first entry for context <strong>"{activeContext}"</strong>.
+            This is the very first entry in <strong>"{activeWorkspace}"</strong>.
           </span>
         </div>
       )}
@@ -180,7 +180,7 @@ export default function LogVirtualList({
           padding: 'var(--space-10)'
         }}>
           <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
-            No logs in this context yet
+            No logs in this workspace yet
           </p>
           <p style={{ margin: 0, fontSize: 'var(--text-xs)', textAlign: 'center', maxWidth: '300px' }}>
             Write down your thoughts, tasks, or code snippets in the input bar below to create your first log entry.

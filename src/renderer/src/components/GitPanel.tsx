@@ -21,7 +21,7 @@ function formatGitDate(dateStr: string): string {
 }
 
 export default function GitPanel() {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
 
   const [gitPath, setGitPath] = useState<string | null>(null)
@@ -41,7 +41,7 @@ export default function GitPanel() {
       const raw = await window.electronAPI.db.getSetting('contexts_list')
       if (raw) {
         const parsed = JSON.parse(raw as string) as Array<{ slug: string; gitPath?: string }>
-        const ctx = parsed.find(c => c.slug === activeContext)
+        const ctx = parsed.find(c => c.slug === activeWorkspace)
         setGitPath(ctx?.gitPath || null)
       } else {
         setGitPath(null)
@@ -52,7 +52,7 @@ export default function GitPanel() {
     } finally {
       setLoading(false)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   useEffect(() => {
     fetchContextConfig()
@@ -189,7 +189,7 @@ export default function GitPanel() {
             margin: 0,
             maxWidth: '240px'
           }}>
-            Map this context to a local Git repository in Settings to view branch status, uncommitted changes count, and commit history.
+            Map this workspace to a local Git repository in Settings to view branch status, uncommitted changes count, and commit history.
           </p>
         </div>
         <button
@@ -257,7 +257,7 @@ export default function GitPanel() {
           }}>
             {!gitInstalled 
               ? 'Git CLI is not installed or not available in the system PATH.'
-              : `The folder configured for this context does not exist or is not a valid Git repository.`}
+              : `The folder configured for this workspace does not exist or is not a valid Git repository.`}
           </p>
           <div style={{
             background: 'var(--color-surface-2)',

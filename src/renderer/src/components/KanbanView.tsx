@@ -30,7 +30,7 @@ import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
 import { Plus, Layers, LayoutGrid, KanbanSquare, Upload, Eye } from 'lucide-react'
 import Skeleton from './ui/Skeleton'
-import ConfirmDialog, { useConfirm } from './ui/ConfirmDialog'
+import ConfirmDialog, { useConfirm, useChoose } from './ui/ConfirmDialog'
 import useFocusTrap from './ui/useFocusTrap'
 import useEscapeKey from './ui/useEscapeKey'
 import EmptyState from './ui/EmptyState'
@@ -40,11 +40,15 @@ import {
   loadBoardConfig,
   patchBoardConfig,
   DEFAULT_CARD_DISPLAY,
+  sameCardDisplay,
+  sameColumnConfig,
   type BoardConfig,
   type CardDisplay,
   type ColumnConfig,
   type ColumnSort
 } from '../lib/boardConfig'
+import { availableWorkspaceSlug, occupiedWorkspaces, setWorkspaceShared } from '../lib/createWorkspace'
+import { DISPLAY_NAME_KEY, DISPLAY_NAME_MAX, normalizeDisplayName } from '../../../shared/identity'
 import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
 import { errorMessage } from '../../../shared/errors'
 import { getTextColorForBackground } from '../lib/contrast'
@@ -60,7 +64,11 @@ const CARD_DISPLAY_FIELDS: { key: keyof CardDisplay; label: string }[] = [
   { key: 'priority', label: 'Priority Bar' },
   { key: 'tags', label: 'Tags' },
   { key: 'due', label: 'Due Date' },
-  { key: 'bodyPreview', label: 'Body Preview' }
+  { key: 'bodyPreview', label: 'Body Preview' },
+  { key: 'cover', label: 'Cover' },
+  { key: 'checklist', label: 'Checklist Progress' },
+  { key: 'template', label: 'Template Badge' },
+  { key: 'doneCheckbox', label: 'Done Checkbox' }
 ]
 
 const BG_STYLES: Record<string, string> = {
@@ -126,13 +134,11 @@ interface SortableColumnProps {
 
 function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableColumnProps) {
   if (prev.isReadOnly !== next.isReadOnly) return false
-  if (
-    prev.col.id !== next.col.id ||
-    prev.col.name !== next.col.name ||
-    prev.col.wipLimit !== next.col.wipLimit ||
-    prev.col.color !== next.col.color ||
-    prev.col.colorMode !== next.col.colorMode
-  ) return false
+  // Whole-object compares. The five fields this used to name by hand left
+  // collapsed, sort, description and cardDisplay out, so those changes were
+  // dropped here and never reached a card.
+  if (!sameColumnConfig(prev.col, next.col)) return false
+  if (!sameCardDisplay(prev.cardDisplay, next.cardDisplay)) return false
   if (prev.cards.length !== next.cards.length) return false
   for (let i = 0; i < prev.cards.length; i++) {
     if (prev.cards[i] !== next.cards[i]) return false
@@ -209,10 +215,11 @@ const SortableColumn = React.memo(function SortableColumn({
 }, areSortableColumnPropsEqual)
 
 export default function KanbanView() {
-  const activeContext = useAppStore(s => s.activeContext)
-  const availableContexts = useAppStore(s => s.availableContexts)
-  const contextsList = useAppStore(s => s.contextsList)
-  const setContext = useAppStore(s => s.setContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
+  const workspaceList = useAppStore(s => s.workspaceList)
+  const setWorkspaceList = useAppStore(s => s.setWorkspaceList)
+  const setWorkspace = useAppStore(s => s.setWorkspace)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
 
@@ -232,6 +239,46 @@ export default function KanbanView() {
 
   const { toast } = useToast()
   const confirm = useConfirm()
+  const choose = useChoose()
+
+  /**
+   * Kept as typed and normalised on the way out, so the field is not fighting
+   * the caret. Empty is a real answer: the account name stands in for it.
+   */
+  const [displayName, setDisplayName] = useState('')
+  const osUserName = normalizeDisplayName(window.electronAPI.app.osUserName)
+
+  /** False until the stored name has arrived, so loading it does not write it back. */
+  const nameLoaded = useRef(false)
+
+  useEffect(() => {
+    window.electronAPI.db.getSetting(DISPLAY_NAME_KEY)
+      .then(raw => setDisplayName(normalizeDisplayName(raw)))
+      .catch(err => console.error('Failed to read the display name:', err))
+      .finally(() => { nameLoaded.current = true })
+  }, [])
+
+  /**
+   * Saved as it is typed rather than on blur.
+   *
+   * The popover closes on mousedown, which unmounts the field before focus
+   * moves, so no blur is ever delivered and a name typed and then clicked away
+   * from was silently lost. This effect lives on the view, not the popover, so
+   * it survives the close and writes anyway.
+   */
+  useEffect(() => {
+    if (!nameLoaded.current) return
+    const timer = setTimeout(() => {
+      window.electronAPI.db.setSetting(DISPLAY_NAME_KEY, normalizeDisplayName(displayName))
+        .catch(err => console.error('Failed to save the display name:', err))
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [displayName])
+
+  /** Tidies what is in the field once the user has finished with it. */
+  const saveDisplayName = useCallback(() => {
+    setDisplayName(current => normalizeDisplayName(current))
+  }, [])
 
   const [cards, setCards] = useState<Item[]>([])
   const [columns, setColumns] = useState<ColumnConfig[]>([])
@@ -253,20 +300,20 @@ export default function KanbanView() {
     columnsRef.current = next
     setColumns(next)
     try {
-      await patchBoardConfig(activeContext, { columns: next })
+      await patchBoardConfig(activeWorkspace, { columns: next })
     } catch (err) {
       console.error('Failed to persist columns:', err)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   /** Writes any other slice of the board document; state is set by the caller. */
   const persistConfig = useCallback(async (patch: Partial<BoardConfig>): Promise<void> => {
     try {
-      await patchBoardConfig(activeContext, patch)
+      await patchBoardConfig(activeWorkspace, patch)
     } catch (err) {
       console.error('Failed to persist board config:', err)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   /** Applies a change to one column and persists the whole list. */
   const updateColumn = useCallback((colId: string, patch: Partial<ColumnConfig>): void => {
@@ -352,10 +399,20 @@ export default function KanbanView() {
     setCollabMode(mode)
     setCollabProgress('Initializing host signal room...')
 
+    // Labelled here rather than when a peer actually arrives: publishing a
+    // passcode is the moment the board stops being private, whether or not
+    // anybody takes it up.
+    const labelled = setWorkspaceShared(workspaceList, activeWorkspace, true)
+    if (labelled !== workspaceList) {
+      setWorkspaceList(labelled)
+      window.electronAPI.db.setSetting('contexts_list', JSON.stringify(labelled))
+        .catch(err => console.error('Failed to record the workspace as shared:', err))
+    }
+
     const coord = new WebRTCCollaborationCoordinator({
       pairingCode: code,
       isHost: true,
-      context: activeContext,
+      context: activeWorkspace,
       mode,
       onProgress: (p) => setCollabProgress(p),
       onConnect: () => setCollabProgress('Connected to Peer!'),
@@ -367,12 +424,12 @@ export default function KanbanView() {
         setCollabProgress(`Error: ${errorMessage(err)}`)
         setCollabActive(false)
       },
-      // The host keeps its own board; only a joining peer is ever asked.
-      onConfirmBaseline: async () => true
+      // The host keeps its own board and never receives a baseline.
+      onResolveBaseline: async () => ({ action: 'replace' })
     })
     collabCoordinatorRef.current = coord
     await coord.start()
-  }, [activeContext])
+  }, [activeWorkspace, workspaceList, setWorkspaceList])
 
   const joinCollabSession = useCallback(async (code: string) => {
     if (!code || code.length < 5) return
@@ -384,7 +441,7 @@ export default function KanbanView() {
     const coord = new WebRTCCollaborationCoordinator({
       pairingCode: code,
       isHost: false,
-      context: activeContext,
+      context: activeWorkspace,
       mode: 'collaborative', // Client infers mode from baseline message
       onProgress: (p) => setCollabProgress(p),
       onConnect: () => setCollabProgress('Connected to Peer!'),
@@ -396,18 +453,40 @@ export default function KanbanView() {
         setCollabProgress(`Error: ${errorMessage(err)}`)
         setCollabActive(false)
       },
-      onConfirmBaseline: async ({ context, incomingItems }) =>
-        confirm({
-          title: 'Replace this board?',
+      onResolveBaseline: async ({ context, incomingItems }) => {
+        // A check that could not run is not permission to delete, so a failed
+        // read is treated as a clash and the user is asked anyway.
+        let taken: Set<string>
+        try {
+          taken = await occupiedWorkspaces()
+        } catch (err) {
+          console.error('Could not check for an existing workspace:', err)
+          taken = new Set([context])
+        }
+        // Nothing here under that name, so nothing to lose and nothing to ask.
+        if (!taken.has(context)) return { action: 'replace' }
+
+        const copySlug = availableWorkspaceSlug(context, taken)
+        const choice = await choose({
+          title: `You already have "${context}"`,
           message:
-            `Joining will delete every card and task in "${context}" on this computer ` +
-            `and replace them with the host's ${incomingItems} item(s). This cannot be undone.`,
-          confirmText: 'Replace my board'
+            `The host is sharing a board called "${context}" with ${incomingItems} item(s). ` +
+            `Replacing deletes every card and task you have under that name. ` +
+            `Keeping both puts the shared board in "${copySlug}" and leaves yours alone.`,
+          confirmText: 'Replace mine',
+          altText: 'Keep both',
+          cancelText: 'Cancel',
+          isDestructive: true,
+          warning: 'Replacing cannot be undone.'
         })
+        if (choice === 'confirm') return { action: 'replace' }
+        if (choice === 'alt') return { action: 'copy', slug: copySlug }
+        return { action: 'cancel' }
+      }
     })
     collabCoordinatorRef.current = coord
     await coord.start()
-  }, [activeContext, confirm])
+  }, [activeWorkspace, choose])
 
   const disconnectCollab = useCallback(() => {
     if (collabCoordinatorRef.current) {
@@ -484,7 +563,7 @@ export default function KanbanView() {
       // holds the same `kanban-cols:` lock the AI action blocks take, which is
       // what stops the board bootstrap and a concurrent AI write from both
       // seeing "empty" and each installing its own default column set.
-      const config = await loadBoardConfig(activeContext)
+      const config = await loadBoardConfig(activeWorkspace)
       setColumns(config.columns)
       setSwimlanesEnabled(config.swimlanes)
       setBoardBg(config.background)
@@ -493,16 +572,16 @@ export default function KanbanView() {
     } catch (err) {
       console.error('Failed to load Kanban column settings:', err)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   const loadCards = useCallback(async () => {
     try {
-      const res = await window.electronAPI.db.getItems(activeContext, 'card', 1, 1000)
+      const res = await window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 1000)
       setCards(res.items)
     } catch (err) {
       console.error('Failed to load Kanban cards:', err)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   const loadTags = useCallback(async () => {
     try {
@@ -637,7 +716,7 @@ export default function KanbanView() {
           if (swimlanesEnabled) patch.priority = destColumnCards[overIndex].priority
           setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...patch } : c))
           await window.electronAPI.db.updateItem(cardId, patch)
-          await window.electronAPI.db.rebalancePositions(activeContext, newStatus)
+          await window.electronAPI.db.rebalancePositions(activeWorkspace, newStatus)
           loadCards()
           return
         }
@@ -664,7 +743,7 @@ export default function KanbanView() {
       console.error('Failed to update card position:', err)
       loadCards()
     }
-  }, [cards, columns, swimlanesEnabled, activeContext, loadCards, persistColumns])
+  }, [cards, columns, swimlanesEnabled, activeWorkspace, loadCards, persistColumns])
 
   // Column Management
 
@@ -759,7 +838,7 @@ export default function KanbanView() {
     } catch (err) {
       console.error(err)
     }
-  }, [activeContext, persistColumns, loadCards, toast])
+  }, [activeWorkspace, persistColumns, loadCards, toast])
 
   // Card Management
 
@@ -832,7 +911,7 @@ export default function KanbanView() {
         : 1000.0
       const created = await window.electronAPI.db.createItem({
         type: 'card',
-        context: activeContext,
+        context: activeWorkspace,
         title: 'New card',
         body: '',
         status: columnId,
@@ -846,17 +925,7 @@ export default function KanbanView() {
     } catch (err) {
       console.error('Failed to create card:', err)
     }
-  }, [cards, activeContext])
-
-  // Quick add card to Backlog. Uses first column as fallback (not hardcoded 'open')
-  const handleAddCardToBacklog = () => {
-    const fallbackCol = columns[0]
-    if (!fallbackCol) {
-      toast('Add a column first before creating cards.', { type: 'info' })
-      return
-    }
-    handleAddCardToColumn(fallbackCol.id)
-  }
+  }, [cards, activeWorkspace])
 
   // Template Instantiation
   const handleCreateCardFromTemplate = async (templateCard: Item) => {
@@ -894,7 +963,7 @@ export default function KanbanView() {
 
       const created = await window.electronAPI.db.createItem({
         type: 'card',
-        context: activeContext,
+        context: activeWorkspace,
         title: `${templateCard.title} (Copy)`,
         body: templateCard.body,
         status: colId,
@@ -1257,7 +1326,7 @@ export default function KanbanView() {
               }}
             >
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                #{contextsList.find(c => c.slug === activeContext)?.name || activeContext}
+                #{workspaceList.find(c => c.slug === activeWorkspace)?.name || activeWorkspace}
               </span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}>
                 <path d="m6 9 6 6 6-6"/>
@@ -1280,15 +1349,15 @@ export default function KanbanView() {
                   animation: 'dropdown-in 150ms var(--ease-enter)'
                 }}
               >
-                {availableContexts.map(ctx => {
-                  const entry = contextsList.find(c => c.slug === ctx)
+                {availableWorkspaces.map(ctx => {
+                  const entry = workspaceList.find(c => c.slug === ctx)
                   const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
                   const color = entry ? entry.color : 'var(--color-balance)'
                   return (
                     <button
                       key={ctx}
                       onClick={() => {
-                        setContext(ctx)
+                        setWorkspace(ctx)
                         setDropdownOpen(false)
                       }}
                       style={{
@@ -1301,7 +1370,7 @@ export default function KanbanView() {
                         border: 'none',
                         cursor: 'pointer',
                         fontSize: 'var(--text-sm)',
-                        color: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-text-base)',
+                        color: ctx === activeWorkspace ? 'var(--color-secondary)' : 'var(--color-text-base)',
                         textAlign: 'left',
                         transition: 'background var(--duration-fast) var(--ease-default)'
                       }}
@@ -1312,7 +1381,7 @@ export default function KanbanView() {
                         width: '8px',
                         height: '8px',
                         borderRadius: '50%',
-                        background: ctx === activeContext ? 'var(--color-secondary)' : color,
+                        background: ctx === activeWorkspace ? 'var(--color-secondary)' : color,
                         flexShrink: 0
                       }} />
                       {name}
@@ -1338,14 +1407,14 @@ export default function KanbanView() {
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   onClick={() => {
                     setView('settings')
-                    setSettingsTab('contexts')
+                    setSettingsTab('workspaces')
                     setDropdownOpen(false)
                   }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px', opacity: 0.7 }}>
                     <path d="M5 12h14M12 5v14"/>
                   </svg>
-                  New Context
+                  New Workspace
                 </button>
               </div>
             )}
@@ -1361,13 +1430,13 @@ export default function KanbanView() {
         </div>
 
         {/* Never shrinks. A button pushed past the right edge is a button
-            nobody can press, and New Card was going over it. */}
+            nobody can press, and this row has gone over it before. */}
         <div className="row" style={{ flexShrink: 0 }}>
           {/* P2P Board Collaboration Share */}
           <div style={{ position: 'relative' }} ref={collabPopoverRef}>
             <HeaderBtn
               onClick={() => setShowCollabPopover(v => !v)}
-              title="Collaborative P2P Workspace Board Sharing"
+              title="Share this board with someone else"
               icon={
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: collabActive ? 'var(--color-secondary)' : 'inherit' }}>
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -1412,7 +1481,7 @@ export default function KanbanView() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    P2P Workspace Sharing
+                    Share This Board
                   </span>
                   {collabActive && (
                     <span style={{ fontSize: '10px', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-full)', fontWeight: 'var(--weight-semibold)' }}>
@@ -1423,10 +1492,40 @@ export default function KanbanView() {
 
                 {!collabActive ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    {/* Who you are, once, for both hosting and joining. Card
+                        history credits this name, so it is worth setting before
+                        a board is shared rather than after. */}
+                    <div className="col">
+                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Your Name</span>
+                      <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
+                        Shown against your changes on a shared board.
+                        {osUserName && ` Left empty, changes are credited to ${osUserName}.`}
+                      </p>
+                      <input
+                        value={displayName}
+                        maxLength={DISPLAY_NAME_MAX}
+                        onChange={e => setDisplayName(e.target.value)}
+                        onBlur={saveDisplayName}
+                        // The fallback rather than an invented example, so the
+                        // empty field shows what it will actually do.
+                        placeholder={osUserName || 'e.g. Dimitris'}
+                        style={{
+                          marginTop: '2px',
+                          background: 'var(--color-surface-2)',
+                          border: '1px solid var(--color-surface-offset)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--color-text-base)',
+                          fontSize: 'var(--text-xs)',
+                          padding: '6px var(--space-2)',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
                     {/* Host section */}
                     <div className="col">
-                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Host Board Share</span>
-                      <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>Let others join and view/edit this active card wall.</p>
+                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Invite Someone</span>
+                      <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>Give another person this board to read or edit, live, while you both have it open.</p>
                       
                       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
                         <button
@@ -1488,7 +1587,7 @@ export default function KanbanView() {
 
                     {/* Join section */}
                     <div className="col">
-                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Join Shared Board</span>
+                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Join Someone's Board</span>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <input
                           type="text"
@@ -1527,6 +1626,39 @@ export default function KanbanView() {
                         </button>
                       </div>
                     </div>
+
+                    {/* The two features are one word apart and were being
+                        mistaken for each other. Each now says what it is not
+                        and where the other one lives. */}
+                    <p style={{
+                      fontSize: '11px',
+                      color: 'var(--color-text-faint)',
+                      margin: 0,
+                      paddingTop: 'var(--space-2)',
+                      borderTop: '1px solid var(--color-surface-offset)',
+                      lineHeight: 1.4
+                    }}>
+                      This is for another person, and covers this board only. To keep your own
+                      machines in step, use{' '}
+                      <button
+                        onClick={() => {
+                          setShowCollabPopover(false)
+                          setView('settings')
+                          setSettingsTab('sync')
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          font: 'inherit',
+                          color: 'var(--color-secondary)',
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        Device Sync
+                      </button>.
+                    </p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -2242,45 +2374,10 @@ export default function KanbanView() {
             </div>
           )}
 
-          {/* Add Column */}
-          {!isReadOnlyMode && (
-            <HeaderBtn
-              onClick={() => setShowAddColModal(true)}
-              title="Add a new column"
-              icon={<Plus size={13} />}
-            >
-              Add Column
-            </HeaderBtn>
-          )}
+          {/* Adding a column lives at the end of the column row, where the
+              new column will appear. A second button in the header only cost
+              space in a header that has too little of it. */}
 
-          {/* Add Card (primary CTA) */}
-          {!isReadOnlyMode && (
-            <button
-              id="kanban-add-card"
-              onClick={handleAddCardToBacklog}
-              style={{
-                background: 'var(--color-secondary)',
-                border: 'none',
-                color: 'var(--color-text-inverted)',
-                borderRadius: 'var(--radius-md)',
-                padding: '0 var(--space-4)',
-                height: '32px',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 'var(--weight-bold)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-1-5)',
-                letterSpacing: '0.01em',
-                transition: 'filter 100ms ease, transform 100ms ease'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.12)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-              onMouseLeave={e => { e.currentTarget.style.filter = 'none'; e.currentTarget.style.transform = 'none' }}
-            >
-              <Plus size={13} strokeWidth={2.5} />
-              New Card
-            </button>
-          )}
         </div>
       </header>
 
@@ -2731,6 +2828,7 @@ export default function KanbanView() {
           columns={columns}
           onClose={() => setActiveCardId(null)}
           onUpdate={handleUpdateCardDetails}
+          cardDisplay={cardDisplay}
           isReadOnly={isReadOnlyMode}
         />
       )}

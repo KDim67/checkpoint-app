@@ -84,6 +84,17 @@ export function reconcile(settings: StartupSettings): StartupSettings {
   return { ...settings, startMinimised: false, closeToTray: false }
 }
 
+/** Written into the login item, read back at startup. Both ends need it. */
+export const MINIMISED_FLAG = '--start-minimised'
+
+/**
+ * The flag decides, not the setting: opening the app by hand should show it.
+ * Without a tray icon there is nothing to click, so it refuses to hide.
+ */
+export function shouldStartHidden(argv: string[], settings: StartupSettings): boolean {
+  return argv.includes(MINIMISED_FLAG) && settings.showTrayIcon
+}
+
 /** True when a change to these settings needs the tray created or destroyed. */
 export function trayVisibilityChanged(before: StartupSettings, after: StartupSettings): boolean {
   return before.showTrayIcon !== after.showTrayIcon

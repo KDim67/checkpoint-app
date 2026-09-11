@@ -309,7 +309,7 @@ function buildMcpServer(): McpServer {
 
   mcp.registerTool(
     'list_workspaces',
-    { description: 'List every workspace (context) in Checkpoint.' },
+    { description: 'List every workspace in Checkpoint.' },
     async () => json({ workspaces: getContextSlugs() })
   )
 

@@ -154,8 +154,8 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
   {
     key: 'sync',
     icon: <RefreshCw size={16} />,
-    title: 'Zero-Cloud P2P Sync Engine',
-    description: 'Bridges note directories and SQLite database updates directly between machines over Wi-Fi (LAN) or the Internet (WebRTC).',
+    title: 'Device Sync',
+    description: 'Keeps your own machines in step, over your network or the internet, with no cloud in between.',
     warning: 'Disabling closes all active network listeners and WebRTC signaling tunnels.',
     getState: async () => {
       const v = await window.electronAPI.db.getSetting('sync_enabled')

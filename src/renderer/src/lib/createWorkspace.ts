@@ -1,7 +1,7 @@
 /**
  * Creating a workspace from a project template.
  *
- * Two places do this. The context manager in Settings and the first-run
+ * Two places do this. The workspace manager in Settings and the first-run
  * panel, and they must produce the same thing, so the scaffolding lives here
  * rather than in either of them.
  *
@@ -19,7 +19,7 @@ import {
 } from '../../../shared/projectTemplates'
 import { collectLabels, type ImportedBoard } from '../../../shared/foreignImport'
 
-/** The same slug rule the context manager has always used. */
+/** The same slug rule the workspace manager has always used. */
 export function slugifyWorkspace(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
@@ -124,6 +124,157 @@ export interface WorkspaceEntry {
   name: string
   color: string
   gitPath?: string
+  /**
+   * Has been part of a P2P session, hosted or joined.
+   *
+   * A label rather than a mode: nothing behaves differently because of it. It
+   * exists so a workspace holding someone else's board is not indistinguishable
+   * from one of your own, which is the whole of the complaint.
+   */
+  shared?: boolean
+}
+
+/** Shared by onboarding, the settings manager and joining a shared board. */
+export const WORKSPACE_COLORS = [
+  '#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'
+]
+
+/**
+ * The picker reads this list, so a workspace missing from it is unreachable
+ * once you leave. An existing entry comes back untouched: rejoining a shared
+ * board is not a rename.
+ */
+export function ensureWorkspaceListed(
+  list: WorkspaceEntry[],
+  slug: string,
+  name?: string
+): WorkspaceEntry[] {
+  // Same array, not a copy: the caller skips the write on identity.
+  if (list.some(w => w.slug === slug)) return list
+
+  return [...list, {
+    slug,
+    name: name?.trim() || slug,
+    color: WORKSPACE_COLORS[list.length % WORKSPACE_COLORS.length]
+  }]
+}
+
+/**
+ * Every workspace slug that is spoken for.
+ *
+ * Both halves matter. A slug can hold items without ever reaching the picker,
+ * and a workspace can be listed while still empty. Treating either as free is
+ * how joining a shared board overwrites something.
+ *
+ * The item read is allowed to throw: a caller deciding whether it is safe to
+ * delete a board must not be handed an empty set when the question could not
+ * be answered. The list read is a second opinion and only logs.
+ */
+export async function occupiedWorkspaces(): Promise<Set<string>> {
+  const taken = new Set<string>(await window.electronAPI.db.getContexts())
+
+  try {
+    const raw = await window.electronAPI.db.getSetting('contexts_list') as string | null
+    const list = raw ? JSON.parse(raw) : []
+    if (Array.isArray(list)) {
+      for (const entry of list as WorkspaceEntry[]) {
+        if (entry && typeof entry.slug === 'string') taken.add(entry.slug)
+      }
+    }
+  } catch (err) {
+    console.error('Could not read the workspace list:', err)
+  }
+
+  return taken
+}
+
+/**
+ * A slug near `desired` that nothing is using yet.
+ *
+ * Joining a shared board used to overwrite whatever was already under that
+ * name. Keeping both copies needs somewhere to put the second one, and the
+ * name has to be predictable enough to show in the prompt before it is made.
+ */
+export function availableWorkspaceSlug(desired: string, taken: Iterable<string>): string {
+  const used = new Set(taken)
+  if (!used.has(desired)) return desired
+
+  const shared = `${desired}-shared`
+  if (!used.has(shared)) return shared
+
+  // Counts rather than searching, so joining the same board a third time does
+  // not land back on the second copy.
+  for (let n = 2; n < 1000; n++) {
+    const candidate = `${shared}-${n}`
+    if (!used.has(candidate)) return candidate
+  }
+  // A thousand copies of one board is not a real situation, but silently
+  // returning a taken slug would be a wipe, so this ends somewhere unique.
+  return `${shared}-${Date.now()}`
+}
+
+/** Turns the shared label on or off. Returns the same list when it already says that. */
+export function setWorkspaceShared(
+  list: WorkspaceEntry[],
+  slug: string,
+  shared: boolean
+): WorkspaceEntry[] {
+  const entry = list.find(w => w.slug === slug)
+  if (!entry || Boolean(entry.shared) === shared) return list
+  // Absent rather than false, so an unshared workspace serialises the way it
+  // did before the flag existed.
+  return list.map(w => {
+    if (w.slug !== slug) return w
+    if (shared) return { ...w, shared: true }
+    const next = { ...w }
+    delete next.shared
+    return next
+  })
+}
+
+/**
+ * Lists a workspace if it is new and labels it shared either way.
+ *
+ * Separate from ensureWorkspaceListed because rejoining a board you already
+ * hold is exactly the case that needs the label, and exactly the case that
+ * function deliberately leaves untouched.
+ */
+export function markWorkspaceShared(
+  list: WorkspaceEntry[],
+  slug: string,
+  name?: string
+): WorkspaceEntry[] {
+  return setWorkspaceShared(ensureWorkspaceListed(list, slug, name), slug, true)
+}
+
+/**
+ * The list only: the baseline brings the board and its columns, so scaffolding
+ * here would lay a template over data that has just arrived. Never throws, as
+ * this runs mid-join and a failed write should cost a picker entry, not the board.
+ */
+export async function registerSharedWorkspace(
+  slug: string,
+  name?: string
+): Promise<WorkspaceEntry[]> {
+  let existing: WorkspaceEntry[] = []
+  try {
+    const raw = await window.electronAPI.db.getSetting('contexts_list') as string | null
+    if (raw) existing = JSON.parse(raw) as WorkspaceEntry[]
+  } catch (err) {
+    console.error('Could not read the workspace list:', err)
+  }
+  if (!Array.isArray(existing)) existing = []
+
+  const next = markWorkspaceShared(existing, slug, name)
+  // Identity: already listed and already labelled, so nothing to write.
+  if (next === existing) return next
+
+  try {
+    await window.electronAPI.db.setSetting('contexts_list', JSON.stringify(next))
+  } catch (err) {
+    console.error('Could not record the shared workspace:', err)
+  }
+  return next
 }
 
 /**

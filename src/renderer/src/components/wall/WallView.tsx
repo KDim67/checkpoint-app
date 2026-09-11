@@ -211,7 +211,7 @@ interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y
 const ZOOM_SETTLE_MS = 150
 
 export default function WallView() {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const selectItem = useAppStore(s => s.selectItem)
   const setView = useAppStore(s => s.setView)
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
@@ -362,10 +362,10 @@ export default function WallView() {
   /** Restyling only makes sense when everything selected is a connector. */
   const arrowsSelected = selectedItems.length > 0 && selectedItems.every(i => i.kind === 'arrow')
 
-  const wallIndex = index?.context === activeContext ? index.value : null
+  const wallIndex = index?.context === activeWorkspace ? index.value : null
   const activeWall = wallIndex?.walls.find(w => w.id === wallIndex.activeId) ?? null
   /** Null until the index has been read: there is no wall to open before then. */
-  const docKey = activeWall ? wallDocKey(activeContext, activeWall.id) : null
+  const docKey = activeWall ? wallDocKey(activeWorkspace, activeWall.id) : null
 
   // Load
   /** What the walls can point at. Workspace-wide, so switching wall leaves it. */
@@ -374,7 +374,7 @@ export default function WallView() {
 
     const readCards = (): Promise<void> =>
       window.electronAPI.db
-        .getItems(activeContext, 'card', 1, 500)
+        .getItems(activeWorkspace, 'card', 1, 500)
         .catch(() => ({ items: [] as Item[] }))
         .then(res => { if (!cancelled) setCards((res.items ?? []).filter(c => c.status !== 'archived')) })
 
@@ -383,7 +383,7 @@ export default function WallView() {
       // Notes are not per-workspace, so they are offered whole.
       window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[]),
       // The board's own columns, not whatever statuses happen to be in use.
-      loadBoardConfig(activeContext).catch(() => null)
+      loadBoardConfig(activeWorkspace).catch(() => null)
     ]).then(([noteList, config]) => {
       if (cancelled) return
       setNotes(noteList ?? [])
@@ -402,7 +402,7 @@ export default function WallView() {
       cancelled = true
       window.removeEventListener('db-mutation', onMutation)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   /**
    * Closes a toolbar popover when the click lands elsewhere.
@@ -458,11 +458,11 @@ export default function WallView() {
     let cancelled = false
     setIndex(null)
     setWallMenuOpen(false)
-    loadWallIndex(activeContext).then(loaded => {
-      if (!cancelled) setIndex({ context: activeContext, value: loaded })
+    loadWallIndex(activeWorkspace).then(loaded => {
+      if (!cancelled) setIndex({ context: activeWorkspace, value: loaded })
     })
     return () => { cancelled = true }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   useEffect(() => {
     if (!docKey) return
@@ -518,9 +518,9 @@ export default function WallView() {
   }, [docKey])
 
   const commitIndex = useCallback((next: WallIndex) => {
-    setIndex({ context: activeContext, value: next })
-    void saveWallIndex(activeContext, next)
-  }, [activeContext])
+    setIndex({ context: activeWorkspace, value: next })
+    void saveWallIndex(activeWorkspace, next)
+  }, [activeWorkspace])
 
   const addWall = useCallback(() => {
     // From the loaded index, so a slow load cannot start a competing list.
@@ -578,12 +578,12 @@ export default function WallView() {
     setPendingDelete(null)
     if (next === wallIndex) return
 
-    const key = wallDocKey(activeContext, pendingDelete.id)
+    const key = wallDocKey(activeWorkspace, pendingDelete.id)
     discardedRef.current.add(key)
     // Before the switch: the flush on the way out would land after the delete.
     await deleteWallDoc(key)
     commitIndex(next)
-  }, [pendingDelete, wallIndex, activeContext, commitIndex])
+  }, [pendingDelete, wallIndex, activeWorkspace, commitIndex])
 
   /** `record: false` for drag frames. The whole gesture is one undo step. */
   const setItems = useCallback((items: WallItem[], { record = true } = {}) => {
@@ -777,14 +777,14 @@ export default function WallView() {
         borderColor: style.getPropertyValue('--color-surface-offset').trim() || '#24293f'
       })
       if (!png) { toast('Could not render the wall.', { type: 'error' }); return }
-      const saved = await window.electronAPI.app.saveBinaryFile(`${activeContext}-${activeWall?.name ?? 'wall'}.png`.replace(/[^\w.-]+/g, '-'), await png.arrayBuffer(), 'png')
+      const saved = await window.electronAPI.app.saveBinaryFile(`${activeWorkspace}-${activeWall?.name ?? 'wall'}.png`.replace(/[^\w.-]+/g, '-'), await png.arrayBuffer(), 'png')
       if (saved) toast('Wall exported.')
     } catch (err) {
       toast(`Export failed: ${errorMessage(err)}`, { type: 'error' })
     } finally {
       setBusy(null)
     }
-  }, [activeContext, activeWall, toast])
+  }, [activeWorkspace, activeWall, toast])
 
   const fitToContent = useCallback(() => {
     const rect = viewportRef.current?.getBoundingClientRect()
