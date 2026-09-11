@@ -140,7 +140,7 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
           onPaste={handlePaste}
           onDrop={handleDrop}
           onDragOver={e => e.preventDefault()}
-          placeholder={`Type a log for context "${context}"... (Use #tags, Markdown, or Shift+Enter for newlines)`}
+          placeholder={`Type a log for "${context}"... (Use #tags, Markdown, or Shift+Enter for newlines)`}
           rows={1}
           style={{
             flex: 1,

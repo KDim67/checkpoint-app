@@ -12,6 +12,7 @@
  */
 
 import type { BulkUpdatePayload, Item, ItemPriority, ItemType, Relation, RelationType, Tag } from './types'
+import { normalizeBoardConfig, type BoardConfig } from './boardModel'
 
 // The messages
 
@@ -31,6 +32,34 @@ export type RemoteMutation =
   | { type: 'bulkDeleteItems'; ids: string[] }
   | { type: 'rebalancePositions'; context: string; status: string }
 
+/**
+ * Points a mutation at a different workspace.
+ *
+ * Someone who joined a shared board as a copy holds it under a different slug
+ * from the host's, and both sides still have to agree on which board a change
+ * is about. The slug is translated at the wire so nothing else in the app has
+ * to know. Mutations addressed by id carry no workspace and pass through.
+ */
+export function retargetMutation(mutation: RemoteMutation, context: string): RemoteMutation {
+  if (mutation.type === 'createItem' || mutation.type === 'updateItem') {
+    if (mutation.item.context === context) return mutation
+    return { ...mutation, item: { ...mutation.item, context } }
+  }
+  if (mutation.type === 'rebalancePositions') {
+    return mutation.context === context ? mutation : { ...mutation, context }
+  }
+  // The third carrier of a workspace name, and the least obvious: a bulk edit
+  // can move cards between workspaces, and its patch names the destination.
+  // Sent untranslated it would move the peer's cards into a workspace named
+  // after this side's copy.
+  if (mutation.type === 'bulkUpdateItems') {
+    const { context: target } = mutation.payload.patch
+    if (target === undefined || target === context) return mutation
+    return { ...mutation, payload: { ...mutation.payload, patch: { ...mutation.payload.patch, context } } }
+  }
+  return mutation
+}
+
 export interface BoardBaselineMessage {
   type: 'board-baseline'
   context: string
@@ -39,6 +68,15 @@ export interface BoardBaselineMessage {
   itemTags: { item_id: string; tag_id: string }[]
   relations: Relation[]
   mode: 'collaborative' | 'readonly'
+  /**
+   * The host's columns, so the cards have somewhere to land.
+   *
+   * Optional, because a build older than this one sends no board at all and a
+   * peer joining from one must still get its cards. Without it a workspace
+   * created by joining starts on the four default columns, and every card
+   * whose status is a column the host renamed or added renders nowhere.
+   */
+  board?: BoardConfig
 }
 
 export interface DbMutationMessage {
@@ -236,7 +274,11 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
       itemTags: normalizeAll(o.itemTags, normalizeItemTag),
       relations: normalizeAll(o.relations, normalizeSyncRelation),
       // Read-only by default, so an unclear peer does not make us broadcast back.
-      mode: o.mode === 'collaborative' ? 'collaborative' : 'readonly'
+      mode: o.mode === 'collaborative' ? 'collaborative' : 'readonly',
+      // Absent from an older peer. Left undefined rather than normalised into
+      // a default board, so the joiner can tell "no board was sent" from "the
+      // host really has the default four" and keep its own in the first case.
+      board: o.board === undefined ? undefined : normalizeBoardConfig(o.board)
     }
   }
 

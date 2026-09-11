@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 export const CreateItemSchema = z.object({
   type: z.enum(['log', 'card', 'task']),
-  context: z.string().min(1, 'Context slug cannot be empty'),
+  context: z.string().min(1, 'Workspace slug cannot be empty'),
   title: z.string().default(''),
   body: z.string().default(''),
   status: z.string().default('open'),
@@ -65,7 +65,7 @@ export const TaskQueryParamsSchema = z.object({
 })
 
 export const CreateFocusSessionSchema = z.object({
-  context: z.string().min(1, 'Context slug cannot be empty'),
+  context: z.string().min(1, 'Workspace slug cannot be empty'),
   duration_ms: z.number().int().positive('Duration must be a positive integer'),
   notes: z.string().default(''),
   tasks_json: z.string().default('[]')

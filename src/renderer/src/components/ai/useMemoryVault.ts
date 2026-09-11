@@ -18,13 +18,13 @@ import type { AiMemory, MemoryCategory } from '../../../../shared/types'
 export type { MemoryCategory, AiMemory as MemoryRow } from '../../../../shared/types'
 
 interface Options {
-  activeContext: string
+  activeWorkspace: string
   selectedModel: string
   /** Typed off useToast so the two cannot drift apart. */
   toast: ReturnType<typeof useToast>['toast']
 }
 
-export function useMemoryVault({ activeContext, selectedModel, toast }: Options) {
+export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Options) {
   const [showMemoryPanel, setShowMemoryPanel] = useState(false)
   const [memories, setMemories] = useState<AiMemory[]>([])
   const [memoryLoading, setMemoryLoading] = useState(false)
@@ -45,17 +45,17 @@ export function useMemoryVault({ activeContext, selectedModel, toast }: Options)
     if (!showMemoryPanel) return
     let cancelled = false
     setMemoryLoading(true)
-    window.electronAPI.memory.getMemories(activeContext)
+    window.electronAPI.memory.getMemories(activeWorkspace)
       .then(mems => { if (!cancelled) setMemories(mems || []) })
       .catch(e => { if (!cancelled) { console.warn('Failed to load memories:', e); setMemories([]) } })
       .finally(() => { if (!cancelled) setMemoryLoading(false) })
     return () => { cancelled = true }
-  }, [showMemoryPanel, activeContext])
+  }, [showMemoryPanel, activeWorkspace])
 
   const handleAuditMemories = async () => {
     try {
       setMemoryLoading(true)
-      const validContext = activeContext || 'default'
+      const validContext = activeWorkspace || 'default'
       const audited = await window.electronAPI.memory.auditMemories(validContext, selectedModel)
       setMemories(audited)
       toast('Memory vault audited and optimized!', { type: 'success' })
@@ -107,7 +107,7 @@ export function useMemoryVault({ activeContext, selectedModel, toast }: Options)
     if (!newMemoryKey.trim() || !newMemoryContent.trim()) return
     try {
       const saved = await window.electronAPI.memory.saveMemory({
-        context: activeContext || 'default',
+        context: activeWorkspace || 'default',
         category: newMemoryCategory,
         memory_key: newMemoryKey.trim(),
         content: newMemoryContent.trim()

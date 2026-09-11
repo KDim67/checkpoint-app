@@ -19,9 +19,9 @@ export default function LogView() {
   const aiEnabled = useAiEnabled()
   const [searchQuery, setSearchQuery] = useState('')
 
-  const activeContext = useAppStore(s => s.activeContext)
-  const availableContexts = useAppStore(s => s.availableContexts)
-  const setContext = useAppStore(s => s.setContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
+  const setWorkspace = useAppStore(s => s.setWorkspace)
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
 
@@ -45,7 +45,7 @@ export default function LogView() {
   const loadInitialFeed = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await window.electronAPI.db.getItems(activeContext, 'log', 1, 50)
+      const res = await window.electronAPI.db.getItems(activeWorkspace, 'log', 1, 50)
       
       // SQLite returns sorted by position ASC, created_at DESC (which is newest first).
       // For a Slack-like chronological feed (oldest at the top, newest at the bottom),
@@ -61,7 +61,7 @@ export default function LogView() {
     } finally {
       setLoading(false)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   useEffect(() => {
     loadInitialFeed()
@@ -79,7 +79,7 @@ export default function LogView() {
   const handleLoadMore = useCallback(async () => {
     const nextPage = page + 1
     try {
-      const res = await window.electronAPI.db.getItems(activeContext, 'log', nextPage, 50)
+      const res = await window.electronAPI.db.getItems(activeWorkspace, 'log', nextPage, 50)
       if (res.items.length > 0) {
         const reversed = [...res.items].reverse()
         setItems(prev => [...reversed, ...prev])
@@ -91,7 +91,7 @@ export default function LogView() {
     } catch (err) {
       console.error('Failed to load more logs:', err)
     }
-  }, [activeContext, page, items.length])
+  }, [activeWorkspace, page, items.length])
 
   // Create Log Entry
   const handleSubmitLog = async (body: string, tagIds: string[]) => {
@@ -99,7 +99,7 @@ export default function LogView() {
       const title = body.split('\n')[0].replace(/^[#\s*>-]+/, '').trim().substring(0, 80) || 'Untitled Log'
       const newItem = await window.electronAPI.db.createItem({
         type: 'log',
-        context: activeContext,
+        context: activeWorkspace,
         title,
         body,
         status: 'open',
@@ -275,7 +275,7 @@ export default function LogView() {
             color: 'var(--color-text-base)',
             margin: 0
           }}>
-            Context Feed
+            Workspace Feed
           </h1>
           <div style={{ position: 'relative' }} ref={dropdownRef}>
             <button
@@ -301,7 +301,7 @@ export default function LogView() {
                 e.currentTarget.style.background = 'var(--color-surface-2)'
               }}
             >
-              #{activeContext}
+              #{activeWorkspace}
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}>
                 <path d="m6 9 6 6 6-6"/>
               </svg>
@@ -323,11 +323,11 @@ export default function LogView() {
                   animation: 'dropdown-in 150ms var(--ease-enter)'
                 }}
               >
-                {availableContexts.map(ctx => (
+                {availableWorkspaces.map(ctx => (
                   <button
                     key={ctx}
                     onClick={() => {
-                      setContext(ctx)
+                      setWorkspace(ctx)
                       setDropdownOpen(false)
                     }}
                     style={{
@@ -340,7 +340,7 @@ export default function LogView() {
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: 'var(--text-sm)',
-                      color: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-text-base)',
+                      color: ctx === activeWorkspace ? 'var(--color-secondary)' : 'var(--color-text-base)',
                       textAlign: 'left',
                       transition: 'background var(--duration-fast) var(--ease-default)'
                     }}
@@ -351,7 +351,7 @@ export default function LogView() {
                       width: '8px',
                       height: '8px',
                       borderRadius: '50%',
-                      background: ctx === activeContext ? 'var(--color-secondary)' : 'var(--color-balance)',
+                      background: ctx === activeWorkspace ? 'var(--color-secondary)' : 'var(--color-balance)',
                       flexShrink: 0
                     }} />
                     {ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -376,14 +376,14 @@ export default function LogView() {
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                   onClick={() => {
                     setView('settings')
-                    setSettingsTab('contexts')
+                    setSettingsTab('workspaces')
                     setDropdownOpen(false)
                   }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px', opacity: 0.7 }}>
                     <path d="M5 12h14M12 5v14"/>
                   </svg>
-                  New Context
+                  New Workspace
                 </button>
               </div>
             )}
@@ -462,8 +462,8 @@ export default function LogView() {
         {items.length === 0 ? (
           <EmptyState
             icon={<FileText size={48} />}
-            title="Context Feed is Empty"
-            description={`No logs recorded for context "#${activeContext}" yet. Write a quick note below to start capturing context.`}
+            title="Workspace Feed is Empty"
+            description={`No logs recorded in "#${activeWorkspace}" yet. Write a quick note below to start capturing what you are doing.`}
           />
         ) : displayedItems.length === 0 ? (
           <EmptyState
@@ -479,14 +479,14 @@ export default function LogView() {
             onTogglePin={handleTogglePin}
             onDelete={handleDeleteLog}
             onConvertToCard={handleConvertToCard}
-            activeContext={activeContext}
+            activeWorkspace={activeWorkspace}
           />
         )}
       </div>
 
       {/* Pinned compose bar */}
       <LogInput
-        context={activeContext}
+        context={activeWorkspace}
         onSubmit={handleSubmitLog}
       />
 

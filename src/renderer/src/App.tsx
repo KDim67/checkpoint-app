@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
-import type { ContextEntry } from './store/appStore'
 import { useAppStore, type ActiveView } from './store/appStore'
 import { useAiEnabled } from './lib/useAiEnabled'
 import { Sidebar } from './components/Sidebar'
@@ -10,13 +9,14 @@ import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './lib/fontScale'
 import { applyStoredTheme, watchTheme } from './lib/themeBoot'
 import Lightbox from './components/ui/Lightbox'
+import UpdateIndicator from './components/ui/UpdateIndicator'
 import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
 import { getNumberSetting, setNumberSetting } from './lib/settings'
 import { getBoolSetting, setBoolSetting } from './lib/settings'
 import { createWorkspace, slugifyWorkspace, type WorkspaceEntry } from './lib/createWorkspace'
 
 const ONBOARDING_SEEN_KEY = 'onboarding_seen'
-/** Same palette the context manager assigns from, so colours stay consistent. */
+/** Same palette the workspace manager assigns from, so colours stay consistent. */
 const ONBOARDING_COLORS = ['#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 import {
   APP_SHORTCUTS,
@@ -133,6 +133,9 @@ function ThemeToggle() {
 
 // Titlebar
 function Titlebar() {
+  const setView = useAppStore(s => s.setView)
+  const setSettingsTab = useAppStore(s => s.setSettingsTab)
+
   return (
     <div className="titlebar">
       <div style={{ display: 'flex', alignItems: 'center', userSelect: 'none' }}>
@@ -149,6 +152,12 @@ function Titlebar() {
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion'] }}>
+        <UpdateIndicator
+          onOpen={() => {
+            setView('settings')
+            setSettingsTab('about')
+          }}
+        />
         <ThemeToggle />
         {window.electronAPI.app.platform === 'linux' && (
           <div className="titlebar-controls" style={{ display: 'flex', gap: 'var(--space-0-5)' }}>
@@ -507,9 +516,9 @@ function HudShell() {
 export default function App() {
   const activeView = useAppStore(s => s.activeView)
   const setView = useAppStore(s => s.setView)
-  const setAvailableContexts = useAppStore(s => s.setAvailableContexts)
-  const setContextsList = useAppStore(s => s.setContextsList)
-  const setContext = useAppStore(s => s.setContext)
+  const setAvailableWorkspaces = useAppStore(s => s.setAvailableWorkspaces)
+  const setWorkspaceList = useAppStore(s => s.setWorkspaceList)
+  const setWorkspace = useAppStore(s => s.setWorkspace)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   // The shortcut handler binds once, so it reads the flag through a ref.
   const appAiEnabled = useAiEnabled()
@@ -574,10 +583,10 @@ export default function App() {
     }
     const { list } = await createWorkspace(existing, entry, templateId)
 
-    setContextsList(list)
-    setAvailableContexts(list.map(c => c.slug))
-    setContext(slug)
-  }, [setContextsList, setAvailableContexts, setContext])
+    setWorkspaceList(list)
+    setAvailableWorkspaces(list.map(c => c.slug))
+    setWorkspace(slug)
+  }, [setWorkspaceList, setAvailableWorkspaces, setWorkspace])
 
   // Ctrl/Cmd+K, bound in the renderer rather than as a global shortcut: a global
   // one would fire while Checkpoint is in the background and steal the keystroke
@@ -634,12 +643,12 @@ export default function App() {
     try {
       const contexts = await window.electronAPI.db.getContexts()
       if (contexts.length > 0) {
-        setAvailableContexts(contexts)
+        setAvailableWorkspaces(contexts)
 
         const rawList = await window.electronAPI.db.getSetting('contexts_list') as string | null
         // Written by this app, but it is JSON off disk and a hand-edited
         // settings row is still a possibility.
-        let list: ContextEntry[] = []
+        let list: WorkspaceEntry[] = []
         if (rawList) {
           try {
             list = JSON.parse(rawList)
@@ -653,7 +662,7 @@ export default function App() {
           }))
           window.electronAPI.db.setSetting('contexts_list', JSON.stringify(list)).catch(() => {})
         }
-        setContextsList(list)
+        setWorkspaceList(list)
 
         const defaultContext = await window.electronAPI.db.getSetting('default_context') as string | null
         const savedContext = await window.electronAPI.db.getSetting('active_context') as string | null
@@ -662,13 +671,13 @@ export default function App() {
           : savedContext && contexts.includes(savedContext) ? savedContext
           : contexts[0] // Fallback to first available context
         if (startContext) {
-          setContext(startContext)
+          setWorkspace(startContext)
         }
       }
     } catch {
       // DB not yet initialized. Use defaults
     }
-  }, [setAvailableContexts, setContextsList, setContext])
+  }, [setAvailableWorkspaces, setWorkspaceList, setWorkspace])
 
   // Land on the configured start view before the redirect guard runs, so a
   // restored view is not immediately bounced by checkEnabledViews.

@@ -15,6 +15,8 @@ import { getSetting, setSetting } from './db'
 import {
   normalizeStartupSettings,
   reconcile,
+  shouldStartHidden,
+  MINIMISED_FLAG,
   type StartupSettings
 } from '../shared/startupSettings'
 
@@ -58,7 +60,7 @@ export function setStartupSettings(next: unknown): StartupSettings {
       openAtLogin: settings.openAtLogin,
       // Passed so a login launch can start hidden; the app reads it back at
       // startup rather than guessing from the absence of a window.
-      args: settings.startMinimised ? ['--start-minimised'] : []
+      args: settings.startMinimised ? [MINIMISED_FLAG] : []
     })
   } catch (err) {
     console.error('[tray] Could not update the login item:', err)
@@ -76,9 +78,15 @@ export function setStartupSettings(next: unknown): StartupSettings {
   return settings
 }
 
-/** True when this launch was started by Windows at login, minimised. */
+/** True when Windows started this at login and it should stay in the tray. */
 export function launchedMinimised(): boolean {
-  return process.argv.includes('--start-minimised')
+  // A failed settings read must not cost the window.
+  try {
+    return shouldStartHidden(process.argv, getStartupSettings())
+  } catch (err) {
+    console.error('[tray] Could not read the startup settings:', err)
+    return false
+  }
 }
 
 function panelPosition(): { x: number; y: number } {

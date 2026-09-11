@@ -329,13 +329,13 @@ function parseBatchBoardJson(jsonString: string): BatchBoard | null {
 type ShownColumn = { name: string; color?: string }
 
 function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
   const [completedData, setCompletedData] = useState<{ columns: ShownColumn[]; cards: BatchCard[]; skippedCards?: number; reusedCols?: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const batchData = parseBatchBoardJson(jsonString)
-  const signature = batchData ? `batch::${activeContext || 'default'}::${batchData.columns.map(c => c.name).join(',')}_${batchData.cards.map(c => c.title).join(',')}` : ''
+  const signature = batchData ? `batch::${activeWorkspace || 'default'}::${batchData.columns.map(c => c.name).join(',')}_${batchData.cards.map(c => c.title).join(',')}` : ''
 
   useEffect(() => {
     let isMounted = true
@@ -348,7 +348,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
         }
         executedActionSignaturesSet.add(signature)
 
-        const validContext = activeContext || 'default'
+        const validContext = activeWorkspace || 'default'
 
         // 1. Create Columns (locked: prevents a concurrent column writer,
         //    e.g. the Kanban view's own "bootstrap default columns" path, or
@@ -482,7 +482,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
     }
     processBatch()
     return () => { isMounted = false }
-  }, [jsonString, activeContext, signature])
+  }, [jsonString, activeWorkspace, signature])
 
   if (error) {
     return (
@@ -623,7 +623,7 @@ function opSignatureValue(o: UpdateOperation): string | number {
 }
 
 function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string; dedupeKey?: string }) {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
   const [result, setResult] = useState<(UpdateOutcome & { replayed?: boolean }) | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -637,7 +637,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
   // in a NEW message must execute again. Repeating a request is the most
   // natural user reaction when something didn't work.
   const signature = operations.length
-    ? `update::${activeContext || 'default'}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target}:${opSignatureValue(o)}`).join('|')}`
+    ? `update::${activeWorkspace || 'default'}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target}:${opSignatureValue(o)}`).join('|')}`
     : ''
 
   useEffect(() => {
@@ -658,7 +658,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
         }
         executedActionSignaturesSet.add(signature)
 
-        const validContext = activeContext || 'default'
+        const validContext = activeWorkspace || 'default'
 
         const outcome = await withLock(`kanban-cards:${validContext}`, async () => {
           const [tasksRes, cardsRes] = await Promise.all([
@@ -819,7 +819,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
     run()
     return () => { isMounted = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jsonString, activeContext, signature])
+  }, [jsonString, activeWorkspace, signature])
 
   // One-click rollback: replay the recorded inverse patches in reverse order.
   const handleUndo = async () => {
@@ -981,7 +981,7 @@ const executedConfigOutcomesMap = new Map<string, ConfigOutcome>()
  * user has to unpick by hand.
  */
 function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string; dedupeKey?: string }) {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [outcome, setOutcome] = useState<ConfigOutcome | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [undoing, setUndoing] = useState(false)
@@ -989,7 +989,7 @@ function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: stri
   const parsed = faultTolerantParseJSON(jsonString)
   const normalized = parsed ? normalizeConfigUpdate(parsed) : null
   const operations = normalized?.operations ?? []
-  const context = activeContext || 'default'
+  const context = activeWorkspace || 'default'
   const signature = operations.length
     ? `config::${context}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target ?? o.name ?? ''}`).join('|')}`
     : ''
@@ -1134,7 +1134,7 @@ function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: stri
 }
 
 function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const selectItem = useAppStore(s => s.selectItem)
   const setView = useAppStore(s => s.setView)
   const [createdItem, setCreatedItem] = useState<Item | null>(null)
@@ -1143,7 +1143,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
 
   const normalized = normalizeCardJson(jsonString)
   const title = normalized?.title || ''
-  const signature = title ? `card::${activeContext || 'default'}::${title.toLowerCase()}` : ''
+  const signature = title ? `card::${activeWorkspace || 'default'}::${title.toLowerCase()}` : ''
 
   const cached = signature ? createdItemsCacheMap.get(signature) : null
   const currentItem = createdItem || cached?.item
@@ -1178,7 +1178,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
         }
         executedActionSignaturesSet.add(signature)
 
-        const validContext = activeContext || 'default'
+        const validContext = activeWorkspace || 'default'
 
         const created = await withLock(`kanban-cards:${validContext}`, async () => {
           const existingItemsRes = await window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
@@ -1275,7 +1275,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
     }
     autoCreate()
     return () => { isMounted = false }
-  }, [jsonString, activeContext, signature])
+  }, [jsonString, activeWorkspace, signature])
 
   // Look up the human-readable column name for whatever status ID this card has.
   // Must stay above the early returns below: this block renders a "generating"
@@ -1286,7 +1286,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
     if (!data) return
     const lookup = async () => {
       try {
-        const ctx = activeContext || 'default'
+        const ctx = activeWorkspace || 'default'
         const { columns: cols } = await loadBoardConfig(ctx)
         const match = cols.find(c =>
           c.id === data.status || c.name?.toLowerCase() === String(data.status).toLowerCase()
@@ -1302,7 +1302,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
       } catch { setColDisplayName(String(data.status)) }
     }
     lookup()
-  }, [data?.status, activeContext])
+  }, [data?.status, activeWorkspace])
 
   if (error) {
     return (
@@ -1460,14 +1460,14 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
 }
 
 function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
   const [createdCol, setCreatedCol] = useState<ColumnConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const normalized = normalizeColumnJson(jsonString)
   const name = normalized?.name || ''
-  const signature = name ? `col::${activeContext || 'default'}::${name.toLowerCase()}` : ''
+  const signature = name ? `col::${activeWorkspace || 'default'}::${name.toLowerCase()}` : ''
 
   const cachedCol = signature ? createdColsCacheMap.get(signature) : null
   const colData = createdCol || cachedCol || (normalized ? { name: normalized.name, color: normalized.color, wipLimit: normalized.wipLimit } : null)
@@ -1491,7 +1491,7 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
         const wipLimit = normalized.wipLimit
         const color = normalized.color
         const colorMode = toColorMode(normalized.colorMode)
-        const context = activeContext || 'default'
+        const context = activeWorkspace || 'default'
 
         const newCol = await withLock(boardConfigLockKey(context), async () => {
           const config = await readBoardConfigUnlocked(context)
@@ -1523,7 +1523,7 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
     }
     autoCreateCol()
     return () => { isMounted = false }
-  }, [jsonString, activeContext, signature])
+  }, [jsonString, activeWorkspace, signature])
 
   if (error) {
     return (
@@ -1606,7 +1606,7 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
 }
 
 function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
 
@@ -1689,7 +1689,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
 
   const handleCommit = async () => {
     let count = 0
-    const context = activeContext || 'default'
+    const context = activeWorkspace || 'default'
     const posBase = Date.now() // ascending positions keep plan order on the board
     for (const step of approvedSteps) {
       try {
@@ -2453,11 +2453,11 @@ function linkifyCardTitles(content: string, entries: Array<{ title: string; id: 
 
 function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onCopy, isCopied, isStreaming, hasRevertAction }: ChatMessageProps) {
   const isUser = message.role === 'user'
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   // Card-title linkification only for committed assistant messages (streaming
   // text shifts constantly; user text is their own words). Memoized: the
   // regex sweep over up to 80 titles must not run on unrelated re-renders.
-  const boardTitles = useBoardTitles(activeContext || 'default', !isUser && !isStreaming)
+  const boardTitles = useBoardTitles(activeWorkspace || 'default', !isUser && !isStreaming)
   const renderedContent = React.useMemo(
     () => (!isUser && !isStreaming) ? linkifyCardTitles(message.content, boardTitles) : message.content,
     [isUser, isStreaming, message.content, boardTitles]

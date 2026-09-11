@@ -15,12 +15,12 @@ const allOn = (): ViewEnabledMap => ({
 
 const context = (over: Partial<CommandContext> = {}): CommandContext => ({
   setView: vi.fn(),
-  setContext: vi.fn(),
+  setWorkspace: vi.fn(),
   setSettingsTab: vi.fn(),
   setRightPanelContent: vi.fn(),
   toggleRightPanel: vi.fn(),
-  contexts: ['work'],
-  activeContext: 'work',
+  workspaces: ['work'],
+  activeWorkspace: 'work',
   enabledViews: allOn() as Partial<Record<ActiveView, boolean>>,
   savedViews: [],
   applyView: vi.fn(),

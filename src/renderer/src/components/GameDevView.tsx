@@ -80,10 +80,10 @@ export default function GameDevView() {
 
   const moveCardToDone = useCallback(async (cardId: string) => {
     try {
-      const activeContext = useAppStore.getState().activeContext
+      const activeWorkspace = useAppStore.getState().activeWorkspace
       // Reads the unified board document rather than the legacy column key,
       // which stopped being written once board configuration was unified.
-      const { columns } = await loadBoardConfig(activeContext)
+      const { columns } = await loadBoardConfig(activeWorkspace)
       const doneCol = columns.find(c => c.id === 'done' || c.name.toLowerCase().includes('done'))
       const doneColId = doneCol?.id ?? 'done'
       await window.electronAPI.db.updateItem(cardId, { status: doneColId })

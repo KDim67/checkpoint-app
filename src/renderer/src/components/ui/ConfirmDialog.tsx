@@ -1,4 +1,4 @@
-import React, { useRef, createContext, useContext, useState, useCallback } from 'react'
+import React, { useRef, createContext, useContext, useState, useCallback, useMemo } from 'react'
 import useEscapeKey from './useEscapeKey'
 import useFocusTrap from './useFocusTrap'
 
@@ -8,10 +8,17 @@ interface ConfirmDialogProps {
   message: string
   confirmText?: string
   cancelText?: string
+  /**
+   * A third way out, between cancelling and going through with it. Set only
+   * where the choice is genuinely three-way, such as replacing a board or
+   * keeping both copies of it.
+   */
+  altText?: string
   isDestructive?: boolean
   /** Extra emphasis for irreversible actions, shown below the message. */
   warning?: string
   onConfirm: () => void
+  onAlt?: () => void
   onCancel: () => void
 }
 
@@ -21,9 +28,11 @@ export default function ConfirmDialog({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
+  altText,
   isDestructive = false,
   warning,
   onConfirm,
+  onAlt,
   onCancel
 }: ConfirmDialogProps) {
   const cancelBtnRef = useRef<HTMLButtonElement | null>(null)
@@ -147,7 +156,29 @@ export default function ConfirmDialog({
           >
             {cancelText}
           </button>
-          
+
+          {altText && onAlt && (
+            <button
+              type="button"
+              onClick={onAlt}
+              style={{
+                background: 'var(--color-surface-offset)',
+                border: '1px solid var(--color-surface-offset)',
+                color: 'var(--color-text-base)',
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-2) var(--space-4)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 'var(--weight-medium)',
+                cursor: 'pointer',
+                transition: 'filter var(--duration-fast) var(--ease-default)'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.2)')}
+              onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
+            >
+              {altText}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onConfirm}
@@ -178,13 +209,21 @@ interface ConfirmOptions {
   message: string
   confirmText?: string
   cancelText?: string
+  altText?: string
   isDestructive?: boolean
   warning?: string
 }
 
-type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
+/**
+ * Which button was pressed. Escape and the backdrop both count as 'cancel',
+ * so a question with three answers still has exactly one way to refuse it.
+ */
+export type ConfirmChoice = 'confirm' | 'alt' | 'cancel'
 
-const ConfirmContext = createContext<ConfirmFn | undefined>(undefined)
+type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
+type ChooseFn = (options: ConfirmOptions) => Promise<ConfirmChoice>
+
+const ConfirmContext = createContext<{ confirm: ConfirmFn; choose: ChooseFn } | undefined>(undefined)
 
 /**
  * Promise-based wrapper around ConfirmDialog, so a call site reads the same
@@ -198,27 +237,36 @@ const ConfirmContext = createContext<ConfirmFn | undefined>(undefined)
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<{
     options: ConfirmOptions
-    resolve: (value: boolean) => void
+    resolve: (value: ConfirmChoice) => void
   } | null>(null)
 
-  const confirm = useCallback<ConfirmFn>(options => {
-    return new Promise<boolean>(resolve => {
+  const choose = useCallback<ChooseFn>(options => {
+    return new Promise<ConfirmChoice>(resolve => {
       setPending(prev => {
         // A second request while one is open would strand the first promise
         // forever; treat being displaced as a cancel.
-        prev?.resolve(false)
+        prev?.resolve('cancel')
         return { options, resolve }
       })
     })
   }, [])
 
-  const settle = (value: boolean) => {
+  // Anything but the confirm button is a no, which is what every existing
+  // call site already assumes.
+  const confirm = useCallback<ConfirmFn>(
+    options => choose(options).then(choice => choice === 'confirm'),
+    [choose]
+  )
+
+  const settle = (value: ConfirmChoice) => {
     pending?.resolve(value)
     setPending(null)
   }
 
+  const api = useMemo(() => ({ confirm, choose }), [confirm, choose])
+
   return (
-    <ConfirmContext.Provider value={confirm}>
+    <ConfirmContext.Provider value={api}>
       {children}
       <ConfirmDialog
         isOpen={pending !== null}
@@ -226,19 +274,30 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         message={pending?.options.message ?? ''}
         confirmText={pending?.options.confirmText}
         cancelText={pending?.options.cancelText}
+        altText={pending?.options.altText}
         isDestructive={pending?.options.isDestructive}
         warning={pending?.options.warning}
-        onConfirm={() => settle(true)}
-        onCancel={() => settle(false)}
+        onConfirm={() => settle('confirm')}
+        onAlt={() => settle('alt')}
+        onCancel={() => settle('cancel')}
       />
     </ConfirmContext.Provider>
   )
 }
 
-export function useConfirm(): ConfirmFn {
+function useConfirmContext() {
   const context = useContext(ConfirmContext)
   if (!context) {
     throw new Error('useConfirm must be used within a ConfirmProvider')
   }
   return context
+}
+
+export function useConfirm(): ConfirmFn {
+  return useConfirmContext().confirm
+}
+
+/** The same dialog with a third button, for a question that has three answers. */
+export function useChoose(): ChooseFn {
+  return useConfirmContext().choose
 }

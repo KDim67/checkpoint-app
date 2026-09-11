@@ -33,7 +33,7 @@ import SettingsSection, {
   Divider,
   RowBetween
 } from './settings/SettingsSection'
-import ContextManager from './settings/ContextManager'
+import WorkspaceManager from './settings/WorkspaceManager'
 import SyncSettings from './settings/SyncSettings'
 import ExportPanel from './settings/ExportPanel'
 import NotificationSettings from './settings/NotificationSettings'
@@ -91,7 +91,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
   {
     group: 'Workspace',
     tabs: [
-      { id: 'contexts', label: 'Workspaces & Board', icon: <Layers size={14} />,   description: 'Manage workspaces and the Kanban columns of the active one.' },
+      { id: 'workspaces', label: 'Workspaces & Board', icon: <Layers size={14} />,   description: 'Manage workspaces and the Kanban columns of the active one.' },
       { id: 'ai',       label: 'AI Assistant',       icon: <Sparkles size={14} />, description: 'Model providers, generation options, email voice and persistent memory.' }
     ]
   },
@@ -103,7 +103,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
       { id: 'notifications', label: 'Notifications',      icon: <Bell size={14} />,     description: 'What Checkpoint tells you about, and when it stays quiet.' },
       { id: 'backup',       label: 'Database Backup',    icon: <Archive size={14} />,  description: 'Automated database snapshots, retention and restore points.' },
       { id: 'storage',      label: 'Storage & Export',    icon: <HardDrive size={14} />, description: 'Manage local attachment vaults and clean up orphaned files.' },
-      { id: 'sync',         label: 'P2P Network Sync',   icon: <RefreshCw size={14} />, description: 'Sync database and note directories with other machines.' },
+      { id: 'sync',         label: 'Device Sync',        icon: <RefreshCw size={14} />, description: 'Keep your own machines in step. Sharing a board with someone else is Share, on the board.' },
       { id: 'mcp',          label: 'MCP Server',         icon: <Plug size={14} />,      description: 'Let external AI agents read and edit Checkpoint over a local connection.' },
       { id: 'about',        label: 'About',              icon: <Info size={14} />,     description: 'Version, credits and diagnostics.' }
     ]
@@ -114,14 +114,14 @@ const ALL_TABS: TabInfo[] = TAB_GROUPS.flatMap(g => g.tabs)
 
 // Old tab ids (pre-merge) still navigable from anywhere in the app
 const LEGACY_TAB_ALIASES: Record<string, SettingsTab> = {
-  kanban: 'contexts',
+  kanban: 'workspaces',
   themeCustomizer: 'appearance',
   extensions: 'features',
   widget: 'general'
 }
 
 // Kanban per-context column config
-function KanbanSettings({ activeContext }: { activeContext: string }) {
+function KanbanSettings({ activeWorkspace }: { activeWorkspace: string }) {
   const [columns, setColumns] = useState<ColumnConfig[]>([])
   const [loading, setLoading] = useState(true)
   // Track local (not-yet-saved) edits to column names separately
@@ -136,17 +136,17 @@ function KanbanSettings({ activeContext }: { activeContext: string }) {
         // raw column key, so it silently dropped colour and colour-mode on
         // every save. Any column styled on the board lost that styling as soon
         // as its WIP limit was edited here.
-        const config = await loadBoardConfig(activeContext)
+        const config = await loadBoardConfig(activeWorkspace)
         setColumns(config.columns)
         setLocalNames(Object.fromEntries(config.columns.map(c => [c.id, c.name])))
       } catch (err) { console.error(err) }
       setLoading(false)
     }
     load()
-  }, [activeContext])
+  }, [activeWorkspace])
 
   const save = async (updated: ColumnConfig[]) => {
-    await patchBoardConfig(activeContext, { columns: updated })
+    await patchBoardConfig(activeWorkspace, { columns: updated })
     setColumns(updated)
   }
 
@@ -350,7 +350,7 @@ function WidgetSettings() {
 
 
 function MemoryVaultManager() {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [memories, setMemories] = useState<AiMemory[]>([])
   const [newKey, setNewKey] = useState('')
   const [newContent, setNewContent] = useState('')
@@ -358,19 +358,19 @@ function MemoryVaultManager() {
 
   const loadMemories = async () => {
     try {
-      const list = await window.electronAPI.memory.getMemories(activeContext)
+      const list = await window.electronAPI.memory.getMemories(activeWorkspace)
       setMemories(list || [])
     } catch (e) { console.warn('Failed to load memories:', e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { loadMemories() }, [activeContext])
+  useEffect(() => { loadMemories() }, [activeWorkspace])
 
   const handleAddMemory = async () => {
     if (!newKey.trim() || !newContent.trim()) return
     try {
       await window.electronAPI.memory.saveMemory({
-        context: activeContext || 'default',
+        context: activeWorkspace || 'default',
         category: 'semantic',
         memory_key: newKey.trim(),
         content: newContent.trim()
@@ -394,7 +394,7 @@ function MemoryVaultManager() {
         <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
           AI Persistent Memory Vault ({memories.length})
         </div>
-        <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>Active Context: {activeContext || 'default'}</span>
+        <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>Active workspace: {activeWorkspace || 'default'}</span>
       </div>
       <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', lineHeight: 1.4 }}>
         Manage stored project rules, preferences, and game lore recalled automatically during AI chat sessions.
@@ -968,7 +968,7 @@ function ThemeModeSettings() {
 
 // General Settings
 function GeneralSettings() {
-  const availableContexts = useAppStore(s => s.availableContexts)
+  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
 
   const [defaultContext, setDefaultContext] = useState<string>('')
   const [startView, setStartView] = useState<string>(START_VIEW_LAST_USED)
@@ -1009,7 +1009,7 @@ function GeneralSettings() {
           }}
         >
           <option value="">Last used (default)</option>
-          {availableContexts.map(ctx => (
+          {availableWorkspaces.map(ctx => (
             <option key={ctx} value={ctx}>{ctx}</option>
           ))}
         </select>
@@ -1053,7 +1053,7 @@ function GeneralSettings() {
 export default function SettingsView() {
   const rawTab = useAppStore(s => s.settingsTab)
   const setActiveTab = useAppStore(s => s.setSettingsTab)
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const isWindows = window.electronAPI.app.platform === 'win32'
   const aiEnabled = useAiEnabled()
 
@@ -1081,14 +1081,14 @@ export default function SettingsView() {
             )}
           </>
         )
-      case 'contexts':
+      case 'workspaces':
         return (
           <>
-            <SettingsSection icon={<Layers size={14} />} title="Workspaces" description="Isolated contexts with their own boards, logs and notes.">
-              <ContextManager />
+            <SettingsSection icon={<Layers size={14} />} title="Workspaces" description="Each one keeps its own board, logs and notes.">
+              <WorkspaceManager />
             </SettingsSection>
-            <SettingsSection icon={<Layout size={14} />} title="Kanban Columns" description={`Column names and WIP limits for #${activeContext}.`}>
-              <KanbanSettings activeContext={activeContext} />
+            <SettingsSection icon={<Layout size={14} />} title="Kanban Columns" description={`Column names and WIP limits for #${activeWorkspace}.`}>
+              <KanbanSettings activeWorkspace={activeWorkspace} />
             </SettingsSection>
           </>
         )
@@ -1144,7 +1144,7 @@ export default function SettingsView() {
         )
       case 'sync':
         return (
-          <SettingsSection icon={<RefreshCw size={14} />} title="P2P Network Sync" description="Synchronize database and note folders with other machines.">
+          <SettingsSection icon={<RefreshCw size={14} />} title="Device Sync" description="Your own machines, kept in step. Not the same thing as sharing a board.">
             <SyncSettings />
           </SettingsSection>
         )

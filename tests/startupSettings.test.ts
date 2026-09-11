@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_STARTUP_SETTINGS,
+  MINIMISED_FLAG,
   normalizeStartupSettings,
   reconcile,
+  shouldStartHidden,
   trayVisibilityChanged,
   type StartupSettings
 } from '../src/shared/startupSettings'
@@ -80,5 +82,38 @@ describe('trayVisibilityChanged', () => {
   it('is true only when the icon is turned on or off', () => {
     expect(trayVisibilityChanged(settings({ showTrayIcon: true }), settings({ showTrayIcon: false }))).toBe(true)
     expect(trayVisibilityChanged(settings({ openAtLogin: false }), settings({ openAtLogin: true }))).toBe(false)
+  })
+})
+
+// The helper that read this flag was never called, so the switch did nothing.
+describe('shouldStartHidden', () => {
+  // argv[0] is the executable. Only what follows it matters here.
+  const argv = (...extra: string[]): string[] => ['Checkpoint.exe', ...extra]
+
+  it('stays hidden when Windows launched it with the flag', () => {
+    expect(shouldStartHidden(argv(MINIMISED_FLAG), settings({ showTrayIcon: true }))).toBe(true)
+  })
+
+  it('shows a window when the app was opened by hand', () => {
+    // No flag means they opened it themselves.
+    expect(shouldStartHidden(argv(), settings({ startMinimised: true, showTrayIcon: true }))).toBe(false)
+  })
+
+  it('shows a window when there is no tray icon to hide behind', () => {
+    // Nothing to click otherwise.
+    expect(shouldStartHidden(argv(MINIMISED_FLAG), settings({ showTrayIcon: false }))).toBe(false)
+  })
+
+  it('is not fooled by a flag that merely starts the same way', () => {
+    expect(shouldStartHidden(argv('--start-minimised-later'), settings({ showTrayIcon: true }))).toBe(false)
+  })
+
+  it('reads the flag wherever it sits in the arguments', () => {
+    expect(shouldStartHidden(argv('--other', MINIMISED_FLAG), settings({ showTrayIcon: true }))).toBe(true)
+  })
+
+  it('uses the same flag the login item is given', () => {
+    // Written in one file, read in another.
+    expect(MINIMISED_FLAG).toBe('--start-minimised')
   })
 })

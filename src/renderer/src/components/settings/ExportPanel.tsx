@@ -6,7 +6,7 @@ import { EXPORT_FORMATS, type ExportFormat } from '../../../../shared/exportForm
 
 export default function ExportPanel(): React.JSX.Element {
   const { toast } = useToast()
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [format, setFormat] = useState<ExportFormat>('markdown')
   const [scope, setScope] = useState<'current' | 'all'>('current')
   const [busy, setBusy] = useState(false)
@@ -15,7 +15,7 @@ export default function ExportPanel(): React.JSX.Element {
     setBusy(true)
     try {
       const result = await window.electronAPI.exporter.items({
-        context: scope === 'all' ? null : activeContext,
+        context: scope === 'all' ? null : activeWorkspace,
         format
       })
       // A cancelled save dialog is not a failure and should not read like one.
@@ -53,7 +53,7 @@ export default function ExportPanel(): React.JSX.Element {
 
       <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <button onClick={() => setScope('current')} style={choice(scope === 'current')}>
-          {activeContext}
+          {activeWorkspace}
         </button>
         <button onClick={() => setScope('all')} style={choice(scope === 'all')}>
           All workspaces

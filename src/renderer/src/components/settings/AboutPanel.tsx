@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { copyrightYears, COPYRIGHT_HOLDER } from '../../../../shared/licence'
 import { errorMessage } from '../../../../shared/errors'
-import type { UpdateCheckResult, UpdateProgress } from '../../../../shared/types'
+import type { UpdateCheckResult } from '../../../../shared/types'
+import { describeUpdateProgress } from '../../../../shared/updateEta'
+import { useUpdateProgress } from '../../lib/useUpdateProgress'
 import { FolderOpen, Info, PlayCircle, RefreshCw } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
@@ -61,21 +63,8 @@ export default function AboutPanel() {
 
   const [checking, setChecking] = useState(false)
   const [update, setUpdate] = useState<UpdateCheckResult | null>(null)
-  /**
-   * What the background download is doing. Asked for once on the way in, then
-   * followed live, because most of a download happens while this panel is shut
-   * and a finished one has no events left to replay.
-   */
-  const [progress, setProgress] = useState<UpdateProgress | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    window.electronAPI.app.updateState()
-      .then(state => { if (!cancelled) setProgress(state) })
-      .catch(err => console.error('Failed to read the update state:', err))
-    const unsubscribe = window.electronAPI.app.onUpdateProgress(setProgress)
-    return () => { cancelled = true; unsubscribe() }
-  }, [])
+  /** The same download the titlebar indicator is showing, read from one place. */
+  const progress = useUpdateProgress()
 
   const checkForUpdates = useCallback(async () => {
     setChecking(true)
@@ -241,9 +230,9 @@ export default function AboutPanel() {
           </div>
         )}
 
-        {/* The background download, which otherwise happens with nothing on
-            screen at all. Only here: someone reading this panel has asked how
-            the update is getting on, which is not the same as being told. */}
+        {/* The background download in full, with the size and the time left.
+            The titlebar indicator says the same thing in two words; this is
+            where the rest of it goes. */}
         {progress && (
           <div
             role="status"
@@ -254,9 +243,7 @@ export default function AboutPanel() {
               color: progress.phase === 'ready' ? 'var(--color-success)' : 'var(--color-text-muted)'
             }}
           >
-            {progress.phase === 'ready'
-              ? `Version ${progress.version} is ready. It installs the next time you close Checkpoint.`
-              : `Downloading${progress.version ? ` version ${progress.version}` : ''}, ${progress.percent}%.`}
+            {describeUpdateProgress(progress)}
 
             {progress.phase === 'downloading' && (
               <div

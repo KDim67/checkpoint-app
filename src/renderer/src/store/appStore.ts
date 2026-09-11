@@ -10,18 +10,18 @@ import {
 
 export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
-export interface ContextEntry {
-  slug: string
-  name: string
-  color: string
-  gitPath?: string
-}
+/**
+ * One definition, in the module that creates them. Type-only, so nothing is
+ * imported at runtime and the store stays free of a cycle back into lib.
+ */
+export type { WorkspaceEntry } from '../lib/createWorkspace'
+import type { WorkspaceEntry } from '../lib/createWorkspace'
 
 // Merged tab set: Widget lives in General, Kanban in Workspaces & Board,
 // Theme Builder in Appearance, Extensions in Features & Plugins.
 export type SettingsTab =
   | 'general'
-  | 'contexts'
+  | 'workspaces'
   | 'ai'
   | 'appearance'
   | 'hotkeyBinder'
@@ -33,13 +33,32 @@ export type SettingsTab =
   | 'mcp'
   | 'about'
 
+/**
+ * A note on the two words, because the codebase uses both on purpose.
+ *
+ * The thing is called a **workspace**. That is what the user reads, and what
+ * the app state, components and props below call it.
+ *
+ * Anything that is written down or sent somewhere still calls it a **context**:
+ * the `context` column on six tables, the `contexts_list`, `active_context` and
+ * `default_context` settings keys, the `db:getContexts` IPC channels, the field
+ * on `Item`, and the workspace name inside a collaboration or sync payload.
+ *
+ * Those are not spellings, they are contracts. Renaming the column means a
+ * migration across six tables; renaming the payload field means a 1.0.2 build
+ * cannot share a board or sync with a 1.0.1 one; renaming the MCP parameter
+ * breaks whatever an agent has already been told. None of it changes anything
+ * the user sees, so none of it is worth the risk.
+ *
+ * The rule, then: workspace above the storage line, context at and below it.
+ */
 interface AppState {
   // Navigation
   activeView: ActiveView
-  // Context
-  activeContext: string
-  availableContexts: string[]
-  contextsList: ContextEntry[]
+  // Workspace
+  activeWorkspace: string
+  availableWorkspaces: string[]
+  workspaceList: WorkspaceEntry[]
   // Settings Tab
   settingsTab: SettingsTab
   // Right panel
@@ -77,13 +96,13 @@ interface AppState {
 
   // Actions
   setView: (view: ActiveView) => void
-  setContext: (context: string) => void
+  setWorkspace: (slug: string) => void
   setSettingsTab: (tab: SettingsTab) => void
   toggleRightPanel: (content?: AppState['rightPanelContent']) => void
   setRightPanelContent: (content: 'item-detail' | 'ai-chat' | 'git' | null) => void
   selectItem: (id: string | null) => void
-  setAvailableContexts: (contexts: string[]) => void
-  setContextsList: (list: ContextEntry[]) => void
+  setAvailableWorkspaces: (slugs: string[]) => void
+  setWorkspaceList: (list: WorkspaceEntry[]) => void
   setLoading: (loading: boolean) => void
   setPreselectedTaskId: (id: string | null) => void
   setPendingNoteTitle: (title: string | null) => void
@@ -111,9 +130,9 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   immer(set => ({
     activeView: 'kanban',
-    activeContext: 'default',
-    availableContexts: ['default'],
-    contextsList: [],
+    activeWorkspace: 'default',
+    availableWorkspaces: ['default'],
+    workspaceList: [],
     settingsTab: 'general',
     rightPanelOpen: false,
     rightPanelContent: null,
@@ -153,11 +172,11 @@ export const useAppStore = create<AppState>()(
       }
     },
 
-    setContext: (context: string) => {
+    setWorkspace: (slug: string) => {
       set(state => {
-        state.activeContext = context
+        state.activeWorkspace = slug
       })
-      window.electronAPI.db.setSetting('active_context', context).catch((err) => {
+      window.electronAPI.db.setSetting('active_context', slug).catch((err) => {
         console.error('Failed to save active_context setting:', err)
       })
     },
@@ -206,14 +225,14 @@ export const useAppStore = create<AppState>()(
         }
       }),
 
-    setAvailableContexts: (contexts: string[]) =>
+    setAvailableWorkspaces: (slugs: string[]) =>
       set(state => {
-        state.availableContexts = contexts
+        state.availableWorkspaces = slugs
       }),
 
-    setContextsList: (list: ContextEntry[]) =>
+    setWorkspaceList: (list: WorkspaceEntry[]) =>
       set(state => {
-        state.contextsList = list
+        state.workspaceList = list
       }),
 
     setLoading: (loading: boolean) =>

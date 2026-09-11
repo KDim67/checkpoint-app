@@ -28,7 +28,7 @@ interface WorkflowColumn {
 }
 
 export default function BacklogView() {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [showRecurring, setShowRecurring] = useState(false)
   const [activeView, setActiveView] = useState<SavedView | null>(null)
   const pendingViewId = useAppStore(s => s.pendingViewId)
@@ -171,17 +171,17 @@ export default function BacklogView() {
       // kanban_columns_* key directly, which stopped being written once board
       // configuration was unified, so every column added, renamed or removed
       // after that migration was invisible here.
-      const config = await loadBoardConfig(activeContext)
+      const config = await loadBoardConfig(activeWorkspace)
       setWorkflowColumns(config.columns)
     } catch (err) {
       console.error('Failed to load columns:', err)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   // 3. Load Column Layout settings (Widths, Order, Visibility)
   const loadColumnLayout = useCallback(async () => {
     try {
-      const key = `backlog_columns_layout_${activeContext}`
+      const key = `backlog_columns_layout_${activeWorkspace}`
       const val = await window.electronAPI.db.getSetting(key)
       if (val) {
         const config = JSON.parse(val as string)
@@ -192,7 +192,7 @@ export default function BacklogView() {
     } catch (err) {
       console.error('Failed to load column layout:', err)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   // Save layout configurations
   const saveColumnLayout = async (
@@ -201,7 +201,7 @@ export default function BacklogView() {
     visibility: typeof visibleColumns
   ) => {
     try {
-      const key = `backlog_columns_layout_${activeContext}`
+      const key = `backlog_columns_layout_${activeWorkspace}`
       await window.electronAPI.db.setSetting(
         key,
         JSON.stringify({ widths, order, visibility })
@@ -250,7 +250,7 @@ export default function BacklogView() {
             page,
             pageSize
           }
-      const res = await window.electronAPI.db.queryTasks(activeContext, params)
+      const res = await window.electronAPI.db.queryTasks(activeWorkspace, params)
       setTasks(res.items)
       setTotalTasks(res.total)
     } catch (err) {
@@ -260,7 +260,7 @@ export default function BacklogView() {
     }
   }, [
     activeView,
-    activeContext,
+    activeWorkspace,
     debouncedQuery,
     selectedStatuses,
     selectedPriorities,
@@ -280,7 +280,7 @@ export default function BacklogView() {
     loadWorkflowColumns()
     loadColumnLayout()
     loadTags()
-  }, [activeContext, loadWorkflowColumns, loadColumnLayout, loadTags])
+  }, [activeWorkspace, loadWorkflowColumns, loadColumnLayout, loadTags])
 
   // Reload tasks when filter dependencies alter
   useEffect(() => {
@@ -384,7 +384,7 @@ export default function BacklogView() {
   const loadArchivedTasks = useCallback(async () => {
     setArchiveLoading(true)
     try {
-      const res = await window.electronAPI.db.queryTasks(activeContext, {
+      const res = await window.electronAPI.db.queryTasks(activeWorkspace, {
         archivedOnly: true,
         sortBy: 'created_at',
         sortDesc: true,
@@ -397,7 +397,7 @@ export default function BacklogView() {
     } finally {
       setArchiveLoading(false)
     }
-  }, [activeContext])
+  }, [activeWorkspace])
 
   useEffect(() => {
     if (showArchive) loadArchivedTasks()
@@ -526,7 +526,7 @@ export default function BacklogView() {
     try {
       const newTask = await window.electronAPI.db.createItem({
         type: 'task',
-        context: activeContext,
+        context: activeWorkspace,
         title: 'New Task',
         body: '',
         status: workflowColumns[0]?.id || 'open',
@@ -915,7 +915,7 @@ export default function BacklogView() {
           Repeating tasks
         </button>
         {showRecurring && (
-          <RecurringPanel context={activeContext} onChanged={loadTasks} />
+          <RecurringPanel context={activeWorkspace} onChanged={loadTasks} />
         )}
       </div>
 

@@ -24,11 +24,24 @@ export interface ColumnConfig {
 
 export type ColumnSort = 'manual' | 'priority' | 'due'
 
+/**
+ * What a card shows on its face. Every one of these hides something without
+ * touching the data, so a board can be dense or detailed without the cards
+ * themselves differing.
+ *
+ * `doneCheckbox` hides a control rather than a field. The tick doubles as the
+ * done marker and the way to set it, but the kanban_toggle_done shortcut and
+ * the detail modal both still work, so nothing becomes unreachable.
+ */
 export interface CardDisplay {
   priority: boolean
   tags: boolean
   due: boolean
   bodyPreview: boolean
+  cover: boolean
+  checklist: boolean
+  template: boolean
+  doneCheckbox: boolean
 }
 
 export interface BoardFilters {
@@ -55,7 +68,34 @@ export const DEFAULT_CARD_DISPLAY: CardDisplay = {
   priority: true,
   tags: true,
   due: true,
-  bodyPreview: true
+  bodyPreview: true,
+  cover: true,
+  checklist: true,
+  template: true,
+  doneCheckbox: true
+}
+
+/**
+ * Both column components are memoised. Their comparators listed fields by hand
+ * and missed these, so the Card Fields toggles, collapsing, sorting and column
+ * descriptions all changed state that never reached the screen.
+ *
+ * Read off the object rather than written out, so a field added later is
+ * compared without anyone having to remember.
+ */
+export function sameCardDisplay(a?: CardDisplay, b?: CardDisplay): boolean {
+  const left = a ?? DEFAULT_CARD_DISPLAY
+  const right = b ?? DEFAULT_CARD_DISPLAY
+  return (Object.keys(DEFAULT_CARD_DISPLAY) as (keyof CardDisplay)[])
+    .every(key => left[key] === right[key])
+}
+
+export function sameColumnConfig(a: ColumnConfig, b: ColumnConfig): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof ColumnConfig>
+  for (const key of keys) {
+    if (a[key] !== b[key]) return false
+  }
+  return true
 }
 
 export const DEFAULT_FILTERS: BoardFilters = {
@@ -124,6 +164,15 @@ function wip(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+/** A missing or unparseable switch falls back to its default, never to false. */
+function normalizeCardDisplay(raw: Record<string, unknown>): CardDisplay {
+  const display = { ...DEFAULT_CARD_DISPLAY }
+  for (const key of Object.keys(DEFAULT_CARD_DISPLAY) as (keyof CardDisplay)[]) {
+    display[key] = bool(raw[key], DEFAULT_CARD_DISPLAY[key])
+  }
+  return display
+}
+
 export function normalizeColumn(raw: unknown, index: number): ColumnConfig | null {
   const o = asObject(raw)
   if (!o) return null
@@ -189,12 +238,9 @@ export function normalizeBoardConfig(raw: unknown): BoardConfig {
     archivedColumns,
     background: str(o.background, 'default') || 'default',
     swimlanes: bool(o.swimlanes, false),
-    cardDisplay: {
-      priority: bool(display.priority, DEFAULT_CARD_DISPLAY.priority),
-      tags: bool(display.tags, DEFAULT_CARD_DISPLAY.tags),
-      due: bool(display.due, DEFAULT_CARD_DISPLAY.due),
-      bodyPreview: bool(display.bodyPreview, DEFAULT_CARD_DISPLAY.bodyPreview)
-    },
+    // Read off the defaults rather than listed by hand. Listing them is what
+    // let four toggles be added to the type and silently dropped on load.
+    cardDisplay: normalizeCardDisplay(display),
     filters: {
       query: str(filters.query),
       priority: Number.isFinite(priorityNum) ? (priorityNum as number) : null,

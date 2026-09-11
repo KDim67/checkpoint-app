@@ -6,7 +6,14 @@ import { useAppStore } from '../../store/appStore'
 import ColorPicker from '../ui/ColorPicker'
 import { useToast } from '../ui/Toast'
 import ModalShell from '../ui/ModalShell'
-import { applyImportedBoard, createWorkspace, slugifyWorkspace, type WorkspaceEntry } from '../../lib/createWorkspace'
+import {
+  applyImportedBoard,
+  createWorkspace,
+  setWorkspaceShared,
+  slugifyWorkspace,
+  type WorkspaceEntry
+} from '../../lib/createWorkspace'
+import SharedBadge from '../ui/SharedBadge'
 import type { ImportedBoard } from '../../../../shared/foreignImport'
 import { errorMessage } from '../../../../shared/errors'
 import {
@@ -15,7 +22,6 @@ import {
   describeTemplate
 } from '../../../../shared/projectTemplates'
 
-type ContextEntry = WorkspaceEntry
 
 const PRESET_COLORS = [
   '#1e45fc', '#cdf12b', '#10b981', '#f97316',
@@ -24,16 +30,16 @@ const PRESET_COLORS = [
 
 const STORAGE_KEY = 'contexts_list'
 
-export default function ContextManager() {
-  const activeContext = useAppStore(s => s.activeContext)
-  const setContext = useAppStore(s => s.setContext)
-  const availableContexts = useAppStore(s => s.availableContexts)
-  const setAvailableContexts = useAppStore(s => s.setAvailableContexts)
-  const setContextsList = useAppStore(s => s.setContextsList)
+export default function WorkspaceManager() {
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const setWorkspace = useAppStore(s => s.setWorkspace)
+  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
+  const setAvailableWorkspaces = useAppStore(s => s.setAvailableWorkspaces)
+  const setWorkspaceList = useAppStore(s => s.setWorkspaceList)
 
   const { toast } = useToast()
 
-  const [contexts, setContexts] = useState<ContextEntry[]>([])
+  const [contexts, setContexts] = useState<WorkspaceEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [editingSlug, setEditingSlug] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -60,7 +66,7 @@ export default function ContextManager() {
     try {
       const res = await window.electronAPI.db.exportContext(slug, name)
       if (res.success && res.filePath) {
-        toast(`Exported context successfully to ${res.filePath.split(/[\\/]/).pop()}`)
+        toast(`Exported workspace successfully to ${res.filePath.split(/[\\/]/).pop()}`)
       } else if (res.error) {
         toast(`Export failed: ${res.error}`)
       }
@@ -106,7 +112,7 @@ export default function ContextManager() {
 
     setImporting(true)
     try {
-      const newEntry: ContextEntry = {
+      const newEntry: WorkspaceEntry = {
         slug,
         name: importName.trim(),
         color: PRESET_COLORS[contexts.length % PRESET_COLORS.length]
@@ -115,7 +121,7 @@ export default function ContextManager() {
       // still exists holding whatever arrived, which beats losing all of it.
       await persist([...contexts, newEntry])
       const summary = await applyImportedBoard(slug, importBoard)
-      setContext(slug)
+      setWorkspace(slug)
       setImportBoard(null)
       toast(summary, { duration: 8000 })
     } catch (err) {
@@ -136,15 +142,15 @@ export default function ContextManager() {
       const res = await window.electronAPI.db.importContextData(slug, importPayload)
       if (res.success) {
         if (!exists) {
-          const newEntry: ContextEntry = {
+          const newEntry: WorkspaceEntry = {
             slug,
             name: importName.trim(),
             color: PRESET_COLORS[contexts.length % PRESET_COLORS.length]
           }
           await persist([...contexts, newEntry])
         }
-        setContext(slug)
-        toast(`Imported context "${importName}" successfully!`)
+        setWorkspace(slug)
+        toast(`Imported workspace "${importName}" successfully!`)
         setImportPayload(null)
       } else {
         toast(`Import failed: ${res.error}`)
@@ -158,11 +164,11 @@ export default function ContextManager() {
     try {
       const raw = await window.electronAPI.db.getSetting(STORAGE_KEY)
       if (raw) {
-        const parsed = JSON.parse(raw as string) as ContextEntry[]
+        const parsed = JSON.parse(raw as string) as WorkspaceEntry[]
         setContexts(parsed)
       } else {
-        // Bootstrap from availableContexts
-        const bootstrapped: ContextEntry[] = availableContexts.map((slug, i) => ({
+        // Bootstrap from availableWorkspaces
+        const bootstrapped: WorkspaceEntry[] = availableWorkspaces.map((slug, i) => ({
           slug,
           name: slug.charAt(0).toUpperCase() + slug.slice(1),
           color: PRESET_COLORS[i % PRESET_COLORS.length]
@@ -175,15 +181,26 @@ export default function ContextManager() {
     } finally {
       setLoading(false)
     }
-  }, [availableContexts])
+  }, [availableWorkspaces])
 
   useEffect(() => { load() }, [load])
 
-  const persist = async (updated: ContextEntry[]) => {
+  const persist = async (updated: WorkspaceEntry[]) => {
     await window.electronAPI.db.setSetting(STORAGE_KEY, JSON.stringify(updated))
     setContexts(updated)
-    setAvailableContexts(updated.map(c => c.slug))
-    setContextsList(updated)
+    setAvailableWorkspaces(updated.map(c => c.slug))
+    setWorkspaceList(updated)
+  }
+
+  /** Drops the shared label. Nothing else changes: it was never a mode. */
+  const handleUnshare = async (slug: string) => {
+    const updated = setWorkspaceShared(contexts, slug, false)
+    if (updated === contexts) return
+    try {
+      await persist(updated)
+    } catch (err) {
+      console.error('Failed to clear the shared label:', err)
+    }
   }
 
   const handleAdd = async () => {
@@ -192,7 +209,7 @@ export default function ContextManager() {
     const slug = slugifyWorkspace(trimmed)
     if (contexts.some(c => c.slug === slug)) return
 
-    const newEntry: ContextEntry = {
+    const newEntry: WorkspaceEntry = {
       slug,
       name: trimmed,
       color: addColor,
@@ -204,14 +221,14 @@ export default function ContextManager() {
       // Shared with the first-run panel, so both produce the same workspace.
       const { list, summary, templateFailed } = await createWorkspace(contexts, newEntry, addTemplateId)
       setContexts(list)
-      setAvailableContexts(list.map(c => c.slug))
-      setContextsList(list)
+      setAvailableWorkspaces(list.map(c => c.slug))
+      setWorkspaceList(list)
 
       // The workspace itself is already saved; losing the scaffolding is worth
       // a warning, not an unwind that would leave nothing behind.
       if (templateFailed) toast('Workspace created, but the template could not be applied.')
 
-      setContext(slug)
+      setWorkspace(slug)
       if (summary) toast(summary)
 
       setAddName('')
@@ -246,8 +263,8 @@ export default function ContextManager() {
           return
         }
         // Update active context if it was active
-        if (activeContext === slug) {
-          setContext(newSlug)
+        if (activeWorkspace === slug) {
+          setWorkspace(newSlug)
         }
       }
 
@@ -278,8 +295,8 @@ export default function ContextManager() {
     const { slug } = deleteWarning
     const updated = contexts.filter(c => c.slug !== slug)
     await persist(updated)
-    if (activeContext === slug && updated.length > 0) {
-      setContext(updated[0].slug)
+    if (activeWorkspace === slug && updated.length > 0) {
+      setWorkspace(updated[0].slug)
     }
     setDeleteWarning(null)
   }
@@ -298,7 +315,7 @@ export default function ContextManager() {
     await persist(updated)
   }
 
-  if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading contexts…</div>
+  if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading workspaces…</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -313,7 +330,7 @@ export default function ContextManager() {
             padding: 'var(--space-3) var(--space-3)',
             background: 'var(--color-surface-2)',
             borderRadius: 'var(--radius-md)',
-            border: activeContext === ctx.slug
+            border: activeWorkspace === ctx.slug
               ? `1px solid ${ctx.color}50`
               : '1px solid var(--color-surface-offset)'
           }}
@@ -419,7 +436,7 @@ export default function ContextManager() {
                     onCommit={cVal => setEditColor(cVal)}
                     swatchSize={20}
                     hexInputWidth={62}
-                    title="Custom Context Color"
+                    title="Custom Workspace Color"
                   />
                 </div>
               </div>
@@ -458,6 +475,18 @@ export default function ContextManager() {
                   }}>
                     #{ctx.slug}
                   </span>
+                  {/* Clickable, because the label is only ever right until it
+                      is not: a board you shared once and no longer do should
+                      not carry the badge forever with no way to drop it. */}
+                  {ctx.shared && (
+                    <button
+                      onClick={() => handleUnshare(ctx.slug)}
+                      title="Shared with someone. Click to clear the label."
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                    >
+                      <SharedBadge withLabel />
+                    </button>
+                  )}
                   {ctx.gitPath && (
                     <span style={{
                       fontSize: '10px',
@@ -500,7 +529,7 @@ export default function ContextManager() {
                   className="btn-icon"
                   style={{ width: '24px', height: '24px' }}
                   onClick={() => handleExport(ctx.slug, ctx.name)}
-                  title="Export Context Workspace"
+                  title="Export Workspace"
                 >
                   <Download size={12} />
                 </button>
@@ -514,7 +543,7 @@ export default function ContextManager() {
                     setEditColor(ctx.color)
                     setEditGitPath(ctx.gitPath || '')
                   }}
-                  title="Edit Context"
+                  title="Edit Workspace"
                 >
                   <Edit2 size={11} />
                 </button>
@@ -523,7 +552,7 @@ export default function ContextManager() {
                     className="btn-icon"
                     style={{ width: '24px', height: '24px', color: 'var(--color-error)' }}
                     onClick={() => handleDeleteRequest(ctx.slug)}
-                    title="Delete context"
+                    title="Delete workspace"
                   >
                     <Trash2 size={11} />
                   </button>
@@ -552,7 +581,7 @@ export default function ContextManager() {
             value={addName}
             onChange={e => setAddName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowAddForm(false) }}
-            placeholder="Context name (e.g. Side Project)"
+            placeholder="Workspace name (e.g. Side Project)"
             style={{
               background: 'var(--color-surface-1)',
               border: '1px solid var(--color-surface-offset)',
@@ -606,7 +635,7 @@ export default function ContextManager() {
                 onCommit={cVal => setAddColor(cVal)}
                 swatchSize={20}
                 hexInputWidth={62}
-                title="Custom Context Color"
+                title="Custom Workspace Color"
               />
             </div>
           </div>
@@ -673,7 +702,7 @@ export default function ContextManager() {
               disabled={creating || !addName.trim()}
               onClick={handleAdd}
             >
-              {creating ? 'Creating…' : 'Add Context'}
+              {creating ? 'Creating…' : 'Add Workspace'}
             </button>
             <button className="btn-secondary" style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-1-5) var(--space-4)' }}
               disabled={creating}
@@ -700,7 +729,7 @@ export default function ContextManager() {
             onClick={() => setShowAddForm(true)}
           >
             <Plus size={14} />
-            Add Context
+            Add Workspace
           </button>
           
           <button
@@ -726,11 +755,11 @@ export default function ContextManager() {
 
       {/* Delete confirmation modal */}
       {deleteWarning && (
-        <ModalShell label="Delete context" onClose={() => setDeleteWarning(null)} width="380px" closeOnBackdrop={false}>
+        <ModalShell label="Delete workspace" onClose={() => setDeleteWarning(null)} width="380px" closeOnBackdrop={false}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <AlertTriangle size={20} color="var(--color-warning)" />
             <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
-              Delete context?
+              Delete workspace?
             </span>
           </div>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
@@ -760,7 +789,7 @@ export default function ContextManager() {
                 fontWeight: 'var(--weight-semibold)'
               }}
             >
-              Delete Context
+              Delete Workspace
             </button>
           </RowBetween>
         </ModalShell>
@@ -772,14 +801,14 @@ export default function ContextManager() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <Plus size={20} color="var(--color-secondary)" />
             <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
-              Import Workspace Context
+              Import Workspace
             </span>
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               <label htmlFor="import-context-name" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
-                Workspace Context Name
+                Workspace Name
               </label>
               <input
                 id="import-context-name"
@@ -809,7 +838,7 @@ export default function ContextManager() {
             {contexts.some(c => c.slug === importSlug) && (
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '8px', borderRadius: '4px', fontSize: '11px', color: 'var(--color-error)' }}>
                 <AlertTriangle size={14} />
-                <span>Warning: Context #{importSlug} already exists. This will merge/overwrite items!</span>
+                <span>Warning: Workspace #{importSlug} already exists. This will merge/overwrite items!</span>
               </div>
             )}
 

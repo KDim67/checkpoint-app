@@ -13,8 +13,15 @@ import {
   onConnectionFailed,
   iceServers
 } from './webrtcTransport'
-import { normalizeCollabMessage, type CollabMessage } from '../../../shared/collabProtocol'
+import {
+  normalizeCollabMessage,
+  normalizeRemoteMutation,
+  retargetMutation,
+  type CollabMessage
+} from '../../../shared/collabProtocol'
 import { readSignalingMessage, signalingPublishError } from '../../../shared/signalingPayload'
+import { registerSharedWorkspace } from './createWorkspace'
+import { loadBoardConfig, saveBoardConfig } from './boardConfig'
 
 interface CollabOptions {
   pairingCode: string
@@ -32,12 +39,25 @@ interface CollabOptions {
    */
   onError: (err: unknown) => void
   /**
-   * Asked before the host's board replaces the local one. Joining wipes every
-   * card and task in the target context, so this is the user's only chance to
-   * stop it. Returning false aborts the join with the local board intact.
+   * Asked only when the incoming board would land on top of one that already
+   * exists here. Replacing wipes every card and task under that slug, so this
+   * is the user's one chance to say no, or to take the board as a copy and
+   * keep what they had.
    */
-  onConfirmBaseline: (info: { context: string; incomingItems: number }) => Promise<boolean>
+  onResolveBaseline: (info: { context: string; incomingItems: number }) => Promise<BaselineChoice>
 }
+
+/**
+ * What to do with an arriving board.
+ *
+ * 'copy' carries its own slug rather than deriving one here: the caller holds
+ * the workspace list, and two places computing the same name is two places
+ * that can disagree about it.
+ */
+export type BaselineChoice =
+  | { action: 'replace' }
+  | { action: 'copy'; slug: string }
+  | { action: 'cancel' }
 
 export class WebRTCCollaborationCoordinator {
   private pc: RTCPeerConnection | null = null
@@ -50,8 +70,24 @@ export class WebRTCCollaborationCoordinator {
   private connectionActive = false
   private assembler = new FrameAssembler()
 
+  /**
+   * The workspace this session is actually working in, and the name both peers
+   * call it on the wire. They differ only for someone who joined a shared board
+   * as a copy, which is why they are two fields rather than one.
+   *
+   * The local one used to be read from options.context, which for a joiner is
+   * whatever workspace they happened to be sitting in when they clicked Join.
+   * The baseline lands in the host's workspace and switches to it, so that
+   * comparison was against the wrong name and every edit the joiner made was
+   * filtered out and never sent.
+   */
+  private sessionContext: string
+  private wireContext: string
+
   constructor(options: CollabOptions) {
     this.options = options
+    this.sessionContext = options.context
+    this.wireContext = options.context
   }
 
   public async start(): Promise<void> {
@@ -271,6 +307,10 @@ export class WebRTCCollaborationCoordinator {
         r => items.some(item => item.id === r.from_id || item.id === r.to_id)
       )
 
+      // The columns travel with the cards. A card's status is a column id, so
+      // without them the peer holds cards addressed to columns it does not have.
+      const board = await loadBoardConfig(this.options.context)
+
       await this.send({
         type: 'board-baseline',
         context: this.options.context,
@@ -278,7 +318,8 @@ export class WebRTCCollaborationCoordinator {
         tags,
         itemTags,
         relations,
-        mode: this.options.mode
+        mode: this.options.mode,
+        board
       })
 
       // Bind local changes listener
@@ -304,12 +345,22 @@ export class WebRTCCollaborationCoordinator {
     // other workspace was broadcast to the peer.
     const mutationContext: string | null =
       detail.item?.context ?? (typeof detail.context === 'string' ? detail.context : null)
-    if (mutationContext !== null && mutationContext !== this.options.context) return
+    if (mutationContext !== null && mutationContext !== this.sessionContext) return
 
+    // Validated here rather than only on arrival, so a malformed mutation is
+    // dropped where it can be seen instead of silently on the peer.
+    const mutation = normalizeRemoteMutation(detail)
+    if (!mutation) {
+      console.warn('[Collab Coordinator] Skipped a local change of an unrecognised shape.')
+      return
+    }
 
     // Event handlers cannot await; a failed broadcast must not become an
     // unhandled rejection.
-    void this.send({ type: 'db-mutation-event', mutation: detail }).catch(err => {
+    void this.send({
+      type: 'db-mutation-event',
+      mutation: retargetMutation(mutation, this.wireContext)
+    }).catch(err => {
       console.error('[Collab Coordinator] Failed to broadcast local change:', err)
     })
   }
@@ -333,36 +384,63 @@ export class WebRTCCollaborationCoordinator {
 
     switch (msg.type) {
       case 'board-baseline': {
-        // applyBoardBaseline deletes every card and task in the target context
-        // before seeding the host's. That is unrecoverable, and it used to run
-        // the instant the channel opened. A user joining a session while
-        // holding their own board of the same name simply lost it. Ask first.
-        const accepted = await this.options.onConfirmBaseline({
+        // applyBoardBaseline deletes every card and task in the target
+        // workspace before seeding the host's, and that is unrecoverable. The
+        // caller decides what to do about it: replace, take the board as a
+        // copy under a free name, or refuse.
+        const choice = await this.options.onResolveBaseline({
           context: msg.context,
           incomingItems: msg.items.length
         })
-        if (!accepted) {
+        if (choice.action === 'cancel') {
           this.options.onProgress('Join cancelled: your local board was left untouched.')
           this.cleanup()
           this.options.onDisconnect()
           break
         }
 
+        // The host's name for the board stays the name on the wire whatever it
+        // is called here, or the two sides stop talking about the same board.
+        this.wireContext = msg.context
+        this.sessionContext = choice.action === 'copy' ? choice.slug : msg.context
+        const target = this.sessionContext
+
         this.options.onProgress('Applying board baseline...')
         this.isApplyingRemote = true
 
         try {
-          // Switch local workspace context and view to match shared board!
+          // Into the picker before switching in, or leaving it is a one-way trip.
           const store = useAppStore.getState()
-          store.setContext(msg.context)
+          const workspaces = await registerSharedWorkspace(target)
+          store.setWorkspaceList(workspaces)
+          store.setAvailableWorkspaces([...new Set([...store.availableWorkspaces, target])])
+          store.setWorkspace(target)
           store.setView('kanban')
 
-          // Wipe context items and seed
-          await window.electronAPI.sync.applyBoardBaseline(msg.context, msg.items, msg.tags, msg.itemTags, msg.relations)
-          
+          // Every item still carries the host's workspace. applyBoardBaseline
+          // deletes by the slug it is given but inserts each item under its
+          // own, so without this a copy would arrive empty and the board it
+          // was meant to spare would be overwritten instead.
+          const items = target === msg.context
+            ? msg.items
+            : msg.items.map(item => ({ ...item, context: target }))
+
+          // The host's columns first, so the cards are never briefly addressed
+          // to columns this side does not have. Absent from an older peer, in
+          // which case whatever board is already here is the best guess.
+          if (msg.board) {
+            try {
+              await saveBoardConfig(target, msg.board)
+            } catch (err) {
+              console.error('[Collab Client] Failed to take the host board config:', err)
+            }
+          }
+
+          await window.electronAPI.sync.applyBoardBaseline(target, items, msg.tags, msg.itemTags, msg.relations)
+
           window.dispatchEvent(new CustomEvent('kanban-refresh'))
-          this.options.onProgress(`Joined board: ${msg.context}. Ready!`)
-          
+          this.options.onProgress(`Joined board: ${target}. Ready!`)
+
           // If collaborative mode, bind local writes listener
           if (msg.mode === 'collaborative') {
             window.addEventListener('db-mutation', this.handleLocalMutation)
@@ -378,7 +456,11 @@ export class WebRTCCollaborationCoordinator {
       case 'db-mutation-event': {
         this.isApplyingRemote = true
         try {
-          await window.electronAPI.sync.applyRemoteMutation(msg.mutation)
+          // Arrives addressed to the host's workspace, which is not what this
+          // side calls it when the board was joined as a copy.
+          await window.electronAPI.sync.applyRemoteMutation(
+            retargetMutation(msg.mutation, this.sessionContext)
+          )
           window.dispatchEvent(new CustomEvent('kanban-refresh'))
         } catch (err) {
           console.error('[Collab Coordinator] Failed to apply remote mutation:', err)

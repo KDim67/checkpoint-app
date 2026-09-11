@@ -10,7 +10,7 @@ import { IpcChannels } from '../shared/ipcChannels'
 // Webhook Schema
 
 const WebhookPayloadSchema = z.object({
-  context: z.string().min(1, 'Context slug cannot be empty'),
+  context: z.string().min(1, 'Workspace slug cannot be empty'),
   title: z.string().default(''),
   body: z.string().default(''),
   priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).default(0),

@@ -167,15 +167,15 @@ export default function SyncSettings() {
     const peer = peerToPair
     setPeerToPair(null)
 
-    addLog(`Initiating P2P sync with discovered peer "${peer.name}" (${peer.ip})...`)
+    addLog(`Initiating sync with discovered peer "${peer.name}" (${peer.ip})...`)
     try {
       const stats = await window.electronAPI.sync.connectAndSync(peer.ip, peer.port, code)
-      addLog(`P2P sync with "${peer.name}" succeeded! (Integrated ${stats.dbUpdates} updates)`)
+      addLog(`Sync with "${peer.name}" succeeded! (Integrated ${stats.dbUpdates} updates)`)
       toast('Sync successful')
       await saveSyncSuccess(`LAN (${peer.name})`, stats.dbUpdates, stats.filesSynced)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
-      addLog(`P2P sync with "${peer.name}" failed: ${errorMsg}`)
+      addLog(`Sync with "${peer.name}" failed: ${errorMsg}`)
       toast('Sync failed')
     }
   }
@@ -203,7 +203,7 @@ export default function SyncSettings() {
         addLog(`[WebRTC] Sync completed successfully! (Integrated ${stats.dbUpdates} updates, ${stats.filesSynced} files)`)
         toast('Internet sync completed')
         setIsWebrtcActive(false)
-        await saveSyncSuccess('Internet (P2P)', stats.dbUpdates, stats.filesSynced)
+        await saveSyncSuccess('Internet', stats.dbUpdates, stats.filesSynced)
       },
       onError: (err) => {
         addLog(`[WebRTC Error] ${errorMessage(err)}`)
@@ -238,7 +238,7 @@ export default function SyncSettings() {
         addLog(`[WebRTC] Sync completed successfully! (Integrated ${stats.dbUpdates} updates, ${stats.filesSynced} files)`)
         toast('Internet sync completed')
         setIsWebrtcActive(false)
-        await saveSyncSuccess('Internet (P2P)', stats.dbUpdates, stats.filesSynced)
+        await saveSyncSuccess('Internet', stats.dbUpdates, stats.filesSynced)
       },
       onError: (err) => {
         addLog(`[WebRTC Error] ${errorMessage(err)}`)
@@ -267,10 +267,10 @@ export default function SyncSettings() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-4)' }}>
         <div>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
-            P2P Network Sync
+            Device Sync
           </h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: '4px', marginBottom: 0 }}>
-            Sync logs, tasks, and notes bidirectionally over LAN or the Internet. Completely cloud-free.
+            Keeps your own machines in step: items, notes and settings, over your network or the internet. To hand a board to another person, use Share on the board instead.
           </p>
         </div>
 
@@ -470,7 +470,7 @@ export default function SyncSettings() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
                 <Globe size={18} style={{ color: 'var(--color-secondary)' }} />
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
-                  Internet P2P Sync (WebRTC)
+                  Internet Sync (WebRTC)
                 </h3>
               </div>
               <p style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)', margin: 0 }}>
@@ -578,7 +578,7 @@ export default function SyncSettings() {
             Sync Engine is Disabled
           </h3>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '4px', maxWidth: '320px', textAlign: 'center' }}>
-            Turn on the switch in the top right corner to activate local Wi-Fi auto-discovery and internet P2P WebRTC sharing.
+            Turn on the switch in the top right corner to activate discovery of your other machines on this network, and sync over the internet.
           </p>
         </div>
       )}

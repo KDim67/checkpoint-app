@@ -41,7 +41,7 @@ function FocusOptionToggle({
 }
 
 export default function FocusView() {
-  const activeContext = useAppStore(s => s.activeContext)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
   const { match: matchKey } = useViewShortcuts('focus')
@@ -95,8 +95,8 @@ export default function FocusView() {
     setLoading(true)
     try {
       // 1. Fetch uncompleted cards and tasks
-      const cardsRes = await window.electronAPI.db.getItems(activeContext, 'card', 1, 100)
-      const tasksRes = await window.electronAPI.db.getItems(activeContext, 'task', 1, 100)
+      const cardsRes = await window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 100)
+      const tasksRes = await window.electronAPI.db.getItems(activeWorkspace, 'task', 1, 100)
 
       const merged = [...cardsRes.items, ...tasksRes.items].filter(
         item => item.status !== 'done'
@@ -104,7 +104,7 @@ export default function FocusView() {
       setDbItems(merged)
 
       // 2. Fetch past focus sessions
-      const sessions = await window.electronAPI.db.getFocusSessions(activeContext)
+      const sessions = await window.electronAPI.db.getFocusSessions(activeWorkspace)
       setPastSessions(sessions.slice(0, 5)) // show top 5 recent sessions
 
       // 3. Handle preselected task navigation for immediate Pomodoro timer start
@@ -126,7 +126,7 @@ export default function FocusView() {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeContext, toast])
+  }, [activeWorkspace, toast])
 
   useEffect(() => {
     loadFocusData()
@@ -302,7 +302,7 @@ export default function FocusView() {
     try {
       const created = await window.electronAPI.db.createItem({
         type: 'task',
-        context: activeContext,
+        context: activeWorkspace,
         title,
         body: '',
         status: 'open',
@@ -337,7 +337,7 @@ export default function FocusView() {
 
       // 1. Write session row to focus_sessions
       await window.electronAPI.db.createFocusSession({
-        context: activeContext,
+        context: activeWorkspace,
         duration_ms: elapsedTimeMs,
         notes: retroNotes.trim(),
         tasks_json: selectedTasksJson
@@ -375,7 +375,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
       // 4. Create log entry in DB
       await window.electronAPI.db.createItem({
         type: 'log',
-        context: activeContext,
+        context: activeWorkspace,
         title,
         body: logBody,
         status: 'open',

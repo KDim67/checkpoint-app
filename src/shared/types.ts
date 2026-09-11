@@ -14,6 +14,14 @@ export type RelationType = 'blocks' | 'relates_to' | 'duplicates'
 export interface Item {
   id: string             // UUID v4
   type: ItemType
+  /**
+   * The workspace this belongs to, by slug.
+   *
+   * Called `context` because that is the column name and the field name in
+   * every sync and collaboration payload, including ones sent by builds older
+   * than this one. The user-facing word for it is "workspace" everywhere, and
+   * the renderer's own state says workspace too. See appStore for the rule.
+   */
   context: string        // e.g. 'dayjob' | 'unity-project' | 'personal'
   title: string
   body: string           // Markdown content
@@ -418,23 +426,30 @@ export interface PluginInfo {
 export type ShortcutMap = Record<string, string>;
 
 /**
+ * How a background download is getting on.
+ *
+ * The byte counts travel with the percentage because both surfaces that show
+ * this say how long is left, and a percentage on its own cannot answer that.
+ */
+export type UpdateProgress =
+  | {
+      phase: 'downloading'
+      version: string
+      percent: number
+      transferred: number
+      total: number
+      /** Averaged over the whole download by electron-updater, not a spot reading. */
+      bytesPerSecond: number
+    }
+  | { phase: 'ready'; version: string }
+
+/**
  * What a manual update check found.
  *
  * `unsupported` is a dev run: only the packaged app has a release to compare
  * itself against. The version on `current` is the one already installed; on
  * `available` it is the newer one now downloading.
  */
-/**
- * How a background download is getting on.
- *
- * Pushed to the renderer but shown nowhere except the About panel: the
- * automatic pass stays quiet on purpose, and this only answers the question
- * for somebody who has gone looking for the answer.
- */
-export type UpdateProgress =
-  | { phase: 'downloading'; version: string; percent: number }
-  | { phase: 'ready'; version: string }
-
 export type UpdateCheckResult =
   | { status: 'unsupported' }
   | { status: 'current'; version: string }

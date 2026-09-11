@@ -20,13 +20,13 @@ export interface Command extends CommandLike {
 /** The store surface the commands need. Passed in so this module stays testable. */
 export interface CommandContext {
   setView: (view: ActiveView) => void
-  setContext: (context: string) => void
+  setWorkspace: (slug: string) => void
   setSettingsTab: (tab: SettingsTab) => void
   setRightPanelContent: (content: 'item-detail' | 'ai-chat' | 'git' | null) => void
   toggleRightPanel: (content?: 'item-detail' | 'ai-chat' | 'git' | null) => void
   /** Workspaces available to switch to. */
-  contexts: string[]
-  activeContext: string
+  workspaces: string[]
+  activeWorkspace: string
   /** Views the user has switched off are not offered. */
   enabledViews: Partial<Record<ActiveView, boolean>>
   /** With AI off, the assistant panel and its settings tab are not commands. */
@@ -53,14 +53,14 @@ const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
 const SETTINGS_TABS: { tab: SettingsTab; label: string; keywords?: string[] }[] = [
   { tab: 'general', label: 'General' },
   { tab: 'appearance', label: 'Appearance & Theme', keywords: ['colors', 'theme', 'font', 'presets'] },
-  { tab: 'contexts', label: 'Workspaces & Board', keywords: ['contexts', 'columns'] },
+  { tab: 'workspaces', label: 'Workspaces & Board', keywords: ['workspaces', 'context', 'columns'] },
   { tab: 'ai', label: 'AI Assistant', keywords: ['model', 'provider', 'api key'] },
   { tab: 'hotkeyBinder', label: 'Shortcuts & Mouse', keywords: ['keys', 'bindings', 'hotkeys', 'rebind', 'mouse', 'buttons'] },
   { tab: 'features', label: 'Features & Plugins', keywords: ['toggles', 'extensions'] },
   { tab: 'notifications', label: 'Notifications', keywords: ['alerts', 'quiet hours', 'reminders'] },
   { tab: 'backup', label: 'Database Backup', keywords: ['snapshot', 'restore'] },
   { tab: 'storage', label: 'Storage & Export', keywords: ['files', 'disk', 'export', 'csv', 'markdown', 'backup data'] },
-  { tab: 'sync', label: 'P2P Network Sync', keywords: ['peer', 'lan', 'devices'] },
+  { tab: 'sync', label: 'Device Sync', keywords: ['sync', 'p2p', 'peer', 'lan', 'devices', 'machines'] },
   { tab: 'mcp', label: 'MCP Server', keywords: ['agent', 'tools', 'activity'] },
   { tab: 'about', label: 'About' }
 ]
@@ -86,14 +86,16 @@ export function buildCommands(ctx: CommandContext): Command[] {
     })
   }
 
-  for (const context of ctx.contexts) {
-    if (context === ctx.activeContext) continue
+  for (const slug of ctx.workspaces) {
+    if (slug === ctx.activeWorkspace) continue
     commands.push({
-      id: `context:${context}`,
-      label: `Switch to ${context}`,
+      // Prefixed to keep it distinct from every other command id. The prefix
+      // is not shown and changing it would only invalidate nothing.
+      id: `workspace:${slug}`,
+      label: `Switch to ${slug}`,
       group: 'Workspace',
       keywords: ['context', 'workspace', 'project'],
-      run: () => ctx.setContext(context)
+      run: () => ctx.setWorkspace(slug)
     })
   }
 
