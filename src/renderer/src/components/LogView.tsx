@@ -10,6 +10,7 @@ import { useToast } from './ui/Toast'
 import { FileText } from 'lucide-react'
 import StandupTranslatorView from './StandupTranslatorView'
 import { itemPage } from '../data/items'
+import MenuItem, { MenuDivider } from './ui/MenuItem'
 
 export default function LogView() {
   const [items, setItems] = useState<Item[]>([])
@@ -358,34 +359,16 @@ export default function LogView() {
                     {ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </button>
                 ))}
-                <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
-                <button
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-2)',
-                    width: '100%',
-                    padding: '6px 12px',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-sm)',
-                    color: 'var(--color-text-muted)',
-                    textAlign: 'left'
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                <MenuDivider />
+                <MenuItem
                   onClick={() => {
                     setView('settings')
                     setSettingsTab('workspaces')
                     setDropdownOpen(false)
                   }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px', opacity: 0.7 }}>
-                    <path d="M5 12h14M12 5v14"/>
-                  </svg>
                   New Workspace
-                </button>
+                </MenuItem>
               </div>
             )}
           </div>
