@@ -1,12 +1,13 @@
 import { BrowserWindow, globalShortcut } from 'electron'
 import { join } from 'path'
+import { IpcChannels } from '../shared/ipcChannels'
 
 let hudWindow: BrowserWindow | null = null
 
 /**
  * Creates the frameless centered HUD BrowserWindow context.
  */
-export function createHudWindow(): BrowserWindow {
+function createHudWindow(): BrowserWindow {
   if (hudWindow) return hudWindow
 
   const preloadPath = join(__dirname, '../preload/index.mjs')
@@ -64,10 +65,10 @@ export function showHud(): void {
 /**
  * Hides the HUD overlay and triggers a reset signal.
  */
-export function hideHud(): void {
+function hideHud(): void {
   if (hudWindow && hudWindow.isVisible()) {
     hudWindow.hide()
-    hudWindow.webContents.send('hud:reset')
+    hudWindow.webContents.send(IpcChannels.HUD_RESET)
     // Reset window height to default 64px
     hudWindow.setSize(600, 64)
   }
