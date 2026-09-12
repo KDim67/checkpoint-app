@@ -3,10 +3,14 @@
   // The renderer's ambient bridge types come along because tests import renderer
   // modules that call window.electronAPI. Without this the test program sees a
   // bare Window and every such call fails to typecheck here but nowhere else.
-  "include": ["tests/**/*.ts", "vitest.config.ts", "src/renderer/src/electron.d.ts"],
+  "include": ["tests/**/*.ts", "tests/**/*.tsx", "vitest.config.ts", "src/renderer/src/electron.d.ts"],
+  // Component tests pull renderer code into this program, so it needs the DOM
+  // types that code is written against. JSX is left as the renderer has it, so
+  // a component is checked here by the same rules as in its own program.
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"]
   }
 }

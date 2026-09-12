@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
 export default defineConfig({
+  // The app is built with the automatic JSX runtime, so components never import
+  // React just to render. Without this the test transform expects them to.
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
       '@shared': resolve('src/shared'),
@@ -15,7 +18,10 @@ export default defineConfig({
     }
   },
   test: {
-    include: ['tests/**/*.test.ts'],
+    // Component tests opt into jsdom with a `@vitest-environment jsdom` line at
+    // the top of the file. Everything else keeps running in plain Node, where
+    // it has always run and where it is fastest.
+    include: ['tests/**/*.test.{ts,tsx}'],
     environment: 'node'
   }
 })
