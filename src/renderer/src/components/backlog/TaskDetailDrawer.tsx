@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Markdown from '../ui/Markdown'
-import { X, Tag, Link2, Sparkles, CheckSquare, Square, Plus } from 'lucide-react'
+import { X, Tag, Sparkles, CheckSquare, Square, Plus } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAiEnabled } from '../../lib/useAiEnabled'
-import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
+import type { Item, Tag as TagType } from '../../../../shared/types'
 import {
   parseChecklist,
   computeProgress,
@@ -13,6 +13,8 @@ import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
+import RelationsPanel from '../ui/RelationsPanel'
+import { useItemRelations } from '../ui/useItemRelations'
 import { listTags } from '../../data/tags'
 
 interface TaskDetailDrawerProps {
@@ -67,11 +69,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [showTagSelector, setShowTagSelector] = useState(false)
 
-  // Relations
-  const [relations, setRelations] = useState<Relation[]>([])
-  const [relationSearchQuery, setRelationSearchQuery] = useState('')
-  const [relationSearchResults, setRelationSearchResults] = useState<Item[]>([])
-  const [selectedRelationType, setSelectedRelationType] = useState<RelationType>('relates_to')
+  const itemRelations = useItemRelations(taskId, task, activeWorkspace)
+  const { setRelations } = itemRelations
 
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const containerRef = useFocusTrap(!loading, titleInputRef)
@@ -128,29 +127,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     }
     loadDetails()
     return () => { active = false }
-  }, [taskId, activeWorkspace])
-
-  // Search relation autocomplete
-  useEffect(() => {
-    if (!relationSearchQuery.trim()) {
-      setRelationSearchResults([])
-      return
-    }
-
-    const delayDebounceFn = setTimeout(async () => {
-      try {
-        const res = await window.electronAPI.db.searchItems({
-          query: relationSearchQuery,
-          context: activeWorkspace
-        })
-        setRelationSearchResults(res.items.filter(i => i.id !== taskId))
-      } catch (err) {
-        console.error('Failed to search items for relations:', err)
-      }
-    }, 300)
-
-    return () => clearTimeout(delayDebounceFn)
-  }, [relationSearchQuery, taskId, activeWorkspace])
+  }, [taskId, activeWorkspace, setRelations])
 
   const handleTitleBlur = () => {
     if (!task || !title.trim() || title === task.title) return
@@ -255,28 +232,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
       setTask(refreshed)
     }
     await loadSubtasks(task.id)
-  }
-
-  const handleAddRelation = async (targetId: string) => {
-    if (!task) return
-    try {
-      await window.electronAPI.db.createRelation(task.id, targetId, selectedRelationType)
-      const rels = await window.electronAPI.db.getRelations(task.id)
-      setRelations(rels)
-      setRelationSearchQuery('')
-      setRelationSearchResults([])
-    } catch (err) {
-      console.error('Failed to create relation:', err)
-    }
-  }
-
-  const handleDeleteRelation = async (relationId: string) => {
-    try {
-      await window.electronAPI.db.deleteRelation(relationId)
-      setRelations(prev => prev.filter(r => r.id !== relationId))
-    } catch (err) {
-      console.error('Failed to delete relation:', err)
-    }
   }
 
   const handleAiAssist = () => {
@@ -848,143 +803,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </div>
           </div>
 
-          {/* Relations Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-            <span className="label-caps">
-              Linked Relations
-            </span>
-
-            {relations.length > 0 && (
-              <div className="col">
-                {relations.map(rel => {
-                  const isFromCurrent = rel.from_id === taskId
-                  const peerId = isFromCurrent ? rel.to_id : rel.from_id
-                  const label = rel.type === 'blocks'
-                    ? (isFromCurrent ? 'blocks' : 'is blocked by')
-                    : rel.type === 'duplicates'
-                      ? 'duplicates'
-                      : 'relates to'
-
-                  return (
-                    <div
-                      key={rel.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: 'var(--color-surface-2)',
-                        border: '1px solid var(--color-surface-offset)',
-                        padding: 'var(--space-2) var(--space-4)',
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: 'var(--text-xs)'
-                      }}
-                    >
-                      <span className="row">
-                        <Link2 size={12} style={{ color: 'var(--color-text-muted)' }} />
-                        <span style={{ color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>{label}</span>
-                        <span style={{ color: 'var(--color-text-base)' }}>Item #{peerId.substring(0, 8)}</span>
-                      </span>
-
-                      <button
-                        onClick={() => handleDeleteRelation(rel.id)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--color-error)',
-                          cursor: 'pointer',
-                          padding: 0
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 'var(--space-2)', position: 'relative' }}>
-              <select
-                value={selectedRelationType}
-                onChange={e => setSelectedRelationType(e.target.value as RelationType)}
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-xs)',
-                  outline: 'none',
-                  flexShrink: 0
-                }}
-              >
-                <option value="relates_to">Relates To</option>
-                <option value="blocks">Blocks</option>
-                <option value="duplicates">Duplicates</option>
-              </select>
-
-              <input
-                type="text"
-                value={relationSearchQuery}
-                onChange={e => setRelationSearchQuery(e.target.value)}
-                placeholder="Search task/card title to link..."
-                style={{
-                  flex: 1,
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-xs)',
-                  outline: 'none'
-                }}
-              />
-
-              {relationSearchResults.length > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: '100%',
-                  left: 0,
-                  right: 0,
-                  marginBottom: '4px',
-                  background: 'var(--color-surface-elevated)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: '0 -10px 15px -3px rgba(0,0,0,0.3)',
-                  maxHeight: '150px',
-                  overflowY: 'auto',
-                  zIndex: 200,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1px'
-                }}>
-                  {relationSearchResults.map(res => (
-                    <button
-                      key={res.id}
-                      onClick={() => handleAddRelation(res.id)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--color-text-base)',
-                        padding: 'var(--space-2)',
-                        fontSize: 'var(--text-xs)',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '2px'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <strong style={{ fontSize: '11px' }}>{res.title}</strong>
-                      <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>#{res.id.substring(0, 8)} | context: {res.context}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <RelationsPanel links={itemRelations} placeholder="Search task/card title to link..." />
         </div>
       </div>
 
