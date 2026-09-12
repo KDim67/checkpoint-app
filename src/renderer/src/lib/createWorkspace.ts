@@ -20,6 +20,8 @@ import {
 import { collectLabels, type ImportedBoard } from '../../../shared/foreignImport'
 import { readWorkspaceList, writeWorkspaceList } from './workspaceList'
 import { createItem } from '../data/items'
+import { getContexts } from '../data/workspaces'
+import { createTag } from '../data/tags'
 
 /** The same slug rule the workspace manager has always used. */
 export function slugifyWorkspace(name: string): string {
@@ -78,7 +80,7 @@ export async function applyImportedBoard(slug: string, board: ImportedBoard): Pr
   const tagIdByName = new Map<string, string>()
   for (const label of collectLabels(board)) {
     try {
-      const tag = await window.electronAPI.db.createTag({ name: label.name, color: label.color })
+      const tag = await createTag(label.name, label.color)
       tagIdByName.set(label.name, tag.id)
     } catch (err) {
       // A tag that cannot be made is not worth losing the card it was on.
@@ -173,7 +175,7 @@ export function ensureWorkspaceListed(
  * be answered. The list read is a second opinion and only logs.
  */
 export async function occupiedWorkspaces(): Promise<Set<string>> {
-  const taken = new Set<string>(await window.electronAPI.db.getContexts())
+  const taken = new Set<string>(await getContexts())
 
   for (const entry of await readWorkspaceList()) taken.add(entry.slug)
 

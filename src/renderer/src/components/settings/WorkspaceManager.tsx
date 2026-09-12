@@ -23,6 +23,7 @@ import {
 } from '../../../../shared/projectTemplates'
 import { readWorkspaceList, writeWorkspaceList } from '../../lib/workspaceList'
 import { countItems } from '../../data/items'
+import { exportContext, importContext, importContextData, renameContext } from '../../data/workspaces'
 
 
 const PRESET_COLORS = [
@@ -65,7 +66,7 @@ export default function WorkspaceManager() {
 
   const handleExport = async (slug: string, name: string) => {
     try {
-      const res = await window.electronAPI.db.exportContext(slug, name)
+      const res = await exportContext(slug, name)
       if (res.success && res.filePath) {
         toast(`Exported workspace successfully to ${res.filePath.split(/[\\/]/).pop()}`)
       } else if (res.error) {
@@ -78,7 +79,7 @@ export default function WorkspaceManager() {
 
   const handleImportStart = async () => {
     try {
-      const res = await window.electronAPI.db.importContext()
+      const res = await importContext()
       if (res.success && res.payload) {
         setImportBoard(null)
         setImportPayload(res.payload)
@@ -140,7 +141,7 @@ export default function WorkspaceManager() {
     try {
       const exists = contexts.some(c => c.slug === slug)
       
-      const res = await window.electronAPI.db.importContextData(slug, importPayload)
+      const res = await importContextData(slug, importPayload)
       if (res.success) {
         if (!exists) {
           const newEntry: WorkspaceEntry = {
@@ -257,7 +258,7 @@ export default function WorkspaceManager() {
     try {
       if (newSlug !== slug) {
         // Run DB update/migration
-        const res = await window.electronAPI.db.renameContext(slug, newSlug)
+        const res = await renameContext(slug, newSlug)
         if (res && res.error) {
           toast(`Failed to rename workspace: ${res.error}`)
           return
