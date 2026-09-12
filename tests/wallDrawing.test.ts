@@ -14,6 +14,7 @@ import {
   itemAtPoint,
   type WallItem
 } from '../src/shared/wallModel'
+import { defined } from './helpers/defined'
 
 const item = (over: Partial<WallItem> = {}): WallItem => ({
   id: 'a', kind: 'note', x: 0, y: 0, width: 100, height: 100, z: 0, ...over
@@ -25,7 +26,7 @@ describe('a drawn stroke', () => {
   it('boxes the path and rebases the points into it', () => {
     // Box coordinates, not wall ones, so moving and resizing a stroke are the
     // same operations as for every other item.
-    const ink = inkFromPath(path, [])!
+    const ink = defined(inkFromPath(path, []))
     expect(ink.kind).toBe('ink')
     expect(ink.x).toBeLessThan(100)
     expect(ink.y).toBeLessThan(100)
@@ -33,13 +34,13 @@ describe('a drawn stroke', () => {
   })
 
   it('leaves room for the cap, so a stroke is not clipped by its own box', () => {
-    const ink = inkFromPath(path, [])!
+    const ink = defined(inkFromPath(path, []))
     expect(ink.width).toBeGreaterThan(140 - 100)
     expect(ink.height).toBeGreaterThan(160 - 100)
   })
 
   it('keeps every point of the path', () => {
-    expect(inkFromPath(path, [])!.points).toHaveLength(path.length * 2)
+    expect(defined(inkFromPath(path, [])).points).toHaveLength(path.length * 2)
   })
 
   it('refuses a single point, which is a click and not a stroke', () => {
@@ -48,12 +49,12 @@ describe('a drawn stroke', () => {
   })
 
   it('sits above whatever is already on the wall', () => {
-    const ink = inkFromPath(path, [item({ z: 9 })])!
+    const ink = defined(inkFromPath(path, [item({ z: 9 })]))
     expect(ink.z).toBeGreaterThan(9)
   })
 
   it('takes a colour and width from the caller', () => {
-    const ink = inkFromPath(path, [], { color: '#f28b82', strokeWidth: STROKE_WIDTHS[2] })!
+    const ink = defined(inkFromPath(path, [], { color: '#f28b82', strokeWidth: STROKE_WIDTHS[2] }))
     expect(ink.color).toBe('#f28b82')
     expect(ink.strokeWidth).toBe(STROKE_WIDTHS[2])
   })
@@ -232,7 +233,7 @@ describe('stroke smoothing', () => {
   })
 
   it('carries the flag from the pen that drew it', () => {
-    const ink = inkFromPath([{ x: 0, y: 0 }, { x: 5, y: 5 }], [], { smooth: 0.6 })!
+    const ink = defined(inkFromPath([{ x: 0, y: 0 }, { x: 5, y: 5 }], [], { smooth: 0.6 }))
     expect(ink.smooth).toBe(0.6)
   })
 })

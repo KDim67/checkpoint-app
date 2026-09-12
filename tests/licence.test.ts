@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import {
   COPYRIGHT_FROM, COPYRIGHT_HOLDER, copyrightYears, copyrightLine
 } from '../src/shared/licence'
+import { defined } from './helpers/defined'
 
 // The About panel used to spell the copyright out by hand, and said 2025 for a
 // project whose first commit is from 2026, under a holder LICENSE does not
@@ -58,11 +59,11 @@ describe('agreement with what ships in the installer', () => {
     // until it is wrong.
     const match = /^copyright:\s*"(.+)"$/m.exec(readFileSync('electron-builder.yml', 'utf8'))
     expect(match, 'electron-builder.yml has no copyright line').not.toBeNull()
-    expect(match![1]).toContain(COPYRIGHT_HOLDER)
+    expect(defined(match)[1]).toContain(COPYRIGHT_HOLDER)
   })
 
   it('starts from the same year in the packaged metadata', () => {
     const match = /^copyright:\s*"(.+)"$/m.exec(readFileSync('electron-builder.yml', 'utf8'))
-    expect(match![1]).toContain(String(COPYRIGHT_FROM))
+    expect(defined(match)[1]).toContain(String(COPYRIGHT_FROM))
   })
 })

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { simplifyPath, inkFromPath, SIMPLIFY_TOLERANCE } from '../src/shared/wallModel'
+import { defined } from './helpers/defined'
 
 // A pointer emits a sample every few milliseconds, so one confident stroke
 // arrives as hundreds of nearly identical points. They are stored, synced and
@@ -60,22 +61,22 @@ describe('thinning a stroke', () => {
 
 describe('what actually gets stored', () => {
   it('stores the thinned stroke, not every sample', () => {
-    const ink = inkFromPath(line(500), [])!
-    expect(ink.points!.length / 2).toBeLessThan(20)
+    const ink = defined(inkFromPath(line(500), []))
+    expect(defined(ink.points).length / 2).toBeLessThan(20)
   })
 
   it('still spans what was drawn', () => {
-    const ink = inkFromPath(line(500), [])!
-    const xs = ink.points!.filter((_, i) => i % 2 === 0)
+    const ink = defined(inkFromPath(line(500), []))
+    const xs = defined(ink.points).filter((_, i) => i % 2 === 0)
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(499, 0)
   })
 
   it('keeps a box that fits the points it kept', () => {
     // Thinning before measuring, so a dropped sample cannot leave the box
     // bigger than the stroke inside it.
-    const ink = inkFromPath([{ x: 0, y: 0 }, { x: 40, y: 3 }, { x: 80, y: 0 }], [])!
-    const xs = ink.points!.filter((_, i) => i % 2 === 0)
-    const ys = ink.points!.filter((_, i) => i % 2 === 1)
+    const ink = defined(inkFromPath([{ x: 0, y: 0 }, { x: 40, y: 3 }, { x: 80, y: 0 }], []))
+    const xs = defined(ink.points).filter((_, i) => i % 2 === 0)
+    const ys = defined(ink.points).filter((_, i) => i % 2 === 1)
     expect(Math.max(...xs)).toBeLessThanOrEqual(ink.width)
     expect(Math.max(...ys)).toBeLessThanOrEqual(ink.height)
   })

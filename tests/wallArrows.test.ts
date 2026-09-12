@@ -16,6 +16,7 @@ import {
   ARROW_HEAD_MODES,
   type WallItem
 } from '../src/shared/wallModel'
+import { defined } from './helpers/defined'
 
 const box = (over: Partial<WallItem> = {}): WallItem => ({
   id: 'a', kind: 'note', x: 0, y: 0, width: 100, height: 100, z: 0, ...over
@@ -138,7 +139,7 @@ describe('taking the corners off a path', () => {
     // A 4-long leg cannot give up 10 at each end, and a corner that ate more
     // than its own segment would double back.
     const d = roundedPath([{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }], 10)
-    const numbers = d.match(/-?\d+(\.\d+)?/g)!.map(Number)
+    const numbers = defined(d.match(/-?\d+(\.\d+)?/g)).map(Number)
     expect(Math.min(...numbers)).toBeGreaterThanOrEqual(0)
     expect(Math.max(...numbers)).toBeLessThanOrEqual(4)
   })
@@ -182,7 +183,7 @@ describe('line styles', () => {
   })
 
   it('makes dots short enough to be dots', () => {
-    const [on, off] = arrowDash('dotted', 4)!.split(' ').map(Number)
+    const [on, off] = defined(arrowDash('dotted', 4)).split(' ').map(Number)
     expect(on).toBeLessThan(off)
   })
 
@@ -323,14 +324,14 @@ describe('an end attached to nothing', () => {
 
   it('resolves a loose end to the point it was left at', () => {
     const arrow = box({ id: 'arrow', kind: 'arrow', from: 'anchored', toPoint: { x: 400, y: 300 } })
-    const ends = arrowAnchors(arrow, byId)!
+    const ends = defined(arrowAnchors(arrow, byId))
     expect(ends.to.x).toBe(400)
     expect(ends.to.y).toBe(300)
   })
 
   it('draws to the point exactly, since a point has no edge to stop at', () => {
     const arrow = box({ id: 'arrow', kind: 'arrow', from: 'anchored', toPoint: { x: 400, y: 300 } })
-    const ends = arrowAnchors(arrow, byId)!
+    const ends = defined(arrowAnchors(arrow, byId))
     expect(arrowGeometry(ends.from, ends.to).end).toEqual({ x: 400, y: 300 })
   })
 
@@ -393,7 +394,7 @@ describe('what a loose end does to the wall bounds', () => {
   const note = box({ id: 'n', x: 0, y: 0, width: 100, height: 100 })
 
   it('is counted, so an export cannot crop it off', () => {
-    const b = boundsOf([note, box({ id: 'a', kind: 'arrow', from: 'n', toPoint: { x: 500, y: 400 } })])!
+    const b = defined(boundsOf([note, box({ id: 'a', kind: 'arrow', from: 'n', toPoint: { x: 500, y: 400 } })]))
     expect(b.maxX).toBe(500)
     expect(b.maxY).toBe(400)
   })
@@ -407,7 +408,7 @@ describe('what a loose end does to the wall bounds', () => {
   })
 
   it('works from loose ends alone', () => {
-    const b = boundsOf([box({ id: 'a', kind: 'arrow', fromPoint: { x: 10, y: 20 }, toPoint: { x: 30, y: 5 } })])!
+    const b = defined(boundsOf([box({ id: 'a', kind: 'arrow', fromPoint: { x: 10, y: 20 }, toPoint: { x: 30, y: 5 } })]))
     expect(b).toEqual({ minX: 10, minY: 5, maxX: 30, maxY: 20 })
   })
 

@@ -10,6 +10,7 @@ import {
   todoistPriorityFromCsv,
   collectLabels
 } from '../src/shared/foreignImport'
+import { defined } from './helpers/defined'
 
 describe('telling a Todoist export apart', () => {
   it('recognises the Sync API shape', () => {
@@ -81,7 +82,7 @@ describe('a Todoist JSON backup', () => {
     ]
   }
 
-  const board = parseTodoistBoard(backup)!
+  const board = defined(parseTodoistBoard(backup))
 
   it('uses the project name for the workspace', () => {
     expect(board.name).toBe('Renovation')
@@ -92,16 +93,16 @@ describe('a Todoist JSON backup', () => {
   })
 
   it('puts section-less tasks in the first column rather than losing them', () => {
-    const skip = board.cards.find(c => c.title === 'Book the skip')!
+    const skip = defined(board.cards.find(c => c.title === 'Book the skip'))
     expect(skip.status).toBe(board.columns[0].id)
   })
 
   it('carries description, due date and priority across', () => {
-    const paint = board.cards.find(c => c.title === 'Order paint')!
+    const paint = defined(board.cards.find(c => c.title === 'Order paint'))
     expect(paint.body).toBe('Matt, not satin')
     expect(paint.priority).toBe(0)
 
-    const strip = board.cards.find(c => c.title === 'Strip the wallpaper')!
+    const strip = defined(board.cards.find(c => c.title === 'Strip the wallpaper'))
     expect(strip.priority).toBe(3)
     expect(strip.due_at).toBe(Date.parse('2026-10-01'))
   })
@@ -111,13 +112,13 @@ describe('a Todoist JSON backup', () => {
   })
 
   it('makes a sub-task a checklist item rather than a card of its own', () => {
-    const paint = board.cards.find(c => c.title === 'Order paint')!
+    const paint = defined(board.cards.find(c => c.title === 'Order paint'))
     expect(paint.checklist).toEqual([{ text: 'Pick a colour', done: false }])
     expect(board.cards.some(c => c.title === 'Pick a colour')).toBe(false)
   })
 
   it('archives a completed task instead of dropping it, and says so', () => {
-    const measured = board.cards.find(c => c.title === 'Measure the room')!
+    const measured = defined(board.cards.find(c => c.title === 'Measure the room'))
     expect(measured.status).toBe('archived')
     expect(board.notes.join(' ')).toContain('1 completed task')
   })
@@ -134,21 +135,21 @@ describe('a Todoist JSON backup', () => {
 })
 
 describe('a Todoist backup holding several projects', () => {
-  const board = parseTodoistBoard({
+  const board = defined(parseTodoistBoard({
     projects: [{ id: 'p1', name: 'Work' }, { id: 'p2', name: 'Home' }],
     sections: [{ id: 's1', name: 'Later', project_id: 'p1' }],
     items: [
       { id: 't1', content: 'Ship the release', project_id: 'p1' },
       { id: 't2', content: 'Fix the tap', project_id: 'p2' }
     ]
-  })!
+  }))
 
   it('makes the projects the columns, since their sections are not comparable', () => {
     expect(board.columns.map(c => c.name)).toEqual(['Work', 'Home'])
   })
 
   it('files each task under its own project', () => {
-    expect(board.cards.find(c => c.title === 'Fix the tap')!.status).toBe(board.columns[1].id)
+    expect(defined(board.cards.find(c => c.title === 'Fix the tap')).status).toBe(board.columns[1].id)
   })
 
   it('says out loud that sections were flattened', () => {
@@ -200,37 +201,37 @@ describe('a Todoist template CSV', () => {
   })
 
   it('turns section rows into columns, keeping one for what came first', () => {
-    const board = parseTodoistCsv(csv, 'Renovation')!
+    const board = defined(parseTodoistCsv(csv, 'Renovation'))
     expect(board.columns.map(c => c.name)).toEqual(['Renovation', 'Next up', 'Doing'])
   })
 
   it('reads the CSV priority scale, not the API one', () => {
-    const board = parseTodoistCsv(csv, 'Renovation')!
+    const board = defined(parseTodoistCsv(csv, 'Renovation'))
     // PRIORITY 1 is Todoist's p1. Read as the API scale it would arrive as
     // the lowest instead of the highest.
-    expect(board.cards.find(c => c.title === 'Strip the wallpaper')!.priority).toBe(3)
-    expect(board.cards.find(c => c.title === 'Order paint, matt')!.priority).toBe(1)
+    expect(defined(board.cards.find(c => c.title === 'Strip the wallpaper')).priority).toBe(3)
+    expect(defined(board.cards.find(c => c.title === 'Order paint, matt')).priority).toBe(1)
   })
 
   it('makes an indented row a checklist item on the task above it', () => {
-    const board = parseTodoistCsv(csv, 'Renovation')!
-    const strip = board.cards.find(c => c.title === 'Strip the wallpaper')!
+    const board = defined(parseTodoistCsv(csv, 'Renovation'))
+    const strip = defined(board.cards.find(c => c.title === 'Strip the wallpaper'))
     expect(strip.checklist).toEqual([{ text: 'Pick a colour', done: false }])
   })
 
   it('appends a note row to the task it belongs to', () => {
-    const board = parseTodoistCsv(csv, 'Renovation')!
-    const strip = board.cards.find(c => c.title === 'Strip the wallpaper')!
+    const board = defined(parseTodoistCsv(csv, 'Renovation'))
+    const strip = defined(board.cards.find(c => c.title === 'Strip the wallpaper'))
     expect(strip.body).toContain('Ask about the trim')
   })
 
   it('keeps a quoted comma in a task title', () => {
-    const board = parseTodoistCsv(csv, 'Renovation')!
+    const board = defined(parseTodoistCsv(csv, 'Renovation'))
     expect(board.cards.some(c => c.title === 'Order paint, matt')).toBe(true)
   })
 
   it('says what a template export cannot carry', () => {
-    const board = parseTodoistCsv(csv, 'Renovation')!
+    const board = defined(parseTodoistCsv(csv, 'Renovation'))
     expect(board.notes.join(' ')).toContain('no labels')
   })
 

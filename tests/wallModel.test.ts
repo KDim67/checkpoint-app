@@ -36,6 +36,7 @@ import {
   withFrameContents,
   DEFAULT_WALL_ID
 } from '../src/shared/wallModel'
+import { defined } from './helpers/defined'
 
 const item = (over: Partial<WallItem> = {}): WallItem => ({
   id: 'a',
@@ -73,7 +74,7 @@ describe('normalizeWallItem', () => {
   })
 
   it('falls back to the size for its kind', () => {
-    const got = normalizeWallItem({ kind: 'frame' }, 0)!
+    const got = defined(normalizeWallItem({ kind: 'frame' }, 0))
     expect(got.width).toBe(DEFAULT_SIZES.frame.width)
     expect(got.height).toBe(DEFAULT_SIZES.frame.height)
   })
@@ -81,25 +82,25 @@ describe('normalizeWallItem', () => {
   it('floors size, so nothing becomes unclickable', () => {
     // A zero-size item cannot be selected, and so cannot be fixed without
     // editing the database by hand.
-    const got = normalizeWallItem({ kind: 'note', width: 0, height: -50 }, 0)!
+    const got = defined(normalizeWallItem({ kind: 'note', width: 0, height: -50 }, 0))
     expect(got.width).toBeGreaterThanOrEqual(40)
     expect(got.height).toBeGreaterThanOrEqual(32)
   })
 
   it('invents an id when one is missing, rather than dropping the item', () => {
-    const got = normalizeWallItem({ kind: 'note' }, 7)!
+    const got = defined(normalizeWallItem({ kind: 'note' }, 7))
     expect(got.id).toBeTruthy()
   })
 
   it('survives junk in every numeric field', () => {
-    const got = normalizeWallItem({ kind: 'note', x: 'left', y: null, z: {} }, 2)!
+    const got = defined(normalizeWallItem({ kind: 'note', x: 'left', y: null, z: {} }, 2))
     expect(got.x).toBe(0)
     expect(got.y).toBe(0)
     expect(got.z).toBe(2)
   })
 
   it('keeps an empty text body, which is a legitimate empty sticky note', () => {
-    expect(normalizeWallItem({ kind: 'note', text: '' }, 0)!.text).toBe('')
+    expect(defined(normalizeWallItem({ kind: 'note', text: '' }, 0)).text).toBe('')
   })
 })
 
@@ -147,13 +148,13 @@ describe('paint order', () => {
   it('brings one item above everything without reordering the others', () => {
     const items = [item({ id: 'a', z: 1 }), item({ id: 'b', z: 2 }), item({ id: 'c', z: 3 })]
     const next = bringToFront(items, 'a')
-    expect(next.find(i => i.id === 'a')!.z).toBeGreaterThan(3)
+    expect(defined(next.find(i => i.id === 'a')).z).toBeGreaterThan(3)
     expect(next.map(i => i.id)).toEqual(['a', 'b', 'c'])
   })
 
   it('sends one item below everything', () => {
     const items = [item({ id: 'a', z: 1 }), item({ id: 'b', z: 2 })]
-    expect(sendToBack(items, 'b').find(i => i.id === 'b')!.z).toBeLessThan(1)
+    expect(defined(sendToBack(items, 'b').find(i => i.id === 'b')).z).toBeLessThan(1)
   })
 
   it('starts z at 1 for an empty wall', () => {
