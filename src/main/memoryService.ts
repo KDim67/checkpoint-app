@@ -92,8 +92,9 @@ export function saveMemory(payload: {
 
   const existing = stmtGetExistingByKey.get(context, key) as { id: string; access_count: number; created_at: number } | undefined
 
-  if (payload.id || existing) {
-    const id = payload.id || existing!.id
+  const updateId = payload.id || existing?.id
+  if (updateId) {
+    const id = updateId
     stmtUpdateMemory.run(category, payload.content, is_pinned, now, id)
     return {
       id,

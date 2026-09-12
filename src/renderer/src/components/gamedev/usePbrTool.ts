@@ -187,7 +187,9 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
       const toDataUrl = (data: Uint8ClampedArray<ArrayBuffer>) => {
         const c = document.createElement('canvas')
         c.width = W; c.height = H
-        c.getContext('2d')!.putImageData(new ImageData(data, W, H), 0, 0)
+        const mapCtx = c.getContext('2d')
+        if (!mapCtx) throw new Error('This system could not draw the exported maps')
+        mapCtx.putImageData(new ImageData(data, W, H), 0, 0)
         return c.toDataURL('image/png')
       }
 

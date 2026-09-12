@@ -155,18 +155,18 @@ export function parseNaturalDate(input: string, now: number = Date.now()): Parse
   const day = findDay(text, reference)
   const time = findTime(day ? text.replace(day.source, ' ') : text)
 
-  if (!day && !time) return { dueAt: null, cleanedText: text.trim(), matched: null }
-
   let due: Date
   if (day) {
     due = new Date(day.date)
     if (time) due.setHours(time.hours, time.minutes, 0, 0)
     else if (!day.impliedTime) due.setHours(DEFAULT_HOUR, 0, 0, 0)
-  } else {
+  } else if (time) {
     due = startOfDay(reference)
-    due.setHours(time!.hours, time!.minutes, 0, 0)
+    due.setHours(time.hours, time.minutes, 0, 0)
     // A bare time that has already gone means the next one.
     if (due.getTime() <= now) due = addDays(due, 1)
+  } else {
+    return { dueAt: null, cleanedText: text.trim(), matched: null }
   }
 
   let cleaned = text
