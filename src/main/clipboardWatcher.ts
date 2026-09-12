@@ -7,7 +7,7 @@ let recordCopy: ((text: string) => void) | null = null
 
 /**
  * Registers the sink for captured copies. Kept separate from start/stop so the
- * enabled flag can be flipped from setSetting without db.ts having to reach
+ * enabled flag can be flipped from setSetting without the db module having to reach
  * back into main/index.ts for the callback.
  */
 export function configureClipboardWatcher(recordCopyFn: (text: string) => void): void {

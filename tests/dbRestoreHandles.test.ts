@@ -31,7 +31,7 @@ const seed = (): void => {
 }
 
 describe('swapping the database file the way a restore does', () => {
-  it('keeps working when the connection goes through db.ts', () => {
+  it('keeps working when the connection goes through the db module', () => {
     seed()
 
     // What a restore should do: discardDb drops the cache along with the

@@ -20,7 +20,7 @@ import ConfirmDialog from './ui/ConfirmDialog'
 import { useToast } from './ui/Toast'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 
-// Keep in sync with the DELETE ... LIMIT in db.ts (stmtDeleteClipboardHistoryOverflow).
+// Keep in sync with the DELETE ... LIMIT in db/clipboard.ts (stmtDeleteClipboardHistoryOverflow).
 const HISTORY_LIMIT = 200
 
 // Content-type detection

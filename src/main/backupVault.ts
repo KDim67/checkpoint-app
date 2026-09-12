@@ -218,9 +218,9 @@ export async function runRestore(filename: string): Promise<void> {
       }
     }
 
-    // 4. Close the connection through db.ts, not by reaching for the handle.
+    // 4. Close the connection through the db module, not by reaching for the handle.
     //
-    // db.ts caches prepared statements keyed by SQL, compiled against whichever
+    // The db module caches prepared statements keyed by SQL, compiled against whichever
     // connection was open at the time. Closing the raw handle left every one of
     // them pointing at a dead connection while `dbInstance` still looked live,
     // so after a restore the search, task, analytics and update paths all threw

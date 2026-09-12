@@ -59,7 +59,7 @@ describe('restoring a backup', () => {
     initDb(dataPath)
     addItem('a searchable thing')
     // Warms the cache against the pre-restore connection. Closing the raw
-    // handle instead of going through db.ts used to leave every cached
+    // handle instead of going through the db module used to leave every cached
     // statement compiled against it, and better-sqlite3 then throws
     // "The database connection is not open" on the next query.
     expect(search('searchable')).toBe(1)
