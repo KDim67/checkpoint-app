@@ -75,8 +75,21 @@ describe('sameColumnConfig', () => {
   })
 
   it('reads undefined and absent as the same thing', () => {
-    // JSON off disk gives one, a fresh object the other.
+    // JSON off disk gives one, a fresh object the other. This is why the
+    // comparison cannot take the cheap shortcut of counting keys.
     expect(sameColumnConfig(column(), column({ description: undefined }))).toBe(true)
+    expect(sameColumnConfig(column({ description: undefined }), column())).toBe(true)
+  })
+
+  it('notices a field only the second one has', () => {
+    // The first walk only covers the keys the first object has, so a key that
+    // exists solely on the second would slip past a one-way comparison.
+    expect(sameColumnConfig(column(), { ...column(), sort: 'due' })).toBe(false)
+  })
+
+  it('is free when both sides are the very same object', () => {
+    const one = column()
+    expect(sameColumnConfig(one, one)).toBe(true)
   })
 })
 

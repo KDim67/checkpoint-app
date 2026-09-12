@@ -11,7 +11,16 @@
  * them.
  */
 
-import type { BulkUpdatePayload, Item, ItemPriority, ItemType, Relation, RelationType, Tag } from './types'
+import type {
+  BulkUpdatePayload,
+  Item,
+  ItemPriority,
+  ItemType,
+  Relation,
+  RelationType,
+  SyncTombstone,
+  Tag
+} from './types'
 import { normalizeBoardConfig, type BoardConfig } from './boardModel'
 
 // The messages
@@ -60,6 +69,12 @@ export function retargetMutation(mutation: RemoteMutation, context: string): Rem
   return mutation
 }
 
+/**
+ * What a guest is allowed to do. The host decides it, and can change its mind
+ * without ending the session.
+ */
+export type CollabMode = 'collaborative' | 'readonly'
+
 export interface BoardBaselineMessage {
   type: 'board-baseline'
   context: string
@@ -67,7 +82,7 @@ export interface BoardBaselineMessage {
   tags: Tag[]
   itemTags: { item_id: string; tag_id: string }[]
   relations: Relation[]
-  mode: 'collaborative' | 'readonly'
+  mode: CollabMode
   /**
    * The host's columns, so the cards have somewhere to land.
    *
@@ -77,6 +92,39 @@ export interface BoardBaselineMessage {
    * whose status is a column the host renamed or added renders nowhere.
    */
   board?: BoardConfig
+  /**
+   * What this side has deleted, so a merge on the other end can honour it.
+   *
+   * Without them a merge knows only its own deletions, and every card the
+   * sender threw away walks back in from the receiver's copy. Optional, because
+   * a build older than this sends none and a merge without them is the merge
+   * that shipped before.
+   */
+  tombstones?: SyncTombstone[]
+}
+
+/**
+ * Who is in the room, as only the host can know.
+ *
+ * Guests are connected to the host and not to each other, so the list has to
+ * come from the middle and be sent on every change.
+ */
+export interface RosterMessage {
+  type: 'roster'
+  members: { id: string; name: string }[]
+}
+
+/**
+ * The board document: columns, background, swimlanes, the card face.
+ *
+ * It used to travel only with the opening baseline, so a column added during a
+ * session reached nobody, and a card moved into it arrived addressed to a
+ * column the other side did not have and rendered nowhere.
+ */
+export interface BoardConfigMessage {
+  type: 'board-config'
+  context: string
+  board: BoardConfig
 }
 
 export interface DbMutationMessage {
@@ -84,7 +132,87 @@ export interface DbMutationMessage {
   mutation: RemoteMutation
 }
 
-export type CollabMessage = BoardBaselineMessage | DbMutationMessage
+/**
+ * Sent before hanging up on purpose, so the other side can say who left rather
+ * than just going quiet.
+ *
+ * A peer that crashes or loses its network sends nothing, which is the
+ * difference the receiver is being told about: a message means they chose to.
+ */
+export interface PeerLeavingMessage {
+  type: 'peer-leaving'
+  /** May be empty. The receiver falls back to something readable. */
+  by: string
+}
+
+/**
+ * Said as soon as the channel opens, by both sides, so each can name the other.
+ *
+ * Without it the host knows only that somebody is in, which is no basis for
+ * deciding whether to let them stay.
+ */
+export interface PeerHelloMessage {
+  type: 'peer-hello'
+  /** May be empty. The receiver falls back to something readable. */
+  by: string
+}
+
+/**
+ * The host dropping a guest on purpose.
+ *
+ * Separate from peer-leaving because the two read completely differently from
+ * the other end: one is someone saying goodbye, the other is being shown the
+ * door, and a connection that just goes quiet is neither.
+ */
+export interface PeerRemovedMessage {
+  type: 'peer-removed'
+  by: string
+}
+
+/** The host changing what the guest may do, without ending the session. */
+export interface ModeChangeMessage {
+  type: 'mode-change'
+  mode: CollabMode
+}
+
+/**
+ * One side offering the other the board the two of them make together.
+ *
+ * It carries the merged result rather than the raw copy for the other side to
+ * merge for itself. Two independent merges do not have to agree: each side
+ * breaks ties in its own favour and honours only its own deletions, so the
+ * boards would end up nearly the same, which is the worst kind of same. One
+ * merge, sent whole, and both ends hold the same board.
+ */
+export interface MergeProposalMessage {
+  type: 'merge-proposal'
+  by: string
+  context: string
+  items: Item[]
+  tags: Tag[]
+  itemTags: { item_id: string; tag_id: string }[]
+  relations: Relation[]
+  board: BoardConfig
+}
+
+/** Whether the other side took the merge. A no is an answer, not a failure. */
+export interface MergeAnswerMessage {
+  type: 'merge-answer'
+  accepted: boolean
+  by: string
+}
+
+export type CollabMessage =
+  | BoardBaselineMessage
+  | DbMutationMessage
+  | PeerLeavingMessage
+  | PeerHelloMessage
+  | PeerRemovedMessage
+  | ModeChangeMessage
+  | MergeProposalMessage
+  | MergeAnswerMessage
+  | RosterMessage
+  | BoardConfigMessage
 
 // Primitives
 
@@ -180,6 +308,29 @@ function normalizeItemTag(raw: unknown): { item_id: string; tag_id: string } | n
 /** Drops the entries that cannot be written, keeping the rest. */
 function normalizeAll<T>(raw: unknown, one: (value: unknown) => T | null): T[] {
   return Array.isArray(raw) ? raw.map(one).filter((v): v is T => v !== null) : []
+}
+
+/**
+ * A deletion the sender remembers. The table matters: only these three record a
+ * row id, and a merge reading a note's filename as a card id would keep that
+ * card out for no reason.
+ */
+function normalizeTombstone(raw: unknown): SyncTombstone | null {
+  const o = obj(raw)
+  if (!o) return null
+  const rowId = id(o.id)
+  const table = id(o.table_name)
+  if (!rowId || !table) return null
+  if (table !== 'items' && table !== 'tags' && table !== 'relations') return null
+  return { id: rowId, table_name: table, deleted_at: num(o.deleted_at) ?? 0 }
+}
+
+/** Someone in the room. A member with no id is nobody. */
+function normalizeRosterMember(raw: unknown): { id: string; name: string } | null {
+  const o = obj(raw)
+  if (!o) return null
+  const memberId = id(o.id)
+  return memberId ? { id: memberId, name: str(o.name) } : null
 }
 
 /** Ids only, for the mutations that carry a list of them. */
@@ -278,13 +429,73 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
       // Absent from an older peer. Left undefined rather than normalised into
       // a default board, so the joiner can tell "no board was sent" from "the
       // host really has the default four" and keep its own in the first case.
-      board: o.board === undefined ? undefined : normalizeBoardConfig(o.board)
+      board: o.board === undefined ? undefined : normalizeBoardConfig(o.board),
+      tombstones: o.tombstones === undefined
+        ? undefined
+        : normalizeAll(o.tombstones, normalizeTombstone)
     }
+  }
+
+  if (o.type === 'roster') {
+    return { type: 'roster', members: normalizeAll(o.members, normalizeRosterMember) }
+  }
+
+  if (o.type === 'board-config') {
+    const context = id(o.context)
+    if (!context) return null
+    return { type: 'board-config', context, board: normalizeBoardConfig(o.board) }
   }
 
   if (o.type === 'db-mutation-event') {
     const mutation = normalizeRemoteMutation(o.mutation)
     return mutation ? { type: 'db-mutation-event', mutation } : null
+  }
+
+  if (o.type === 'peer-leaving') {
+    // No name is still a valid goodbye: knowing they left on purpose is the
+    // point, and who they were is the decoration.
+    return { type: 'peer-leaving', by: str(o.by) }
+  }
+
+  if (o.type === 'peer-hello') {
+    return { type: 'peer-hello', by: str(o.by) }
+  }
+
+  if (o.type === 'peer-removed') {
+    return { type: 'peer-removed', by: str(o.by) }
+  }
+
+  if (o.type === 'merge-proposal') {
+    const context = id(o.context)
+    // Same rule as the baseline: a merge with no workspace on it has nowhere to
+    // go, and the workspace is what the receiver is about to overwrite.
+    if (!context) return null
+    return {
+      type: 'merge-proposal',
+      by: str(o.by),
+      context,
+      items: normalizeAll(o.items, normalizeSyncItem),
+      tags: normalizeAll(o.tags, normalizeSyncTag),
+      itemTags: normalizeAll(o.itemTags, normalizeItemTag),
+      relations: normalizeAll(o.relations, normalizeSyncRelation),
+      board: normalizeBoardConfig(o.board)
+    }
+  }
+
+  if (o.type === 'merge-answer') {
+    // Only an explicit yes is a yes. Anything else, including a field that will
+    // not read, leaves the other side's board exactly as it was, which is the
+    // failure nobody has to undo.
+    return { type: 'merge-answer', accepted: o.accepted === true, by: str(o.by) }
+  }
+
+  if (o.type === 'mode-change') {
+    // Rejected rather than defaulted, unlike every other field here. A mode
+    // nobody can read must not become the permissive one: this is the message
+    // that decides what a peer is allowed to do, and the safe way to fail is to
+    // leave what was already agreed in place.
+    if (o.mode !== 'collaborative' && o.mode !== 'readonly') return null
+    return { type: 'mode-change', mode: o.mode }
   }
 
   return null

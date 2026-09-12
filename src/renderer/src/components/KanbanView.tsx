@@ -3,6 +3,7 @@ import type { Tag } from '../../../shared/types'
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragStartEvent,
   DragOverlay,
   useSensor,
@@ -10,7 +11,6 @@ import {
   PointerSensor,
   KeyboardSensor,
   rectIntersection,
-  pointerWithin,
   CollisionDetection,
   MeasuringStrategy
 } from '@dnd-kit/core'
@@ -30,7 +30,7 @@ import { useAppStore } from '../store/appStore'
 import type { Item } from '../../../shared/types'
 import { Plus, Layers, LayoutGrid, KanbanSquare, Upload, Eye } from 'lucide-react'
 import Skeleton from './ui/Skeleton'
-import ConfirmDialog, { useConfirm, useChoose } from './ui/ConfirmDialog'
+import ConfirmDialog, { useConfirm, usePick } from './ui/ConfirmDialog'
 import useFocusTrap from './ui/useFocusTrap'
 import useEscapeKey from './ui/useEscapeKey'
 import EmptyState from './ui/EmptyState'
@@ -47,8 +47,18 @@ import {
   type ColumnConfig,
   type ColumnSort
 } from '../lib/boardConfig'
+import { describeImpact, type MergeImpact } from '../../../shared/boardMerge'
+import {
+  dropIndex,
+  dropTargetAt,
+  lastCardIn,
+  positionForIndex,
+  type CardBox,
+  type ColumnBox,
+  type DropTarget
+} from '../../../shared/cardDrop'
 import { availableWorkspaceSlug, occupiedWorkspaces, setWorkspaceShared } from '../lib/createWorkspace'
-import { DISPLAY_NAME_KEY, DISPLAY_NAME_MAX, normalizeDisplayName } from '../../../shared/identity'
+import { authorLabel, DISPLAY_NAME_KEY, DISPLAY_NAME_MAX, normalizeDisplayName } from '../../../shared/identity'
 import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
 import { errorMessage } from '../../../shared/errors'
 import { getTextColorForBackground } from '../lib/contrast'
@@ -101,13 +111,37 @@ function getBoardBackgroundStyle(bg: string): string {
   return bg
 }
 
-const customCollisionDetection: CollisionDetection = (args) => {
-  if (String(args.active.id).startsWith('col::')) {
-    return rectIntersection(args)
-  }
-  const pointerCollisions = pointerWithin(args)
-  if (pointerCollisions.length > 0) return pointerCollisions
-  return rectIntersection(args)
+/**
+ * What the collision detector needs to know that the rectangles do not say:
+ * which droppables are columns, which are cards and whose column each card is
+ * in.
+ *
+ * Worked out from the board's own state rather than from the ids, because the
+ * ids do not carry it. Columns register under their own id and cards under
+ * theirs, but so does each column's sortable, under a `col::` id, and reading
+ * "not a column id" as "a card" is what silently sent every drop to the end of
+ * the first column.
+ */
+interface DropGeometry {
+  /** Column id to whether a drop can pick a slot in it rather than just land in it. */
+  columns: Map<string, boolean>
+  cardColumn: Map<string, string>
+}
+
+/**
+ * Whether a drop can pick a slot in a column or only land in it.
+ *
+ * A column sorted by priority or due date decides its own order, so a slot
+ * picked in one is a slot the card would not keep. Swimlanes override a
+ * column's own sort with a priority grouping, and a lane is very much worth
+ * aiming at: dropping into one is how a card's priority gets set.
+ *
+ * Read by the collision detector and by the column that draws the gap. Written
+ * out twice they could disagree, and then the gap is drawn somewhere the card
+ * is not going to land.
+ */
+function canAimAtSlot(column: ColumnConfig, swimlanes: boolean): boolean {
+  return swimlanes || (column.sort ?? 'manual') === 'manual'
 }
 
 // Shared stable reference for empty columns, so the memoized column never
@@ -130,10 +164,18 @@ interface SortableColumnProps {
   onToggleCollapse?: (columnId: string) => void
   onSetSort?: (columnId: string, sort: ColumnSort) => void
   cardDisplay?: CardDisplay
+  /** Where the drop preview sits, as an index into `cards`. null for nowhere. */
+  dropSlot?: number | null
+  /** The height the dragged card had, so the gap is the footprint it will take. */
+  dropHeight?: number
 }
 
 function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableColumnProps) {
   if (prev.isReadOnly !== next.isReadOnly) return false
+  // The board hands these down only while a card is in the air, and only the
+  // column under the pointer gets a slot, so this is what keeps a drag to one
+  // re-rendering column instead of all of them.
+  if (prev.dropSlot !== next.dropSlot || prev.dropHeight !== next.dropHeight) return false
   // Whole-object compares. The five fields this used to name by hand left
   // collapsed, sort, description and cardDisplay out, so those changes were
   // dropped here and never reached a card.
@@ -162,7 +204,9 @@ const SortableColumn = React.memo(function SortableColumn({
   isReadOnly = false,
   onToggleCollapse,
   onSetSort,
-  cardDisplay
+  cardDisplay,
+  dropSlot = null,
+  dropHeight
 }: SortableColumnProps) {
   const {
     attributes,
@@ -209,6 +253,8 @@ const SortableColumn = React.memo(function SortableColumn({
         onSetSort={onSetSort}
         description={col.description}
         cardDisplay={cardDisplay}
+        dropSlot={dropSlot}
+        dropHeight={dropHeight}
       />
     </div>
   )
@@ -239,7 +285,7 @@ export default function KanbanView() {
 
   const { toast } = useToast()
   const confirm = useConfirm()
-  const choose = useChoose()
+  const pick = usePick()
 
   /**
    * Kept as typed and normalised on the way out, so the field is not fighting
@@ -269,8 +315,12 @@ export default function KanbanView() {
   useEffect(() => {
     if (!nameLoaded.current) return
     const timer = setTimeout(() => {
-      window.electronAPI.db.setSetting(DISPLAY_NAME_KEY, normalizeDisplayName(displayName))
+      const name = normalizeDisplayName(displayName)
+      window.electronAPI.db.setSetting(DISPLAY_NAME_KEY, name)
         .catch(err => console.error('Failed to save the display name:', err))
+      // The room is holding the name read when the session started, so without
+      // this a rename reaches nobody until the next connection.
+      void collabCoordinatorRef.current?.rename(name)
     }, 400)
     return () => clearTimeout(timer)
   }, [displayName])
@@ -296,7 +346,19 @@ export default function KanbanView() {
 
   // Single source of truth for writing the column list: updates the ref
   // synchronously, the state, and the persisted setting the AI also reads.
+  /**
+   * Whether this side may write the board document.
+   *
+   * A ref because the persistence layer is defined above the collaboration
+   * state it depends on, and written during render rather than in an effect so
+   * it is never a frame behind the permission it stands for.
+   */
+  const readOnlyRef = useRef(false)
+
   const persistColumns = useCallback(async (next: ColumnConfig[]): Promise<void> => {
+    // The board document travels between peers now, so a guest with no right to
+    // change the board has no right to change this either.
+    if (readOnlyRef.current) return
     columnsRef.current = next
     setColumns(next)
     try {
@@ -308,6 +370,7 @@ export default function KanbanView() {
 
   /** Writes any other slice of the board document; state is set by the caller. */
   const persistConfig = useCallback(async (patch: Partial<BoardConfig>): Promise<void> => {
+    if (readOnlyRef.current) return
     try {
       await patchBoardConfig(activeWorkspace, patch)
     } catch (err) {
@@ -352,6 +415,18 @@ export default function KanbanView() {
   }, [rightPanelOpen])
 
   const [activeDragCard, setActiveDragCard] = useState<Item | null>(null)
+  /**
+   * Where the card in the air would land.
+   *
+   * State on the board rather than each column reading the drag context for
+   * itself. The context's value changes on every pointer move, so every column
+   * on the board re-rendered on every frame of every drag just to work out that
+   * nothing about it had changed. This changes when the target changes, which
+   * during a whole drag is a handful of times.
+   */
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+  /** The height the dragged card had before it was picked up. */
+  const [dragHeight, setDragHeight] = useState(0)
   const [pendingDeleteColId, setPendingDeleteColId] = useState<string | null>(null)
 
   // Advanced Kanban States
@@ -382,6 +457,15 @@ export default function KanbanView() {
   const [collabIsHost, setCollabIsHost] = useState(false)
   const [collabCode, setCollabCode] = useState('')
   const [collabMode, setCollabMode] = useState<'collaborative' | 'readonly'>('collaborative')
+  /**
+   * Everyone in the room, as they call themselves.
+   *
+   * The host keeps this from its own connections; a guest is told it, because
+   * guests are connected to the host and not to each other. A member with an
+   * empty name is on a build that does not introduce itself, and is still very
+   * much in the room.
+   */
+  const [collabRoster, setCollabRoster] = useState<{ id: string; name: string }[]>([])
   const [collabProgress, setCollabProgress] = useState('Idle')
   const [showCollabPopover, setShowCollabPopover] = useState(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
@@ -390,6 +474,41 @@ export default function KanbanView() {
   const collabPopoverRef = useRef<HTMLDivElement>(null)
 
   const isReadOnlyMode = collabActive && collabMode === 'readonly' && !collabIsHost
+  readOnlyRef.current = isReadOnlyMode
+
+  /**
+   * Whether to take the board the other side has merged for the two of you.
+   *
+   * Put with numbers on it. "Do you want to merge" is not a question anybody
+   * can answer, and saying yes to it overwrites a board.
+   */
+  const considerMerge = useCallback(async ({ by, impact }: { by: string; impact: MergeImpact }) => {
+    const what = describeImpact(impact)
+    const them = by || 'They'
+    const back = impact.cardsReturning
+    return confirm({
+      title: by ? `${by} wants to merge your boards` : 'Merge the two boards?',
+      message: what
+        ? `${them} merged their copy of this board with yours and is offering the result: ` +
+          `${what}. Taking it makes both boards the same. Nothing of yours is lost.`
+        : `${them} merged their copy of this board with yours. Nothing here would change.`,
+      confirmText: 'Merge',
+      cancelText: 'Keep mine',
+      warning: back > 0
+        ? `${back} card${back === 1 ? '' : 's'} you deleted would come back, because they still have ${back === 1 ? 'it' : 'them'}.`
+        : undefined
+    })
+  }, [confirm])
+
+  /** What the other side did with a merge this side offered. */
+  const reportMergeAnswer = useCallback((accepted: boolean, by: string) => {
+    const them = by || 'They'
+    setCollabProgress(
+      accepted
+        ? `${them} took the merge. Both boards now match.`
+        : `${them} kept their own board. Yours is merged, theirs is not.`
+    )
+  }, [])
 
   const startCollabHosting = useCallback(async (mode: 'collaborative' | 'readonly') => {
     const code = Math.floor(100000 + Math.random() * 900000).toString()
@@ -397,6 +516,7 @@ export default function KanbanView() {
     setCollabIsHost(true)
     setCollabCode(code)
     setCollabMode(mode)
+    setCollabWorkspace(activeWorkspace)
     setCollabProgress('Initializing host signal room...')
 
     // Labelled here rather than when a peer actually arrives: publishing a
@@ -415,27 +535,47 @@ export default function KanbanView() {
       context: activeWorkspace,
       mode,
       onProgress: (p) => setCollabProgress(p),
-      onConnect: () => setCollabProgress('Connected to Peer!'),
+      onConnect: () => setCollabProgress('Someone joined.'),
+      // Toasted as well as logged. A session that ends by itself used to do it
+      // in silence: the button went back to saying Share and the reason sat in
+      // a popover nobody had open, so the only thing anyone could report was
+      // that sharing had stopped working.
       onDisconnect: () => {
         setCollabProgress('Peer disconnected.')
         setCollabActive(false)
+        toast('Sharing stopped: the connection closed')
       },
       onError: (err) => {
         setCollabProgress(`Error: ${errorMessage(err)}`)
         setCollabActive(false)
+        toast(`Sharing stopped: ${errorMessage(err)}`)
+      },
+      displayName,
+      onRoster: setCollabRoster,
+      onMergeProposed: considerMerge,
+      onMergeAnswer: reportMergeAnswer,
+      // One guest going does not end the session: the passcode still works and
+      // everyone else is still here.
+      onPeerLeft: (name) => {
+        setCollabProgress(`${authorLabel(name)} left. The same passcode still works.`)
       },
       // The host keeps its own board and never receives a baseline.
       onResolveBaseline: async () => ({ action: 'replace' })
     })
     collabCoordinatorRef.current = coord
     await coord.start()
-  }, [activeWorkspace, workspaceList, setWorkspaceList])
+  }, [activeWorkspace, workspaceList, setWorkspaceList, displayName, considerMerge, reportMergeAnswer, toast])
 
   const joinCollabSession = useCallback(async (code: string) => {
     if (!code || code.length < 5) return
     setCollabActive(true)
     setCollabIsHost(false)
+    // Cleared, not left as it was. Hosting read-only and then joining someone
+    // else's board carried that over, and until the host's board arrived to say
+    // otherwise it locked this user out of their own.
+    setCollabMode('collaborative')
     setCollabCode(code)
+    setCollabWorkspace(activeWorkspace)
     setCollabProgress('Initiating connection...')
 
     const coord = new WebRTCCollaborationCoordinator({
@@ -443,15 +583,31 @@ export default function KanbanView() {
       isHost: false,
       context: activeWorkspace,
       mode: 'collaborative', // Client infers mode from baseline message
+      displayName,
       onProgress: (p) => setCollabProgress(p),
-      onConnect: () => setCollabProgress('Connected to Peer!'),
+      onConnect: () => setCollabProgress('Connected to the host.'),
       onDisconnect: () => {
         setCollabProgress('Host disconnected.')
         setCollabActive(false)
+        setCollabRoster([])
+        toast('Sharing stopped: the host closed the connection')
       },
       onError: (err) => {
         setCollabProgress(`Error: ${errorMessage(err)}`)
         setCollabActive(false)
+        toast(`Sharing stopped: ${errorMessage(err)}`)
+      },
+      onRoster: setCollabRoster,
+      onMergeProposed: considerMerge,
+      onMergeAnswer: reportMergeAnswer,
+      // The host's word on what this side may do, and it can change mid-session.
+      onMode: setCollabMode,
+      onRemoved: (by) => {
+        const said = by ? `${by} removed you from the board` : 'You were removed from the board'
+        setCollabProgress(`${said}.`)
+        setCollabActive(false)
+        setCollabRoster([])
+        toast(said)
       },
       onResolveBaseline: async ({ context, incomingItems }) => {
         // A check that could not run is not permission to delete, so a failed
@@ -464,39 +620,157 @@ export default function KanbanView() {
           taken = new Set([context])
         }
         // Nothing here under that name, so nothing to lose and nothing to ask.
-        if (!taken.has(context)) return { action: 'replace' }
+        if (!taken.has(context)) {
+          setCollabWorkspace(context)
+          return { action: 'replace' }
+        }
 
         const copySlug = availableWorkspaceSlug(context, taken)
-        const choice = await choose({
+        // Three answers, each of which needs a sentence to be understood. A row
+        // of buttons can hold the labels but not the sentences, and picking
+        // between "Replace mine" and "Keep both" on the labels alone is how
+        // someone deletes a board they meant to keep.
+        const choice = await pick({
           title: `You already have "${context}"`,
           message:
-            `The host is sharing a board called "${context}" with ${incomingItems} item(s). ` +
-            `Replacing deletes every card and task you have under that name. ` +
-            `Keeping both puts the shared board in "${copySlug}" and leaves yours alone.`,
-          confirmText: 'Replace mine',
-          altText: 'Keep both',
+            `They are sharing a board called "${context}" with ${incomingItems} item(s), ` +
+            `and you have a board of your own under that name.`,
           cancelText: 'Cancel',
-          isDestructive: true,
-          warning: 'Replacing cannot be undone.'
+          choices: [
+            {
+              key: 'merge',
+              label: 'Merge the two',
+              detail:
+                'Keeps everything from both copies. A card you both have keeps what each of ' +
+                'you wrote on it, and anything you deleted stays deleted.'
+            },
+            {
+              key: 'copy',
+              label: 'Keep them apart',
+              detail: `Puts their board in "${copySlug}" and leaves yours exactly as it is.`
+            },
+            {
+              key: 'replace',
+              label: 'Replace mine',
+              detail:
+                'Deletes every card and task you have under that name and takes theirs instead. ' +
+                'This cannot be undone.',
+              isDestructive: true
+            }
+          ]
         })
-        if (choice === 'confirm') return { action: 'replace' }
-        if (choice === 'alt') return { action: 'copy', slug: copySlug }
+        // The session belongs to whichever workspace the board actually lands in,
+        // which for a copy is not the name the host used.
+        if (choice === 'merge') {
+          setCollabWorkspace(context)
+          return { action: 'merge' }
+        }
+        if (choice === 'replace') {
+          setCollabWorkspace(context)
+          return { action: 'replace' }
+        }
+        if (choice === 'copy') {
+          setCollabWorkspace(copySlug)
+          return { action: 'copy', slug: copySlug }
+        }
         return { action: 'cancel' }
       }
     })
     collabCoordinatorRef.current = coord
     await coord.start()
-  }, [activeWorkspace, choose])
+  }, [activeWorkspace, pick, displayName, considerMerge, reportMergeAnswer, toast])
+
+  /**
+   * The workspace the live session belongs to.
+   *
+   * Switching workspace leaves the session running against the one you left,
+   * which is correct (the other side agreed to share that board, not this one)
+   * but looked like a dead connection: nothing synced and the panel still said
+   * Active. Holding the slug lets the panel say so, and offer the way back.
+   */
+  const [collabWorkspace, setCollabWorkspace] = useState('')
+  const collabElsewhere = collabActive && collabWorkspace !== '' && collabWorkspace !== activeWorkspace
 
   const disconnectCollab = useCallback(() => {
     if (collabCoordinatorRef.current) {
-      collabCoordinatorRef.current.cleanup()
+      // Announced before hanging up, so the other side is told who left rather
+      // than watching the connection go quiet. Best effort, never blocking.
+      void collabCoordinatorRef.current.leave()
       collabCoordinatorRef.current = null
     }
     setCollabActive(false)
     setCollabIsHost(false)
     setCollabCode('')
+    setCollabWorkspace('')
+    setCollabRoster([])
     setCollabProgress('Disconnected')
+  }, [])
+
+  /**
+   * Shows one person the door, and leaves everyone else where they are.
+   *
+   * Their client will not come back on its own, but the passcode they hold
+   * still works, so this is a door rather than a lock. Changing the passcode is
+   * the lock, and it is separate because it removes everybody.
+   */
+  const removeCollabGuest = useCallback(async (member: { id: string; name: string }) => {
+    const coord = collabCoordinatorRef.current
+    if (!coord) return
+
+    const who = authorLabel(member.name)
+    const confirmed = await confirm({
+      title: `Remove ${who}?`,
+      message:
+        'They lose access straight away and their app will not reconnect on its own. ' +
+        'Everyone else stays. The passcode does not change, so use Change passcode ' +
+        'if you want it to stop working for them for good.',
+      confirmText: 'Remove',
+      isDestructive: true
+    })
+    if (!confirmed) return
+
+    await coord.remove(member.id)
+    setCollabProgress(`Removed ${who}.`)
+  }, [confirm])
+
+  /**
+   * A new passcode, which is the only thing that really locks anyone out.
+   *
+   * Everybody has to rejoin, so it is deliberately its own action rather than
+   * something removing one person does on the quiet.
+   */
+  const rotateCollabCode = useCallback(async () => {
+    const coord = collabCoordinatorRef.current
+    if (!coord) return
+    // Rehosting starts from the workspace on screen, so doing this from a board
+    // that is not the shared one would quietly share that one instead.
+    if (collabElsewhere) return
+
+    const confirmed = await confirm({
+      title: 'Change the passcode?',
+      message:
+        'Everyone connected is disconnected and the old passcode stops working. ' +
+        'Your board stays shared: give the new one to whoever should still be here.',
+      confirmText: 'Change it',
+      isDestructive: true
+    })
+    if (!confirmed) return
+
+    await coord.leave()
+    collabCoordinatorRef.current = null
+    setCollabRoster([])
+    await startCollabHosting(collabMode)
+    setCollabProgress('The passcode has changed. Everyone needs the new one.')
+  }, [collabMode, collabElsewhere, confirm, startCollabHosting])
+
+  /** Lets the guest write, or stops them, without ending the session. */
+  const setCollabGuestMode = useCallback(async (mode: 'collaborative' | 'readonly') => {
+    setCollabMode(mode)
+    try {
+      await collabCoordinatorRef.current?.setMode(mode)
+    } catch (err) {
+      console.error('Failed to tell the peer about the mode change:', err)
+    }
   }, [])
 
   useEffect(() => {
@@ -615,44 +889,201 @@ export default function KanbanView() {
     }
   }, [loadCards, loadColumns])
 
+  // Cards for a column, filtered and sorted appropriately
+  // Group + filter + sort all cards into their columns in a SINGLE pass, memoized
+  // on the inputs. Previously each column re-filtered the whole card list on every
+  // render, and a drag renders the board repeatedly, so that was O(columns × cards)
+  // per frame. The main source of drag lag. Now it's one pass, and card object refs
+  // are preserved so the memoized columns only re-render when their own cards
+  // actually change.
+  //
+  // It sits above the drag handlers because it is the order the user is looking
+  // at, and that is the order a drop has to be worked out against.
+  const cardsByColumn = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const map = new Map<string, Item[]>()
+    for (const c of cards) {
+      if (c.status === 'archived') continue
+      if (q && !(
+        c.title.toLowerCase().includes(q) ||
+        c.body.toLowerCase().includes(q) ||
+        (c.tags && c.tags.some(t => t.name.toLowerCase().includes(q)))
+      )) continue
+      if (filterPriority !== -1 && c.priority !== filterPriority) continue
+      if (filterTagId !== 'all' && !(c.tags && c.tags.some(t => t.id === filterTagId))) continue
+      let arr = map.get(c.status)
+      if (!arr) { arr = []; map.set(c.status, arr) }
+      arr.push(c)
+    }
+    // Sorting stays inside this single pass. Applying a per-column order as a
+    // second pass over the map would reintroduce the per-frame work this memo
+    // exists to avoid during a drag.
+    const byPosition = (a: Item, b: Item): number => a.position - b.position
+    const byPriority = (a: Item, b: Item): number =>
+      b.priority !== a.priority ? b.priority - a.priority : a.position - b.position
+    // Cards with no due date sort last rather than reading as "due first".
+    const byDue = (a: Item, b: Item): number => {
+      if (!a.due_at && !b.due_at) return a.position - b.position
+      if (!a.due_at) return 1
+      if (!b.due_at) return -1
+      return a.due_at - b.due_at || a.position - b.position
+    }
+
+    const sortModes = new Map(columns.map(c => [c.id, c.sort ?? 'manual']))
+    for (const [colId, arr] of map) {
+      // Swimlanes are a board-wide priority grouping and outrank a column's own
+      // order; without that the two settings would visibly contradict.
+      if (swimlanesEnabled) { arr.sort(byPriority); continue }
+      const mode = sortModes.get(colId) ?? 'manual'
+      arr.sort(mode === 'priority' ? byPriority : mode === 'due' ? byDue : byPosition)
+    }
+    return map
+  }, [cards, searchQuery, filterPriority, filterTagId, swimlanesEnabled, columns])
+
+  const getCardsForColumn = useCallback(
+    (columnId: string): Item[] => cardsByColumn.get(columnId) || EMPTY_ITEMS,
+    [cardsByColumn]
+  )
+
   // Drag & Drop
+
+  /**
+   * Kept in a ref because the collision detector runs on every pointer move and
+   * must not be rebuilt under the drag each time a card changes.
+   */
+  const dropGeometryRef = useRef<DropGeometry>({ columns: new Map(), cardColumn: new Map() })
+  useEffect(() => {
+    const columnOrder = new Map<string, boolean>()
+    for (const col of columns) columnOrder.set(col.id, canAimAtSlot(col, swimlanesEnabled))
+    const cardColumn = new Map<string, string>()
+    for (const card of cards) cardColumn.set(card.id, card.status)
+    dropGeometryRef.current = { columns: columnOrder, cardColumn }
+  }, [columns, cards, swimlanesEnabled])
+
+  /**
+   * Which droppable the card in the air is aimed at.
+   *
+   * dnd-kit's own detectors answer "which rectangle is the pointer inside", and
+   * the gaps between cards are inside no card at all, so a pointer resting in
+   * one fell through to the column, and the column means the end of the list.
+   * That is the jump to the bottom. This asks the question the user is actually
+   * asking, which card would I end up above, and cardDrop answers it against
+   * the midpoints, so a gap belongs to the card either side of it.
+   */
+  const collisionDetection = useCallback<CollisionDetection>(args => {
+    // Dragging a column is a different gesture with different targets: the
+    // other columns, hit by the dragged column's own rectangle.
+    if (String(args.active.id).startsWith('col::')) return rectIntersection(args)
+
+    // The keyboard sensor moves a rectangle rather than a pointer, so its
+    // centre stands in for one and the same rules apply.
+    const point = args.pointerCoordinates ?? {
+      x: args.collisionRect.left + args.collisionRect.width / 2,
+      y: args.collisionRect.top + args.collisionRect.height / 2
+    }
+
+    const { columns: columnOrder, cardColumn } = dropGeometryRef.current
+    const columnBoxes: ColumnBox[] = []
+    const cardBoxes: CardBox[] = []
+    for (const container of args.droppableContainers) {
+      const rect = container.rect.current
+      if (!rect) continue
+      const id = String(container.id)
+      if (columnOrder.has(id)) {
+        columnBoxes.push({ id, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom })
+        continue
+      }
+      // Anything that is neither a known column nor a known card is left alone
+      // rather than guessed at. Each column registers a sortable of its own
+      // under a `col::` id, and reading those as cards is what once sent every
+      // drop to the end of the first column.
+      const column = cardColumn.get(id)
+      if (column) cardBoxes.push({ id, column, top: rect.top, height: rect.height })
+    }
+
+    const target = dropTargetAt(columnBoxes, cardBoxes, point)
+    if (!target) return []
+    if (columnOrder.get(target.column) !== true) return [{ id: target.column }]
+
+    // Past the last card of the card's own column. dnd-kit can only preview a
+    // move onto another card, so naming the column here parts nothing and the
+    // drag looks dead. Aiming at the bottom card says the same thing: with this
+    // card lifted out of the list, taking the bottom card's slot is the end of
+    // it. A column holding nothing but the dragged card names the card itself,
+    // which is the drag that changes nothing.
+    const before = target.before ?? (
+      cardColumn.get(String(args.active.id)) === target.column
+        ? lastCardIn(cardBoxes, target.column)
+        : null
+    )
+    return [{ id: before ?? target.column }]
+  }, [])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     if (isReadOnlyMode) return
     const { active } = event
     const id = active.id as string
-    if (!id.startsWith('col::')) {
-      setCards(currentCards => {
-        const found = currentCards.find(c => c.id === id)
-        if (found) setActiveDragCard(found)
-        return currentCards
-      })
-    }
+    if (id.startsWith('col::')) return
+    setCards(currentCards => {
+      const found = currentCards.find(c => c.id === id)
+      if (found) setActiveDragCard(found)
+      return currentCards
+    })
+    // Read here because the card is about to be lifted out of the layout, and
+    // the gap held open for it should be the footprint it will really take.
+    setDragHeight(active.rect.current.initial?.height ?? 0)
   }, [isReadOnlyMode])
 
-  // NOTE: we deliberately do NOT move a card into another column during dragOver.
-  // Doing so unmounts/remounts the card in a different SortableContext on every
-  // frame you hover a new column, which forces dnd-kit to re-register and
-  // re-measure. The cause of the cross-column drag lag. Instead, the target
-  // column's own `isOver` droppable highlight provides live feedback, the drag
-  // overlay follows the cursor, and the actual move is committed once in
-  // handleDragEnd. Within-column reordering still previews smoothly via dnd-kit's
-  // built-in SortableContext transforms (no state churn).
-
-  const handleDragCancel = useCallback(() => {
-    setActiveDragCard(null)
-    loadCards()
-  }, [loadCards])
-
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+  /**
+   * Where the card would land, not a move of it.
+   *
+   * Actually moving the card into the hovered column here is what the board
+   * used to do, and it unmounted and remounted the card in a different
+   * SortableContext every time, which is what made a cross-column drag crawl.
+   * dnd-kit calls this only when the target changes, so noting the target costs
+   * one render per target rather than one per frame, and the column draws the
+   * gap for itself. Reordering inside a column still previews through dnd-kit's
+   * own sortable transforms.
+   */
+  const handleDragOver = useCallback((event: DragOverEvent) => {
     if (isReadOnlyMode) return
     const { active, over } = event
+    if (String(active.id).startsWith('col::')) return
+    if (!over) {
+      setDropTarget(null)
+      return
+    }
+    const overId = String(over.id)
+    const { columns: columnOrder, cardColumn } = dropGeometryRef.current
+    if (columnOrder.has(overId)) {
+      setDropTarget({ column: overId, before: null })
+      return
+    }
+    const column = cardColumn.get(overId)
+    setDropTarget(column ? { column, before: overId } : null)
+  }, [isReadOnlyMode])
+
+  const endDrag = useCallback(() => {
     setActiveDragCard(null)
+    setDropTarget(null)
+  }, [])
+
+  const handleDragCancel = useCallback(() => {
+    endDrag()
+    loadCards()
+  }, [endDrag, loadCards])
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    // Before the read-only check, because the overlay and the gap have to be
+    // put away whether or not the drop is allowed to land.
+    endDrag()
+    if (isReadOnlyMode) return
+    const { active, over } = event
 
     if (!over || active.id === over.id) return
 
-    const activeId = active.id as string
-    const overId = over.id as string
+    const activeId = String(active.id)
+    const overId = String(over.id)
 
     // Column reorder: ids are prefixed with "col::"
     if (activeId.startsWith('col::')) {
@@ -666,84 +1097,48 @@ export default function KanbanView() {
 
     // Card move / reorder
     const cardId = activeId
-    let newStatus = overId
-    const isColumnTarget = columns.some(c => c.id === overId)
-
     const draggedCard = cards.find(c => c.id === cardId)
     if (!draggedCard) return
 
-    if (!isColumnTarget) {
-      const targetCard = cards.find(c => c.id === overId)
-      if (!targetCard) return
-      newStatus = targetCard.status
+    const isColumnTarget = columns.some(c => c.id === overId)
+    const newStatus = isColumnTarget ? overId : cards.find(c => c.id === overId)?.status
+    if (!newStatus) return
+
+    // The destination column in the order the user is looking at. The gap was
+    // drawn into this same list, so working the position out from any other
+    // order is how a card ends up somewhere other than where the gap was.
+    const order = cardsByColumn.get(newStatus) ?? EMPTY_ITEMS
+    const rest = order.filter(c => c.id !== cardId)
+    const index = dropIndex(order.map(c => c.id), cardId, isColumnTarget ? null : overId)
+    const newPosition = positionForIndex(rest.map(c => c.position), index)
+
+    // Swimlanes group the whole board by priority, so which lane a card is
+    // dropped into is a choice of priority as much as a choice of place.
+    const neighbour = rest[index] ?? rest[index - 1]
+    const newPriority = swimlanesEnabled ? (neighbour?.priority ?? draggedCard.priority) : undefined
+
+    // A null position means the cards either side of the gap already hold
+    // numbers with nothing between them. Take the lower one and renumber the
+    // column, which is the only thing that makes room.
+    const needsRebalance = newPosition === null
+    const patch: Partial<Item> = {
+      status: newStatus,
+      position: newPosition ?? rest[index].position
     }
-
-    // When swimlanes are enabled, sort visually (priority desc, position asc) so
-    // overIndex matches the rendered order the user sees. Otherwise sort by position only.
-    const destColumnCards = cards
-      .filter(c => c.status === newStatus && c.id !== cardId)
-      .sort(swimlanesEnabled
-        ? (a, b) => b.priority !== a.priority ? b.priority - a.priority : a.position - b.position
-        : (a, b) => a.position - b.position
-      )
-
-    let newPosition = 0
-    // When swimlanes are on, also infer the target priority from neighboring cards
-    let newPriority: 0 | 1 | 2 | 3 | undefined = undefined
-
-    if (isColumnTarget) {
-      newPosition = destColumnCards.length === 0
-        ? 1000.0
-        : destColumnCards[destColumnCards.length - 1].position + 1000.0
-      if (swimlanesEnabled) {
-        // Dropped on column header → inherit priority of the last card in the column, or keep existing
-        newPriority = destColumnCards.length > 0
-          ? destColumnCards[destColumnCards.length - 1].priority
-          : draggedCard.priority
-      }
-    } else {
-      const overIndex = destColumnCards.findIndex(c => c.id === overId)
-      if (overIndex === 0) {
-        newPosition = destColumnCards[0].position / 2.0
-      } else if (overIndex === -1 || overIndex === destColumnCards.length) {
-        newPosition = destColumnCards[destColumnCards.length - 1].position + 1000.0
-      } else {
-        const a = destColumnCards[overIndex - 1].position
-        const b = destColumnCards[overIndex].position
-        newPosition = (a + b) / 2.0
-        if (Math.abs(a - b) < 0.00001) {
-          const patch: Partial<Item> = { status: newStatus, position: newPosition }
-          if (swimlanesEnabled) patch.priority = destColumnCards[overIndex].priority
-          setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...patch } : c))
-          await window.electronAPI.db.updateItem(cardId, patch)
-          await window.electronAPI.db.rebalancePositions(activeWorkspace, newStatus)
-          loadCards()
-          return
-        }
-      }
-
-      // Infer priority from the card the user dropped onto (or the card before it)
-      if (swimlanesEnabled) {
-        const neighborCard = overIndex >= 0 && overIndex < destColumnCards.length
-          ? destColumnCards[overIndex]
-          : overIndex > 0
-          ? destColumnCards[overIndex - 1]
-          : undefined
-        newPriority = neighborCard?.priority ?? draggedCard.priority
-      }
-    }
-
-    const patch: Partial<Item> = { status: newStatus, position: newPosition }
-    if (swimlanesEnabled && newPriority !== undefined) patch.priority = newPriority
+    if (newPriority !== undefined) patch.priority = newPriority
 
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...patch } : c))
     try {
       await window.electronAPI.db.updateItem(cardId, patch)
+      if (needsRebalance) {
+        await window.electronAPI.db.rebalancePositions(activeWorkspace, newStatus)
+        loadCards()
+      }
     } catch (err) {
       console.error('Failed to update card position:', err)
       loadCards()
     }
-  }, [cards, columns, swimlanesEnabled, activeWorkspace, loadCards, persistColumns])
+  }, [cards, cardsByColumn, columns, swimlanesEnabled, activeWorkspace, loadCards, persistColumns, endDrag, isReadOnlyMode])
 
   // Column Management
 
@@ -1104,59 +1499,6 @@ export default function KanbanView() {
     if (!showArchiveBin) setSelectedArchived(new Set())
   }, [showArchiveBin])
 
-  // Cards for a column, filtered and sorted appropriately
-  // Group + filter + sort all cards into their columns in a SINGLE pass, memoized
-  // on the inputs. Previously each column re-filtered the whole card list on every
-  // render, so a drag (which calls setCards on each cross-column move) did O(columns
-  // × cards) work per frame. The main source of drag lag. Now it's one pass, and
-  // card object refs are preserved so the memoized columns only re-render when their
-  // own cards actually change.
-  const cardsByColumn = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    const map = new Map<string, Item[]>()
-    for (const c of cards) {
-      if (c.status === 'archived') continue
-      if (q && !(
-        c.title.toLowerCase().includes(q) ||
-        c.body.toLowerCase().includes(q) ||
-        (c.tags && c.tags.some(t => t.name.toLowerCase().includes(q)))
-      )) continue
-      if (filterPriority !== -1 && c.priority !== filterPriority) continue
-      if (filterTagId !== 'all' && !(c.tags && c.tags.some(t => t.id === filterTagId))) continue
-      let arr = map.get(c.status)
-      if (!arr) { arr = []; map.set(c.status, arr) }
-      arr.push(c)
-    }
-    // Sorting stays inside this single pass. Applying a per-column order as a
-    // second pass over the map would reintroduce the per-frame work this memo
-    // exists to avoid during a drag.
-    const byPosition = (a: Item, b: Item): number => a.position - b.position
-    const byPriority = (a: Item, b: Item): number =>
-      b.priority !== a.priority ? b.priority - a.priority : a.position - b.position
-    // Cards with no due date sort last rather than reading as "due first".
-    const byDue = (a: Item, b: Item): number => {
-      if (!a.due_at && !b.due_at) return a.position - b.position
-      if (!a.due_at) return 1
-      if (!b.due_at) return -1
-      return a.due_at - b.due_at || a.position - b.position
-    }
-
-    const sortModes = new Map(columns.map(c => [c.id, c.sort ?? 'manual']))
-    for (const [colId, arr] of map) {
-      // Swimlanes are a board-wide priority grouping and outrank a column's own
-      // order; without that the two settings would visibly contradict.
-      if (swimlanesEnabled) { arr.sort(byPriority); continue }
-      const mode = sortModes.get(colId) ?? 'manual'
-      arr.sort(mode === 'priority' ? byPriority : mode === 'due' ? byDue : byPosition)
-    }
-    return map
-  }, [cards, searchQuery, filterPriority, filterTagId, swimlanesEnabled, columns])
-
-  const getCardsForColumn = useCallback(
-    (columnId: string): Item[] => cardsByColumn.get(columnId) || EMPTY_ITEMS,
-    [cardsByColumn]
-  )
-
   const templateCards = cards.filter(c => {
     try {
       const meta = JSON.parse(c.metadata || '{}')
@@ -1484,11 +1826,56 @@ export default function KanbanView() {
                     Share This Board
                   </span>
                   {collabActive && (
-                    <span style={{ fontSize: '10px', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-full)', fontWeight: 'var(--weight-semibold)' }}>
-                      Active
+                    <span style={{
+                      fontSize: '10px',
+                      background: collabElsewhere ? 'var(--color-warning-muted)' : 'var(--color-secondary-muted)',
+                      color: collabElsewhere ? 'var(--color-warning)' : 'var(--color-secondary)',
+                      padding: '2px 6px',
+                      borderRadius: 'var(--radius-full)',
+                      fontWeight: 'var(--weight-semibold)'
+                    }}>
+                      {collabElsewhere ? 'Elsewhere' : 'Active'}
                     </span>
                   )}
                 </div>
+
+                {/* The session belongs to the workspace it was started in and
+                    stays there when you move, so nothing you do here is shared
+                    and nothing they do shows up. It said Active throughout,
+                    which read exactly like a dead connection. */}
+                {collabElsewhere && (
+                  <div style={{
+                    fontSize: '11px',
+                    color: 'var(--color-warning)',
+                    background: 'var(--color-warning-muted)',
+                    border: '1px solid var(--color-warning)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: 'var(--space-2) var(--space-3)',
+                    lineHeight: 1.4
+                  }}>
+                    You are sharing <strong>#{collabWorkspace}</strong>, not the board you are looking
+                    at. Nothing here is being shared.
+                    <button
+                      onClick={() => {
+                        setWorkspace(collabWorkspace)
+                        setShowCollabPopover(false)
+                      }}
+                      style={{
+                        display: 'block',
+                        marginTop: '6px',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        font: 'inherit',
+                        color: 'var(--color-warning)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Go back to #{collabWorkspace}
+                    </button>
+                  </div>
+                )}
 
                 {!collabActive ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -1688,6 +2075,59 @@ export default function KanbanView() {
                         </div>
                       )}
 
+                      {/* Who is in the room. The session used to report only
+                          that somebody was, which is no basis for deciding
+                          whether they should stay. */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                          {collabIsHost
+                            ? `In this board (${collabRoster.length})`
+                            : `Also here (${collabRoster.length})`}
+                        </span>
+                        {collabRoster.length === 0 ? (
+                          <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+                            Nobody yet
+                          </span>
+                        ) : (
+                          collabRoster.map(member => (
+                            <div key={member.id} className="row-between" style={{ gap: 'var(--space-2)' }}>
+                              <span style={{
+                                fontSize: '11px',
+                                fontWeight: 'var(--weight-semibold)',
+                                color: 'var(--color-text-base)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {authorLabel(member.name)}
+                              </span>
+                              {/* Removing is the host's, and not from a board
+                                  it is not looking at. */}
+                              {collabIsHost && !collabElsewhere && (
+                                <button
+                                  onClick={() => removeCollabGuest(member)}
+                                  title={`Remove ${authorLabel(member.name)}`}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    padding: '0 2px',
+                                    fontSize: '10px',
+                                    fontWeight: 'var(--weight-semibold)',
+                                    color: 'var(--color-text-faint)',
+                                    cursor: 'pointer',
+                                    flexShrink: 0
+                                  }}
+                                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-warning)')}
+                                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-faint)')}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+
                       <div style={{ height: '1px', background: 'var(--color-surface-1)', margin: '4px 0' }} />
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -1697,6 +2137,58 @@ export default function KanbanView() {
                         </span>
                       </div>
                     </div>
+
+                    {/* What the host can do about the person in the room. Only
+                        the host, and only while someone is in it. */}
+                    {collabIsHost && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                        <button
+                          onClick={() => setCollabGuestMode(collabMode === 'readonly' ? 'collaborative' : 'readonly')}
+                          title={collabMode === 'readonly'
+                            ? 'Let them make changes to the board'
+                            : 'Let them look, but not change anything'}
+                          style={{
+                            width: '100%',
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 'var(--weight-semibold)',
+                            background: 'transparent',
+                            color: 'var(--color-text-base)',
+                            border: '1px solid var(--color-surface-offset)',
+                            padding: '6px 0',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            transition: 'border-color var(--duration-fast) var(--ease-default)'
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-secondary)')}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
+                        >
+                          {collabMode === 'readonly' ? 'Let them edit' : 'Make it read-only'}
+                        </button>
+
+                        {!collabElsewhere && (
+                          <button
+                            onClick={rotateCollabCode}
+                            title="Disconnect everyone and issue a new passcode"
+                            style={{
+                              width: '100%',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'var(--weight-semibold)',
+                              background: 'transparent',
+                              color: 'var(--color-warning)',
+                              border: '1px solid var(--color-warning)',
+                              padding: '6px 0',
+                              borderRadius: 'var(--radius-md)',
+                              cursor: 'pointer',
+                              transition: 'background var(--duration-fast) var(--ease-default)'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-warning-muted)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            Change passcode
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     <button
                       onClick={disconnectCollab}
@@ -2501,13 +2993,14 @@ export default function KanbanView() {
       ) : (
         <DndContext
           sensors={sensors}
-          collisionDetection={customCollisionDetection}
+          collisionDetection={collisionDetection}
           measuring={{
             droppable: {
               strategy: MeasuringStrategy.WhileDragging
             }
           }}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
@@ -2524,11 +3017,29 @@ export default function KanbanView() {
               height: 'calc(100% - 98px)', // Adjusted for header (52px) + filter toolbar (46px)
               minHeight: 0
             }}>
-              {columns.map(col => (
+              {columns.map(col => {
+                const colCards = getCardsForColumn(col.id)
+                // The gap is only drawn for a card arriving from elsewhere.
+                // Reordering inside a column already parts the list through
+                // dnd-kit's sortable transforms, and both at once would be the
+                // same thing said twice.
+                const foreign = activeDragCard !== null && activeDragCard.status !== col.id
+                // A column that sorts itself would move the card out of the gap
+                // the moment it landed in it, so it gets the highlight and no
+                // promise about where.
+                const aimable = canAimAtSlot(col, swimlanesEnabled)
+                const slot = foreign && aimable && dropTarget?.column === col.id
+                  ? (dropTarget.before === null
+                      ? colCards.length
+                      : colCards.findIndex(c => c.id === dropTarget.before))
+                  : -1
+                return (
                 <SortableColumn
                   key={col.id}
                   col={col}
-                  cards={getCardsForColumn(col.id)}
+                  cards={colCards}
+                  dropSlot={slot === -1 ? null : slot}
+                  dropHeight={dragHeight}
                   onRename={handleRenameColumn}
                   onDelete={handleDeleteColumn}
                   onCardClick={setActiveCardId}
@@ -2543,7 +3054,8 @@ export default function KanbanView() {
                   onSetSort={handleSetColumnSort}
                   cardDisplay={cardDisplay}
                 />
-              ))}
+                )
+              })}
 
               {/* Ghost "Add Column" tile at end */}
               {!isReadOnlyMode && (
@@ -2588,7 +3100,7 @@ export default function KanbanView() {
 
           <DragOverlay dropAnimation={null}>
             {activeDragCard ? (
-              <div style={{ transform: 'rotate(2deg)', width: '280px', pointerEvents: 'none' }}>
+              <div style={{ width: '280px', pointerEvents: 'none' }}>
                 <KanbanCard
                   card={activeDragCard}
                   onClick={() => {}}

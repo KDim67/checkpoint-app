@@ -15,6 +15,17 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong.'): 
   if (err && typeof err === 'object') {
     const maybe = (err as { message?: unknown }).message
     if (typeof maybe === 'string' && maybe.trim()) return maybe
+
+    // An RTCErrorEvent is an Event, not an Error, and keeps its text one level
+    // down on `.error`. Without this every WebRTC failure read as the fallback,
+    // which is how a session that died reported nothing about why. Read by hand
+    // rather than by recursing, so a value pointing at itself cannot spin.
+    const inner = (err as { error?: unknown }).error
+    if (inner instanceof Error && inner.message) return inner.message
+    if (inner && typeof inner === 'object') {
+      const nested = (inner as { message?: unknown }).message
+      if (typeof nested === 'string' && nested.trim()) return nested
+    }
   }
 
   // Numbers and symbols stringify usefully; objects and null do not.

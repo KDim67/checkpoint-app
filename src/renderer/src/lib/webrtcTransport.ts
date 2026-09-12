@@ -12,6 +12,7 @@
  * limit is reachable from application code.
  */
 
+import { errorMessage } from '../../../shared/errors'
 import { STUN_SERVERS, turnIceServer, type IceServer } from '../../../shared/iceConfig'
 import { getStringSetting } from './settings'
 
@@ -87,6 +88,79 @@ function waitForDrain(channel: RTCDataChannel): Promise<void> {
  * respecting the send queue. Small messages go out as-is so the common case
  * carries no framing overhead.
  */
+/**
+ * What a data channel error actually was.
+ *
+ * The event carries a short machine-readable reason on `error.errorDetail`, and
+ * that reason is the whole diagnosis: an SCTP failure, a channel the far end
+ * tore down, a message too big to send. Reported as "Something went wrong" it
+ * is worth nothing, which is exactly the report this exists to stop.
+ *
+ * Read defensively: the shape is browser-specific and this must never be the
+ * thing that throws while explaining a throw.
+ */
+export function describeChannelError(event: Event): string {
+  const error = (event as { error?: unknown }).error
+  if (!error || typeof error !== 'object') return errorMessage(event, 'The data channel failed.')
+
+  const detail = (error as { errorDetail?: unknown }).errorDetail
+  const message = (error as { message?: unknown }).message
+  const cause = (error as { sctpCauseCode?: unknown }).sctpCauseCode
+
+  const parts: string[] = []
+  if (typeof detail === 'string' && detail) parts.push(detail)
+  if (typeof cause === 'number') parts.push(`SCTP cause ${cause}`)
+  const head = parts.join(', ')
+  const tail = typeof message === 'string' && message.trim() ? message.trim() : ''
+
+  if (head && tail) return `${head}: ${tail}`
+  return head || tail || 'The data channel failed.'
+}
+
+/** How long to wait for the last message of a session to actually go. */
+const FAREWELL_TIMEOUT_MS = 600
+
+/**
+ * Gets whatever has been queued out of the door, then closes the channel.
+ *
+ * `send` only hands bytes to the transport. Tearing the connection down in the
+ * same breath as the last message threw that message away often enough to
+ * matter, and the one message anybody sends that way is the goodbye, which is
+ * the whole point of not just going quiet.
+ *
+ * Closing the channel rather than the connection is what makes the ordering
+ * hold: SCTP delivers what is queued before it resets the stream. Bounded,
+ * because a peer that has already gone will never drain and the caller is on
+ * its way out regardless.
+ */
+export function closeGracefully(channel: RTCDataChannel): Promise<void> {
+  if (channel.readyState !== 'open') return Promise.resolve()
+
+  return new Promise(resolve => {
+    const deadline = Date.now() + FAREWELL_TIMEOUT_MS
+
+    const shut = (): void => {
+      channel.removeEventListener('close', done)
+      resolve()
+    }
+    const done = (): void => shut()
+
+    const drain = (): void => {
+      if (channel.readyState !== 'open') return shut()
+      if (channel.bufferedAmount === 0 || Date.now() >= deadline) {
+        channel.addEventListener('close', done, { once: true })
+        channel.close()
+        // The close event is the confirmation, and this is the deadline for it.
+        setTimeout(shut, Math.max(0, deadline - Date.now()))
+        return
+      }
+      setTimeout(drain, 20)
+    }
+
+    drain()
+  })
+}
+
 export async function sendFramed(channel: RTCDataChannel, msg: unknown): Promise<void> {
   if (channel.readyState !== 'open') {
     throw new Error(`Cannot send on a ${channel.readyState} data channel`)

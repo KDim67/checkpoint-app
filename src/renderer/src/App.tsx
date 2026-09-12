@@ -282,6 +282,32 @@ function RightPanel() {
     void import('./lib/webrtcTransport').then(({ refreshTurnServer }) => refreshTurnServer())
   }, [])
 
+  /**
+   * Nothing dropped on the window ever navigates it.
+   *
+   * A drop that reaches the document with its default intact replaces the page
+   * with whatever was dropped, and in a packaged build the app is served from
+   * file://, so a dropped file counts as same-origin and the main process lets
+   * it through. The app is then gone, with no way back but a restart.
+   *
+   * Every real drop zone handles its own drop and this runs after them, so it
+   * only ever catches the misses: the drop that landed an inch to the left, or
+   * the one carrying something that zone had nothing to do with.
+   *
+   * The cost is that the window now accepts a drop anywhere, so the cursor no
+   * longer refuses one outside a drop zone. Nothing happens either way, and a
+   * cursor is a cheaper thing to lose than the running app.
+   */
+  useEffect(() => {
+    const swallow = (e: DragEvent): void => e.preventDefault()
+    window.addEventListener('dragover', swallow)
+    window.addEventListener('drop', swallow)
+    return () => {
+      window.removeEventListener('dragover', swallow)
+      window.removeEventListener('drop', swallow)
+    }
+  }, [])
+
   useEffect(() => {
     getNumberSetting('right_panel_width', DEFAULT_PANEL_WIDTH)
       .then(w => setPanelWidth(clampPanelWidth(w)))

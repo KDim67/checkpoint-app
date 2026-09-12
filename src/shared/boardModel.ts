@@ -91,9 +91,19 @@ export function sameCardDisplay(a?: CardDisplay, b?: CardDisplay): boolean {
 }
 
 export function sameColumnConfig(a: ColumnConfig, b: ColumnConfig): boolean {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof ColumnConfig>
-  for (const key of keys) {
+  if (a === b) return true
+
+  // Walked twice rather than through a union Set. This runs for every column on
+  // every render, and two spread arrays plus a Set per comparison is real work
+  // to avoid. Counting keys instead would be cheaper still and wrong: a field
+  // set to undefined and a field that is absent mean the same thing here, and
+  // JSON off disk gives one while a fresh object gives the other.
+  for (const key of Object.keys(a) as (keyof ColumnConfig)[]) {
     if (a[key] !== b[key]) return false
+  }
+  // Only the keys b has that a does not are left, and only if they say something.
+  for (const key of Object.keys(b) as (keyof ColumnConfig)[]) {
+    if (a[key] === undefined && b[key] !== undefined) return false
   }
   return true
 }

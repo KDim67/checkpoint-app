@@ -37,6 +37,10 @@ interface KanbanColumnProps {
   description?: string
   /** Board-level card face switches, forwarded to every card. */
   cardDisplay?: CardDisplay
+  /** Where to hold a gap open for the card in the air. null for nowhere. */
+  dropSlot?: number | null
+  /** The height that card had, so the gap is the footprint it will take. */
+  dropHeight?: number
 }
 
 function MenuItem({ label, onClick, danger = false }: { label: string; onClick: () => void; danger?: boolean }) {
@@ -65,6 +69,37 @@ function MenuItem({ label, onClick, danger = false }: { label: string; onClick: 
   )
 }
 
+/**
+ * The space the card will land in.
+ *
+ * Cross-column dragging used to show nothing at all: the target column lit up
+ * and the card teleported into place on drop. This is the missing half, drawn
+ * as the same dashed outline the card leaves behind at its origin, so the two
+ * ends of the move look like one gesture.
+ *
+ * Sized from the card actually being dragged rather than a guess, so the gap
+ * is the footprint the card will really take.
+ *
+ * `warn` is the column saying the card will not fit under its WIP limit. Said
+ * here rather than after the drop, while there is still a chance to aim
+ * somewhere else.
+ */
+function DropPlaceholder({ height, warn }: { height: number; warn: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className="card-drop-slot"
+      style={{
+        height: `${height}px`,
+        flexShrink: 0,
+        borderRadius: 'var(--radius-md)',
+        border: `2px dashed ${warn ? 'var(--color-warning)' : 'var(--color-secondary)'}`,
+        background: warn ? 'var(--color-warning-muted)' : 'var(--color-secondary-muted)'
+      }}
+    />
+  )
+}
+
 function KanbanColumn({
   id,
   name,
@@ -88,9 +123,11 @@ function KanbanColumn({
   sort = 'manual',
   onSetSort,
   description,
-  cardDisplay
+  cardDisplay,
+  dropSlot = null,
+  dropHeight = 0
 }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id })
+  const { setNodeRef, isOver: pointedAt } = useDroppable({ id })
   const confirm = useConfirm()
 
   const [isEditing, setIsEditing] = useState(false)
@@ -152,6 +189,23 @@ function KanbanColumn({
 
   const isWipExceeded = wipLimit !== null && cards.length > wipLimit
   const cardIds = cards.map(c => c.id)
+
+  /**
+   * This column is where the card would land.
+   *
+   * The droppable only counts the pointer as being on the column when it is not
+   * on one of the cards, which past the first card is almost never. Holding a
+   * gap open is the same statement, so the column lights up for both and a drag
+   * across the board reads the same wherever in a column it is aimed.
+   */
+  const isOver = pointedAt || dropSlot !== null
+
+  // A card is on its way in and the column is already at its limit. Warned on
+  // the gap itself rather than only counted afterwards.
+  const dropExceedsWip = dropSlot !== null && wipLimit !== null && cards.length >= wipLimit
+
+  // Roughly one line of card, for a drag whose rect was never measured.
+  const slotHeight = dropHeight > 0 ? dropHeight : 56
 
   // System default columns cannot be deleted
   const isDefaultCol = id === 'open' || id === 'done' || id === 'in_progress' || id === 'in_review'
@@ -246,6 +300,10 @@ function KanbanColumn({
 
   return (
     <div
+      // The whole column, not just the list inside it. A pointer over the
+      // header or the Add card button is still aimed at this column, and the
+      // drop logic reads the column's rectangle to decide which one that is.
+      ref={setNodeRef}
       id={`kanban-col-${id}`}
       style={{
         width: '300px',
@@ -699,7 +757,6 @@ function KanbanColumn({
 
       {/* Cards Area */}
       <div
-        ref={setNodeRef}
         style={{
           flex: 1,
           padding: 'var(--space-3)',
@@ -711,17 +768,20 @@ function KanbanColumn({
         }}
       >
         <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-          {cards.map(card => (
-            <KanbanCard
-              key={card.id}
-              card={card}
-              onClick={onCardClick}
-              onDelete={onCardDelete}
-              onConvertToTask={onCardConvertToTask}
-              onUpdate={onCardUpdate}
-              display={cardDisplay}
-            />
+          {cards.map((card, i) => (
+            <React.Fragment key={card.id}>
+              {dropSlot === i && <DropPlaceholder height={slotHeight} warn={dropExceedsWip} />}
+              <KanbanCard
+                card={card}
+                onClick={onCardClick}
+                onDelete={onCardDelete}
+                onConvertToTask={onCardConvertToTask}
+                onUpdate={onCardUpdate}
+                display={cardDisplay}
+              />
+            </React.Fragment>
           ))}
+          {dropSlot === cards.length && <DropPlaceholder height={slotHeight} warn={dropExceedsWip} />}
         </SortableContext>
 
 
@@ -836,6 +896,9 @@ function AddCardFooter({ onAdd, accentColor, colTextColor, isFullCol }: { onAdd:
 
 function areKanbanColumnPropsEqual(prev: KanbanColumnProps, next: KanbanColumnProps) {
   if (prev.isReadOnly !== next.isReadOnly) return false
+  // Only the column under the pointer is given a slot, so a drag re-renders
+  // that one column rather than every column on the board.
+  if (prev.dropSlot !== next.dropSlot || prev.dropHeight !== next.dropHeight) return false
   if (prev.id !== next.id || prev.name !== next.name || prev.wipLimit !== next.wipLimit) return false
   if (prev.color !== next.color || prev.colorMode !== next.colorMode) return false
   // The second memo, and it dropped the same props the outer one did.

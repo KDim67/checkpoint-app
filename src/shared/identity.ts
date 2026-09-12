@@ -41,3 +41,21 @@ export function authorLabel(name: string): string {
 export function resolveAuthor(typed: unknown, osUser: unknown): string {
   return normalizeDisplayName(typed) || normalizeDisplayName(osUser)
 }
+
+/**
+ * This install's own id, minted once and kept.
+ *
+ * A guest sends it with its connection offer so a host can refuse someone it
+ * has removed. The id a guest publishes for signalling is minted per attempt
+ * and so survives nothing, which made a removal last only until they restarted.
+ */
+export const INSTALL_ID_KEY = 'install_id'
+
+/** A valid id, or '' for anything that is not one. */
+export function readInstallId(raw: unknown): string {
+  return typeof raw === 'string' && /^[a-z0-9-]{8,64}$/.test(raw) ? raw : ''
+}
+
+export function newInstallId(random = Math.random): string {
+  return `${Date.now().toString(36)}-${random().toString(36).slice(2, 12)}`
+}
