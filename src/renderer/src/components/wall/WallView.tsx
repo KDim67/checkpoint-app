@@ -28,7 +28,7 @@ import {
   bringToFront, boundsOf, createWallItem, duplicateItems, fitCamera, inPaintOrder,
   itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
   boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
-  snap, SNAP_GRID, gridSpacing, toWallPoint, WALL_COLORS, zoomAt,
+  gridSpacing, toWallPoint, WALL_COLORS, zoomAt,
   createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
   arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset,
   distanceToPolyline, inkFromPath, pruneArrows,
@@ -36,6 +36,10 @@ import {
   type ArrowShape, type ArrowLine, type ArrowHeads,
   type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef
 } from '../../../../shared/wallModel'
+import {
+  arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory,
+  resizedSize, rotationAngle, rotationStart, snapMoving, type WallDrag
+} from '../../../../shared/wallPointer'
 import {
   canRedo, canUndo, initHistory, pushHistory, redo, replacePresent, undo,
   type History
@@ -121,12 +125,6 @@ const nameOf = (value: string): string => value.charAt(0).toUpperCase() + value.
 const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
 const CLICK_SLOP = 4
-/**
- * How far a connector has to be dragged before it will be left pointing at
- * empty canvas. Well past the click threshold, so a short slip does not leave
- * a stub of an arrow behind.
- */
-const LOOSE_END_SLOP = 24
 
 
 /**
@@ -184,26 +182,6 @@ const wallShortcutSections = (
     ]
   }
 ]
-
-type Drag =
-  | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
-  | { mode: 'move'; startX: number; startY: number; origin: WallItem[]; moved: boolean }
-  | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
-  | {
-      mode: 'arrow'
-      fromId: string
-      startX: number
-      startY: number
-      moved: boolean
-      overId: string | null
-      /** Started from a hover handle rather than the arrow tool. */
-      viaHandle?: boolean
-    }
-  | { mode: 'arrowEnd'; id: string; end: 'start' | 'end' }
-  | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
-  | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
-  | { mode: 'draw' }
-  | null
 
 interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
@@ -301,7 +279,7 @@ export default function WallView() {
   const [menuButton, setMenuButton] = useState<MenuButton>(MENU_BUTTON_MODES[0])
 
   const viewportRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<Drag>(null)
+  const dragRef = useRef<WallDrag>(null)
   /**
    * The newest pointer position, and the frame that will apply it.
    *
@@ -906,7 +884,7 @@ export default function WallView() {
         const cy = (single.y + single.height / 2) * cam.zoom + cam.y + (rect?.top ?? 0)
         dragRef.current = {
           mode: 'rotate', id: single.id, cx, cy,
-          start: Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) - (single.rotation ?? 0)
+          start: rotationStart({ x: e.clientX, y: e.clientY }, { x: cx, y: cy }, single.rotation ?? 0)
         }
       } else {
         dragRef.current = { mode: 'resize', id: single.id, startX: e.clientX, startY: e.clientY, w: single.width, h: single.height }
@@ -941,10 +919,7 @@ export default function WallView() {
 
     if (id && item && e.button === 0) {
       if (item.locked) { setSelectedIds(new Set()); return }
-      const already = selectedRef.current.has(id)
-      const next = e.shiftKey
-        ? new Set(already ? [...selectedRef.current].filter(x => x !== id) : [...selectedRef.current, id])
-        : (already ? selectedRef.current : new Set([id]))
+      const next = pressSelection(selectedRef.current, id, e.shiftKey)
       setSelectedIds(next)
       if (!e.shiftKey) setItems(bringToFront(docRef.current.items, id), { record: false })
       movingRef.current = withFrameContents(docRef.current.items, next)
@@ -1098,19 +1073,8 @@ export default function WallView() {
       const arrow = docRef.current.items.find(i => i.id === drag.id)
       if (!arrow) return
 
-      // Not onto the item at the other end, which would be a loop with nothing
-      // to draw, and not onto another arrow.
-      const other = drag.end === 'start' ? arrow.to : arrow.from
-      const hit = itemAtPoint(docRef.current.items, at)
-      const target = hit && hit.kind !== 'arrow' && hit.id !== other ? hit : null
-
-      // Left where it is dropped when that is nowhere: an arrow pointing at a
-      // spot on the wall is a thing people mean.
-      const patch = drag.end === 'start'
-        ? (target ? { from: target.id, fromPoint: undefined } : { from: undefined, fromPoint: at })
-        : (target ? { to: target.id, toPoint: undefined } : { to: undefined, toPoint: at })
-
-      setArrowEndHover(target?.id ?? null)
+      const { targetId, patch } = arrowEndTarget(docRef.current.items, at, arrow, drag.end)
+      setArrowEndHover(targetId)
       // Recorded once when the drag ends, not per frame.
       setItems(patchItems(docRef.current.items, new Set([drag.id]), patch), { record: false })
       return
@@ -1121,9 +1085,7 @@ export default function WallView() {
         drag.moved = true
       }
       const at = toWallPoint(screenPoint(e), cam)
-      const hit = itemAtPoint(docRef.current.items, at)
-      // An arrow cannot end on another arrow, or on the item it started from.
-      drag.overId = hit && hit.id !== drag.fromId && hit.kind !== 'arrow' ? hit.id : null
+      drag.overId = arrowDropTarget(docRef.current.items, at, drag.fromId)
       setArrowDrag({ fromId: drag.fromId, at, overId: drag.overId })
       return
     }
@@ -1135,7 +1097,7 @@ export default function WallView() {
       setDrawing(path => {
         if (!path) return path
         const last = path[path.length - 1]
-        return Math.hypot(at.x - last.x, at.y - last.y) < 2 / cam.zoom ? path : [...path, at]
+        return isStrokeJitter(last, at, cam.zoom) ? path : [...path, at]
       })
       return
     }
@@ -1166,11 +1128,10 @@ export default function WallView() {
     }
 
     if (drag.mode === 'rotate') {
-      const angle = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx) * (180 / Math.PI) - drag.start
-      // Shift snaps to 15°, the way every rotation handle does.
+      const rotation = rotationAngle({ x: e.clientX, y: e.clientY }, { x: drag.cx, y: drag.cy }, drag.start, e.shiftKey)
       setItems(
         docRef.current.items.map(i =>
-          i.id === drag.id ? { ...i, rotation: e.shiftKey ? Math.round(angle / 15) * 15 : Math.round(angle) } : i
+          i.id === drag.id ? { ...i, rotation } : i
         ),
         { record: false }
       )
@@ -1198,23 +1159,16 @@ export default function WallView() {
 
       const moving = movingRef.current
       const moved = moveItems(drag.origin, moving, dx, dy)
-      const live = snapping
-        ? moved.map(i => (moving.has(i.id) ? { ...i, x: snap(i.x, SNAP_GRID), y: snap(i.y, SNAP_GRID) } : i))
-        : moved
+      const live = snapMoving(moved, moving, snapping)
       // Drawn by hand and committed on release, like a pan. Through state,
       // every frame re-rendered the wall to move a few items across it.
       liveItemsRef.current = live
       paintItems(live, moving)
     } else {
+      const size = resizedSize(drag.w, drag.h, dx, dy, snapping)
       setItems(
         docRef.current.items.map(i =>
-          i.id === drag.id
-            ? {
-                ...i,
-                width: Math.max(40, snapping ? snap(drag.w + dx, SNAP_GRID) : drag.w + dx),
-                height: Math.max(32, snapping ? snap(drag.h + dy, SNAP_GRID) : drag.h + dy)
-              }
-            : i
+          i.id === drag.id ? { ...i, ...size } : i
         ),
         { record: false }
       )
@@ -1304,43 +1258,21 @@ export default function WallView() {
         ...(arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {})
       }
 
-      if (drag.moved) {
-        let drawn = false
-        if (drag.overId) {
-          addItem('arrow', { from: drag.fromId, to: drag.overId, ...style })
-          drawn = true
-        } else if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > LOOSE_END_SLOP) {
-          // Dropped on empty canvas, so the far end stays where it was let go.
-          // An arrow pointing at a spot rather than at a thing is a normal
-          // thing to want on a wall.
-          addItem('arrow', {
-            from: drag.fromId,
-            toPoint: toWallPoint(screenPoint(e), docRef.current.camera),
-            ...style
-          })
-          drawn = true
-        }
-        setArrowFrom(null)
-        // A finished arrow hands the pointer back. A slip that drew nothing
-        // does not: the tool is still armed because it was never used.
-        if (drawn) setTool('select')
-        return
+      const release = arrowRelease({
+        fromId: drag.fromId,
+        moved: drag.moved,
+        overId: drag.overId,
+        viaHandle: drag.viaHandle,
+        travelled: Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY),
+        armed: arrowFrom
+      })
+      if (release.draw) {
+        addItem('arrow', release.draw.to !== null
+          ? { from: release.draw.from, to: release.draw.to, ...style }
+          : { from: release.draw.from, toPoint: toWallPoint(screenPoint(e), docRef.current.camera), ...style })
       }
-
-      // A handle press that never moved is a misfire, not the first half of a
-      // gesture: there is no mode to be left waiting in.
-      if (drag.viaHandle) return
-
-      // Never moved, so it was a click. Pick a source, then a target, which is
-      // the easier gesture when the two items nearly touch.
-      if (arrowFrom && arrowFrom !== drag.fromId) {
-        addItem('arrow', { from: arrowFrom, to: drag.fromId, ...style })
-        setArrowFrom(null)
-        setTool('select')
-      } else {
-        // Clicking the same item again puts it down rather than looping it.
-        setArrowFrom(arrowFrom === drag.fromId ? null : drag.fromId)
-      }
+      if (release.armed !== undefined) setArrowFrom(release.armed)
+      if (release.handBack) setTool('select')
       return
     }
 
@@ -1370,8 +1302,7 @@ export default function WallView() {
 
     // One undo step for the whole gesture, recorded now that it is finished.
     // A move that never passed the threshold changed nothing worth recording.
-    if (drag?.mode === 'move' && !drag.moved) return
-    if (drag && (drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'arrowEnd')) {
+    if (recordsHistory(drag)) {
       historyRef.current = pushHistory(historyRef.current, movedItems ?? docRef.current.items)
       setHistoryTick(t => t + 1)
     }
