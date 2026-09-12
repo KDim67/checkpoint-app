@@ -130,6 +130,26 @@ export function getItemsPaginated(
 }
 
 /**
+ * Every item of one type in a workspace, in the order a page of them comes in.
+ *
+ * For callers that need the whole board rather than a page of it. One page with
+ * a large limit reads a board past that limit as though it ended there.
+ */
+export function getAllItems(context: string, type: string): Item[] {
+  const order = type === 'log' ? 'i.position DESC' : 'i.position ASC'
+  const rows = prepareOnce(getDb(), `
+    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
+    FROM items i
+    LEFT JOIN item_tags it ON i.id = it.item_id
+    LEFT JOIN tags t ON it.tag_id = t.id
+    WHERE i.context = ? AND i.type = ?
+    GROUP BY i.id
+    ORDER BY ${order}, i.created_at DESC
+  `).all(context, type) as Record<string, unknown>[]
+  return rows.map(rowToItem)
+}
+
+/**
  * Every item, for export. Unpaginated on purpose.
  *
  * An export that quietly stopped at a page boundary would be worse than none,

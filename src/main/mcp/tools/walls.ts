@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { getItemById, getItemsPaginated, getSetting, setSetting } from '../../db'
+import { getAllItems, getItemById, getSetting, setSetting } from '../../db'
 import {
   createWallItem,
   normalizeWallDoc,
@@ -89,7 +89,7 @@ export function registerWallTools(mcp: McpServer): void {
     async ({ context: ctx, wall_id }) => {
       const wall = resolveWall(ctx, wall_id)
       const doc = readWallDoc(wall.key)
-      const cards = new Map(getItemsPaginated(ctx, 'card', 1, 1000).items.map(c => [c.id, c]))
+      const cards = new Map(getAllItems(ctx, 'card').map(c => [c.id, c]))
       const titleOf = (item: WallItem): string | undefined =>
         item.kind === 'card' ? cards.get(item.ref ?? '')?.title : item.ref
 
