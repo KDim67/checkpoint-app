@@ -92,6 +92,9 @@ export const enum IpcChannels {
 
   // HUD
   HUD_TOGGLE             = 'hud:toggle',
+  HUD_RESIZE             = 'hud:resize',
+  /** Main → renderer: clear whatever the HUD was holding. */
+  HUD_RESET              = 'hud:reset',
 
   // Webhook
   WEBHOOK_TOGGLE         = 'webhook:toggle',
@@ -167,6 +170,10 @@ export const enum IpcChannels {
   /** Renderer asks for the theme CSS to apply now, rather than awaiting a push. */
   CUSTOMIZER_GET_CSS             = 'customizer:getCss',
   CUSTOMIZER_REGISTER_SHORTCUTS  = 'customizer:registerShortcuts',
+  CUSTOMIZER_TOGGLE_ENGINE       = 'customizer:toggleEngine',
+  CUSTOMIZER_GET_ENGINE_STATE    = 'customizer:getEngineState',
+  CUSTOMIZER_GET_THEME           = 'customizer:getTheme',
+  CUSTOMIZER_GET_SHORTCUTS       = 'customizer:getShortcuts',
 
   // Cheatsheets
   CHEATSHEETS_LIST              = 'cheatsheets:list',
@@ -197,6 +204,7 @@ export const enum IpcChannels {
   AI_SEARCH_MEMORIES            = 'ai:searchMemories',
   AI_TOGGLE_PIN_MEMORY          = 'ai:togglePinMemory',
   AI_UPDATE_MEMORY_CONTENT      = 'ai:updateMemoryContent',
+  AI_AUDIT_MEMORIES             = 'ai:auditMemories',
   AI_CONSOLIDATE_MEMORY         = 'ai:consolidateMemory',
   WORKSPACE_SELECT_FOLDER       = 'workspace:selectFolder',
   WORKSPACE_GET_STRUCTURE        = 'workspace:getStructure',

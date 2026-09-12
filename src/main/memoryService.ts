@@ -230,7 +230,7 @@ export function searchMemories(query: string, context: string = 'default', limit
 /**
  * Sequential processing of AI-directed memory adjustments (save, update, delete).
  */
-export function processMemoryActions(actions: MemoryAction[], context: string): void {
+function processMemoryActions(actions: MemoryAction[], context: string): void {
   for (const item of actions) {
     try {
       const key = item.memory_key
@@ -261,7 +261,7 @@ export function processMemoryActions(actions: MemoryAction[], context: string): 
  * Prunes the database to enforce memory limits (40 for small models, 120 for large).
  * Evicts oldest unpinned memories first.
  */
-export function pruneMemories(context: string = 'default', limit: number = 40): void {
+function pruneMemories(context: string = 'default', limit: number = 40): void {
   const countRow = stmtPruneCount.get(context) as { cnt: number }
   if (countRow.cnt <= limit) return
 
@@ -449,15 +449,15 @@ export function initMemoryIpc(): void {
     return searchMemories(query, context, limit)
   })
 
-  ipcMain.handle('ai:togglePinMemory', (_event, id: string) => {
+  ipcMain.handle(IpcChannels.AI_TOGGLE_PIN_MEMORY, (_event, id: string) => {
     return togglePinMemory(id)
   })
 
-  ipcMain.handle('ai:updateMemoryContent', (_event, id: string, content: string) => {
+  ipcMain.handle(IpcChannels.AI_UPDATE_MEMORY_CONTENT, (_event, id: string, content: string) => {
     return updateMemoryContent(id, content)
   })
 
-  ipcMain.handle('ai:auditMemories', (_event, context: string, model: string) => {
+  ipcMain.handle(IpcChannels.AI_AUDIT_MEMORIES, (_event, context: string, model: string) => {
     return auditMemories(context, model)
   })
 
