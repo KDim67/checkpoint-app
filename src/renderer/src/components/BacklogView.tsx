@@ -152,9 +152,7 @@ export default function BacklogView() {
   }, [activeTaskId])
 
   useEffect(() => {
-    if (rightPanelOpen && activeTaskId) {
-      setActiveTaskId(null)
-    }
+    if (rightPanelOpen) setActiveTaskId(null)
   }, [rightPanelOpen])
 
   // 1. Debounce Search Input

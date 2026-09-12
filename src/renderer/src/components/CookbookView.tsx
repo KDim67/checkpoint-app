@@ -252,7 +252,7 @@ export default function CookbookView() {
       cleanDone()
       cleanError()
     }
-  }, [])
+  }, [toast])
 
   const handleToggleSafeMode = async (newValue: boolean) => {
     setSafeMode(newValue)

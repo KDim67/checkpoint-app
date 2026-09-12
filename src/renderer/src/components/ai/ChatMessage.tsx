@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import CodeBlock from '../ui/CodeBlock'
@@ -102,8 +102,14 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
   const batchData = parseBatchBoardJson(jsonString)
   const signature = batchData ? `batch::${activeWorkspace || 'default'}::${batchData.columns.map(c => c.name).join(',')}_${batchData.cards.map(c => c.title).join(',')}` : ''
 
+  // Rebuilt from the JSON on every render, so read through a ref rather than
+  // listed: listing it would run the effect on every render.
+  const parsedRef = useRef(batchData)
+  parsedRef.current = batchData
+
   useEffect(() => {
     let isMounted = true
+    const batchData = parsedRef.current
     const processBatch = async () => {
       try {
         if (!batchData || !signature) return
@@ -748,7 +754,14 @@ function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: stri
     ? `config::${context}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target ?? o.name ?? ''}`).join('|')}`
     : ''
 
+  // Rebuilt from the JSON on every render, so read through a ref rather than
+  // listed: listing it would run the effect on every render, and cancel the
+  // edit already in flight.
+  const parsedRef = useRef(operations)
+  parsedRef.current = operations
+
   useEffect(() => {
+    const operations = parsedRef.current
     if (!signature || operations.length === 0) return
 
     const cached = executedConfigOutcomesMap.get(signature)
@@ -913,8 +926,14 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
 
   const data = currentItem || previewData
 
+  // Rebuilt from the JSON on every render, so read through a ref rather than
+  // listed: listing them would run the effect on every render.
+  const parsedRef = useRef({ normalized, title, cached })
+  parsedRef.current = { normalized, title, cached }
+
   useEffect(() => {
     let isMounted = true
+    const { normalized, title, cached } = parsedRef.current
     const autoCreate = async () => {
       try {
         if (!normalized || !title || !signature) return
@@ -1022,14 +1041,15 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
   // placeholder while `data` is still streaming in, so hooks placed after those
   // returns would change in count once the card resolves, and React would throw.
   const [colDisplayName, setColDisplayName] = React.useState<string>('')
+  const dataStatus = data?.status
   React.useEffect(() => {
-    if (!data) return
+    if (dataStatus === undefined) return
     const lookup = async () => {
       try {
         const ctx = activeWorkspace || 'default'
         const { columns: cols } = await loadBoardConfig(ctx)
         const match = cols.find(c =>
-          c.id === data.status || c.name?.toLowerCase() === String(data.status).toLowerCase()
+          c.id === dataStatus || c.name?.toLowerCase() === String(dataStatus).toLowerCase()
         )
         if (match) setColDisplayName(match.name)
         else {
@@ -1037,12 +1057,12 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
           const labels: Record<string, string> = {
             open: 'To Do', in_progress: 'In Progress', in_review: 'In Review', done: 'Done'
           }
-          setColDisplayName(labels[data.status] || String(data.status))
+          setColDisplayName(labels[dataStatus] || String(dataStatus))
         }
-      } catch { setColDisplayName(String(data.status)) }
+      } catch { setColDisplayName(String(dataStatus)) }
     }
     lookup()
-  }, [data?.status, activeWorkspace])
+  }, [dataStatus, activeWorkspace])
 
   if (error) {
     return (
@@ -1212,8 +1232,14 @@ function CreateColumnActionBlock({ jsonString }: { jsonString: string }) {
   const cachedCol = signature ? createdColsCacheMap.get(signature) : null
   const colData = createdCol || cachedCol || (normalized ? { name: normalized.name, color: normalized.color, wipLimit: normalized.wipLimit } : null)
 
+  // Rebuilt from the JSON on every render, so read through a ref rather than
+  // listed: listing them would run the effect on every render.
+  const parsedRef = useRef({ normalized, name, cachedCol })
+  parsedRef.current = { normalized, name, cachedCol }
+
   useEffect(() => {
     let isMounted = true
+    const { normalized, name, cachedCol } = parsedRef.current
     const autoCreateCol = async () => {
       try {
         if (!normalized || !name || !signature) return

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import type { AiMemory } from '../../../shared/types'
 import { useConfirm } from './ui/ConfirmDialog'
 import {
@@ -353,15 +353,15 @@ function MemoryVaultManager() {
   const [newContent, setNewContent] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const loadMemories = async () => {
+  const loadMemories = useCallback(async () => {
     try {
       const list = await window.electronAPI.memory.getMemories(activeWorkspace)
       setMemories(list || [])
     } catch (e) { console.warn('Failed to load memories:', e) }
     finally { setLoading(false) }
-  }
+  }, [activeWorkspace])
 
-  useEffect(() => { loadMemories() }, [activeWorkspace])
+  useEffect(() => { loadMemories() }, [loadMemories])
 
   const handleAddMemory = async () => {
     if (!newKey.trim() || !newContent.trim()) return

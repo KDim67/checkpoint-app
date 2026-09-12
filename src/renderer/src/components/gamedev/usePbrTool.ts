@@ -221,7 +221,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
       onActivate()
       loadTexturePath(preloadTexturePath)
     }
-  }, [preloadTexturePath, loadTexturePath])
+  }, [preloadTexturePath, loadTexturePath, onActivate])
 
   // Watch albedo dataUrl changes and draw into canvases
   useEffect(() => {
