@@ -19,10 +19,10 @@ import type { Item, Tag as TagType, Relation, RelationType } from '../../../../s
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import ColorPicker from '../ui/ColorPicker'
-import { useConfirm } from '../ui/ConfirmDialog'
 import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 import RewindPanel from './RewindPanel'
 import { getStringSetting } from '../../lib/settings'
+import TagRow from '../ui/TagRow'
 
 interface CardDetailModalProps {
   cardId: string
@@ -42,7 +42,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const aiEnabled = useAiEnabled()
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
-  const confirm = useConfirm()
 
   const [card, setCard] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
@@ -914,95 +913,16 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                   flexDirection: 'column',
                   gap: '2px'
                 }}>
-                  {allTags.map(tag => {
-                    const isSelected = selectedTagIds.includes(tag.id)
-                    return (
-                      <div
-                        key={tag.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: 'var(--space-1) var(--space-2)',
-                          borderRadius: 'var(--radius-sm)',
-                          fontSize: 'var(--text-xs)',
-                          gap: '6px'
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <button
-                          onClick={() => handleTagToggle(tag.id)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--color-text-base)',
-                            padding: 0,
-                            fontSize: 'var(--text-xs)',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--space-2)',
-                            flex: 1
-                          }}
-                        >
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color, flexShrink: 0 }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag.name}</span>
-                        </button>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                          <ColorPicker
-                            value={tag.color}
-                            showHexInput={false}
-                            swatchSize={14}
-                            title="Edit Tag Color"
-                            onCommit={async (newColor) => {
-                              try {
-                                await window.electronAPI.db.updateTag(tag.id, { color: newColor })
-                                const refreshed = await window.electronAPI.db.getTags()
-                                setAllTags(refreshed)
-                              } catch (err) {
-                                console.error(err)
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={async () => {
-                              const ok = await confirm({
-                                title: `Delete "${tag.name}"?`,
-                                message: 'The label goes with it, off every card and task that carries it.',
-                                confirmText: 'Delete',
-                                isDestructive: true
-                              })
-                              if (!ok) return
-                              try {
-                                await window.electronAPI.db.deleteTag(tag.id)
-                                setSelectedTagIds(prev => prev.filter(id => id !== tag.id))
-                                setAllTags(await window.electronAPI.db.getTags())
-                              } catch (err) {
-                                console.error(err)
-                              }
-                            }}
-                            title="Delete label"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--color-text-faint)',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-error)')}
-                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-faint)')}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                          {isSelected && <Check size={12} style={{ color: 'var(--color-secondary)' }} />}
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {allTags.map(tag => (
+                    <TagRow
+                      key={tag.id}
+                      tag={tag}
+                      isSelected={selectedTagIds.includes(tag.id)}
+                      onToggle={handleTagToggle}
+                      onTagsChanged={setAllTags}
+                      onDeleted={id => setSelectedTagIds(prev => prev.filter(t => t !== id))}
+                    />
+                  ))}
                   {allTags.length === 0 && (
                     <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', padding: 'var(--space-2)' }}>
                       No tags available.
