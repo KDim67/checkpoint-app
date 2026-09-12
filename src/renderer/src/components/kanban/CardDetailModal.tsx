@@ -4,21 +4,18 @@ import type { CardDisplay } from '../../../../shared/boardModel'
 import { cardEdit, type CardSnapshot } from '../../../../shared/cardDraft'
 import {
   appendCardChanges,
-  changeSentence,
   describeCardChanges,
   readCardHistory,
-  visibleCardHistory,
   type CardChange
 } from '../../../../shared/cardHistory'
-import { authorLabel, DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
+import { DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
 import Markdown from '../ui/Markdown'
-import { X, Tag, Sparkles, Check, CheckSquare, Trash2, FilePlus, Paperclip, Clock, Layers } from 'lucide-react'
+import { X, Tag, Sparkles, Check } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAiEnabled } from '../../lib/useAiEnabled'
 import type { Item, Tag as TagType } from '../../../../shared/types'
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
-import ColorPicker from '../ui/ColorPicker'
 import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 import RewindPanel from './RewindPanel'
 import { getStringSetting } from '../../lib/settings'
@@ -26,6 +23,11 @@ import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
 import RelationsPanel from '../ui/RelationsPanel'
 import { useItemRelations } from '../ui/useItemRelations'
+import CardAttachments, { type CardAttachment } from './CardAttachments'
+import CardChecklist from './CardChecklist'
+import CardCoverPicker, { type CardCover } from './CardCoverPicker'
+import CardDiscussion from './CardDiscussion'
+import CardTextureTools from './CardTextureTools'
 import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
 
@@ -66,7 +68,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
   // Trello Meta States
   const [cover, setCover] = useState<{ type: 'color' | 'image'; value: string; size?: 'header' | 'full' } | null>(null)
-  const [liveCoverColor, setLiveCoverColor] = useState<string | null>(null)
   const [checklist, setChecklist] = useState<Array<{ id: string; text: string; done: boolean }>>([])
   const [comments, setComments] = useState<Array<{ id: string; user: string; text: string; createdAt: number }>>([])
   const [activities, setActivities] = useState<CardChange[]>([])
@@ -434,6 +435,18 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     draftMetadata({ cover: { type: 'image', value: urlOrPath } })
   }
 
+  const handleCoverChange = (next: CardCover | null) => {
+    setCover(next)
+    draftMetadata({ cover: next })
+  }
+
+  const handleRemoveAttachment = (att: CardAttachment) => {
+    const updated = attachments.filter(a => a.id !== att.id)
+    setAttachments(updated)
+    updateMetadata({ attachments: updated })
+    addActivity(`Removed attachment "${att.name}"`)
+  }
+
   const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     if (!card) return
     const priority = parseInt(e.target.value) as Item['priority']
@@ -530,9 +543,9 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
         <div
           id="card-modal-cover-banner"
           style={{
-            height: (liveCoverColor || cover?.type === 'color') ? '48px' : (cover?.type === 'image' ? '110px' : '0px'),
-            backgroundColor: liveCoverColor || (cover?.type === 'color' ? cover.value : 'transparent'),
-            backgroundImage: !liveCoverColor && cover?.type === 'image' ? `url(${cover.value})` : undefined,
+            height: cover?.type === 'color' ? '48px' : (cover?.type === 'image' ? '110px' : '0px'),
+            backgroundColor: cover?.type === 'color' ? cover.value : 'transparent',
+            backgroundImage: cover?.type === 'image' ? `url(${cover.value})` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             width: '100%',
@@ -895,137 +908,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 )}
               </div>
 
-            {/* Cover Color Selector */}
-            {/* Cover Color & Display Mode Selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
-              <span className="label-caps">
-                Cover Color & Mode
-              </span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Mode Selector (Header Strip vs Full Background) */}
-                {cover && cover.type === 'color' && (
-                  <div style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextCover = { ...cover, size: 'header' as const }
-                        setCover(nextCover)
-                        draftMetadata({ cover: nextCover })
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 'var(--weight-semibold)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        background: (cover.size !== 'full') ? 'var(--color-primary)' : 'var(--color-surface-1)',
-                        color: (cover.size !== 'full') ? '#ffffff' : 'var(--color-text-muted)',
-                        border: '1px solid var(--color-surface-offset)'
-                      }}
-                    >
-                      <div style={{ width: '12px', height: '10px', borderRadius: '2px', border: '1px solid currentColor', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ height: '4px', background: 'currentColor' }} />
-                      </div>
-                      <span>Header</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextCover = { ...cover, size: 'full' as const }
-                        setCover(nextCover)
-                        draftMetadata({ cover: nextCover })
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: 'var(--weight-semibold)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        background: (cover.size === 'full') ? 'var(--color-primary)' : 'var(--color-surface-1)',
-                        color: (cover.size === 'full') ? '#ffffff' : 'var(--color-text-muted)',
-                        border: '1px solid var(--color-surface-offset)'
-                      }}
-                    >
-                      <div style={{ width: '12px', height: '10px', borderRadius: '2px', background: 'currentColor' }} />
-                      <span>Full Card</span>
-                    </button>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', height: '100%', minHeight: '36px' }}>
-                  {['none', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#a855f7', '#ec4899'].map(color => {
-                    const isSelected = color === 'none' ? !cover : (cover?.type === 'color' && cover.value === color)
-                    return (
-                      <button
-                        key={color}
-                        onClick={() => {
-                          setLiveCoverColor(null)
-                          if (color === 'none') {
-                            setCover(null)
-                            draftMetadata({ cover: null })
-                          } else {
-                            const size = cover?.size || 'header'
-                            const nextCover = { type: 'color' as const, value: color, size }
-                            setCover(nextCover)
-                            draftMetadata({ cover: nextCover })
-                          }
-                        }}
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '4px',
-                          background: color === 'none' ? 'transparent' : color,
-                          border: isSelected 
-                            ? '2px solid var(--color-text-base)' 
-                            : (color === 'none' ? '1px dashed var(--color-text-muted)' : '1px solid transparent'),
-                          cursor: 'pointer',
-                          padding: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--color-text-base)',
-                          fontSize: '9px'
-                        }}
-                        title={color === 'none' ? 'No Cover' : color}
-                      >
-                        {color === 'none' && '×'}
-                      </button>
-                    )
-                  })}
-                  <ColorPicker
-                    value={cover?.type === 'color' ? cover.value : ''}
-                    onLiveDomUpdate={col => {
-                      const banner = document.getElementById('card-modal-cover-banner')
-                      if (banner) banner.style.backgroundColor = col
-                    }}
-                    onCommit={col => {
-                      if (col) {
-                        const size = cover?.size || 'header'
-                        const nextCover = { type: 'color' as const, value: col, size }
-                        setCover(nextCover)
-                        draftMetadata({ cover: nextCover })
-                      } else {
-                        setCover(null)
-                        draftMetadata({ cover: null })
-                      }
-                    }}
-                    swatchSize={20}
-                    hexInputWidth={58}
-                    title="Custom Cover Hexcode"
-                  />
-                </div>
-              </div>
-            </div>
+            <CardCoverPicker cover={cover} onChange={handleCoverChange} />
 
             {/* Template Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
@@ -1161,451 +1044,34 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </div>
           </div>
 
-          {/* Game Dev Texture Tooling Integration */}
-          {(() => {
-            const regex = /(?:file:\/\/\/)?([a-zA-Z]:[\\/][^:\r\n"']+\.(?:png|jpg|jpeg|tga|bmp|webp))/gi;
-            const paths: string[] = [];
-            let match;
-            while ((match = regex.exec(body)) !== null) {
-              let cleanPath = match[1].replace(/\\/g, '/');
-              if (!paths.includes(cleanPath)) {
-                paths.push(cleanPath);
-              }
-            }
-
-            if (paths.length === 0) return null;
-
-            return (
-              <div style={{
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-3)',
-                marginTop: 'var(--space-2)'
-              }}>
-                <div className="row">
-                  <Sparkles size={14} style={{ color: 'var(--color-secondary)' }} />
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Game Dev: Texture Tooling Detected
-                  </span>
-                </div>
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-                  This ticket references local texture files. You can generate Normal/Height/Roughness/AO maps, or blend them into seamless tiling textures.
-                </p>
-                <div className="col">
-                  {paths.map((path, idx) => {
-                    const fileName = path.split('/').pop() || path;
-                    return (
-                      <div key={idx} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: 'var(--color-surface-1)',
-                        border: '1px solid var(--color-surface-offset)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: 'var(--space-2) var(--space-3)',
-                      }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1, marginRight: 'var(--space-2)' }}>
-                          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {fileName}
-                          </span>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={path}>
-                            {path}
-                          </span>
-                        </div>
-                        
-                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                          {/* Generate Maps (PBR) Button */}
-                          <button
-                            onClick={() => {
-                              useAppStore.getState().setGamedevPreloadTexture(path, card.id);
-                              useAppStore.getState().setView('gamedev');
-                              onClose();
-                            }}
-                            style={{
-                              background: 'var(--color-primary)',
-                              border: 'none',
-                              borderRadius: 'var(--radius-sm)',
-                              color: 'white',
-                              fontSize: '11px',
-                              fontWeight: 'var(--weight-semibold)',
-                              padding: '6px 12px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            onMouseOver={e => e.currentTarget.style.background = 'var(--color-primary-hover)'}
-                            onMouseOut={e => e.currentTarget.style.background = 'var(--color-primary)'}
-                          >
-                            <Sparkles size={12} />
-                            <span>PBR Maps</span>
-                          </button>
-
-                          {/* Make Seamless Button */}
-                          <button
-                            onClick={() => {
-                              useAppStore.getState().setGamedevPreloadSeamless(path, card.id);
-                              useAppStore.getState().setView('gamedev');
-                              onClose();
-                            }}
-                            style={{
-                              background: 'var(--color-surface-offset)',
-                              border: '1px solid var(--color-balance)',
-                              borderRadius: 'var(--radius-sm)',
-                              color: 'var(--color-text-base)',
-                              fontSize: '11px',
-                              fontWeight: 'var(--weight-semibold)',
-                              padding: '6px 12px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            onMouseOver={e => {
-                              e.currentTarget.style.background = 'var(--color-surface-2)'
-                              e.currentTarget.style.borderColor = 'var(--color-secondary)'
-                            }}
-                            onMouseOut={e => {
-                              e.currentTarget.style.background = 'var(--color-surface-offset)'
-                              e.currentTarget.style.borderColor = 'var(--color-balance)'
-                            }}
-                          >
-                            <Layers size={12} style={{ color: 'var(--color-secondary)' }} />
-                            <span>Make Seamless</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
+          <CardTextureTools body={body} cardId={card.id} onClose={onClose} />
 
           <RelationsPanel links={itemRelations} placeholder="Search card title to link..." />
 
-          {/* Sub-Task Checklist Segment */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
-            <div className="row-between">
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckSquare size={13} style={{ color: 'var(--color-secondary)' }} />
-                Sub-Task Checklist
-              </span>
-              {checklist.length > 0 && (
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
-                  {checklist.filter(c => c.done).length} of {checklist.length} tasks completed
-                </span>
-              )}
-            </div>
+          <CardChecklist
+            items={checklist}
+            draft={newChecklistText}
+            setDraft={setNewChecklistText}
+            onAdd={handleAddChecklistItem}
+            onToggle={handleToggleChecklistItem}
+            onDelete={handleDeleteChecklistItem}
+          />
 
-            {/* Checklist Progress Bar */}
-            {checklist.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ height: '6px', background: 'var(--color-surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: `${checklist.length > 0 ? Math.round((checklist.filter(i => i.done).length / checklist.length) * 100) : 0}%`, height: '100%', background: 'var(--color-secondary)', borderRadius: '3px', transition: 'width 200ms ease' }} />
-                </div>
-              </div>
-            )}
-
-            {/* Checklist Items */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {checklist.map(item => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px var(--space-2)',
-                    background: 'var(--color-surface-2)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--color-surface-offset)'
-                  }}
-                >
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
-                    <input
-                      type="checkbox"
-                      checked={item.done}
-                      onChange={() => handleToggleChecklistItem(item.id)}
-                    />
-                    <span style={{
-                      fontSize: 'var(--text-xs)',
-                      color: item.done ? 'var(--color-text-faint)' : 'var(--color-text-base)',
-                      textDecoration: item.done ? 'line-through' : 'none',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {item.text}
-                    </span>
-                  </label>
-                  <button
-                    onClick={() => handleDeleteChecklistItem(item.id)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', padding: '2px' }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--color-error)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-faint)'}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Add Checklist Item Form */}
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              <input
-                type="text"
-                placeholder="Add sub-task..."
-                value={newChecklistText}
-                onChange={e => setNewChecklistText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleAddChecklistItem(newChecklistText)
-                    setNewChecklistText('')
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-xs)',
-                  outline: 'none'
-                }}
-              />
-              <button
-                onClick={() => {
-                  handleAddChecklistItem(newChecklistText)
-                  setNewChecklistText('')
-                }}
-                style={{
-                  background: 'var(--color-surface-offset)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--color-text-base)',
-                  fontWeight: 'var(--weight-semibold)',
-                  fontSize: 'var(--text-xs)',
-                  padding: '0 var(--space-4)',
-                  cursor: 'pointer'
-                }}
-              >
-                Add Item
-              </button>
-            </div>
-          </div>
-
-          {/* Attachments Segment. The whole section is the drop target, not
-              just the button: dragging a file at a small button is a worse
-              version of clicking it. */}
-          <div
-            onDragOver={e => {
-              if (isReadOnly) return
-              e.preventDefault()
-              setDraggingAttachment(true)
-            }}
-            onDragLeave={e => {
-              // Fires when crossing into a child, so only a leave that actually
-              // exits the section counts.
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDraggingAttachment(false)
-            }}
-            onDrop={e => {
-              // First, and whatever the drop turns out to be. Letting a drop
-              // run its default is how a window navigates to what was dropped
-              // on it, and a card modal replaced by a text file is not a state
-              // there is a way back from.
-              e.preventDefault()
-              setDraggingAttachment(false)
-              if (isReadOnly || e.dataTransfer.files.length === 0) return
-              attachFiles(e.dataTransfer.files)
-            }}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-3)',
-              borderTop: '1px solid var(--color-surface-offset)',
-              paddingTop: 'var(--space-4)',
-              marginTop: 'var(--space-2)',
-              outline: draggingAttachment ? '2px dashed var(--color-secondary)' : 'none',
-              outlineOffset: 'var(--space-2)',
-              borderRadius: 'var(--radius-md)'
-            }}
-          >
-            <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Paperclip size={13} style={{ color: 'var(--color-secondary)' }} />
-              Attachments
-              <span style={{ fontWeight: 'var(--weight-regular)', textTransform: 'none', color: 'var(--color-text-faint)' }}>
-                {draggingAttachment ? 'drop to attach' : 'or drop files here'}
-              </span>
-            </span>
-
-            {/* List of Attachments */}
-            {attachments.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-                {attachments.map(att => (
-                  <div
-                    key={att.id}
-                    style={{
-                      padding: 'var(--space-2) var(--space-3)',
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
-                      borderRadius: 'var(--radius-md)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 'var(--space-2)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                      <span
-                        title={att.path}
-                        style={{
-                          fontSize: '11px',
-                          color: 'var(--color-text-base)',
-                          fontWeight: 'var(--weight-medium)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          cursor: 'pointer'
-                        }}
-                        onClick={() => {
-                          if (att.path.startsWith('http://') || att.path.startsWith('https://')) {
-                            window.open(att.path, '_blank')
-                          } else {
-                            window.electronAPI.app?.showItemInFolder?.(att.path)
-                          }
-                        }}
-                      >
-                        {att.name}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {att.isImage && (
-                        <button
-                          onClick={() => handleSetCoverImage(att.path)}
-                          title="Set as Card Cover"
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--color-secondary)',
-                            fontSize: '9px',
-                            cursor: 'pointer',
-                            padding: '2px'
-                          }}
-                        >
-                          Cover
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          const updated = attachments.filter(a => a.id !== att.id)
-                          setAttachments(updated)
-                          updateMetadata({ attachments: updated })
-                          addActivity(`Removed attachment "${att.name}"`)
-                        }}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', padding: '2px' }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add Attachment Forms */}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: '4px', flex: 1, minWidth: '220px' }}>
-                <input
-                  type="text"
-                  placeholder="Link URL..."
-                  value={newLinkUrl}
-                  onChange={e => setNewLinkUrl(e.target.value)}
-                  style={{
-                    flex: 2,
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '3px 6px',
-                    fontSize: '11px',
-                    outline: 'none'
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Name (optional)..."
-                  value={newLinkName}
-                  onChange={e => setNewLinkName(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '3px 6px',
-                    fontSize: '11px',
-                    outline: 'none',
-                    minWidth: 0
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    handleAddLinkAttachment(newLinkName, newLinkUrl)
-                    setNewLinkName('')
-                    setNewLinkUrl('')
-                  }}
-                  style={{
-                    background: 'var(--color-surface-offset)',
-                    border: 'none',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--color-text-base)',
-                    fontSize: '10px',
-                    fontWeight: 'var(--weight-semibold)',
-                    padding: '3px 8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Link
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <button
-                  onClick={() => document.getElementById('card-file-uploader')?.click()}
-                  style={{
-                    background: 'var(--color-surface-offset)',
-                    border: '1px solid var(--color-surface-offset)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--color-text-base)',
-                    fontSize: '10px',
-                    fontWeight: 'var(--weight-semibold)',
-                    padding: '4px 10px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <FilePlus size={12} />
-                  <span>Attach Local File</span>
-                </button>
-                <input
-                  type="file"
-                  id="card-file-uploader"
-                  style={{ display: 'none' }}
-                  onChange={handleAddFileAttachment}
-                />
-              </div>
-            </div>
-          </div>
+          <CardAttachments
+            attachments={attachments}
+            isReadOnly={isReadOnly}
+            dragging={draggingAttachment}
+            setDragging={setDraggingAttachment}
+            linkName={newLinkName}
+            setLinkName={setNewLinkName}
+            linkUrl={newLinkUrl}
+            setLinkUrl={setNewLinkUrl}
+            onAttachFiles={attachFiles}
+            onAddLink={handleAddLinkAttachment}
+            onFileChosen={handleAddFileAttachment}
+            onSetCover={handleSetCoverImage}
+            onRemove={handleRemoveAttachment}
+          />
 
           {/* Rewind. What the user was doing the last time this card was
               worked on. Sits with the historical material rather than above the
@@ -1616,126 +1082,14 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </div>
           )}
 
-          {/* Comments & Activity Log Segment (Split layouts) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 'var(--space-5)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
-            
-            {/* Comments Thread */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <span className="label-caps">
-                Discussion
-              </span>
-
-              {/* Post comment input */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <textarea
-                  placeholder="Write a comment..."
-                  value={commentInput}
-                  onChange={e => setCommentInput(e.target.value)}
-                  onPaste={async (e) => {
-                    const isImage = await handleImagePaste(e, commentInput, setCommentInput)
-                    if (isImage) return
-                  }}
-                  onDrop={async (e) => {
-                    await handleImageDrop(e, commentInput, setCommentInput)
-                  }}
-                  onDragOver={e => e.preventDefault()}
-                  rows={2}
-                  style={{
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 'var(--space-2) var(--space-3)',
-                    color: 'var(--color-text-base)',
-                    fontSize: 'var(--text-xs)',
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                    resize: 'none'
-                  }}
-                />
-                <button
-                  onClick={handlePostComment}
-                  disabled={!commentInput.trim()}
-                  style={{
-                    alignSelf: 'flex-end',
-                    background: 'var(--color-secondary)',
-                    border: 'none',
-                    color: 'var(--color-text-inverted)',
-                    fontWeight: 'var(--weight-bold)',
-                    fontSize: '10px',
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    opacity: commentInput.trim() ? 1 : 0.5
-                  }}
-                >
-                  Save Comment
-                </button>
-              </div>
-
-              {/* Comments Feed */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '200px', overflowY: 'auto' }}>
-                {comments.map(c => (
-                  <div
-                    key={c.id}
-                    style={{
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: 'var(--space-3)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}
-                  >
-                    <div className="row-between">
-                      <strong style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>{authorLabel(c.user)}</strong>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
-                          {new Date(c.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteComment(c.id)}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', fontSize: '9px', padding: 0 }}
-                        >
-                          delete
-                        </button>
-                      </div>
-                    </div>
-                    <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-base)', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                      {c.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Audit Activities Trail */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderLeft: '1px solid var(--color-surface-offset)', paddingLeft: 'var(--space-4)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Clock size={11} style={{ color: 'var(--color-text-faint)' }} />
-                Activity History
-              </span>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
-                {visibleCardHistory(activities).map(act => (
-                  <div key={act.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '4px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', lineHeight: 1.3 }}>
-                      {changeSentence(act)}
-                    </span>
-                    {act.at > 0 && (
-                      <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
-                        {new Date(act.at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {visibleCardHistory(activities).length === 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No changes yet.</span>
-                )}
-              </div>
-            </div>
-
-          </div>
+          <CardDiscussion
+            comments={comments}
+            activities={activities}
+            draft={commentInput}
+            setDraft={setCommentInput}
+            onPost={handlePostComment}
+            onDelete={handleDeleteComment}
+          />
         </div>
       </div>
 
