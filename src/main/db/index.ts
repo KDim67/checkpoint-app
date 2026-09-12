@@ -25,6 +25,7 @@ import { prepareTombstoneStatements } from './tombstones'
 export { closeDb, discardDb, getDb } from './connection'
 export {
   getItemsPaginated,
+  getAllItems,
   getAllItemsForExport,
   getItemById,
   createItem,

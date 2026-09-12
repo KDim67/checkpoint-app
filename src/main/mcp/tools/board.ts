@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { getContextSlugs, getDb, getItemsPaginated, updateItem } from '../../db'
+import { getAllItems, getContextSlugs, getDb, updateItem } from '../../db'
 import { applyConfigOps, normalizeConfigUpdate } from '../../../shared/boardOps'
 import { recordMcpActivity } from '../../mcpActivity'
 import { context, json, notifyRenderer, readBoardConfig, summarizeItem, text, writeBoardConfig, z } from '../toolKit'
@@ -20,7 +20,7 @@ export function registerBoardTools(mcp: McpServer): void {
     },
     async ({ context: ctx }) => {
       const config = readBoardConfig(ctx)
-      const cards = getItemsPaginated(ctx, 'card', 1, 1000).items
+      const cards = getAllItems(ctx, 'card')
       return json({
         context: ctx,
         background: config.background,
@@ -153,7 +153,7 @@ export function registerBoardTools(mcp: McpServer): void {
       // claims; they follow to the first surviving column, matching the board.
       let movedCards = 0
       for (const move of applied.cardMoves) {
-        const affected = getItemsPaginated(ctx, 'card', 1, 1000).items
+        const affected = getAllItems(ctx, 'card')
           .filter(i => i.status === move.fromColumn)
         for (const card of affected) {
           updateItem(getDb(), card.id, { status: move.toColumn })
