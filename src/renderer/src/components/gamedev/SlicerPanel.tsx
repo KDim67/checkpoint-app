@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle, Download, Loader, Scissors } from 'lucide-r
 import type { SlicerTool } from './useSlicerTool'
 import FilePickerButton from './FilePickerButton'
 import SettingsColumn from './SettingsColumn'
+import NoImageLoaded from './NoImageLoaded'
 
 export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
   return (
@@ -149,28 +150,11 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
               overflow: 'hidden'
             }}>
               {!tool.slicerUrl ? (
-                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
-                  <Scissors size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>No Image Loaded</span>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Choose a composite texture or grid sheet to partition.</span>
-                  </div>
-                  <button
-                    onClick={tool.handleSelectSlicerFile}
-                    style={{
-                      background: 'var(--color-primary)',
-                      border: 'none',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'white',
-                      fontWeight: 'var(--weight-semibold)',
-                      fontSize: 'var(--text-xs)',
-                      padding: '10px 20px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Choose Image
-                  </button>
-                </div>
+                <NoImageLoaded
+                  icon={<Scissors size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />}
+                  hint="Choose a composite texture or grid sheet to partition."
+                  onChoose={tool.handleSelectSlicerFile}
+                />
               ) : tool.isSlicerProcessing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
                   <Loader size={32} className="animate-spin" style={{ color: 'var(--color-secondary)' }} />

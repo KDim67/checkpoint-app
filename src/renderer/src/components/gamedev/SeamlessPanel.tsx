@@ -3,6 +3,7 @@ import { CheckCircle, Download, Loader, Repeat, Settings } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { SeamlessTool } from './useSeamlessTool'
 import TextureDropZone from './TextureDropZone'
+import ActiveTextureHeader from './ActiveTextureHeader'
 
 export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool; onCardDone: (cardId: string) => Promise<void> }) {
   return (
@@ -197,58 +198,17 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
               
               {/* Metadata Header */}
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-3) var(--space-4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Active Asset:</span>
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tool.seamlessPath || ''}>
-                    {tool.seamlessPath ? tool.seamlessPath.split(/[\\/]/).pop() : 'Direct Memory'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  <button
-                    onClick={tool.handleSeamlessBrowseClick}
-                    style={{
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--color-text-base)',
-                      fontSize: '11px',
-                      padding: '6px 12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Change Texture
-                  </button>
-                  <button
-                    onClick={() => {
-                      tool.setSeamlessUrl(null)
-                      tool.setSeamlessPath(null)
-                      tool.setSeamlessExportedFile(null)
-                      useAppStore.getState().setGamedevPreloadSeamless(null, null)
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid var(--color-error-muted)',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--color-error)',
-                      fontSize: '11px',
-                      padding: '6px 12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
+              <ActiveTextureHeader
+                label="Active Asset:"
+                path={tool.seamlessPath}
+                onChange={tool.handleSeamlessBrowseClick}
+                onClear={() => {
+                  tool.setSeamlessUrl(null)
+                  tool.setSeamlessPath(null)
+                  tool.setSeamlessExportedFile(null)
+                  useAppStore.getState().setGamedevPreloadSeamless(null, null)
+                }}
+              />
 
               {/* 3x3 repeating preview grid with before/after compare toggle */}
               <div style={{

@@ -3,6 +3,7 @@ import { Box, CheckCircle, Download, Loader, RefreshCw, Settings, Sparkles } fro
 import { useAppStore } from '../../store/appStore'
 import type { PbrTool } from './usePbrTool'
 import TextureDropZone from './TextureDropZone'
+import ActiveTextureHeader from './ActiveTextureHeader'
 
 /** Shared by every map tile, so the sizing is fixed in one place. */
 const MAP_MEDIA: React.CSSProperties = {
@@ -259,58 +260,17 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
               
               {/* File Metadata Header */}
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-3) var(--space-4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Active Albedo File:</span>
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tool.albedoPath || ''}>
-                    {tool.albedoPath ? tool.albedoPath.split(/[\\/]/).pop() : 'Direct Memory'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  <button
-                    onClick={tool.handleBrowseClick}
-                    style={{
-                      background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--color-text-base)',
-                      fontSize: '11px',
-                      padding: '6px 12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Change Texture
-                  </button>
-                  <button
-                    onClick={() => {
-                      tool.setAlbedoUrl(null)
-                      tool.setAlbedoPath(null)
-                      tool.setExportedFiles([])
-                      useAppStore.getState().setGamedevPreloadTexture(null, null)
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid var(--color-error-muted)',
-                      borderRadius: 'var(--radius-sm)',
-                      color: 'var(--color-error)',
-                      fontSize: '11px',
-                      padding: '6px 12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
+              <ActiveTextureHeader
+                label="Active Albedo File:"
+                path={tool.albedoPath}
+                onChange={tool.handleBrowseClick}
+                onClear={() => {
+                  tool.setAlbedoUrl(null)
+                  tool.setAlbedoPath(null)
+                  tool.setExportedFiles([])
+                  useAppStore.getState().setGamedevPreloadTexture(null, null)
+                }}
+              />
 
               {/* 2D Previews Grid */}
               <div style={{

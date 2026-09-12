@@ -33,6 +33,7 @@ import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
 import { getRelations } from '../../data/relations'
+import DetailTitleInput from '../ui/DetailTitleInput'
 
 interface CardDetailModalProps {
   cardId: string
@@ -646,27 +647,12 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           )}
           {/* Card Title Editable */}
           <div>
-            <input
-              ref={titleInputRef}
+            <DetailTitleInput
+              inputRef={titleInputRef}
               id="card-modal-title"
-              type="text"
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={setTitle}
               placeholder="Enter card title..."
-              style={{
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: '1px solid transparent',
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--weight-bold)',
-                color: 'var(--color-text-base)',
-                outline: 'none',
-                padding: '4px 0',
-                transition: 'border-color var(--duration-fast)'
-              }}
-              onFocus={e => (e.target.style.borderBottomColor = 'var(--color-surface-offset)')}
-              onBlurCapture={e => (e.currentTarget.style.borderBottomColor = 'transparent')}
             />
           </div>
 
