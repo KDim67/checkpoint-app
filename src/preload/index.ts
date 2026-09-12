@@ -546,9 +546,6 @@ const api = {
     deleteModel: (modelTag: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.OLLAMA_DELETE, modelTag),
 
-    listLocalModels: (): Promise<string[]> =>
-      ipcRenderer.invoke(IpcChannels.OLLAMA_LIST_LOCAL),
-
     onPullProgress: (callback: (event: PullProgressEvent) => void): (() => void) => {
       const handler = (_e: IpcRendererEvent, event: PullProgressEvent) => callback(event)
       ipcRenderer.on(IpcChannels.OLLAMA_PULL_PROGRESS, handler)
