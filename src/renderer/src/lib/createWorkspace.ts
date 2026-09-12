@@ -18,6 +18,7 @@ import {
   findProjectTemplate
 } from '../../../shared/projectTemplates'
 import { collectLabels, type ImportedBoard } from '../../../shared/foreignImport'
+import { readWorkspaceList, writeWorkspaceList } from './workspaceList'
 
 /** The same slug rule the workspace manager has always used. */
 export function slugifyWorkspace(name: string): string {
@@ -173,17 +174,7 @@ export function ensureWorkspaceListed(
 export async function occupiedWorkspaces(): Promise<Set<string>> {
   const taken = new Set<string>(await window.electronAPI.db.getContexts())
 
-  try {
-    const raw = await window.electronAPI.db.getSetting('contexts_list') as string | null
-    const list = raw ? JSON.parse(raw) : []
-    if (Array.isArray(list)) {
-      for (const entry of list as WorkspaceEntry[]) {
-        if (entry && typeof entry.slug === 'string') taken.add(entry.slug)
-      }
-    }
-  } catch (err) {
-    console.error('Could not read the workspace list:', err)
-  }
+  for (const entry of await readWorkspaceList()) taken.add(entry.slug)
 
   return taken
 }
@@ -256,21 +247,13 @@ export async function registerSharedWorkspace(
   slug: string,
   name?: string
 ): Promise<WorkspaceEntry[]> {
-  let existing: WorkspaceEntry[] = []
-  try {
-    const raw = await window.electronAPI.db.getSetting('contexts_list') as string | null
-    if (raw) existing = JSON.parse(raw) as WorkspaceEntry[]
-  } catch (err) {
-    console.error('Could not read the workspace list:', err)
-  }
-  if (!Array.isArray(existing)) existing = []
-
+  const existing = await readWorkspaceList()
   const next = markWorkspaceShared(existing, slug, name)
   // Identity: already listed and already labelled, so nothing to write.
   if (next === existing) return next
 
   try {
-    await window.electronAPI.db.setSetting('contexts_list', JSON.stringify(next))
+    await writeWorkspaceList(next)
   } catch (err) {
     console.error('Could not record the shared workspace:', err)
   }

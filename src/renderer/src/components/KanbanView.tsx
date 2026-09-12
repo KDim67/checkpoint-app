@@ -62,6 +62,8 @@ import { authorLabel, DISPLAY_NAME_KEY, DISPLAY_NAME_MAX, normalizeDisplayName }
 import { WebRTCCollaborationCoordinator } from '../lib/webrtcCollaboration'
 import { errorMessage } from '../../../shared/errors'
 import { getTextColorForBackground } from '../lib/contrast'
+import { writeWorkspaceList } from '../lib/workspaceList'
+import { getStringSetting, setStringSetting } from '../lib/settings'
 
 
 // Re-exported rather than declared: the shape now belongs to lib/boardConfig,
@@ -298,7 +300,7 @@ export default function KanbanView() {
   const nameLoaded = useRef(false)
 
   useEffect(() => {
-    window.electronAPI.db.getSetting(DISPLAY_NAME_KEY)
+    getStringSetting(DISPLAY_NAME_KEY, '')
       .then(raw => setDisplayName(normalizeDisplayName(raw)))
       .catch(err => console.error('Failed to read the display name:', err))
       .finally(() => { nameLoaded.current = true })
@@ -316,7 +318,7 @@ export default function KanbanView() {
     if (!nameLoaded.current) return
     const timer = setTimeout(() => {
       const name = normalizeDisplayName(displayName)
-      window.electronAPI.db.setSetting(DISPLAY_NAME_KEY, name)
+      setStringSetting(DISPLAY_NAME_KEY, name)
         .catch(err => console.error('Failed to save the display name:', err))
       // The room is holding the name read when the session started, so without
       // this a rename reaches nobody until the next connection.
@@ -564,7 +566,7 @@ export default function KanbanView() {
     const labelled = setWorkspaceShared(workspaceList, activeWorkspace, true)
     if (labelled !== workspaceList) {
       setWorkspaceList(labelled)
-      window.electronAPI.db.setSetting('contexts_list', JSON.stringify(labelled))
+      writeWorkspaceList(labelled)
         .catch(err => console.error('Failed to record the workspace as shared:', err))
     }
 

@@ -21,6 +21,7 @@ import {
   DEFAULT_TEMPLATE_ID,
   describeTemplate
 } from '../../../../shared/projectTemplates'
+import { readWorkspaceList, writeWorkspaceList } from '../../lib/workspaceList'
 
 
 const PRESET_COLORS = [
@@ -28,7 +29,6 @@ const PRESET_COLORS = [
   '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'
 ]
 
-const STORAGE_KEY = 'contexts_list'
 
 export default function WorkspaceManager() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
@@ -162,10 +162,9 @@ export default function WorkspaceManager() {
 
   const load = useCallback(async () => {
     try {
-      const raw = await window.electronAPI.db.getSetting(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw as string) as WorkspaceEntry[]
-        setContexts(parsed)
+      const stored = await readWorkspaceList()
+      if (stored.length > 0) {
+        setContexts(stored)
       } else {
         // Bootstrap from availableWorkspaces
         const bootstrapped: WorkspaceEntry[] = availableWorkspaces.map((slug, i) => ({
@@ -173,7 +172,7 @@ export default function WorkspaceManager() {
           name: slug.charAt(0).toUpperCase() + slug.slice(1),
           color: PRESET_COLORS[i % PRESET_COLORS.length]
         }))
-        await window.electronAPI.db.setSetting(STORAGE_KEY, JSON.stringify(bootstrapped))
+        await writeWorkspaceList(bootstrapped)
         setContexts(bootstrapped)
       }
     } catch (err) {
@@ -186,7 +185,7 @@ export default function WorkspaceManager() {
   useEffect(() => { load() }, [load])
 
   const persist = async (updated: WorkspaceEntry[]) => {
-    await window.electronAPI.db.setSetting(STORAGE_KEY, JSON.stringify(updated))
+    await writeWorkspaceList(updated)
     setContexts(updated)
     setAvailableWorkspaces(updated.map(c => c.slug))
     setWorkspaceList(updated)

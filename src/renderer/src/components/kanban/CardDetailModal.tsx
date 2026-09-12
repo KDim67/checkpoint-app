@@ -24,6 +24,7 @@ import ColorPicker from '../ui/ColorPicker'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 import RewindPanel from './RewindPanel'
+import { getStringSetting } from '../../lib/settings'
 
 interface CardDetailModalProps {
   cardId: string
@@ -155,7 +156,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           const tags = await window.electronAPI.db.getTags()
           setAllTags(tags)
 
-          const rawName = await window.electronAPI.db.getSetting(DISPLAY_NAME_KEY)
+          const rawName = await getStringSetting(DISPLAY_NAME_KEY, '')
           // The account name stands in when the field was never filled, so a
           // shared board does not fill up with entries credited to nobody.
           if (active) setDisplayName(resolveAuthor(rawName, window.electronAPI.app.osUserName))

@@ -60,3 +60,25 @@ export async function getNumberSetting(key: string, defaultValue: number): Promi
 export async function setNumberSetting(key: string, value: number): Promise<void> {
   await window.electronAPI.db.setSetting(key, String(value))
 }
+
+/**
+ * A setting the app stores as a JSON blob.
+ *
+ * Falls back for a row that is missing, empty, or no longer parses. These rows
+ * are written by the app and read back as text, so a half-written or
+ * hand-edited row is a real possibility and must not take a screen down with it.
+ */
+export async function getJsonSetting<T>(key: string, fallback: T): Promise<T> {
+  try {
+    const raw = await window.electronAPI.db.getSetting(key)
+    if (typeof raw !== 'string' || raw === '') return fallback
+    const parsed = JSON.parse(raw)
+    return parsed === null || parsed === undefined ? fallback : (parsed as T)
+  } catch {
+    return fallback
+  }
+}
+
+export async function setJsonSetting(key: string, value: unknown): Promise<void> {
+  await window.electronAPI.db.setSetting(key, JSON.stringify(value))
+}

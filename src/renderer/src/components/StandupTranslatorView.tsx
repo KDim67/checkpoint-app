@@ -7,6 +7,7 @@ import { loadProviders, isLocalUrl } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
+import { getNumberSetting } from '../lib/settings'
 
 // Zero-dependency SVG Icons
 const SparklesIcon = () => (
@@ -175,10 +176,8 @@ export default function StandupTranslatorView({
         const baseUrl = active?.baseURL || ''
         if (model) setSelectedModel(model)
 
-        const dbTemp = await window.electronAPI.db.getSetting('ai_temperature')
-        const dbMaxTokens = await window.electronAPI.db.getSetting('ai_max_tokens')
-        if (dbTemp !== null) setTemperature(Number(dbTemp))
-        if (dbMaxTokens !== null) setMaxTokens(Number(dbMaxTokens))
+        setTemperature(await getNumberSetting('ai_temperature', 0.7))
+        setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
 
         if (isLocalUrl(baseUrl)) {
           const list = await window.electronAPI.ollama.listLocal().catch(() => [] as string[])

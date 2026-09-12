@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Logo from './ui/Logo'
+import { getStringSetting } from '../lib/settings'
 
 interface WidgetData {
   totalCount: number
@@ -80,8 +81,8 @@ export default function WidgetView() {
 
   useEffect(() => {
     // Load context, then poll every 5 seconds for live responsiveness
-    window.electronAPI.db.getSetting('active_context').then((ctx) => {
-      if (typeof ctx === 'string' && ctx) {
+    getStringSetting('active_context', '').then((ctx) => {
+      if (ctx) {
         contextRef.current = ctx
       }
       refresh()

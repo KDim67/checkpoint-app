@@ -11,8 +11,15 @@ import { applyStoredTheme, watchTheme } from './lib/themeBoot'
 import Lightbox from './components/ui/Lightbox'
 import UpdateIndicator from './components/ui/UpdateIndicator'
 import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
-import { getNumberSetting, setNumberSetting } from './lib/settings'
-import { getBoolSetting, setBoolSetting } from './lib/settings'
+import {
+  getBoolSetting,
+  getEnumSetting,
+  getNumberSetting,
+  getStringSetting,
+  setBoolSetting,
+  setNumberSetting,
+  setStringSetting
+} from './lib/settings'
 import { createWorkspace, slugifyWorkspace, type WorkspaceEntry } from './lib/createWorkspace'
 
 const ONBOARDING_SEEN_KEY = 'onboarding_seen'
@@ -26,6 +33,7 @@ import {
   isTypingTarget,
   type ShortcutBindings
 } from './lib/shortcuts'
+import { readWorkspaceList, writeWorkspaceList } from './lib/workspaceList'
 
 // Lazy-loaded views (code split per view)
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
@@ -93,7 +101,7 @@ function ThemeToggle() {
     setTheme(nextTheme)
     document.documentElement.setAttribute('data-theme', nextTheme)
     // Persist so the choice survives restarts (same key the Settings page uses)
-    window.electronAPI.db.setSetting('app_theme', nextTheme).catch(console.error)
+    setStringSetting('app_theme', nextTheme).catch(console.error)
   }
 
   return (
@@ -595,9 +603,7 @@ export default function App() {
     const slug = slugifyWorkspace(name)
     if (!slug) throw new Error('That name has no letters or numbers in it.')
 
-    const raw = await window.electronAPI.db.getSetting('contexts_list') as string | null
-    let existing: WorkspaceEntry[] = []
-    try { existing = raw ? JSON.parse(raw) : [] } catch { existing = [] }
+    const existing = await readWorkspaceList()
     if (existing.some(c => c.slug === slug)) {
       throw new Error(`A workspace called "${slug}" already exists.`)
     }
@@ -671,27 +677,19 @@ export default function App() {
       if (contexts.length > 0) {
         setAvailableWorkspaces(contexts)
 
-        const rawList = await window.electronAPI.db.getSetting('contexts_list') as string | null
-        // Written by this app, but it is JSON off disk and a hand-edited
-        // settings row is still a possibility.
-        let list: WorkspaceEntry[] = []
-        if (rawList) {
-          try {
-            list = JSON.parse(rawList)
-          } catch {}
-        }
+        let list: WorkspaceEntry[] = await readWorkspaceList()
         if (list.length === 0) {
           list = contexts.map((slug, i) => ({
             slug,
             name: slug.charAt(0).toUpperCase() + slug.slice(1),
             color: ['#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'][i % 8]
           }))
-          window.electronAPI.db.setSetting('contexts_list', JSON.stringify(list)).catch(() => {})
+          writeWorkspaceList(list).catch(() => {})
         }
         setWorkspaceList(list)
 
-        const defaultContext = await window.electronAPI.db.getSetting('default_context') as string | null
-        const savedContext = await window.electronAPI.db.getSetting('active_context') as string | null
+        const defaultContext = await getStringSetting('default_context', '')
+        const savedContext = await getStringSetting('active_context', '')
         const startContext =
           defaultContext && contexts.includes(defaultContext) ? defaultContext
           : savedContext && contexts.includes(savedContext) ? savedContext
@@ -736,15 +734,13 @@ export default function App() {
     loadContexts()
 
     // Load and apply compact mode setting
-    window.electronAPI.db.getSetting('appearance_compact').then((cm) => {
-      if (cm === 'true') {
-        document.documentElement.setAttribute('data-compact', 'true')
-      }
+    getBoolSetting('appearance_compact', false).then((compact) => {
+      if (compact) document.documentElement.setAttribute('data-compact', 'true')
     }).catch(console.error)
 
     // Apply the persisted interface theme. Previously saved by Settings but
     // never read on boot, so the app silently reset to dark every launch.
-    window.electronAPI.db.getSetting('app_theme').then((t) => {
+    getStringSetting('app_theme', '').then((t) => {
       if (!t) return
       if (t === 'system') {
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -756,11 +752,9 @@ export default function App() {
 
     // Apply the persisted font scale. Previously only applied once the
     // Appearance settings tab was opened.
-    window.electronAPI.db.getSetting('appearance_font_size').then((fs) => {
-      if (fs === 'small' || fs === 'medium' || fs === 'large') {
-        applyFontSize(fs)
-      }
-    }).catch(console.error)
+    getEnumSetting('appearance_font_size', ['small', 'medium', 'large'] as const, 'medium')
+      .then(applyFontSize)
+      .catch(console.error)
 
     // Hot-reload user theme CSS.
     //

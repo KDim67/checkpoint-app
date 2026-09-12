@@ -16,6 +16,7 @@ export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'wal
  */
 export type { WorkspaceEntry } from '../lib/createWorkspace'
 import type { WorkspaceEntry } from '../lib/createWorkspace'
+import { setStringSetting } from '../lib/settings'
 
 // Merged tab set: Widget lives in General, Kanban in Workspaces & Board,
 // Theme Builder in Appearance, Extensions in Features & Plugins.
@@ -162,7 +163,7 @@ export const useAppStore = create<AppState>()(
       // Remembered so "Start on: Last used" can restore it next launch.
       // Settings is deliberately not recorded. Nobody wants to boot into it.
       if (view !== 'settings') {
-        window.electronAPI.db.setSetting('last_active_view', view).catch(err => {
+        setStringSetting('last_active_view', view).catch(err => {
           console.error('Failed to save last_active_view setting:', err)
         })
       }
@@ -172,7 +173,7 @@ export const useAppStore = create<AppState>()(
       set(state => {
         state.activeWorkspace = slug
       })
-      window.electronAPI.db.setSetting('active_context', slug).catch((err) => {
+      setStringSetting('active_context', slug).catch((err) => {
         console.error('Failed to save active_context setting:', err)
       })
     },

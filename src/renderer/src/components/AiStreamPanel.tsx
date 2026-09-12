@@ -50,6 +50,7 @@ import RevertConfirmModal from './ai/RevertConfirmModal'
 import CustomModelPromptModal from './ai/CustomModelPromptModal'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
+import { getJsonSetting, getNumberSetting, getStringSetting, setJsonSetting, setStringSetting } from '../lib/settings'
 
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
@@ -274,20 +275,14 @@ export default function AiStreamPanel() {
   const [caIntent, setCaIntent] = useState<'create' | 'analyze'>('analyze')
 
   useEffect(() => {
-    window.electronAPI.db.getSetting('ai_custom_actions').then(raw => {
-      if (typeof raw !== 'string' || !raw) return
-      try {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) {
-          setCustomActions(parsed.filter(a => a && a.id && a.label && a.prompt))
-        }
-      } catch { /* corrupted setting. Start fresh */ }
+    getJsonSetting<CustomAction[]>('ai_custom_actions', []).then(list => {
+      if (Array.isArray(list)) setCustomActions(list.filter(a => a && a.id && a.label && a.prompt))
     }).catch(() => {})
   }, [])
 
   const persistCustomActions = (list: CustomAction[]): void => {
     setCustomActions(list)
-    window.electronAPI.db.setSetting('ai_custom_actions', JSON.stringify(list)).catch(() => {})
+    setJsonSetting('ai_custom_actions', list).catch(() => {})
   }
 
   const handleAddCustomAction = (): void => {
@@ -348,10 +343,8 @@ export default function AiStreamPanel() {
 
       if (savedModel) setSelectedModel(savedModel)
 
-      const dbTemp = await window.electronAPI.db.getSetting('ai_temperature')
-      const dbMaxTokens = await window.electronAPI.db.getSetting('ai_max_tokens')
-      if (dbTemp !== null) setTemperature(Number(dbTemp))
-      if (dbMaxTokens !== null) setMaxTokens(Number(dbMaxTokens))
+      setTemperature(await getNumberSetting('ai_temperature', 0.7))
+      setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
 
       if (isLocalEndpoint) {
         // Local endpoint: the model MUST be one Ollama actually has installed.
@@ -583,7 +576,7 @@ export default function AiStreamPanel() {
   // Set the model and keep the active provider profile (the source of truth) in sync.
   const applyModel = useCallback(async (val: string) => {
     setSelectedModel(val)
-    await window.electronAPI.db.setSetting('ai_model', val)
+    await setStringSetting('ai_model', val)
     setProviders(prev => {
       if (!activeProviderId) return prev
       const next = prev.map(p => (p.id === activeProviderId ? { ...p, model: val } : p))
@@ -1164,8 +1157,8 @@ export default function AiStreamPanel() {
       const combinedLength = (userTurn.content?.length || 0) + (assistantTurn.content?.length || 0)
       if (combinedLength < 200) return
 
-      const dbModel = await window.electronAPI.db.getSetting('ai_model').catch(() => null)
-      const model = (dbModel as string) || selectedModel
+      const dbModel = await getStringSetting('ai_model', '').catch(() => '')
+      const model = dbModel || selectedModel
       if (!model) return
 
       setMemoryConsolidating(true)

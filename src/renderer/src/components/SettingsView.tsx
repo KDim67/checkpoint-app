@@ -54,7 +54,7 @@ import {
   START_VIEW_LAST_USED,
   type ViewEnabledMap
 } from '../lib/features'
-import { getStringSetting, setStringSetting } from '../lib/settings'
+import { getBoolSetting, getNumberSetting, getStringSetting, setBoolSetting, setNumberSetting, setStringSetting } from '../lib/settings'
 import { useAppStore } from '../store/appStore'
 import { useAiEnabled } from '../lib/useAiEnabled'
 import {
@@ -242,12 +242,9 @@ function WidgetSettings() {
 
   useEffect(() => {
     const load = async () => {
-      const e = await window.electronAPI.db.getSetting('widget_enabled')
-      const p = await window.electronAPI.db.getSetting('widget_position')
-      const o = await window.electronAPI.db.getSetting('widget_opacity')
-      if (e) setEnabled(e === 'true')
-      if (p) setPosition(p as typeof position)
-      if (o) setOpacity(Number(o))
+      setEnabled(await getBoolSetting('widget_enabled', false))
+      setPosition(await getStringSetting('widget_position', 'bottom-right') as typeof position)
+      setOpacity(await getNumberSetting('widget_opacity', 0.9))
     }
     load()
   }, [])
@@ -268,19 +265,19 @@ function WidgetSettings() {
 
   const handleToggle = async (v: boolean) => {
     setEnabled(v)
-    await window.electronAPI.db.setSetting('widget_enabled', String(v))
+    await setBoolSetting('widget_enabled', v)
     await window.electronAPI.widget.toggle(v)
   }
 
   const handlePosition = async (p: typeof position) => {
     setPosition(p)
-    await window.electronAPI.db.setSetting('widget_position', p)
+    await setStringSetting('widget_position', p)
     await window.electronAPI.widget.setPosition(p)
   }
 
   const handleOpacity = async (o: number) => {
     setOpacity(o)
-    await window.electronAPI.db.setSetting('widget_opacity', String(o))
+    await setNumberSetting('widget_opacity', o)
     await window.electronAPI.widget.setOpacity(o)
   }
 
@@ -480,14 +477,11 @@ function AiSettings() {
           setModel(activeProv.model)
         }
 
-        const dbTemp     = await window.electronAPI.db.getSetting('ai_temperature')
-        const dbMaxToks  = await window.electronAPI.db.getSetting('ai_max_tokens')
-
-        // Explicit null check, not truthiness: temperature 0 is a valid and
-        // meaningful setting (fully deterministic output), and `if (dbTemp)`
-        // skipped it, so choosing 0 silently reverted to the default on reopen.
-        if (dbTemp !== null && dbTemp !== undefined) setTemperature(Number(dbTemp))
-        if (dbMaxToks !== null && dbMaxToks !== undefined) setMaxTokens(Number(dbMaxToks))
+        // Read as numbers rather than tested for truthiness: temperature 0 is a
+        // valid and meaningful setting, and choosing it used to revert to the
+        // default on reopen.
+        setTemperature(await getNumberSetting('ai_temperature', 0.7))
+        setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
         const samples = await loadEmailSamples()
         if (samples.length > 0) setEmailSamples(samples)
       } catch (err) { console.error('Failed to load AI settings:', err) }
@@ -901,8 +895,7 @@ function ThemeModeSettings() {
 
   useEffect(() => {
     const load = async () => {
-      const t = await window.electronAPI.db.getSetting('app_theme')
-      if (t) setTheme(t as typeof theme)
+      setTheme(await getStringSetting('app_theme', 'dark') as typeof theme)
     }
     load()
   }, [])
@@ -919,7 +912,7 @@ function ThemeModeSettings() {
   const handleTheme = async (t: typeof theme) => {
     setTheme(t)
     applyTheme(t)
-    await window.electronAPI.db.setSetting('app_theme', t)
+    await setStringSetting('app_theme', t)
   }
 
   // Icons rather than emoji: emoji are rendered by the OS font, so they ignore
@@ -976,8 +969,7 @@ function GeneralSettings() {
 
   useEffect(() => {
     const load = async () => {
-      const dc = await window.electronAPI.db.getSetting('default_context')
-      if (typeof dc === 'string') setDefaultContext(dc)
+      setDefaultContext(await getStringSetting('default_context', ''))
       setStartView(await getStringSetting('start_view', START_VIEW_LAST_USED))
       setEnabledViews(await readViewFeatures())
     }
@@ -994,7 +986,7 @@ function GeneralSettings() {
           value={defaultContext}
           onChange={e => {
             setDefaultContext(e.target.value)
-            window.electronAPI.db.setSetting('default_context', e.target.value)
+            setStringSetting('default_context', e.target.value)
           }}
           style={{
             background: 'var(--color-surface-2)',
@@ -1365,7 +1357,7 @@ function BackupSettings() {
   const handleToggle = async (checked: boolean) => {
     try {
       setEnabled(checked)
-      await window.electronAPI.db.setSetting('feature_backup', String(checked))
+      await setBoolSetting('feature_backup', checked)
       await window.electronAPI.backup.run('init')
       toast(checked ? 'Backup scheduler activated' : 'Backup scheduler deactivated')
       loadStatus()
@@ -1378,7 +1370,7 @@ function BackupSettings() {
   const handleIntervalChange = async (val: string) => {
     try {
       setIntervalVal(val)
-      await window.electronAPI.db.setSetting('backup_interval', val)
+      await setStringSetting('backup_interval', val)
       await window.electronAPI.backup.run('init')
       toast(`Backup schedule set to: ${val}`)
       loadStatus()
@@ -1391,7 +1383,7 @@ function BackupSettings() {
     const cleanVal = Math.max(1, Math.min(100, val))
     try {
       setMaxCount(cleanVal)
-      await window.electronAPI.db.setSetting('backup_max_count', String(cleanVal))
+      await setNumberSetting('backup_max_count', cleanVal)
       await window.electronAPI.backup.run('init')
       loadStatus()
     } catch (err) {
@@ -1401,7 +1393,7 @@ function BackupSettings() {
 
   const handlePathBlur = async () => {
     try {
-      await window.electronAPI.db.setSetting('backup_path', customPath.trim())
+      await setStringSetting('backup_path', customPath.trim())
       await window.electronAPI.backup.run('init')
       toast('Backup destination path updated')
       loadStatus()
