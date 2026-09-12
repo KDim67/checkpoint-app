@@ -11,9 +11,7 @@ import {
   type CardChange
 } from '../../../../shared/cardHistory'
 import { authorLabel, DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { CustomCodeBlock } from '../log/LogEntry'
+import Markdown from '../ui/Markdown'
 import { X, Tag, Link2, Sparkles, Check, CheckSquare, Trash2, FilePlus, Paperclip, Clock, Layers } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAiEnabled } from '../../lib/useAiEnabled'
@@ -1362,39 +1360,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                       Nothing to preview yet.
                     </span>
                   )}
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    urlTransform={url => url}
-                    components={{
-                      code({ className, children, ...props }) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        const isBlock = className?.includes('language-') || String(children).includes('\n')
-                        return isBlock ? (
-                          <CustomCodeBlock
-                            language={match ? match[1] : undefined}
-                            value={String(children).replace(/\n$/, '')}
-                          />
-                        ) : (
-                          <code
-                            className={className}
-                            {...props}
-                            style={{
-                              background: 'var(--color-surface-1)',
-                              padding: '2px 6px',
-                              borderRadius: 'var(--radius-sm)',
-                              fontFamily: 'var(--font-mono)',
-                              fontSize: '0.9em',
-                              color: 'var(--color-secondary)'
-                            }}
-                          >
-                            {children}
-                          </code>
-                        )
-                      }
-                    }}
-                  >
-                    {body}
-                  </ReactMarkdown>
+                  <Markdown>{body}</Markdown>
                 </div>
               )}
             </div>

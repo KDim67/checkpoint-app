@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { CustomCodeBlock } from '../log/LogEntry'
+import Markdown from '../ui/Markdown'
 import { X, Tag, Link2, Sparkles, Check, CheckSquare, Square, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAiEnabled } from '../../lib/useAiEnabled'
@@ -1005,39 +1003,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                   fontSize: 'var(--text-sm)',
                   lineHeight: 1.6
                 }} className="markdown-body">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    urlTransform={url => url}
-                    components={{
-                      code({ className, children, ...props }) {
-                        const match = /language-(\w+)/.exec(className || '')
-                        const isBlock = className?.includes('language-') || String(children).includes('\n')
-                        return isBlock ? (
-                          <CustomCodeBlock
-                            language={match ? match[1] : undefined}
-                            value={String(children).replace(/\n$/, '')}
-                          />
-                        ) : (
-                          <code
-                            className={className}
-                            {...props}
-                            style={{
-                              background: 'var(--color-surface-1)',
-                              padding: '2px 6px',
-                              borderRadius: 'var(--radius-sm)',
-                              fontFamily: 'var(--font-mono)',
-                              fontSize: '0.9em',
-                              color: 'var(--color-secondary)'
-                            }}
-                          >
-                            {children}
-                          </code>
-                        )
-                      }
-                    }}
-                  >
-                    {body}
-                  </ReactMarkdown>
+                  <Markdown>{body}</Markdown>
                 </div>
               )}
             </div>
