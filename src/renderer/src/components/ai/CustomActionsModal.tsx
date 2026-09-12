@@ -2,40 +2,31 @@
  * The user's own quick-action prompts: a small library of reusable prompts, each
  * tagged with the intent it should be sent under.
  *
- * Lifted out of AiStreamPanel with its JSX unchanged. State stays in the panel
- * and arrives as props: this unmounts every time it closes, so it must not own
- * anything worth keeping.
+ * Lifted out of AiStreamPanel with its JSX unchanged. State lives in
+ * useCustomActions and arrives as one `actions` prop: this unmounts every time
+ * it closes, so it must not own anything worth keeping.
  */
 
-import React from 'react'
 import { Sparkles, Trash2, X } from 'lucide-react'
-import type { CustomAction } from './types'
+import type { CustomActions } from './useCustomActions'
 
 interface Props {
-  customActions: CustomAction[]
-  persistCustomActions: (list: CustomAction[]) => void
-  caLabel: string
-  setCaLabel: React.Dispatch<React.SetStateAction<string>>
-  caPrompt: string
-  setCaPrompt: React.Dispatch<React.SetStateAction<string>>
-  caIntent: 'create' | 'analyze'
-  setCaIntent: React.Dispatch<React.SetStateAction<'create' | 'analyze'>>
-  handleAddCustomAction: () => void
-  setShowCustomActionsModal: React.Dispatch<React.SetStateAction<boolean>>
+  actions: CustomActions
 }
 
-export default function CustomActionsModal({
-  customActions,
-  persistCustomActions,
-  caLabel,
-  setCaLabel,
-  caPrompt,
-  setCaPrompt,
-  caIntent,
-  setCaIntent,
-  handleAddCustomAction,
-  setShowCustomActionsModal
-}: Props) {
+export default function CustomActionsModal({ actions }: Props) {
+  const {
+    customActions,
+    persistCustomActions,
+    caLabel,
+    setCaLabel,
+    caPrompt,
+    setCaPrompt,
+    caIntent,
+    setCaIntent,
+    handleAddCustomAction,
+    setShowCustomActionsModal
+  } = actions
   return (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 110,

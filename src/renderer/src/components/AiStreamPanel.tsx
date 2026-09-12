@@ -14,7 +14,7 @@ import { loadBoardConfig, patchBoardConfig } from '../lib/boardConfig'
 import { useModelCapabilities } from '../lib/useModelCapabilities'
 import ModelCapabilityBar from './ai/ModelCapabilityBar'
 import { TIER_BUDGETS } from '../../../shared/modelCapabilities'
-import type { CustomAction, Message, SavedChat, WorkspaceFileInfo } from './ai/types'
+import type { Message, SavedChat } from './ai/types'
 import {
   classifyIntent,
   detectSkill,
@@ -42,6 +42,9 @@ import {
 } from './ai/promptAssembly'
 import { gatherAttachmentMessages } from './ai/attachmentContext'
 import { useMemoryVault } from './ai/useMemoryVault'
+import { useSavedChats } from './ai/useSavedChats'
+import { useCustomActions } from './ai/useCustomActions'
+import { useWorkspaceFolder } from './ai/useWorkspaceFolder'
 import MemoryVaultModal from './ai/MemoryVaultModal'
 import CustomActionsModal from './ai/CustomActionsModal'
 import SavedChatsModal from './ai/SavedChatsModal'
@@ -51,13 +54,11 @@ import RevertConfirmModal from './ai/RevertConfirmModal'
 import CustomModelPromptModal from './ai/CustomModelPromptModal'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
-import { getJsonSetting, getNumberSetting, getStringSetting, setJsonSetting, setStringSetting } from '../lib/settings'
+import { getNumberSetting, getStringSetting, setStringSetting } from '../lib/settings'
 import { bulkDeleteItems, readItems, searchItems } from '../data/items'
 import { createStreamBuffer } from '../lib/streamBuffer'
 
-const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
-const STORAGE_KEY_WORKSPACE_FOLDER = 'checkpoint_ai_workspace_folder'
 
 // Dedicated stream channel. Keeps this panel's stream isolated from other
 // consumers (e.g. the Standup Translator) so both can run concurrently.
@@ -103,56 +104,11 @@ export default function AiStreamPanel() {
   const [pullProgress, setPullProgress] = useState<number>(0)
 
   // Saved Chats State
-  const [savedChats, setSavedChats] = useState<SavedChat[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SAVED_CHATS)
-      return stored ? JSON.parse(stored) : []
-    } catch {
-      return []
-    }
-  })
-  const [currentChatId, setCurrentChatId] = useState<string>(() => `chat_${Date.now()}`)
-  const [showSavedChatsModal, setShowSavedChatsModal] = useState(false)
-  const [chatSearchQuery, setChatSearchQuery] = useState('')
+  const chatHistory = useSavedChats(messages)
+  // Only what the panel still touches; the rest reaches the drawer through the
+  // object itself.
+  const { savedChats, currentChatId, setCurrentChatId, showSavedChatsModal, setShowSavedChatsModal, setChatSearchQuery, removeChat } = chatHistory
   const [revertConfirmData, setRevertConfirmData] = useState<{ cardTitles: string[]; columnNames: string[]; index: number } | null>(null)
-  const [editingChatId, setEditingChatId] = useState<string | null>(null)
-  const [editingTitle, setEditingTitle] = useState('')
-
-  // Sync active messages into saved chats list (limit 50)
-  useEffect(() => {
-    if (messages.length === 0) return
-    setSavedChats(prev => {
-      const existingIdx = prev.findIndex(c => c.id === currentChatId)
-      const firstUserMsg = messages.find(m => m.role === 'user')?.content || 'New Conversation'
-      const defaultTitle = firstUserMsg.length > 28 ? firstUserMsg.slice(0, 28) + '...' : firstUserMsg
-
-      let updated: SavedChat[]
-      if (existingIdx >= 0) {
-        updated = [...prev]
-        updated[existingIdx] = {
-          ...updated[existingIdx],
-          messages,
-          title: updated[existingIdx].title || defaultTitle
-        }
-      } else {
-        const newChat: SavedChat = {
-          id: currentChatId,
-          title: defaultTitle,
-          createdAt: Date.now(),
-          messages
-        }
-        updated = [newChat, ...prev]
-      }
-
-      const capped = updated.slice(0, 50)
-      try {
-        localStorage.setItem(STORAGE_KEY_SAVED_CHATS, JSON.stringify(capped))
-      } catch (e) {
-        console.warn('Failed to persist saved chats:', e)
-      }
-      return capped
-    })
-  }, [messages, currentChatId])
 
   const handleNewChat = () => {
     if (isStreaming) {
@@ -188,27 +144,10 @@ export default function AiStreamPanel() {
 
   const handleDeleteChat = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updated = savedChats.filter(c => c.id !== id)
-    setSavedChats(updated)
-    try {
-      localStorage.setItem(STORAGE_KEY_SAVED_CHATS, JSON.stringify(updated))
-    } catch {}
+    removeChat(id)
     if (id === currentChatId) {
       handleNewChat()
     }
-  }
-
-  const handleSaveRename = (id: string) => {
-    if (!editingTitle.trim()) {
-      setEditingChatId(null)
-      return
-    }
-    const updated = savedChats.map(c => c.id === id ? { ...c, title: editingTitle.trim() } : c)
-    setSavedChats(updated)
-    try {
-      localStorage.setItem(STORAGE_KEY_SAVED_CHATS, JSON.stringify(updated))
-    } catch {}
-    setEditingChatId(null)
   }
 
   // Buffering and throttling references
@@ -264,44 +203,11 @@ export default function AiStreamPanel() {
   })
 
   // Workspace Folder Import & Codebase Indexing
-  const [workspaceFolder, setWorkspaceFolder] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY_WORKSPACE_FOLDER) || null
-    } catch {
-      return null
-    }
-  })
-  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileInfo[]>([])
-  const [workspaceIndexing, setWorkspaceIndexing] = useState(false)
+  const { workspaceFolder, workspaceFiles, workspaceIndexing, handleImportWorkspace, handleClearWorkspace } = useWorkspaceFolder()
 
   // Custom quick actions (user-defined prompt library)
-  const [customActions, setCustomActions] = useState<CustomAction[]>([])
-  const [showCustomActionsModal, setShowCustomActionsModal] = useState(false)
-  const [caLabel, setCaLabel] = useState('')
-  const [caPrompt, setCaPrompt] = useState('')
-  const [caIntent, setCaIntent] = useState<'create' | 'analyze'>('analyze')
-
-  useEffect(() => {
-    getJsonSetting<CustomAction[]>('ai_custom_actions', []).then(list => {
-      if (Array.isArray(list)) setCustomActions(list.filter(a => a && a.id && a.label && a.prompt))
-    }).catch(() => {})
-  }, [])
-
-  const persistCustomActions = (list: CustomAction[]): void => {
-    setCustomActions(list)
-    setJsonSetting('ai_custom_actions', list).catch(() => {})
-  }
-
-  const handleAddCustomAction = (): void => {
-    if (!caLabel.trim() || !caPrompt.trim()) return
-    persistCustomActions([
-      ...customActions,
-      { id: `ca_${Date.now()}`, label: caLabel.trim().slice(0, 40), prompt: caPrompt.trim(), intent: caIntent }
-    ])
-    setCaLabel('')
-    setCaPrompt('')
-    setCaIntent('analyze')
-  }
+  const quickActions = useCustomActions()
+  const { customActions, showCustomActionsModal, setShowCustomActionsModal } = quickActions
 
   // Copy toast
   const [copiedMsgIndex, setCopiedMsgIndex] = useState<number | null>(null)
@@ -513,44 +419,6 @@ export default function AiStreamPanel() {
       stream.flush()
     }
   }, [])
-
-  // 2b. Re-index a previously selected workspace folder on mount. Only the
-  // folder restored from the last session is indexed here: picking a new one
-  // indexes it where it is picked.
-  const restoredFolderRef = useRef(workspaceFolder)
-  useEffect(() => {
-    const restoredFolder = restoredFolderRef.current
-    if (!restoredFolder) return
-    let cancelled = false
-    setWorkspaceIndexing(true)
-    window.electronAPI.workspace.getStructure(restoredFolder)
-      .then(files => { if (!cancelled) setWorkspaceFiles(files || []) })
-      .catch(err => console.warn('Failed to re-index workspace folder:', err))
-      .finally(() => { if (!cancelled) setWorkspaceIndexing(false) })
-    return () => { cancelled = true }
-  }, [])
-
-  const handleImportWorkspace = async () => {
-    try {
-      const folder = await window.electronAPI.workspace.selectFolder()
-      if (!folder) return
-      setWorkspaceIndexing(true)
-      setWorkspaceFolder(folder)
-      try { localStorage.setItem(STORAGE_KEY_WORKSPACE_FOLDER, folder) } catch {}
-      const files = await window.electronAPI.workspace.getStructure(folder)
-      setWorkspaceFiles(files || [])
-    } catch (err) {
-      console.warn('Failed to import workspace folder:', err)
-    } finally {
-      setWorkspaceIndexing(false)
-    }
-  }
-
-  const handleClearWorkspace = () => {
-    setWorkspaceFolder(null)
-    setWorkspaceFiles([])
-    try { localStorage.removeItem(STORAGE_KEY_WORKSPACE_FOLDER) } catch {}
-  }
 
   const handleSelectSkill = (skillId: string | null) => {
     setActiveSkillId(prev => {
@@ -1772,13 +1640,13 @@ export default function AiStreamPanel() {
       </div>
 
       {/* Custom Quick Actions Manager Modal */}
-      {showCustomActionsModal && <CustomActionsModal customActions={customActions} persistCustomActions={persistCustomActions} caLabel={caLabel} setCaLabel={setCaLabel} caPrompt={caPrompt} setCaPrompt={setCaPrompt} caIntent={caIntent} setCaIntent={setCaIntent} handleAddCustomAction={handleAddCustomAction} setShowCustomActionsModal={setShowCustomActionsModal} />}
+      {showCustomActionsModal && <CustomActionsModal actions={quickActions} />}
 
       {/* Cookbook Model Manager Popup Modal */}
       {showCookbookModal && <CookbookModal selectedModel={selectedModel} localModels={localModels} pullingTag={pullingTag} pullProgress={pullProgress} handleModelChange={handleModelChange} handlePullModel={handlePullModel} setShowCookbookModal={setShowCookbookModal} />}
 
       {/* Saved Chats Drawer Modal */}
-      {showSavedChatsModal && <SavedChatsModal savedChats={savedChats} currentChatId={currentChatId} chatSearchQuery={chatSearchQuery} setChatSearchQuery={setChatSearchQuery} editingChatId={editingChatId} setEditingChatId={setEditingChatId} editingTitle={editingTitle} setEditingTitle={setEditingTitle} handleNewChat={handleNewChat} handleLoadChat={handleLoadChat} handleDeleteChat={handleDeleteChat} handleSaveRename={handleSaveRename} setShowSavedChatsModal={setShowSavedChatsModal} />}
+      {showSavedChatsModal && <SavedChatsModal chats={chatHistory} handleNewChat={handleNewChat} handleLoadChat={handleLoadChat} handleDeleteChat={handleDeleteChat} />}
       {/* Memory Vault Modal */}
       {showMemoryPanel && <MemoryVaultModal vault={vault} activeWorkspace={activeWorkspace} />}
 
