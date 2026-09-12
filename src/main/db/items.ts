@@ -284,12 +284,16 @@ export function deleteItem(id: string): string | null {
 /**
  * Deletes many items in one transaction.
  *
- * Runs the statement directly rather than looping deleteItem, which is what the
- * bulk handler has always done: no tombstone is recorded for these.
+ * Each leaves a tombstone, as deleting it alone does. Sync only skips an item it
+ * has a tombstone for, so without one the next sync from a copy that still has
+ * the item puts it straight back, and a merge cannot tell it was deleted.
  */
 export function bulkDeleteItems(db: Database.Database, ids: string[]): number {
   db.transaction(() => {
-    for (const id of ids) stmtDeleteItem.run(id)
+    for (const id of ids) {
+      recordTombstone(id, 'items')
+      stmtDeleteItem.run(id)
+    }
   })()
   return ids.length
 }
