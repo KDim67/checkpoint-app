@@ -3,34 +3,30 @@
  * installed, with pull progress for the ones it does not.
  *
  * Lifted out of AiStreamPanel with its JSX unchanged, down to the indentation.
- * State stays in the panel and arrives as props: nothing here owns anything,
- * which is what makes it safe for this to unmount every time it closes.
+ * State lives in useModelConfig and arrives as one `models` prop: nothing here
+ * owns anything, which is what makes it safe for this to unmount every time it
+ * closes.
  */
 
-import React from 'react'
 import { BookOpen, Download, RefreshCw } from 'lucide-react'
 import ChatPanelModal from './ChatPanelModal'
 import catalogData from '../../../../shared/catalog.json'
+import type { ModelConfig } from './useModelConfig'
 
 interface Props {
-  selectedModel: string
-  localModels: string[]
-  pullingTag: string | null
-  pullProgress: number
-  handleModelChange: (val: string) => void | Promise<void>
-  handlePullModel: (tag: string) => void | Promise<void>
-  setShowCookbookModal: React.Dispatch<React.SetStateAction<boolean>>
+  models: ModelConfig
 }
 
-export default function CookbookModal({
-  selectedModel,
-  localModels,
-  pullingTag,
-  pullProgress,
-  handleModelChange,
-  handlePullModel,
-  setShowCookbookModal
-}: Props) {
+export default function CookbookModal({ models }: Props) {
+  const {
+    selectedModel,
+    localModels,
+    pullingTag,
+    pullProgress,
+    handleModelChange,
+    handlePullModel,
+    setShowCookbookModal
+  } = models
   return (
     <ChatPanelModal
       icon={<BookOpen size={14} style={{ color: 'var(--color-secondary)' }} />}

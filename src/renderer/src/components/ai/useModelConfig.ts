@@ -1,0 +1,162 @@
+/**
+ * The provider profiles, the chosen model with its sampling settings, and the
+ * cookbook's install progress.
+ *
+ * Held by the panel rather than the modals that edit it, which unmount whenever
+ * they close, while the header shows the provider and model all the time.
+ */
+
+import { useCallback, useEffect, useState } from 'react'
+import { activateProvider, isLocalUrl, loadProviders, persistProviders, type AiProvider } from './aiProviders'
+import { getNumberSetting, setStringSetting } from '../../lib/settings'
+
+export function useModelConfig() {
+  const [selectedModel, setSelectedModel] = useState('llama3')
+  const [localModels, setLocalModels] = useState<string[]>([])
+  const [temperature, setTemperature] = useState(0.7)
+  const [maxTokens, setMaxTokens] = useState(2048)
+  const [providers, setProviders] = useState<AiProvider[]>([])
+  const [activeProviderId, setActiveProviderId] = useState<string>('')
+  const [showCookbookModal, setShowCookbookModal] = useState(false)
+  const [showCustomModelPrompt, setShowCustomModelPrompt] = useState(false)
+  const [customModelInput, setCustomModelInput] = useState('')
+  const [pullingTag, setPullingTag] = useState<string | null>(null)
+  const [pullProgress, setPullProgress] = useState<number>(0)
+
+  // Load provider profiles + models. Provider-aware: the model list and the
+  // Ollama dropdown only apply to LOCAL endpoints; cloud providers use the
+  // profile's typed model. Re-runs whenever the active provider changes.
+  const loadAiConfig = useCallback(async () => {
+    try {
+      const { providers: provs, activeId } = await loadProviders()
+      setProviders(provs)
+      setActiveProviderId(activeId)
+
+      const active = provs.find(p => p.id === activeId)
+      const baseUrl = active?.baseURL || ''
+      const savedModel = active?.model || ''
+      const isLocalEndpoint = isLocalUrl(baseUrl)
+
+      if (savedModel) setSelectedModel(savedModel)
+
+      setTemperature(await getNumberSetting('ai_temperature', 0.7))
+      setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
+
+      if (isLocalEndpoint) {
+        // Local endpoint: the model MUST be one Ollama actually has installed.
+        const list = await window.electronAPI.ollama.listLocal().catch(() => [] as string[])
+        if (list && list.length > 0) {
+          setLocalModels(list)
+          // Auto-heal the "default model not installed → 404" trap.
+          const savedInstalled = savedModel && list.includes(savedModel)
+          if (!savedModel || !savedInstalled) {
+            setSelectedModel(list[0])
+            const next = provs.map(p => (p.id === activeId ? { ...p, model: list[0] } : p))
+            setProviders(next)
+            await persistProviders(next, activeId)
+          }
+        } else {
+          setLocalModels([])
+        }
+      } else {
+        // Cloud provider: use the profile's typed model, no Ollama dropdown.
+        setLocalModels([])
+      }
+    } catch (err) {
+      console.warn('Failed to load AI config:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadAiConfig()
+    const handler = (): void => { loadAiConfig() }
+    window.addEventListener('checkpoint-ai-provider-changed', handler)
+    return () => window.removeEventListener('checkpoint-ai-provider-changed', handler)
+  }, [loadAiConfig])
+
+  const handleSwitchProvider = useCallback(async (id: string) => {
+    setActiveProviderId(id)
+    await activateProvider(providers, id)
+    await loadAiConfig()
+  }, [providers, loadAiConfig])
+
+  // Set the model and keep the active provider profile (the source of truth) in sync.
+  const applyModel = useCallback(async (val: string) => {
+    setSelectedModel(val)
+    await setStringSetting('ai_model', val)
+    setProviders(prev => {
+      if (!activeProviderId) return prev
+      const next = prev.map(p => (p.id === activeProviderId ? { ...p, model: val } : p))
+      persistProviders(next, activeProviderId)
+      return next
+    })
+  }, [activeProviderId])
+
+  const handleModelChange = async (val: string) => {
+    if (val === '__OPEN_COOKBOOK__') {
+      setShowCookbookModal(true)
+      refreshLocalModels()
+      return
+    }
+    if (val === '__CUSTOM_MODEL__') {
+      setCustomModelInput('')
+      setShowCustomModelPrompt(true)
+      return
+    }
+    await applyModel(val)
+  }
+
+  const refreshLocalModels = async () => {
+    try {
+      const list = await window.electronAPI.ollama.listLocal()
+      if (list && list.length > 0) {
+        setLocalModels(list)
+      }
+    } catch (e) {
+      console.warn('Failed to refresh local models:', e)
+    }
+  }
+
+  const handlePullModel = async (tag: string) => {
+    setPullingTag(tag)
+    setPullProgress(0)
+    const unsub = window.electronAPI.cookbook.onPullProgress(evt => {
+      if (evt.percent !== undefined) setPullProgress(evt.percent)
+    })
+    try {
+      await window.electronAPI.cookbook.pullModel(tag)
+      await refreshLocalModels()
+      await handleModelChange(tag)
+    } catch (e) {
+      console.error('Failed to pull model:', e)
+    } finally {
+      unsub()
+      setPullingTag(null)
+    }
+  }
+
+  return {
+    selectedModel,
+    localModels,
+    temperature,
+    setTemperature,
+    maxTokens,
+    setMaxTokens,
+    providers,
+    activeProviderId,
+    showCookbookModal,
+    setShowCookbookModal,
+    showCustomModelPrompt,
+    setShowCustomModelPrompt,
+    customModelInput,
+    setCustomModelInput,
+    pullingTag,
+    pullProgress,
+    handleSwitchProvider,
+    applyModel,
+    handleModelChange,
+    handlePullModel
+  }
+}
+
+export type ModelConfig = ReturnType<typeof useModelConfig>
