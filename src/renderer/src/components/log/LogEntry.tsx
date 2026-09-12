@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { Copy, Pin, Trash2, ArrowRightLeft, Check } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
+import FormActions from '../ui/FormActions'
 
 interface LogEntryProps {
   item: Item
@@ -321,42 +322,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-              <button
-                type="button"
-                onClick={() => setShowConvertModal(false)}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-4)',
-                  fontSize: 'var(--text-sm)',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                style={{
-                  background: 'var(--color-secondary)',
-                  border: 'none',
-                  color: 'var(--color-text-inverted)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-4)',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--weight-semibold)',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-                onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
-              >
-                Promote to Card
-              </button>
-            </div>
+            <FormActions onCancel={() => setShowConvertModal(false)} submitLabel="Promote to Card" />
           </form>
         </div>
       )}

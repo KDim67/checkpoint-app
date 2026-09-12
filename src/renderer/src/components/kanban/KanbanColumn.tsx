@@ -8,6 +8,7 @@ import type { Item } from '../../../../shared/types'
 import { sameCardDisplay, type CardDisplay, type ColumnSort } from '../../lib/boardConfig'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { useConfirm } from '../ui/ConfirmDialog'
+import ColorSwatchButtons from '../ui/ColorSwatchButtons'
 
 interface KanbanColumnProps {
   id: string
@@ -514,34 +515,13 @@ function KanbanColumn({
                 </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
-                  {['none', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#a855f7', '#ec4899'].map(cVal => (
-                    <button
-                      type="button"
-                      key={cVal}
-                      onClick={() => {
-                        const nextCol = cVal === 'none' ? undefined : cVal
-                        setEditColor(nextCol)
-                        onRename(id, editName.trim() || name, editWip, nextCol, editColorMode)
-                      }}
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '4px',
-                        background: cVal === 'none' ? 'transparent' : cVal,
-                        border: (editColor === cVal || (cVal === 'none' && !editColor)) ? '2px solid var(--color-text-base)' : (cVal === 'none' ? '1px dashed var(--color-text-muted)' : '1px solid transparent'),
-                        cursor: 'pointer',
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '9px',
-                        color: 'var(--color-text-base)'
-                      }}
-                      title={cVal === 'none' ? 'Default Accent' : cVal}
-                    >
-                      {cVal === 'none' && '×'}
-                    </button>
-                  ))}
+                  <ColorSwatchButtons
+                    value={editColor}
+                    onPick={nextCol => {
+                      setEditColor(nextCol)
+                      onRename(id, editName.trim() || name, editWip, nextCol, editColorMode)
+                    }}
+                  />
                   <ColorPicker
                     value={editColor || ''}
                     onLiveDomUpdate={cVal => {

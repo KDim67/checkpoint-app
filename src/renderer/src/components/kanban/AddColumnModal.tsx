@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react'
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import ColorPicker from '../ui/ColorPicker'
+import FormActions from '../ui/FormActions'
+import ColorSwatchButtons from '../ui/ColorSwatchButtons'
 
 interface AddColumnModalProps {
   onClose: () => void
@@ -229,30 +231,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-            {['none', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#a855f7', '#ec4899'].map(cVal => (
-              <button
-                type="button"
-                key={cVal}
-                onClick={() => setColor(cVal === 'none' ? undefined : cVal)}
-                style={{
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '4px',
-                  background: cVal === 'none' ? 'transparent' : cVal,
-                  border: (color === cVal || (cVal === 'none' && !color)) ? '2px solid var(--color-text-base)' : (cVal === 'none' ? '1px dashed var(--color-text-muted)' : '1px solid transparent'),
-                  cursor: 'pointer',
-                  padding: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '9px',
-                  color: 'var(--color-text-base)'
-                }}
-                title={cVal === 'none' ? 'Default Accent' : cVal}
-              >
-                {cVal === 'none' && '×'}
-              </button>
-            ))}
+            <ColorSwatchButtons value={color} onPick={setColor} />
             <ColorPicker
               value={color || ''}
               onCommit={cVal => setColor(cVal || undefined)}
@@ -263,44 +242,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           </div>
         </div>
 
-        {/* Form Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-base)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: 'var(--text-sm)',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            Cancel
-          </button>
-          
-          <button
-            type="submit"
-            style={{
-              background: 'var(--color-secondary)',
-              border: 'none',
-              color: 'var(--color-text-inverted)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 'var(--weight-semibold)',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-            onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
-          >
-            Create Column
-          </button>
-        </div>
+        <FormActions onCancel={onClose} submitLabel="Create Column" />
       </form>
     </div>
   )

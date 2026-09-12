@@ -10,7 +10,7 @@ import {
 } from '../../../../shared/cardHistory'
 import { DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
 import Markdown from '../ui/Markdown'
-import { X, Tag, Check } from 'lucide-react'
+import { Tag, Check } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAiEnabled } from '../../lib/useAiEnabled'
 import type { Item, Tag as TagType } from '../../../../shared/types'
@@ -31,6 +31,7 @@ import CardDiscussion from './CardDiscussion'
 import CardTextureTools from './CardTextureTools'
 import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
+import DrawerCloseButton from '../ui/DrawerCloseButton'
 
 interface CardDetailModalProps {
   cardId: string
@@ -609,22 +610,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </button>
             )}
 
-            <button
-              onClick={onClose}
-              title={dirty ? 'Close and discard the unsaved changes' : 'Close'}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--color-text-muted)',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex'
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
-            >
-              <X size={20} />
-            </button>
+            <DrawerCloseButton onClick={onClose} title={dirty ? 'Close and discard the unsaved changes' : 'Close'} />
           </div>
         </div>
 

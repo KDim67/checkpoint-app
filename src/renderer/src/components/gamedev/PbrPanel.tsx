@@ -2,6 +2,7 @@ import React from 'react'
 import { Box, CheckCircle, Download, Loader, RefreshCw, Settings, Sparkles } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { PbrTool } from './usePbrTool'
+import TextureDropZone from './TextureDropZone'
 
 /** Shared by every map tile, so the sizing is fixed in one place. */
 const MAP_MEDIA: React.CSSProperties = {
@@ -96,71 +97,14 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
 
         {!albedoUrl ? (
           /* Drop Zone */
-          <div
+          <TextureDropZone
             onDragOver={handlePbrDragOver}
             onDrop={handlePbrDrop}
             onClick={handleBrowseClick}
-            style={{
-              // Not flex: 1. The drop target grew to whatever height was
-              // going, which on a tall window left a nine hundred pixel dashed
-              // box with a small label adrift in the middle of it.
-              minHeight: '260px',
-              maxHeight: '420px',
-              border: '2px dashed var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--space-4)',
-              cursor: 'pointer',
-              background: 'var(--color-surface-1)',
-              transition: 'border-color var(--duration-fast), background var(--duration-fast)',
-            }}
-            onMouseOver={e => {
-              e.currentTarget.style.borderColor = 'var(--color-primary)'
-              e.currentTarget.style.background = 'var(--color-surface-2)'
-            }}
-            onMouseOut={e => {
-              e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-              e.currentTarget.style.background = 'var(--color-surface-1)'
-            }}
-          >
-            {isProcessing ? (
-              <>
-                <Loader size={32} className="animate-spin" style={{ color: 'var(--color-secondary)' }} />
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Processing texture...</span>
-              </>
-            ) : (
-              <>
-                <div style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'var(--color-surface-2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid var(--color-surface-offset)'
-                }}>
-                  <Download size={24} style={{ color: 'var(--color-text-muted)', transform: 'rotate(180deg)' }} />
-                </div>
-                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
-                    Drag & Drop Albedo Texture
-                  </span>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    or click to browse local files (.png, .jpg, .jpeg, .tga, .bmp)
-                  </span>
-                  {/* What comes back. An empty drop target says what to put in
-                      and never said what you get out. */}
-                  <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', marginTop: 'var(--space-2)' }}>
-                    Returns Normal, Height, Roughness and Ambient Occlusion, previewed on a 3D model
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
+            processing={isProcessing}
+            label="Drag & Drop Albedo Texture"
+            outcome="Returns Normal, Height, Roughness and Ambient Occlusion, previewed on a 3D model"
+          />
         ) : (
           /* Generator Workspace */
           <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>

@@ -1,8 +1,9 @@
 import React from 'react'
 import type { UpscaleAlgorithm } from './types'
-import { CheckCircle, Download, Loader, Maximize2, Settings } from 'lucide-react'
+import { CheckCircle, Download, Loader, Maximize2 } from 'lucide-react'
 import type { UpscalerTool } from './useUpscalerTool'
 import FilePickerButton from './FilePickerButton'
+import SettingsColumn from './SettingsColumn'
 
 export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
   const {
@@ -32,22 +33,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--space-4)', minHeight: 0, flex: 1 }}>
           {/* Left Configuration Column */}
-          <div style={{
-            background: 'var(--color-surface-1)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-4)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-            overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
-              <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-              <span className="label-caps">
-                Upscale Settings
-              </span>
-            </div>
+          <SettingsColumn title="Upscale Settings">
 
             {/* File picker */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -108,7 +94,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                 <span>Compare: show original (nearest-scaled)</span>
               </label>
             )}
-          </div>
+          </SettingsColumn>
 
           {/* Right Viewport Column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
