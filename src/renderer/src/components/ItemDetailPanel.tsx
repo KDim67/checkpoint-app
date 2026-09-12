@@ -11,22 +11,20 @@ import {
   Tag as TagIcon,
   Check,
   ChevronDown,
-  FileText,
-  Trash2
+  FileText
 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { Item, Tag as TagType } from '../../../shared/types'
 import Skeleton from './ui/Skeleton'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
-import { useConfirm } from './ui/ConfirmDialog'
 import { loadBoardConfig } from '../lib/boardConfig'
+import TagRow from './ui/TagRow'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const { toast } = useToast()
-  const confirm = useConfirm()
 
   const [item, setItem] = useState<Item | null>(null)
   const [loading, setLoading] = useState(false)
@@ -392,97 +390,16 @@ export default function ItemDetailPanel() {
                   overflowY: 'auto',
                   padding: '6px'
                 }}>
-                  {allTags.map(tag => {
-                    const isSel = selectedTagIds.includes(tag.id)
-                    return (
-                      <div
-                        key={tag.id}
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '4px 6px',
-                          borderRadius: 'var(--radius-sm)',
-                          fontSize: '11px',
-                          gap: '6px'
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTag(tag.id)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--color-text-base)',
-                            padding: 0,
-                            fontSize: '11px',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            flex: 1
-                          }}
-                        >
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color, flexShrink: 0 }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag.name}</span>
-                        </button>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                          <ColorPicker
-                            value={tag.color}
-                            showHexInput={false}
-                            swatchSize={14}
-                            title="Edit Tag Color"
-                            onCommit={async (newColor) => {
-                              try {
-                                await window.electronAPI.db.updateTag(tag.id, { color: newColor })
-                                const refreshed = await window.electronAPI.db.getTags()
-                                setAllTags(refreshed)
-                              } catch (err) {
-                                console.error(err)
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={async () => {
-                              const ok = await confirm({
-                                title: `Delete "${tag.name}"?`,
-                                message: 'The label goes with it, off every card and task that carries it.',
-                                confirmText: 'Delete',
-                                isDestructive: true
-                              })
-                              if (!ok) return
-                              try {
-                                await window.electronAPI.db.deleteTag(tag.id)
-                                setSelectedTagIds(prev => prev.filter(id => id !== tag.id))
-                                setAllTags(await window.electronAPI.db.getTags())
-                              } catch (err) {
-                                console.error(err)
-                              }
-                            }}
-                            title="Delete label"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--color-text-faint)',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-error)')}
-                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-faint)')}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                          {isSel && <Check size={12} style={{ color: 'var(--color-secondary)' }} />}
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {allTags.map(tag => (
+                    <TagRow
+                      key={tag.id}
+                      tag={tag}
+                      isSelected={selectedTagIds.includes(tag.id)}
+                      onToggle={handleToggleTag}
+                      onTagsChanged={setAllTags}
+                      onDeleted={id => setSelectedTagIds(prev => prev.filter(t => t !== id))}
+                    />
+                  ))}
                   {allTags.length === 0 && (
                     <div style={{ padding: '8px', fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center' }}>
                       No tags configured
