@@ -17,9 +17,9 @@ import { useAppStore } from '../store/appStore'
 import type { Item, Tag as TagType } from '../../../shared/types'
 import Skeleton from './ui/Skeleton'
 import { useToast } from './ui/Toast'
-import ColorPicker from './ui/ColorPicker'
 import { loadBoardConfig } from '../lib/boardConfig'
 import TagRow from './ui/TagRow'
+import TagCreator from './ui/TagCreator'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
@@ -42,7 +42,6 @@ export default function ItemDetailPanel() {
   const [allTags, setAllTags] = useState<TagType[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [showTagSelector, setShowTagSelector] = useState(false)
-  const [selectedTagColor, setSelectedTagColor] = useState('#3b82f6')
 
   const tagSelectorRef = useRef<HTMLDivElement>(null)
 
@@ -406,95 +405,12 @@ export default function ItemDetailPanel() {
                     </div>
                   )}
                   
-                  {/* Create custom label inline manager */}
-                  <div style={{ borderTop: '1px solid var(--color-surface-offset)', marginTop: '8px', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>
-                      Create Label
-                    </span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <input
-                        type="text"
-                        placeholder="Label name..."
-                        id="panel-new-tag-name"
-                        style={{
-                          flex: 1,
-                          background: 'var(--color-surface-2)',
-                          border: '1px solid var(--color-surface-offset)',
-                          borderRadius: '4px',
-                          color: 'var(--color-text-base)',
-                          fontSize: '11px',
-                          padding: '3px 6px',
-                          outline: 'none',
-                          minWidth: 0
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            document.getElementById('panel-new-tag-create-btn')?.click()
-                          }
-                        }}
-                      />
-                      <button
-                        id="panel-new-tag-create-btn"
-                        type="button"
-                        onClick={async () => {
-                          const el = document.getElementById('panel-new-tag-name') as HTMLInputElement
-                          if (el && el.value.trim()) {
-                            const name = el.value.trim()
-                            try {
-                              const created = await window.electronAPI.db.createTag({ name, color: selectedTagColor })
-                              const tags = await window.electronAPI.db.getTags()
-                              setAllTags(tags)
-                              handleToggleTag(created.id)
-                              el.value = ''
-                            } catch (err) {
-                              console.error(err)
-                            }
-                          }
-                        }}
-                        style={{
-                          background: 'var(--color-secondary)',
-                          border: 'none',
-                          borderRadius: '4px',
-                          color: 'var(--color-text-inverted)',
-                          fontWeight: 'var(--weight-bold)',
-                          fontSize: '10px',
-                          padding: '3px 8px',
-                          cursor: 'pointer',
-                          flexShrink: 0
-                        }}
-                      >
-                        Create
-                      </button>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#cdf12b', '#ff45b5'].map(color => (
-                          <button
-                            key={color}
-                            type="button"
-                            onClick={() => setSelectedTagColor(color)}
-                            style={{
-                              width: '14px',
-                              height: '14px',
-                              borderRadius: '50%',
-                              background: color,
-                              border: selectedTagColor === color ? '1px solid var(--color-text-base)' : '1px solid transparent',
-                              cursor: 'pointer',
-                              padding: 0
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <ColorPicker
-                        value={selectedTagColor}
-                        onCommit={setSelectedTagColor}
-                        swatchSize={18}
-                        hexInputWidth={54}
-                        title="Custom Tag Color"
-                      />
-                    </div>
-                  </div>
+                  <TagCreator
+                    onCreated={(created, tags) => {
+                      setAllTags(tags)
+                      handleToggleTag(created.id)
+                    }}
+                  />
                 </div>
               )}
             </div>
