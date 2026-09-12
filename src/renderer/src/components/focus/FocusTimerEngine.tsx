@@ -4,6 +4,7 @@ import { useToast } from '../ui/Toast'
 import { MODE_TITLES, formatTime, isFocusInterval, durationMsFor } from './pomodoroTimer'
 import { loadFocusSettings } from '../../lib/focusSettings'
 import { reconcileSelectedTasks } from './reconcileTasks'
+import { readItems } from '../../data/items'
 
 /**
  * Mounted once at the app root (outside FocusView) so a running focus/break
@@ -62,10 +63,10 @@ export default function FocusTimerEngine(): null {
       if (focusSelectedTasks.length === 0) return
       try {
         const [cards, tasks] = await Promise.all([
-          window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 500),
-          window.electronAPI.db.getItems(activeWorkspace, 'task', 1, 500)
+          readItems(activeWorkspace, 'card'),
+          readItems(activeWorkspace, 'task')
         ])
-        const live = [...cards.items, ...tasks.items]
+        const live = [...cards, ...tasks]
         const next = reconcileSelectedTasks(focusSelectedTasks, live)
         // Referentially identical when nothing changed, so this is a no-op
         // render-wise on the vast majority of board mutations.

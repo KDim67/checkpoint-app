@@ -16,6 +16,7 @@ import { ToggleSwitch } from './settings/SettingsSection'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { isTypingTarget } from '../lib/shortcuts'
 import { useViewShortcuts } from '../lib/useViewShortcuts'
+import { itemPage } from '../data/items'
 
 interface SelectedTask {
   id: string
@@ -95,8 +96,8 @@ export default function FocusView() {
     setLoading(true)
     try {
       // 1. Fetch uncompleted cards and tasks
-      const cardsRes = await window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 100)
-      const tasksRes = await window.electronAPI.db.getItems(activeWorkspace, 'task', 1, 100)
+      const cardsRes = await itemPage(activeWorkspace, 'card', 1, 100)
+      const tasksRes = await itemPage(activeWorkspace, 'task', 1, 100)
 
       const merged = [...cardsRes.items, ...tasksRes.items].filter(
         item => item.status !== 'done'

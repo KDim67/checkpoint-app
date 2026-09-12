@@ -9,6 +9,7 @@ import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import { FileText } from 'lucide-react'
 import StandupTranslatorView from './StandupTranslatorView'
+import { itemPage } from '../data/items'
 
 export default function LogView() {
   const [items, setItems] = useState<Item[]>([])
@@ -45,7 +46,7 @@ export default function LogView() {
   const loadInitialFeed = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await window.electronAPI.db.getItems(activeWorkspace, 'log', 1, 50)
+      const res = await itemPage(activeWorkspace, 'log', 1, 50)
       
       // SQLite returns sorted by position ASC, created_at DESC (which is newest first).
       // For a Slack-like chronological feed (oldest at the top, newest at the bottom),
@@ -79,7 +80,7 @@ export default function LogView() {
   const handleLoadMore = useCallback(async () => {
     const nextPage = page + 1
     try {
-      const res = await window.electronAPI.db.getItems(activeWorkspace, 'log', nextPage, 50)
+      const res = await itemPage(activeWorkspace, 'log', nextPage, 50)
       if (res.items.length > 0) {
         const reversed = [...res.items].reverse()
         setItems(prev => [...reversed, ...prev])

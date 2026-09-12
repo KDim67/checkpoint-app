@@ -51,6 +51,7 @@ import CustomModelPromptModal from './ai/CustomModelPromptModal'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getJsonSetting, getNumberSetting, getStringSetting, setJsonSetting, setStringSetting } from '../lib/settings'
+import { readItems } from '../data/items'
 
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
@@ -635,10 +636,10 @@ export default function AiStreamPanel() {
     // 1. Delete cards/tasks with matching titles in this context
     if (cardTitles.length > 0) {
       const [tasksRes, cardsRes] = await Promise.all([
-        window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
-        window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
+        readItems(validContext, 'task').catch(() => []),
+        readItems(validContext, 'card').catch(() => [])
       ])
-      const allItems = [...(tasksRes?.items || []), ...(cardsRes?.items || [])].filter(i => i.status !== 'archived')
+      const allItems = [...(tasksRes || []), ...(cardsRes || [])].filter(i => i.status !== 'archived')
       const itemsToDelete = allItems
         .filter(item => cardTitles.includes(item.title.trim()))
         .map(item => item.id)
@@ -871,11 +872,11 @@ export default function AiStreamPanel() {
           const { columns: colsList } = await loadBoardConfig(validContext)
 
           const [tasksRes, cardsRes] = await Promise.all([
-            window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
-            window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
+            readItems(validContext, 'task').catch(() => []),
+            readItems(validContext, 'card').catch(() => [])
           ])
-          const cardOnlyItems = (cardsRes?.items || []).filter(i => i.status !== 'archived')
-          const allItems = [...(tasksRes?.items || []), ...cardOnlyItems].filter(i => i.status !== 'archived')
+          const cardOnlyItems = (cardsRes || []).filter(i => i.status !== 'archived')
+          const allItems = [...(tasksRes || []), ...cardOnlyItems].filter(i => i.status !== 'archived')
 
           const liveBoardStateText = buildBoardState(validContext, colsList, cardOnlyItems, allItems)
 

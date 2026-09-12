@@ -25,6 +25,7 @@ import { getStringSetting } from '../../lib/settings'
 import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
 import { listTags } from '../../data/tags'
+import { readItems } from '../../data/items'
 
 interface CardDetailModalProps {
   cardId: string
@@ -106,8 +107,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
       try {
         let found: Item | null = initialCardRef.current || null
         if (!found) {
-          const res = await window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 1000)
-          found = res.items.find(i => i.id === cardId) || null
+          const res = await readItems(activeWorkspace, 'card')
+          found = res.find(i => i.id === cardId) || null
         }
         if (!found) {
           onCloseRef.current()
