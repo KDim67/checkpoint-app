@@ -85,6 +85,13 @@ export function useCollabSession() {
    */
   const [collabRoster, setCollabRoster] = useState<{ id: string; name: string }[]>([])
   const [collabProgress, setCollabProgress] = useState('Idle')
+  /**
+   * Held here rather than in the panel. The panel unmounts while the board
+   * reloads for a workspace switch, and a passcode half typed, or the popover
+   * it was typed into, should still be there afterwards.
+   */
+  const [showCollabPopover, setShowCollabPopover] = useState(false)
+  const [joinCodeInput, setJoinCodeInput] = useState('')
 
   /**
    * The workspace the live session belongs to.
@@ -456,6 +463,10 @@ export function useCollabSession() {
     setDisplayName,
     saveDisplayName,
     osUserName,
+    popoverOpen: showCollabPopover,
+    setPopoverOpen: setShowCollabPopover,
+    joinCode: joinCodeInput,
+    setJoinCode: setJoinCodeInput,
     host: startCollabHosting,
     join: joinCollabSession,
     disconnect: disconnectCollab,

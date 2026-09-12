@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import { authorLabel, DISPLAY_NAME_MAX } from '@shared/identity'
@@ -11,24 +11,23 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const { toast } = useToast()
 
-  const [showCollabPopover, setShowCollabPopover] = useState(false)
-  const [joinCodeInput, setJoinCodeInput] = useState('')
   const collabPopoverRef = useRef<HTMLDivElement>(null)
+  const { setPopoverOpen } = session
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (collabPopoverRef.current && !collabPopoverRef.current.contains(e.target as Node)) {
-        setShowCollabPopover(false)
+        setPopoverOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [setPopoverOpen])
 
   return (
     <div style={{ position: 'relative' }} ref={collabPopoverRef}>
       <HeaderBtn
-        onClick={() => setShowCollabPopover(v => !v)}
+        onClick={() => session.setPopoverOpen(v => !v)}
         title="Share this board with someone else"
         icon={
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: session.active ? 'var(--color-secondary)' : 'inherit' }}>
@@ -38,7 +37,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
         }
-        active={showCollabPopover}
+        active={session.popoverOpen}
       >
         {session.active ? (session.isHost ? 'Hosting Live' : 'Joined Live') : 'Share'}
         {session.active && (
@@ -53,7 +52,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
         )}
       </HeaderBtn>
 
-      {showCollabPopover && (
+      {session.popoverOpen && (
         <div
           style={{
             position: 'absolute',
@@ -109,7 +108,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
               <button
                 onClick={() => {
                   setWorkspace(session.workspace)
-                  setShowCollabPopover(false)
+                  session.setPopoverOpen(false)
                 }}
                 style={{
                   display: 'block',
@@ -231,8 +230,8 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                     type="text"
                     maxLength={6}
                     placeholder="Passcode (e.g. 123456)"
-                    value={joinCodeInput}
-                    onChange={e => setJoinCodeInput(e.target.value.replace(/\D/g, ''))}
+                    value={session.joinCode}
+                    onChange={e => session.setJoinCode(e.target.value.replace(/\D/g, ''))}
                     style={{
                       flex: 1,
                       background: 'var(--color-surface-offset)',
@@ -246,18 +245,18 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                   />
                   <button
                     onClick={() => {
-                      session.join(joinCodeInput)
+                      session.join(session.joinCode)
                     }}
-                    disabled={joinCodeInput.length < 5}
+                    disabled={session.joinCode.length < 5}
                     style={{
                       fontSize: 'var(--text-xs)',
                       fontWeight: 'var(--weight-semibold)',
-                      background: joinCodeInput.length < 5 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
-                      color: joinCodeInput.length < 5 ? 'var(--color-text-muted)' : '#fff',
+                      background: session.joinCode.length < 5 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
+                      color: session.joinCode.length < 5 ? 'var(--color-text-muted)' : '#fff',
                       border: 'none',
                       padding: '0 var(--space-3)',
                       borderRadius: 'var(--radius-md)',
-                      cursor: joinCodeInput.length < 5 ? 'not-allowed' : 'pointer'
+                      cursor: session.joinCode.length < 5 ? 'not-allowed' : 'pointer'
                     }}
                   >
                     Join
@@ -280,7 +279,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 machines in step, use{' '}
                 <button
                   onClick={() => {
-                    setShowCollabPopover(false)
+                    session.setPopoverOpen(false)
                     setView('settings')
                     setSettingsTab('sync')
                   }}
