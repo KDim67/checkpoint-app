@@ -19,6 +19,7 @@ import {
 } from '../../../shared/projectTemplates'
 import { collectLabels, type ImportedBoard } from '../../../shared/foreignImport'
 import { readWorkspaceList, writeWorkspaceList } from './workspaceList'
+import { createItem } from '../data/items'
 
 /** The same slug rule the workspace manager has always used. */
 export function slugifyWorkspace(name: string): string {
@@ -41,7 +42,7 @@ async function applyProjectTemplate(slug: string, templateId: string): Promise<s
   }))
 
   for (const draft of buildTemplateCards(template)) {
-    await window.electronAPI.db.createItem({
+    await createItem({
       type: 'card',
       context: slug,
       title: draft.title,
@@ -94,7 +95,7 @@ export async function applyImportedBoard(slug: string, board: ImportedBoard): Pr
         text: item.text,
         done: item.done
       }))
-      await window.electronAPI.db.createItem(
+      await createItem(
         {
           type: 'card',
           context: slug,

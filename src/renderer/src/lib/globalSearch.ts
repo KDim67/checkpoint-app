@@ -9,6 +9,7 @@
 
 import { mergeSearchHits, snippet, type SearchHit } from '../../../shared/searchResults'
 import type { Item, NoteSearchResult } from '../../../shared/types'
+import { searchItems } from '../data/items'
 
 /** Minimum length before searching. FTS on one character matches everything. */
 export const MIN_QUERY_LENGTH = 2
@@ -32,7 +33,7 @@ export async function searchEverything(query: string, context: string): Promise<
   const [items, notes, cheatsheets] = await Promise.all([
     settled(
       'items',
-      window.electronAPI.db.searchItems({ query: q, context, pageSize: 8 }),
+      searchItems({ query: q, context, pageSize: 8 }),
       { items: [] as Item[], total: 0, page: 1, pageSize: 8 }
     ),
     settled('notes', window.electronAPI.notes.searchNotes(q), [] as NoteSearchResult[]),

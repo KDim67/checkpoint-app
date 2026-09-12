@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Item, Relation, RelationType } from '@shared/types'
+import { searchItems } from '../../data/items'
+import { createRelation, deleteRelation, getRelations } from '../../data/relations'
 
 /**
  * An item's links to other items, and the search that finds a new one.
@@ -22,7 +24,7 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const res = await window.electronAPI.db.searchItems({
+        const res = await searchItems({
           query: relationSearchQuery,
           context: activeWorkspace
         })
@@ -39,8 +41,8 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
   const add = async (targetId: string) => {
     if (!owner) return
     try {
-      await window.electronAPI.db.createRelation(owner.id, targetId, selectedRelationType)
-      const rels = await window.electronAPI.db.getRelations(owner.id)
+      await createRelation(owner.id, targetId, selectedRelationType)
+      const rels = await getRelations(owner.id)
       setRelations(rels)
       setRelationSearchQuery('')
       setRelationSearchResults([])
@@ -51,7 +53,7 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
 
   const remove = async (relationId: string) => {
     try {
-      await window.electronAPI.db.deleteRelation(relationId)
+      await deleteRelation(relationId)
       setRelations(prev => prev.filter(r => r.id !== relationId))
     } catch (err) {
       console.error('Failed to delete relation:', err)

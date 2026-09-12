@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { parseNaturalDate, describeDue } from '../../../shared/naturalDate'
 import { readWorkspaceList } from '../lib/workspaceList'
 import { resolveTagIds } from '../data/tags'
+import { createItem } from '../data/items'
 
 // SVG Icons
 
@@ -204,7 +205,7 @@ export default function HudView() {
         )
 
         // 2. Insert item into SQLite database
-        await window.electronAPI.db.createItem({
+        await createItem({
           type: parsed.type,
           context: parsed.context,
           title: parsed.cleanedText,

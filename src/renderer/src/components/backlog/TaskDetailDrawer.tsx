@@ -18,6 +18,8 @@ import AiAssistButton from '../ui/AiAssistButton'
 import { useItemRelations } from '../ui/useItemRelations'
 import { listTags } from '../../data/tags'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
+import { searchItems } from '../../data/items'
+import { getRelations } from '../../data/relations'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -89,7 +91,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     const loadDetails = async () => {
       setLoading(true)
       try {
-        const itemsResult = await window.electronAPI.db.searchItems({
+        const itemsResult = await searchItems({
           query: taskId,
           context: activeWorkspace,
           type: 'task'
@@ -118,7 +120,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           const tags = await listTags()
           setAllTags(tags)
 
-          const rels = await window.electronAPI.db.getRelations(taskId)
+          const rels = await getRelations(taskId)
           setRelations(rels)
         }
       } catch (err) {
@@ -223,7 +225,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     if (!result.ok) return
     // Re-read rather than trusting a local edit: the conversion rewrote the body
     // in main, and this is the same lookup the drawer opens with.
-    const found = await window.electronAPI.db.searchItems({
+    const found = await searchItems({
       query: task.id,
       context: activeWorkspace,
       type: 'task'

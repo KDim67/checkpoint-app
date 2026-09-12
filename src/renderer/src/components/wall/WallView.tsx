@@ -69,6 +69,7 @@ import {
 } from '../../lib/wallInput'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
+import { updateItem } from '../../data/items'
 
 const NUDGE = 4
 /** Narrow enough not to crowd the wall, wide enough for a real card title. */
@@ -531,7 +532,7 @@ export default function WallView() {
     try {
       // One at a time. Each write fires the mutation event the app listens on.
       for (const move of plan) {
-        await window.electronAPI.db.updateItem(move.id, { status: move.status, position: move.position })
+        await updateItem(move.id, { status: move.status, position: move.position })
       }
       const name = columns.find(c => c.id === columnId)?.name ?? columnId
       toast(`Moved ${plan.length} card${plan.length === 1 ? '' : 's'} to ${name}.`)

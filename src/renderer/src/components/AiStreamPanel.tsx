@@ -51,7 +51,7 @@ import CustomModelPromptModal from './ai/CustomModelPromptModal'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getJsonSetting, getNumberSetting, getStringSetting, setJsonSetting, setStringSetting } from '../lib/settings'
-import { readItems } from '../data/items'
+import { bulkDeleteItems, readItems, searchItems } from '../data/items'
 import { createStreamBuffer } from '../lib/streamBuffer'
 
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
@@ -318,7 +318,7 @@ export default function AiStreamPanel() {
 
     const loadContextDetails = async () => {
       try {
-        const res = await window.electronAPI.db.searchItems({
+        const res = await searchItems({
           query: selectedItemId,
           context: activeWorkspace
         })
@@ -633,7 +633,7 @@ export default function AiStreamPanel() {
         .map(item => item.id)
 
       if (itemsToDelete.length > 0) {
-        await window.electronAPI.db.bulkDeleteItems(itemsToDelete).catch(() => {})
+        await bulkDeleteItems(itemsToDelete).catch(() => {})
       }
     }
 
