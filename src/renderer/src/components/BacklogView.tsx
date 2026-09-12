@@ -22,6 +22,7 @@ import {
   type SavedView
 } from '../../../shared/savedViews'
 import { getJsonSetting, getStringSetting, setJsonSetting } from '../lib/settings'
+import { listTags } from '../data/tags'
 
 interface WorkflowColumn {
   id: string
@@ -218,7 +219,7 @@ export default function BacklogView() {
   // 4. Load Tags
   const loadTags = useCallback(async () => {
     try {
-      const tags = await window.electronAPI.db.getTags()
+      const tags = await listTags()
       setAllTags(tags)
     } catch (err) {
       console.error('Failed to load tags:', err)

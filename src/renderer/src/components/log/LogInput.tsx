@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Send, Hash } from 'lucide-react'
 import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
+import { resolveTagIds } from '../../data/tags'
 
 interface LogInputProps {
   context: string
@@ -78,23 +79,12 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
       }
 
       // 2. Fetch all existing tags to see if we need to create any
-      const existingTags = await window.electronAPI.db.getTags()
-      const tagIds: string[] = []
-
-      for (const tagName of matches) {
-        const existing = existingTags.find(t => t.name.toLowerCase() === tagName)
-        if (existing) {
-          tagIds.push(existing.id)
-        } else {
-          // Create new tag with a random curated color
-          const randomColor = CURATED_COLORS[Math.floor(Math.random() * CURATED_COLORS.length)]
-          const newTag = await window.electronAPI.db.createTag({
-            name: tagName,
-            color: randomColor
-          })
-          tagIds.push(newTag.id)
-        }
-      }
+      const tagIds = await resolveTagIds(
+        matches.map(name => ({
+          name,
+          color: CURATED_COLORS[Math.floor(Math.random() * CURATED_COLORS.length)]
+        }))
+      )
 
       // 3. Submit
       await onSubmit(text, tagIds)

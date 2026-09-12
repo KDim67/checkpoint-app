@@ -17,6 +17,7 @@ import { Check, Trash2 } from 'lucide-react'
 import type { Tag } from '../../../../shared/types'
 import ColorPicker from './ColorPicker'
 import { useConfirm } from './ConfirmDialog'
+import { deleteTag, recolourTag } from '../../data/tags'
 
 interface TagRowProps {
   tag: Tag
@@ -33,8 +34,7 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
 
   const recolour = async (color: string): Promise<void> => {
     try {
-      await window.electronAPI.db.updateTag(tag.id, { color })
-      onTagsChanged(await window.electronAPI.db.getTags())
+      onTagsChanged(await recolourTag(tag.id, color))
     } catch (err) {
       console.error(err)
     }
@@ -49,9 +49,8 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
     })
     if (!ok) return
     try {
-      await window.electronAPI.db.deleteTag(tag.id)
       onDeleted(tag.id)
-      onTagsChanged(await window.electronAPI.db.getTags())
+      onTagsChanged(await deleteTag(tag.id))
     } catch (err) {
       console.error(err)
     }

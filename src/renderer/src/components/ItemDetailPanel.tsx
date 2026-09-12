@@ -20,6 +20,7 @@ import { useToast } from './ui/Toast'
 import { loadBoardConfig } from '../lib/boardConfig'
 import TagRow from './ui/TagRow'
 import TagCreator from './ui/TagCreator'
+import { listTags } from '../data/tags'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
@@ -75,7 +76,7 @@ export default function ItemDetailPanel() {
         setColumns(boardColumns.map(c => ({ id: c.id, name: c.name })))
 
         // Load all tags
-        const tags = await window.electronAPI.db.getTags()
+        const tags = await listTags()
         setAllTags(tags)
       } catch (err) {
         console.error('Failed to load item detail metadata:', err)

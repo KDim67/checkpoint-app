@@ -13,6 +13,7 @@ import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
+import { listTags } from '../../data/tags'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -113,7 +114,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             setEstimate('')
           }
 
-          const tags = await window.electronAPI.db.getTags()
+          const tags = await listTags()
           setAllTags(tags)
 
           const rels = await window.electronAPI.db.getRelations(taskId)
