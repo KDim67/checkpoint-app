@@ -1735,38 +1735,23 @@ export default function KanbanView() {
                   const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
                   const color = entry ? entry.color : 'var(--color-balance)'
                   return (
-                    <button
+                    <MenuItem
                       key={ctx}
-                      onClick={() => {
-                        setWorkspace(ctx)
-                        setDropdownOpen(false)
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--space-2)',
-                        width: '100%',
-                        padding: '6px 12px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: 'var(--text-sm)',
-                        color: ctx === activeWorkspace ? 'var(--color-secondary)' : 'var(--color-text-base)',
-                        textAlign: 'left',
-                        transition: 'background var(--duration-fast) var(--ease-default)'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                    >
-                      <span style={{
+                      active={ctx === activeWorkspace}
+                      icon={<span style={{
                         width: '8px',
                         height: '8px',
                         borderRadius: '50%',
                         background: ctx === activeWorkspace ? 'var(--color-secondary)' : color,
                         flexShrink: 0
-                      }} />
+                      }} />}
+                      onClick={() => {
+                        setWorkspace(ctx)
+                        setDropdownOpen(false)
+                      }}
+                    >
                       {name}
-                    </button>
+                    </MenuItem>
                   )
                 })}
                 <MenuDivider />
