@@ -2,25 +2,24 @@
  * Free-text entry for a model the catalogue does not list.
  *
  * Lifted out of AiStreamPanel with its JSX unchanged, down to the indentation.
- * State stays in the panel and arrives as props: nothing here owns anything,
- * which is what makes it safe for this to unmount every time it closes.
+ * State lives in useModelConfig and arrives as one `models` prop: nothing here
+ * owns anything, which is what makes it safe for this to unmount every time it
+ * closes.
  */
 
-import React from 'react'
+import type { ModelConfig } from './useModelConfig'
 
 interface Props {
-  customModelInput: string
-  setCustomModelInput: React.Dispatch<React.SetStateAction<string>>
-  applyModel: (val: string) => Promise<void>
-  setShowCustomModelPrompt: React.Dispatch<React.SetStateAction<boolean>>
+  models: ModelConfig
 }
 
-export default function CustomModelPromptModal({
-  customModelInput,
-  setCustomModelInput,
-  applyModel,
-  setShowCustomModelPrompt
-}: Props) {
+export default function CustomModelPromptModal({ models }: Props) {
+  const {
+    customModelInput,
+    setCustomModelInput,
+    applyModel,
+    setShowCustomModelPrompt
+  } = models
   return (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 1000,

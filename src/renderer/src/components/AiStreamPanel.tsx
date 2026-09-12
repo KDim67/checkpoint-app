@@ -8,7 +8,7 @@ import { clearActionCaches } from './ai/actions/shared'
 import ChatInput from './ai/ChatInput'
 import { AI_SKILLS, getSkillById } from './ai/skills'
 import { buildAssistantMessage } from './ai/boardEnrich'
-import { loadProviders, persistProviders, activateProvider, isLocalUrl, type AiProvider } from './ai/aiProviders'
+import { isLocalUrl } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
 import { loadBoardConfig, patchBoardConfig } from '../lib/boardConfig'
 import { useModelCapabilities } from '../lib/useModelCapabilities'
@@ -45,6 +45,7 @@ import { useMemoryVault } from './ai/useMemoryVault'
 import { useSavedChats } from './ai/useSavedChats'
 import { useCustomActions } from './ai/useCustomActions'
 import { useWorkspaceFolder } from './ai/useWorkspaceFolder'
+import { useModelConfig } from './ai/useModelConfig'
 import MemoryVaultModal from './ai/MemoryVaultModal'
 import CustomActionsModal from './ai/CustomActionsModal'
 import SavedChatsModal from './ai/SavedChatsModal'
@@ -54,7 +55,7 @@ import RevertConfirmModal from './ai/RevertConfirmModal'
 import CustomModelPromptModal from './ai/CustomModelPromptModal'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
-import { getNumberSetting, getStringSetting, setStringSetting } from '../lib/settings'
+import { getStringSetting } from '../lib/settings'
 import { bulkDeleteItems, readItems, searchItems } from '../data/items'
 import { createStreamBuffer } from '../lib/streamBuffer'
 
@@ -82,7 +83,12 @@ export default function AiStreamPanel() {
   const [contextItem, setContextItem] = useState<Item | null>(null)
 
   // Configuration settings loaded from DB
-  const [selectedModel, setSelectedModel] = useState('llama3')
+  const modelConfig = useModelConfig()
+  const {
+    selectedModel, localModels, temperature, setTemperature, maxTokens, setMaxTokens,
+    providers, activeProviderId, showCookbookModal, showCustomModelPrompt, handleSwitchProvider,
+    handleModelChange
+  } = modelConfig
   const { caps: modelCaps, budget: modelBudget, refresh: refreshModelCaps } = useModelCapabilities(selectedModel)
   // Mirrored into a ref because the submit path is a long async function; it
   // must read the capabilities current at send time, not at closure creation.
@@ -92,16 +98,6 @@ export default function AiStreamPanel() {
     modelCapsRef.current = modelCaps
     setReportedPromptTokens(null)
   }, [modelCaps])
-  const [localModels, setLocalModels] = useState<string[]>([])
-  const [temperature, setTemperature] = useState(0.7)
-  const [maxTokens, setMaxTokens] = useState(2048)
-  const [providers, setProviders] = useState<AiProvider[]>([])
-  const [activeProviderId, setActiveProviderId] = useState<string>('')
-  const [showCookbookModal, setShowCookbookModal] = useState(false)
-  const [showCustomModelPrompt, setShowCustomModelPrompt] = useState(false)
-  const [customModelInput, setCustomModelInput] = useState('')
-  const [pullingTag, setPullingTag] = useState<string | null>(null)
-  const [pullProgress, setPullProgress] = useState<number>(0)
 
   // Saved Chats State
   const chatHistory = useSavedChats(messages)
@@ -240,63 +236,6 @@ export default function AiStreamPanel() {
     loadContextDetails()
   }, [selectedItemId, activeWorkspace])
 
-  // 2. Load provider profiles + models. Provider-aware: the model list and the
-  //    Ollama dropdown only apply to LOCAL endpoints; cloud providers use the
-  //    profile's typed model. Re-runs whenever the active provider changes.
-  const loadAiConfig = useCallback(async () => {
-    try {
-      const { providers: provs, activeId } = await loadProviders()
-      setProviders(provs)
-      setActiveProviderId(activeId)
-
-      const active = provs.find(p => p.id === activeId)
-      const baseUrl = active?.baseURL || ''
-      const savedModel = active?.model || ''
-      const isLocalEndpoint = isLocalUrl(baseUrl)
-
-      if (savedModel) setSelectedModel(savedModel)
-
-      setTemperature(await getNumberSetting('ai_temperature', 0.7))
-      setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
-
-      if (isLocalEndpoint) {
-        // Local endpoint: the model MUST be one Ollama actually has installed.
-        const list = await window.electronAPI.ollama.listLocal().catch(() => [] as string[])
-        if (list && list.length > 0) {
-          setLocalModels(list)
-          // Auto-heal the "default model not installed → 404" trap.
-          const savedInstalled = savedModel && list.includes(savedModel)
-          if (!savedModel || !savedInstalled) {
-            setSelectedModel(list[0])
-            const next = provs.map(p => (p.id === activeId ? { ...p, model: list[0] } : p))
-            setProviders(next)
-            await persistProviders(next, activeId)
-          }
-        } else {
-          setLocalModels([])
-        }
-      } else {
-        // Cloud provider: use the profile's typed model, no Ollama dropdown.
-        setLocalModels([])
-      }
-    } catch (err) {
-      console.warn('Failed to load AI config:', err)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadAiConfig()
-    const handler = (): void => { loadAiConfig() }
-    window.addEventListener('checkpoint-ai-provider-changed', handler)
-    return () => window.removeEventListener('checkpoint-ai-provider-changed', handler)
-  }, [loadAiConfig])
-
-  const handleSwitchProvider = useCallback(async (id: string) => {
-    setActiveProviderId(id)
-    await activateProvider(providers, id)
-    await loadAiConfig()
-  }, [providers, loadAiConfig])
-
   // Auto-scroll to bottom of messages container
   const scrollToBottom = useCallback((force = false) => {
     if (scrollContainerRef.current && (isAtBottomRef.current || force)) {
@@ -429,61 +368,6 @@ export default function AiStreamPanel() {
       } catch {}
       return next
     })
-  }
-
-  // Set the model and keep the active provider profile (the source of truth) in sync.
-  const applyModel = useCallback(async (val: string) => {
-    setSelectedModel(val)
-    await setStringSetting('ai_model', val)
-    setProviders(prev => {
-      if (!activeProviderId) return prev
-      const next = prev.map(p => (p.id === activeProviderId ? { ...p, model: val } : p))
-      persistProviders(next, activeProviderId)
-      return next
-    })
-  }, [activeProviderId])
-
-  const handleModelChange = async (val: string) => {
-    if (val === '__OPEN_COOKBOOK__') {
-      setShowCookbookModal(true)
-      refreshLocalModels()
-      return
-    }
-    if (val === '__CUSTOM_MODEL__') {
-      setCustomModelInput('')
-      setShowCustomModelPrompt(true)
-      return
-    }
-    await applyModel(val)
-  }
-
-  const refreshLocalModels = async () => {
-    try {
-      const list = await window.electronAPI.ollama.listLocal()
-      if (list && list.length > 0) {
-        setLocalModels(list)
-      }
-    } catch (e) {
-      console.warn('Failed to refresh local models:', e)
-    }
-  }
-
-  const handlePullModel = async (tag: string) => {
-    setPullingTag(tag)
-    setPullProgress(0)
-    const unsub = window.electronAPI.cookbook.onPullProgress(evt => {
-      if (evt.percent !== undefined) setPullProgress(evt.percent)
-    })
-    try {
-      await window.electronAPI.cookbook.pullModel(tag)
-      await refreshLocalModels()
-      await handleModelChange(tag)
-    } catch (e) {
-      console.error('Failed to pull model:', e)
-    } finally {
-      unsub()
-      setPullingTag(null)
-    }
   }
 
   // Snapshots & Board Reversion
@@ -1643,7 +1527,7 @@ export default function AiStreamPanel() {
       {showCustomActionsModal && <CustomActionsModal actions={quickActions} />}
 
       {/* Cookbook Model Manager Popup Modal */}
-      {showCookbookModal && <CookbookModal selectedModel={selectedModel} localModels={localModels} pullingTag={pullingTag} pullProgress={pullProgress} handleModelChange={handleModelChange} handlePullModel={handlePullModel} setShowCookbookModal={setShowCookbookModal} />}
+      {showCookbookModal && <CookbookModal models={modelConfig} />}
 
       {/* Saved Chats Drawer Modal */}
       {showSavedChatsModal && <SavedChatsModal chats={chatHistory} handleNewChat={handleNewChat} handleLoadChat={handleLoadChat} handleDeleteChat={handleDeleteChat} />}
@@ -1654,7 +1538,7 @@ export default function AiStreamPanel() {
       {revertConfirmData && <RevertConfirmModal revertConfirmData={revertConfirmData} setRevertConfirmData={setRevertConfirmData} revertAICreatedEntities={revertAICreatedEntities} setMessages={setMessages} />}
 
       {/* Custom Model Prompt Modal */}
-      {showCustomModelPrompt && <CustomModelPromptModal customModelInput={customModelInput} setCustomModelInput={setCustomModelInput} applyModel={applyModel} setShowCustomModelPrompt={setShowCustomModelPrompt} />}
+      {showCustomModelPrompt && <CustomModelPromptModal models={modelConfig} />}
     </div>
   )
 }
