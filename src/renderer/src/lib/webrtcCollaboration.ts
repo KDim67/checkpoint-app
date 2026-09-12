@@ -41,7 +41,6 @@ interface CollabOptions {
   onProgress: (progress: string) => void
   onConnect: () => void
   onDisconnect: () => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   /**
    * Anything can arrive here: a caught unknown, or an RTCErrorEvent, which is
    * not an Error at all. Read it with errorMessage rather than reaching for

@@ -420,7 +420,6 @@ export default function AiStreamPanel() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming])
 
   // 4. Mount IPC Streaming Listeners with cleanups to prevent leaks
