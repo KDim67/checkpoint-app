@@ -13,9 +13,16 @@ interface MenuItemProps {
   children: React.ReactNode
   /** Shown before the label, at the same muted weight. */
   icon?: React.ReactNode
+  /**
+   * Whether this row is the one currently chosen.
+   *
+   * Left undefined for a row that is an action rather than a choice, which is
+   * what makes it read as quieter than the list above it.
+   */
+  active?: boolean
 }
 
-export default function MenuItem({ onClick, children, icon }: MenuItemProps) {
+export default function MenuItem({ onClick, children, icon, active }: MenuItemProps) {
   return (
     <button
       style={{
@@ -28,8 +35,11 @@ export default function MenuItem({ onClick, children, icon }: MenuItemProps) {
         border: 'none',
         cursor: 'pointer',
         fontSize: 'var(--text-sm)',
-        color: 'var(--color-text-muted)',
-        textAlign: 'left'
+        color: active === undefined
+          ? 'var(--color-text-muted)'
+          : active ? 'var(--color-secondary)' : 'var(--color-text-base)',
+        textAlign: 'left',
+        transition: 'background var(--duration-fast) var(--ease-default)'
       }}
       onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
