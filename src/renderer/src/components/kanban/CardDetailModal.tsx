@@ -10,7 +10,7 @@ import {
 } from '../../../../shared/cardHistory'
 import { DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
 import Markdown from '../ui/Markdown'
-import { X, Tag, Sparkles, Check } from 'lucide-react'
+import { X, Tag, Check } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAiEnabled } from '../../lib/useAiEnabled'
 import type { Item, Tag as TagType } from '../../../../shared/types'
@@ -22,6 +22,7 @@ import { getStringSetting } from '../../lib/settings'
 import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
 import RelationsPanel from '../ui/RelationsPanel'
+import AiAssistButton from '../ui/AiAssistButton'
 import { useItemRelations } from '../ui/useItemRelations'
 import CardAttachments, { type CardAttachment } from './CardAttachments'
 import CardChecklist from './CardChecklist'
@@ -578,34 +579,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           </div>
 
           <div className="row">
-            {aiEnabled && <button
-              onClick={handleAiAssist}
-              style={{
-                background: 'var(--color-secondary-muted)',
-                border: '1.5px solid var(--color-secondary)',
-                color: 'var(--color-secondary)',
-                borderRadius: 'var(--radius-md)',
-                padding: '6px 14px',
-                fontSize: 'var(--text-sm)',
-                fontWeight: 'var(--weight-bold)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.filter = 'brightness(1.2)'
-                e.currentTarget.style.transform = 'translateY(-1px)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.filter = 'none'
-                e.currentTarget.style.transform = 'none'
-              }}
-            >
-              <Sparkles size={16} fill="currentColor" />
-              <span>AI Assist</span>
-            </button>}
+            {aiEnabled && <AiAssistButton onClick={handleAiAssist} />}
 
             {/* Nothing here is written until this is pressed. It only appears
                 when there is something to write, so a card being read never
