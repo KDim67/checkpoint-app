@@ -132,7 +132,8 @@ export const NOTE_TEMPLATES: NoteTemplate[] = [
 
 /** Content for a fresh daily note. */
 export function dailyNoteContent(title: string): string {
-  const tmpl = NOTE_TEMPLATES.find(t => t.id === 'daily')!
+  const tmpl = NOTE_TEMPLATES.find(t => t.id === 'daily')
+  if (!tmpl) throw new Error('The daily note template is missing')
   return tmpl.build(title)
 }
 

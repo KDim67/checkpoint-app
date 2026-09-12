@@ -775,8 +775,8 @@ export function simplifyPath(points: Point[], tolerance = SIMPLIFY_TOLERANCE): P
   // the recursion depth follows the data.
   const stack: Array<[number, number]> = [[0, points.length - 1]]
 
-  while (stack.length > 0) {
-    const [first, last] = stack.pop()!
+  for (let span = stack.pop(); span; span = stack.pop()) {
+    const [first, last] = span
     if (last <= first + 1) continue
 
     let furthest = -1

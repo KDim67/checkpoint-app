@@ -134,7 +134,9 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
       const exportCanvas = document.createElement('canvas')
       exportCanvas.width = 256
       exportCanvas.height = 16
-      exportCanvas.getContext('2d')!.putImageData(new ImageData(d, 256, 16), 0, 0)
+      const exportCtx = exportCanvas.getContext('2d')
+      if (!exportCtx) throw new Error('This system could not draw the LUT strip')
+      exportCtx.putImageData(new ImageData(d, 256, 16), 0, 0)
 
       const base64Data = exportCanvas.toDataURL('image/png')
       // Anchor the export next to whichever asset is loaded in a sibling tool.
