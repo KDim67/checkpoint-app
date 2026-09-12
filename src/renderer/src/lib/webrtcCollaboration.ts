@@ -874,9 +874,11 @@ export class WebRTCCollaborationCoordinator {
     // away, and its author never saw the board they would be overwriting.
     if (this.decidingMerge) {
       this.options.onProgress(
-        who ? `${who} also offered a merge. One at a time.` : 'Another merge was offered.'
+        who
+          ? `${who} offered a merge at the same time. They will have to join again.`
+          : 'A second merge was offered at the same time and could not be taken.'
       )
-      await this.answerMerge(from, false, 'another merge was being decided')
+      await this.answerMerge(from, false, 'somebody else was merging at the same time')
       return
     }
 
@@ -1117,8 +1119,22 @@ export class WebRTCCollaborationCoordinator {
           break
         }
         this.offeredMerge = false
-        if (msg.accepted) await this.recordAgreement(this.sessionContext, this.hostInstall)
-        this.options.onMergeAnswer?.(msg.accepted, msg.by.trim(), msg.reason?.trim() ?? '')
+        if (msg.accepted) {
+          await this.recordAgreement(this.sessionContext, this.hostInstall)
+          this.options.onMergeAnswer?.(true, msg.by.trim(), '')
+          break
+        }
+
+        // Refused, so this side is holding the board the two of them would have
+        // made and the room is holding the host's. There is nothing shared here
+        // any more, and staying would be worse than leaving: every card this
+        // board has and the room does not would be wiped without a word the
+        // moment the host takes somebody else's merge.
+        //
+        // The merged board stays. It is what this side asked for, and the only
+        // copy of it.
+        this.options.onMergeAnswer?.(false, msg.by.trim(), msg.reason?.trim() ?? '')
+        await this.leave()
         break
       }
 
