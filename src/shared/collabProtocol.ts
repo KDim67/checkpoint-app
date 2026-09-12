@@ -22,6 +22,7 @@ import type {
   Tag
 } from './types'
 import { normalizeBoardConfig, type BoardConfig } from './boardModel'
+import { readInstallId } from './identity'
 
 // The messages
 
@@ -101,6 +102,15 @@ export interface BoardBaselineMessage {
    * that shipped before.
    */
   tombstones?: SyncTombstone[]
+  /**
+   * Which installation is hosting, so the joiner can file the board it is about
+   * to hold against the person it agreed with rather than against the board's
+   * name. Two people sharing a board called "default" are not the same peer,
+   * and a common ancestor taken from the wrong one decides conflicts wrongly.
+   *
+   * Empty from a build that does not send it, which falls back to the name.
+   */
+  install?: string
 }
 
 /**
@@ -195,11 +205,38 @@ export interface MergeProposalMessage {
   board: BoardConfig
 }
 
+/**
+ * The shared board, replaced wholesale by the host.
+ *
+ * Sent to the rest of the room once the host takes a merge somebody offered.
+ * They are told rather than asked: a guest is already live with the host's
+ * board, so a guest who said no would keep receiving edits to cards it does not
+ * have and sending edits for cards the others no longer do, and nobody would
+ * know. Only the host is asked, because the board being shared is the host's.
+ */
+export interface BoardResetMessage {
+  type: 'board-reset'
+  /** Whose merge it was, so the notice can say where the board came from. */
+  by: string
+  context: string
+  items: Item[]
+  tags: Tag[]
+  itemTags: { item_id: string; tag_id: string }[]
+  relations: Relation[]
+  board: BoardConfig
+}
+
 /** Whether the other side took the merge. A no is an answer, not a failure. */
 export interface MergeAnswerMessage {
   type: 'merge-answer'
   accepted: boolean
   by: string
+  /**
+   * Why not, when the no was the app's and not the user's. "They said no" and
+   * "nobody was asked" read the same from here otherwise, and only one of them
+   * is worth trying again.
+   */
+  reason?: string
 }
 
 export type CollabMessage =
@@ -211,6 +248,7 @@ export type CollabMessage =
   | ModeChangeMessage
   | MergeProposalMessage
   | MergeAnswerMessage
+  | BoardResetMessage
   | RosterMessage
   | BoardConfigMessage
 
@@ -432,7 +470,10 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
       board: o.board === undefined ? undefined : normalizeBoardConfig(o.board),
       tombstones: o.tombstones === undefined
         ? undefined
-        : normalizeAll(o.tombstones, normalizeTombstone)
+        : normalizeAll(o.tombstones, normalizeTombstone),
+      // Empty covers both an older host and one whose id will not read, and
+      // both mean the same thing here: no peer to file the board under.
+      install: readInstallId(o.install)
     }
   }
 
@@ -482,11 +523,33 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
     }
   }
 
+  if (o.type === 'board-reset') {
+    const context = id(o.context)
+    // Same rule as the baseline: no workspace on it is nowhere to put it, and
+    // the workspace is what this is about to overwrite.
+    if (!context) return null
+    return {
+      type: 'board-reset',
+      by: str(o.by),
+      context,
+      items: normalizeAll(o.items, normalizeSyncItem),
+      tags: normalizeAll(o.tags, normalizeSyncTag),
+      itemTags: normalizeAll(o.itemTags, normalizeItemTag),
+      relations: normalizeAll(o.relations, normalizeSyncRelation),
+      board: normalizeBoardConfig(o.board)
+    }
+  }
+
   if (o.type === 'merge-answer') {
     // Only an explicit yes is a yes. Anything else, including a field that will
     // not read, leaves the other side's board exactly as it was, which is the
     // failure nobody has to undo.
-    return { type: 'merge-answer', accepted: o.accepted === true, by: str(o.by) }
+    return {
+      type: 'merge-answer',
+      accepted: o.accepted === true,
+      by: str(o.by),
+      reason: str(o.reason)
+    }
   }
 
   if (o.type === 'mode-change') {
