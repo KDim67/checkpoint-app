@@ -52,6 +52,7 @@ import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getJsonSetting, getNumberSetting, getStringSetting, setJsonSetting, setStringSetting } from '../lib/settings'
 import { readItems } from '../data/items'
+import { createStreamBuffer } from '../lib/streamBuffer'
 
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
@@ -158,7 +159,7 @@ export default function AiStreamPanel() {
     }
     setMessages([])
     setStreamingText('')
-    chunkBufferRef.current = ''
+    streamRef.current.reset()
     setIsStreaming(false)
     streamingChatIdRef.current = null
     hasReceivedFirstChunkRef.current = false
@@ -177,7 +178,7 @@ export default function AiStreamPanel() {
     }
     setMessages(chat.messages)
     setStreamingText('')
-    chunkBufferRef.current = ''
+    streamRef.current.reset()
     setIsStreaming(false)
     streamingChatIdRef.current = null
     setCurrentChatId(chat.id)
@@ -210,9 +211,7 @@ export default function AiStreamPanel() {
   }
 
   // Buffering and throttling references
-  const chunkBufferRef = useRef('')
-  const animationFrameRef = useRef<number | null>(null)
-  const lastUpdateRef = useRef(0)
+  const streamRef = useRef(createStreamBuffer(text => setStreamingText(text)))
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const currentChatIdRef = useRef(currentChatId)
   const streamingChatIdRef = useRef<string | null>(null)
@@ -438,18 +437,7 @@ export default function AiStreamPanel() {
         setIsWaitingForFirstChunk(false)
       }
 
-      chunkBufferRef.current += chunk
-
-      const now = Date.now()
-      if (now - lastUpdateRef.current > 50) {
-        lastUpdateRef.current = now
-        setStreamingText(chunkBufferRef.current)
-      } else if (!animationFrameRef.current) {
-        animationFrameRef.current = requestAnimationFrame(() => {
-          animationFrameRef.current = null
-          setStreamingText(chunkBufferRef.current)
-        })
-      }
+      streamRef.current.push(chunk)
     })
 
     const unsubscribeDone = window.electronAPI.ai.onDone((streamId, usage) => {
@@ -461,11 +449,7 @@ export default function AiStreamPanel() {
         isAbortedRef.current = false
         return
       }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
-      const finalAssistantResponse = chunkBufferRef.current
+      const finalAssistantResponse = streamRef.current.flush()
 
       // Only append to UI if user is still on the same chat
       if (streamingChatIdRef.current === currentChatIdRef.current) {
@@ -483,7 +467,7 @@ export default function AiStreamPanel() {
         })
         setStreamingText('')
       }
-      chunkBufferRef.current = ''
+      streamRef.current.reset()
       streamingChatIdRef.current = null
       hasReceivedFirstChunkRef.current = false
       setIsWaitingForFirstChunk(false)
@@ -496,12 +480,8 @@ export default function AiStreamPanel() {
         isAbortedRef.current = false
         return
       }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
       const errText = `\n\n**Error:** ${errMessage}`
-      const finalAssistantResponse = chunkBufferRef.current + errText
+      const finalAssistantResponse = streamRef.current.flush() + errText
       if (streamingChatIdRef.current === currentChatIdRef.current) {
         const { thinking, content: finalContent } = parseThinkingAndContent(finalAssistantResponse)
         setMessages(prev => [...prev, {
@@ -512,7 +492,7 @@ export default function AiStreamPanel() {
         }])
         setStreamingText('')
       }
-      chunkBufferRef.current = ''
+      streamRef.current.reset()
       streamingChatIdRef.current = null
       hasReceivedFirstChunkRef.current = false
       setIsWaitingForFirstChunk(false)
@@ -523,9 +503,7 @@ export default function AiStreamPanel() {
       unsubscribeChunk()
       unsubscribeDone()
       unsubscribeError()
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-      }
+      streamRef.current.flush()
     }
   }, [])
 
@@ -824,7 +802,7 @@ export default function AiStreamPanel() {
     streamingChatIdRef.current = currentChatIdRef.current
     hasReceivedFirstChunkRef.current = false
     isAbortedRef.current = false
-    chunkBufferRef.current = ''
+    streamRef.current.reset()
     setStreamingText('')
     const modelLower = selectedModel.toLowerCase()
 
@@ -1021,7 +999,7 @@ export default function AiStreamPanel() {
           if (isAbortedRef.current) {
             isAbortedRef.current = false
             setStreamingText('')
-            chunkBufferRef.current = ''
+            streamRef.current.reset()
             streamingChatIdRef.current = null
             hasReceivedFirstChunkRef.current = false
             setIsWaitingForFirstChunk(false)
@@ -1040,7 +1018,7 @@ export default function AiStreamPanel() {
                 })
               }
               setStreamingText('')
-              chunkBufferRef.current = ''
+              streamRef.current.reset()
               streamingChatIdRef.current = null
               hasReceivedFirstChunkRef.current = false
               setIsWaitingForFirstChunk(false)
@@ -1084,16 +1062,12 @@ export default function AiStreamPanel() {
       isAbortedRef.current = true
       await window.electronAPI.ai.abortStream(ASSISTANT_STREAM_ID)
       await window.electronAPI.ai.abortStructured().catch(() => {})
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
-      const partialText = chunkBufferRef.current.trim()
+      const partialText = streamRef.current.flush().trim()
       if (partialText) {
         setMessages(prev => [...prev, { role: 'assistant', content: partialText + '\n\n*(Generation stopped)*', timestamp: Date.now() }])
       }
       setStreamingText('')
-      chunkBufferRef.current = ''
+      streamRef.current.reset()
       streamingChatIdRef.current = null
       hasReceivedFirstChunkRef.current = false
       setIsWaitingForFirstChunk(false)

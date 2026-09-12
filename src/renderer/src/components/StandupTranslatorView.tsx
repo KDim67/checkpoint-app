@@ -9,6 +9,7 @@ import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getNumberSetting } from '../lib/settings'
 import { readItems } from '../data/items'
+import { createStreamBuffer } from '../lib/streamBuffer'
 
 // Zero-dependency SVG Icons
 const SparklesIcon = () => (
@@ -121,9 +122,7 @@ export default function StandupTranslatorView({
   // AI Streaming State
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState('')
-  const chunkBufferRef = useRef('')
-  const animationFrameRef = useRef<number | null>(null)
-  const lastUpdateRef = useRef(0)
+  const streamRef = useRef(createStreamBuffer(text => setStreamingText(text)))
   const reportEndRef = useRef<HTMLDivElement>(null)
 
   // Action feedback states
@@ -208,36 +207,18 @@ export default function StandupTranslatorView({
     if (!isOpen) return
     const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk, streamId) => {
       if (streamId !== STANDUP_STREAM_ID) return
-      chunkBufferRef.current += chunk
-
-      const now = Date.now()
-      if (now - lastUpdateRef.current > 50) {
-        lastUpdateRef.current = now
-        setStreamingText(chunkBufferRef.current)
-      } else if (!animationFrameRef.current) {
-        animationFrameRef.current = requestAnimationFrame(() => {
-          animationFrameRef.current = null
-          setStreamingText(chunkBufferRef.current)
-        })
-      }
+      streamRef.current.push(chunk)
     })
 
     const unsubscribeDone = window.electronAPI.ai.onDone((streamId) => {
       if (streamId !== STANDUP_STREAM_ID) return
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
-      setStreamingText(chunkBufferRef.current)
+      setStreamingText(streamRef.current.flush())
       setIsStreaming(false)
     })
 
     const unsubscribeError = window.electronAPI.ai.onError((errMessage, streamId) => {
       if (streamId !== STANDUP_STREAM_ID) return
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
+      streamRef.current.flush()
       setStreamingText(prev => prev + `\n\n**Error:** ${errMessage}`)
       setIsStreaming(false)
     })
@@ -246,9 +227,7 @@ export default function StandupTranslatorView({
       unsubscribeChunk()
       unsubscribeDone()
       unsubscribeError()
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-      }
+      streamRef.current.flush()
     }
   }, [isOpen])
 
@@ -264,10 +243,7 @@ export default function StandupTranslatorView({
     if (isStreaming) {
       // handleAbort is called inline here to avoid circular dependency
       window.electronAPI.ai.abortStream(STANDUP_STREAM_ID).catch(() => {})
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-        animationFrameRef.current = null
-      }
+      streamRef.current.flush()
       setIsStreaming(false)
     }
     onClose()
@@ -338,7 +314,7 @@ export default function StandupTranslatorView({
     }
 
     setIsStreaming(true)
-    chunkBufferRef.current = ''
+    streamRef.current.reset()
     setStreamingText('')
 
     const styleDescriptions = {
