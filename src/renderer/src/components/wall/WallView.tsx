@@ -17,10 +17,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
-  Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
-  Grid3x3, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  PanelRight, Paintbrush, PenLine, Spline, MousePointer2,
-  Keyboard
+  Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Undo2, Redo2,
+  Grid3x3, ExternalLink, FileText, Wand2, Expand, Palette, Download,
+  PanelRight, PenLine, Spline, MousePointer2
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
@@ -53,7 +52,6 @@ import { errorMessage } from '../../../../shared/errors'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemLayer from './WallItemLayer'
 import WallContextMenu, { type MenuEntry } from './WallContextMenu'
-import WallColorPicker from './WallColorPicker'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import WallBoardRail, { type RailTab } from './WallBoardRail'
 import WallSwitcher from './WallSwitcher'
@@ -62,129 +60,28 @@ import {
   decodeWallDrag, filterGroups, groupCardsByColumn, planHandoff, WALL_DRAG_MIME
 } from '../../../../shared/wallBoard'
 import { loadBoardConfig } from '../../lib/boardConfig'
-import { getBoolSetting, getNumberSetting, getEnumSetting, setBoolSetting, setNumberSetting, setStringSetting } from '../../lib/settings'
-import { VIEW_SHORTCUTS, type ShortcutBindings } from '../../lib/shortcuts'
+import { getBoolSetting, getNumberSetting, getEnumSetting, setBoolSetting } from '../../lib/settings'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
 import {
   PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES,
-  panButtonLabel, panHintLabel, type PanButtons, type MenuButton
+  panHintLabel, type PanButtons, type MenuButton
 } from '../../lib/wallInput'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
 import { updateItem } from '../../data/items'
+import { toolButton } from './wallButtons'
+import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, clampRail } from './wallPreferences'
+import { NUDGE } from './wallShortcutSheet'
+import WallBackgroundMenu from './WallBackgroundMenu'
+import WallSearch from './WallSearch'
+import WallShortcutsMenu from './WallShortcutsMenu'
+import WallPlacePicker from './WallPlacePicker'
+import WallSelectionBar from './WallSelectionBar'
+import WallPenSettings from './WallPenSettings'
+import WallRailHandle from './WallRailHandle'
 
-const NUDGE = 4
-/** Narrow enough not to crowd the wall, wide enough for a real card title. */
-const RAIL_MIN = 190
-const RAIL_MAX = 460
-// Deliberately not under the `wall_` prefix: those keys name a workspace,
-// and a workspace called "rail_open" would own this one. These are preferences.
-const RAIL_OPEN_KEY = 'wallview_rail_open'
-const RAIL_WIDTH_KEY = 'wallview_rail_width'
-const SMOOTHING_KEY = 'wallview_pen_smoothing'
-const ARROW_SHAPE_KEY = 'wallview_arrow_shape'
-const ARROW_LINE_KEY = 'wallview_arrow_line'
-const ARROW_HEADS_KEY = 'wallview_arrow_heads'
-
-
-/**
- * The style buttons draw their own option rather than borrowing an icon.
- * "Dashed" as a picture of a dashed line needs no legend, and there is no
- * icon in the set that means "elbow" without a caption next to it.
- */
-const glyphProps = {
-  width: 15, height: 15, viewBox: '0 0 15 15',
-  fill: 'none', stroke: 'currentColor', strokeWidth: 1.7,
-  strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const
-}
-
-const SHAPE_GLYPHS: Record<ArrowShape, string> = {
-  straight: 'M2 12L13 3',
-  curved: 'M2 12Q3 3 13 4',
-  elbow: 'M2 12H8V3H13'
-}
-
-const shapeGlyph = (shape: ArrowShape): React.JSX.Element => (
-  <svg {...glyphProps}><path d={SHAPE_GLYPHS[shape]} /></svg>
-)
-
-const lineGlyph = (line: ArrowLine): React.JSX.Element => (
-  <svg {...glyphProps} strokeWidth={2}>
-    <path d="M2 7.5H13" strokeDasharray={line === 'dashed' ? '4 3' : line === 'dotted' ? '0.5 3' : undefined} />
-  </svg>
-)
-
-const headsGlyph = (heads: ArrowHeads): React.JSX.Element => (
-  <svg {...glyphProps}>
-    <path d="M2 7.5H13" />
-    {heads !== 'none' && <path d="M10 4.5L13 7.5L10 10.5" />}
-    {heads === 'both' && <path d="M5 4.5L2 7.5L5 10.5" />}
-  </svg>
-)
-
-/** Sentence case for a tooltip, since the values are lower-case identifiers. */
-const nameOf = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
-
-const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))
 /** How far a press may travel and still count as a click rather than a drag. */
 const CLICK_SLOP = 4
-
-
-/**
- * Everything the wall binds, written down somewhere it can be read.
- *
- * V, P and A have switched tools since the tools existed and the first person
- * to use the wall never found them. A tooltip only reaches someone already
- * pointing at the button, which is the one moment they do not need telling;
- * this is the list you open when you do not know what to point at yet.
- */
-const wallShortcutSections = (
-  bindings: ShortcutBindings,
-  panButtons: PanButtons,
-  menuButton: MenuButton
-): { group: string; rows: [string, string][] }[] => [
-  {
-    group: 'Tools',
-    // Read from the bindings rather than written out, so the sheet cannot
-    // disagree with what the keys actually do once someone changes one.
-    rows: [
-      ...VIEW_SHORTCUTS
-        .filter(s => s.scope === 'wall' && s.id.startsWith('wall_tool_') && bindings[s.id])
-        .map(s => [bindings[s.id], s.label] as [string, string]),
-      ['Esc', 'Back to select, and close whatever is open']
-    ]
-  },
-  {
-    group: 'Mouse',
-    rows: [
-      // One row, because two rows both reading "Pan the wall" look like a
-      // mistake rather than a choice. Both of these follow the settings, so
-      // the sheet cannot end up describing buttons that do something else.
-      [panButtonLabel(panButtons), 'Pan the wall'],
-      ['Space + drag', 'Pan without putting the tool down'],
-      ...(menuButton === 'none'
-        ? []
-        : [[menuButton === 'right' ? 'Right-click' : 'Middle-click',
-            'Menu for what is under the pointer'] as [string, string]]),
-      ['Wheel', 'Zoom where the pointer is'],
-      ['Double-click', 'New sticky note, or open what was clicked'],
-      ['Shift-click', 'Add to or take from the selection']
-    ]
-  },
-  {
-    group: 'Editing',
-    rows: [
-      ['Ctrl+Z', 'Undo'],
-      ['Ctrl+Shift+Z', 'Redo'],
-      [bindings.wall_duplicate || 'Unbound', 'Duplicate the selection'],
-      ['Ctrl+A', 'Select everything unlocked'],
-      // Both, because the bound one is a preference and Delete is a fact.
-      [bindings.wall_delete ? `${bindings.wall_delete} or Delete` : 'Delete', 'Remove the selection'],
-      ['Arrows', `Nudge by ${NUDGE}px`],
-      ['Shift+Arrows', `Nudge by ${NUDGE * 5}px`]
-    ]
-  }
-]
 
 interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
@@ -324,7 +221,6 @@ export default function WallView() {
   /** Just-deleted docs. The flush on the way out would otherwise restore them. */
   const discardedRef = useRef<Set<string>>(new Set())
   const railHoverRef = useRef<{ overRail: boolean; columnId: string | null }>({ overRail: false, columnId: null })
-  const railResizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
   /** In a ref because the export callback is created before the lookup maps. */
   const labelRef = useRef<(item: WallItem) => string | undefined>(() => undefined)
   const docRef = useRef(doc)
@@ -1593,113 +1489,6 @@ export default function WallView() {
   /** A popover belongs to the selection that opened it. */
   useEffect(() => { setSwatchOpen(false) }, [selectedIds])
 
-  /**
-   * `.btn-icon:hover` already paints `--color-surface-offset`, so an active
-   * state that only did the same was indistinguishable from hovering. Active is
-   * now the accent colour plus an underline: legible without relying on colour,
-   * which matters most for the pen and arrow, where being wrong about which
-   * tool is armed changes what a click does.
-   */
-  /**
-   * One button per property, showing the option in force and moving to the
-   * next on click. Three buttons rather than nine, which is what keeps the
-   * palette a single narrow column.
-   */
-  const cycleButton = <T extends string>(
-    label: string,
-    options: readonly T[],
-    current: T,
-    glyph: (value: T) => React.ReactNode,
-    onPick: (next: T) => void,
-    compact = false
-  ): React.JSX.Element => {
-    const next = options[(options.indexOf(current) + 1) % options.length]
-    const size = compact ? '26px' : '30px'
-    return (
-      <button
-        key={label}
-        onClick={() => onPick(next)}
-        title={`${label}: ${nameOf(current)}. Click for ${nameOf(next)}.`}
-        aria-label={`${label}: ${nameOf(current)}`}
-        style={{
-          width: size, height: size,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'none', color: 'var(--color-text-muted)',
-          border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-          transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = 'var(--color-secondary-muted)'
-          e.currentTarget.style.color = 'var(--color-secondary)'
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'none'
-          e.currentTarget.style.color = 'var(--color-text-muted)'
-        }}
-      >
-        {glyph(current)}
-      </button>
-    )
-  }
-
-  /** The three style controls, shared by the palette and the toolbar. */
-  const arrowStyleButtons = (
-    shape: ArrowShape,
-    line: ArrowLine,
-    heads: ArrowHeads,
-    onShape: (v: ArrowShape) => void,
-    onLine: (v: ArrowLine) => void,
-    onHeads: (v: ArrowHeads) => void,
-    compact = false
-  ): React.JSX.Element[] => [
-    cycleButton('Route', ARROW_SHAPES, shape, shapeGlyph, onShape, compact),
-    cycleButton('Line', ARROW_LINES, line, lineGlyph, onLine, compact),
-    cycleButton('Heads', ARROW_HEAD_MODES, heads, headsGlyph, onHeads, compact)
-  ]
-
-  const toolButton = (
-    label: string,
-    icon: React.ReactNode,
-    onClick: () => void,
-    opts: { active?: boolean; disabled?: boolean; shortcut?: string } = {}
-  ): React.JSX.Element => {
-    // The key rides in the tooltip rather than on the face of the button:
-    // thirty pixels square has room for the icon and nothing else. Anyone who
-    // wants the whole set at once opens the list beside the search box.
-    const described = opts.shortcut ? `${label} (${opts.shortcut})` : label
-    return (
-    <button
-      key={label}
-      onClick={onClick}
-      title={described}
-      aria-label={described}
-      aria-keyshortcuts={opts.shortcut}
-      aria-pressed={opts.active}
-      disabled={opts.disabled}
-      className="btn-icon"
-      style={{
-        position: 'relative',
-        width: '30px', height: '30px',
-        background: opts.active ? 'var(--color-secondary-muted)' : undefined,
-        color: opts.active ? 'var(--color-secondary)' : undefined,
-        opacity: opts.disabled ? 0.4 : 1,
-        cursor: opts.disabled ? 'not-allowed' : 'pointer'
-      }}
-    >
-      {icon}
-      {opts.active && (
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute', left: '6px', right: '6px', bottom: '3px', height: '2px',
-            borderRadius: '999px', background: 'var(--color-secondary)'
-          }}
-        />
-      )}
-    </button>
-    )
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
 
@@ -1721,32 +1510,7 @@ export default function WallView() {
         borderBottom: '1px solid var(--color-surface-offset)',
         flexShrink: 0, position: 'relative'
       }}>
-        <div data-wall-popover="bg" style={{ position: 'relative' }}>
-          {toolButton('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
-
-          {bgOpen && (
-            <>
-              <div
-                style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
-                  padding: 'var(--space-2)', width: '188px',
-                  background: 'var(--color-surface-elevated)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
-                }}
-              >
-                <WallColorPicker
-                  colors={WALL_COLORS}
-                  value={custom ?? undefined}
-                  onChange={setBackground}
-                  columns={4}
-                  defaultLabel="Follow the theme"
-                  onDefault={() => { setBackground('default'); setBgOpen(false) }}
-                />
-              </div>
-            </>
-          )}
-        </div>
+        <WallBackgroundMenu bgOpen={bgOpen} setBgOpen={setBgOpen} custom={custom} setBackground={setBackground} />
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
@@ -1812,135 +1576,15 @@ export default function WallView() {
                 : `Drag to select · Space or ${panHintLabel(panButtons)} to pan`}
           </span>
 
-          <div style={{ position: 'relative' }}>
-            <Search
-              size={12}
-              style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-faint)', pointerEvents: 'none' }}
-            />
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Escape') { setQuery(''); (e.target as HTMLInputElement).blur() }
-                // Enter jumps to the best match, so finding something never
-                // needs the mouse.
-                if (e.key === 'Enter' && matches.length > 0) { jumpTo(matches[0]); setQuery('') }
-              }}
-              placeholder="Find on this wall"
-              aria-label="Find on this wall"
-              style={{
-                width: '170px',
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--color-text-base)',
-                padding: '4px 8px 4px 24px',
-                fontSize: 'var(--text-xs)',
-                outline: 'none'
-              }}
-            />
+          <WallSearch query={query} setQuery={setQuery} matches={matches} jumpTo={jumpTo} labelOf={labelOf} />
 
-            {query.trim() !== '' && matches.length === 0 && (
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 25,
-                width: '260px', padding: 'var(--space-3)',
-                background: 'var(--color-surface-elevated)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
-                fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)'
-              }}>
-                Nothing on this wall matches.
-              </div>
-            )}
-
-            {matches.length > 0 && (
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 25,
-                width: '260px', maxHeight: '260px', overflowY: 'auto',
-                background: 'var(--color-surface-elevated)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', padding: '4px'
-              }}>
-                {matches.slice(0, 12).map(m => (
-                  <button
-                    key={m.id}
-                    onClick={() => { jumpTo(m); setQuery('') }}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left', background: 'none',
-                      border: 'none', cursor: 'pointer', padding: 'var(--space-2)',
-                      borderRadius: 'var(--radius-sm)', color: 'var(--color-text-base)',
-                      fontSize: 'var(--text-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-                  >
-                    {labelOf(m) || '(untitled)'}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div data-wall-popover="keys" style={{ position: 'relative' }}>
-            {toolButton(
-              'Keyboard shortcuts',
-              <Keyboard size={14} />,
-              () => setShortcutsOpen(v => !v),
-              { active: shortcutsOpen }
-            )}
-
-            {shortcutsOpen && (
-              <div
-                role="dialog"
-                aria-label="Keyboard shortcuts"
-                style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 41,
-                  width: '326px', maxHeight: '62vh', overflowY: 'auto',
-                  padding: 'var(--space-3)',
-                  background: 'var(--color-surface-elevated)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
-                }}
-              >
-                {wallShortcutSections(keys, panButtons, menuButton).map((section, i) => (
-                  <div
-                    key={section.group}
-                    style={{ marginBottom: i === wallShortcutSections(keys, panButtons, menuButton).length - 1 ? 0 : 'var(--space-3)' }}
-                  >
-                    <div style={{
-                      marginBottom: '2px',
-                      fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em',
-                      color: 'var(--color-text-faint)'
-                    }}>
-                      {section.group}
-                    </div>
-                    {section.rows.map(([keys, what]) => (
-                      <div key={keys} style={{
-                        display: 'flex', alignItems: 'baseline',
-                        justifyContent: 'space-between', gap: 'var(--space-3)',
-                        padding: '2px 0'
-                      }}>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>
-                          {what}
-                        </span>
-                        <kbd style={{
-                          flexShrink: 0, whiteSpace: 'nowrap',
-                          padding: '1px 5px',
-                          background: 'var(--color-surface-2)',
-                          border: '1px solid var(--color-surface-offset)',
-                          borderRadius: 'var(--radius-sm)',
-                          color: 'var(--color-text-muted)',
-                          fontFamily: 'var(--font-mono)', fontSize: '10px'
-                        }}>
-                          {keys}
-                        </kbd>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <WallShortcutsMenu
+            shortcutsOpen={shortcutsOpen}
+            setShortcutsOpen={setShortcutsOpen}
+            keys={keys}
+            panButtons={panButtons}
+            menuButton={menuButton}
+          />
 
           {/* At this end because the panel it opens is on this side. It used
               to sit on the far left, pointing across the whole toolbar. */}
@@ -1953,36 +1597,7 @@ export default function WallView() {
         </div>
 
         {picker && (
-          <div data-wall-ui style={{
-            position: 'absolute', top: '100%', left: 'var(--space-3)', zIndex: 20,
-            marginTop: '4px', width: '300px', maxHeight: '340px', overflowY: 'auto',
-            background: 'var(--color-surface-elevated)', border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', padding: '4px'
-          }}>
-            {pickerRows.length === 0 ? (
-              <div style={{ padding: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
-                {picker === 'card'
-                  ? 'Every card is already on the wall.'
-                  : notes.length === 0 ? 'No notes yet.' : 'Every note is already on the wall.'}
-              </div>
-            ) : pickerRows.map(row => (
-              <button
-                key={row.ref}
-                onClick={() => { addItem(picker === 'card' ? 'card' : 'doc', { ref: row.ref }); setPicker(null) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
-                  textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
-                  color: 'var(--color-text-base)', fontSize: 'var(--text-xs)'
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-              >
-                <Plus size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
-              </button>
-            ))}
-          </div>
+          <WallPlacePicker picker={picker} pickerRows={pickerRows} notes={notes} addItem={addItem} setPicker={setPicker} />
         )}
 
         <input
@@ -2339,96 +1954,21 @@ export default function WallView() {
 
           {/* Controls for the current selection, floated above it. */}
           {floatingPos && selectedItems.length > 0 && (
-            <div ref={floatingRef} data-wall-ui style={{
-              position: 'absolute',
-              left: `${floatingPos.left}px`, top: `${floatingPos.top}px`,
-              transform: 'translateX(-50%)',
-              display: 'flex', alignItems: 'center', gap: '2px',
-              padding: '3px',
-              background: 'var(--color-surface-elevated)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-lg)',
-              zIndex: 15
-            }}>
-              {/* One swatch, not the whole palette laid out flat.
-
-                  Nine circles and five buttons in a row made this toolbar wider
-                  than most of what it floats over, so it covered the thing you
-                  had just selected. The palette itself has not shrunk back to
-                  the six colours it used to offer: it is all still here, one
-                  click in, which is what the pen palette already does. */}
-              <div data-wall-swatch style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setSwatchOpen(v => !v)}
-                  title="Colour"
-                  aria-label="Colour"
-                  aria-expanded={swatchOpen}
-                  className="btn-icon"
-                  style={{
-                    width: '30px', height: '30px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: swatchOpen ? 'var(--color-surface-offset)' : undefined
-                  }}
-                >
-                  <span
-                    aria-hidden
-                    style={{
-                      width: '16px', height: '16px', borderRadius: '50%',
-                      background: single?.color ?? 'transparent',
-                      // Nothing selected has a colour of its own yet, or the
-                      // selection is mixed: an empty ring says so without
-                      // claiming one of the eight.
-                      border: single?.color
-                        ? '1px solid rgba(0, 0, 0, 0.25)'
-                        : '1px dashed var(--color-text-faint)'
-                    }}
-                  />
-                </button>
-
-                {swatchOpen && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 42,
-                    padding: 'var(--space-2)', width: '146px',
-                    background: 'var(--color-surface-elevated)',
-                    border: '1px solid var(--color-surface-offset)',
-                    borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
-                  }}>
-                    <WallColorPicker
-                      colors={WALL_COLORS}
-                      value={single?.color}
-                      onChange={c => {
-                        setItems(patchItems(doc.items, selectedIds, { color: c }))
-                        setSwatchOpen(false)
-                      }}
-                      columns={4}
-                    />
-                  </div>
-                )}
-              </div>
-              <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
-              {arrowsSelected && arrowStyleButtons(
-                single?.arrowShape ?? ARROW_SHAPES[0],
-                single?.arrowLine ?? ARROW_LINES[0],
-                single?.arrowHeads ?? ARROW_HEAD_MODES[0],
-                v => setItems(patchItems(doc.items, selectedIds, { arrowShape: v })),
-                v => setItems(patchItems(doc.items, selectedIds, { arrowLine: v })),
-                v => setItems(patchItems(doc.items, selectedIds, { arrowHeads: v }))
-              )}
-              {arrowsSelected && single && toolButton(
-                single.text ? 'Edit label' : 'Add a label',
-                <Type size={13} />,
-                () => setEditingId(single.id)
-              )}
-              {arrowsSelected && (
-                <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
-              )}
-              {toolButton('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(doc.items, single.id)), { disabled: !single })}
-              {toolButton('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(doc.items, single.id)), { disabled: !single })}
-              {toolButton('Duplicate', <Copy size={13} />, duplicateSelected)}
-              {toolButton(single?.locked ? 'Unlock' : 'Lock', single?.locked ? <Unlock size={13} /> : <Lock size={13} />, toggleLock)}
-              {toolButton('Delete', <Trash2 size={13} />, removeSelected)}
-            </div>
+            <WallSelectionBar
+              floatingPos={floatingPos}
+              floatingRef={floatingRef}
+              swatchOpen={swatchOpen}
+              setSwatchOpen={setSwatchOpen}
+              single={single}
+              arrowsSelected={arrowsSelected}
+              items={doc.items}
+              selectedIds={selectedIds}
+              setItems={setItems}
+              setEditingId={setEditingId}
+              duplicateSelected={duplicateSelected}
+              toggleLock={toggleLock}
+              removeSelected={removeSelected}
+            />
           )}
 
           {picker && (
@@ -2449,86 +1989,21 @@ export default function WallView() {
           )}
 
           {tool !== 'select' && (
-            <div
-              data-wall-ui
-              role="group"
-              aria-label="Pen settings"
-              style={{
-                position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)',
-                zIndex: 20, display: 'flex', flexDirection: 'column', gap: '6px',
-                padding: 'var(--space-2)',
-                // A single column is tall, so it gets a ceiling rather than
-                // running off the bottom of a short window.
-                maxHeight: 'calc(100% - var(--space-6))', overflowY: 'auto', overflowX: 'hidden',
-                background: 'var(--color-surface-elevated)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-lg)'
-              }}
-            >
-              <WallColorPicker
-                colors={WALL_COLORS}
-                value={penColor}
-                onChange={setPenColor}
-                columns={1}
-              />
-
-              <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
-
-              {STROKE_WIDTHS.map(width => (
-                <button
-                  key={width}
-                  onClick={() => setPenWidth(width)}
-                  title={`${width}px`}
-                  aria-label={`Stroke width ${width}`}
-                  aria-pressed={penWidth === width}
-                  style={{
-                    // 26 to match the swatches above it, so the strip has one edge.
-                    width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: penWidth === width ? 'var(--color-secondary-muted)' : 'none',
-                    border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                    transition: 'background var(--duration-fast) var(--ease-default)'
-                  }}
-                >
-                  <span style={{
-                    width: `${width + 6}px`, height: `${width}px`, borderRadius: '999px',
-                    background: penWidth === width ? 'var(--color-secondary)' : 'var(--color-text-muted)'
-                  }} />
-                </button>
-              ))}
-
-              <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '2px 0' }} />
-
-              {tool === 'arrow' && arrowStyleButtons(
-                arrowShape, arrowLine, arrowHeads,
-                v => { setArrowShape(v); void setStringSetting(ARROW_SHAPE_KEY, v) },
-                v => { setArrowLine(v); void setStringSetting(ARROW_LINE_KEY, v) },
-                v => { setArrowHeads(v); void setStringSetting(ARROW_HEADS_KEY, v) },
-                true
-              )}
-
-              {tool === 'pen' && (
-              <button
-                onClick={() => {
-                  const next = !smoothing
-                  setSmoothing(next)
-                  void setNumberSetting(SMOOTHING_KEY, next ? SMOOTHING_STRENGTH : 0)
-                }}
-                title={smoothing ? 'Smoothing on' : 'Smoothing off'}
-                aria-label="Smooth strokes"
-                aria-pressed={smoothing}
-                style={{
-                  width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: smoothing ? 'var(--color-secondary-muted)' : 'none',
-                  color: smoothing ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-                  border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                  transition: 'background var(--duration-fast) var(--ease-default)'
-                }}
-              >
-                <Spline size={13} />
-              </button>
-              )}
-            </div>
+            <WallPenSettings
+              tool={tool}
+              penColor={penColor}
+              setPenColor={setPenColor}
+              penWidth={penWidth}
+              setPenWidth={setPenWidth}
+              arrowShape={arrowShape}
+              setArrowShape={setArrowShape}
+              arrowLine={arrowLine}
+              setArrowLine={setArrowLine}
+              arrowHeads={arrowHeads}
+              setArrowHeads={setArrowHeads}
+              smoothing={smoothing}
+              setSmoothing={setSmoothing}
+            />
           )}
 
         {busy && (
@@ -2552,30 +2027,7 @@ export default function WallView() {
 
         {railOpen && (
           <>
-            <div
-              onPointerDown={e => {
-                ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                railResizeRef.current = { startX: e.clientX, startWidth: railWidth }
-              }}
-              onPointerMove={e => {
-                const resize = railResizeRef.current
-                // Inverted: the handle is on the rail's left edge now, so
-                // dragging left has to widen it rather than shrink it.
-                if (resize) setRailWidth(clampRail(resize.startWidth - (e.clientX - resize.startX)))
-              }}
-              onPointerUp={e => {
-                if (!railResizeRef.current) return
-                railResizeRef.current = null
-                try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* already released */ }
-                void setNumberSetting(RAIL_WIDTH_KEY, railWidth)
-              }}
-              role="separator"
-              aria-label="Resize the board panel"
-              style={{
-                width: '5px', flexShrink: 0, cursor: 'col-resize',
-                background: 'var(--color-surface-offset)'
-              }}
-            />
+            <WallRailHandle railWidth={railWidth} setRailWidth={setRailWidth} />
 
             <WallBoardRail
               width={railWidth}
