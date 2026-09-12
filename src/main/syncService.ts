@@ -7,8 +7,9 @@ import crypto from 'crypto'
 import { getDb } from './db'
 import type { SyncPayload } from '../shared/types'
 import { filterSyncableSettings, isSyncableSettingKey } from '../shared/syncSettings'
+import { SYNC_TCP_PORT } from '../shared/ports'
 
-const DEFAULT_TCP_PORT = 5739
+const DEFAULT_TCP_PORT = SYNC_TCP_PORT
 const DEFAULT_UDP_PORT = 5740
 const DISCOVERY_INTERVAL_MS = 5000
 

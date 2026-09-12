@@ -15,10 +15,6 @@ export function getNotesDir(): string {
   return join(getConfigDir(), 'notes')
 }
 
-export function getMapsDir(): string {
-  return join(getConfigDir(), 'maps')
-}
-
 export function getMediaDir(): string {
   return join(getConfigDir(), 'media')
 }

@@ -23,8 +23,6 @@ export interface RecurrenceRule {
   untilAt: number | null
 }
 
-export const FREQUENCIES: Frequency[] = ['daily', 'weekly', 'monthly']
-
 /**
  * What the renderer needs to list a recurrence.
  *

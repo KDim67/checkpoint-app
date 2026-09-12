@@ -449,8 +449,6 @@ CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
 ${ITEMS_FTS_TRIGGERS_SQL}
 `
 
-
-
 // Init
 
 export function initDb(dataPath: string): Database.Database {
@@ -1108,26 +1106,6 @@ export function getSubtasks(itemId: string): SubtaskRow[] {
     .all(itemId) as SubtaskRow[]
 }
 
-/**
- * Counts for many parents at once.
- *
- * A row-by-row query would be one round trip per task in the table, which is
- * what makes a progress column too slow to be worth showing.
- */
-export function getSubtaskCounts(itemIds: string[]): Map<string, { total: number; done: number }> {
-  const out = new Map<string, { total: number; done: number }>()
-  if (itemIds.length === 0) return out
-  const rows = getDb()
-    .prepare(
-      `SELECT item_id, COUNT(*) as total, SUM(done) as done
-       FROM subtasks WHERE item_id IN (${itemIds.map(() => '?').join(',')})
-       GROUP BY item_id`
-    )
-    .all(...itemIds) as { item_id: string; total: number; done: number | null }[]
-  for (const row of rows) out.set(row.item_id, { total: row.total, done: row.done ?? 0 })
-  return out
-}
-
 export function insertSubtask(row: SubtaskRow): void {
   getDb()
     .prepare(
@@ -1363,8 +1341,6 @@ export function searchItems(query: SearchQuery): PaginatedResult<Item> {
   const total = (prepareOnce(db, countSql).get(...countArgs) as { count: number }).count
   return { items: rows.map(rowToItem), total, page, pageSize }
 }
-
-
 
 export function queryTasks(db: Database.Database, context: string, params: TaskQueryParams): PaginatedResult<Item> {
   const page = params.page ?? 1
@@ -2041,7 +2017,6 @@ export function registerDbHandlers(db: Database.Database): void {
       restoreClipboardItem(parsedContent, parsedPin, parsedLabel)
     })
   })
-
 
   ipcMain.handle(IpcChannels.CLIPBOARD_CLEAR_HISTORY, () => {
     return handleSafe(() => clearClipboardHistory())

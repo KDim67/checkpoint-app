@@ -123,8 +123,6 @@ export function notify(input: NotifyInput): boolean {
       if (win.isMinimized()) win.restore()
       win.show()
       win.focus()
-      // Let the renderer decide what to do with it; main has no view state.
-      if (input.itemId) win.webContents.send('notification:activated', { itemId: input.itemId })
     })
 
     notification.show()

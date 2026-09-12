@@ -65,7 +65,6 @@ export const enum IpcChannels {
   AI_GENERATE_STRUCTURED = 'ai:generateStructured',
   AI_GENERATE_ABORT      = 'ai:generateAbort',
   AI_GET_CAPABILITIES    = 'ai:getCapabilities',
-  AI_LIST_MODELS         = 'ai:listModels',
   AI_CHUNK               = 'ai:chunk',
   AI_DONE                = 'ai:done',
   AI_ERROR               = 'ai:error',
@@ -93,12 +92,9 @@ export const enum IpcChannels {
 
   // HUD
   HUD_TOGGLE             = 'hud:toggle',
-  HUD_ON_TOGGLE          = 'hud:onToggle',
-  HUD_SUBMIT             = 'hud:submit',
 
   // Webhook
   WEBHOOK_TOGGLE         = 'webhook:toggle',
-  WEBHOOK_EVENT          = 'webhook:event',
 
   // MCP Server
   MCP_TOGGLE             = 'mcp:toggle',
@@ -130,8 +126,6 @@ export const enum IpcChannels {
   NOTIFY_SEND            = 'notify:send',
   NOTIFY_GET_POLICY      = 'notify:getPolicy',
   NOTIFY_SET_POLICY      = 'notify:setPolicy',
-  /** Main → renderer: a notification was clicked. */
-  NOTIFY_ACTIVATED       = 'notification:activated',
 
   // Recurring work
   RECURRENCE_LIST        = 'recurrence:list',
@@ -147,7 +141,6 @@ export const enum IpcChannels {
   // Activity Tracker
   TRACKER_TOGGLE         = 'tracker:toggle',
   TRACKER_GET_STATE      = 'tracker:getState',
-  TRACKER_ACTIVITY_LOG   = 'tracker:activityLog',
   TRACKER_GET_STATS      = 'tracker:getStats',
 
   // App
@@ -204,7 +197,6 @@ export const enum IpcChannels {
   AI_SEARCH_MEMORIES            = 'ai:searchMemories',
   AI_TOGGLE_PIN_MEMORY          = 'ai:togglePinMemory',
   AI_UPDATE_MEMORY_CONTENT      = 'ai:updateMemoryContent',
-  AI_BATCH_SAVE_MEMORIES        = 'ai:batchSaveMemories',
   AI_CONSOLIDATE_MEMORY         = 'ai:consolidateMemory',
   WORKSPACE_SELECT_FOLDER       = 'workspace:selectFolder',
   WORKSPACE_GET_STRUCTURE        = 'workspace:getStructure',
@@ -231,4 +223,3 @@ export const enum IpcChannels {
   SYNC_APPLY_BOARD_BASELINE     = 'sync:applyBoardBaseline',
   SYNC_APPLY_REMOTE_MUTATION    = 'sync:applyRemoteMutation'
 }
-

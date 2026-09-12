@@ -228,28 +228,6 @@ export function searchMemories(query: string, context: string = 'default', limit
 }
 
 /**
- * Batch-save memories extracted by the AI consolidation pass.
- * Accepts an array of {category, memory_key, content} objects.
- */
-export function batchSaveMemories(
-  items: Array<{ category: 'semantic' | 'episodic' | 'working'; memory_key: string; content: string }>,
-  context: string
-): void {
-  for (const item of items) {
-    try {
-      saveMemory({
-        context,
-        category: item.category,
-        memory_key: item.memory_key.slice(0, 120),
-        content: item.content.slice(0, 2000)
-      })
-    } catch (e) {
-      console.warn('[MemoryService] Failed to save memory item:', e)
-    }
-  }
-}
-
-/**
  * Sequential processing of AI-directed memory adjustments (save, update, delete).
  */
 export function processMemoryActions(actions: MemoryAction[], context: string): void {
@@ -477,14 +455,6 @@ export function initMemoryIpc(): void {
 
   ipcMain.handle('ai:updateMemoryContent', (_event, id: string, content: string) => {
     return updateMemoryContent(id, content)
-  })
-
-  ipcMain.handle('ai:batchSaveMemories', (_event, items: CreateMemoryPayload[], context: string) => {
-    return batchSaveMemories(items, context)
-  })
-
-  ipcMain.handle('ai:pruneMemories', (_event, context: string, limit: number) => {
-    return pruneMemories(context, limit)
   })
 
   ipcMain.handle('ai:auditMemories', (_event, context: string, model: string) => {

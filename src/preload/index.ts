@@ -335,9 +335,6 @@ const api = {
     getCapabilities: (model: string, force?: boolean): Promise<ModelCapabilities> =>
       ipcRenderer.invoke(IpcChannels.AI_GET_CAPABILITIES, model, force),
 
-    listModels: (): Promise<{ ok: boolean; models: string[]; error?: string }> =>
-      ipcRenderer.invoke(IpcChannels.AI_LIST_MODELS),
-
     // Returns an unsubscribe function. MUST be called on component unmount
     onChunk: (callback: (chunk: string, streamId?: string) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, chunk: string, streamId?: string) => callback(chunk, streamId)
@@ -380,12 +377,6 @@ const api = {
     toggle: (active?: boolean): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.HUD_TOGGLE, active),
 
-    onToggle: (callback: (visible: boolean) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, visible: boolean) => callback(visible)
-      ipcRenderer.on(IpcChannels.HUD_ON_TOGGLE, handler)
-      return () => ipcRenderer.removeListener(IpcChannels.HUD_ON_TOGGLE, handler)
-    },
-
     onReset: (callback: () => void): (() => void) => {
       const handler = () => callback()
       ipcRenderer.on('hud:reset', handler)
@@ -400,13 +391,7 @@ const api = {
   // Webhook
   webhook: {
     toggle: (active: boolean, port: number): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.WEBHOOK_TOGGLE, active, port),
-
-    onEvent: (callback: (payload: unknown) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, payload: unknown) => callback(payload)
-      ipcRenderer.on(IpcChannels.WEBHOOK_EVENT, handler)
-      return () => ipcRenderer.removeListener(IpcChannels.WEBHOOK_EVENT, handler)
-    }
+      ipcRenderer.invoke(IpcChannels.WEBHOOK_TOGGLE, active, port)
   },
 
   tray: {
@@ -461,12 +446,7 @@ const api = {
     }): Promise<boolean> => ipcRenderer.invoke(IpcChannels.NOTIFY_SEND, input),
     getPolicy: (): Promise<NotificationPolicy> => ipcRenderer.invoke(IpcChannels.NOTIFY_GET_POLICY),
     setPolicy: (policy: NotificationPolicy): Promise<NotificationPolicy> =>
-      ipcRenderer.invoke(IpcChannels.NOTIFY_SET_POLICY, policy),
-    onActivated: (callback: (payload: { itemId?: string }) => void): (() => void) => {
-      const listener = (_e: IpcRendererEvent, payload: { itemId?: string }): void => callback(payload)
-      ipcRenderer.on(IpcChannels.NOTIFY_ACTIVATED, listener)
-      return () => ipcRenderer.removeListener(IpcChannels.NOTIFY_ACTIVATED, listener)
-    }
+      ipcRenderer.invoke(IpcChannels.NOTIFY_SET_POLICY, policy)
   },
 
   recurrence: {
@@ -545,47 +525,9 @@ const api = {
     }
   },
 
-  // Hardware profiling (AI Cookbook)
-  hardware: {
-    getSpecs: (): Promise<unknown> =>
-      ipcRenderer.invoke(IpcChannels.HARDWARE_GET_SPECS)
-  },
-
-  // Ollama (AI Cookbook)
   ollama: {
-    check: (): Promise<unknown> =>
-      ipcRenderer.invoke(IpcChannels.OLLAMA_CHECK_INSTALLED),
-
     listLocal: (): Promise<string[]> =>
-      ipcRenderer.invoke(IpcChannels.OLLAMA_LIST_LOCAL),
-
-    pull: (modelTag: string, modelId: string): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.OLLAMA_PULL, modelTag, modelId),
-
-    stop: (): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.OLLAMA_STOP),
-
-    delete: (modelTag: string): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.OLLAMA_DELETE, modelTag),
-
-    onPullProgress: (callback: (event: unknown) => void): (() => void) => {
-      const handler = (_e: IpcRendererEvent, event: unknown) => callback(event)
-      ipcRenderer.on(IpcChannels.OLLAMA_PULL_PROGRESS, handler)
-      return () => ipcRenderer.removeListener(IpcChannels.OLLAMA_PULL_PROGRESS, handler)
-    },
-
-    onPullDone: (callback: (modelId: string) => void): (() => void) => {
-      const handler = (_e: IpcRendererEvent, modelId: string) => callback(modelId)
-      ipcRenderer.on(IpcChannels.OLLAMA_PULL_DONE, handler)
-      return () => ipcRenderer.removeListener(IpcChannels.OLLAMA_PULL_DONE, handler)
-    },
-
-    onPullError: (callback: (modelId: string, error: string) => void): (() => void) => {
-      const handler = (_e: IpcRendererEvent, modelId: string, error: string) =>
-        callback(modelId, error)
-      ipcRenderer.on(IpcChannels.OLLAMA_PULL_ERROR, handler)
-      return () => ipcRenderer.removeListener(IpcChannels.OLLAMA_PULL_ERROR, handler)
-    }
+      ipcRenderer.invoke(IpcChannels.OLLAMA_LIST_LOCAL)
   },
 
   cookbook: {
@@ -782,10 +724,6 @@ const api = {
       ipcRenderer.invoke(IpcChannels.AI_TOGGLE_PIN_MEMORY, id),
     updateMemoryContent: (id: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.AI_UPDATE_MEMORY_CONTENT, id, content),
-    batchSaveMemories: (items: CreateMemoryPayload[], context: string): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.AI_BATCH_SAVE_MEMORIES, items, context),
-    pruneMemories: (context: string, limit: number): Promise<void> =>
-      ipcRenderer.invoke('ai:pruneMemories', context, limit),
     auditMemories: (context: string, model: string): Promise<AiMemory[]> =>
       ipcRenderer.invoke('ai:auditMemories', context, model),
     consolidateMemory: (params: {

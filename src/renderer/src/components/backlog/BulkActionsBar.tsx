@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { X, Trash2, Download, Tag as TagIcon, ChevronUp, ChevronDown, Minus } from 'lucide-react'
 import type { Item, Tag as TagType } from '../../../../shared/types'
-import { PRIORITY_LABELS } from '../../lib/priority'
+import { PRIORITY_LABELS, PRIORITY_LEVELS } from '../../lib/priority'
 
 interface BulkActionsBarProps {
   selectedItems: Item[]
@@ -194,7 +194,7 @@ export default function BulkActionsBar({
                 boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)'
               }}
             >
-              {([3, 2, 1, 0] as const).map(p => (
+              {PRIORITY_LEVELS.map(p => (
                 <button
                   key={p}
                   onClick={async () => {

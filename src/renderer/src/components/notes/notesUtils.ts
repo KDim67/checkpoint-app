@@ -43,12 +43,6 @@ export function readingTime(text: string): string {
   return `${minutes} min read`
 }
 
-/** Extracts unaliased [[wiki-link]] targets from raw markdown. */
-export function extractWikiLinks(content: string): string[] {
-  const matches = content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)
-  return Array.from(new Set(Array.from(matches).map(m => m[1].trim())))
-}
-
 // Persisted preferences (localStorage)
 
 export type SortKey = 'updated' | 'title' | 'size'

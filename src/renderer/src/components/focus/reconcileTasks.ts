@@ -31,8 +31,3 @@ export function reconcileSelectedTasks(selected: Item[], live: Item[]): Item[] {
   }
   return reconciled
 }
-
-/** True when reconciliation would change the selection. */
-export function selectionNeedsUpdate(selected: Item[], live: Item[]): boolean {
-  return reconcileSelectedTasks(selected, live) !== selected
-}
