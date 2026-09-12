@@ -515,7 +515,14 @@ export default function KanbanView() {
     })
   }, [confirm])
 
-  /** What the host did with the merge this side offered. */
+  /**
+   * What the host did with the merge this side offered.
+   *
+   * A no ends the session, which the coordinator is doing as this runs: this
+   * board is now the merged one and the room is still on the host's, and a
+   * guest holding cards the room does not have loses them the moment the host
+   * takes anybody else's merge. So the panel is closed here too.
+   */
   const reportMergeAnswer = useCallback((accepted: boolean, by: string, reason: string) => {
     const them = by || 'They'
     if (accepted) {
@@ -523,9 +530,11 @@ export default function KanbanView() {
       return
     }
     const why = reason
-      ? `The merge was not taken: ${reason}. Your board is merged, theirs is not.`
-      : `${them} kept their own board. Yours is merged, theirs is not.`
+      ? `The merge was not taken: ${reason}. Your board is merged and sharing has ended.`
+      : `${them} kept their own board. Your board is merged and sharing has ended.`
     setCollabProgress(why)
+    setCollabActive(false)
+    setCollabRoster([])
     // Said out loud as well. The board just changed under this user and the
     // panel it would otherwise be said in is usually shut.
     toast(why)

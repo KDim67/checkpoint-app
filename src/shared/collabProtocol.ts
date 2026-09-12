@@ -213,6 +213,11 @@ export interface MergeProposalMessage {
  * board, so a guest who said no would keep receiving edits to cards it does not
  * have and sending edits for cards the others no longer do, and nobody would
  * know. Only the host is asked, because the board being shared is the host's.
+ *
+ * Safe to apply whole because everyone it reaches is holding the board it
+ * replaces. The one way to be in the room holding anything else is to have
+ * merged and been turned down, and that ends the session rather than leaving
+ * somebody here with cards this would delete.
  */
 export interface BoardResetMessage {
   type: 'board-reset'
