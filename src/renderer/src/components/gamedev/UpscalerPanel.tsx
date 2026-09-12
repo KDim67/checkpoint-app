@@ -6,22 +6,6 @@ import FilePickerButton from './FilePickerButton'
 import SettingsColumn from './SettingsColumn'
 
 export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
-  const {
-    upscalePath,
-    upscaleUrl,
-    upscaleAlgorithm,
-    setUpscaleAlgorithm,
-    upscaleExportedPath,
-    isUpscaleSaving,
-    upscaleDims,
-    upscaleShowOriginal,
-    setUpscaleShowOriginal,
-    upscalePreviewCanvasRef,
-    handleSelectUpscaleFile,
-    handleUpscaleDrop,
-    handleUpscaleExport
-  } = tool
-
   return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
         <div className="gamedev-info-banner">
@@ -41,8 +25,8 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                 Source Image
               </span>
               <FilePickerButton
-                onClick={handleSelectUpscaleFile}
-                path={upscalePath}
+                onClick={tool.handleSelectUpscaleFile}
+                path={tool.upscalePath}
                 placeholder="Load Texture..."
               />
             </div>
@@ -53,8 +37,8 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                 Scaling Filter
               </span>
               <select
-                value={upscaleAlgorithm}
-                onChange={e => setUpscaleAlgorithm(e.target.value as UpscaleAlgorithm)}
+                value={tool.upscaleAlgorithm}
+                onChange={e => tool.setUpscaleAlgorithm(e.target.value as UpscaleAlgorithm)}
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',
@@ -84,12 +68,12 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
             </div>
 
             {/* Before / after compare */}
-            {upscaleUrl && (
+            {tool.upscaleUrl && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"
-                  checked={upscaleShowOriginal}
-                  onChange={e => setUpscaleShowOriginal(e.target.checked)}
+                  checked={tool.upscaleShowOriginal}
+                  onChange={e => tool.setUpscaleShowOriginal(e.target.checked)}
                 />
                 <span>Compare: show original (nearest-scaled)</span>
               </label>
@@ -110,11 +94,11 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                  {upscaleShowOriginal ? 'Viewing: Original (nearest-scaled for comparison)' : 'Viewing: Upscaled result'}
+                  {tool.upscaleShowOriginal ? 'Viewing: Original (nearest-scaled for comparison)' : 'Viewing: Upscaled result'}
                 </span>
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', fontFamily: 'var(--font-mono)' }}>
-                  {upscaleDims
-                    ? `${upscaleDims.w}×${upscaleDims.h} → ${upscaleDims.ow}×${upscaleDims.oh} (${Math.round(upscaleDims.ow / upscaleDims.w)}×)`
+                  {tool.upscaleDims
+                    ? `${tool.upscaleDims.w}×${tool.upscaleDims.h} → ${tool.upscaleDims.ow}×${tool.upscaleDims.oh} (${Math.round(tool.upscaleDims.ow / tool.upscaleDims.w)}×)`
                     : 'Idle, load or drop an image'}
                 </span>
               </div>
@@ -123,7 +107,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
             {/* Viewport canvas. Accepts drag & drop */}
             <div
               onDragOver={e => e.preventDefault()}
-              onDrop={handleUpscaleDrop}
+              onDrop={tool.handleUpscaleDrop}
               style={{
                 flex: 1,
                 background: 'var(--color-background)',
@@ -136,7 +120,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                 overflow: 'hidden'
               }}
             >
-              {!upscaleUrl ? (
+              {!tool.upscaleUrl ? (
                 <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
                   <Maximize2 size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -144,7 +128,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Drop a pixel-art image here, or browse for one.</span>
                   </div>
                   <button
-                    onClick={handleSelectUpscaleFile}
+                    onClick={tool.handleSelectUpscaleFile}
                     style={{
                       background: 'var(--color-primary)',
                       border: 'none',
@@ -163,7 +147,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                 // imageRendering: pixelated. Without it the browser's smooth
                 // downscale blurs the crisp result, defeating the whole tool
                 <canvas
-                  ref={upscalePreviewCanvasRef}
+                  ref={tool.upscalePreviewCanvasRef}
                   style={{
                     width: '100%',
                     height: '100%',
@@ -180,7 +164,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
             </div>
 
             {/* Export trigger */}
-            {upscalePath && upscaleUrl && (
+            {tool.upscalePath && tool.upscaleUrl && (
               <div style={{
                 background: 'var(--color-surface-1)',
                 border: '1px solid var(--color-surface-offset)',
@@ -198,8 +182,8 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                     </span>
                   </div>
                   <button
-                    onClick={handleUpscaleExport}
-                    disabled={isUpscaleSaving}
+                    onClick={tool.handleUpscaleExport}
+                    disabled={tool.isUpscaleSaving}
                     style={{
                       background: 'var(--color-secondary)',
                       border: 'none',
@@ -211,10 +195,10 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      opacity: isUpscaleSaving ? 0.7 : 1,
+                      opacity: tool.isUpscaleSaving ? 0.7 : 1,
                     }}
                   >
-                    {isUpscaleSaving ? (
+                    {tool.isUpscaleSaving ? (
                       <>
                         <Loader size={14} className="animate-spin" />
                         <span>Exporting...</span>
@@ -228,7 +212,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                   </button>
                 </div>
 
-                {upscaleExportedPath && (
+                {tool.upscaleExportedPath && (
                   <div style={{
                     background: 'var(--color-success-muted)',
                     border: '1px solid rgba(0, 255, 128, 0.2)',
@@ -244,7 +228,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                       <CheckCircle size={13} />
                       <strong>Upscaled successfully saved!</strong>
                     </div>
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Saved Path: {upscaleExportedPath}</span>
+                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Saved Path: {tool.upscaleExportedPath}</span>
                   </div>
                 )}
               </div>

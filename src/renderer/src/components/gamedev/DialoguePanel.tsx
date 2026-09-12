@@ -10,24 +10,6 @@ export default function DialoguePanel({
   tool: DialogueTool
   onCopy: (text: string, label: string) => void
 }) {
-  const {
-    dialogueNodes,
-    nodeSpeaker,
-    setNodeSpeaker,
-    nodeText,
-    setNodeText,
-    nodeId,
-    setNodeId,
-    dialogueViewMode,
-    setDialogueViewMode,
-    dialogueChoiceInputs,
-    setDialogueChoiceInputs,
-    addDialogueNode,
-    removeDialogueNode,
-    addChoiceToNode,
-    removeChoiceFromNode,
-    compiledMermaid
-  } = tool
   const copyToClipboard = onCopy
 
   return (
@@ -58,8 +40,8 @@ export default function DialoguePanel({
               <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Unique Node ID</label>
               <input
                 type="text"
-                value={nodeId}
-                onChange={e => setNodeId(e.target.value)}
+                value={tool.nodeId}
+                onChange={e => tool.setNodeId(e.target.value)}
                 placeholder="e.g. quest_decline"
                 style={{
                   background: 'var(--color-surface-2)',
@@ -75,8 +57,8 @@ export default function DialoguePanel({
               <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Speaker Name</label>
               <input
                 type="text"
-                value={nodeSpeaker}
-                onChange={e => setNodeSpeaker(e.target.value)}
+                value={tool.nodeSpeaker}
+                onChange={e => tool.setNodeSpeaker(e.target.value)}
                 placeholder="e.g. Hero"
                 style={{
                   background: 'var(--color-surface-2)',
@@ -93,8 +75,8 @@ export default function DialoguePanel({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Dialogue Line</label>
             <textarea
-              value={nodeText}
-              onChange={e => setNodeText(e.target.value)}
+              value={tool.nodeText}
+              onChange={e => tool.setNodeText(e.target.value)}
               placeholder="e.g. I must find another path..."
               rows={2}
               style={{
@@ -111,7 +93,7 @@ export default function DialoguePanel({
           </div>
 
           <button
-            onClick={addDialogueNode}
+            onClick={tool.addDialogueNode}
             style={{
               background: 'var(--color-secondary)',
               color: 'var(--color-text-inverted)',
@@ -136,7 +118,7 @@ export default function DialoguePanel({
           <h4 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', margin: '0 0 var(--space-2)' }}>Branching Connections</h4>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', overflowY: 'auto', maxHeight: '180px' }}>
-            {dialogueNodes.map((node, nodeIdx) => (
+            {tool.dialogueNodes.map((node, nodeIdx) => (
               <div key={node.id} style={{
                 padding: 'var(--space-2)',
                 background: 'var(--color-surface-2)',
@@ -150,7 +132,7 @@ export default function DialoguePanel({
                     {node.id} ({node.speaker})
                   </strong>
                   <button
-                    onClick={() => removeDialogueNode(node.id)}
+                    onClick={() => tool.removeDialogueNode(node.id)}
                     disabled={node.id === 'start'}
                     style={{
                       background: 'transparent',
@@ -172,7 +154,7 @@ export default function DialoguePanel({
                   <div key={choiceIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', background: 'var(--color-surface-1)', padding: '2px 6px', borderRadius: '4px', marginTop: '2px' }}>
                     <span>choice: <strong>{c.text}</strong> ➔ {c.nextId}</span>
                     <button
-                      onClick={() => removeChoiceFromNode(nodeIdx, choiceIdx)}
+                      onClick={() => tool.removeChoiceFromNode(nodeIdx, choiceIdx)}
                       style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer' }}
                     >
                       ×
@@ -185,8 +167,8 @@ export default function DialoguePanel({
                   <input
                     type="text"
                     placeholder="Choice text"
-                    value={dialogueChoiceInputs[node.id]?.text || ''}
-                    onChange={e => setDialogueChoiceInputs(prev => ({
+                    value={tool.dialogueChoiceInputs[node.id]?.text || ''}
+                    onChange={e => tool.setDialogueChoiceInputs(prev => ({
                       ...prev,
                       [node.id]: {
                         text: e.target.value,
@@ -204,8 +186,8 @@ export default function DialoguePanel({
                     }}
                   />
                   <select
-                    value={dialogueChoiceInputs[node.id]?.nextId || ''}
-                    onChange={e => setDialogueChoiceInputs(prev => ({
+                    value={tool.dialogueChoiceInputs[node.id]?.nextId || ''}
+                    onChange={e => tool.setDialogueChoiceInputs(prev => ({
                       ...prev,
                       [node.id]: {
                         text: prev[node.id]?.text || '',
@@ -223,16 +205,16 @@ export default function DialoguePanel({
                     }}
                   >
                     <option value="">Next Node</option>
-                    {dialogueNodes.map(opt => (
+                    {tool.dialogueNodes.map(opt => (
                       opt.id !== node.id && <option key={opt.id} value={opt.id}>{opt.id}</option>
                     ))}
                   </select>
                   <button
                     onClick={() => {
-                      const inputVal = dialogueChoiceInputs[node.id]
+                      const inputVal = tool.dialogueChoiceInputs[node.id]
                       if (inputVal && inputVal.text && inputVal.nextId) {
-                        addChoiceToNode(nodeIdx, inputVal.text, inputVal.nextId)
-                        setDialogueChoiceInputs(prev => ({
+                        tool.addChoiceToNode(nodeIdx, inputVal.text, inputVal.nextId)
+                        tool.setDialogueChoiceInputs(prev => ({
                           ...prev,
                           [node.id]: { text: '', nextId: '' }
                         }))
@@ -271,10 +253,10 @@ export default function DialoguePanel({
             <div className="row">
               <div style={{ display: 'flex', gap: '2px', background: 'var(--color-surface-2)', padding: '2px', borderRadius: '6px', border: '1px solid var(--color-surface-offset)' }}>
                 <button
-                  onClick={() => setDialogueViewMode('visual')}
+                  onClick={() => tool.setDialogueViewMode('visual')}
                   style={{
-                    background: dialogueViewMode === 'visual' ? 'var(--color-secondary-muted)' : 'transparent',
-                    color: dialogueViewMode === 'visual' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                    background: tool.dialogueViewMode === 'visual' ? 'var(--color-secondary-muted)' : 'transparent',
+                    color: tool.dialogueViewMode === 'visual' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                     border: 'none',
                     padding: '4px 8px',
                     borderRadius: '4px',
@@ -287,10 +269,10 @@ export default function DialoguePanel({
                   Visual Chart
                 </button>
                 <button
-                  onClick={() => setDialogueViewMode('code')}
+                  onClick={() => tool.setDialogueViewMode('code')}
                   style={{
-                    background: dialogueViewMode === 'code' ? 'var(--color-secondary-muted)' : 'transparent',
-                    color: dialogueViewMode === 'code' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                    background: tool.dialogueViewMode === 'code' ? 'var(--color-secondary-muted)' : 'transparent',
+                    color: tool.dialogueViewMode === 'code' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                     border: 'none',
                     padding: '4px 8px',
                     borderRadius: '4px',
@@ -304,7 +286,7 @@ export default function DialoguePanel({
                 </button>
               </div>
               <button
-                onClick={() => copyToClipboard(compiledMermaid, 'Mermaid Flowchart')}
+                onClick={() => copyToClipboard(tool.compiledMermaid, 'Mermaid Flowchart')}
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',
@@ -324,8 +306,8 @@ export default function DialoguePanel({
             </div>
           </div>
 
-          {dialogueViewMode === 'visual' ? (
-            <MermaidChart style={{ maxHeight: '340px', boxSizing: 'border-box' }} code={compiledMermaid} />
+          {tool.dialogueViewMode === 'visual' ? (
+            <MermaidChart style={{ maxHeight: '340px', boxSizing: 'border-box' }} code={tool.compiledMermaid} />
           ) : (
             <pre style={{
               margin: 0,
@@ -341,7 +323,7 @@ export default function DialoguePanel({
               maxHeight: '340px',
               border: '1px solid var(--color-surface-offset)'
             }}>
-              {compiledMermaid}
+              {tool.compiledMermaid}
             </pre>
           )}
         </div>

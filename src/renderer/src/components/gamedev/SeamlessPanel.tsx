@@ -5,38 +5,6 @@ import type { SeamlessTool } from './useSeamlessTool'
 import TextureDropZone from './TextureDropZone'
 
 export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool; onCardDone: (cardId: string) => Promise<void> }) {
-  const {
-    setSeamlessPath,
-    setSeamlessUrl,
-    setSeamlessExportedFile,
-    updateSeamlessPreviewDebounced,
-    preloadSeamlessCardId,
-    seamlessPath,
-    seamlessUrl,
-    seamlessBlendWidth,
-    setSeamlessBlendWidth,
-    seamlessAlgorithm,
-    setSeamlessAlgorithm,
-    seamlessTilingScale,
-    setSeamlessTilingScale,
-    seamlessEqualizer,
-    setSeamlessEqualizer,
-    seamlessWavySeams,
-    setSeamlessWavySeams,
-    isSeamlessProcessing,
-    isSeamlessSaving,
-    seamlessShowGrid,
-    setSeamlessShowGrid,
-    seamlessExportedFile,
-    seamlessShowOriginal,
-    setSeamlessShowOriginal,
-    seamlessTilingCanvasRef,
-    handleSeamlessExport,
-    handleSeamlessDragOver,
-    handleSeamlessDrop,
-    handleSeamlessBrowseClick
-  } = tool
-
   return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
         <div className="gamedev-info-banner">
@@ -46,13 +14,13 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
           </div>
         </div>
 
-        {!seamlessUrl ? (
+        {!tool.seamlessUrl ? (
           /* Drop Zone */
           <TextureDropZone
-            onDragOver={handleSeamlessDragOver}
-            onDrop={handleSeamlessDrop}
-            onClick={handleSeamlessBrowseClick}
-            processing={isSeamlessProcessing}
+            onDragOver={tool.handleSeamlessDragOver}
+            onDrop={tool.handleSeamlessDrop}
+            onClick={tool.handleSeamlessBrowseClick}
+            processing={tool.isSeamlessProcessing}
             label="Drag & Drop Base Texture"
           />
         ) : (
@@ -88,13 +56,13 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </span>
                   <div style={{ display: 'flex', gap: '4px', background: 'var(--color-background)', padding: '2px', borderRadius: 'var(--radius-sm)' }}>
                     <button
-                      onClick={() => setSeamlessAlgorithm('mirror')}
+                      onClick={() => tool.setSeamlessAlgorithm('mirror')}
                       style={{
                         flex: 1,
-                        background: seamlessAlgorithm === 'mirror' ? 'var(--color-surface-2)' : 'transparent',
+                        background: tool.seamlessAlgorithm === 'mirror' ? 'var(--color-surface-2)' : 'transparent',
                         border: 'none',
                         borderRadius: 'var(--radius-sm)',
-                        color: seamlessAlgorithm === 'mirror' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                        color: tool.seamlessAlgorithm === 'mirror' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                         padding: '6px',
                         fontSize: '11px',
                         fontWeight: 'var(--weight-semibold)',
@@ -104,13 +72,13 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       Mirror Edges
                     </button>
                     <button
-                      onClick={() => setSeamlessAlgorithm('feather')}
+                      onClick={() => tool.setSeamlessAlgorithm('feather')}
                       style={{
                         flex: 1,
-                        background: seamlessAlgorithm === 'feather' ? 'var(--color-surface-2)' : 'transparent',
+                        background: tool.seamlessAlgorithm === 'feather' ? 'var(--color-surface-2)' : 'transparent',
                         border: 'none',
                         borderRadius: 'var(--radius-sm)',
-                        color: seamlessAlgorithm === 'feather' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                        color: tool.seamlessAlgorithm === 'feather' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                         padding: '6px',
                         fontSize: '11px',
                         fontWeight: 'var(--weight-semibold)',
@@ -123,19 +91,19 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 </div>
 
                 {/* Blend Width (only if feathering is selected) */}
-                {seamlessAlgorithm === 'feather' && (
+                {tool.seamlessAlgorithm === 'feather' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                       <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Blend/Overlap Width</span>
-                      <span style={{ color: 'var(--color-secondary)' }}>{Math.round(seamlessBlendWidth * 100)}%</span>
+                      <span style={{ color: 'var(--color-secondary)' }}>{Math.round(tool.seamlessBlendWidth * 100)}%</span>
                     </div>
                     <input
                       type="range"
                       min="0.05"
                       max="0.40"
                       step="0.01"
-                      value={seamlessBlendWidth}
-                      onChange={e => { setSeamlessBlendWidth(parseFloat(e.target.value)); updateSeamlessPreviewDebounced() }}
+                      value={tool.seamlessBlendWidth}
+                      onChange={e => { tool.setSeamlessBlendWidth(parseFloat(e.target.value)); tool.updateSeamlessPreviewDebounced() }}
                       style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                     />
                   </div>
@@ -145,33 +113,33 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                     <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Luminance Equalizer</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{Math.round(seamlessEqualizer * 100)}%</span>
+                    <span style={{ color: 'var(--color-secondary)' }}>{Math.round(tool.seamlessEqualizer * 100)}%</span>
                   </div>
                   <input
                     type="range"
                     min="0.0"
                     max="1.0"
                     step="0.05"
-                    value={seamlessEqualizer}
-                    onChange={e => { setSeamlessEqualizer(parseFloat(e.target.value)); updateSeamlessPreviewDebounced() }}
+                    value={tool.seamlessEqualizer}
+                    onChange={e => { tool.setSeamlessEqualizer(parseFloat(e.target.value)); tool.updateSeamlessPreviewDebounced() }}
                     style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                   />
                 </div>
 
                 {/* Wavy Seams (only if feathering is selected) */}
-                {seamlessAlgorithm === 'feather' && (
+                {tool.seamlessAlgorithm === 'feather' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                       <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Wavy Seams (Mask Warping)</span>
-                      <span style={{ color: 'var(--color-secondary)' }}>{Math.round(seamlessWavySeams * 100)}%</span>
+                      <span style={{ color: 'var(--color-secondary)' }}>{Math.round(tool.seamlessWavySeams * 100)}%</span>
                     </div>
                     <input
                       type="range"
                       min="0.0"
                       max="1.0"
                       step="0.05"
-                      value={seamlessWavySeams}
-                      onChange={e => { setSeamlessWavySeams(parseFloat(e.target.value)); updateSeamlessPreviewDebounced() }}
+                      value={tool.seamlessWavySeams}
+                      onChange={e => { tool.setSeamlessWavySeams(parseFloat(e.target.value)); tool.updateSeamlessPreviewDebounced() }}
                       style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                     />
                   </div>
@@ -186,13 +154,13 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     {([2, 3, 4] as const).map(scale => (
                       <button
                         key={scale}
-                        onClick={() => setSeamlessTilingScale(scale)}
+                        onClick={() => tool.setSeamlessTilingScale(scale)}
                         style={{
                           flex: 1,
-                          background: seamlessTilingScale === scale ? 'var(--color-surface-2)' : 'transparent',
+                          background: tool.seamlessTilingScale === scale ? 'var(--color-surface-2)' : 'transparent',
                           border: 'none',
                           borderRadius: 'var(--radius-sm)',
-                          color: seamlessTilingScale === scale ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+                          color: tool.seamlessTilingScale === scale ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                           padding: '6px',
                           fontSize: '11px',
                           fontWeight: 'var(--weight-semibold)',
@@ -212,8 +180,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </span>
                   <input
                     type="checkbox"
-                    checked={seamlessShowGrid}
-                    onChange={e => setSeamlessShowGrid(e.target.checked)}
+                    checked={tool.seamlessShowGrid}
+                    onChange={e => tool.setSeamlessShowGrid(e.target.checked)}
                     style={{
                       width: '14px',
                       height: '14px',
@@ -240,14 +208,14 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
               }}>
                 <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Active Asset:</span>
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={seamlessPath || ''}>
-                    {seamlessPath ? seamlessPath.split(/[\\/]/).pop() : 'Direct Memory'}
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tool.seamlessPath || ''}>
+                    {tool.seamlessPath ? tool.seamlessPath.split(/[\\/]/).pop() : 'Direct Memory'}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <button
-                    onClick={handleSeamlessBrowseClick}
+                    onClick={tool.handleSeamlessBrowseClick}
                     style={{
                       background: 'var(--color-surface-2)',
                       border: '1px solid var(--color-surface-offset)',
@@ -262,9 +230,9 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </button>
                   <button
                     onClick={() => {
-                      setSeamlessUrl(null)
-                      setSeamlessPath(null)
-                      setSeamlessExportedFile(null)
+                      tool.setSeamlessUrl(null)
+                      tool.setSeamlessPath(null)
+                      tool.setSeamlessExportedFile(null)
                       useAppStore.getState().setGamedevPreloadSeamless(null, null)
                     }}
                     style={{
@@ -299,7 +267,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 {/* Before / After Compare Toggle */}
                 <div style={{ display: 'flex', gap: '4px', alignSelf: 'center', background: 'var(--color-surface-1)', padding: '3px', borderRadius: 'var(--radius-sm)' }}>
                   <button
-                    onClick={() => setSeamlessShowOriginal(false)}
+                    onClick={() => tool.setSeamlessShowOriginal(false)}
                     style={{
                       padding: '4px 12px',
                       fontSize: '10px',
@@ -307,14 +275,14 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       borderRadius: 'calc(var(--radius-sm) - 1px)',
                       border: 'none',
                       cursor: 'pointer',
-                      background: !seamlessShowOriginal ? 'var(--color-primary)' : 'transparent',
-                      color: !seamlessShowOriginal ? 'var(--color-on-accent)' : 'var(--color-text-muted)'
+                      background: !tool.seamlessShowOriginal ? 'var(--color-primary)' : 'transparent',
+                      color: !tool.seamlessShowOriginal ? 'var(--color-on-accent)' : 'var(--color-text-muted)'
                     }}
                   >
                     Result
                   </button>
                   <button
-                    onClick={() => setSeamlessShowOriginal(true)}
+                    onClick={() => tool.setSeamlessShowOriginal(true)}
                     style={{
                       padding: '4px 12px',
                       fontSize: '10px',
@@ -322,14 +290,14 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       borderRadius: 'calc(var(--radius-sm) - 1px)',
                       border: 'none',
                       cursor: 'pointer',
-                      background: seamlessShowOriginal ? 'var(--color-surface-2)' : 'transparent',
-                      color: seamlessShowOriginal ? 'var(--color-text-base)' : 'var(--color-text-muted)'
+                      background: tool.seamlessShowOriginal ? 'var(--color-surface-2)' : 'transparent',
+                      color: tool.seamlessShowOriginal ? 'var(--color-text-base)' : 'var(--color-text-muted)'
                     }}
                   >
                     Original
                   </button>
                 </div>
-                <canvas ref={seamlessTilingCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+                <canvas ref={tool.seamlessTilingCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
               </div>
 
               {/* Export Trigger Block */}
@@ -350,8 +318,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     </span>
                   </div>
                   <button
-                    onClick={handleSeamlessExport}
-                    disabled={isSeamlessSaving}
+                    onClick={tool.handleSeamlessExport}
+                    disabled={tool.isSeamlessSaving}
                     style={{
                       background: 'var(--color-secondary)',
                       border: 'none',
@@ -363,10 +331,10 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      opacity: isSeamlessSaving ? 0.7 : 1,
+                      opacity: tool.isSeamlessSaving ? 0.7 : 1,
                     }}
                   >
-                    {isSeamlessSaving ? (
+                    {tool.isSeamlessSaving ? (
                       <>
                         <Loader size={14} className="animate-spin" />
                         <span>Exporting...</span>
@@ -381,7 +349,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 </div>
 
                 {/* Kanban Card Ticket Done Prompt */}
-                {preloadSeamlessCardId && seamlessExportedFile && (
+                {tool.preloadSeamlessCardId && tool.seamlessExportedFile && (
                   <div style={{
                     background: 'var(--color-secondary-muted)',
                     border: '1px solid var(--color-secondary)',
@@ -405,7 +373,9 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
                       <button
                         onClick={async () => {
-                          await onCardDone(preloadSeamlessCardId)
+                          const cardId = tool.preloadSeamlessCardId
+                          if (!cardId) return
+                          await onCardDone(cardId)
                           useAppStore.getState().setGamedevPreloadSeamless(null, null)
                         }}
                         style={{

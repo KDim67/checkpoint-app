@@ -5,25 +5,6 @@ import type { AtlasTool } from './useAtlasTool'
 import FilePickerButton from './FilePickerButton'
 
 export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
-  const {
-    atlasFolderPath,
-    atlasSprites,
-    atlasPadding,
-    setAtlasPadding,
-    atlasMaxSize,
-    setAtlasMaxSize,
-    atlasAutoTrim,
-    setAtlasAutoTrim,
-    isAtlasPacking,
-    isAtlasSaving,
-    atlasExportedPng,
-    atlasExportedJson,
-    atlasLayout,
-    atlasPreviewCanvasRef,
-    handleSelectAtlasFolder,
-    handleAtlasExport
-  } = tool
-
   return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
         <div className="gamedev-info-banner">
@@ -59,13 +40,13 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 Source Directory
               </span>
               <FilePickerButton
-                onClick={handleSelectAtlasFolder}
-                path={atlasFolderPath}
+                onClick={tool.handleSelectAtlasFolder}
+                path={tool.atlasFolderPath}
                 placeholder="Choose a Folder..."
               />
-              {atlasFolderPath && (
+              {tool.atlasFolderPath && (
                 <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', overflowWrap: 'break-word' }}>
-                  Path: {atlasFolderPath}
+                  Path: {tool.atlasFolderPath}
                 </span>
               )}
             </div>
@@ -76,15 +57,15 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                   <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Border Padding</span>
-                  <span style={{ color: 'var(--color-secondary)' }}>{atlasPadding}px</span>
+                  <span style={{ color: 'var(--color-secondary)' }}>{tool.atlasPadding}px</span>
                 </div>
                 <input
                   type="range"
                   min="0"
                   max="32"
                   step="1"
-                  value={atlasPadding}
-                  onChange={e => setAtlasPadding(parseInt(e.target.value))}
+                  value={tool.atlasPadding}
+                  onChange={e => tool.setAtlasPadding(parseInt(e.target.value))}
                   style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                 />
               </div>
@@ -95,8 +76,8 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                   Max Atlas Size
                 </span>
                 <select
-                  value={atlasMaxSize}
-                  onChange={e => setAtlasMaxSize(parseInt(e.target.value) as AtlasMaxSize)}
+                  value={tool.atlasMaxSize}
+                  onChange={e => tool.setAtlasMaxSize(parseInt(e.target.value) as AtlasMaxSize)}
                   style={{
                     background: 'var(--color-surface-2)',
                     border: '1px solid var(--color-surface-offset)',
@@ -123,8 +104,8 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 </div>
                 <input
                   type="checkbox"
-                  checked={atlasAutoTrim}
-                  onChange={e => setAtlasAutoTrim(e.target.checked)}
+                  checked={tool.atlasAutoTrim}
+                  onChange={e => tool.setAtlasAutoTrim(e.target.checked)}
                   style={{
                     width: '14px',
                     height: '14px',
@@ -136,7 +117,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
             </div>
 
             {/* Reality Check Warnings */}
-            {atlasSprites.length > 150 && (
+            {tool.atlasSprites.length > 150 && (
               <div style={{
                 background: 'var(--color-warning-muted)',
                 border: '1px solid rgba(255, 170, 0, 0.3)',
@@ -151,7 +132,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               }}>
                 <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <span>
-                  High Sprite Count Warning: Packing {atlasSprites.length} textures. Chrome is capped at 200 loose frames to prevent memory exhaustion.
+                  High Sprite Count Warning: Packing {tool.atlasSprites.length} textures. Chrome is capped at 200 loose frames to prevent memory exhaustion.
                 </span>
               </div>
             )}
@@ -172,14 +153,14 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Atlas Status:</span>
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
-                  {atlasFolderPath ? `${atlasSprites.length} Sprites Loaded` : 'Idle - Please choose folder'}
+                  {tool.atlasFolderPath ? `${tool.atlasSprites.length} Sprites Loaded` : 'Idle - Please choose folder'}
                 </span>
               </div>
-              {atlasLayout && (
+              {tool.atlasLayout && (
                 <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: '11px' }}>
                   <div>
                     <span style={{ color: 'var(--color-text-muted)', marginRight: '4px' }}>Packed Dimensions:</span>
-                    <span style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)' }}>{atlasLayout.size} x {atlasLayout.size} px</span>
+                    <span style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)' }}>{tool.atlasLayout.size} x {tool.atlasLayout.size} px</span>
                   </div>
                 </div>
               )}
@@ -197,7 +178,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               padding: 'var(--space-4)',
               overflow: 'hidden'
             }}>
-              {!atlasFolderPath ? (
+              {!tool.atlasFolderPath ? (
                 <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
                   <Box size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -205,7 +186,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Select a folder of loose sprites to begin forging the atlas.</span>
                   </div>
                   <button
-                    onClick={handleSelectAtlasFolder}
+                    onClick={tool.handleSelectAtlasFolder}
                     style={{
                       background: 'var(--color-primary)',
                       border: 'none',
@@ -220,18 +201,18 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                     Choose Folder
                   </button>
                 </div>
-              ) : isAtlasPacking ? (
+              ) : tool.isAtlasPacking ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
                   <Loader size={32} className="animate-spin" style={{ color: 'var(--color-secondary)' }} />
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Calculating optimum packing layout...</span>
                 </div>
               ) : (
-                <canvas ref={atlasPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+                <canvas ref={tool.atlasPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
               )}
             </div>
 
             {/* Export Trigger Block */}
-            {atlasFolderPath && atlasLayout && (
+            {tool.atlasFolderPath && tool.atlasLayout && (
               <div style={{
                 background: 'var(--color-surface-1)',
                 border: '1px solid var(--color-surface-offset)',
@@ -249,8 +230,8 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                     </span>
                   </div>
                   <button
-                    onClick={handleAtlasExport}
-                    disabled={isAtlasSaving}
+                    onClick={tool.handleAtlasExport}
+                    disabled={tool.isAtlasSaving}
                     style={{
                       background: 'var(--color-secondary)',
                       border: 'none',
@@ -262,10 +243,10 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      opacity: isAtlasSaving ? 0.7 : 1,
+                      opacity: tool.isAtlasSaving ? 0.7 : 1,
                     }}
                   >
-                    {isAtlasSaving ? (
+                    {tool.isAtlasSaving ? (
                       <>
                         <Loader size={14} className="animate-spin" />
                         <span>Saving...</span>
@@ -280,7 +261,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 </div>
 
                 {/* Saved file notification info */}
-                {atlasExportedPng && (
+                {tool.atlasExportedPng && (
                   <div style={{
                     background: 'var(--color-success-muted)',
                     border: '1px solid rgba(0, 255, 128, 0.2)',
@@ -296,8 +277,8 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                       <CheckCircle size={13} />
                       <strong>Atlas generated successfully!</strong>
                     </div>
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>PNG Path: {atlasExportedPng}</span>
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>JSON Path: {atlasExportedJson}</span>
+                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>PNG Path: {tool.atlasExportedPng}</span>
+                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>JSON Path: {tool.atlasExportedJson}</span>
                   </div>
                 )}
               </div>
