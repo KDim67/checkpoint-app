@@ -9,7 +9,7 @@ import useFocusTrap from './useFocusTrap'
  * being readable: the labels have to shrink to fit, and a label alone cannot
  * say what the answer does. The row has space to say it.
  */
-export interface PickChoice {
+interface PickChoice {
   key: string
   label: string
   /** One line on what this answer does. Shown under the label. */

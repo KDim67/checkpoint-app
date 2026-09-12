@@ -7,7 +7,7 @@
 // Core Domain Types
 
 export type ItemType = 'log' | 'card' | 'task'
-export type ItemStatus = string
+type ItemStatus = string
 export type ItemPriority = 0 | 1 | 2 | 3 // 0=none, 1=low, 2=med, 3=high
 export type RelationType = 'blocks' | 'relates_to' | 'duplicates'
 
@@ -52,7 +52,7 @@ export interface Relation {
   type: RelationType
 }
 
-export interface AppSetting {
+interface AppSetting {
   key: string
   value: string          // JSON-stringified value
 }
@@ -155,7 +155,7 @@ export interface PaginatedResult<T> {
 // AI
 
 /** Multimodal content part (OpenAI-compatible). Used for vision-model image input. */
-export type AiContentPart =
+type AiContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }
 
@@ -237,7 +237,7 @@ export interface FitResult {
 }
 
 /** Model capabilities used for filtering and capability badges. */
-export type ModelCapability = 'chat' | 'code' | 'reasoning' | 'vision' | 'tools' | 'embedding'
+type ModelCapability = 'chat' | 'code' | 'reasoning' | 'vision' | 'tools' | 'embedding'
 
 export interface CatalogModel {
   id: string

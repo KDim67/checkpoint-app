@@ -8,7 +8,7 @@
  */
 
 /** Parses `#rrggbb` into channels, or null if it is not a six-digit hex. */
-export function parseHex(hex: string): [number, number, number] | null {
+function parseHex(hex: string): [number, number, number] | null {
   const h = hex.trim().replace('#', '')
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
   return [
@@ -28,14 +28,14 @@ const toHex = (n: number): string =>
  * tuned against the board's colour picker presets; switching formulas flips
  * several of them.
  */
-export function perceivedBrightness(r: number, g: number, b: number): number {
+function perceivedBrightness(r: number, g: number, b: number): number {
   return (r * 299 + g * 587 + b * 114) / 1000
 }
 
 /** The brightness at or above which a background wants dark text. */
-export const LIGHT_BACKGROUND_THRESHOLD = 115
+const LIGHT_BACKGROUND_THRESHOLD = 115
 
-export const DARK_FOREGROUND = '#0f172a'
+const DARK_FOREGROUND = '#0f172a'
 export const LIGHT_FOREGROUND = '#ffffff'
 
 /**

@@ -19,7 +19,7 @@ export const MODE_TITLES: Record<TimerMode, string> = {
   'long-break': 'Long Break'
 }
 
-export interface TimerPresetConfig {
+interface TimerPresetConfig {
   label: string
   durationMs: number
 }

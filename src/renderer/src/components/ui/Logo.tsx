@@ -1,7 +1,7 @@
 import React from 'react'
 import logoSvg from '../../assets/checkpoint_logo.svg'
 
-export interface LogoProps {
+interface LogoProps {
   size?: number
   variant?: 'full' | 'mark'
   showText?: boolean

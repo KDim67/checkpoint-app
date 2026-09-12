@@ -23,7 +23,7 @@ export const THEME_VAR_NAMES = [
   '--font-sans'
 ] as const
 
-export type ThemeVarName = (typeof THEME_VAR_NAMES)[number]
+type ThemeVarName = (typeof THEME_VAR_NAMES)[number]
 export type ThemeVariables = Record<ThemeVarName, string>
 
 /** The shipped brand values. Also what "Reset to Defaults" returns you to. */

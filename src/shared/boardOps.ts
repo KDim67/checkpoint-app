@@ -17,7 +17,7 @@ import {
   type ColumnSort
 } from './boardModel'
 
-export type ConfigOp =
+type ConfigOp =
   | 'add_column'
   | 'update_column'
   | 'delete_column'
@@ -55,7 +55,7 @@ export interface ConfigOperation {
   restoreCards?: { id: string; status: string }[]
 }
 
-export interface ApplyResult {
+interface ApplyResult {
   next: BoardConfig
   /** Applied in order, returns the board to its previous configuration. */
   inverse: ConfigOperation[]

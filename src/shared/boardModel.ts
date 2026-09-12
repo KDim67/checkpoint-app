@@ -44,7 +44,7 @@ export interface CardDisplay {
   doneCheckbox: boolean
 }
 
-export interface BoardFilters {
+interface BoardFilters {
   query: string
   priority: number | null
   tagId: string | null
@@ -108,7 +108,7 @@ export function sameColumnConfig(a: ColumnConfig, b: ColumnConfig): boolean {
   return true
 }
 
-export const DEFAULT_FILTERS: BoardFilters = {
+const DEFAULT_FILTERS: BoardFilters = {
   query: '',
   priority: null,
   tagId: null

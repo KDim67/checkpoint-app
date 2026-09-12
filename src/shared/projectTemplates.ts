@@ -10,7 +10,7 @@
 import type { ColumnConfig } from './boardModel'
 import type { ItemPriority } from './types'
 
-export interface TemplateColumn {
+interface TemplateColumn {
   name: string
   /** Null, or absent, means no limit. Same convention as ColumnConfig. */
   wipLimit?: number | null
@@ -18,7 +18,7 @@ export interface TemplateColumn {
   description?: string
 }
 
-export interface TemplateCard {
+interface TemplateCard {
   title: string
   body?: string
   /** The column's *name*; ids are derived, so templates stay readable. */
@@ -256,7 +256,7 @@ export function buildTemplateColumns(template: ProjectTemplate): ColumnConfig[] 
   }))
 }
 
-export interface TemplateCardDraft {
+interface TemplateCardDraft {
   title: string
   body: string
   /** Column id, already resolved against the template's own columns. */

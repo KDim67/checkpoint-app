@@ -76,7 +76,7 @@ export function getBackupDir(): string {
  * of the live database immediately before a restore overwrites it, so a restore
  * chosen by mistake can be undone.
  */
-export type BackupKind = 'scheduled' | 'preRestore'
+type BackupKind = 'scheduled' | 'preRestore'
 
 const PREFIXES: Record<BackupKind, string> = {
   scheduled: 'backup_',

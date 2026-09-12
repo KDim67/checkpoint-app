@@ -115,7 +115,7 @@ if (!gotTheLock) {
   })
 }
 
-export function registerAppShortcuts(): void {
+function registerAppShortcuts(): void {
   // Unregister existing custom shortcut if any
   if (activeClipboardHotkey) {
     globalShortcut.unregister(activeClipboardHotkey)
@@ -1068,7 +1068,7 @@ function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.on('hud:resize', (_event, height: number) => {
+  ipcMain.on(IpcChannels.HUD_RESIZE, (_event, height: number) => {
     import('./hud').then(({ resizeHud }) => {
       resizeHud(height)
     }).catch(console.error)
@@ -1112,7 +1112,7 @@ function registerIpcHandlers(): void {
   })
 
   // Phase 22 Customizer & Extensions Handlers
-  ipcMain.handle('customizer:toggleEngine', async (_event, active: boolean) => {
+  ipcMain.handle(IpcChannels.CUSTOMIZER_TOGGLE_ENGINE, async (_event, active: boolean) => {
     const { enableCustomizer, disableCustomizer } = await import('./customizer')
     const { setSetting } = await import('./db')
     setSetting('customizer_enabled', String(active))
@@ -1125,7 +1125,7 @@ function registerIpcHandlers(): void {
     registerAppShortcuts()
   })
 
-  ipcMain.handle('customizer:getEngineState', async () => {
+  ipcMain.handle(IpcChannels.CUSTOMIZER_GET_ENGINE_STATE, async () => {
     const { getSetting } = await import('./db')
     return getSetting<string>('customizer_enabled', 'false') === 'true'
   })
@@ -1139,7 +1139,7 @@ function registerIpcHandlers(): void {
     updateTitleBarOverlay(vars)
   })
 
-  ipcMain.handle('customizer:getTheme', async () => {
+  ipcMain.handle(IpcChannels.CUSTOMIZER_GET_THEME, async () => {
     const { getSetting } = await import('./db')
     const rawVars = getSetting('customizer_theme_vars', '{}')
     try {
@@ -1229,7 +1229,7 @@ function registerIpcHandlers(): void {
     registerAppShortcuts()
   })
 
-  ipcMain.handle('customizer:getShortcuts', async () => {
+  ipcMain.handle(IpcChannels.CUSTOMIZER_GET_SHORTCUTS, async () => {
     const { getSetting } = await import('./db')
     const rawShortcuts = getSetting('customizer_shortcuts', '{}')
     try {

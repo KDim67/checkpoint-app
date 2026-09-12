@@ -75,7 +75,7 @@ interface OllamaTagEntry {
  * away everything but the name, which is why model size had to be guessed from
  * that name in the first place.
  */
-export async function listOllamaModels(
+async function listOllamaModels(
   baseURL: string
 ): Promise<Array<{ name: string; paramsB: number | null; quantization: string | null }>> {
   const data = (await fetchJson(`${ollamaRoot(baseURL)}/api/tags`)) as { models?: OllamaTagEntry[] }

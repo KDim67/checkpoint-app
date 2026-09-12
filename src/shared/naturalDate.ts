@@ -3,14 +3,13 @@
  * `- task`, `#tag`, `@context` and `!priority`; the due date was the one thing
  * left to set by hand, which defeats a capture bar.
  *
- * A small, predictable grammar rather than a date library. Everything it knows
- * is in RECOGNISED below: matching more than the user expects silently dates
- * things that were never meant to be dated.
+ * A small, predictable grammar rather than a date library: matching more than
+ * the user expects silently dates things that were never meant to be dated.
  *
  * Local time, like the recurrence rules. "Tomorrow 3pm" means 3pm where they are.
  */
 
-export interface ParsedDate {
+interface ParsedDate {
   /** Epoch milliseconds, or null when the text carried no date. */
   dueAt: number | null
   /** The input with the date phrase removed. */
@@ -31,14 +30,6 @@ const WEEKDAYS: Record<string, number> = {
   friday: 5, fri: 5,
   saturday: 6, sat: 6
 }
-
-/** Everything the parser will match, for the UI hint and for the tests. */
-export const RECOGNISED = [
-  'today', 'tonight', 'tomorrow', 'next week',
-  'monday … sunday (and mon, tue, …)', 'next monday …',
-  'in 2 days', 'in 3 weeks', 'in 4 hours',
-  '3pm', '15:30', 'at 9am'
-]
 
 const startOfDay = (d: Date): Date => {
   const out = new Date(d)

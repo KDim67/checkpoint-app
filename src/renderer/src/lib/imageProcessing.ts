@@ -8,7 +8,7 @@
  * One free rectangle in the atlas, and the two it becomes once something is
  * placed in it. The tree is recursive, so the node type has to be too.
  */
-export interface PackerNode {
+interface PackerNode {
   x: number
   y: number
   w: number
@@ -57,7 +57,7 @@ export class BinaryTreePacker {
 }
 
 // Shared PBR Pixel Processing Utility
-export interface PbrParams {
+interface PbrParams {
   normalIntensity: number
   heightDepth: number
   roughnessContrast: number
@@ -159,7 +159,7 @@ export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, par
 // export path, and composable (Scale4x = Scale2x applied twice).
 
 /** Read a pixel as a packed 32-bit RGBA value with clamped border reads. */
-export function makePixelReaders(s: Uint8ClampedArray, w: number, h: number) {
+function makePixelReaders(s: Uint8ClampedArray, w: number, h: number) {
   const idx = (x: number, y: number): number => {
     const cx = x < 0 ? 0 : x >= w ? w - 1 : x
     const cy = y < 0 ? 0 : y >= h ? h - 1 : y
@@ -239,7 +239,7 @@ export function scale3xData(s: Uint8ClampedArray, w: number, h: number) {
 }
 
 // Shared LUT Builder Utility
-export interface LutParams {
+interface LutParams {
   exposure: number
   brightness: number
   contrast: number

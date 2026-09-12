@@ -12,7 +12,7 @@
 const STYLE_ELEMENT_ID = 'user-theme'
 
 /** Injects (or replaces) the customization engine's stylesheet. */
-export function injectCustomCss(css: string): void {
+function injectCustomCss(css: string): void {
   let el = document.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null
   if (!el) {
     el = document.createElement('style')

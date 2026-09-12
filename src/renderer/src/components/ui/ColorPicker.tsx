@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import ColorField from './ColorField'
 
-export interface ColorPickerProps {
+interface ColorPickerProps {
   value: string
   onChange?: (color: string) => void
   onCommit?: (color: string) => void

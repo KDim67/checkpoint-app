@@ -9,7 +9,7 @@ import { getBoolSetting, setBoolSetting, getStringSetting } from './settings'
  * gamedev_helpers ended up with a different setting-key shape and a different
  * default from every other view.
  */
-export interface ViewFeature {
+interface ViewFeature {
   view: ActiveView
   key: string
   label: string

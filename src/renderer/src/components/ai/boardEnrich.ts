@@ -11,7 +11,7 @@ import type { AiDialogueBlock, AiPlanBlock } from './aiActionTypes'
 import { asArray, asObject, str } from './aiActionTypes'
 import type { ItemPriority } from '@shared/types'
 
-export type StructuredKind = 'board' | 'plan' | 'dialogue' | 'update' | 'config'
+type StructuredKind = 'board' | 'plan' | 'dialogue' | 'update' | 'config'
 
 // Palette
 const NAMED_COLORS: Record<string, string> = {
@@ -145,13 +145,13 @@ function normalizeTags(raw: unknown, title: string, body: string): Tag[] {
 }
 
 // Public: normalize + enrich a board plan
-export interface EnrichedBoard {
+interface EnrichedBoard {
   message: string
   columns: EnrichedColumn[]
   cards: EnrichedCard[]
 }
 
-export function enrichBoard(raw: unknown): EnrichedBoard | null {
+function enrichBoard(raw: unknown): EnrichedBoard | null {
   const obj = asObject(raw)
   if (!obj) return null
 
@@ -205,7 +205,7 @@ export function enrichBoard(raw: unknown): EnrichedBoard | null {
 }
 
 // Public: normalize a plan
-export function normalizePlan(raw: unknown): { message: string; block: AiPlanBlock } | null {
+function normalizePlan(raw: unknown): { message: string; block: AiPlanBlock } | null {
   const obj = asObject(raw)
   if (!obj) return null
   const steps = asArray(obj.steps).map((s, i) => {
@@ -224,7 +224,7 @@ export function normalizePlan(raw: unknown): { message: string; block: AiPlanBlo
 }
 
 // Public: normalize a dialogue tree (and repair dangling targets)
-export function normalizeDialogue(raw: unknown): { message: string; block: AiDialogueBlock } | null {
+function normalizeDialogue(raw: unknown): { message: string; block: AiDialogueBlock } | null {
   const obj = asObject(raw)
   if (!obj) return null
   const nodes = asArray(obj.nodes).map(n => {
@@ -254,7 +254,7 @@ export function normalizeDialogue(raw: unknown): { message: string; block: AiDia
 }
 
 // Public: normalize board-edit operations
-export type BoardOp = 'move' | 'set_priority' | 'retitle' | 'update_body' | 'archive' | 'set_due_date'
+type BoardOp = 'move' | 'set_priority' | 'retitle' | 'update_body' | 'archive' | 'set_due_date'
 
 /**
  * A validated board edit. Modelled as a discriminated union so each variant

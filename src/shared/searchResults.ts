@@ -7,7 +7,7 @@
  * must not bury the one note being looked for.
  */
 
-export type SearchHitKind = 'card' | 'task' | 'log' | 'note' | 'cheatsheet'
+type SearchHitKind = 'card' | 'task' | 'log' | 'note' | 'cheatsheet'
 
 export interface SearchHit {
   /** Stable within a result set; used as the React key and for dedupe. */

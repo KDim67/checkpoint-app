@@ -30,7 +30,7 @@ export interface WorkspaceFileInfo {
   size: number
 }
 
-export async function selectWorkspaceFolder(): Promise<string | null> {
+async function selectWorkspaceFolder(): Promise<string | null> {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
     title: 'Select Codebase Project Folder'
@@ -41,7 +41,7 @@ export async function selectWorkspaceFolder(): Promise<string | null> {
   return result.filePaths[0]
 }
 
-export function indexWorkspaceFiles(dirPath: string): WorkspaceFileInfo[] {
+function indexWorkspaceFiles(dirPath: string): WorkspaceFileInfo[] {
   if (!existsSync(dirPath)) return []
   const filesList: WorkspaceFileInfo[] = []
 
@@ -79,7 +79,7 @@ export function indexWorkspaceFiles(dirPath: string): WorkspaceFileInfo[] {
   return filesList.slice(0, 500) // Cap at 500 files for clean memory performance
 }
 
-export async function readWorkspaceFile(dirPath: string, relativePath: string): Promise<string> {
+async function readWorkspaceFile(dirPath: string, relativePath: string): Promise<string> {
   const fullPath = join(dirPath, relativePath)
   if (!existsSync(fullPath)) return ''
   try {

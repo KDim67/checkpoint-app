@@ -8,7 +8,7 @@
 
 import type { Message } from './types'
 
-export type SystemMessage = { role: 'system'; content: string }
+type SystemMessage = { role: 'system'; content: string }
 
 /**
  * Characters of cheatsheet text to request per attached document.

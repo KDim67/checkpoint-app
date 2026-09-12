@@ -36,7 +36,7 @@ const boardCard = z.object({
   tags: tagList
 })
 
-export const BoardResult = z.object({
+const BoardResult = z.object({
   message: z.string().optional(),
   columns: z
     .array(
@@ -51,7 +51,7 @@ export const BoardResult = z.object({
   cards: z.array(boardCard).min(1, 'no cards produced')
 })
 
-export const PlanResult = z.object({
+const PlanResult = z.object({
   message: z.string().optional(),
   title: z.string().min(1),
   overview: z.string().optional().transform(v => v ?? ''),
@@ -66,7 +66,7 @@ export const PlanResult = z.object({
     .min(1, 'no steps produced')
 })
 
-export const DialogueResult = z.object({
+const DialogueResult = z.object({
   message: z.string().optional(),
   startNode: z.string().optional(),
   nodes: z
@@ -89,7 +89,7 @@ export const DialogueResult = z.object({
     .min(1, 'no dialogue nodes produced')
 })
 
-export const UpdateResult = z.object({
+const UpdateResult = z.object({
   message: z.string().optional(),
   operations: z
     .array(
@@ -114,7 +114,7 @@ export const UpdateResult = z.object({
  * generation because the model attached a stray key to one operation would
  * throw away the other nine.
  */
-export const ConfigResult = z.object({
+const ConfigResult = z.object({
   message: z.string().optional(),
   operations: z
     .array(
@@ -156,7 +156,7 @@ const VALIDATORS: Record<AiStructuredKind, z.ZodTypeAny> = {
   config: ConfigResult
 }
 
-export interface ValidationOutcome {
+interface ValidationOutcome {
   ok: boolean
   data?: unknown
   /** Human-readable problem list, fed back to the model on the repair attempt. */

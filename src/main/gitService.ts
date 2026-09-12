@@ -8,7 +8,7 @@ const execPromise = util.promisify(exec)
 /**
  * Checks if Git is installed on the user's machine and in their PATH.
  */
-export async function isGitInstalled(): Promise<boolean> {
+async function isGitInstalled(): Promise<boolean> {
   try {
     await execPromise('git --version')
     return true

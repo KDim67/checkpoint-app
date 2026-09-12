@@ -12,14 +12,14 @@
 
 import type { ItemPriority } from './types'
 
-export type ImportSource = 'trello' | 'todoist'
+type ImportSource = 'trello' | 'todoist'
 
-export interface ImportedColumn {
+interface ImportedColumn {
   id: string
   name: string
 }
 
-export interface ImportedCard {
+interface ImportedCard {
   title: string
   body: string
   /** Resolved column id, or 'archived'. */
@@ -241,7 +241,7 @@ const TODOIST_LABEL_COLORS: Record<string, string> = {
   taupe: '#ccac93'
 }
 
-export function todoistLabelColor(color: unknown): string {
+function todoistLabelColor(color: unknown): string {
   return TODOIST_LABEL_COLORS[str(color)] ?? '#6b7280'
 }
 

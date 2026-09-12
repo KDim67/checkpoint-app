@@ -20,7 +20,7 @@ import {
   type StartupSettings
 } from '../shared/startupSettings'
 
-export const STARTUP_SETTING_KEY = 'startup_settings'
+const STARTUP_SETTING_KEY = 'startup_settings'
 
 const PANEL_WIDTH = 288
 /**
@@ -165,7 +165,7 @@ export function setPanelHeight(height: number): void {
   panel.setPosition(x, y, false)
 }
 
-export function showPanel(): void {
+function showPanel(): void {
   const win = createPanel()
   const { x, y } = panelPosition()
   win.setPosition(x, y, false)
@@ -177,7 +177,7 @@ export function hidePanel(): void {
   if (panel && !panel.isDestroyed() && panel.isVisible()) panel.hide()
 }
 
-export function togglePanel(): void {
+function togglePanel(): void {
   if (panel && !panel.isDestroyed() && panel.isVisible()) hidePanel()
   else showPanel()
 }
@@ -192,7 +192,7 @@ export function showMainWindow(): void {
   win.focus()
 }
 
-export function createTray(): void {
+function createTray(): void {
   if (tray && !tray.isDestroyed()) return
 
   const icon = nativeImage.createFromPath(join(__dirname, '../../resources/icon.png'))
@@ -212,7 +212,7 @@ export function createTray(): void {
   tray.on('right-click', () => togglePanel())
 }
 
-export function destroyTray(): void {
+function destroyTray(): void {
   hidePanel()
   if (panel && !panel.isDestroyed()) { panel.destroy(); panel = null }
   if (tray && !tray.isDestroyed()) { tray.destroy(); tray = null }

@@ -1237,7 +1237,7 @@ function buildMcpServer(): McpServer {
 
 // Lifecycle
 
-export function startMcpServer(requestedPort: number): Promise<number> {
+function startMcpServer(requestedPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
     if (server) {
       resolve(activePort ?? requestedPort)

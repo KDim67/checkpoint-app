@@ -156,7 +156,7 @@ async function writeMergeBase(context: string, peer: string, items: Item[]): Pro
  * the workspace list, and two places computing the same name is two places
  * that can disagree about it.
  */
-export type BaselineChoice =
+type BaselineChoice =
   | { action: 'replace' }
   | { action: 'copy'; slug: string }
   /** Keep this side's board and fold theirs into it. Loses nothing either way. */

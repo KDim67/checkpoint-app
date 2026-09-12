@@ -153,7 +153,7 @@ export function isMachineLocalSettingKey(key: string): boolean {
 }
 
 /** True for a key the allowlist recognises, before the denylists get a say. */
-export function isListedForSync(key: string): boolean {
+function isListedForSync(key: string): boolean {
   const k = key.toLowerCase()
   if (NEVER_SYNC.has(k)) return false
   if (SYNCABLE_KEYS.has(k)) return true

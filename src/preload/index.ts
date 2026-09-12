@@ -379,12 +379,12 @@ const api = {
 
     onReset: (callback: () => void): (() => void) => {
       const handler = () => callback()
-      ipcRenderer.on('hud:reset', handler)
-      return () => ipcRenderer.removeListener('hud:reset', handler)
+      ipcRenderer.on(IpcChannels.HUD_RESET, handler)
+      return () => ipcRenderer.removeListener(IpcChannels.HUD_RESET, handler)
     },
 
     resize: (height: number): void => {
-      ipcRenderer.send('hud:resize', height)
+      ipcRenderer.send(IpcChannels.HUD_RESIZE, height)
     }
   },
 
@@ -640,15 +640,15 @@ const api = {
 
   customizer: {
     toggleEngine: (active: boolean): Promise<void> =>
-      ipcRenderer.invoke('customizer:toggleEngine', active),
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_TOGGLE_ENGINE, active),
     getEngineState: (): Promise<boolean> =>
-      ipcRenderer.invoke('customizer:getEngineState'),
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_ENGINE_STATE),
     updateTheme: (vars: Record<string, string>): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_UPDATE_THEME, vars),
     /** The CSS to apply right now. Empty when the engine is off. */
     getCss: (): Promise<string> => ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_CSS),
     getTheme: (): Promise<Record<string, string>> =>
-      ipcRenderer.invoke('customizer:getTheme'),
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_THEME),
     getPlugins: (): Promise<PluginInfo[]> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_PLUGINS),
     /** Resolves to why it failed, so a broken plugin does not silently stay off. */
@@ -662,7 +662,7 @@ const api = {
     registerShortcuts: (shortcuts: ShortcutMap): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_REGISTER_SHORTCUTS, shortcuts),
     getShortcuts: (): Promise<ShortcutMap> =>
-      ipcRenderer.invoke('customizer:getShortcuts')
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_SHORTCUTS)
   },
 
   cheatsheets: {
@@ -722,7 +722,7 @@ const api = {
     updateMemoryContent: (id: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.AI_UPDATE_MEMORY_CONTENT, id, content),
     auditMemories: (context: string, model: string): Promise<AiMemory[]> =>
-      ipcRenderer.invoke('ai:auditMemories', context, model),
+      ipcRenderer.invoke(IpcChannels.AI_AUDIT_MEMORIES, context, model),
     consolidateMemory: (params: {
       context: string
       userText: string

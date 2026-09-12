@@ -30,7 +30,7 @@ export function slugifyWorkspace(name: string): string {
  * unknown. An unrecognised template should leave a usable empty workspace
  * rather than fail the whole creation.
  */
-export async function applyProjectTemplate(slug: string, templateId: string): Promise<string> {
+async function applyProjectTemplate(slug: string, templateId: string): Promise<string> {
   const template = findProjectTemplate(templateId)
   if (!template) return ''
 

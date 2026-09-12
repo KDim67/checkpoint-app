@@ -14,7 +14,7 @@ import { errorMessage } from '../../../../shared/errors'
  * One sprite on its way into the atlas: where it was cropped from, how big it
  * was before trimming, and where the packer decided to put it.
  */
-export interface AtlasBlock {
+interface AtlasBlock {
   name: string
   path: string
   img: HTMLImageElement
@@ -34,7 +34,7 @@ export interface AtlasBlock {
 }
 
 /** A frame in the exported JSON, in the shape TexturePacker writes. */
-export interface AtlasFrame {
+interface AtlasFrame {
   frame: { x: number; y: number; w: number; h: number }
   rotated: boolean
   trimmed: boolean

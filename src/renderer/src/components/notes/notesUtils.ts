@@ -83,7 +83,7 @@ export const prefs = {
 
 // Templates
 
-export interface NoteTemplate {
+interface NoteTemplate {
   id: string
   label: string
   description: string
@@ -157,7 +157,7 @@ export type FormatAction =
   | 'mermaid'
   | 'hr'
 
-export interface EditResult {
+interface EditResult {
   value: string
   selStart: number
   selEnd: number

@@ -10,7 +10,7 @@
 import type { BoardConfig, ColumnConfig } from './boardModel'
 import type { Item, Relation, Tag } from './types'
 
-export interface ItemTagLink {
+interface ItemTagLink {
   item_id: string
   tag_id: string
 }
@@ -26,7 +26,7 @@ export interface BoardSide {
 }
 
 /** What the merge did, in the terms the user would put it in. */
-export interface MergeSummary {
+interface MergeSummary {
   columnsAdded: number
   cardsAdded: number
   /** Cards both sides had, where their copy was the more recent one. */
@@ -38,7 +38,7 @@ export interface MergeSummary {
   cardsTakenAway: number
 }
 
-export interface MergeResult extends BoardSide {
+interface MergeResult extends BoardSide {
   summary: MergeSummary
 }
 

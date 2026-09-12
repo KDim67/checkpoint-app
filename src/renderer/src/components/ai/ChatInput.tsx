@@ -26,7 +26,7 @@ import { Send, Square, Plus, Mail, Sparkles, FileText, X, BookOpen, Mic, LayoutG
 import type { Item } from '../../../../shared/types'
 import { useToast } from '../ui/Toast'
 
-export interface CustomQuickAction {
+interface CustomQuickAction {
   id: string
   label: string
   prompt: string

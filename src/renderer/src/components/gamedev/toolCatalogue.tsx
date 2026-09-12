@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import type { GameDevTab } from './types'
 
-export interface GameDevToolMeta {
+interface GameDevToolMeta {
   id: GameDevTab
   label: string
   /** One line, shown on the launcher card. What it does, not how. */
@@ -12,7 +12,7 @@ export interface GameDevToolMeta {
   icon: React.ReactNode
 }
 
-export interface GameDevToolGroup {
+interface GameDevToolGroup {
   group: string
   tools: GameDevToolMeta[]
 }

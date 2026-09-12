@@ -9,7 +9,7 @@
  * which fixed millisecond offsets do not.
  */
 
-export type Frequency = 'daily' | 'weekly' | 'monthly'
+type Frequency = 'daily' | 'weekly' | 'monthly'
 
 export interface RecurrenceRule {
   freq: Frequency

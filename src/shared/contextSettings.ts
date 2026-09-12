@@ -45,7 +45,7 @@ export function contextSettingKeys(context: string, storedIndex: unknown): strin
 
 // Importing into a different workspace
 
-export interface SettingEntry {
+interface SettingEntry {
   key: string
   /** Exactly as stored. A JSON string, not a parsed value. */
   value: string

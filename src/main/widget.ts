@@ -58,7 +58,7 @@ function storedOpacity(): number {
 }
 
 /** Creates the widget window. Returns null on non-Windows platforms. */
-export function createWidget(): BrowserWindow | null {
+function createWidget(): BrowserWindow | null {
   if (process.platform !== 'win32') return null
 
   const { x, y } = cornerFor(storedPosition())

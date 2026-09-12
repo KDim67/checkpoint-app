@@ -7,7 +7,7 @@
  * unreadable one is shown by filename rather than executed to find out.
  */
 
-export interface PluginMetadata {
+interface PluginMetadata {
   name: string | null
   description: string | null
   version: string | null

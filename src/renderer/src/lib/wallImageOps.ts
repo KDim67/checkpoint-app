@@ -16,7 +16,7 @@ const PBR_DEFAULTS = {
   aoIntensity: 0.6
 }
 
-export interface Pixels {
+interface Pixels {
   data: Uint8ClampedArray
   width: number
   height: number
@@ -27,7 +27,7 @@ export interface Pixels {
  * does not expose them. `checkpoint-media://` is same-origin enough not to
  * taint the canvas.
  */
-export function loadPixels(filename: string): Promise<Pixels> {
+function loadPixels(filename: string): Promise<Pixels> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
@@ -50,7 +50,7 @@ export function loadPixels(filename: string): Promise<Pixels> {
 }
 
 /** Writes pixels back out as a PNG and stores it, returning the new filename. */
-export async function savePixels(pixels: Pixels): Promise<string> {
+async function savePixels(pixels: Pixels): Promise<string> {
   const canvas = document.createElement('canvas')
   canvas.width = pixels.width
   canvas.height = pixels.height
@@ -67,7 +67,7 @@ export async function savePixels(pixels: Pixels): Promise<string> {
   return window.electronAPI.media.saveFromBuffer(await blob.arrayBuffer(), 'png')
 }
 
-export interface DerivedImage {
+interface DerivedImage {
   filename: string
   /** Appended to the original's caption, so the wall says what each one is. */
   label: string

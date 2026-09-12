@@ -17,7 +17,7 @@ const MARGIN = 40
 /** Cap so a sprawling wall cannot ask for a canvas the GPU refuses. */
 const MAX_EDGE = 8000
 
-export interface ExportContext {
+interface ExportContext {
   /** Live title for a card or note, since the wall stores only a reference. */
   titleOf: (item: WallItem) => string | undefined
   /** Resolved background and text colours, read from the live theme. */
