@@ -70,7 +70,7 @@ module.exports = [
     // would otherwise hit the default parser and fail on the first annotation.
     // no-explicit-any stays an error here: test code is new, so there is no
     // backlog to grandfather in, and a stray any in a test hides a real gap.
-    files: ['tests/**/*.ts'],
+    files: ['tests/**/*.{ts,tsx}'],
     languageOptions: {
       parser: parserTypeScript,
       parserOptions: {
