@@ -4,7 +4,7 @@ import { normalizeDialogueNodes, type DialogueNode } from './types'
 import { themeTokenHex, useThemeVersion } from '../../lib/themeTokens'
 
 /** Raised by the AI panel when it has a dialogue tree to hand over. */
-const AI_DIALOGUE_EVENT = 'ai-load-dialogue-tree'
+export const AI_DIALOGUE_EVENT = 'ai-load-dialogue-tree'
 
 /**
  * Dialogue Quest Flow state, editing operations, and the Mermaid compilation.

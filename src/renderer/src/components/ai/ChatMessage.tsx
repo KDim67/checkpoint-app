@@ -23,6 +23,7 @@ import type {
 } from './aiActionTypes'
 import { asArray, asObject, str, tagColorOf, tagNameOf, toColorMode, toItemPriority } from './aiActionTypes'
 import type { Item, Tag } from '@shared/types'
+import { AI_DIALOGUE_EVENT } from '../gamedev/useDialogueTool'
 
 interface ChatMessageProps {
   message: {
@@ -2200,7 +2201,7 @@ function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
   const visibleNodes = expanded ? nodes : nodes.slice(0, PREVIEW_LIMIT)
 
   const handleLoadTree = () => {
-    window.dispatchEvent(new CustomEvent('ai-load-dialogue-tree', { detail: parsed }))
+    window.dispatchEvent(new CustomEvent(AI_DIALOGUE_EVENT, { detail: parsed }))
     setLoaded(true)
     setView('gamedev')
   }
