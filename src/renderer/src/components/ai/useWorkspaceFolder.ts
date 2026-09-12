@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { WorkspaceFileInfo } from './types'
+import * as workspaceApi from '../../data/workspaceFolder'
 
 const STORAGE_KEY_WORKSPACE_FOLDER = 'checkpoint_ai_workspace_folder'
 
@@ -29,7 +30,7 @@ export function useWorkspaceFolder() {
     if (!restoredFolder) return
     let cancelled = false
     setWorkspaceIndexing(true)
-    window.electronAPI.workspace.getStructure(restoredFolder)
+    workspaceApi.getStructure(restoredFolder)
       .then(files => { if (!cancelled) setWorkspaceFiles(files || []) })
       .catch(err => console.warn('Failed to re-index workspace folder:', err))
       .finally(() => { if (!cancelled) setWorkspaceIndexing(false) })
@@ -38,12 +39,12 @@ export function useWorkspaceFolder() {
 
   const handleImportWorkspace = async () => {
     try {
-      const folder = await window.electronAPI.workspace.selectFolder()
+      const folder = await workspaceApi.selectFolder()
       if (!folder) return
       setWorkspaceIndexing(true)
       setWorkspaceFolder(folder)
       try { localStorage.setItem(STORAGE_KEY_WORKSPACE_FOLDER, folder) } catch {}
-      const files = await window.electronAPI.workspace.getStructure(folder)
+      const files = await workspaceApi.getStructure(folder)
       setWorkspaceFiles(files || [])
     } catch (err) {
       console.warn('Failed to import workspace folder:', err)

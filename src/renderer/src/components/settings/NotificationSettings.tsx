@@ -7,6 +7,7 @@ import {
   isQuietHour,
   type NotificationPolicy
 } from '../../../../shared/notificationPolicy'
+import * as notificationsApi from '../../data/notifications'
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
 const hourLabel = (h: number) => `${String(h).padStart(2, '0')}:00`
@@ -17,8 +18,7 @@ export default function NotificationSettings(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    window.electronAPI.notifications
-      .getPolicy()
+    notificationsApi.getPolicy()
       .then(p => { setPolicy(p); setLoaded(true) })
       .catch(err => { console.error('Failed to load notification policy:', err); setLoaded(true) })
   }, [])
@@ -28,7 +28,7 @@ export default function NotificationSettings(): React.JSX.Element {
     // normalized copy, which is what actually governs.
     setPolicy(next)
     try {
-      const stored = await window.electronAPI.notifications.setPolicy(next)
+      const stored = await notificationsApi.setPolicy(next)
       setPolicy(stored)
     } catch (err) {
       console.error(err)
@@ -178,7 +178,7 @@ export default function NotificationSettings(): React.JSX.Element {
           <button
             className="btn-secondary"
             onClick={async () => {
-              const fired = await window.electronAPI.notifications.send({
+              const fired = await notificationsApi.send({
                 category: 'due',
                 title: 'Checkpoint',
                 body: 'Notifications are working.'

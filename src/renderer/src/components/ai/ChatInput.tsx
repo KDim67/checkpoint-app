@@ -25,6 +25,8 @@ type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
 import { Send, Square, Plus, Mail, Sparkles, FileText, X, BookOpen, Mic, LayoutGrid, ListTree, ArrowUpDown, ShieldAlert, Image as ImageIcon, Settings2, FileCode } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
 import { useToast } from '../ui/Toast'
+import * as cheatsheetsApi from '../../data/cheatsheets'
+import * as notesApi from '../../data/notes'
 
 interface CustomQuickAction {
   id: string
@@ -214,13 +216,13 @@ export default function ChatInput({
   useEffect(() => {
     const fetchSources = async () => {
       try {
-        const list = await window.electronAPI.cheatsheets.list()
+        const list = await cheatsheetsApi.list()
         setAvailableCheatsheets(list)
       } catch (err) {
         console.warn('Failed to fetch cheatsheets for AI input:', err)
       }
       try {
-        const notes = await window.electronAPI.notes.listNotes()
+        const notes = await notesApi.listNotes()
         setAvailableNotes((notes || []).map(n => n.title))
       } catch (err) {
         console.warn('Failed to fetch notes for AI input:', err)

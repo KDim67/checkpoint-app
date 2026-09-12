@@ -3,6 +3,7 @@ import type { AtlasMaxSize } from './types'
 import { useToast } from '../ui/Toast'
 import { BinaryTreePacker } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
+import * as gamedevApi from '../../data/gamedev'
 
 /**
  * Atlas Forge: folder selection, bin packing, and PNG/JSON export.
@@ -62,7 +63,7 @@ export function useAtlasTool() {
   // Tab 7: Atlas Forge (Sprite Packer) Callbacks
   const handleSelectAtlasFolder = useCallback(async () => {
     try {
-      const res = await window.electronAPI.gamedev.selectSpriteFolder()
+      const res = await gamedevApi.selectSpriteFolder()
       if (res) {
         setAtlasFolderPath(res.path)
         setAtlasSprites(res.files)
@@ -315,7 +316,7 @@ export function useAtlasTool() {
       }
 
       const base64Data = exportCanvas.toDataURL('image/png')
-      const res = await window.electronAPI.gamedev.saveSpriteAtlas({
+      const res = await gamedevApi.saveSpriteAtlas({
         folderPath: atlasFolderPath,
         atlasDataUrl: base64Data,
         atlasJson: JSON.stringify(atlasJsonObj, null, 2)

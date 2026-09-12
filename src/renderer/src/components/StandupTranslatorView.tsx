@@ -10,6 +10,9 @@ import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getNumberSetting } from '../lib/settings'
 import { createItem, readItems } from '../data/items'
 import { createStreamBuffer } from '../lib/streamBuffer'
+import * as ollamaApi from '../data/ollama'
+import * as aiApi from '../data/ai'
+import * as appApi from '../data/app'
 
 // Zero-dependency SVG Icons
 const SparklesIcon = () => (
@@ -180,7 +183,7 @@ export default function StandupTranslatorView({
         setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
 
         if (isLocalUrl(baseUrl)) {
-          const list = await window.electronAPI.ollama.listLocal().catch(() => [] as string[])
+          const list = await ollamaApi.listLocal().catch(() => [] as string[])
           if (list && list.length > 0) {
             setLocalModels(list)
             setUseOllamaSelector(true)
@@ -206,18 +209,18 @@ export default function StandupTranslatorView({
   useEffect(() => {
     if (!isOpen) return
     const stream = streamRef.current
-    const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk, streamId) => {
+    const unsubscribeChunk = aiApi.onChunk((chunk, streamId) => {
       if (streamId !== STANDUP_STREAM_ID) return
       streamRef.current.push(chunk)
     })
 
-    const unsubscribeDone = window.electronAPI.ai.onDone((streamId) => {
+    const unsubscribeDone = aiApi.onDone((streamId) => {
       if (streamId !== STANDUP_STREAM_ID) return
       setStreamingText(streamRef.current.flush())
       setIsStreaming(false)
     })
 
-    const unsubscribeError = window.electronAPI.ai.onError((errMessage, streamId) => {
+    const unsubscribeError = aiApi.onError((errMessage, streamId) => {
       if (streamId !== STANDUP_STREAM_ID) return
       streamRef.current.flush()
       setStreamingText(prev => prev + `\n\n**Error:** ${errMessage}`)
@@ -243,7 +246,7 @@ export default function StandupTranslatorView({
   const handleClose = useCallback(() => {
     if (isStreaming) {
       // handleAbort is called inline here to avoid circular dependency
-      window.electronAPI.ai.abortStream(STANDUP_STREAM_ID).catch(() => {})
+      aiApi.abortStream(STANDUP_STREAM_ID).catch(() => {})
       streamRef.current.flush()
       setIsStreaming(false)
     }
@@ -296,7 +299,7 @@ export default function StandupTranslatorView({
 
   const handleAbort = async () => {
     try {
-      await window.electronAPI.ai.abortStream(STANDUP_STREAM_ID)
+      await aiApi.abortStream(STANDUP_STREAM_ID)
     } catch (err) {
       console.error('Failed to abort stream:', err)
     }
@@ -339,7 +342,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
     ]
 
     try {
-      await window.electronAPI.ai.startStream({
+      await aiApi.startStream({
         model: selectedModel,
         messages,
         temperature,
@@ -368,7 +371,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
     if (!streamingText) return
     const defaultName = `standup_report_${activeWorkspace}_${new Date().toISOString().slice(0, 10)}.md`
     try {
-      const success = await window.electronAPI.app.saveFile(defaultName, streamingText)
+      const success = await appApi.saveFile(defaultName, streamingText)
       if (success) {
         toast('Report saved successfully!')
       }

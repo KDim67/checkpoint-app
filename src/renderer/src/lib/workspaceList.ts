@@ -7,6 +7,7 @@
  */
 
 import type { WorkspaceEntry } from './createWorkspace'
+import { getSetting, setSetting } from '../data/settings'
 
 const LIST_KEY = 'contexts_list'
 
@@ -17,7 +18,7 @@ const LIST_KEY = 'contexts_list'
  */
 export async function readWorkspaceList(): Promise<WorkspaceEntry[]> {
   try {
-    const raw = await window.electronAPI.db.getSetting(LIST_KEY)
+    const raw = await getSetting(LIST_KEY)
     if (typeof raw !== 'string' || raw === '') return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -29,5 +30,5 @@ export async function readWorkspaceList(): Promise<WorkspaceEntry[]> {
 }
 
 export async function writeWorkspaceList(list: WorkspaceEntry[]): Promise<void> {
-  await window.electronAPI.db.setSetting(LIST_KEY, JSON.stringify(list))
+  await setSetting(LIST_KEY, JSON.stringify(list))
 }

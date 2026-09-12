@@ -21,6 +21,7 @@ import DrawerCloseButton from '../ui/DrawerCloseButton'
 import { searchItems } from '../../data/items'
 import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
+import * as subtasksApi from '../../data/subtasks'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -60,7 +61,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
   const loadSubtasks = useCallback(async (id: string) => {
     try {
-      setSubtasks(await window.electronAPI.subtasks.list(id))
+      setSubtasks(await subtasksApi.list(id))
     } catch (err) {
       console.error('Failed to load subtasks:', err)
     }
@@ -201,13 +202,13 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const handleToggleSubtask = async (subtask: Subtask) => {
     // Applied locally first: a checkbox that waits for a round trip feels broken.
     setSubtasks(prev => prev.map(s => (s.id === subtask.id ? { ...s, done: !s.done } : s)))
-    await window.electronAPI.subtasks.update(subtask.id, { done: !subtask.done })
+    await subtasksApi.update(subtask.id, { done: !subtask.done })
     if (task) loadSubtasks(task.id)
   }
 
   const handleDeleteSubtask = async (subtask: Subtask) => {
     setSubtasks(prev => prev.filter(s => s.id !== subtask.id))
-    await window.electronAPI.subtasks.remove(subtask.id)
+    await subtasksApi.remove(subtask.id)
   }
 
   const handleAddSubtaskSubmit = async (e: React.FormEvent) => {
@@ -215,14 +216,14 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     const title = newSubtaskText.trim()
     if (!title || !task) return
     setNewSubtaskText('')
-    await window.electronAPI.subtasks.add(task.id, title)
+    await subtasksApi.add(task.id, title)
     await loadSubtasks(task.id)
   }
 
   /** Rescues the checkboxes written before subtasks were real rows. */
   const handleConvertChecklist = async () => {
     if (!task) return
-    const result = await window.electronAPI.subtasks.convert(task.id)
+    const result = await subtasksApi.convert(task.id)
     if (!result.ok) return
     // Re-read rather than trusting a local edit: the conversion rewrote the body
     // in main, and this is the same lookup the drawer opens with.

@@ -7,6 +7,7 @@ import TurnRelaySettings from './TurnRelaySettings'
 import { errorMessage } from '../../../../shared/errors'
 import { SYNC_TCP_PORT } from '../../../../shared/ports'
 import { getBoolSetting, getJsonSetting, setBoolSetting, setJsonSetting } from '../../lib/settings'
+import * as syncApi from '../../data/sync'
 
 interface Peer {
   name: string
@@ -70,7 +71,7 @@ export default function SyncSettings() {
       setSyncEnabled(isEnabled)
       
       if (isEnabled) {
-        await window.electronAPI.sync.startHost()
+        await syncApi.startHost()
         addLog('Sync engine enabled. LAN TCP Host started.')
       }
 
@@ -85,13 +86,13 @@ export default function SyncSettings() {
     if (syncEnabled) {
       interval = setInterval(async () => {
         try {
-          const status = await window.electronAPI.sync.getStatus()
+          const status = await syncApi.getStatus()
           setHostStatus(status)
           if (status.progress && status.progress !== 'Idle') {
             addLog(`[LAN] ${status.progress}`)
           }
 
-          const peers = await window.electronAPI.sync.getDiscoveredPeers()
+          const peers = await syncApi.getDiscoveredPeers()
           setDiscoveredPeers(peers)
         } catch {}
       }, 3000)
@@ -106,11 +107,11 @@ export default function SyncSettings() {
       await setBoolSetting('sync_enabled', checked)
       
       if (checked) {
-        await window.electronAPI.sync.startHost()
+        await syncApi.startHost()
         addLog('Sync engine started. Discoverable on local Wi-Fi.')
         toast('Sync server active')
       } else {
-        await window.electronAPI.sync.stopHost()
+        await syncApi.stopHost()
         handleStopWebRTC()
         setDiscoveredPeers([])
         addLog('Sync engine disabled. All servers closed.')
@@ -134,7 +135,7 @@ export default function SyncSettings() {
       setIsManualSyncing(true)
       addLog(`Initiating manual LAN connection to ${manualIp}:${manualPort}...`)
       
-      const stats = await window.electronAPI.sync.connectAndSync(
+      const stats = await syncApi.connectAndSync(
         manualIp,
         parseInt(manualPort, 10) || SYNC_TCP_PORT,
         manualCode
@@ -165,7 +166,7 @@ export default function SyncSettings() {
 
     addLog(`Initiating sync with discovered peer "${peer.name}" (${peer.ip})...`)
     try {
-      const stats = await window.electronAPI.sync.connectAndSync(peer.ip, peer.port, code)
+      const stats = await syncApi.connectAndSync(peer.ip, peer.port, code)
       addLog(`Sync with "${peer.name}" succeeded! (Integrated ${stats.dbUpdates} updates)`)
       toast('Sync successful')
       await saveSyncSuccess(`LAN (${peer.name})`, stats.dbUpdates, stats.filesSynced)

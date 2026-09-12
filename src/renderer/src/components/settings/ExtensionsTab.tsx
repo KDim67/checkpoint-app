@@ -4,6 +4,7 @@ import { useToast } from '../ui/Toast'
 import { FolderOpen, Sparkles, AlertTriangle, Terminal, ShieldAlert, X } from 'lucide-react'
 import { PluginInfo } from '../../../../shared/types'
 import { EXAMPLE_PLUGINS } from '../../../../shared/examplePlugins'
+import * as customizerApi from '../../data/customizer'
 
 export default function ExtensionsTab() {
   const { toast } = useToast()
@@ -14,10 +15,10 @@ export default function ExtensionsTab() {
 
   const loadPluginsList = async () => {
     try {
-      const enabled = await window.electronAPI.customizer.getEngineState()
+      const enabled = await customizerApi.getEngineState()
       setEngineEnabled(enabled)
 
-      const list = await window.electronAPI.customizer.getPlugins()
+      const list = await customizerApi.getPlugins()
       setPlugins(list)
     } catch (err) {
       console.error('Failed to load plugins:', err)
@@ -32,7 +33,7 @@ export default function ExtensionsTab() {
 
   const handleTogglePlugin = async (filename: string, checked: boolean) => {
     try {
-      const result = await window.electronAPI.customizer.togglePlugin(filename, checked)
+      const result = await customizerApi.togglePlugin(filename, checked)
       if (!result.ok) {
         // The switch stays off and the reason is shown. Previously a plugin that
         // threw on load was recorded as enabled and failed silently every launch.
@@ -53,7 +54,7 @@ export default function ExtensionsTab() {
 
   const handleInstallExample = async (filename: string) => {
     try {
-      const result = await window.electronAPI.customizer.installExample(filename)
+      const result = await customizerApi.installExample(filename)
       if (!result.ok) {
         toast(result.error ?? 'Could not install that example')
         return
@@ -70,7 +71,7 @@ export default function ExtensionsTab() {
 
   const handleOpenFolder = async () => {
     try {
-      await window.electronAPI.customizer.openPluginsFolder()
+      await customizerApi.openPluginsFolder()
     } catch (err) {
       console.error(err)
       toast('Failed to open plugins directory')
@@ -157,7 +158,7 @@ export default function ExtensionsTab() {
           <button
             onClick={async () => {
               try {
-                await window.electronAPI.customizer.toggleEngine(true)
+                await customizerApi.toggleEngine(true)
                 setEngineEnabled(true)
                 toast('Customization Engine activated')
               } catch (err) {

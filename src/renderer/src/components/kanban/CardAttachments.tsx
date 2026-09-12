@@ -1,5 +1,6 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
 import { FilePlus, Paperclip } from 'lucide-react'
+import * as appApi from '../../data/app'
 
 export type CardAttachment = { id: string; name: string; path: string; isImage: boolean; createdAt: number }
 
@@ -111,7 +112,7 @@ export default function CardAttachments({
                     if (att.path.startsWith('http://') || att.path.startsWith('https://')) {
                       window.open(att.path, '_blank')
                     } else {
-                      window.electronAPI.app?.showItemInFolder?.(att.path)
+                      appApi.showItemInFolder(att.path)
                     }
                   }}
                 >

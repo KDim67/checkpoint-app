@@ -10,6 +10,7 @@
 import type { CommandLike } from '../../../shared/commandMatch'
 import type { ActiveView, SettingsTab } from '../store/appStore'
 import type { SavedView } from '../../../shared/savedViews'
+import { setSetting } from '../data/settings'
 
 export interface Command extends CommandLike {
   /** Shown on the right of the row. A shortcut hint or the current value. */
@@ -68,7 +69,7 @@ const SETTINGS_TABS: { tab: SettingsTab; label: string; keywords?: string[] }[] 
 /** Applies a theme the same way the title-bar toggle does, and persists it. */
 async function applyTheme(theme: 'dark' | 'light'): Promise<void> {
   document.documentElement.setAttribute('data-theme', theme)
-  await window.electronAPI.db.setSetting('app_theme', theme)
+  await setSetting('app_theme', theme)
 }
 
 export function buildCommands(ctx: CommandContext): Command[] {

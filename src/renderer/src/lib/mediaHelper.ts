@@ -4,6 +4,9 @@
  * and inserts the resulting checkpoint-media:// tags into the input string.
  */
 
+import * as mediaApi from '../data/media'
+import * as appApi from '../data/app'
+
 /**
  * Handles paste events on a textarea. Detects images in clipboard,
  * saves them locally, and inserts Markdown image links at the cursor.
@@ -30,7 +33,7 @@ export async function handleImagePaste(
         const ext = mimeType.split('/')[1] || 'png'
 
         // Save image to config/media via Electron IPC
-        const filename = await window.electronAPI.media.saveFromBuffer(arrayBuffer, ext)
+        const filename = await mediaApi.saveFromBuffer(arrayBuffer, ext)
         markdownImgs += `\n![Pasted Image](checkpoint-media://${filename})\n`
       }
 
@@ -85,7 +88,7 @@ export async function handleImagePaste(
     const ext = mimeType.split('/')[1] || 'png'
 
     // Save image to config/media via Electron IPC
-    const filename = await window.electronAPI.media.saveFromBuffer(arrayBuffer, ext)
+    const filename = await mediaApi.saveFromBuffer(arrayBuffer, ext)
     const markdownImg = `\n![Pasted Image](checkpoint-media://${filename})\n`
 
     // Insert at current cursor position
@@ -134,13 +137,13 @@ export async function handleImageDrop(
   try {
     // Resolve absolute paths for the dropped files via Electron utility
     const absolutePaths = imageFiles
-      .map(file => window.electronAPI.app.getPathForFile(file))
+      .map(file => appApi.getPathForFile(file))
       .filter(Boolean)
 
     if (absolutePaths.length === 0) return false
 
     // Copy files to local config/media via Electron IPC
-    const savedMappings = await window.electronAPI.media.saveFilePaths(absolutePaths)
+    const savedMappings = await mediaApi.saveFilePaths(absolutePaths)
     if (savedMappings.length === 0) return false
 
     let markdownImgs = ''

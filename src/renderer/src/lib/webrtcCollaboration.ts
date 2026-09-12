@@ -32,6 +32,8 @@ import { signalingPublishUrl, signalingStreamUrl } from '../../../shared/signali
 import { registerSharedWorkspace } from './createWorkspace'
 import { BOARD_CONFIG_EVENT, loadBoardConfig, saveBoardConfig } from './boardConfig'
 import { normalizeBoardConfig } from '../../../shared/boardModel'
+import * as syncApi from '../data/sync'
+import { getSetting, setSetting } from '../data/settings'
 
 interface CollabOptions {
   pairingCode: string
@@ -110,7 +112,7 @@ interface BaseCard {
 
 async function readMergeBase(context: string, peer: string): Promise<Map<string, Item>> {
   try {
-    const raw = await window.electronAPI.db.getSetting(mergeBaseKey(context, peer))
+    const raw = await getSetting(mergeBaseKey(context, peer))
     if (!Array.isArray(raw)) return new Map()
     const base = new Map<string, Item>()
     for (const entry of raw as BaseCard[]) {
@@ -143,7 +145,7 @@ async function writeMergeBase(context: string, peer: string, items: Item[]): Pro
       updated_at: item.updated_at,
       metadata: item.metadata
     }))
-    await window.electronAPI.db.setSetting(mergeBaseKey(context, peer), base)
+    await setSetting(mergeBaseKey(context, peer), base)
   } catch (err) {
     console.warn('[Collab] Could not record the merge base:', err)
   }
@@ -195,10 +197,10 @@ function newPeerId(): string {
 /** This install's id, minted on first use and kept from then on. */
 async function loadInstallId(): Promise<string> {
   try {
-    const stored = readInstallId(await window.electronAPI.db.getSetting(INSTALL_ID_KEY))
+    const stored = readInstallId(await getSetting(INSTALL_ID_KEY))
     if (stored) return stored
     const minted = newInstallId()
-    await window.electronAPI.db.setSetting(INSTALL_ID_KEY, minted)
+    await setSetting(INSTALL_ID_KEY, minted)
     return minted
   } catch (err) {
     // Without one this side simply cannot be blocked, which is the old
@@ -607,7 +609,7 @@ export class WebRTCCollaborationCoordinator {
 
     try {
       // 1. Gather all database records for this context
-      const fullDb = await window.electronAPI.sync.getDbPayload()
+      const fullDb = await syncApi.getDbPayload()
       const items = fullDb.items.filter(
         i => i.context === this.options.context && (i.type === 'card' || i.type === 'task')
       )
@@ -730,7 +732,7 @@ export class WebRTCCollaborationCoordinator {
     incoming: Item[]
   ): Promise<void> {
     const [local, board] = await Promise.all([
-      window.electronAPI.sync.getDbPayload(),
+      syncApi.getDbPayload(),
       loadBoardConfig(target)
     ])
 
@@ -783,7 +785,7 @@ export class WebRTCCollaborationCoordinator {
     )
 
     await saveBoardConfig(target, merged.board)
-    await window.electronAPI.sync.applyBoardBaseline(
+    await syncApi.applyBoardBaseline(
       target,
       merged.items,
       merged.tags,
@@ -834,7 +836,7 @@ export class WebRTCCollaborationCoordinator {
    */
   private async recordAgreement(target: string, peer: string): Promise<void> {
     try {
-      const db = await window.electronAPI.sync.getDbPayload()
+      const db = await syncApi.getDbPayload()
       await writeMergeBase(
         target,
         peer,
@@ -894,7 +896,7 @@ export class WebRTCCollaborationCoordinator {
     let accepted = false
     try {
       if (this.options.onMergeProposed) {
-        const local = await window.electronAPI.sync.getDbPayload()
+        const local = await syncApi.getDbPayload()
         const mine = local.items.filter(
           item => item.context === target && (item.type === 'card' || item.type === 'task')
         )
@@ -917,7 +919,7 @@ export class WebRTCCollaborationCoordinator {
             item.context === target ? item : { ...item, context: target }
           )
           await saveBoardConfig(target, msg.board)
-          await window.electronAPI.sync.applyBoardBaseline(
+          await syncApi.applyBoardBaseline(
             target, items, msg.tags, msg.itemTags, msg.relations
           )
           window.dispatchEvent(new CustomEvent('kanban-refresh'))
@@ -1075,7 +1077,7 @@ export class WebRTCCollaborationCoordinator {
               }
             }
 
-            await window.electronAPI.sync.applyBoardBaseline(target, items, msg.tags, msg.itemTags, msg.relations)
+            await syncApi.applyBoardBaseline(target, items, msg.tags, msg.itemTags, msg.relations)
             // Both sides now hold the host's board exactly, which is the one
             // moment they are known to agree and so the ancestor a later merge
             // of this pair reasons from.
@@ -1156,7 +1158,7 @@ export class WebRTCCollaborationCoordinator {
             item.context === target ? item : { ...item, context: target }
           )
           await saveBoardConfig(target, msg.board)
-          await window.electronAPI.sync.applyBoardBaseline(
+          await syncApi.applyBoardBaseline(
             target, items, msg.tags, msg.itemTags, msg.relations
           )
           window.dispatchEvent(new CustomEvent('kanban-refresh'))
@@ -1215,7 +1217,7 @@ export class WebRTCCollaborationCoordinator {
         try {
           // Arrives addressed to the host's workspace, which is not what this
           // side calls it when the board was joined as a copy.
-          await window.electronAPI.sync.applyRemoteMutation(
+          await syncApi.applyRemoteMutation(
             retargetMutation(msg.mutation, this.sessionContext)
           )
           window.dispatchEvent(new CustomEvent('kanban-refresh'))

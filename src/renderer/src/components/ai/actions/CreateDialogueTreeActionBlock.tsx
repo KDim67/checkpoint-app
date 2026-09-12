@@ -6,6 +6,7 @@ import type { AiDialogueChoice, AiDialogueNode } from '../aiActionTypes'
 import { asArray, asObject, str } from '../aiActionTypes'
 import { AI_DIALOGUE_EVENT } from '../../gamedev/useDialogueTool'
 import { faultTolerantParseJSON } from '../aiActionParse'
+import * as appApi from '../../../data/app'
 
 export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonString: string }) {
   const setView = useAppStore(s => s.setView)
@@ -49,7 +50,7 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
 
   const handleSaveJson = async () => {
     const fname = `dialogue_${(startNode || 'tree').replace(/\s+/g, '_')}.json`
-    const success = await window.electronAPI.app.saveFile(fname, JSON.stringify(parsed, null, 2))
+    const success = await appApi.saveFile(fname, JSON.stringify(parsed, null, 2))
     if (success) toast('Dialogue tree saved as JSON!', { type: 'success' })
   }
 
@@ -64,7 +65,7 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
       }
       md += '---\n\n'
     }
-    const success = await window.electronAPI.app.saveFile('dialogue_tree.md', md)
+    const success = await appApi.saveFile('dialogue_tree.md', md)
     if (success) toast('Dialogue tree saved as Markdown!', { type: 'success' })
   }
 

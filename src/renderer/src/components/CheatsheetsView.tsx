@@ -7,6 +7,8 @@ import { useAiEnabled } from '../lib/useAiEnabled'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getJsonSetting, setJsonSetting } from '../lib/settings'
+import * as cheatsheetsApi from '../data/cheatsheets'
+import * as appApi from '../data/app'
 
 interface CheatsheetFile {
   name: string
@@ -71,7 +73,7 @@ export default function CheatsheetsView() {
   const loadCheatsheets = useCallback(async () => {
     setLoading(true)
     try {
-      const list = await window.electronAPI.cheatsheets.list()
+      const list = await cheatsheetsApi.list()
       setCheatsheets(list)
     } catch (err) {
       console.error('Failed to load cheatsheets:', err)
@@ -113,7 +115,7 @@ export default function CheatsheetsView() {
     setSearching(true)
     const timer = setTimeout(async () => {
       try {
-        const res = await window.electronAPI.cheatsheets.search(q)
+        const res = await cheatsheetsApi.search(q)
         setContentResults(res)
       } catch (err) {
         console.warn('Cheatsheet content search failed:', err)
@@ -130,7 +132,7 @@ export default function CheatsheetsView() {
     if (viewMode !== 'text' || !selectedPdf) return
     let cancelled = false
     setTextLoading(true)
-    window.electronAPI.cheatsheets.getText(selectedPdf.name)
+    cheatsheetsApi.getText(selectedPdf.name)
       .then(t => { if (!cancelled) setTextContent(t || '') })
       .catch(() => { if (!cancelled) setTextContent('') })
       .finally(() => { if (!cancelled) setTextLoading(false) })
@@ -226,11 +228,11 @@ export default function CheatsheetsView() {
   // Add File Actions
   const handleAddFile = async () => {
     try {
-      const srcPath = await window.electronAPI.cheatsheets.selectFile()
+      const srcPath = await cheatsheetsApi.selectFile()
       if (!srcPath) return // Canceled
 
       setLoading(true)
-      const newName = await window.electronAPI.cheatsheets.add(srcPath)
+      const newName = await cheatsheetsApi.add(srcPath)
       toast(`Successfully added cheatsheet: ${newName}`, { type: 'success' })
       await loadCheatsheets()
     } catch (err) {
@@ -282,9 +284,9 @@ export default function CheatsheetsView() {
     for (const pdf of pdfs) {
       try {
         // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
-        const filePath = window.electronAPI.app.getPathForFile(pdf)
+        const filePath = appApi.getPathForFile(pdf)
         if (filePath) {
-          await window.electronAPI.cheatsheets.add(filePath)
+          await cheatsheetsApi.add(filePath)
           addedCount++
         }
       } catch (err) {
@@ -318,7 +320,7 @@ export default function CheatsheetsView() {
     }
 
     try {
-      await window.electronAPI.cheatsheets.rename(renamePdf.name, cleanName)
+      await cheatsheetsApi.rename(renamePdf.name, cleanName)
       toast('Cheatsheet renamed successfully', { type: 'success' })
 
       const newFileName = cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`
@@ -353,7 +355,7 @@ export default function CheatsheetsView() {
   const handleDeleteConfirm = async () => {
     if (!deletePdf) return
     try {
-      await window.electronAPI.cheatsheets.remove(deletePdf.name)
+      await cheatsheetsApi.remove(deletePdf.name)
       toast('Cheatsheet deleted successfully', { type: 'success' })
 
       if (pinned.includes(deletePdf.name)) {
@@ -379,7 +381,7 @@ export default function CheatsheetsView() {
   const handleOpenExternal = () => {
     if (!selectedPdf) return
     const url = `cheatsheet://show/${encodeURIComponent(selectedPdf.name)}`
-    window.electronAPI.app.openExternal(url)
+    appApi.openExternal(url)
   }
 
   // List derivation: name filter + pins + sort

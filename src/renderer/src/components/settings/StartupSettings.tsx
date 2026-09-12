@@ -6,6 +6,7 @@ import {
   STARTUP_OPTIONS,
   type StartupSettings as Settings
 } from '../../../../shared/startupSettings'
+import * as trayApi from '../../data/tray'
 
 /**
  * The same switches the tray panel carries, in the settings page.
@@ -20,14 +21,13 @@ export default function StartupSettings(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    window.electronAPI.tray
-      .getStartup()
+    trayApi.getStartup()
       .then(s => { setSettings(s); setLoaded(true) })
       .catch(err => { console.error('Failed to load startup settings:', err); setLoaded(true) })
 
     // These switches also live in the tray panel; without this the two disagree
     // until one of them is reloaded.
-    return window.electronAPI.tray.onStartupChanged(setSettings)
+    return trayApi.onStartupChanged(setSettings)
   }, [])
 
   const toggle = async (key: keyof Settings, value: boolean) => {
@@ -37,7 +37,7 @@ export default function StartupSettings(): React.JSX.Element {
       // Main reconciles. Turning the tray icon off forces the dependent options
       // off, so its answer replaces the optimistic one rather than sitting
       // beside it.
-      setSettings(await window.electronAPI.tray.setStartup(next))
+      setSettings(await trayApi.setStartup(next))
     } catch (err) {
       console.error(err)
       toast('Could not save startup settings')

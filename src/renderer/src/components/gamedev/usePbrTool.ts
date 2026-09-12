@@ -4,6 +4,8 @@ import { useToast } from '../ui/Toast'
 import { useAppStore } from '../../store/appStore'
 import { computePbrMaps } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
+import * as gamedevApi from '../../data/gamedev'
+import * as appApi from '../../data/app'
 
 /**
  * PBR Map Generator: albedo intake, height/normal/roughness/AO derivation, the
@@ -53,7 +55,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
   const loadTexturePath = useCallback(async (path: string) => {
     setIsProcessing(true)
     try {
-      const res = await window.electronAPI.gamedev.loadTexture(path)
+      const res = await gamedevApi.loadTexture(path)
       if (res) {
         setAlbedoPath(res.path)
         setAlbedoUrl(res.dataUrl)
@@ -87,7 +89,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     setIsProcessing(true)
     try {
       // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
-      const path = window.electronAPI.app.getPathForFile(file)
+      const path = appApi.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {
         setAlbedoPath(path)
@@ -106,7 +108,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
   const handleBrowseClick = useCallback(async () => {
     setIsProcessing(true)
     try {
-      const res = await window.electronAPI.gamedev.selectTexture()
+      const res = await gamedevApi.selectTexture()
       if (res) {
         setAlbedoPath(res.path)
         setAlbedoUrl(res.dataUrl)
@@ -200,7 +202,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
         ao:        toDataUrl(aData)
       }
 
-      const res = await window.electronAPI.gamedev.saveMaps({ albedoPath, maps })
+      const res = await gamedevApi.saveMaps({ albedoPath, maps })
       if (res.success) {
         toast('PBR maps exported next to original Albedo texture!', { type: 'success' })
         setExportedFiles(res.writtenFiles)

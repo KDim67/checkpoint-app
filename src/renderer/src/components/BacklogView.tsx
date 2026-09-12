@@ -24,6 +24,7 @@ import {
 import { getJsonSetting, getStringSetting, setJsonSetting } from '../lib/settings'
 import { listTags } from '../data/tags'
 import { bulkDeleteItems, bulkUpdateItems, createItem, queryTasks, updateItem } from '../data/items'
+import * as appApi from '../data/app'
 
 interface WorkflowColumn {
   id: string
@@ -516,7 +517,7 @@ export default function BacklogView() {
       }
     })
 
-    const success = await window.electronAPI.app.saveFile('backlog-export.md', content)
+    const success = await appApi.saveFile('backlog-export.md', content)
     if (success) {
       toast(`Exported ${selectedItems.length} tasks to markdown file`)
       setSelectedIds([])

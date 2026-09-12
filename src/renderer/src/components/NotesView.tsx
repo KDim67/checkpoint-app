@@ -14,6 +14,8 @@ import {
 } from './notes/notesUtils'
 import type { NoteMetadata, NoteSearchResult } from '../../../shared/types'
 import { useAppStore } from '../store/appStore'
+import * as notesApi from '../data/notes'
+import * as appApi from '../data/app'
 
 export default function NotesView(): React.JSX.Element {
   const { toast } = useToast()
@@ -56,7 +58,7 @@ export default function NotesView(): React.JSX.Element {
   // Load notes list
   const loadNotesList = useCallback(async (): Promise<NoteMetadata[]> => {
     try {
-      const list = await window.electronAPI.notes.listNotes()
+      const list = await notesApi.listNotes()
       setNotes(list)
       return list
     } catch (err) {
@@ -92,7 +94,7 @@ export default function NotesView(): React.JSX.Element {
     let cancelled = false
     ;(async () => {
       try {
-        const content = await window.electronAPI.notes.readNote(activeNoteTitle)
+        const content = await notesApi.readNote(activeNoteTitle)
         if (cancelled) return
         setActiveNoteContent(content)
         setTempTitle(activeNoteTitle)
@@ -110,7 +112,7 @@ export default function NotesView(): React.JSX.Element {
     if (!activeNoteTitle) return
     setSaving(true)
     try {
-      await window.electronAPI.notes.writeNote(activeNoteTitle, activeNoteContent, activeNoteTitle)
+      await notesApi.writeNote(activeNoteTitle, activeNoteContent, activeNoteTitle)
       setIsDirty(false)
       await loadNotesList()
     } catch (err) {
@@ -140,7 +142,7 @@ export default function NotesView(): React.JSX.Element {
     }
     renamingRef.current = true
     try {
-      await window.electronAPI.notes.writeNote(next, activeNoteContent, activeNoteTitle)
+      await notesApi.writeNote(next, activeNoteContent, activeNoteTitle)
       // Migrate pin + active selection to the new title
       setPins(p => p.map(t => (t === activeNoteTitle ? next : t)))
       setIsDirty(false)
@@ -214,7 +216,7 @@ export default function NotesView(): React.JSX.Element {
   // Create / templates / daily
   const createNote = useCallback(async (title: string, content: string, activate = true) => {
     try {
-      await window.electronAPI.notes.writeNote(title, content)
+      await notesApi.writeNote(title, content)
       const list = await loadNotesList()
       if (activate && list.some(n => n.title === title)) {
         setActiveNoteTitle(title)
@@ -249,7 +251,7 @@ export default function NotesView(): React.JSX.Element {
    * could not come across word for word is reported instead of being hidden.
    */
   const handleImportVault = useCallback(async () => {
-    const res = await window.electronAPI.notes.importVault()
+    const res = await notesApi.importVault()
     if (res.cancelled) return
     if (!res.success || !res.result) {
       toast(res.error || 'Could not read that vault', { type: 'error' })
@@ -299,7 +301,7 @@ export default function NotesView(): React.JSX.Element {
     const title = pendingDeleteTitle
     setPendingDeleteTitle(null)
     try {
-      await window.electronAPI.notes.deleteNote(title)
+      await notesApi.deleteNote(title)
       setPins(p => p.filter(t => t !== title))
       toast('Note deleted', { type: 'success' })
       if (activeNoteTitle === title) setActiveNoteTitle(null)
@@ -314,7 +316,7 @@ export default function NotesView(): React.JSX.Element {
   const handleExport = useCallback(async () => {
     if (!activeNoteTitle) return
     try {
-      const ok = await window.electronAPI.app.saveFile(`${activeNoteTitle}.md`, activeNoteContent)
+      const ok = await appApi.saveFile(`${activeNoteTitle}.md`, activeNoteContent)
       if (ok) toast('Note exported', { type: 'success' })
     } catch (err) {
       console.error('Failed to export note:', err)
@@ -337,7 +339,7 @@ export default function NotesView(): React.JSX.Element {
     setSearching(true)
     const timer = setTimeout(async () => {
       try {
-        const results = await window.electronAPI.notes.searchNotes(q)
+        const results = await notesApi.searchNotes(q)
         setSearchResults(results)
       } catch (err) {
         console.error('Note search failed:', err)

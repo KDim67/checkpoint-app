@@ -68,7 +68,7 @@ import {
 } from '../../lib/wallInput'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
-import { updateItem } from '../../data/items'
+import { updateItem, itemPage } from '../../data/items'
 import { toolButton } from './wallButtons'
 import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, clampRail } from './wallPreferences'
 import { NUDGE } from './wallShortcutSheet'
@@ -79,6 +79,9 @@ import WallPlacePicker from './WallPlacePicker'
 import WallSelectionBar from './WallSelectionBar'
 import WallPenSettings from './WallPenSettings'
 import WallRailHandle from './WallRailHandle'
+import * as notesApi from '../../data/notes'
+import * as mediaApi from '../../data/media'
+import * as appApi from '../../data/app'
 
 /** How far a press may travel and still count as a click rather than a drag. */
 const CLICK_SLOP = 4
@@ -250,15 +253,14 @@ export default function WallView() {
     let cancelled = false
 
     const readCards = (): Promise<void> =>
-      window.electronAPI.db
-        .getItems(activeWorkspace, 'card', 1, 500)
+      itemPage(activeWorkspace, 'card', 1, 500)
         .catch(() => ({ items: [] as Item[] }))
         .then(res => { if (!cancelled) setCards((res.items ?? []).filter(c => c.status !== 'archived')) })
 
     void readCards()
     Promise.all([
       // Notes are not per-workspace, so they are offered whole.
-      window.electronAPI.notes.listNotes().catch(() => [] as NoteMetadata[]),
+      notesApi.listNotes().catch(() => [] as NoteMetadata[]),
       // The board's own columns, not whatever statuses happen to be in use.
       loadBoardConfig(activeWorkspace).catch(() => null)
     ]).then(([noteList, config]) => {
@@ -590,7 +592,7 @@ export default function WallView() {
       try {
         const buffer = await file.arrayBuffer()
         const ext = (file.type.split('/')[1] || 'png').replace('+xml', '')
-        const filename = await window.electronAPI.media.saveFromBuffer(buffer, ext)
+        const filename = await mediaApi.saveFromBuffer(buffer, ext)
         addItem('image', { ref: filename, text: file.name }, at)
       } catch (err) {
         toast(`Could not add image: ${errorMessage(err)}`, { type: 'error' })
@@ -655,7 +657,7 @@ export default function WallView() {
         borderColor: style.getPropertyValue('--color-surface-offset').trim() || '#24293f'
       })
       if (!png) { toast('Could not render the wall.', { type: 'error' }); return }
-      const saved = await window.electronAPI.app.saveBinaryFile(`${activeWorkspace}-${activeWall?.name ?? 'wall'}.png`.replace(/[^\w.-]+/g, '-'), await png.arrayBuffer(), 'png')
+      const saved = await appApi.saveBinaryFile(`${activeWorkspace}-${activeWall?.name ?? 'wall'}.png`.replace(/[^\w.-]+/g, '-'), await png.arrayBuffer(), 'png')
       if (saved) toast('Wall exported.')
     } catch (err) {
       toast(`Export failed: ${errorMessage(err)}`, { type: 'error' })

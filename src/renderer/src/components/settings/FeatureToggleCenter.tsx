@@ -5,6 +5,11 @@ import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeat
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 import { getBoolSetting, getNumberSetting, getStringSetting, setBoolSetting } from '../../lib/settings'
+import * as webhookApi from '../../data/webhook'
+import * as hudApi from '../../data/hud'
+import * as backupApi from '../../data/backup'
+import * as trackerApi from '../../data/tracker'
+import * as syncApi from '../../data/sync'
 
 interface ToggleConfig {
   key: string
@@ -99,7 +104,7 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
       // here moved it off the port main had started it on, so every external
       // tool posting to the documented port stopped being delivered.
       const port = await getNumberSetting('webhook_port', WEBHOOK_DEFAULT_PORT)
-      await window.electronAPI.webhook.toggle(active, port)
+      await webhookApi.toggle(active, port)
     }
   },
   {
@@ -113,7 +118,7 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     },
     toggle: async (active: boolean) => {
       await setBoolSetting('feature_hud', active)
-      await window.electronAPI.hud.toggle(active)
+      await hudApi.toggle(active)
     }
   },
   {
@@ -130,7 +135,7 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
       // Persisting the flag alone left the old timers running and armed no new
       // ones, so the warning above only came true on the next launch.
       // initializeBackupScheduler clears then re-arms, so it is right either way.
-      await window.electronAPI.backup.run('init')
+      await backupApi.run('init')
     }
   },
   {
@@ -140,12 +145,12 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     description: 'Monitors active window focus to build a passive work timeline.',
     warning: 'Disabling terminates the active window focus scanning loop.',
     getState: async () => {
-      try { return await window.electronAPI.tracker.getState() }
+      try { return await trackerApi.getState() }
       catch { return false }
     },
     toggle: async (active: boolean) => {
       await setBoolSetting('feature_tracker', active)
-      await window.electronAPI.tracker.toggle(active)
+      await trackerApi.toggle(active)
     }
   },
   {
@@ -160,9 +165,9 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     toggle: async (active: boolean) => {
       await setBoolSetting('sync_enabled', active)
       if (active) {
-        await window.electronAPI.sync.startHost()
+        await syncApi.startHost()
       } else {
-        await window.electronAPI.sync.stopHost()
+        await syncApi.stopHost()
       }
       window.dispatchEvent(new CustomEvent('settings-update-sync'))
     }

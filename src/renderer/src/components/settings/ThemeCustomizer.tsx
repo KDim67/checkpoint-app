@@ -9,6 +9,7 @@ import {
   deriveThemeVars,
   type ThemeVariables
 } from '../../../../shared/themePresets'
+import * as customizerApi from '../../data/customizer'
 
 const COLOR_VARIABLE_LABELS: Record<Exclude<keyof ThemeVariables, '--font-sans'>, { label: string; desc: string }> = {
   '--color-background': { label: 'Canvas Background', desc: 'Base color for the entire workspace background.' },
@@ -40,10 +41,10 @@ export default function ThemeCustomizer() {
   useEffect(() => {
     const load = async () => {
       try {
-        const enabled = await window.electronAPI.customizer.getEngineState()
+        const enabled = await customizerApi.getEngineState()
         setEngineEnabled(enabled)
 
-        const stored = await window.electronAPI.customizer.getTheme()
+        const stored = await customizerApi.getTheme()
         if (stored && Object.keys(stored).length > 0) {
           // Only the canonical variables are kept in state. Earlier writes also
           // stored the derived tints, and carrying those around meant a later
@@ -64,7 +65,7 @@ export default function ThemeCustomizer() {
   const handleEngineToggle = async (checked: boolean) => {
     try {
       setEngineEnabled(checked)
-      await window.electronAPI.customizer.toggleEngine(checked)
+      await customizerApi.toggleEngine(checked)
       toast(checked ? 'Customization Engine activated' : 'Customization Engine deactivated')
     } catch (err) {
       console.error(err)
@@ -84,7 +85,7 @@ export default function ThemeCustomizer() {
     setThemeVars(next)
     if (!engineEnabled) return
     try {
-      await window.electronAPI.customizer.updateTheme(deriveThemeVars(next))
+      await customizerApi.updateTheme(deriveThemeVars(next))
     } catch (err) {
       console.error(err)
     }
@@ -105,7 +106,7 @@ export default function ThemeCustomizer() {
     setThemeVars(DEFAULT_THEME)
     if (engineEnabled) {
       try {
-        await window.electronAPI.customizer.updateTheme({})
+        await customizerApi.updateTheme({})
         toast('Custom theme colors reset to default')
       } catch (err) {
         console.error(err)

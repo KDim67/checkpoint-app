@@ -52,6 +52,20 @@ module.exports = [
     }
   },
   {
+    // The renderer reaches the main process through src/renderer/src/data and
+    // nowhere else. A screen that imports a data module can be tested against a
+    // stand-in for it; a screen that reads the global cannot.
+    files: ['src/renderer/src/**/*.{ts,tsx}'],
+    ignores: ['src/renderer/src/data/**'],
+    rules: {
+      'no-restricted-properties': ['error', {
+        object: 'window',
+        property: 'electronAPI',
+        message: 'Reach the bridge through a module in src/renderer/src/data.'
+      }]
+    }
+  },
+  {
     // Tests live outside src/, so the block above does not reach them and they
     // would otherwise hit the default parser and fail on the first annotation.
     // no-explicit-any stays an error here: test code is new, so there is no

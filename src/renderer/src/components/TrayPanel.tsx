@@ -7,6 +7,8 @@ import {
   STARTUP_OPTIONS,
   type StartupSettings
 } from '../../../shared/startupSettings'
+import * as trayApi from '../data/tray'
+import * as mcpApi from '../data/mcp'
 
 interface Summary {
   context: string
@@ -36,8 +38,8 @@ export default function TrayPanel(): React.JSX.Element {
   const load = useCallback(async () => {
     try {
       const [nextSummary, nextStartup] = await Promise.all([
-        window.electronAPI.tray.summary(),
-        window.electronAPI.tray.getStartup()
+        trayApi.summary(),
+        trayApi.getStartup()
       ])
       setSummary(nextSummary)
       setStartup(nextStartup)
@@ -58,8 +60,8 @@ export default function TrayPanel(): React.JSX.Element {
     window.addEventListener('focus', load)
     // Counts move while the panel is open. A card completed in the main window,
     // or an agent writing over MCP, and the switches are also shown in Settings.
-    const stopData = window.electronAPI.mcp.onDataChanged(load)
-    const stopStartup = window.electronAPI.tray.onStartupChanged(setStartup)
+    const stopData = mcpApi.onDataChanged(load)
+    const stopStartup = trayApi.onStartupChanged(setStartup)
 
     return () => {
       stopWatching()
@@ -73,17 +75,17 @@ export default function TrayPanel(): React.JSX.Element {
   useLayoutEffect(() => {
     if (!ready || !rootRef.current) return
     const height = Math.ceil(rootRef.current.getBoundingClientRect().height)
-    window.electronAPI.tray.resize(height).catch(() => {})
+    trayApi.resize(height).catch(() => {})
   }, [ready, startup, summary])
 
-  const act = (action: string): void => { window.electronAPI.tray.action(action) }
+  const act = (action: string): void => { trayApi.action(action) }
 
   const toggle = async (key: keyof StartupSettings): Promise<void> => {
     const next = { ...startup, [key]: !startup[key] }
     setStartup(next)
     // Main reconciles (turning the tray icon off forces the other two off), so
     // its answer is authoritative, not the optimistic value above.
-    setStartup(await window.electronAPI.tray.setStartup(next))
+    setStartup(await trayApi.setStartup(next))
   }
 
   const actionRow: React.CSSProperties = {

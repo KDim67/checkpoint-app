@@ -3,6 +3,7 @@ import { parseNaturalDate, describeDue } from '../../../shared/naturalDate'
 import { readWorkspaceList } from '../lib/workspaceList'
 import { resolveTagIds } from '../data/tags'
 import { createItem } from '../data/items'
+import * as hudApi from '../data/hud'
 
 // SVG Icons
 
@@ -148,7 +149,7 @@ export default function HudView() {
 
   // Listen to main process reset triggers (e.g. on blur/hide)
   useEffect(() => {
-    const unsub = window.electronAPI.hud.onReset(() => {
+    const unsub = hudApi.onReset(() => {
       setValue('')
       setError(null)
     })
@@ -158,11 +159,11 @@ export default function HudView() {
   // Handle resizing: resize HUD height dynamically to accommodate errors or syntax tips
   useEffect(() => {
     if (error) {
-      window.electronAPI.hud.resize(100)
+      hudApi.resize(100)
     } else if (isFocused) {
-      window.electronAPI.hud.resize(84)
+      hudApi.resize(84)
     } else {
-      window.electronAPI.hud.resize(64)
+      hudApi.resize(64)
     }
   }, [error, isFocused])
 
@@ -171,7 +172,7 @@ export default function HudView() {
       e.preventDefault()
       if (submitting) return
       // Hide window (blur listener will also reset inputs)
-      await window.electronAPI.hud.toggle(false)
+      await hudApi.toggle(false)
       return
     }
 
@@ -220,7 +221,7 @@ export default function HudView() {
         // 3. Success feedback & hide HUD
         playChime()
         setValue('')
-        await window.electronAPI.hud.toggle(false)
+        await hudApi.toggle(false)
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Database write failure'
         setError(msg)

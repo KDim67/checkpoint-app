@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from 'react'
 import type { UpdateProgress } from '../../../shared/types'
+import * as appApi from '../data/app'
 
 type Listener = (progress: UpdateProgress | null) => void
 
@@ -34,8 +35,8 @@ function publish(next: UpdateProgress | null): void {
 function ensureSubscribed(): void {
   if (subscribed) return
   subscribed = true
-  window.electronAPI.app.onUpdateProgress(publish)
-  window.electronAPI.app.updateState()
+  appApi.onUpdateProgress(publish)
+  appApi.updateState()
     // A live event that lands before this read resolves is the newer answer.
     .then(state => { if (state && !current) publish(state) })
     .catch(err => console.error('Failed to read the update state:', err))

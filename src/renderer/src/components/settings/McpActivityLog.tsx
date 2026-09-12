@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { RotateCcw, History } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import type { McpActivityEntry } from '../../../../shared/mcpActivity'
+import * as mcpApi from '../../data/mcp'
 
 /** Coarse on purpose. The useful question is "was this just now, or last week?". */
 function relativeTime(ms: number, now: number): string {
@@ -26,7 +27,7 @@ export default function McpActivityLog(): React.JSX.Element {
 
   const load = useCallback(async () => {
     try {
-      const rows = await window.electronAPI.mcp.listActivity(50)
+      const rows = await mcpApi.listActivity(50)
       setEntries(rows)
       setNow(Date.now())
     } catch (err) {
@@ -40,14 +41,14 @@ export default function McpActivityLog(): React.JSX.Element {
     load()
     // An agent can write while this panel is open, so refresh on the same event
     // the rest of the UI uses to notice outside changes.
-    const off = window.electronAPI.mcp.onDataChanged(() => load())
+    const off = mcpApi.onDataChanged(() => load())
     return off
   }, [load])
 
   const handleUndo = async (entry: McpActivityEntry) => {
     setBusyId(entry.id)
     try {
-      const result = await window.electronAPI.mcp.undoActivity(entry.id)
+      const result = await mcpApi.undoActivity(entry.id)
       if (result.ok) toast('Change undone')
       else toast(result.reason ?? 'Could not undo that change')
       await load()

@@ -22,6 +22,7 @@ import {
   legacySwimlanesKey,
   type BoardConfig
 } from '../../../shared/boardModel'
+import { getSetting, setSetting } from '../data/settings'
 
 export * from '../../../shared/boardModel'
 
@@ -31,16 +32,16 @@ export * from '../../../shared/boardModel'
  * and nesting withLock on the same key would deadlock.
  */
 async function readUnlocked(context: string): Promise<{ config: BoardConfig; migrated: boolean }> {
-  const stored = await window.electronAPI.db.getSetting(boardConfigKey(context))
+  const stored = await getSetting(boardConfigKey(context))
   if (stored !== null && stored !== undefined && stored !== '') {
     return { config: normalizeBoardConfig(stored), migrated: false }
   }
 
   const [legacyColumns, legacyBackground, legacyArchived, legacySwimlanes] = await Promise.all([
-    window.electronAPI.db.getSetting(legacyColumnsKey(context)),
-    window.electronAPI.db.getSetting(legacyBackgroundKey(context)),
-    window.electronAPI.db.getSetting(legacyArchivedKey(context)),
-    window.electronAPI.db.getSetting(legacySwimlanesKey(context))
+    getSetting(legacyColumnsKey(context)),
+    getSetting(legacyBackgroundKey(context)),
+    getSetting(legacyArchivedKey(context)),
+    getSetting(legacySwimlanesKey(context))
   ])
   return {
     config: migrateLegacy(legacyColumns, legacyBackground, legacyArchived, legacySwimlanes),
@@ -64,7 +65,7 @@ async function writeUnlocked(context: string, config: BoardConfig): Promise<void
   // Passed as an object, so setSetting encodes it exactly once. The legacy
   // column key was stringified by its caller as well, producing a
   // double-encoded value; not repeating that is what keeps reads simple.
-  await window.electronAPI.db.setSetting(boardConfigKey(context), config)
+  await setSetting(boardConfigKey(context), config)
   window.dispatchEvent(new CustomEvent(BOARD_CONFIG_EVENT, { detail: { context, board: config } }))
 }
 

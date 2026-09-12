@@ -15,6 +15,7 @@ import {
   onConnectionFailed,
   iceServers
 } from './webrtcTransport'
+import * as syncApi from '../data/sync'
 
 interface FileMetadata {
   relPath: string
@@ -279,9 +280,9 @@ export class WebRTCSyncCoordinator {
     
     // Retrieve host db payload & files list
     this.options.onProgress('Exchanging local database states...')
-    const dbPayload = await window.electronAPI.sync.getDbPayload()
-    const notesIndex = await window.electronAPI.sync.getFileIndex('notes')
-    const mediaIndex = await window.electronAPI.sync.getFileIndex('media')
+    const dbPayload = await syncApi.getDbPayload()
+    const notesIndex = await syncApi.getFileIndex('notes')
+    const mediaIndex = await syncApi.getFileIndex('media')
 
     await this.send({
       type: 'db-payload-offer',
@@ -301,7 +302,7 @@ export class WebRTCSyncCoordinator {
         this.options.onProgress('Merging peer database and files...')
         
         // 1. Merge Database payload
-        const result = await window.electronAPI.sync.applyDbPayload(msg.dbPayload)
+        const result = await syncApi.applyDbPayload(msg.dbPayload)
         this.dbUpdatesCount += result.pulledNewerCount
         this.options.onProgress(`Merged database: ${result.pulledNewerCount} records integrated.`)
 
@@ -310,9 +311,9 @@ export class WebRTCSyncCoordinator {
         await this.alignFilesAndSync('media', msg.mediaIndex)
 
         // 3. Send client response back to host
-        const clientDbPayload = await window.electronAPI.sync.getDbPayload()
-        const clientNotesIndex = await window.electronAPI.sync.getFileIndex('notes')
-        const clientMediaIndex = await window.electronAPI.sync.getFileIndex('media')
+        const clientDbPayload = await syncApi.getDbPayload()
+        const clientNotesIndex = await syncApi.getFileIndex('notes')
+        const clientMediaIndex = await syncApi.getFileIndex('media')
 
         await this.send({
           type: 'db-payload-reply',
@@ -325,7 +326,7 @@ export class WebRTCSyncCoordinator {
 
       case 'db-payload-reply': {
         this.options.onProgress('Merging client database updates...')
-        const result = await window.electronAPI.sync.applyDbPayload(msg.dbPayload)
+        const result = await syncApi.applyDbPayload(msg.dbPayload)
         this.dbUpdatesCount += result.pulledNewerCount
 
         // Align host files
@@ -348,7 +349,7 @@ export class WebRTCSyncCoordinator {
         // The transport reassembles the frames, so a file arrives here whole.
         this.options.onProgress(`Writing ${msg.relPath}...`)
         const bytes = base64ToBytes(msg.data)
-        await window.electronAPI.sync.writeFileChunk(
+        await syncApi.writeFileChunk(
           msg.subDir,
           msg.relPath,
           bytes.buffer as ArrayBuffer,
@@ -366,7 +367,7 @@ export class WebRTCSyncCoordinator {
 
       case 'delete-file': {
         // Peer deleted note/media file
-        await window.electronAPI.sync.deleteFile(msg.subDir, msg.relPath)
+        await syncApi.deleteFile(msg.subDir, msg.relPath)
         this.filesSyncedCount++
         break
       }
@@ -375,7 +376,7 @@ export class WebRTCSyncCoordinator {
 
   // Compare file indexes and request missing files or push newer ones
   private async alignFilesAndSync(subDir: 'notes' | 'media', peerIndex: FileMetadata[]): Promise<void> {
-    const localIndex = await window.electronAPI.sync.getFileIndex(subDir)
+    const localIndex = await syncApi.getFileIndex(subDir)
     const localMap = new Map(localIndex.map(f => [f.relPath, f]))
     const peerMap = new Map(peerIndex.map(f => [f.relPath, f]))
 
@@ -396,7 +397,7 @@ export class WebRTCSyncCoordinator {
     // inside the loop below, so a peer missing 100 files triggered 100 full
     // dumps of every table in the database across IPC.
     const deletedRelPaths = new Set(
-      (await window.electronAPI.sync.getDbPayload()).tombstones
+      (await syncApi.getDbPayload()).tombstones
         .filter((t: { table_name: string }) => t.table_name === 'notes')
         .map((t: { id: string }) => t.id)
     )
@@ -429,7 +430,7 @@ export class WebRTCSyncCoordinator {
    * belongs to the transport, which also applies backpressure.
    */
   private async sendFile(subDir: 'notes' | 'media', relPath: string): Promise<void> {
-    const fileBytes = await window.electronAPI.sync.readFileChunk(subDir, relPath)
+    const fileBytes = await syncApi.readFileChunk(subDir, relPath)
     if (!fileBytes) return
 
     this.options.onProgress(`Sending ${relPath}...`)

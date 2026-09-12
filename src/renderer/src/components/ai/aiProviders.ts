@@ -1,3 +1,5 @@
+import { getSetting as getSettingRow, setSetting as setSettingRow } from '../../data/settings'
+
 // AI Provider Profiles.
 //
 // The app's main process reads a single flat config (ai_base_url / ai_api_key /
@@ -79,7 +81,7 @@ function newId(): string {
 
 async function getSetting(key: string): Promise<string | null> {
   try {
-    const v = await window.electronAPI.db.getSetting(key)
+    const v = await getSettingRow(key)
     return v == null ? null : String(v)
   } catch {
     return null
@@ -88,7 +90,7 @@ async function getSetting(key: string): Promise<string | null> {
 
 async function setSetting(key: string, val: string): Promise<void> {
   try {
-    await window.electronAPI.db.setSetting(key, val)
+    await setSettingRow(key, val)
   } catch (err) {
     console.warn(`Failed to persist ${key}:`, err)
   }

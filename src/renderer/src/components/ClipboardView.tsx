@@ -19,6 +19,8 @@ import type { ClipboardItem } from '../../../shared/types'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { useToast } from './ui/Toast'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
+import * as clipboardApi from '../data/clipboard'
+import * as appApi from '../data/app'
 
 // Keep in sync with the DELETE ... LIMIT in db/clipboard.ts (stmtDeleteClipboardHistoryOverflow).
 const HISTORY_LIMIT = 200
@@ -96,7 +98,7 @@ export default function ClipboardView() {
   // Load history from DB
   const loadHistory = useCallback(async () => {
     try {
-      const data = await window.electronAPI.clipboard.getHistory()
+      const data = await clipboardApi.getHistory()
       setHistory(data)
     } catch (err) {
       console.error('Failed to load clipboard history:', err)
@@ -108,7 +110,7 @@ export default function ClipboardView() {
   useEffect(() => {
     loadHistory()
     // Instant refresh the moment the background watcher captures something new…
-    const unsubscribe = window.electronAPI.clipboard.onHistoryChanged(loadHistory)
+    const unsubscribe = clipboardApi.onHistoryChanged(loadHistory)
     // …plus a relaxed fallback poll in case an event is ever missed.
     const interval = setInterval(loadHistory, 5000)
     return () => {
@@ -120,7 +122,7 @@ export default function ClipboardView() {
   // Actions
   const handleTogglePin = async (id: string, isPinned: boolean) => {
     try {
-      await window.electronAPI.clipboard.togglePin(id, !isPinned)
+      await clipboardApi.togglePin(id, !isPinned)
       loadHistory()
     } catch (err) {
       console.error('Failed to toggle pin:', err)
@@ -134,7 +136,7 @@ export default function ClipboardView() {
 
   const handleSaveLabel = async (id: string) => {
     try {
-      await window.electronAPI.clipboard.updateLabel(id, editLabelText.trim() || null)
+      await clipboardApi.updateLabel(id, editLabelText.trim() || null)
       setEditingId(null)
       loadHistory()
     } catch (err) {
@@ -147,7 +149,7 @@ export default function ClipboardView() {
       const targetItem = history.find(item => item.id === id)
       if (!targetItem) return
 
-      await window.electronAPI.clipboard.deleteItem(id)
+      await clipboardApi.deleteItem(id)
       loadHistory()
 
       toast('Clipboard item deleted.', {
@@ -155,7 +157,7 @@ export default function ClipboardView() {
           label: 'Undo',
           onClick: async () => {
             try {
-              await window.electronAPI.clipboard.restoreItem(
+              await clipboardApi.restoreItem(
                 targetItem.content,
                 targetItem.is_pinned === 1,
                 targetItem.label
@@ -178,7 +180,7 @@ export default function ClipboardView() {
   const performClearHistory = async () => {
     setIsClearConfirmOpen(false)
     try {
-      await window.electronAPI.clipboard.clearHistory()
+      await clipboardApi.clearHistory()
       loadHistory()
     } catch (err) {
       console.error('Failed to clear clipboard history:', err)
@@ -199,7 +201,7 @@ export default function ClipboardView() {
   // Copy & hide the window (quick-paste flow via the global hotkey panel)
   const handleCopyAndClose = async (content: string) => {
     try {
-      await window.electronAPI.clipboard.paste(content)
+      await clipboardApi.paste(content)
     } catch (err) {
       console.error('Failed to copy and close:', err)
     }
@@ -207,7 +209,7 @@ export default function ClipboardView() {
 
   const handleOpenLink = async (content: string) => {
     try {
-      await window.electronAPI.app.openExternal(normalizeUrl(content))
+      await appApi.openExternal(normalizeUrl(content))
     } catch (err) {
       console.error('Failed to open link:', err)
     }
@@ -230,7 +232,7 @@ export default function ClipboardView() {
     if (!contentTrimmed) return
 
     try {
-      await window.electronAPI.clipboard.createSnippet(contentTrimmed, newLabel.trim() || null)
+      await clipboardApi.createSnippet(contentTrimmed, newLabel.trim() || null)
       setNewLabel('')
       setNewContent('')
       setIsAdding(false)
