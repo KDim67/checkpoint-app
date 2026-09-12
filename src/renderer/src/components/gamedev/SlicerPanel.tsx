@@ -1,7 +1,8 @@
 import React from 'react'
-import { AlertTriangle, CheckCircle, Download, Loader, Scissors, Settings } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Download, Loader, Scissors } from 'lucide-react'
 import type { SlicerTool } from './useSlicerTool'
 import FilePickerButton from './FilePickerButton'
+import SettingsColumn from './SettingsColumn'
 
 export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
   const {
@@ -34,22 +35,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--space-4)', minHeight: 0, flex: 1 }}>
           {/* Left Configuration Column */}
-          <div style={{
-            background: 'var(--color-surface-1)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-4)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-            overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
-              <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
-              <span className="label-caps">
-                Slicing Settings
-              </span>
-            </div>
+          <SettingsColumn title="Slicing Settings">
 
             {/* File input button */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -141,7 +127,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                 </div>
               </div>
             )}
-          </div>
+          </SettingsColumn>
 
           {/* Right Canvas Column */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>

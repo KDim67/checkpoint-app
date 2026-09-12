@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { FolderOpen } from 'lucide-react'
 import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 
 // Not re-exported: this module must export components only, or React Fast
@@ -7,6 +6,7 @@ import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 // from lib/fontScale directly.
 import { applyFontSize, type FontSize } from '../../lib/fontScale'
 import { getBoolSetting, getEnumSetting, setBoolSetting, setStringSetting } from '../../lib/settings'
+import PathRow from './PathRow'
 
 function applyCompactMode(enabled: boolean): void {
   if (enabled) {
@@ -120,39 +120,16 @@ export default function AppearanceSettings() {
         label="Custom Theme File"
         hint="Drop a theme.css here to override CSS tokens. Changes are hot-reloaded instantly."
       >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)',
-          background: 'var(--color-surface-2)',
-          border: '1px solid var(--color-surface-offset)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-2) var(--space-3)'
-        }}>
-          <code style={{
-            flex: 1,
-            fontSize: '11px',
-            fontFamily: 'var(--font-mono)',
-            color: 'var(--color-text-muted)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
-            {themePath || 'Loading…'}
-          </code>
-          <button
-            className="btn-icon"
-            title="Open folder in Explorer"
-            onClick={() => {
-              // Open the parent directory of the theme file
-              const dir = themePath.replace(/[/\\][^/\\]+$/, '')
-              window.electronAPI.app.openExternal(`file://${dir}`)
-            }}
-            style={{ width: '28px', height: '28px', flexShrink: 0 }}
-          >
-            <FolderOpen size={13} />
-          </button>
-        </div>
+        <PathRow
+          openTitle="Open folder in Explorer"
+          onOpen={() => {
+            // Open the parent directory of the theme file
+            const dir = themePath.replace(/[/\\][^/\\]+$/, '')
+            window.electronAPI.app.openExternal(`file://${dir}`)
+          }}
+        >
+          {themePath || 'Loading…'}
+        </PathRow>
       </FieldRow>
     </div>
   )

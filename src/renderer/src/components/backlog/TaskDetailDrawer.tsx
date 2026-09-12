@@ -17,6 +17,7 @@ import RelationsPanel from '../ui/RelationsPanel'
 import AiAssistButton from '../ui/AiAssistButton'
 import { useItemRelations } from '../ui/useItemRelations'
 import { listTags } from '../../data/tags'
+import DrawerCloseButton from '../ui/DrawerCloseButton'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -328,21 +329,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           <div className="row">
             {aiEnabled && <AiAssistButton onClick={handleAiAssist} />}
 
-            <button
-              onClick={onClose}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--color-text-muted)',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex'
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
-            >
-              <X size={20} />
-            </button>
+            <DrawerCloseButton onClick={onClose} />
           </div>
         </div>
 

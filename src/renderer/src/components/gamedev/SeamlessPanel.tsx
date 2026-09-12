@@ -2,6 +2,7 @@ import React from 'react'
 import { CheckCircle, Download, Loader, Repeat, Settings } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { SeamlessTool } from './useSeamlessTool'
+import TextureDropZone from './TextureDropZone'
 
 export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool; onCardDone: (cardId: string) => Promise<void> }) {
   const {
@@ -47,66 +48,13 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
 
         {!seamlessUrl ? (
           /* Drop Zone */
-          <div
+          <TextureDropZone
             onDragOver={handleSeamlessDragOver}
             onDrop={handleSeamlessDrop}
             onClick={handleSeamlessBrowseClick}
-            style={{
-              // Not flex: 1. The drop target grew to whatever height was
-              // going, which on a tall window left a nine hundred pixel dashed
-              // box with a small label adrift in the middle of it.
-              minHeight: '260px',
-              maxHeight: '420px',
-              border: '2px dashed var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 'var(--space-4)',
-              cursor: 'pointer',
-              background: 'var(--color-surface-1)',
-              transition: 'border-color var(--duration-fast), background var(--duration-fast)',
-            }}
-            onMouseOver={e => {
-              e.currentTarget.style.borderColor = 'var(--color-primary)'
-              e.currentTarget.style.background = 'var(--color-surface-2)'
-            }}
-            onMouseOut={e => {
-              e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-              e.currentTarget.style.background = 'var(--color-surface-1)'
-            }}
-          >
-            {isSeamlessProcessing ? (
-              <>
-                <Loader size={32} className="animate-spin" style={{ color: 'var(--color-secondary)' }} />
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Processing texture...</span>
-              </>
-            ) : (
-              <>
-                <div style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'var(--color-surface-2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid var(--color-surface-offset)'
-                }}>
-                  <Download size={24} style={{ color: 'var(--color-text-muted)', transform: 'rotate(180deg)' }} />
-                </div>
-                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
-                    Drag & Drop Base Texture
-                  </span>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    or click to browse local files (.png, .jpg, .jpeg, .tga, .bmp)
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
+            processing={isSeamlessProcessing}
+            label="Drag & Drop Base Texture"
+          />
         ) : (
           /* Seamless Workspace */
           <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>

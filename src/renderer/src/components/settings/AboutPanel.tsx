@@ -4,9 +4,10 @@ import { errorMessage } from '../../../../shared/errors'
 import type { UpdateCheckResult } from '../../../../shared/types'
 import { describeUpdateProgress } from '../../../../shared/updateEta'
 import { useUpdateProgress } from '../../lib/useUpdateProgress'
-import { FolderOpen, Info, PlayCircle, RefreshCw } from 'lucide-react'
+import { Info, PlayCircle, RefreshCw } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
+import PathRow from './PathRow'
 
 /** The tone of the status line, so a failure does not read like good news. */
 const UPDATE_TONE: Record<UpdateCheckResult['status'], string> = {
@@ -159,35 +160,9 @@ export default function AboutPanel() {
         <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
           Database Location
         </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)',
-          background: 'var(--color-surface-2)',
-          border: '1px solid var(--color-surface-offset)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-2) var(--space-3)'
-        }}>
-          <code style={{
-            flex: 1,
-            fontSize: '11px',
-            fontFamily: 'var(--font-mono)',
-            color: 'var(--color-text-muted)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
-            {info.dataPath}/checkpoint.db
-          </code>
-          <button
-            className="btn-icon"
-            title="Open folder"
-            style={{ width: '28px', height: '28px', flexShrink: 0 }}
-            onClick={() => window.electronAPI.app.openExternal(`file://${info.dataPath}`)}
-          >
-            <FolderOpen size={13} />
-          </button>
-        </div>
+        <PathRow openTitle="Open folder" onOpen={() => window.electronAPI.app.openExternal(`file://${info.dataPath}`)}>
+          {info.dataPath}/checkpoint.db
+        </PathRow>
       </div>
 
       <Divider />
