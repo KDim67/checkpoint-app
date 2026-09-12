@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import Markdown from '../ui/Markdown'
 import { formatDistanceToNow } from 'date-fns'
 import { Copy, Pin, Trash2, ArrowRightLeft, Check } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
@@ -11,69 +10,6 @@ interface LogEntryProps {
   onTogglePin: (id: string, currentPriority: number) => void
   onDelete: (id: string) => void
   onConvertToCard: (id: string, title: string, tagIds: string[]) => void
-}
-
-export function CustomCodeBlock({ language, value }: { language?: string; value: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(value)
-    setCopied(true)
-    setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
-  }
-
-  return (
-    <div style={{
-      margin: 'var(--space-3) 0',
-      background: 'var(--color-surface-2)',
-      borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--color-surface-offset)',
-      overflow: 'hidden'
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 'var(--space-2) var(--space-4)',
-        background: 'var(--color-surface-offset)',
-        fontSize: 'var(--text-xs)',
-        fontFamily: 'var(--font-mono)',
-        color: 'var(--color-text-muted)'
-      }}>
-        <span>{language || 'code'}</span>
-        <button
-          onClick={handleCopy}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--color-text-muted)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-1)',
-            padding: 0
-          }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
-        >
-          {copied ? <Check size={12} style={{ color: 'var(--color-success)' }} /> : <Copy size={12} />}
-          <span>{copied ? 'Copied!' : 'Copy'}</span>
-        </button>
-      </div>
-      <pre style={{
-        margin: 0,
-        padding: 'var(--space-4)',
-        overflowX: 'auto',
-        fontSize: 'var(--text-sm)',
-        fontFamily: 'var(--font-mono)',
-        color: 'var(--color-text-base)',
-        lineHeight: 1.5,
-        background: 'transparent'
-      }}>
-        <code>{value}</code>
-      </pre>
-    </div>
-  )
 }
 
 export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard }: LogEntryProps) {
@@ -255,35 +191,9 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
         lineHeight: 1.6,
         wordBreak: 'break-word'
       }} className="markdown-body">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          urlTransform={url => url}
+        <Markdown
+          inlineCodeSurface="var(--color-surface-2)"
           components={{
-            code({ className, children, ...props }) {
-              const match = /language-(\w+)/.exec(className || '')
-              const isBlock = className?.includes('language-') || String(children).includes('\n')
-              return isBlock ? (
-                <CustomCodeBlock
-                  language={match ? match[1] : undefined}
-                  value={String(children).replace(/\n$/, '')}
-                />
-              ) : (
-                <code
-                  className={className}
-                  {...props}
-                  style={{
-                    background: 'var(--color-surface-2)',
-                    padding: '2px 6px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '0.9em',
-                    color: 'var(--color-secondary)'
-                  }}
-                >
-                  {children}
-                </code>
-              )
-            },
             p({ children }) {
               return <p style={{ margin: '0 0 var(--space-2) 0' }}>{children}</p>
             },
@@ -315,7 +225,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
           }}
         >
           {item.body}
-        </ReactMarkdown>
+        </Markdown>
       </div>
 
       {/* Render Tags Row */}

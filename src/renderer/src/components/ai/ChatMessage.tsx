@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { CustomCodeBlock } from '../log/LogEntry'
+import CodeBlock from '../ui/CodeBlock'
 import { Sparkles, User, Mail, BookOpen, CheckCircle2, Layout, RefreshCw, Columns, ArrowRight, Pencil, Copy, Check, Trash2, FileText, FileDown, Brain, X } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { withLock } from '../../lib/asyncMutex'
@@ -840,7 +840,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
     }
   }
 
-  if (!normalized) return <CustomCodeBlock language="json" value={jsonString.trim()} />
+  if (!normalized) return <CodeBlock language="json" value={jsonString.trim()} />
 
   if (error) {
     return (
@@ -2878,7 +2878,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                   // Fallback: plain code block
                   const isBlock = className?.includes('language-') || String(children).includes('\n')
                   return isBlock ? (
-                    <CustomCodeBlock
+                    <CodeBlock
                       language={match ? match[1] : undefined}
                       value={String(children).replace(/\n$/, '')}
                     />

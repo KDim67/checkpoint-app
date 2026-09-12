@@ -1,0 +1,68 @@
+/**
+ * Markdown, rendered the way this app renders it.
+ *
+ * The code override is the reason this exists: a fenced block has to become a
+ * CodeBlock, which no stylesheet can do, and that configuration was written out
+ * four times. Extra element renderers merge on top for the one screen that
+ * styles headings and quotes itself.
+ *
+ * `inlineCodeSurface` exists only because the three call sites disagreed about
+ * it, which looks accidental rather than meant. Worth collapsing once somebody
+ * has looked at all three side by side.
+ */
+
+import React from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import CodeBlock from './CodeBlock'
+
+interface MarkdownProps {
+  children: string
+  /** Background behind inline code. */
+  inlineCodeSurface?: string
+  /** Renderers for other elements, merged over the built-in ones. */
+  components?: Components
+}
+
+export default function Markdown({
+  children,
+  inlineCodeSurface = 'var(--color-surface-1)',
+  components
+}: MarkdownProps) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      urlTransform={url => url}
+      components={{
+        code({ className, children, ...props }) {
+          const match = /language-(\w+)/.exec(className || '')
+          const isBlock = className?.includes('language-') || String(children).includes('\n')
+          return isBlock ? (
+            <CodeBlock
+              language={match ? match[1] : undefined}
+              value={String(children).replace(/\n$/, '')}
+            />
+          ) : (
+            <code
+              className={className}
+              {...props}
+              style={{
+                background: inlineCodeSurface,
+                padding: '2px 6px',
+                borderRadius: 'var(--radius-sm)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.9em',
+                color: 'var(--color-secondary)'
+              }}
+            >
+              {children}
+            </code>
+          )
+        },
+        ...components
+      }}
+    >
+      {children}
+    </ReactMarkdown>
+  )
+}
