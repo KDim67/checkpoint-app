@@ -6,8 +6,8 @@
  * Nothing about a board reaches it.
  *
  * Named in one place because it appeared at nine call sites across two
- * coordinators, and because the content security policy in index.html has to
- * agree with it: changing the host means changing connect-src too.
+ * coordinators. The content security policy in index.html is filled in from it
+ * when the renderer is built, so connect-src always names the same host.
  */
 
 export const SIGNALING_HOST = 'https://ntfy.sh'
