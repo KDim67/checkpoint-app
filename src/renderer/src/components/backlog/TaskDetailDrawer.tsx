@@ -128,7 +128,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     }
     loadDetails()
     return () => { active = false }
-  }, [taskId, activeWorkspace, setRelations])
+  }, [taskId, activeWorkspace, setRelations, loadSubtasks])
 
   const handleTitleBlur = () => {
     if (!task || !title.trim() || title === task.title) return

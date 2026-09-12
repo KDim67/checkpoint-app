@@ -412,7 +412,7 @@ export default function AiStreamPanel() {
     const messageAdded = messages.length > prevMessagesLengthRef.current
     prevMessagesLengthRef.current = messages.length
     scrollToBottom(messageAdded)
-  }, [messages, streamingText])
+  }, [messages, streamingText, scrollToBottom])
 
   // Esc anywhere stops an in-flight generation. The input is disabled while
   // streaming, so a keyboard-only user otherwise has no way to abort.
@@ -430,6 +430,7 @@ export default function AiStreamPanel() {
 
   // 4. Mount IPC Streaming Listeners with cleanups to prevent leaks
   useEffect(() => {
+    const stream = streamRef.current
     const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk, streamId) => {
       if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       if (isAbortedRef.current) return
@@ -508,16 +509,20 @@ export default function AiStreamPanel() {
       unsubscribeChunk()
       unsubscribeDone()
       unsubscribeError()
-      streamRef.current.flush()
+      stream.flush()
     }
   }, [])
 
-  // 2b. Re-index a previously selected workspace folder on mount
+  // 2b. Re-index a previously selected workspace folder on mount. Only the
+  // folder restored from the last session is indexed here: picking a new one
+  // indexes it where it is picked.
+  const restoredFolderRef = useRef(workspaceFolder)
   useEffect(() => {
-    if (!workspaceFolder) return
+    const restoredFolder = restoredFolderRef.current
+    if (!restoredFolder) return
     let cancelled = false
     setWorkspaceIndexing(true)
-    window.electronAPI.workspace.getStructure(workspaceFolder)
+    window.electronAPI.workspace.getStructure(restoredFolder)
       .then(files => { if (!cancelled) setWorkspaceFiles(files || []) })
       .catch(err => console.warn('Failed to re-index workspace folder:', err))
       .finally(() => { if (!cancelled) setWorkspaceIndexing(false) })

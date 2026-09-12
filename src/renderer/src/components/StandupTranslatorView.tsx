@@ -130,7 +130,7 @@ export default function StandupTranslatorView({
   const [posting, setPosting] = useState(false)
 
   // 1. Load active contexts & logs when modal opens
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoadingLogs(true)
     try {
       const res = await readItems(activeWorkspace, 'log')
@@ -152,14 +152,14 @@ export default function StandupTranslatorView({
     } finally {
       setLoadingLogs(false)
     }
-  }
+  }, [activeWorkspace, timeRange, toast])
 
   useEffect(() => {
     if (isOpen) {
       fetchLogs()
       setStreamingText('')
     }
-  }, [isOpen, timeRange, activeWorkspace])
+  }, [isOpen, fetchLogs])
 
   // 2. Load the active AI provider + models whenever the modal opens, so the
   //    standup uses the same endpoint/model as the assistant. For a local
@@ -205,6 +205,7 @@ export default function StandupTranslatorView({
   //    the same time without intercepting each other's chunks.
   useEffect(() => {
     if (!isOpen) return
+    const stream = streamRef.current
     const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk, streamId) => {
       if (streamId !== STANDUP_STREAM_ID) return
       streamRef.current.push(chunk)
@@ -227,7 +228,7 @@ export default function StandupTranslatorView({
       unsubscribeChunk()
       unsubscribeDone()
       unsubscribeError()
-      streamRef.current.flush()
+      stream.flush()
     }
   }, [isOpen])
 

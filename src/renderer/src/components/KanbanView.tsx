@@ -366,9 +366,7 @@ export default function KanbanView() {
   }, [activeCardId])
 
   useEffect(() => {
-    if (rightPanelOpen && activeCardId) {
-      setActiveCardId(null)
-    }
+    if (rightPanelOpen) setActiveCardId(null)
   }, [rightPanelOpen])
 
   const [activeDragCard, setActiveDragCard] = useState<Item | null>(null)

@@ -464,9 +464,10 @@ export default function WallView() {
 
   useEffect(() => {
     if (!docKey) return
+    const discarded = discardedRef.current
     // Runs on the way out of *this* wall, while docRef still holds it.
     return () => {
-      if (discardedRef.current.delete(docKey)) return
+      if (discarded.delete(docKey)) return
       void flushWallDoc(docKey, docRef.current)
     }
   }, [docKey])

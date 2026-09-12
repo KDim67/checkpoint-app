@@ -60,7 +60,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
       onActivate()
       loadSeamlessPath(preloadSeamlessPath)
     }
-  }, [preloadSeamlessPath, loadSeamlessPath])
+  }, [preloadSeamlessPath, loadSeamlessPath, onActivate])
 
   // Seamless processing math
   //
