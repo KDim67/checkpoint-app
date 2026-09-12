@@ -58,6 +58,8 @@ import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getStringSetting } from '../lib/settings'
 import { bulkDeleteItems, readItems, searchItems } from '../data/items'
 import { createStreamBuffer } from '../lib/streamBuffer'
+import * as aiApi from '../data/ai'
+import * as memoryApi from '../data/memory'
 
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
 
@@ -108,7 +110,7 @@ export default function AiStreamPanel() {
 
   const handleNewChat = () => {
     if (isStreaming) {
-      window.electronAPI.ai.abortStream(ASSISTANT_STREAM_ID).catch(() => {})
+      aiApi.abortStream(ASSISTANT_STREAM_ID).catch(() => {})
     }
     setMessages([])
     setStreamingText('')
@@ -127,7 +129,7 @@ export default function AiStreamPanel() {
 
   const handleLoadChat = (chat: SavedChat) => {
     if (isStreaming) {
-      window.electronAPI.ai.abortStream(ASSISTANT_STREAM_ID).catch(() => {})
+      aiApi.abortStream(ASSISTANT_STREAM_ID).catch(() => {})
     }
     setMessages(chat.messages)
     setStreamingText('')
@@ -277,7 +279,7 @@ export default function AiStreamPanel() {
   // 4. Mount IPC Streaming Listeners with cleanups to prevent leaks
   useEffect(() => {
     const stream = streamRef.current
-    const unsubscribeChunk = window.electronAPI.ai.onChunk((chunk, streamId) => {
+    const unsubscribeChunk = aiApi.onChunk((chunk, streamId) => {
       if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       if (isAbortedRef.current) return
       // Ignore chunks if current chat is no longer the streaming chat
@@ -292,7 +294,7 @@ export default function AiStreamPanel() {
       streamRef.current.push(chunk)
     })
 
-    const unsubscribeDone = window.electronAPI.ai.onDone((streamId, usage) => {
+    const unsubscribeDone = aiApi.onDone((streamId, usage) => {
       if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       // Endpoints honouring stream_options report what the prompt actually
       // cost; that replaces the estimate until the next turn changes it.
@@ -326,7 +328,7 @@ export default function AiStreamPanel() {
       setIsStreaming(false)
     })
 
-    const unsubscribeError = window.electronAPI.ai.onError((errMessage, streamId) => {
+    const unsubscribeError = aiApi.onError((errMessage, streamId) => {
       if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       if (isAbortedRef.current) {
         isAbortedRef.current = false
@@ -628,7 +630,7 @@ export default function AiStreamPanel() {
 
           // 2. Semantic Memory Vector Retrieval (runs AFTER board state so memories interpret board context)
           try {
-            const memories = await window.electronAPI.memory.searchMemories(text, validContext, memoryRecallLimit).catch(() => [])
+            const memories = await memoryApi.searchMemories(text, validContext, memoryRecallLimit).catch(() => [])
             setRecalledMemCount(memories?.length || 0)
             if (memories && memories.length > 0) {
               systemPrompt.push({
@@ -751,7 +753,7 @@ export default function AiStreamPanel() {
 
         const structuredMessages = [...apiMessages, { role: 'system' as const, content: instruction }]
         try {
-          const result = await window.electronAPI.ai.generateStructured({
+          const result = await aiApi.generateStructured({
             kind: structuredKind,
             model: selectedModel,
             messages: structuredMessages,
@@ -810,7 +812,7 @@ export default function AiStreamPanel() {
         temperature,
         maxTokens
       }
-      await window.electronAPI.ai.startStream(params, ASSISTANT_STREAM_ID)
+      await aiApi.startStream(params, ASSISTANT_STREAM_ID)
     } catch (err) {
       setIsStreaming(false)
       setMessages(prev => [...prev, { role: 'assistant', content: `**Failed to initiate stream:** ${errorMessage(err)}` }])
@@ -823,8 +825,8 @@ export default function AiStreamPanel() {
   const handleAbort = async () => {
     try {
       isAbortedRef.current = true
-      await window.electronAPI.ai.abortStream(ASSISTANT_STREAM_ID)
-      await window.electronAPI.ai.abortStructured().catch(() => {})
+      await aiApi.abortStream(ASSISTANT_STREAM_ID)
+      await aiApi.abortStructured().catch(() => {})
       const partialText = streamRef.current.flush().trim()
       if (partialText) {
         setMessages(prev => [...prev, { role: 'assistant', content: partialText + '\n\n*(Generation stopped)*', timestamp: Date.now() }])
@@ -906,7 +908,7 @@ export default function AiStreamPanel() {
       // to initialize in a browser-like context, which Electron's renderer is, so this used
       // to throw immediately and get swallowed by the catch below. No memories were ever
       // actually being written.)
-      const saved = await window.electronAPI.memory.consolidateMemory({
+      const saved = await memoryApi.consolidateMemory({
         context: validContext,
         userText: userTurn.content,
         assistantText: assistantTurn.content,
@@ -920,7 +922,7 @@ export default function AiStreamPanel() {
       // Every 10 consolidation runs, perform a self-cleaning audit
       auditTurnRef.current += 1
       if (auditTurnRef.current % 10 === 0) {
-        const audited = await window.electronAPI.memory.auditMemories(validContext, model).catch(() => [])
+        const audited = await memoryApi.auditMemories(validContext, model).catch(() => [])
         if (audited && audited.length > 0 && showMemoryPanel) {
           setMemories(audited)
         }

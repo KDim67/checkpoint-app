@@ -5,6 +5,7 @@ import {
   type ModelCapabilities,
   type TierBudget
 } from '../../../shared/modelCapabilities'
+import * as aiApi from '../data/ai'
 
 /**
  * Capabilities for the selected model, discovered in the main process.
@@ -31,8 +32,7 @@ export function useModelCapabilities(model: string): {
     if (!model) return
 
     setLoading(true)
-    window.electronAPI.ai
-      .getCapabilities(model, nonce > 0)
+    aiApi.getCapabilities(model, nonce > 0)
       .then(next => {
         if (!cancelled && next) setCaps(next)
       })

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { Repeat, Plus, Trash2, Pause, Play, X } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import type { RecurrenceSummary } from '../../../../shared/recurrence'
+import * as recurrenceApi from '../../data/recurrence'
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -31,7 +32,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
 
   const load = useCallback(async () => {
     try {
-      setRules(await window.electronAPI.recurrence.list(context))
+      setRules(await recurrenceApi.list(context))
     } catch (err) {
       console.error('Failed to load recurrences:', err)
     }
@@ -54,7 +55,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
     const start = new Date(startAt).getTime()
     if (!Number.isFinite(start)) { toast('That start date is not valid'); return }
 
-    const result = await window.electronAPI.recurrence.create({
+    const result = await recurrenceApi.create({
       context,
       title: title.trim(),
       type: 'task',
@@ -69,13 +70,13 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
   }
 
   const handleDelete = async (rule: RecurrenceSummary) => {
-    await window.electronAPI.recurrence.remove(rule.id)
+    await recurrenceApi.remove(rule.id)
     toast(`Stopped "${rule.title}" repeating`)
     await load()
   }
 
   const handleToggle = async (rule: RecurrenceSummary) => {
-    await window.electronAPI.recurrence.setActive(rule.id, !rule.active)
+    await recurrenceApi.setActive(rule.id, !rule.active)
     await load()
   }
 

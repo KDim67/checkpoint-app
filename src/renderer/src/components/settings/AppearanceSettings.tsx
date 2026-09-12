@@ -7,6 +7,7 @@ import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 import { applyFontSize, type FontSize } from '../../lib/fontScale'
 import { getBoolSetting, getEnumSetting, setBoolSetting, setStringSetting } from '../../lib/settings'
 import PathRow from './PathRow'
+import * as appApi from '../../data/app'
 
 function applyCompactMode(enabled: boolean): void {
   if (enabled) {
@@ -31,9 +32,9 @@ export default function AppearanceSettings() {
         setCompactMode(compact)
         applyCompactMode(compact)
 
-        const home = await window.electronAPI.app.getDataPath()
+        const home = await appApi.getDataPath()
         // Theme file is at ~/.config/checkpoint/theme.css
-        const platform = window.electronAPI.app.platform
+        const platform = appApi.platform()
         const configDir = platform === 'win32'
           ? home.replace(/\\AppData\\Roaming.*/, '') + '\\.config\\checkpoint'
           : `${home}/.config/checkpoint`
@@ -125,7 +126,7 @@ export default function AppearanceSettings() {
           onOpen={() => {
             // Open the parent directory of the theme file
             const dir = themePath.replace(/[/\\][^/\\]+$/, '')
-            window.electronAPI.app.openExternal(`file://${dir}`)
+            appApi.openExternal(`file://${dir}`)
           }}
         >
           {themePath || 'Loading…'}

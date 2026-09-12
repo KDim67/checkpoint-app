@@ -34,6 +34,7 @@ import { readItems } from '../../data/items'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
 import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
+import * as appApi from '../../data/app'
 
 interface CardDetailModalProps {
   cardId: string
@@ -162,7 +163,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           const rawName = await getStringSetting(DISPLAY_NAME_KEY, '')
           // The account name stands in when the field was never filled, so a
           // shared board does not fill up with entries credited to nobody.
-          if (active) setDisplayName(resolveAuthor(rawName, window.electronAPI.app.osUserName))
+          if (active) setDisplayName(resolveAuthor(rawName, appApi.osUserName()))
 
           const rels = await getRelations(cardId)
           setRelations(rels)
@@ -411,7 +412,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
         id: `att-${at}-${i}`,
         name: file.name,
         // Electron >= 32: File.path no longer exists. Resolve via preload webUtils.
-        path: window.electronAPI.app.getPathForFile(file),
+        path: appApi.getPathForFile(file),
         isImage: file.type.startsWith('image/'),
         createdAt: at
       }))

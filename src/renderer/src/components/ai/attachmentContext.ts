@@ -7,6 +7,9 @@
  */
 
 import type { Message } from './types'
+import * as cheatsheetsApi from '../../data/cheatsheets'
+import * as notesApi from '../../data/notes'
+import * as workspaceApi from '../../data/workspaceFolder'
 
 type SystemMessage = { role: 'system'; content: string }
 
@@ -92,7 +95,7 @@ export async function gatherAttachmentMessages({
     let fullDocText = ''
     for (const sheetName of sheetNames) {
       try {
-        const relevant = await window.electronAPI.cheatsheets.getRelevant(sheetName, text, perSheet)
+        const relevant = await cheatsheetsApi.getRelevant(sheetName, text, perSheet)
         const cleanText = (relevant || '').trim()
         if (cleanText) {
           fullDocText += `\n\n=== ATTACHED CHEATSHEET / REFERENCE DOCUMENT: "${sheetName}" ===\n${cleanText}\n=== END OF DOCUMENT: "${sheetName}" ===\n`
@@ -115,7 +118,7 @@ export async function gatherAttachmentMessages({
     let notesText = ''
     for (const noteTitle of Array.from(allActiveNotes)) {
       try {
-        const content = await window.electronAPI.notes.readNote(noteTitle)
+        const content = await notesApi.readNote(noteTitle)
         const clean = (content || '').trim().slice(0, perNoteCap)
         if (clean) notesText += `\n\n=== ATTACHED NOTE: "${noteTitle}" ===\n${clean}\n=== END OF NOTE ===\n`
       } catch (noteErr) {
@@ -132,7 +135,7 @@ export async function gatherAttachmentMessages({
     // Auto-recall: no notes attached. Surface the 2 most relevant note
     // snippets so lore/design decisions written in Notes stay consistent.
     try {
-      const hits = await window.electronAPI.notes.searchNotes(text)
+      const hits = await notesApi.searchNotes(text)
       const top = (hits || []).slice(0, 2).filter(h => h.snippet && h.snippet.trim())
       if (top.length > 0) {
         const recall = top.map(h => `- Note "${h.title}": …${h.snippet.trim().slice(0, 280)}…`).join('\n')
@@ -150,7 +153,7 @@ export async function gatherAttachmentMessages({
     let filesText = ''
     for (const relPath of Array.from(allActiveFiles)) {
       try {
-        const content = await window.electronAPI.workspace.readFile(workspaceFolder, relPath)
+        const content = await workspaceApi.readFile(workspaceFolder, relPath)
         const clean = (content || '').trim().slice(0, perFileCap)
         if (clean) filesText += `\n\n=== ATTACHED FILE: "${relPath}" ===\n\`\`\`\n${clean}\n\`\`\`\n=== END OF FILE ===\n`
       } catch (fileErr) {

@@ -3,6 +3,8 @@ import type { UpscaleAlgorithm } from './types'
 import { useToast } from '../ui/Toast'
 import { scale2xData, scale3xData } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
+import * as gamedevApi from '../../data/gamedev'
+import * as appApi from '../../data/app'
 
 /**
  * Pixel Art Upscaler: source selection, nearest/EPX scaling, and export.
@@ -27,7 +29,7 @@ export function useUpscalerTool(isActive: boolean) {
   // Tab 10: Pixel Art Upscaler Callbacks
   const handleSelectUpscaleFile = useCallback(async () => {
     try {
-      const res = await window.electronAPI.gamedev.selectTexture()
+      const res = await gamedevApi.selectTexture()
       if (res) {
         setUpscalePath(res.path)
         setUpscaleUrl(res.dataUrl)
@@ -49,7 +51,7 @@ export function useUpscalerTool(isActive: boolean) {
       return
     }
     // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
-    const path = window.electronAPI.app.getPathForFile(file)
+    const path = appApi.getPathForFile(file)
     const reader = new FileReader()
     reader.onload = (event) => {
       setUpscalePath(path)
@@ -155,7 +157,7 @@ export function useUpscalerTool(isActive: boolean) {
     setIsUpscaleSaving(true)
     try {
       const base64Data = canvas.toDataURL('image/png')
-      const res = await window.electronAPI.gamedev.saveUpscaled({
+      const res = await gamedevApi.saveUpscaled({
         originalPath: upscalePath,
         suffix: upscaleAlgorithm,
         dataUrl: base64Data

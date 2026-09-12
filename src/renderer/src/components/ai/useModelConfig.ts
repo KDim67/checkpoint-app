@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { activateProvider, isLocalUrl, loadProviders, persistProviders, type AiProvider } from './aiProviders'
 import { getNumberSetting, setStringSetting } from '../../lib/settings'
+import * as ollamaApi from '../../data/ollama'
+import * as cookbookApi from '../../data/cookbook'
 
 export function useModelConfig() {
   const [selectedModel, setSelectedModel] = useState('llama3')
@@ -44,7 +46,7 @@ export function useModelConfig() {
 
       if (isLocalEndpoint) {
         // Local endpoint: the model MUST be one Ollama actually has installed.
-        const list = await window.electronAPI.ollama.listLocal().catch(() => [] as string[])
+        const list = await ollamaApi.listLocal().catch(() => [] as string[])
         if (list && list.length > 0) {
           setLocalModels(list)
           // Auto-heal the "default model not installed → 404" trap.
@@ -108,7 +110,7 @@ export function useModelConfig() {
 
   const refreshLocalModels = async () => {
     try {
-      const list = await window.electronAPI.ollama.listLocal()
+      const list = await ollamaApi.listLocal()
       if (list && list.length > 0) {
         setLocalModels(list)
       }
@@ -120,11 +122,11 @@ export function useModelConfig() {
   const handlePullModel = async (tag: string) => {
     setPullingTag(tag)
     setPullProgress(0)
-    const unsub = window.electronAPI.cookbook.onPullProgress(evt => {
+    const unsub = cookbookApi.onPullProgress(evt => {
       if (evt.percent !== undefined) setPullProgress(evt.percent)
     })
     try {
-      await window.electronAPI.cookbook.pullModel(tag)
+      await cookbookApi.pullModel(tag)
       await refreshLocalModels()
       await handleModelChange(tag)
     } catch (e) {

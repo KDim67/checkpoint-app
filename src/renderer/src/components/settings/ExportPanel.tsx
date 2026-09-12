@@ -3,6 +3,7 @@ import { Download } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import { EXPORT_FORMATS, type ExportFormat } from '../../../../shared/exportFormats'
+import * as exporterApi from '../../data/exporter'
 
 export default function ExportPanel(): React.JSX.Element {
   const { toast } = useToast()
@@ -14,7 +15,7 @@ export default function ExportPanel(): React.JSX.Element {
   const handleExport = async () => {
     setBusy(true)
     try {
-      const result = await window.electronAPI.exporter.items({
+      const result = await exporterApi.items({
         context: scope === 'all' ? null : activeWorkspace,
         format
       })

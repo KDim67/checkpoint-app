@@ -22,6 +22,7 @@ import { readWorkspaceList, writeWorkspaceList } from './workspaceList'
 import { createItem } from '../data/items'
 import { getContexts } from '../data/workspaces'
 import { createTag } from '../data/tags'
+import { setSetting } from '../data/settings'
 
 /** The same slug rule the workspace manager has always used. */
 export function slugifyWorkspace(name: string): string {
@@ -276,7 +277,7 @@ export async function createWorkspace(
   templateId: string
 ): Promise<{ list: WorkspaceEntry[]; summary: string; templateFailed: boolean }> {
   const list = [...existing, entry]
-  await window.electronAPI.db.setSetting('contexts_list', JSON.stringify(list))
+  await setSetting('contexts_list', JSON.stringify(list))
 
   let summary = ''
   let templateFailed = false

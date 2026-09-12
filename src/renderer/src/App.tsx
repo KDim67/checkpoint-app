@@ -35,6 +35,10 @@ import {
 } from './lib/shortcuts'
 import { readWorkspaceList, writeWorkspaceList } from './lib/workspaceList'
 import { getContexts } from './data/workspaces'
+import * as appApi from './data/app'
+import * as customizerApi from './data/customizer'
+import * as mcpApi from './data/mcp'
+import { onThemeUpdate } from './data/theme'
 
 // Lazy-loaded views (code split per view)
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
@@ -168,15 +172,15 @@ function Titlebar() {
           }}
         />
         <ThemeToggle />
-        {window.electronAPI.app.platform === 'linux' && (
+        {appApi.platform() === 'linux' && (
           <div className="titlebar-controls" style={{ display: 'flex', gap: 'var(--space-0-5)' }}>
-            <TitlebarButton onClick={() => window.electronAPI.app.minimize()} label="Minimize">
+            <TitlebarButton onClick={() => appApi.minimize()} label="Minimize">
               <svg width="10" height="1" viewBox="0 0 10 1"><line x1="0" y1="0.5" x2="10" y2="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>
             </TitlebarButton>
-            <TitlebarButton onClick={() => window.electronAPI.app.maximize()} label="Maximize">
+            <TitlebarButton onClick={() => appApi.maximize()} label="Maximize">
               <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="1.2"/></svg>
             </TitlebarButton>
-            <TitlebarButton onClick={() => window.electronAPI.app.close()} label="Close" isClose>
+            <TitlebarButton onClick={() => appApi.close()} label="Close" isClose>
               <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" strokeWidth="1.5"/></svg>
             </TitlebarButton>
           </div>
@@ -783,15 +787,14 @@ export default function App() {
       }
     }
 
-    const unsubTheme = window.electronAPI.onThemeUpdate(applyThemeCss)
+    const unsubTheme = onThemeUpdate(applyThemeCss)
     // Ask for whatever should be applied now, independent of any broadcast.
-    window.electronAPI.customizer
-      .getCss()
+    customizerApi.getCss()
       .then(css => { if (css) applyThemeCss(css) })
       .catch(console.error)
 
     // Navigation hotkey listener
-    const unsubNavigate = window.electronAPI.app.onNavigateToView((view: string) => {
+    const unsubNavigate = appApi.onNavigateToView((view: string) => {
       setView(view as ActiveView)
     })
 
@@ -799,7 +802,7 @@ export default function App() {
     // bypassing the IPC calls the views normally refresh on. Re-dispatching the
     // DOM events the views already listen for means no view needs to know that
     // an external agent exists.
-    const unsubMcp = window.electronAPI.mcp.onDataChanged(() => {
+    const unsubMcp = mcpApi.onDataChanged(() => {
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       window.dispatchEvent(new CustomEvent('item-updated'))
       window.dispatchEvent(new CustomEvent('wall-refresh'))

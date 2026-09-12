@@ -23,6 +23,8 @@ import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
 import { getBoolSetting, setBoolSetting } from '../lib/settings'
+import * as cookbookApi from '../data/cookbook'
+import * as appApi from '../data/app'
 
 // Capability filters + display metadata for badges.
 const CAP_FILTERS: { id: string; label: string }[] = [
@@ -180,7 +182,7 @@ export default function CookbookView() {
   const loadHardwareSpecs = async () => {
     setLoadingSpecs(true)
     try {
-      const hardwareSpecs = await window.electronAPI.cookbook.getHardwareSpecs()
+      const hardwareSpecs = await cookbookApi.getHardwareSpecs()
       setSpecs(hardwareSpecs)
     } catch (err) {
       console.error('Failed to load hardware specs:', err)
@@ -192,7 +194,7 @@ export default function CookbookView() {
   const loadOllamaStatus = async () => {
     setLoadingOllama(true)
     try {
-      const status = await window.electronAPI.cookbook.checkOllama()
+      const status = await cookbookApi.checkOllama()
       setOllamaStatus(status)
     } catch (err) {
       console.error('Failed to check Ollama status:', err)
@@ -220,14 +222,14 @@ export default function CookbookView() {
 
   // Listen for IPC pull progress events
   useEffect(() => {
-    const unsubscribeProgress = window.electronAPI.cookbook.onPullProgress((event: PullProgressEvent) => {
+    const unsubscribeProgress = cookbookApi.onPullProgress((event: PullProgressEvent) => {
       updatePullingModel(event.modelId)
       setPullPercent(event.percent >= 0 ? event.percent : 0)
       setPullStatusText(event.status)
       setPullError(null)
     })
 
-    const cleanDone = window.electronAPI.cookbook.onPullDone(() => {
+    const cleanDone = cookbookApi.onPullDone(() => {
       const tag = pullingModelTagRef.current
       updatePullingModel(null)
       setPullPercent(0)
@@ -239,7 +241,7 @@ export default function CookbookView() {
       }
     })
 
-    const cleanError = window.electronAPI.cookbook.onPullError((data: { modelTag: string; message: string }) => {
+    const cleanError = cookbookApi.onPullError((data: { modelTag: string; message: string }) => {
       updatePullingModel(null)
       setPullPercent(0)
       setPullStatusText('')
@@ -277,7 +279,7 @@ export default function CookbookView() {
     setPullPercent(0)
     setPullStatusText('Connecting to Ollama...')
     try {
-      await window.electronAPI.cookbook.pullModel(modelTag)
+      await cookbookApi.pullModel(modelTag)
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err)
       setPullError(errMsg)
@@ -288,7 +290,7 @@ export default function CookbookView() {
   const handleAbort = async () => {
     const tag = pullingModelTagRef.current
     try {
-      await window.electronAPI.cookbook.stopPull()
+      await cookbookApi.stopPull()
       if (tag) {
         toast(`Pull of "${tag}" canceled.`)
       }
@@ -303,7 +305,7 @@ export default function CookbookView() {
 
   const handleOpenExternal = async (url: string) => {
     try {
-      await window.electronAPI.app.openExternal(url)
+      await appApi.openExternal(url)
     } catch (err) {
       console.error('Failed to open URL:', err)
     }
@@ -319,7 +321,7 @@ export default function CookbookView() {
     if (!ok) return
     setDeletingTag(modelTag)
     try {
-      const ok = await window.electronAPI.cookbook.deleteModel(modelTag)
+      const ok = await cookbookApi.deleteModel(modelTag)
       if (ok) {
         toast(`Removed "${modelTag}"`, { type: 'success' })
         await loadOllamaStatus()

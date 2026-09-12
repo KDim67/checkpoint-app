@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
 import { errorMessage } from '../../../../shared/errors'
+import * as gamedevApi from '../../data/gamedev'
 
 /**
  * Sprite Slicer: sheet selection, grid/auto slicing, and export.
@@ -29,7 +30,7 @@ export function useSlicerTool() {
   const handleSelectSlicerFile = useCallback(async () => {
     setIsSlicerProcessing(true)
     try {
-      const res = await window.electronAPI.gamedev.selectTexture()
+      const res = await gamedevApi.selectTexture()
       if (res) {
         setSlicerPath(res.path)
         setSlicerUrl(res.dataUrl)
@@ -180,7 +181,7 @@ export function useSlicerTool() {
 
     setIsSlicerSaving(true)
     try {
-      const res = await window.electronAPI.gamedev.saveSlices({
+      const res = await gamedevApi.saveSlices({
         originalPath: slicerPath,
         files: slicedFrames
       })

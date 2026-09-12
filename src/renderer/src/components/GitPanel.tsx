@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore'
 import type { GitCommit, GitStatusResult } from '../../../shared/types'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { readWorkspaceList } from '../lib/workspaceList'
+import * as gitApi from '../data/git'
 
 function formatGitDate(dateStr: string): string {
   if (!dateStr || dateStr === 'unknown') return dateStr
@@ -58,13 +59,13 @@ export default function GitPanel() {
   const loadGitData = useCallback(async (path: string) => {
     setChecking(true)
     try {
-      const isGitOk = await window.electronAPI.git.checkRepo(path)
+      const isGitOk = await gitApi.checkRepo(path)
       setIsValidRepo(isGitOk)
 
       if (isGitOk) {
         const [statusRes, logRes] = await Promise.all([
-          window.electronAPI.git.getStatus(path),
-          window.electronAPI.git.getLog(path)
+          gitApi.getStatus(path),
+          gitApi.getLog(path)
         ])
         setGitInstalled(statusRes.installed)
         setStatus(statusRes)

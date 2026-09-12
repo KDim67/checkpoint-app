@@ -8,6 +8,7 @@ import type { AiPlanStep } from '../aiActionTypes'
 import { asArray, asObject, str } from '../aiActionTypes'
 import { faultTolerantParseJSON } from '../aiActionParse'
 import { createItem } from '../../../data/items'
+import * as appApi from '../../../data/app'
 
 export default function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
@@ -125,7 +126,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
       const approved = stepApprovals[i] !== false
       md += `- [${approved ? ' ' : 'x'}] **${s.title}**\n${s.details ? `  ${s.details}\n` : ''}\n`
     }
-    const success = await window.electronAPI.app.saveFile('implementation_plan.md', md)
+    const success = await appApi.saveFile('implementation_plan.md', md)
     if (success) toast('Implementation plan saved as Markdown!', { type: 'success' })
   }
 

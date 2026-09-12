@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
 import { buildLutData } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
+import * as gamedevApi from '../../data/gamedev'
 
 /**
  * LUT Color Grader.
@@ -148,7 +149,7 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
         return
       }
 
-      const res = await window.electronAPI.gamedev.saveLut({ originalPath: basePath, dataUrl: base64Data })
+      const res = await gamedevApi.saveLut({ originalPath: basePath, dataUrl: base64Data })
       if (res.success) {
         toast('Color graded LUT strip successfully saved to asset directory!', { type: 'success' })
         setLutExportedPath(res.filePath || 'lut.png')

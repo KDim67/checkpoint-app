@@ -9,6 +9,10 @@
  * attribute, and the customization engine's CSS.
  */
 
+import * as customizerApi from '../data/customizer'
+import { getSetting } from '../data/settings'
+import { onThemeUpdate } from '../data/theme'
+
 const STYLE_ELEMENT_ID = 'user-theme'
 
 /** Injects (or replaces) the customization engine's stylesheet. */
@@ -32,8 +36,8 @@ function injectCustomCss(css: string): void {
 export async function applyStoredTheme(): Promise<void> {
   try {
     const [stored, css] = await Promise.all([
-      window.electronAPI.db.getSetting('app_theme').catch(() => null),
-      window.electronAPI.customizer.getCss().catch(() => '')
+      getSetting('app_theme').catch(() => null),
+      customizerApi.getCss().catch(() => '')
     ])
 
     const resolved =
@@ -58,7 +62,7 @@ export async function applyStoredTheme(): Promise<void> {
  * hidden popup receives nothing while it is not on screen.
  */
 export function watchTheme(): () => void {
-  const unsubscribe = window.electronAPI.onThemeUpdate(injectCustomCss)
+  const unsubscribe = onThemeUpdate(injectCustomCss)
   const onFocus = (): void => { applyStoredTheme() }
   window.addEventListener('focus', onFocus)
   return () => {

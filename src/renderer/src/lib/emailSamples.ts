@@ -12,6 +12,7 @@ import {
   parseEmailSamples,
   type EmailSample
 } from '../../../shared/emailSamples'
+import { getSetting, setSetting } from '../data/settings'
 
 const DB_KEY = 'ai_email_writing_samples'
 const CACHE_KEY = 'checkpoint_email_writing_samples'
@@ -46,7 +47,7 @@ function writeCache(samples: EmailSample[]): void {
  */
 export async function loadEmailSamples(): Promise<EmailSample[]> {
   try {
-    const raw = await window.electronAPI.db.getSetting(DB_KEY)
+    const raw = await getSetting(DB_KEY)
     const stored = parseEmailSamples(typeof raw === 'string' ? raw : null)
     if (stored.length > 0) {
       writeCache(stored)
@@ -61,7 +62,7 @@ export async function loadEmailSamples(): Promise<EmailSample[]> {
 export async function saveEmailSamples(samples: EmailSample[]): Promise<void> {
   writeCache(samples)
   try {
-    await window.electronAPI.db.setSetting(DB_KEY, JSON.stringify(samples))
+    await setSetting(DB_KEY, JSON.stringify(samples))
   } catch (err) {
     console.warn('Failed to save email samples to the database:', err)
   }

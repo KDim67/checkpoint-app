@@ -7,9 +7,11 @@
  * working; writers use the string form the settings UI already produces.
  */
 
+import { getSetting, setSetting } from '../data/settings'
+
 export async function getBoolSetting(key: string, defaultValue: boolean): Promise<boolean> {
   try {
-    const raw = await window.electronAPI.db.getSetting(key)
+    const raw = await getSetting(key)
     if (raw === null || raw === undefined) return defaultValue
     if (typeof raw === 'boolean') return raw
     if (raw === 'true') return true
@@ -21,12 +23,12 @@ export async function getBoolSetting(key: string, defaultValue: boolean): Promis
 }
 
 export async function setBoolSetting(key: string, value: boolean): Promise<void> {
-  await window.electronAPI.db.setSetting(key, String(value))
+  await setSetting(key, String(value))
 }
 
 export async function getStringSetting(key: string, defaultValue: string): Promise<string> {
   try {
-    const raw = await window.electronAPI.db.getSetting(key)
+    const raw = await getSetting(key)
     return typeof raw === 'string' && raw !== '' ? raw : defaultValue
   } catch {
     return defaultValue
@@ -44,12 +46,12 @@ export async function getEnumSetting<T extends string>(
 }
 
 export async function setStringSetting(key: string, value: string): Promise<void> {
-  await window.electronAPI.db.setSetting(key, value)
+  await setSetting(key, value)
 }
 
 export async function getNumberSetting(key: string, defaultValue: number): Promise<number> {
   try {
-    const raw = await window.electronAPI.db.getSetting(key)
+    const raw = await getSetting(key)
     const n = typeof raw === 'number' ? raw : parseFloat(String(raw))
     return Number.isFinite(n) ? n : defaultValue
   } catch {
@@ -58,7 +60,7 @@ export async function getNumberSetting(key: string, defaultValue: number): Promi
 }
 
 export async function setNumberSetting(key: string, value: number): Promise<void> {
-  await window.electronAPI.db.setSetting(key, String(value))
+  await setSetting(key, String(value))
 }
 
 /**
@@ -70,7 +72,7 @@ export async function setNumberSetting(key: string, value: number): Promise<void
  */
 export async function getJsonSetting<T>(key: string, fallback: T): Promise<T> {
   try {
-    const raw = await window.electronAPI.db.getSetting(key)
+    const raw = await getSetting(key)
     if (typeof raw !== 'string' || raw === '') return fallback
     const parsed = JSON.parse(raw)
     return parsed === null || parsed === undefined ? fallback : (parsed as T)
@@ -80,5 +82,5 @@ export async function getJsonSetting<T>(key: string, fallback: T): Promise<T> {
 }
 
 export async function setJsonSetting(key: string, value: unknown): Promise<void> {
-  await window.electronAPI.db.setSetting(key, JSON.stringify(value))
+  await setSetting(key, JSON.stringify(value))
 }

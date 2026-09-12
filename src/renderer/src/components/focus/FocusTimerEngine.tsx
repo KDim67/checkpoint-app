@@ -5,6 +5,7 @@ import { MODE_TITLES, formatTime, isFocusInterval, durationMsFor } from './pomod
 import { loadFocusSettings } from '../../lib/focusSettings'
 import { reconcileSelectedTasks } from './reconcileTasks'
 import { readItems } from '../../data/items'
+import * as notificationsApi from '../../data/notifications'
 
 /**
  * Mounted once at the app root (outside FocusView) so a running focus/break
@@ -121,8 +122,7 @@ export default function FocusTimerEngine(): null {
     // same policy as everything else, and so it still fires when this window is
     // not the focused one, which is the whole point of a timer alert.
     // No dedupe key: two intervals ending really are two things to say.
-    window.electronAPI.notifications
-      .send({
+    notificationsApi.send({
         category: 'focus',
         title: isFocus ? 'Focus interval complete 🧠' : 'Break complete ☕',
         body: isFocus

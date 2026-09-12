@@ -23,6 +23,7 @@ import {
   type ShortcutBindings,
   type ShortcutScope
 } from '../../lib/shortcuts'
+import * as customizerApi from '../../data/customizer'
 
 type GlobalAction = 'hud_toggle' | 'clipboard_toggle'
 
@@ -268,10 +269,10 @@ export default function HotkeyBinder() {
   useEffect(() => {
     const load = async () => {
       try {
-        const enabled = await window.electronAPI.customizer.getEngineState()
+        const enabled = await customizerApi.getEngineState()
         setEngineEnabled(enabled)
 
-        const stored = await window.electronAPI.customizer.getShortcuts()
+        const stored = await customizerApi.getShortcuts()
         if (stored && Object.keys(stored).length > 0) {
           setBindings(prev => ({ ...prev, ...stored }))
         }
@@ -353,7 +354,7 @@ export default function HotkeyBinder() {
 
   const handleSave = async () => {
     try {
-      await window.electronAPI.customizer.registerShortcuts(bindings)
+      await customizerApi.registerShortcuts(bindings)
       toast('Global shortcuts registered successfully')
     } catch (err) {
       console.error(err)
@@ -369,7 +370,7 @@ export default function HotkeyBinder() {
     setBindings(defaults)
     setCollisionWarning(null)
     try {
-      await window.electronAPI.customizer.registerShortcuts(defaults)
+      await customizerApi.registerShortcuts(defaults)
       toast('Shortcut keys reset to defaults')
     } catch (err) {
       console.error(err)

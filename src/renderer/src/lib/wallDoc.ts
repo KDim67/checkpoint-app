@@ -11,13 +11,14 @@ import {
   normalizeWallDoc, normalizeWallIndex, wallIndexKey,
   type WallDoc, type WallIndex
 } from '../../../shared/wallModel'
+import { deleteSetting, getSetting, setSetting } from '../data/settings'
 
 /** Long enough to swallow a drag, short enough that a crash loses nothing worth having. */
 const SAVE_DEBOUNCE_MS = 400
 
 export async function loadWallDoc(key: string): Promise<WallDoc> {
   try {
-    const stored = await window.electronAPI.db.getSetting(key)
+    const stored = await getSetting(key)
     return normalizeWallDoc(stored)
   } catch (err) {
     // Empty wall beats a broken view. The stored value is left alone.
@@ -39,8 +40,7 @@ export function saveWallDoc(key: string, doc: WallDoc): void {
       timers.delete(key)
       // An object, not a string: setSetting serialises, and double-encoding bit
       // the board's persistence once already.
-      window.electronAPI.db
-        .setSetting(key, normalizeWallDoc(doc))
+      setSetting(key, normalizeWallDoc(doc))
         .catch(err => console.error('[wall] could not save:', err))
     }, SAVE_DEBOUNCE_MS)
   )
@@ -54,7 +54,7 @@ export async function flushWallDoc(key: string, doc: WallDoc): Promise<void> {
     timers.delete(key)
   }
   try {
-    await window.electronAPI.db.setSetting(key, normalizeWallDoc(doc))
+    await setSetting(key, normalizeWallDoc(doc))
   } catch (err) {
     console.error('[wall] could not flush:', err)
   }
@@ -68,7 +68,7 @@ export async function deleteWallDoc(key: string): Promise<void> {
     timers.delete(key)
   }
   try {
-    await window.electronAPI.db.deleteSetting(key)
+    await deleteSetting(key)
   } catch (err) {
     console.error('[wall] could not delete:', err)
   }
@@ -76,7 +76,7 @@ export async function deleteWallDoc(key: string): Promise<void> {
 
 export async function loadWallIndex(context: string): Promise<WallIndex> {
   try {
-    return normalizeWallIndex(await window.electronAPI.db.getSetting(wallIndexKey(context)))
+    return normalizeWallIndex(await getSetting(wallIndexKey(context)))
   } catch (err) {
     console.error('[wall] could not load index:', err)
     return normalizeWallIndex(null)
@@ -89,7 +89,7 @@ export async function loadWallIndex(context: string): Promise<WallIndex> {
  */
 export async function saveWallIndex(context: string, index: WallIndex): Promise<void> {
   try {
-    await window.electronAPI.db.setSetting(wallIndexKey(context), index)
+    await setSetting(wallIndexKey(context), index)
   } catch (err) {
     console.error('[wall] could not save index:', err)
   }

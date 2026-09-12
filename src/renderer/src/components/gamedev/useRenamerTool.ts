@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react'
 import type { RenamerPreset, RenamerSuffixPreset } from './types'
 import { useToast } from '../ui/Toast'
 import type { AssetFile } from './types'
+import * as appApi from '../../data/app'
+import * as gamedevApi from '../../data/gamedev'
 
 /**
  * Batch Asset Renamer: the file queue, the naming rules, and applying them.
@@ -87,7 +89,7 @@ export function useRenamerTool() {
       // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
       const dropped = Array.from(e.dataTransfer.files).map(f => ({
         name: f.name,
-        path: window.electronAPI.app.getPathForFile(f),
+        path: appApi.getPathForFile(f),
         status: 'pending' as const
       })).filter(f => f.path !== '')
       setFiles(prev => [...prev, ...dropped])
@@ -98,7 +100,7 @@ export function useRenamerTool() {
     if (e.target.files) {
       const selected = Array.from(e.target.files).map(f => ({
         name: f.name,
-        path: window.electronAPI.app.getPathForFile(f),
+        path: appApi.getPathForFile(f),
         status: 'pending' as const
       })).filter(f => f.path !== '')
       setFiles(prev => [...prev, ...selected])
@@ -110,7 +112,7 @@ export function useRenamerTool() {
     setRenaming(true)
     const list = files.map((f, idx) => {
       const newName = getNewName(f.name, idx)
-      const platform = window.electronAPI.app.platform
+      const platform = appApi.platform()
       const separator = platform === 'win32' ? '\\' : '/'
       const lastSep = f.path.lastIndexOf(separator)
       const dir = lastSep !== -1 ? f.path.substring(0, lastSep) : ''
@@ -119,7 +121,7 @@ export function useRenamerTool() {
     })
 
     try {
-      const res = await window.electronAPI.gamedev.batchRename(list)
+      const res = await gamedevApi.batchRename(list)
       if (res.success) {
         toast(`Successfully renamed ${res.renamedCount} assets!`, { type: 'success' })
         setFiles([])

@@ -5,6 +5,7 @@ import { useToast } from '../ui/Toast'
 import { useConfirm } from '../ui/ConfirmDialog'
 import McpActivityLog from './McpActivityLog'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
+import * as mcpApi from '../../data/mcp'
 
 /**
  * Controls the Model Context Protocol server.
@@ -29,7 +30,7 @@ export default function McpSettings(): React.JSX.Element {
 
   const refresh = async (): Promise<void> => {
     try {
-      const status = await window.electronAPI.mcp.getStatus()
+      const status = await mcpApi.getStatus()
       setEnabled(status.enabled)
       setRunning(status.running)
       setPort(String(status.port))
@@ -48,7 +49,7 @@ export default function McpSettings(): React.JSX.Element {
     // leave the switch showing "on" while nothing is listening.
     setEnabled(next)
     try {
-      await window.electronAPI.mcp.toggle(next, parseInt(port, 10) || 9990)
+      await mcpApi.toggle(next, parseInt(port, 10) || 9990)
       toast(next ? 'MCP server started.' : 'MCP server stopped.')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -70,7 +71,7 @@ export default function McpSettings(): React.JSX.Element {
     if (!enabled) return
     setBusy(true)
     try {
-      await window.electronAPI.mcp.toggle(true, parsed)
+      await mcpApi.toggle(true, parsed)
       toast(`MCP server moved to port ${parsed}.`)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -90,7 +91,7 @@ export default function McpSettings(): React.JSX.Element {
     })
     if (!confirmed) return
     try {
-      setToken(await window.electronAPI.mcp.regenerateToken())
+      setToken(await mcpApi.regenerateToken())
       setRevealed(false)
       toast('New token generated. Update your MCP clients.')
     } catch (err) {

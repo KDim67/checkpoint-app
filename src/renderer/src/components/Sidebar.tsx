@@ -5,6 +5,7 @@ import SharedBadge from './ui/SharedBadge'
 import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
 import MenuItem, { MenuDivider } from './ui/MenuItem'
+import * as syncApi from '../data/sync'
 
 // Icons (SVG inline: no icon-lib dependency)
 
@@ -374,7 +375,7 @@ export function Sidebar() {
       const isEnabled = await getBoolSetting('sync_enabled', false)
       setSyncEnabled(isEnabled)
       if (isEnabled) {
-        const status = await window.electronAPI.sync.getStatus()
+        const status = await syncApi.getStatus()
         setIsSyncing(status.isSyncing)
         setSyncProgress(status.progress || 'Idle')
       } else {

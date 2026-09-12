@@ -16,6 +16,10 @@ import {
 import type { Item } from '../../../shared/types'
 import { errorMessage } from '../../../shared/errors'
 import { getFocusSessions } from '../data/focus'
+import * as trackerApi from '../data/tracker'
+import * as clipboardApi from '../data/clipboard'
+import * as gitApi from '../data/git'
+import { getSetting } from '../data/settings'
 
 interface RewindResult {
   rewind: Rewind
@@ -26,7 +30,7 @@ interface RewindResult {
 /** The git path recorded for a workspace, if it has one. */
 async function gitPathFor(context: string): Promise<string | null> {
   try {
-    const raw = await window.electronAPI.db.getSetting('contexts_list')
+    const raw = await getSetting('contexts_list')
     if (typeof raw !== 'string' || !raw) return null
     const list = JSON.parse(raw) as { slug: string; gitPath?: string }[]
     return list.find(c => c.slug === context)?.gitPath || null
@@ -53,8 +57,7 @@ export async function loadRewind(item: Item): Promise<RewindResult> {
   }
 
   const [windows, clipboard, commits] = await Promise.all([
-    window.electronAPI.tracker
-      .getActivityStats(item.context, sitting.start, sitting.end)
+    trackerApi.getActivityStats(item.context, sitting.start, sitting.end)
       .then(stats => stats.byTitle)
       .catch(err => {
         console.warn('[rewind] activity unavailable:', errorMessage(err))
@@ -62,7 +65,7 @@ export async function loadRewind(item: Item): Promise<RewindResult> {
         return []
       }),
 
-    window.electronAPI.clipboard.getHistory().catch(err => {
+    clipboardApi.getHistory().catch(err => {
       console.warn('[rewind] clipboard unavailable:', errorMessage(err))
       unavailable.push('clipboard')
       return []
@@ -70,7 +73,7 @@ export async function loadRewind(item: Item): Promise<RewindResult> {
 
     gitPathFor(item.context).then(path => {
       if (!path) { unavailable.push('git'); return [] }
-      return window.electronAPI.git.getLog(path).catch(err => {
+      return gitApi.getLog(path).catch(err => {
         console.warn('[rewind] git log unavailable:', errorMessage(err))
         unavailable.push('git')
         return []

@@ -9,6 +9,7 @@ import { availableWorkspaceSlug, occupiedWorkspaces, setWorkspaceShared } from '
 import { WebRTCCollaborationCoordinator } from '../../lib/webrtcCollaboration'
 import { writeWorkspaceList } from '../../lib/workspaceList'
 import { getStringSetting, setStringSetting } from '../../lib/settings'
+import * as appApi from '../../data/app'
 
 /**
  * A live share of the board: who is in it, what they may do, and what can be
@@ -33,7 +34,7 @@ export function useCollabSession() {
    * the caret. Empty is a real answer: the account name stands in for it.
    */
   const [displayName, setDisplayName] = useState('')
-  const osUserName = normalizeDisplayName(window.electronAPI.app.osUserName)
+  const osUserName = normalizeDisplayName(appApi.osUserName())
 
   /** False until the stored name has arrived, so loading it does not write it back. */
   const nameLoaded = useRef(false)

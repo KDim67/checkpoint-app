@@ -15,6 +15,7 @@ import CreateColumnActionBlock from './actions/CreateColumnActionBlock'
 import CreatePlanActionBlock from './actions/CreatePlanActionBlock'
 import CreateDialogueTreeActionBlock from './actions/CreateDialogueTreeActionBlock'
 import { useBoardTitles } from './useBoardTitles'
+import * as appApi from '../../data/app'
 
 interface ChatMessageProps {
   message: {
@@ -418,7 +419,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                       href={href}
                       onClick={e => {
                         e.preventDefault()
-                        if (href) window.electronAPI.app.openExternal(href).catch(() => {})
+                        if (href) appApi.openExternal(href).catch(() => {})
                       }}
                       style={{ color: 'var(--color-primary)', cursor: 'pointer' }}
                     >

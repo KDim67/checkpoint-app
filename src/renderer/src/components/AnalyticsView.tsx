@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '../store/appStore'
 import type { AnalyticsData } from '../../../shared/types'
+import * as analyticsApi from '../data/analytics'
+import * as trackerApi from '../data/tracker'
 
 const ALLOCATION_COLORS = ['#10b981', '#1e45fc', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#cdf12b']
 
@@ -151,7 +153,7 @@ export default function AnalyticsView() {
     try {
       setLoading(true)
       // Scope to the active workspace (null = all) so the dashboard matches its header.
-      const res = await window.electronAPI.analytics.getAnalytics(activeWorkspace === 'all' ? null : activeWorkspace)
+      const res = await analyticsApi.getAnalytics(activeWorkspace === 'all' ? null : activeWorkspace)
       setData(res)
       setError(null)
     } catch (err) {
@@ -202,7 +204,7 @@ export default function AnalyticsView() {
         end = now
       }
 
-      const res = await window.electronAPI.tracker.getActivityStats(
+      const res = await trackerApi.getActivityStats(
         activeWorkspace === 'all' ? null : activeWorkspace,
         start,
         end

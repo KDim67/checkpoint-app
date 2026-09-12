@@ -6,6 +6,7 @@
  */
 
 import { computePbrMaps, extractPalette, scale2xData, scale3xData } from './imageProcessing'
+import * as mediaApi from '../data/media'
 
 /** Sensible middle settings, so the menu entry does not need a dialogue first. */
 const PBR_DEFAULTS = {
@@ -64,7 +65,7 @@ async function savePixels(pixels: Pixels): Promise<string> {
   const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('Could not encode the image.')
 
-  return window.electronAPI.media.saveFromBuffer(await blob.arrayBuffer(), 'png')
+  return mediaApi.saveFromBuffer(await blob.arrayBuffer(), 'png')
 }
 
 interface DerivedImage {

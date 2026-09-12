@@ -72,6 +72,13 @@ import {
 import type { SettingsTab } from '../store/appStore'
 import { loadEmailSamples, saveEmailSamples, type EmailSample } from '../lib/emailSamples'
 import { MAX_EMAIL_SAMPLES } from '../../../shared/emailSamples'
+import * as appApi from '../data/app'
+import * as widgetApi from '../data/widget'
+import * as memoryApi from '../data/memory'
+import * as aiApi from '../data/ai'
+import * as backupApi from '../data/backup'
+import * as mediaApi from '../data/media'
+import { setSetting } from '../data/settings'
 
 interface TabInfo {
   id: SettingsTab
@@ -235,7 +242,7 @@ function KanbanSettings({ activeWorkspace }: { activeWorkspace: string }) {
 
 // Widget Settings
 function WidgetSettings() {
-  const isWindows = window.electronAPI.app.platform === 'win32'
+  const isWindows = appApi.platform() === 'win32'
   const [enabled, setEnabled] = useState(false)
   const [position, setPosition] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('bottom-right')
   const [opacity, setOpacity] = useState(0.9)
@@ -266,19 +273,19 @@ function WidgetSettings() {
   const handleToggle = async (v: boolean) => {
     setEnabled(v)
     await setBoolSetting('widget_enabled', v)
-    await window.electronAPI.widget.toggle(v)
+    await widgetApi.toggle(v)
   }
 
   const handlePosition = async (p: typeof position) => {
     setPosition(p)
     await setStringSetting('widget_position', p)
-    await window.electronAPI.widget.setPosition(p)
+    await widgetApi.setPosition(p)
   }
 
   const handleOpacity = async (o: number) => {
     setOpacity(o)
     await setNumberSetting('widget_opacity', o)
-    await window.electronAPI.widget.setOpacity(o)
+    await widgetApi.setOpacity(o)
   }
 
   const POSITIONS: { value: typeof position; label: string }[] = [
@@ -355,7 +362,7 @@ function MemoryVaultManager() {
 
   const loadMemories = useCallback(async () => {
     try {
-      const list = await window.electronAPI.memory.getMemories(activeWorkspace)
+      const list = await memoryApi.getMemories(activeWorkspace)
       setMemories(list || [])
     } catch (e) { console.warn('Failed to load memories:', e) }
     finally { setLoading(false) }
@@ -366,7 +373,7 @@ function MemoryVaultManager() {
   const handleAddMemory = async () => {
     if (!newKey.trim() || !newContent.trim()) return
     try {
-      await window.electronAPI.memory.saveMemory({
+      await memoryApi.saveMemory({
         context: activeWorkspace || 'default',
         category: 'semantic',
         memory_key: newKey.trim(),
@@ -380,7 +387,7 @@ function MemoryVaultManager() {
 
   const handleDeleteMemory = async (id: string) => {
     try {
-      await window.electronAPI.memory.deleteMemory(id)
+      await memoryApi.deleteMemory(id)
       loadMemories()
     } catch (e) { console.warn('Failed to delete memory:', e) }
   }
@@ -495,7 +502,7 @@ function AiSettings() {
    * database kept the old one, and the user had no way to know.
    */
   const save = (key: string, val: string | number): void => {
-    window.electronAPI.db.setSetting(key, val).catch(err => {
+    setSetting(key, val).catch(err => {
       console.error(`Failed to save ${key}:`, err)
       toast(`Could not save that setting, ${err?.message || 'unknown error'}. Try again.`)
     })
@@ -583,7 +590,7 @@ function AiSettings() {
   const handleTest = async () => {
     setConnectionStatus('testing'); setConnectionError('')
     try {
-      const res = await window.electronAPI.ai.testConnection(baseURL, apiKey)
+      const res = await aiApi.testConnection(baseURL, apiKey)
       if (res.success) {
         setConnectionStatus('success')
       } else {
@@ -1046,7 +1053,7 @@ export default function SettingsView() {
   const rawTab = useAppStore(s => s.settingsTab)
   const setActiveTab = useAppStore(s => s.setSettingsTab)
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
-  const isWindows = window.electronAPI.app.platform === 'win32'
+  const isWindows = appApi.platform() === 'win32'
   const aiEnabled = useAiEnabled()
 
   // Resolve any pre-merge tab id that might still arrive from old navigation paths
@@ -1337,7 +1344,7 @@ function BackupSettings() {
 
   const loadStatus = async () => {
     try {
-      const status = await window.electronAPI.backup.getStatus()
+      const status = await backupApi.getStatus()
       setEnabled(status.enabled)
       setIntervalVal(status.interval)
       setMaxCount(status.maxCount)
@@ -1358,7 +1365,7 @@ function BackupSettings() {
     try {
       setEnabled(checked)
       await setBoolSetting('feature_backup', checked)
-      await window.electronAPI.backup.run('init')
+      await backupApi.run('init')
       toast(checked ? 'Backup scheduler activated' : 'Backup scheduler deactivated')
       loadStatus()
     } catch (err) {
@@ -1371,7 +1378,7 @@ function BackupSettings() {
     try {
       setIntervalVal(val)
       await setStringSetting('backup_interval', val)
-      await window.electronAPI.backup.run('init')
+      await backupApi.run('init')
       toast(`Backup schedule set to: ${val}`)
       loadStatus()
     } catch (err) {
@@ -1384,7 +1391,7 @@ function BackupSettings() {
     try {
       setMaxCount(cleanVal)
       await setNumberSetting('backup_max_count', cleanVal)
-      await window.electronAPI.backup.run('init')
+      await backupApi.run('init')
       loadStatus()
     } catch (err) {
       console.error(err)
@@ -1394,7 +1401,7 @@ function BackupSettings() {
   const handlePathBlur = async () => {
     try {
       await setStringSetting('backup_path', customPath.trim())
-      await window.electronAPI.backup.run('init')
+      await backupApi.run('init')
       toast('Backup destination path updated')
       loadStatus()
     } catch (err) {
@@ -1406,7 +1413,7 @@ function BackupSettings() {
     if (running) return
     setRunning(true)
     try {
-      await window.electronAPI.backup.run('backup')
+      await backupApi.run('backup')
       toast('Backup created successfully!')
       loadStatus()
     } catch (err) {
@@ -1420,7 +1427,7 @@ function BackupSettings() {
 
   const handleDelete = async (filename: string) => {
     try {
-      await window.electronAPI.backup.run('delete', filename)
+      await backupApi.run('delete', filename)
       toast('Backup archive deleted')
       loadStatus()
     } catch (err) {
@@ -1442,7 +1449,7 @@ function BackupSettings() {
     setRestoring(filename)
     toast('Restoring database, please wait...')
     try {
-      await window.electronAPI.backup.run('restore', filename)
+      await backupApi.run('restore', filename)
       toast('Database restored successfully! App state reloaded.')
       loadStatus()
     } catch (err) {
@@ -1693,7 +1700,7 @@ function StorageSettings() {
   const loadStorageInfo = async () => {
     setLoading(true)
     try {
-      const info = await window.electronAPI.media.getStorageInfo()
+      const info = await mediaApi.getStorageInfo()
       setStorageInfo(info)
     } catch (err) {
       console.error('Failed to load storage info:', err)
@@ -1709,7 +1716,7 @@ function StorageSettings() {
   const handlePrune = async () => {
     setPruning(true)
     try {
-      const res = await window.electronAPI.media.scanAndPrune()
+      const res = await mediaApi.scanAndPrune()
       setPrunedResult({
         prunedCount: res.prunedCount,
         spaceSavedBytes: res.spaceSavedBytes,

@@ -8,6 +8,7 @@ import { Info, PlayCircle, RefreshCw } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
 import PathRow from './PathRow'
+import * as appApi from '../../data/app'
 
 /** The tone of the status line, so a failure does not read like good news. */
 const UPDATE_TONE: Record<UpdateCheckResult['status'], string> = {
@@ -41,9 +42,9 @@ interface VersionInfo {
 export default function AboutPanel() {
   const [info, setInfo] = useState<VersionInfo>({
     app: '…',
-    electron: window.electronAPI.app.versions?.electron ?? '…',
-    node: window.electronAPI.app.versions?.node ?? '…',
-    chrome: window.electronAPI.app.versions?.chrome ?? '…',
+    electron: appApi.versions()?.electron ?? '…',
+    node: appApi.versions()?.node ?? '…',
+    chrome: appApi.versions()?.chrome ?? '…',
     dataPath: '…'
   })
 
@@ -51,8 +52,8 @@ export default function AboutPanel() {
     const load = async () => {
       try {
         const [version, dataPath] = await Promise.all([
-          window.electronAPI.app.getVersion(),
-          window.electronAPI.app.getDataPath()
+          appApi.getVersion(),
+          appApi.getDataPath()
         ])
         setInfo(prev => ({ ...prev, app: version, dataPath }))
       } catch (err) {
@@ -71,7 +72,7 @@ export default function AboutPanel() {
     setChecking(true)
     setUpdate(null)
     try {
-      setUpdate(await window.electronAPI.app.checkForUpdates())
+      setUpdate(await appApi.checkForUpdates())
     } catch (err) {
       // The handler answers with a result rather than throwing, so reaching
       // here means the channel itself failed.
@@ -160,7 +161,7 @@ export default function AboutPanel() {
         <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
           Database Location
         </div>
-        <PathRow openTitle="Open folder" onOpen={() => window.electronAPI.app.openExternal(`file://${info.dataPath}`)}>
+        <PathRow openTitle="Open folder" onOpen={() => appApi.openExternal(`file://${info.dataPath}`)}>
           {info.dataPath}/checkpoint.db
         </PathRow>
       </div>
@@ -182,7 +183,7 @@ export default function AboutPanel() {
           <button
             className="btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-            onClick={() => window.electronAPI.app.openExternal('https://github.com/KDim67/checkpoint-app')}
+            onClick={() => appApi.openExternal('https://github.com/KDim67/checkpoint-app')}
           >
             <Info size={13} />
             GitHub Repository

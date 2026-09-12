@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from '../ui/Toast'
 import { useAppStore } from '../../store/appStore'
 import { errorMessage } from '../../../../shared/errors'
+import * as gamedevApi from '../../data/gamedev'
+import * as appApi from '../../data/app'
 
 /**
  * Seamless Texture Generator: stitching, the tiling preview, and export.
@@ -40,7 +42,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
   const loadSeamlessPath = useCallback(async (path: string) => {
     setIsSeamlessProcessing(true)
     try {
-      const res = await window.electronAPI.gamedev.loadTexture(path)
+      const res = await gamedevApi.loadTexture(path)
       if (res) {
         setSeamlessPath(res.path)
         setSeamlessUrl(res.dataUrl)
@@ -454,7 +456,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
       )
 
       const base64Data = exportCanvas.toDataURL('image/png')
-      const res = await window.electronAPI.gamedev.saveSeamless({
+      const res = await gamedevApi.saveSeamless({
         originalPath: seamlessPath,
         dataUrl: base64Data
       })
@@ -492,7 +494,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     setSeamlessShowOriginal(false) // reset compare to 'result' on new file
     try {
       // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
-      const path = window.electronAPI.app.getPathForFile(file)
+      const path = appApi.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {
         setSeamlessPath(path)
@@ -511,7 +513,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
   const handleSeamlessBrowseClick = useCallback(async () => {
     setIsSeamlessProcessing(true)
     try {
-      const res = await window.electronAPI.gamedev.selectTexture()
+      const res = await gamedevApi.selectTexture()
       if (res) {
         setSeamlessPath(res.path)
         setSeamlessUrl(res.dataUrl)
