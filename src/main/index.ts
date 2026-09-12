@@ -19,6 +19,7 @@ import {
 } from './cheatsheetService'
 import { batchRenameFiles, selectTextureFile, loadTextureFile, savePbrMaps, saveSeamlessTexture, selectFolder, saveSpriteAtlas, saveSlicedSprites, saveLutTexture, saveUpscaledTexture } from './gamedevService'
 import { SyncService } from './syncService'
+import { beginQuit, getMainWindow, isQuitting, sendToWindow, setMainWindow } from './windows'
 import { getStartupSettings, launchedMinimised } from './tray'
 
 // Pure constants with no dependencies of their own, so importing them
@@ -38,7 +39,6 @@ const syncService = new SyncService()
  * "this time we mean it" Quit would be cancelled too and the app could never
  * exit.
  */
-let isQuitting = false
 
 // Register protocols as privileged before app.whenReady()
 protocol.registerSchemesAsPrivileged([
@@ -84,7 +84,6 @@ app.commandLine.appendSwitch('log-level', '3')
 // Suppress default Electron menu bar entirely
 Menu.setApplicationMenu(null)
 
-let mainWindow: BrowserWindow | null = null
 let activeClipboardHotkey = ''
 
 // Single Instance Lock
@@ -108,9 +107,10 @@ if (!gotTheLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
+    const win = getMainWindow()
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
     }
   })
 }
@@ -154,11 +154,12 @@ function registerAppShortcuts(): void {
   // 2. Clipboard Toggle shortcut
   activeClipboardHotkey = clipboardKey
   const registered = globalShortcut.register(activeClipboardHotkey, () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.show()
-      mainWindow.focus()
-      mainWindow.webContents.send(IpcChannels.APP_NAVIGATE_TO_VIEW, 'clipboard')
+    const win = getMainWindow()
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+      win.webContents.send(IpcChannels.APP_NAVIGATE_TO_VIEW, 'clipboard')
     }
   })
 
@@ -247,12 +248,13 @@ function saveWindowBoundsNow(): void {
     clearTimeout(saveBoundsTimer)
     saveBoundsTimer = null
   }
-  if (!mainWindow || mainWindow.isDestroyed()) return
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return
   try {
-    const maximized = mainWindow.isMaximized()
+    const maximized = win.isMaximized()
     // getBounds() reports the maximized frame; persist the restore size so
     // un-maximizing returns to the size the user actually chose.
-    const { width, height, x, y } = maximized ? mainWindow.getNormalBounds() : mainWindow.getBounds()
+    const { width, height, x, y } = maximized ? win.getNormalBounds() : win.getBounds()
     setSetting('window_bounds', JSON.stringify({ width, height, x, y, maximized }))
   } catch (err) {
     console.error('[index.ts] Failed to save window bounds:', err)
@@ -272,7 +274,7 @@ function createWindow(): void {
 
   const bounds = loadWindowBounds()
 
-  mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     icon: appIcon,
     width: bounds.width,
     height: bounds.height,
@@ -298,6 +300,7 @@ function createWindow(): void {
       sandbox: false
     }
   })
+  setMainWindow(win)
 
   // Reveal the window once it can paint. Eliminates the white flash. This is
   // guarded and backed by `did-finish-load` plus a safety timeout so a slow or
@@ -305,37 +308,37 @@ function createWindow(): void {
   // load) can never leave us with only a detached DevTools window and no app.
   let hasShown = false
   const revealWindow = (): void => {
-    if (hasShown || !mainWindow || mainWindow.isDestroyed()) return
+    if (hasShown || win.isDestroyed()) return
     hasShown = true
     clearTimeout(revealTimeout)    // cancel safety fallback if an event fires first
 
     // Loaded but never shown. The tray is the way in.
     if (launchedMinimised()) {
       // Maximising a hidden window shows it, so wait for the tray to.
-      if (bounds.maximized) mainWindow.once('show', () => mainWindow?.maximize())
+      if (bounds.maximized) win.once('show', () => win.maximize())
       return
     }
 
-    if (bounds.maximized) mainWindow.maximize()
-    mainWindow.show()
-    mainWindow.focus()
+    if (bounds.maximized) win.maximize()
+    win.show()
+    win.focus()
   }
   // Absolute fallback: if neither event fires (hard load-failure loop), show anyway.
   const revealTimeout = setTimeout(revealWindow, 8000)
-  mainWindow.on('ready-to-show', revealWindow)
-  mainWindow.webContents.on('did-finish-load', revealWindow)
+  win.on('ready-to-show', revealWindow)
+  win.webContents.on('did-finish-load', revealWindow)
 
-  mainWindow.on('resize', scheduleSaveWindowBounds)
-  mainWindow.on('move', scheduleSaveWindowBounds)
-  mainWindow.on('maximize', scheduleSaveWindowBounds)
-  mainWindow.on('unmaximize', scheduleSaveWindowBounds)
+  win.on('resize', scheduleSaveWindowBounds)
+  win.on('move', scheduleSaveWindowBounds)
+  win.on('maximize', scheduleSaveWindowBounds)
+  win.on('unmaximize', scheduleSaveWindowBounds)
   // Flush before teardown, or a resize inside the debounce window is lost.
-  mainWindow.on('close', saveWindowBoundsNow)
+  win.on('close', saveWindowBoundsNow)
 
   // Close-to-tray. Off by default: closing has always quit this app, and the
   // setting exists so nobody discovers the change by accident.
-  mainWindow.on('close', event => {
-    if (isQuitting || process.platform === 'darwin') return
+  win.on('close', event => {
+    if (isQuitting() || process.platform === 'darwin') return
     let closeToTray = false
     try {
       // Read at the moment of closing rather than cached, so toggling the
@@ -349,13 +352,13 @@ function createWindow(): void {
     }
     if (closeToTray) {
       event.preventDefault()
-      mainWindow?.hide()
+      win.hide()
     }
   })
 
   // Null reference on close. Allows V8 garbage collection of the window
-  mainWindow.on('closed', () => {
-    mainWindow = null
+  win.on('closed', () => {
+    setMainWindow(null)
     // Quit the app when the main window is closed on non-macOS platforms
     if (process.platform !== 'darwin') {
       app.quit()
@@ -368,15 +371,15 @@ function createWindow(): void {
    * managed to set `location` in the renderer could replace the whole app with
    * a remote page that still sits behind the same preload bridge.
    */
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    const here = mainWindow?.webContents.getURL() ?? ''
+  win.webContents.on('will-navigate', (event, url) => {
+    const here = win.webContents.getURL()
     // The dev server reloads through this path, so same-origin stays allowed.
     if (here && new URL(url).origin === new URL(here).origin) return
     event.preventDefault()
     openExternalSafely(url)
   })
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url }) => {
     openExternalSafely(url)
     return { action: 'deny' }
   })
@@ -384,34 +387,34 @@ function createWindow(): void {
   // Load the renderer
   if (process.env['ELECTRON_RENDERER_URL']) {
     const devUrl = process.env['ELECTRON_RENDERER_URL']
-    mainWindow.loadURL(devUrl)
+    win.loadURL(devUrl)
 
     // Open DevTools only AFTER the app has actually loaded, so a failed initial
     // load can never leave a lone DevTools window floating over a hidden app.
-    mainWindow.webContents.once('did-finish-load', () => {
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDevToolsOpened()) {
-        mainWindow.webContents.openDevTools()
+    win.webContents.once('did-finish-load', () => {
+      if (!win.isDestroyed() && !win.webContents.isDevToolsOpened()) {
+        win.webContents.openDevTools()
       }
     })
 
     // Retry loading if the dev server is not warm yet. Stored handle cancels on success.
     let failRetryTimeout: NodeJS.Timeout | null = null
-    mainWindow.webContents.on('did-finish-load', () => {
+    win.webContents.on('did-finish-load', () => {
       if (failRetryTimeout) { clearTimeout(failRetryTimeout); failRetryTimeout = null }
     })
-    mainWindow.webContents.on('did-fail-load', (_event, errorCode, _errorDescription, validatedURL) => {
+    win.webContents.on('did-fail-load', (_event, errorCode, _errorDescription, validatedURL) => {
       if (validatedURL.startsWith(devUrl)) {
         console.log(`[Dev Server] Port not ready yet (error code: ${errorCode}). Retrying load in 1s...`)
         failRetryTimeout = setTimeout(() => {
           failRetryTimeout = null
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.loadURL(devUrl)
+          if (!win.isDestroyed()) {
+            win.loadURL(devUrl)
           }
         }, 1000)
       }
     })
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
@@ -431,19 +434,21 @@ function registerIpcHandlers(): void {
     if (typeof url === 'string') openExternalSafely(url)
   })
 
-  ipcMain.on(IpcChannels.APP_MINIMIZE, () => mainWindow?.minimize())
+  ipcMain.on(IpcChannels.APP_MINIMIZE, () => getMainWindow()?.minimize())
   ipcMain.on(IpcChannels.APP_MAXIMIZE, () => {
-    if (mainWindow?.isMaximized()) {
-      mainWindow.unmaximize()
+    const win = getMainWindow()
+    if (win?.isMaximized()) {
+      win.unmaximize()
     } else {
-      mainWindow?.maximize()
+      win?.maximize()
     }
   })
-  ipcMain.on(IpcChannels.APP_CLOSE, () => mainWindow?.close())
+  ipcMain.on(IpcChannels.APP_CLOSE, () => getMainWindow()?.close())
 
   ipcMain.handle(IpcChannels.APP_SAVE_FILE, async (_event, defaultName: string, content: string) => {
-    if (!mainWindow) return false
-    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+    const win = getMainWindow()
+    if (!win) return false
+    const { filePath, canceled } = await dialog.showSaveDialog(win, {
       defaultPath: defaultName,
       filters: [{ name: 'Markdown', extensions: ['md'] }]
     })
@@ -464,8 +469,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     IpcChannels.APP_SAVE_BINARY_FILE,
     async (_event, defaultName: string, data: ArrayBuffer, extension: string) => {
-      if (!mainWindow) return false
-      const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      const win = getMainWindow()
+      if (!win) return false
+      const { filePath, canceled } = await dialog.showSaveDialog(win, {
         defaultPath: defaultName,
         filters: [{ name: extension.toUpperCase(), extensions: [extension] }]
       })
@@ -518,9 +524,7 @@ function registerIpcHandlers(): void {
     }
 
     const send = (channel: string, ...args: unknown[]): void => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(channel, ...args)
-      }
+      sendToWindow(channel, ...args)
     }
 
     try {
@@ -634,10 +638,11 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(IpcChannels.OLLAMA_PULL, async (_event, modelTag: string) => {
-    if (!mainWindow) return
+    const win = getMainWindow()
+    if (!win) return
     const { pullModel } = await import('./ollamaManager')
     // Run in background and stream progress via push IPC
-    pullModel(modelTag, mainWindow).catch(console.error)
+    pullModel(modelTag, win).catch(console.error)
   })
 
   ipcMain.handle(IpcChannels.OLLAMA_STOP, async () => {
@@ -731,7 +736,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.CLIPBOARD_PASTE, (_event, content: string) => {
     clipboard.writeText(content)
-    mainWindow?.hide()
+    getMainWindow()?.hide()
     return true
   })
 
@@ -825,7 +830,7 @@ function registerIpcHandlers(): void {
       }
       case 'quit':
         hidePanel()
-        isQuitting = true
+        beginQuit()
         app.quit()
         break
       case 'close':
@@ -912,7 +917,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     IpcChannels.EXPORT_ITEMS,
     async (_event, options: { context: string | null; format: 'markdown' | 'csv' | 'json' }) => {
-      if (!mainWindow) return { ok: false as const, reason: 'No window.' }
+      const win = getMainWindow()
+      if (!win) return { ok: false as const, reason: 'No window.' }
       const { getAllItemsForExport } = await import('./db')
       const { itemsToCsv, itemsToMarkdown, toJsonExport, exportFilename, EXPORT_FORMATS } =
         await import('../shared/exportFormats')
@@ -928,7 +934,7 @@ function registerIpcHandlers(): void {
           : itemsToMarkdown(items, options.context ? `Checkpoint, ${options.context}` : 'Checkpoint')
 
         const spec = EXPORT_FORMATS.find(f => f.id === options.format)
-        const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        const { filePath, canceled } = await dialog.showSaveDialog(win, {
           defaultPath: exportFilename(options.context, options.format, at),
           filters: [{ name: spec?.label ?? 'File', extensions: [spec?.extension ?? 'txt'] }]
         })
@@ -1010,10 +1016,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.MCP_ACTIVITY_UNDO, async (_event, id: string) => {
     const { undoMcpActivity } = await import('./mcpActivity')
     const result = undoMcpActivity(id)
-    if (result.ok && mainWindow && !mainWindow.isDestroyed()) {
+    if (result.ok) {
       // The board and lists are already open; without this the reversal only
       // appears after a manual refresh.
-      mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
+      sendToWindow(IpcChannels.MCP_DATA_CHANGED)
     }
     return result
   })
@@ -1023,11 +1029,7 @@ function registerIpcHandlers(): void {
     const { setSetting } = await import('./db')
 
     setMcpDataChangedHandler(active
-      ? () => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
-          }
-        }
+      ? () => sendToWindow(IpcChannels.MCP_DATA_CHANGED)
       : null)
 
     // Errors propagate to the renderer rather than being swallowed: a port
@@ -1796,7 +1798,7 @@ app.whenReady().then(async () => {
   const { recordClipboardCopy } = await import('./db')
   configureClipboardWatcher((text) => {
     recordClipboardCopy(text)
-    mainWindow?.webContents.send(IpcChannels.CLIPBOARD_HISTORY_CHANGED)
+    sendToWindow(IpcChannels.CLIPBOARD_HISTORY_CHANGED)
   })
   // Off until switched on. Recording every copy is not something to start
   // doing to someone who has not asked for it.
@@ -1847,9 +1849,7 @@ app.whenReady().then(async () => {
       await import('./recurrenceService')
     const { setRecurrenceInstanceClosedHandler } = await import('./db')
     setRecurrenceSpawnHandler(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
-      }
+      sendToWindow(IpcChannels.MCP_DATA_CHANGED)
     })
     setRecurrenceInstanceClosedHandler(onInstanceClosed)
     initializeRecurrenceScheduler()
@@ -1891,9 +1891,7 @@ app.whenReady().then(async () => {
       // Writes arriving over MCP bypass renderer IPC entirely, so the open
       // window would otherwise show a stale board until the user navigated.
       setMcpDataChangedHandler(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send(IpcChannels.MCP_DATA_CHANGED)
-        }
+        sendToWindow(IpcChannels.MCP_DATA_CHANGED)
       })
       await toggleMcpServer(true, port)
     }
@@ -1911,14 +1909,15 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     // macOS: re-create window on dock click if no main window exists
-    if (!mainWindow || mainWindow.isDestroyed()) {
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) {
       createWindow()
     }
   })
 })
 
 app.on('before-quit', () => {
-  isQuitting = true
+  beginQuit()
 })
 
 app.on('window-all-closed', () => {
@@ -1955,4 +1954,3 @@ app.on('will-quit', (e) => {
   }, 800)
 })
 
-export { mainWindow }
