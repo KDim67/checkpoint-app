@@ -442,7 +442,7 @@ describe('mergeBoards', () => {
 describe('mergeImpact', () => {
   it('counts what is new', () => {
     const impact = mergeImpact([card({ id: 'c1' })], [card({ id: 'c1' }), card({ id: 'c2' })])
-    expect(impact).toEqual({ cardsAdded: 1, cardsChanged: 0, cardsReturning: 0 })
+    expect(impact).toEqual({ cardsAdded: 1, cardsChanged: 0, cardsReturning: 0, cardsRemoved: 0 })
   })
 
   it('counts a card that has moved on', () => {
@@ -466,26 +466,50 @@ describe('mergeImpact', () => {
   it('says nothing changed when nothing did', () => {
     const one = card({ id: 'c1' })
     expect(mergeImpact([one], [{ ...one }]))
-      .toEqual({ cardsAdded: 0, cardsChanged: 0, cardsReturning: 0 })
+      .toEqual({ cardsAdded: 0, cardsChanged: 0, cardsReturning: 0, cardsRemoved: 0 })
   })
 
   // The one the user has to be told about before agreeing, because it is the
   // one that undoes something they meant.
   it('separates a card coming back from a card arriving', () => {
     const impact = mergeImpact([], [card({ id: 'c1' }), card({ id: 'c2' })], new Set(['c2']))
-    expect(impact).toEqual({ cardsAdded: 1, cardsChanged: 0, cardsReturning: 1 })
+    expect(impact).toEqual({ cardsAdded: 1, cardsChanged: 0, cardsReturning: 1, cardsRemoved: 0 })
+  })
+
+  // The proposal is the whole board, so a card missing from it is a card the
+  // other side deleted. It is the only way agreeing can cost this board
+  // something, and it used to be counted nowhere and said nowhere.
+  it('counts a card of this side the proposal does not have', () => {
+    const impact = mergeImpact([card({ id: 'c1' }), card({ id: 'c2' })], [card({ id: 'c1' })])
+    expect(impact).toEqual({ cardsAdded: 0, cardsChanged: 0, cardsReturning: 0, cardsRemoved: 1 })
+  })
+
+  it('counts removals alongside everything else', () => {
+    const impact = mergeImpact(
+      [card({ id: 'c1' }), card({ id: 'gone' })],
+      [card({ id: 'c1', updated_at: 9 }), card({ id: 'new' })]
+    )
+    expect(impact).toEqual({ cardsAdded: 1, cardsChanged: 1, cardsReturning: 0, cardsRemoved: 1 })
   })
 })
 
 describe('describeImpact', () => {
+  const none = { cardsAdded: 0, cardsChanged: 0, cardsReturning: 0, cardsRemoved: 0 }
+
   it('says nothing when it would do nothing', () => {
-    expect(describeImpact({ cardsAdded: 0, cardsChanged: 0, cardsReturning: 0 })).toBe(null)
+    expect(describeImpact(none)).toBe(null)
   })
 
   it('counts in the singular and the plural', () => {
-    expect(describeImpact({ cardsAdded: 1, cardsChanged: 0, cardsReturning: 0 })).toBe('1 card added')
-    expect(describeImpact({ cardsAdded: 4, cardsChanged: 2, cardsReturning: 1 }))
+    expect(describeImpact({ ...none, cardsAdded: 1 })).toBe('1 card added')
+    expect(describeImpact({ ...none, cardsAdded: 4, cardsChanged: 2, cardsReturning: 1 }))
       .toBe('4 cards added, 2 changed, 1 you had deleted put back')
+  })
+
+  it('says what would be taken away', () => {
+    expect(describeImpact({ ...none, cardsRemoved: 2 })).toBe('2 of yours taken away')
+    expect(describeImpact({ ...none, cardsAdded: 1, cardsRemoved: 1 }))
+      .toBe('1 card added, 1 of yours taken away')
   })
 })
 

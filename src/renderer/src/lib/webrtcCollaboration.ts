@@ -53,7 +53,9 @@ interface CollabOptions {
    * is the user's one chance to say no, or to take the board as a copy and
    * keep what they had.
    */
-  onResolveBaseline: (info: { context: string; incomingItems: number }) => Promise<BaselineChoice>
+  onResolveBaseline: (
+    info: { context: string; incomingItems: number; mode: CollabMode }
+  ) => Promise<BaselineChoice>
   /** Your name, sent with a deliberate goodbye so the peer can say who left. */
   displayName?: string
   /** One guest went away. The session stays open for them to come back. */
@@ -68,12 +70,15 @@ interface CollabOptions {
   /** The host showed this side the door. Not the same as them leaving. */
   onRemoved?: (by: string) => void
   /**
-   * The other side merged the two boards and is offering the result, so both
-   * ends hold the same one. Answering no leaves this board exactly as it is.
+   * A guest merged its copy with the board it joined and is offering the
+   * result. Asked of the host only, whose answer is the room's: see
+   * BoardResetMessage. Answering no leaves this board exactly as it is.
    */
   onMergeProposed?: (info: { by: string; impact: MergeImpact }) => Promise<boolean>
-  /** What they did with a merge this side offered them. */
-  onMergeAnswer?: (accepted: boolean, by: string) => void
+  /** What the host did with the merge this side offered. */
+  onMergeAnswer?: (accepted: boolean, by: string, reason: string) => void
+  /** The host took someone's merge, and this is the board now. */
+  onBoardReset?: (by: string) => void
 }
 
 /** The tables whose tombstones hold a row id, and so mean something to a merge. */
@@ -82,12 +87,19 @@ const MERGEABLE_TABLES = new Set(['items', 'tags', 'relations'])
 /**
  * Where the board is remembered as it stood when two copies were last the same.
  *
- * Written every time a baseline arrives, which is the one moment the two sides
- * are known to agree. A later merge of the same pair reads it as the common
- * ancestor and can tell a card somebody changed from a card somebody merely
- * saved. Per workspace, because that is what a session is about.
+ * Written every time the two sides are known to agree: when a baseline arrives,
+ * and when a merge is taken. A later merge of the same pair reads it as the
+ * common ancestor and can tell a card somebody changed from a card somebody
+ * merely saved.
+ *
+ * Per workspace and per peer. The workspace is what a session is about, and the
+ * peer is who the agreement was with: boards called "default" are everywhere,
+ * and an ancestor borrowed from a different person decides conflicts by a
+ * history the two of you never had. Peerless keys the name alone, which is
+ * where a board agreed with a build that sends no id still lands.
  */
-const mergeBaseKey = (context: string): string => `merge_base_${context}`
+const mergeBaseKey = (context: string, peer: string): string =>
+  peer ? `merge_base_${context}_${peer}` : `merge_base_${context}`
 
 /** Just enough of each card to say whether it has moved since. */
 interface BaseCard {
@@ -96,9 +108,9 @@ interface BaseCard {
   metadata: string
 }
 
-async function readMergeBase(context: string): Promise<Map<string, Item>> {
+async function readMergeBase(context: string, peer: string): Promise<Map<string, Item>> {
   try {
-    const raw = await window.electronAPI.db.getSetting(mergeBaseKey(context))
+    const raw = await window.electronAPI.db.getSetting(mergeBaseKey(context, peer))
     if (!Array.isArray(raw)) return new Map()
     const base = new Map<string, Item>()
     for (const entry of raw as BaseCard[]) {
@@ -124,14 +136,14 @@ async function readMergeBase(context: string): Promise<Map<string, Item>> {
  * Only the stamp and the metadata, because that is all the comparison reads and
  * a whole board copy in a settings row would be the same data stored twice.
  */
-async function writeMergeBase(context: string, items: Item[]): Promise<void> {
+async function writeMergeBase(context: string, peer: string, items: Item[]): Promise<void> {
   try {
     const base: BaseCard[] = items.map(item => ({
       id: item.id,
       updated_at: item.updated_at,
       metadata: item.metadata
     }))
-    await window.electronAPI.db.setSetting(mergeBaseKey(context), base)
+    await window.electronAPI.db.setSetting(mergeBaseKey(context, peer), base)
   } catch (err) {
     console.warn('[Collab] Could not record the merge base:', err)
   }
@@ -245,6 +257,22 @@ export class WebRTCCollaborationCoordinator {
 
   /** Set once the session is deliberately over, so its own closing events say nothing. */
   private ended = false
+
+  /** Which installation is hosting, as the peer key a joiner files its board under. */
+  private hostInstall = ''
+
+  /**
+   * A merge is being decided on right now.
+   *
+   * One at a time, and the rest are refused rather than queued. Every proposal
+   * is the whole board as its author found it, so a second one decided after
+   * the first went in would put back exactly what the first took away, and the
+   * author of it never saw the board they are overwriting.
+   */
+  private decidingMerge = false
+
+  /** This side offered a merge, so an answer to one is addressed to it. */
+  private offeredMerge = false
 
   constructor(options: CollabOptions) {
     this.options = options
@@ -602,6 +630,10 @@ export class WebRTCCollaborationCoordinator {
         relations,
         mode: this.options.mode,
         board,
+        // Who they are agreeing with, so a merge later on reads the ancestor
+        // this pair actually has rather than one left by whoever last shared a
+        // board of the same name.
+        install: this.installId,
         // What this side has deleted, so a merge on the other end honours it
         // instead of handing every one of them back. Only the tables whose
         // tombstone id is a row id mean anything to the receiver.
@@ -747,7 +779,7 @@ export class WebRTCCollaborationCoordinator {
       new Map((msg.tombstones ?? []).map(stone => [stone.id, stone.deleted_at])),
       // The board as it stood when these two were last together, if this pair
       // has met before. Turns "whose save was later" into "who changed it".
-      await readMergeBase(target)
+      await readMergeBase(target, this.hostInstall)
     )
 
     await saveBoardConfig(target, merged.board)
@@ -758,21 +790,21 @@ export class WebRTCCollaborationCoordinator {
       merged.itemTags,
       merged.relations
     )
-    // The two sides are the same again as of now, which makes this the ancestor
-    // the next merge of this pair reasons from.
-    await writeMergeBase(target, merged.items)
-
     const what = describeMerge(merged.summary)
     this.options.onProgress(
       what ? `Merged into ${target}: ${what}.` : `Merged into ${target}: nothing new to take.`
     )
 
-    // Offered on, so the merge is something the two of them did rather than
-    // something one of them did quietly. The result travels whole: the other
-    // side merging for itself would break ties its own way and honour only its
+    // Offered to the host, so the merge is something the two of them did rather
+    // than something one of them did quietly. The result travels whole: the
+    // host merging for itself would break ties its own way and honour only its
     // own deletions, and two boards that are nearly the same is the worst
     // outcome available here.
+    //
+    // Nothing is recorded as agreed yet. Until the answer comes back this side
+    // is the only one holding this board.
     try {
+      this.offeredMerge = true
       await this.broadcast({
         type: 'merge-proposal',
         by: this.options.displayName ?? '',
@@ -785,12 +817,43 @@ export class WebRTCCollaborationCoordinator {
       })
     } catch (err) {
       // This side is merged either way. Only the offer failed.
-      console.warn('[Collab Client] Could not offer the merge to the other side:', err)
+      this.offeredMerge = false
+      console.warn('[Collab Client] Could not offer the merge to the host:', err)
     }
   }
 
   /**
-   * Someone has merged the two boards and is offering the result.
+   * Records that both sides hold the same board as of now.
+   *
+   * The one moment an ancestor is worth writing down, and a later merge with
+   * this peer reads it to tell a card somebody changed from a card that merely
+   * has a newer save stamp on it.
+   *
+   * Read back out of the database rather than taken from the message, because
+   * what is here is what this side actually agreed to.
+   */
+  private async recordAgreement(target: string, peer: string): Promise<void> {
+    try {
+      const db = await window.electronAPI.sync.getDbPayload()
+      await writeMergeBase(
+        target,
+        peer,
+        db.items.filter(
+          item => item.context === target && (item.type === 'card' || item.type === 'task')
+        )
+      )
+    } catch (err) {
+      console.warn('[Collab] Could not record what both sides now hold:', err)
+    }
+  }
+
+  /**
+   * A guest has merged its copy with the board it joined and is offering the
+   * result to the room.
+   *
+   * The host decides, and decides for everybody: the board being shared is the
+   * host's, and a guest is live with it, so a guest allowed to say no would sit
+   * in the room holding a board nobody else has and nobody else would know.
    *
    * The question is put with numbers on it, because "do you want to merge" is
    * not a question anyone can answer and this one overwrites a board.
@@ -799,6 +862,33 @@ export class WebRTCCollaborationCoordinator {
     const target = this.sessionContext
     const who = msg.by.trim()
 
+    // Only the host is asked, and only the host relays the result. A proposal
+    // arriving anywhere else is a peer talking out of turn.
+    if (!this.options.isHost) {
+      await this.answerMerge(from, false, 'only the host decides that')
+      return
+    }
+
+    // A proposal is the whole board as its author found it. Deciding a second
+    // one after the first has gone in would put back everything the first took
+    // away, and its author never saw the board they would be overwriting.
+    if (this.decidingMerge) {
+      this.options.onProgress(
+        who ? `${who} also offered a merge. One at a time.` : 'Another merge was offered.'
+      )
+      await this.answerMerge(from, false, 'another merge was being decided')
+      return
+    }
+
+    // Read-only is the host saying the guests cannot change this board, and
+    // replacing all of it is the largest change there is. Refused without
+    // asking, so the answer does not depend on who is at the keyboard.
+    if (this.options.mode === 'readonly') {
+      await this.answerMerge(from, false, 'the board is shared read-only')
+      return
+    }
+
+    this.decidingMerge = true
     let accepted = false
     try {
       if (this.options.onMergeProposed) {
@@ -832,16 +922,30 @@ export class WebRTCCollaborationCoordinator {
           this.options.onProgress(
             who ? `Merged with ${who}. Both boards now match.` : 'Merged. Both boards now match.'
           )
-          // And on to everyone else in the room, who otherwise carry on with
-          // the board as it was before the merge. Offered rather than applied,
-          // the same as it was offered here: one person's agreement is not
-          // everybody's.
-          if (this.options.isHost) {
-            await this.broadcast({ ...msg, context: this.wireContext }, from.id)
-          }
+          // The board the room is on now, sent to everyone else in it. They are
+          // told rather than asked: they are live with this board, so one of
+          // them keeping the old one would be holding cards nobody else has and
+          // missing edits to cards it does not, quietly, for as long as the
+          // session lasts.
+          await this.broadcast(
+            {
+              type: 'board-reset',
+              by: who,
+              context: this.wireContext,
+              items,
+              tags: msg.tags,
+              itemTags: msg.itemTags,
+              relations: msg.relations,
+              board: msg.board
+            },
+            from.id
+          )
         } finally {
           this.isApplyingRemote = false
         }
+        // Only now, and only for the peer whose board this is. What everyone
+        // else holds is the host's doing, not an agreement with them.
+        await this.recordAgreement(target, from.install)
       } else {
         this.options.onProgress(
           who ? `Turned down ${who}'s merge. Your board is unchanged.` : 'Merge turned down.'
@@ -853,10 +957,29 @@ export class WebRTCCollaborationCoordinator {
       // said, and the other side has to be told that and not the intention.
       accepted = false
       this.options.onError(err)
+    } finally {
+      this.decidingMerge = false
     }
 
+    // No reason either way: this one was answered by a person.
+    await this.answerMerge(from, accepted)
+  }
+
+  /**
+   * Back to whoever offered the merge.
+   *
+   * A reason only when the no was the app's rather than the user's: "they said
+   * no" and "nobody was asked" read the same from the other end otherwise, and
+   * only one of them is worth trying again.
+   */
+  private async answerMerge(to: PeerLink, accepted: boolean, reason?: string): Promise<void> {
     try {
-      await this.sendTo(from, { type: 'merge-answer', accepted, by: this.options.displayName ?? '' })
+      await this.sendTo(to, {
+        type: 'merge-answer',
+        accepted,
+        by: this.options.displayName ?? '',
+        reason: reason ?? ''
+      })
     } catch (err) {
       console.warn('[Collab] Could not answer the merge proposal:', err)
     }
@@ -883,9 +1006,14 @@ export class WebRTCCollaborationCoordinator {
         // workspace before seeding the host's, and that is unrecoverable. The
         // caller decides what to do about it: replace, take the board as a
         // copy under a free name, fold the two together, or refuse.
+        // Who is hosting, before anything is decided: the choice about to be
+        // made is filed against them, and a merge is not on offer at all when
+        // the board is being shared read-only.
+        this.hostInstall = msg.install ?? ''
         const choice = await this.options.onResolveBaseline({
           context: msg.context,
-          incomingItems: msg.items.length
+          incomingItems: msg.items.length,
+          mode: msg.mode
         })
         if (choice.action === 'cancel') {
           this.cleanup()
@@ -949,7 +1077,7 @@ export class WebRTCCollaborationCoordinator {
             // Both sides now hold the host's board exactly, which is the one
             // moment they are known to agree and so the ancestor a later merge
             // of this pair reasons from.
-            await writeMergeBase(target, items)
+            await writeMergeBase(target, this.hostInstall, items)
             this.options.onProgress(`Joined board: ${target}. Ready!`)
           }
 
@@ -981,7 +1109,52 @@ export class WebRTCCollaborationCoordinator {
       }
 
       case 'merge-answer': {
-        this.options.onMergeAnswer?.(msg.accepted, msg.by.trim())
+        // An answer to nothing is a peer talking out of turn, and reporting it
+        // would tell this user their board had been taken somewhere it was
+        // never sent.
+        if (!this.offeredMerge) {
+          console.warn('[Collab Coordinator] Ignored an answer to a merge this side never offered.')
+          break
+        }
+        this.offeredMerge = false
+        if (msg.accepted) await this.recordAgreement(this.sessionContext, this.hostInstall)
+        this.options.onMergeAnswer?.(msg.accepted, msg.by.trim(), msg.reason?.trim() ?? '')
+        break
+      }
+
+      case 'board-reset': {
+        // Only the host says what the shared board is. A guest sending one is
+        // asking to overwrite the host's board without anyone being asked,
+        // which is what the proposal exists for.
+        if (this.options.isHost) {
+          console.warn('[Collab Host] Ignored a guest trying to replace the shared board.')
+          break
+        }
+        // The host took somebody's merge, so this is the board now. Applied the
+        // way the opening baseline is, because that is what it is: the whole
+        // board, replacing the whole board.
+        const target = this.sessionContext
+        this.isApplyingRemote = true
+        try {
+          const items = msg.items.map(item =>
+            item.context === target ? item : { ...item, context: target }
+          )
+          await saveBoardConfig(target, msg.board)
+          await window.electronAPI.sync.applyBoardBaseline(
+            target, items, msg.tags, msg.itemTags, msg.relations
+          )
+          window.dispatchEvent(new CustomEvent('kanban-refresh'))
+        } catch (err) {
+          console.error('[Collab Coordinator] Failed to take the new shared board:', err)
+          this.options.onError(err)
+          break
+        } finally {
+          this.isApplyingRemote = false
+        }
+        // Still an agreement with the host, whoever ran the merge: the host is
+        // the only side this one has, and its board is what arrived.
+        await this.recordAgreement(target, this.hostInstall)
+        this.options.onBoardReset?.(msg.by.trim())
         break
       }
 
@@ -1225,6 +1398,10 @@ export class WebRTCCollaborationCoordinator {
   /** The host's word on what the guests may do, sent without ending anything. */
   public async setMode(mode: CollabMode): Promise<void> {
     if (!this.options.isHost) return
+    // Kept, not only sent. It was told to whoever was already in the room and
+    // nowhere else, so the next person to join was handed the mode the session
+    // started on and the change never reached them.
+    this.options.mode = mode
     await this.broadcast({ type: 'mode-change', mode })
   }
 
@@ -1254,6 +1431,10 @@ export class WebRTCCollaborationCoordinator {
     this.ended = true
     this.closeAllPeers()
     this.signalingRoom = ''
+    // A merge nobody can answer any more. Left standing, the next session would
+    // refuse its first proposal on the strength of one from the last.
+    this.decidingMerge = false
+    this.offeredMerge = false
 
     if (this.sse) {
       this.sse.close()

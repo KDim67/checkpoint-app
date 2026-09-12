@@ -214,7 +214,9 @@ describe('a message off the wire', () => {
   }
 
   it('passes a genuine baseline through', () => {
-    expect(normalizeCollabMessage(baseline)).toEqual(baseline)
+    // The install id is the host's, and a baseline without one reads as having
+    // no peer to file the board under rather than as a bad message.
+    expect(normalizeCollabMessage(baseline)).toEqual({ ...baseline, install: '' })
   })
 
   it('drops the rows it cannot write, keeping the board', () => {
@@ -246,7 +248,7 @@ describe('a message off the wire', () => {
     const got = normalizeCollabMessage({ type: 'board-baseline', context: 'work' })
     expect(got).toEqual({
       type: 'board-baseline', context: 'work',
-      items: [], tags: [], itemTags: [], relations: [], mode: 'readonly'
+      items: [], tags: [], itemTags: [], relations: [], mode: 'readonly', install: ''
     })
   })
 

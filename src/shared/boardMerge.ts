@@ -327,6 +327,14 @@ export interface MergeImpact {
   cardsChanged: number
   /** Cards deleted here that the merge would put back. Worth saying out loud. */
   cardsReturning: number
+  /**
+   * Cards here that the merge would take away, because the other side had
+   * deleted them and a merge honours the deletions of whoever ran it.
+   *
+   * The one way a merge can cost this board something, so it cannot be left to
+   * the sentence about nothing being lost.
+   */
+  cardsRemoved: number
 }
 
 /**
@@ -341,7 +349,13 @@ export function mergeImpact(
   deletedHere: ReadonlySet<string> = new Set()
 ): MergeImpact {
   const here = new Map(mine.map(item => [item.id, item]))
-  const impact: MergeImpact = { cardsAdded: 0, cardsChanged: 0, cardsReturning: 0 }
+  const offered = new Set(proposed.map(item => item.id))
+  const impact: MergeImpact = {
+    cardsAdded: 0,
+    cardsChanged: 0,
+    cardsReturning: 0,
+    cardsRemoved: mine.reduce((count, item) => (offered.has(item.id) ? count : count + 1), 0)
+  }
   for (const item of proposed) {
     const existing = here.get(item.id)
     if (!existing) {
@@ -366,6 +380,9 @@ export function describeImpact(impact: MergeImpact): string | null {
   if (impact.cardsChanged > 0) parts.push(`${impact.cardsChanged} changed`)
   if (impact.cardsReturning > 0) {
     parts.push(`${impact.cardsReturning} you had deleted put back`)
+  }
+  if (impact.cardsRemoved > 0) {
+    parts.push(`${impact.cardsRemoved} of yours taken away`)
   }
   return parts.length > 0 ? parts.join(', ') : null
 }

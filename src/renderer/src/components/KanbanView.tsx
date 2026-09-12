@@ -486,29 +486,59 @@ export default function KanbanView() {
     const what = describeImpact(impact)
     const them = by || 'They'
     const back = impact.cardsReturning
+    const gone = impact.cardsRemoved
+    // Both of these are the merge costing this board something, and the warning
+    // is the only line that says so.
+    const warnings: string[] = []
+    if (gone > 0) {
+      warnings.push(
+        `${gone} card${gone === 1 ? '' : 's'} you have would be taken away, because ` +
+          `${by || 'they'} deleted ${gone === 1 ? 'it' : 'them'}.`
+      )
+    }
+    if (back > 0) {
+      warnings.push(
+        `${back} card${back === 1 ? '' : 's'} you deleted would come back, because they still ` +
+          `have ${back === 1 ? 'it' : 'them'}.`
+      )
+    }
     return confirm({
       title: by ? `${by} wants to merge your boards` : 'Merge the two boards?',
       message: what
         ? `${them} merged their copy of this board with yours and is offering the result: ` +
-          `${what}. Taking it makes both boards the same. Nothing of yours is lost.`
+          `${what}. Taking it makes it the board everyone here is on.`
         : `${them} merged their copy of this board with yours. Nothing here would change.`,
       confirmText: 'Merge',
       cancelText: 'Keep mine',
-      warning: back > 0
-        ? `${back} card${back === 1 ? '' : 's'} you deleted would come back, because they still have ${back === 1 ? 'it' : 'them'}.`
-        : undefined
+      isDestructive: gone > 0,
+      warning: warnings.length > 0 ? warnings.join(' ') : undefined
     })
   }, [confirm])
 
-  /** What the other side did with a merge this side offered. */
-  const reportMergeAnswer = useCallback((accepted: boolean, by: string) => {
+  /** What the host did with the merge this side offered. */
+  const reportMergeAnswer = useCallback((accepted: boolean, by: string, reason: string) => {
     const them = by || 'They'
-    setCollabProgress(
-      accepted
-        ? `${them} took the merge. Both boards now match.`
-        : `${them} kept their own board. Yours is merged, theirs is not.`
-    )
-  }, [])
+    if (accepted) {
+      setCollabProgress(`${them} took the merge. Both boards now match.`)
+      return
+    }
+    const why = reason
+      ? `The merge was not taken: ${reason}. Your board is merged, theirs is not.`
+      : `${them} kept their own board. Yours is merged, theirs is not.`
+    setCollabProgress(why)
+    // Said out loud as well. The board just changed under this user and the
+    // panel it would otherwise be said in is usually shut.
+    toast(why)
+  }, [toast])
+
+  /** The host took somebody's merge, and this is the shared board now. */
+  const reportBoardReset = useCallback((by: string) => {
+    const said = by
+      ? `${by} merged their board in. The shared board has been updated.`
+      : 'The shared board has been merged and updated.'
+    setCollabProgress(said)
+    toast(said)
+  }, [toast])
 
   const startCollabHosting = useCallback(async (mode: 'collaborative' | 'readonly') => {
     const code = Math.floor(100000 + Math.random() * 900000).toString()
@@ -552,8 +582,9 @@ export default function KanbanView() {
       },
       displayName,
       onRoster: setCollabRoster,
+      // The host is the only side asked about a merge, and the only side that
+      // never offers one, so there is no answer coming back here.
       onMergeProposed: considerMerge,
-      onMergeAnswer: reportMergeAnswer,
       // One guest going does not end the session: the passcode still works and
       // everyone else is still here.
       onPeerLeft: (name) => {
@@ -564,7 +595,7 @@ export default function KanbanView() {
     })
     collabCoordinatorRef.current = coord
     await coord.start()
-  }, [activeWorkspace, workspaceList, setWorkspaceList, displayName, considerMerge, reportMergeAnswer, toast])
+  }, [activeWorkspace, workspaceList, setWorkspaceList, displayName, considerMerge, toast])
 
   const joinCollabSession = useCallback(async (code: string) => {
     if (!code || code.length < 5) return
@@ -600,6 +631,7 @@ export default function KanbanView() {
       onRoster: setCollabRoster,
       onMergeProposed: considerMerge,
       onMergeAnswer: reportMergeAnswer,
+      onBoardReset: reportBoardReset,
       // The host's word on what this side may do, and it can change mid-session.
       onMode: setCollabMode,
       onRemoved: (by) => {
@@ -609,7 +641,7 @@ export default function KanbanView() {
         setCollabRoster([])
         toast(said)
       },
-      onResolveBaseline: async ({ context, incomingItems }) => {
+      onResolveBaseline: async ({ context, incomingItems, mode }) => {
         // A check that could not run is not permission to delete, so a failed
         // read is treated as a clash and the user is asked anyway.
         let taken: Set<string>
@@ -637,13 +669,21 @@ export default function KanbanView() {
             `and you have a board of your own under that name.`,
           cancelText: 'Cancel',
           choices: [
-            {
-              key: 'merge',
-              label: 'Merge the two',
-              detail:
-                'Keeps everything from both copies. A card you both have keeps what each of ' +
-                'you wrote on it, and anything you deleted stays deleted.'
-            },
+            // Not on offer when the board is shared read-only. A merge ends
+            // with the host holding the board the two of you make, and a host
+            // sharing read-only has said the guests do not change this board,
+            // so the offer would only ever be turned down.
+            ...(mode === 'readonly'
+              ? []
+              : [
+                  {
+                    key: 'merge',
+                    label: 'Merge the two',
+                    detail:
+                      'Keeps everything from both copies. A card you both have keeps what each ' +
+                      'of you wrote on it, and anything you deleted stays deleted.'
+                  }
+                ]),
             {
               key: 'copy',
               label: 'Keep them apart',
@@ -678,7 +718,7 @@ export default function KanbanView() {
     })
     collabCoordinatorRef.current = coord
     await coord.start()
-  }, [activeWorkspace, pick, displayName, considerMerge, reportMergeAnswer, toast])
+  }, [activeWorkspace, pick, displayName, considerMerge, reportMergeAnswer, reportBoardReset, toast])
 
   /**
    * The workspace the live session belongs to.

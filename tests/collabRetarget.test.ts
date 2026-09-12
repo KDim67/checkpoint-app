@@ -216,12 +216,56 @@ describe('merge-proposal', () => {
   })
 })
 
+// What the rest of the room is sent once the host takes a merge. Told, not
+// asked: they are live with the host's board and cannot be left holding another.
+describe('board-reset', () => {
+  const reset = {
+    type: 'board-reset',
+    by: 'Dim67',
+    context: 'work',
+    items: [],
+    tags: [],
+    itemTags: [],
+    relations: [],
+    board: { columns: [{ id: 'open', name: 'To Do', wipLimit: null }] }
+  }
+
+  it('carries the board through', () => {
+    const msg = normalizeCollabMessage(reset)
+    if (msg?.type !== 'board-reset') throw new Error('expected a reset')
+    expect(msg.by).toBe('Dim67')
+    expect(msg.context).toBe('work')
+    expect(msg.board.columns.map(c => c.id)).toEqual(['open'])
+  })
+
+  it('refuses a reset with no workspace on it', () => {
+    expect(normalizeCollabMessage({ ...reset, context: '' })).toBeNull()
+    expect(normalizeCollabMessage({ ...reset, context: null })).toBeNull()
+  })
+
+  it('drops a corrupt card rather than the whole board', () => {
+    const msg = normalizeCollabMessage({ ...reset, items: [{ nonsense: true }] })
+    if (msg?.type !== 'board-reset') throw new Error('expected a reset')
+    expect(msg.items).toEqual([])
+  })
+})
+
 describe('merge-answer', () => {
   it('carries a yes and a no', () => {
     expect(normalizeCollabMessage({ type: 'merge-answer', accepted: true, by: 'Dimitris' }))
-      .toEqual({ type: 'merge-answer', accepted: true, by: 'Dimitris' })
+      .toEqual({ type: 'merge-answer', accepted: true, by: 'Dimitris', reason: '' })
     expect(normalizeCollabMessage({ type: 'merge-answer', accepted: false, by: '' }))
-      .toEqual({ type: 'merge-answer', accepted: false, by: '' })
+      .toEqual({ type: 'merge-answer', accepted: false, by: '', reason: '' })
+  })
+
+  // The difference between the host saying no and nobody having been asked.
+  it('carries a reason when the app answered rather than a person', () => {
+    expect(normalizeCollabMessage({
+      type: 'merge-answer',
+      accepted: false,
+      by: 'Dimitris',
+      reason: 'another merge was being decided'
+    })).toMatchObject({ reason: 'another merge was being decided' })
   })
 
   // Only an explicit yes is a yes. Anything else leaves the other side's board
@@ -309,6 +353,28 @@ describe('baseline tombstones', () => {
     const msg = normalizeCollabMessage(baseline)
     if (msg?.type !== 'board-baseline') throw new Error('expected a baseline')
     expect(msg.tombstones).toBeUndefined()
+  })
+})
+
+// Which installation is hosting, so a later merge reads the ancestor this pair
+// has rather than one left by whoever last shared a board of the same name.
+describe('baseline install id', () => {
+  const baseline = { type: 'board-baseline', context: 'work' }
+
+  it('carries the host install through', () => {
+    const msg = normalizeCollabMessage({ ...baseline, install: 'abc123de-9f8g7h6i5j' })
+    if (msg?.type !== 'board-baseline') throw new Error('expected a baseline')
+    expect(msg.install).toBe('abc123de-9f8g7h6i5j')
+  })
+
+  // Both mean the same thing here: no peer to file the board under, so the
+  // ancestor is kept under the workspace name alone.
+  it('is empty from an older host and from one that will not read', () => {
+    for (const raw of [baseline, { ...baseline, install: 'UPPER' }, { ...baseline, install: 42 }]) {
+      const msg = normalizeCollabMessage(raw)
+      if (msg?.type !== 'board-baseline') throw new Error('expected a baseline')
+      expect(msg.install).toBe('')
+    }
   })
 })
 
