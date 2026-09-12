@@ -1,6 +1,7 @@
 import React from 'react'
-import { AlertTriangle, CheckCircle, Download, Loader, Plus, Scissors, Settings } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Download, Loader, Scissors, Settings } from 'lucide-react'
 import type { SlicerTool } from './useSlicerTool'
+import FilePickerButton from './FilePickerButton'
 
 export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
   const {
@@ -55,29 +56,11 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
               <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
                 Sprite Sheet Image
               </span>
-              <button
+              <FilePickerButton
                 onClick={handleSelectSlicerFile}
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--color-text-base)',
-                  fontSize: 'var(--text-xs)',
-                  padding: '10px var(--space-3)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                  overflow: 'hidden'
-                }}
-              >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'var(--space-2)' }}>
-                  {slicerPath ? slicerPath.split(/[\\/]/).pop() : 'Load Texture...'}
-                </span>
-                <Plus size={14} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
-              </button>
+                path={slicerPath}
+                placeholder="Load Texture..."
+              />
             </div>
 
             {/* Slicing mode selector */}

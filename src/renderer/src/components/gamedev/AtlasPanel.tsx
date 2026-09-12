@@ -1,7 +1,8 @@
 import React from 'react'
 import type { AtlasMaxSize } from './types'
-import { AlertTriangle, Box, CheckCircle, Download, Grid, Loader, Plus, Settings } from 'lucide-react'
+import { AlertTriangle, Box, CheckCircle, Download, Grid, Loader, Settings } from 'lucide-react'
 import type { AtlasTool } from './useAtlasTool'
+import FilePickerButton from './FilePickerButton'
 
 export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
   const {
@@ -57,29 +58,11 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
                 Source Directory
               </span>
-              <button
+              <FilePickerButton
                 onClick={handleSelectAtlasFolder}
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--color-text-base)',
-                  fontSize: 'var(--text-xs)',
-                  padding: '10px var(--space-3)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                  overflow: 'hidden'
-                }}
-              >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'var(--space-2)' }}>
-                  {atlasFolderPath ? atlasFolderPath.split(/[\\/]/).pop() : 'Choose a Folder...'}
-                </span>
-                <Plus size={14} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
-              </button>
+                path={atlasFolderPath}
+                placeholder="Choose a Folder..."
+              />
               {atlasFolderPath && (
                 <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', overflowWrap: 'break-word' }}>
                   Path: {atlasFolderPath}

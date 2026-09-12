@@ -1,7 +1,8 @@
 import React from 'react'
 import type { UpscaleAlgorithm } from './types'
-import { CheckCircle, Download, Loader, Maximize2, Plus, Settings } from 'lucide-react'
+import { CheckCircle, Download, Loader, Maximize2, Settings } from 'lucide-react'
 import type { UpscalerTool } from './useUpscalerTool'
+import FilePickerButton from './FilePickerButton'
 
 export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
   const {
@@ -53,29 +54,11 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
                 Source Image
               </span>
-              <button
+              <FilePickerButton
                 onClick={handleSelectUpscaleFile}
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--color-text-base)',
-                  fontSize: 'var(--text-xs)',
-                  padding: '10px var(--space-3)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                  overflow: 'hidden'
-                }}
-              >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'var(--space-2)' }}>
-                  {upscalePath ? upscalePath.split(/[\\/]/).pop() : 'Load Texture...'}
-                </span>
-                <Plus size={14} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
-              </button>
+                path={upscalePath}
+                placeholder="Load Texture..."
+              />
             </div>
 
             {/* Algorithm selection dropdown */}

@@ -10,7 +10,7 @@ import { useToast } from './ui/Toast'
 import { FileText } from 'lucide-react'
 import StandupTranslatorView from './StandupTranslatorView'
 import { itemPage } from '../data/items'
-import MenuItem, { MenuDivider } from './ui/MenuItem'
+import MenuItem, { MenuDivider, MenuPanel } from './ui/MenuItem'
 
 export default function LogView() {
   const [items, setItems] = useState<Item[]>([])
@@ -310,21 +310,7 @@ export default function LogView() {
             </button>
             
             {dropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  left: 0,
-                  zIndex: 100,
-                  background: 'var(--color-surface-elevated)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  minWidth: '180px',
-                  padding: '4px 0',
-                  animation: 'dropdown-in 150ms var(--ease-enter)'
-                }}
-              >
+              <MenuPanel>
                 {availableWorkspaces.map(ctx => (
                   <button
                     key={ctx}
@@ -369,7 +355,7 @@ export default function LogView() {
                 >
                   New Workspace
                 </MenuItem>
-              </div>
+              </MenuPanel>
             )}
           </div>
         </div>

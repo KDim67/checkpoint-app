@@ -66,7 +66,7 @@ import { writeWorkspaceList } from '../lib/workspaceList'
 import { getStringSetting, setStringSetting } from '../lib/settings'
 import { listTags } from '../data/tags'
 import { readItems } from '../data/items'
-import MenuItem, { MenuDivider } from './ui/MenuItem'
+import MenuItem, { MenuDivider, MenuPanel } from './ui/MenuItem'
 
 
 // Re-exported rather than declared: the shape now belongs to lib/boardConfig,
@@ -1729,21 +1729,7 @@ export default function KanbanView() {
             </button>
             
             {dropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  left: 0,
-                  zIndex: 100,
-                  background: 'var(--color-surface-elevated)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  minWidth: '180px',
-                  padding: '4px 0',
-                  animation: 'dropdown-in 150ms var(--ease-enter)'
-                }}
-              >
+              <MenuPanel>
                 {availableWorkspaces.map(ctx => {
                   const entry = workspaceList.find(c => c.slug === ctx)
                   const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -1793,7 +1779,7 @@ export default function KanbanView() {
                 >
                   New Workspace
                 </MenuItem>
-              </div>
+              </MenuPanel>
             )}
           </div>
           <span className="kanban-card-count" style={{
