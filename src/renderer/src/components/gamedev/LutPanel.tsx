@@ -3,23 +3,6 @@ import { CheckCircle, Download, Loader, Settings, Sliders } from 'lucide-react'
 import type { LutTool } from './useLutTool'
 
 export default function LutPanel({ tool }: { tool: LutTool }) {
-  const {
-    lutBrightness,
-    setLutBrightness,
-    lutContrast,
-    setLutContrast,
-    lutSaturation,
-    setLutSaturation,
-    lutTemperature,
-    setLutTemperature,
-    lutExposure,
-    setLutExposure,
-    lutExportedPath,
-    isLutSaving,
-    lutPreviewCanvasRef,
-    handleLutExport
-  } = tool
-
   return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
         <div className="gamedev-info-banner">
@@ -52,15 +35,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                 <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Exposure</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{lutExposure > 0 ? `+${lutExposure}` : lutExposure}%</span>
+                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutExposure > 0 ? `+${tool.lutExposure}` : tool.lutExposure}%</span>
               </div>
               <input
                 type="range"
                 min="-100"
                 max="100"
                 step="1"
-                value={lutExposure}
-                onChange={e => setLutExposure(parseInt(e.target.value))}
+                value={tool.lutExposure}
+                onChange={e => tool.setLutExposure(parseInt(e.target.value))}
                 style={{ width: '100%', accentColor: 'var(--color-primary)' }}
               />
             </div>
@@ -69,15 +52,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                 <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Brightness</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{lutBrightness > 0 ? `+${lutBrightness}` : lutBrightness}%</span>
+                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutBrightness > 0 ? `+${tool.lutBrightness}` : tool.lutBrightness}%</span>
               </div>
               <input
                 type="range"
                 min="-100"
                 max="100"
                 step="1"
-                value={lutBrightness}
-                onChange={e => setLutBrightness(parseInt(e.target.value))}
+                value={tool.lutBrightness}
+                onChange={e => tool.setLutBrightness(parseInt(e.target.value))}
                 style={{ width: '100%', accentColor: 'var(--color-primary)' }}
               />
             </div>
@@ -86,15 +69,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                 <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Contrast</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{lutContrast > 0 ? `+${lutContrast}` : lutContrast}%</span>
+                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutContrast > 0 ? `+${tool.lutContrast}` : tool.lutContrast}%</span>
               </div>
               <input
                 type="range"
                 min="-100"
                 max="100"
                 step="1"
-                value={lutContrast}
-                onChange={e => setLutContrast(parseInt(e.target.value))}
+                value={tool.lutContrast}
+                onChange={e => tool.setLutContrast(parseInt(e.target.value))}
                 style={{ width: '100%', accentColor: 'var(--color-primary)' }}
               />
             </div>
@@ -103,15 +86,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                 <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Saturation</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{lutSaturation > 0 ? `+${lutSaturation}` : lutSaturation}%</span>
+                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutSaturation > 0 ? `+${tool.lutSaturation}` : tool.lutSaturation}%</span>
               </div>
               <input
                 type="range"
                 min="-100"
                 max="100"
                 step="1"
-                value={lutSaturation}
-                onChange={e => setLutSaturation(parseInt(e.target.value))}
+                value={tool.lutSaturation}
+                onChange={e => tool.setLutSaturation(parseInt(e.target.value))}
                 style={{ width: '100%', accentColor: 'var(--color-primary)' }}
               />
             </div>
@@ -120,15 +103,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                 <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Temperature</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{lutTemperature > 0 ? `Warm (+${lutTemperature})` : lutTemperature < 0 ? `Cool (${lutTemperature})` : 'Neutral'}</span>
+                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutTemperature > 0 ? `Warm (+${tool.lutTemperature})` : tool.lutTemperature < 0 ? `Cool (${tool.lutTemperature})` : 'Neutral'}</span>
               </div>
               <input
                 type="range"
                 min="-100"
                 max="100"
                 step="1"
-                value={lutTemperature}
-                onChange={e => setLutTemperature(parseInt(e.target.value))}
+                value={tool.lutTemperature}
+                onChange={e => tool.setLutTemperature(parseInt(e.target.value))}
                 style={{ width: '100%', accentColor: 'var(--color-primary)' }}
               />
             </div>
@@ -136,11 +119,11 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             {/* Reset button */}
             <button
               onClick={() => {
-                setLutExposure(0)
-                setLutBrightness(0)
-                setLutContrast(0)
-                setLutSaturation(0)
-                setLutTemperature(0)
+                tool.setLutExposure(0)
+                tool.setLutBrightness(0)
+                tool.setLutContrast(0)
+                tool.setLutSaturation(0)
+                tool.setLutTemperature(0)
               }}
               style={{
                 background: 'transparent',
@@ -189,7 +172,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               padding: 'var(--space-4)',
               overflow: 'hidden'
             }}>
-              <canvas ref={lutPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '272px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
+              <canvas ref={tool.lutPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '272px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
             </div>
 
             {/* Export LUT Strip */}
@@ -210,8 +193,8 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                   </span>
                 </div>
                 <button
-                  onClick={handleLutExport}
-                  disabled={isLutSaving}
+                  onClick={tool.handleLutExport}
+                  disabled={tool.isLutSaving}
                   style={{
                     background: 'var(--color-secondary)',
                     border: 'none',
@@ -223,10 +206,10 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    opacity: isLutSaving ? 0.7 : 1
+                    opacity: tool.isLutSaving ? 0.7 : 1
                   }}
                 >
-                  {isLutSaving ? (
+                  {tool.isLutSaving ? (
                     <>
                       <Loader size={14} className="animate-spin" />
                       <span>Saving...</span>
@@ -240,7 +223,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                 </button>
               </div>
 
-              {lutExportedPath && (
+              {tool.lutExportedPath && (
                 <div style={{
                   background: 'var(--color-success-muted)',
                   border: '1px solid rgba(0, 255, 128, 0.2)',
@@ -256,7 +239,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                     <CheckCircle size={13} />
                     <strong>LUT generated successfully!</strong>
                   </div>
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Saved Path: {lutExportedPath}</span>
+                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Saved Path: {tool.lutExportedPath}</span>
                 </div>
               )}
             </div>

@@ -49,43 +49,6 @@ function MapPreview({ label, children }: { label: string; children: React.ReactN
 }
 
 export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDone: (cardId: string) => Promise<void> }) {
-  const {
-    setAlbedoPath,
-    setAlbedoUrl,
-    setExportedFiles,
-    preloadCardId,
-    albedoPath,
-    albedoUrl,
-    isProcessing,
-    isSaving,
-    exportedFiles,
-    shape,
-    setShape,
-    rotate,
-    setRotate,
-    normalIntensity,
-    setNormalIntensity,
-    heightDepth,
-    setHeightDepth,
-    roughnessContrast,
-    setRoughnessContrast,
-    roughnessBase,
-    setRoughnessBase,
-    aoIntensity,
-    setAoIntensity,
-    invertHeight,
-    setInvertHeight,
-    heightCanvasRef,
-    normalCanvasRef,
-    roughnessCanvasRef,
-    aoCanvasRef,
-    previewCanvasRef,
-    handlePbrDragOver,
-    handlePbrDrop,
-    handleBrowseClick,
-    handleExport
-  } = tool
-
   return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
         <div className="gamedev-info-banner">
@@ -95,13 +58,13 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
           </div>
         </div>
 
-        {!albedoUrl ? (
+        {!tool.albedoUrl ? (
           /* Drop Zone */
           <TextureDropZone
-            onDragOver={handlePbrDragOver}
-            onDrop={handlePbrDrop}
-            onClick={handleBrowseClick}
-            processing={isProcessing}
+            onDragOver={tool.handlePbrDragOver}
+            onDrop={tool.handlePbrDrop}
+            onClick={tool.handleBrowseClick}
+            processing={tool.isProcessing}
             label="Drag & Drop Albedo Texture"
             outcome="Returns Normal, Height, Roughness and Ambient Occlusion, previewed on a 3D model"
           />
@@ -122,12 +85,12 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
             }}>
               {/* ThreeJS Container */}
               <div style={{ position: 'relative', width: '100%', height: '300px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-surface-offset)' }}>
-                <canvas ref={previewCanvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+                <canvas ref={tool.previewCanvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
                 
                 {/* Floating Controls */}
                 <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '6px' }}>
                   <button
-                    onClick={() => setShape(prev => prev === 'sphere' ? 'cube' : prev === 'cube' ? 'plane' : 'sphere')}
+                    onClick={() => tool.setShape(prev => prev === 'sphere' ? 'cube' : prev === 'cube' ? 'plane' : 'sphere')}
                     title="Cycle preview mesh: sphere → cube → plane"
                     style={{
                       background: 'var(--color-surface-1)',
@@ -144,16 +107,16 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     }}
                   >
                     <Box size={10} />
-                    <span style={{ textTransform: 'capitalize' }}>{shape}</span>
+                    <span style={{ textTransform: 'capitalize' }}>{tool.shape}</span>
                   </button>
                   
                   <button
-                    onClick={() => setRotate(prev => !prev)}
+                    onClick={() => tool.setRotate(prev => !prev)}
                     style={{
                       background: 'var(--color-surface-1)',
                       border: '1px solid var(--color-surface-offset)',
                       borderRadius: 'var(--radius-sm)',
-                      color: rotate ? 'var(--color-secondary)' : 'var(--color-text-base)',
+                      color: tool.rotate ? 'var(--color-secondary)' : 'var(--color-text-base)',
                       padding: '4px 8px',
                       fontSize: '10px',
                       cursor: 'pointer',
@@ -163,7 +126,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                       backdropFilter: 'blur(4px)'
                     }}
                   >
-                    <RefreshCw size={10} className={rotate ? 'animate-spin' : ''} />
+                    <RefreshCw size={10} className={tool.rotate ? 'animate-spin' : ''} />
                     <span>Rotation</span>
                   </button>
                 </div>
@@ -199,8 +162,8 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   </div>
                   <input
                     type="checkbox"
-                    checked={invertHeight}
-                    onChange={e => setInvertHeight(e.target.checked)}
+                    checked={tool.invertHeight}
+                    onChange={e => tool.setInvertHeight(e.target.checked)}
                     style={{ accentColor: 'var(--color-secondary)' }}
                   />
                 </label>
@@ -209,15 +172,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                     <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Normal Intensity</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{normalIntensity.toFixed(1)}</span>
+                    <span style={{ color: 'var(--color-secondary)' }}>{tool.normalIntensity.toFixed(1)}</span>
                   </div>
                   <input
                     type="range"
                     min="0.1"
                     max="10.0"
                     step="0.1"
-                    value={normalIntensity}
-                    onChange={e => setNormalIntensity(parseFloat(e.target.value))}
+                    value={tool.normalIntensity}
+                    onChange={e => tool.setNormalIntensity(parseFloat(e.target.value))}
                     style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                   />
                 </div>
@@ -226,15 +189,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                     <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Height/Bump Depth</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{heightDepth.toFixed(2)}</span>
+                    <span style={{ color: 'var(--color-secondary)' }}>{tool.heightDepth.toFixed(2)}</span>
                   </div>
                   <input
                     type="range"
                     min="0.05"
                     max="5.0"
                     step="0.05"
-                    value={heightDepth}
-                    onChange={e => setHeightDepth(parseFloat(e.target.value))}
+                    value={tool.heightDepth}
+                    onChange={e => tool.setHeightDepth(parseFloat(e.target.value))}
                     style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                   />
                 </div>
@@ -243,15 +206,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                     <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Roughness Contrast</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{roughnessContrast.toFixed(1)}</span>
+                    <span style={{ color: 'var(--color-secondary)' }}>{tool.roughnessContrast.toFixed(1)}</span>
                   </div>
                   <input
                     type="range"
                     min="0.0"
                     max="3.0"
                     step="0.1"
-                    value={roughnessContrast}
-                    onChange={e => setRoughnessContrast(parseFloat(e.target.value))}
+                    value={tool.roughnessContrast}
+                    onChange={e => tool.setRoughnessContrast(parseFloat(e.target.value))}
                     style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                   />
                 </div>
@@ -260,15 +223,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                     <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Roughness Base (Shininess)</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{roughnessBase.toFixed(2)}</span>
+                    <span style={{ color: 'var(--color-secondary)' }}>{tool.roughnessBase.toFixed(2)}</span>
                   </div>
                   <input
                     type="range"
                     min="0.0"
                     max="1.0"
                     step="0.05"
-                    value={roughnessBase}
-                    onChange={e => setRoughnessBase(parseFloat(e.target.value))}
+                    value={tool.roughnessBase}
+                    onChange={e => tool.setRoughnessBase(parseFloat(e.target.value))}
                     style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                   />
                 </div>
@@ -277,15 +240,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                     <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>AO Crevice Darkness</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{aoIntensity.toFixed(1)}</span>
+                    <span style={{ color: 'var(--color-secondary)' }}>{tool.aoIntensity.toFixed(1)}</span>
                   </div>
                   <input
                     type="range"
                     min="0.0"
                     max="5.0"
                     step="0.1"
-                    value={aoIntensity}
-                    onChange={e => setAoIntensity(parseFloat(e.target.value))}
+                    value={tool.aoIntensity}
+                    onChange={e => tool.setAoIntensity(parseFloat(e.target.value))}
                     style={{ width: '100%', accentColor: 'var(--color-primary)' }}
                   />
                 </div>
@@ -307,14 +270,14 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
               }}>
                 <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Active Albedo File:</span>
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={albedoPath || ''}>
-                    {albedoPath ? albedoPath.split(/[\\/]/).pop() : 'Direct Memory'}
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tool.albedoPath || ''}>
+                    {tool.albedoPath ? tool.albedoPath.split(/[\\/]/).pop() : 'Direct Memory'}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <button
-                    onClick={handleBrowseClick}
+                    onClick={tool.handleBrowseClick}
                     style={{
                       background: 'var(--color-surface-2)',
                       border: '1px solid var(--color-surface-offset)',
@@ -329,9 +292,9 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   </button>
                   <button
                     onClick={() => {
-                      setAlbedoUrl(null)
-                      setAlbedoPath(null)
-                      setExportedFiles([])
+                      tool.setAlbedoUrl(null)
+                      tool.setAlbedoPath(null)
+                      tool.setExportedFiles([])
                       useAppStore.getState().setGamedevPreloadTexture(null, null)
                     }}
                     style={{
@@ -362,23 +325,23 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
               }}>
                 
                 <MapPreview label="Albedo (Base Color)">
-                  <img src={albedoUrl || undefined} style={MAP_MEDIA} alt="Albedo" />
+                  <img src={tool.albedoUrl || undefined} style={MAP_MEDIA} alt="Albedo" />
                 </MapPreview>
 
                 <MapPreview label="Normal Map">
-                  <canvas ref={normalCanvasRef} style={MAP_MEDIA} />
+                  <canvas ref={tool.normalCanvasRef} style={MAP_MEDIA} />
                 </MapPreview>
 
                 <MapPreview label="Height Map (Displacement)">
-                  <canvas ref={heightCanvasRef} style={MAP_MEDIA} />
+                  <canvas ref={tool.heightCanvasRef} style={MAP_MEDIA} />
                 </MapPreview>
 
                 <MapPreview label="Roughness Map">
-                  <canvas ref={roughnessCanvasRef} style={MAP_MEDIA} />
+                  <canvas ref={tool.roughnessCanvasRef} style={MAP_MEDIA} />
                 </MapPreview>
 
                 <MapPreview label="Ambient Occlusion (AO)">
-                  <canvas ref={aoCanvasRef} style={MAP_MEDIA} />
+                  <canvas ref={tool.aoCanvasRef} style={MAP_MEDIA} />
                 </MapPreview>
               </div>
 
@@ -400,8 +363,8 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     </span>
                   </div>
                   <button
-                    onClick={handleExport}
-                    disabled={isSaving}
+                    onClick={tool.handleExport}
+                    disabled={tool.isSaving}
                     style={{
                       background: 'var(--color-secondary)',
                       border: 'none',
@@ -413,10 +376,10 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      opacity: isSaving ? 0.7 : 1,
+                      opacity: tool.isSaving ? 0.7 : 1,
                     }}
                   >
-                    {isSaving ? (
+                    {tool.isSaving ? (
                       <>
                         <Loader size={14} className="animate-spin" />
                         <span>Saving...</span>
@@ -431,7 +394,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 </div>
 
                 {/* Workflow Card Move Prompt */}
-                {preloadCardId && exportedFiles.length > 0 && (
+                {tool.preloadCardId && tool.exportedFiles.length > 0 && (
                   <div style={{
                     background: 'var(--color-secondary-muted)',
                     border: '1px solid var(--color-secondary)',
@@ -455,7 +418,9 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
                       <button
                         onClick={async () => {
-                          await onCardDone(preloadCardId)
+                          const cardId = tool.preloadCardId
+                          if (!cardId) return
+                          await onCardDone(cardId)
                           useAppStore.getState().setGamedevPreloadTexture(null, null)
                         }}
                         style={{

@@ -10,16 +10,6 @@ export default function PalettePanel({
   tool: PaletteTool
   onCopy: (text: string, label: string) => void
 }) {
-  const {
-    paletteColors,
-    newColor,
-    setNewColor,
-    addColorToPalette,
-    removeColorFromPalette,
-    generatedUnityColor,
-    generatedUnrealColor,
-    generatedHlslColor
-  } = tool
   const copyToClipboard = onCopy
 
   return (
@@ -47,14 +37,14 @@ export default function PalettePanel({
       
       <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
         <ColorPicker
-          value={newColor}
-          onCommit={setNewColor}
+          value={tool.newColor}
+          onCommit={tool.setNewColor}
           swatchSize={32}
           hexInputWidth={100}
           title="Select Palette Color"
         />
         <button
-          onClick={addColorToPalette}
+          onClick={tool.addColorToPalette}
           style={{
             background: 'var(--color-secondary)',
             color: 'var(--color-text-inverted)',
@@ -76,7 +66,7 @@ export default function PalettePanel({
 
       {/* Grid of colors */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(70px, 100%), 1fr))', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-        {paletteColors.map((col) => (
+        {tool.paletteColors.map((col) => (
           <div
             key={col}
             style={{
@@ -101,7 +91,7 @@ export default function PalettePanel({
               {col.toUpperCase()}
             </span>
             <button
-              onClick={() => removeColorFromPalette(col)}
+              onClick={() => tool.removeColorFromPalette(col)}
               style={{
                 position: 'absolute',
                 top: '2px',
@@ -143,14 +133,14 @@ export default function PalettePanel({
         <div className="row-between">
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>Unity C# Color Array</span>
           <button
-            onClick={() => copyToClipboard(`public Color[] palette = new Color[] {\n  ${generatedUnityColor}\n};`, 'Unity C#')}
+            onClick={() => copyToClipboard(`public Color[] palette = new Color[] {\n  ${tool.generatedUnityColor}\n};`, 'Unity C#')}
             style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px' }}
           >
             <Copy size={10} /> Copy
           </button>
         </div>
         <pre style={{ margin: 0, padding: 'var(--space-2)', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', fontSize: '10px', color: 'var(--color-text-muted)', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
-          {`public Color[] palette = new Color[] {\n  ${generatedUnityColor.substring(0, 80)}...\n};`}
+          {`public Color[] palette = new Color[] {\n  ${tool.generatedUnityColor.substring(0, 80)}...\n};`}
         </pre>
       </div>
 
@@ -159,14 +149,14 @@ export default function PalettePanel({
         <div className="row-between">
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>Unreal Engine C++ FLinearColor</span>
           <button
-            onClick={() => copyToClipboard(`TArray<FLinearColor> Palette = {\n  ${generatedUnrealColor}\n};`, 'Unreal C++')}
+            onClick={() => copyToClipboard(`TArray<FLinearColor> Palette = {\n  ${tool.generatedUnrealColor}\n};`, 'Unreal C++')}
             style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px' }}
           >
             <Copy size={10} /> Copy
           </button>
         </div>
         <pre style={{ margin: 0, padding: 'var(--space-2)', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', fontSize: '10px', color: 'var(--color-text-muted)', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
-          {`TArray<FLinearColor> Palette = {\n  ${generatedUnrealColor.substring(0, 80)}...\n};`}
+          {`TArray<FLinearColor> Palette = {\n  ${tool.generatedUnrealColor.substring(0, 80)}...\n};`}
         </pre>
       </div>
 
@@ -175,14 +165,14 @@ export default function PalettePanel({
         <div className="row-between">
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>HLSL float4 Shader Array</span>
           <button
-            onClick={() => copyToClipboard(generatedHlslColor, 'HLSL float4')}
+            onClick={() => copyToClipboard(tool.generatedHlslColor, 'HLSL float4')}
             style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px' }}
           >
             <Copy size={10} /> Copy
           </button>
         </div>
         <pre style={{ margin: 0, padding: 'var(--space-2)', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', fontSize: '10px', color: 'var(--color-text-muted)', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
-          {generatedHlslColor.substring(0, 100) + '...'}
+          {tool.generatedHlslColor.substring(0, 100) + '...'}
         </pre>
       </div>
     </div>

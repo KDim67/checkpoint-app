@@ -9,36 +9,7 @@ function folderOf(path: string): string {
 }
 
 export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
-  const {
-    files,
-    setFiles,
-    renamerPreset,
-    setRenamerPreset,
-    renamerSuffixPreset,
-    setRenamerSuffixPreset,
-    searchStr,
-    setSearchStr,
-    replaceStr,
-    setReplaceStr,
-    customPrefix,
-    setCustomPrefix,
-    customSuffix,
-    setCustomSuffix,
-    enableIndexing,
-    setEnableIndexing,
-    startIndex,
-    setStartIndex,
-    indexPadding,
-    setIndexPadding,
-    renaming,
-    isDragOver,
-    getNewName,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-    handleFileSelect,
-    handleApplyRename
-  } = tool
+  const { files, getNewName } = tool
 
   /**
    * How many files are headed for each name, keyed by folder so two files of
@@ -85,8 +56,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Asset Type Prefix (Unity/Unreal)</label>
               <select
-                value={renamerPreset}
-                onChange={e => setRenamerPreset(e.target.value as RenamerPreset)}
+                value={tool.renamerPreset}
+                onChange={e => tool.setRenamerPreset(e.target.value as RenamerPreset)}
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',
@@ -107,8 +78,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Texture Map Suffix</label>
               <select
-                value={renamerSuffixPreset}
-                onChange={e => setRenamerSuffixPreset(e.target.value as RenamerSuffixPreset)}
+                value={tool.renamerSuffixPreset}
+                onChange={e => tool.setRenamerSuffixPreset(e.target.value as RenamerSuffixPreset)}
                 style={{
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',
@@ -130,8 +101,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Custom Prefix</label>
                 <input
                   type="text"
-                  value={customPrefix}
-                  onChange={e => setCustomPrefix(e.target.value)}
+                  value={tool.customPrefix}
+                  onChange={e => tool.setCustomPrefix(e.target.value)}
                   placeholder="e.g. Env_"
                   style={{
                     background: 'var(--color-surface-2)',
@@ -147,8 +118,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Custom Suffix</label>
                 <input
                   type="text"
-                  value={customSuffix}
-                  onChange={e => setCustomSuffix(e.target.value)}
+                  value={tool.customSuffix}
+                  onChange={e => tool.setCustomSuffix(e.target.value)}
                   placeholder="e.g. _low"
                   style={{
                     background: 'var(--color-surface-2)',
@@ -168,8 +139,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Search For</label>
                 <input
                   type="text"
-                  value={searchStr}
-                  onChange={e => setSearchStr(e.target.value)}
+                  value={tool.searchStr}
+                  onChange={e => tool.setSearchStr(e.target.value)}
                   placeholder="e.g. temp"
                   style={{
                     background: 'var(--color-surface-2)',
@@ -185,8 +156,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                 <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Replace With</label>
                 <input
                   type="text"
-                  value={replaceStr}
-                  onChange={e => setReplaceStr(e.target.value)}
+                  value={tool.replaceStr}
+                  onChange={e => tool.setReplaceStr(e.target.value)}
                   placeholder="e.g. final"
                   style={{
                     background: 'var(--color-surface-2)',
@@ -213,19 +184,19 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"
-                  checked={enableIndexing}
-                  onChange={e => setEnableIndexing(e.target.checked)}
+                  checked={tool.enableIndexing}
+                  onChange={e => tool.setEnableIndexing(e.target.checked)}
                 />
                 <span>Automatic Number Indexing</span>
               </label>
-              {enableIndexing && (
+              {tool.enableIndexing && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginTop: '2px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Start Index</label>
                     <input
                       type="number"
-                      value={startIndex}
-                      onChange={e => setStartIndex(Math.max(0, parseInt(e.target.value) || 0))}
+                      value={tool.startIndex}
+                      onChange={e => tool.setStartIndex(Math.max(0, parseInt(e.target.value) || 0))}
                       style={{
                         background: 'var(--color-surface-1)',
                         border: '1px solid var(--color-surface-offset)',
@@ -240,8 +211,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                     <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Digits Padding</label>
                     <input
                       type="number"
-                      value={indexPadding}
-                      onChange={e => setIndexPadding(Math.max(1, parseInt(e.target.value) || 2))}
+                      value={tool.indexPadding}
+                      onChange={e => tool.setIndexPadding(Math.max(1, parseInt(e.target.value) || 2))}
                       style={{
                         background: 'var(--color-surface-1)',
                         border: '1px solid var(--color-surface-offset)',
@@ -259,12 +230,12 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
 
           {/* Drag Zone Card */}
           <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            onDragOver={tool.handleDragOver}
+            onDragLeave={tool.handleDragLeave}
+            onDrop={tool.handleDrop}
             style={{
-              background: isDragOver ? 'var(--color-primary-muted)' : 'var(--color-surface-1)',
-              border: isDragOver ? '2px dashed var(--color-secondary)' : '2px dashed var(--color-surface-offset)',
+              background: tool.isDragOver ? 'var(--color-primary-muted)' : 'var(--color-surface-1)',
+              border: tool.isDragOver ? '2px dashed var(--color-secondary)' : '2px dashed var(--color-surface-offset)',
               borderRadius: 'var(--radius-lg)',
               padding: 'var(--space-4)',
               display: 'flex',
@@ -283,9 +254,9 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               id="renamer-file-picker"
               multiple
               style={{ display: 'none' }}
-              onChange={handleFileSelect}
+              onChange={tool.handleFileSelect}
             />
-            <Layers size={36} style={{ color: isDragOver ? 'var(--color-secondary)' : 'var(--color-text-faint)', marginBottom: 'var(--space-2)' }} />
+            <Layers size={36} style={{ color: tool.isDragOver ? 'var(--color-secondary)' : 'var(--color-text-faint)', marginBottom: 'var(--space-2)' }} />
             <h4 style={{ margin: '0 0 var(--space-1)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>
               Drag & Drop Game Assets Here
             </h4>
@@ -314,7 +285,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               <div className="row">
                 <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Renaming Preview ({files.length} items)</span>
                 <button
-                  onClick={() => setFiles([])}
+                  onClick={() => tool.setFiles([])}
                   style={{
                     background: 'transparent',
                     border: 'none',
@@ -331,8 +302,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               </div>
 
               <button
-                onClick={handleApplyRename}
-                disabled={renaming}
+                onClick={tool.handleApplyRename}
+                disabled={tool.renaming}
                 style={{
                   background: 'var(--color-secondary)',
                   color: 'var(--color-text-inverted)',
@@ -345,10 +316,10 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 'var(--space-1-5)',
-                  opacity: renaming ? 0.6 : 1
+                  opacity: tool.renaming ? 0.6 : 1
                 }}
               >
-                <RefreshCw size={12} className={renaming ? 'spin' : ''} />
+                <RefreshCw size={12} className={tool.renaming ? 'spin' : ''} />
                 <span>Apply Batch Rename</span>
               </button>
             </div>
