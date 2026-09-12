@@ -1,5 +1,5 @@
 import { getSetting, setSetting } from './db'
-import { getAiConfig } from './aiService'
+import { getAiConfig } from './aiConfig'
 import {
   defaultCapabilities,
   applyQuantizationPenalty,

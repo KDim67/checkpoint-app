@@ -1,5 +1,6 @@
 import type OpenAI from 'openai'
-import { createOpenAiClient, getAiConfig, humanizeAiError, tokenLimitParam, temperatureParam } from './aiService'
+import { createOpenAiClient, humanizeAiError, tokenLimitParam, temperatureParam } from './aiService'
+import { getAiConfig } from './aiConfig'
 import { getModelCapabilities } from './modelCapabilityService'
 import { validateStructured } from './aiSchemas'
 import { methodOrderForTier, TIER_BUDGETS, type ModelCapabilities } from '../shared/modelCapabilities'

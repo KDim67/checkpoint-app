@@ -4,6 +4,7 @@ import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature } from '../../lib/features'
 import { getBoolSetting } from '../../lib/settings'
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
+import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 
 interface ToggleConfig {
   key: string
@@ -56,7 +57,7 @@ function WebhookToken(): React.JSX.Element | null {
           onClick={() => {
             navigator.clipboard.writeText(token).then(() => {
               setCopied(true)
-              setTimeout(() => setCopied(false), 1500)
+              setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
             }).catch(() => {})
           }}
           style={{

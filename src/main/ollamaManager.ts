@@ -1,5 +1,5 @@
 import { execFileQuiet } from './exec'
-import { getAiConfig } from './aiService'
+import { getAiConfig } from './aiConfig'
 import { BrowserWindow } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { OllamaStatus, PullProgressEvent } from '../shared/cookbookTypes'

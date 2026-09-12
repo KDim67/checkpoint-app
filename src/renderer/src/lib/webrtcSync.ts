@@ -6,6 +6,7 @@
 
 import { deriveKey, deriveTopic, encryptData, decryptData, base64ToBytes, bytesToBase64, SYNC_SALT } from './webrtcCrypto'
 import { readSignalingMessage, signalingPublishError } from '../../../shared/signalingPayload'
+import { signalingPublishUrl, signalingStreamUrl } from '../../../shared/signalingHost'
 import {
   sendFramed,
   FrameAssembler,
@@ -80,7 +81,7 @@ export class WebRTCSyncCoordinator {
 
   // HOST: Listen for incoming client offer, decrypt it, and reply with answer
   private setupHostSignaling(room: string): void {
-    const sseUrl = `https://ntfy.sh/${room}/sse`
+    const sseUrl = signalingStreamUrl(room)
     this.sse = new EventSource(sseUrl)
 
     this.options.onProgress(`Host active. Send passcode to peer...`)
@@ -142,7 +143,7 @@ export class WebRTCSyncCoordinator {
       const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      const res = await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(signalingPublishUrl(room), {
         method: 'POST',
         headers: { 'Title': 'host-reply' },
         body: encryptedSdp
@@ -175,7 +176,7 @@ export class WebRTCSyncCoordinator {
     // sees the offer, and ntfy's SSE stream only carries messages published
     // after subscription, so publishing first risks missing the reply
     // entirely and waiting forever.
-    this.sse = new EventSource(`https://ntfy.sh/${room}/sse`)
+    this.sse = new EventSource(signalingStreamUrl(room))
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
@@ -221,7 +222,7 @@ export class WebRTCSyncCoordinator {
       const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      const res = await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(signalingPublishUrl(room), {
         method: 'POST',
         headers: { 'Title': 'client-offer' },
         body: encryptedSdp

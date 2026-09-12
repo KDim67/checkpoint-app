@@ -15,6 +15,7 @@ import {
   refreshTurnServer, TURN_URL_KEY, TURN_USERNAME_KEY, TURN_CREDENTIAL_KEY
 } from '../../lib/webrtcTransport'
 import { describeTurnSettings, turnIceServer } from '../../../../shared/iceConfig'
+import { SAVED_FEEDBACK_MS } from '../../lib/timings'
 
 const field: React.CSSProperties = {
   width: '100%',
@@ -70,7 +71,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
     // synchronous code and cannot wait on a setting.
     await refreshTurnServer()
     setSaved(true)
-    setTimeout(() => setSaved(false), 1800)
+    setTimeout(() => setSaved(false), SAVED_FEEDBACK_MS)
   }
 
   return (

@@ -5,6 +5,7 @@ import ConfirmDialog from './ui/ConfirmDialog'
 import { useAppStore } from '../store/appStore'
 import { useAiEnabled } from '../lib/useAiEnabled'
 import { errorMessage } from '../../../shared/errors'
+import { COPIED_FEEDBACK_MS } from '../lib/timings'
 
 interface CheatsheetFile {
   name: string
@@ -198,7 +199,7 @@ export default function CheatsheetsView() {
     try {
       await navigator.clipboard.writeText(textContent)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
     } catch { /* clipboard unavailable */ }
   }
 

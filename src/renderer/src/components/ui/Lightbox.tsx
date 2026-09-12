@@ -3,6 +3,7 @@ import { Copy, Download, Check } from 'lucide-react'
 import { useToast } from './Toast'
 import useEscapeKey from './useEscapeKey'
 import useFocusTrap from './useFocusTrap'
+import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 
 interface LightboxProps {
   src: string | null
@@ -35,7 +36,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
         })
       ])
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
       toast('Copied image to clipboard')
     } catch (err) {
       console.error('[Lightbox] Failed to copy image:', err)

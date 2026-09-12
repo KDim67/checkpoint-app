@@ -4,6 +4,7 @@ import { FieldRow, SettingsInput, ToggleSwitch, RowBetween, Divider } from './Se
 import { useToast } from '../ui/Toast'
 import { useConfirm } from '../ui/ConfirmDialog'
 import McpActivityLog from './McpActivityLog'
+import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 
 /**
  * Controls the Model Context Protocol server.
@@ -116,7 +117,7 @@ export default function McpSettings(): React.JSX.Element {
     try {
       await navigator.clipboard.writeText(value)
       setCopied(which)
-      setTimeout(() => setCopied(null), 1500)
+      setTimeout(() => setCopied(null), COPIED_FEEDBACK_MS)
     } catch {
       toast('Could not copy to the clipboard.')
     }

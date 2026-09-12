@@ -18,6 +18,7 @@ import {
 import type { ClipboardItem } from '../../../shared/types'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { useToast } from './ui/Toast'
+import { COPIED_FEEDBACK_MS } from '../lib/timings'
 
 // Keep in sync with the DELETE ... LIMIT in db.ts (stmtDeleteClipboardHistoryOverflow).
 const HISTORY_LIMIT = 200
@@ -189,7 +190,7 @@ export default function ClipboardView() {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedId(id)
-      setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), 1500)
+      setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), COPIED_FEEDBACK_MS)
     } catch (err) {
       console.error('Failed to copy item:', err)
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, GitBranch, AlertTriangle, Copy, Check, FileText, Settings, FolderGit } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { GitCommit, GitStatusResult } from '../../../shared/types'
+import { COPIED_FEEDBACK_MS } from '../lib/timings'
 
 function formatGitDate(dateStr: string): string {
   if (!dateStr || dateStr === 'unknown') return dateStr
@@ -105,7 +106,7 @@ export default function GitPanel() {
     try {
       await navigator.clipboard.writeText(hash)
       setCopiedHash(hash)
-      setTimeout(() => setCopiedHash(null), 2000)
+      setTimeout(() => setCopiedHash(null), COPIED_FEEDBACK_MS)
     } catch (err) {
       console.error('Failed to copy hash:', err)
     }
