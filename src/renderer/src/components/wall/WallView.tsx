@@ -19,7 +19,7 @@ import {
   StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2,
   Trash2, ArrowUp, ArrowDown, Plus, Copy, Lock, Unlock, Undo2, Redo2,
   Grid3x3, ExternalLink, FileText, Wand2, Expand, Palette, Search, Download,
-  ChevronDown, Pencil, PanelRight, Paintbrush, PenLine, Spline, MousePointer2,
+  PanelRight, Paintbrush, PenLine, Spline, MousePointer2,
   Keyboard
 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
@@ -27,9 +27,9 @@ import { useToast } from '../ui/Toast'
 import {
   bringToFront, boundsOf, createWallItem, duplicateItems, fitCamera, inPaintOrder,
   itemsInRect, moveItems, normalizeWallDoc, patchItems, rectFromPoints, sendToBack,
-  boundsOf as wallBounds, cameraCentredOn, itemAtPoint, searchItems,
+  cameraCentredOn, itemAtPoint, searchItems,
   gridSpacing, toWallPoint, WALL_COLORS, zoomAt,
-  createWall, removeWall, renameWall, setActiveWall, wallDocKey, withFrameContents,
+  createWall, removeWall, wallDocKey, withFrameContents,
   arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset,
   distanceToPolyline, inkFromPath, pruneArrows,
   STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES,
@@ -56,6 +56,8 @@ import WallContextMenu, { type MenuEntry } from './WallContextMenu'
 import WallColorPicker from './WallColorPicker'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import WallBoardRail, { type RailTab } from './WallBoardRail'
+import WallSwitcher from './WallSwitcher'
+import WallMinimap from './WallMinimap'
 import {
   decodeWallDrag, filterGroups, groupCardsByColumn, planHandoff, WALL_DRAG_MIME
 } from '../../../../shared/wallBoard'
@@ -1749,150 +1751,17 @@ export default function WallView() {
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
         {/* Which wall */}
-        <div data-wall-popover="wall" style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setWallMenuOpen(v => !v); setRenaming(null) }}
-            title="Switch wall"
-            aria-haspopup="menu"
-            aria-expanded={wallMenuOpen}
-            disabled={!wallIndex}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-              maxWidth: '170px', height: '30px', padding: '0 var(--space-2)',
-              background: wallMenuOpen ? 'var(--color-surface-offset)' : 'transparent',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--color-text-base)', fontSize: 'var(--text-xs)',
-              fontWeight: 500, cursor: wallIndex ? 'pointer' : 'default'
-            }}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {activeWall?.name ?? '…'}
-            </span>
-            {/* Just a hint that there is a choice. */}
-            <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
-          </button>
-
-          {wallMenuOpen && wallIndex && (
-            <>
-              <div
-                role="menu"
-                style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
-                  width: '240px', padding: '4px',
-                  background: 'var(--color-surface-elevated)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-lg)'
-                }}
-              >
-                {wallIndex.walls.map(w => {
-                  const isActive = w.id === wallIndex.activeId
-                  const isRenaming = renaming?.id === w.id
-
-                  if (isRenaming) {
-                    return (
-                      <input
-                        key={w.id}
-                        autoFocus
-                        value={renaming.draft}
-                        onChange={e => setRenaming({ id: w.id, draft: e.target.value })}
-                        // Commits rather than discards. Clicking away after
-                        // typing a name is not a request to throw it away, and
-                        // it happened silently.
-                        onBlur={() => {
-                          commitIndex(renameWall(wallIndex, w.id, renaming.draft))
-                          setRenaming(null)
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            commitIndex(renameWall(wallIndex, w.id, renaming.draft))
-                            setRenaming(null)
-                          }
-                          if (e.key === 'Escape') setRenaming(null)
-                        }}
-                        aria-label="Wall name"
-                        style={{
-                          display: 'block', width: '100%', boxSizing: 'border-box',
-                          padding: 'var(--space-2)',
-                          background: 'var(--color-surface-2)',
-                          border: '1px solid var(--color-secondary)',
-                          borderRadius: 'var(--radius-sm)',
-                          color: 'var(--color-text-base)', fontSize: 'var(--text-xs)',
-                          outline: 'none'
-                        }}
-                      />
-                    )
-                  }
-
-                  return (
-                    <div
-                      key={w.id}
-                      className="wall-switcher-row"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-                        borderRadius: 'var(--radius-sm)',
-                        background: isActive ? 'var(--color-surface-offset)' : 'transparent'
-                      }}
-                    >
-                      <button
-                        onClick={() => { commitIndex(setActiveWall(wallIndex, w.id)); setWallMenuOpen(false) }}
-                        style={{
-                          flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none',
-                          cursor: 'pointer', padding: 'var(--space-2)',
-                          color: isActive ? 'var(--color-text-base)' : 'var(--color-text-muted)',
-                          fontSize: 'var(--text-xs)', fontWeight: isActive ? 600 : 400,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {w.name}
-                      </button>
-
-                      <button
-                        onClick={() => setRenaming({ id: w.id, draft: w.name })}
-                        title="Rename"
-                        aria-label={`Rename ${w.name}`}
-                        className="btn-icon"
-                        style={{ width: '24px', height: '24px', flexShrink: 0 }}
-                      >
-                        <Pencil size={12} />
-                      </button>
-
-                      {/* Hidden, not disabled. An always-greyed button reads as broken. */}
-                      {wallIndex.walls.length > 1 && (
-                        <button
-                          onClick={() => { setPendingDelete(w); setWallMenuOpen(false) }}
-                          title="Delete wall"
-                          aria-label={`Delete ${w.name}`}
-                          className="btn-icon"
-                          style={{ width: '24px', height: '24px', flexShrink: 0, marginRight: '2px' }}
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-
-                <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
-
-                <button
-                  onClick={addWall}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
-                    color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)'
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-                >
-                  <Plus size={12} /> New wall
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        <WallSwitcher
+          wallIndex={wallIndex}
+          activeWall={activeWall}
+          wallMenuOpen={wallMenuOpen}
+          setWallMenuOpen={setWallMenuOpen}
+          renaming={renaming}
+          setRenaming={setRenaming}
+          commitIndex={commitIndex}
+          addWall={addWall}
+          setPendingDelete={setPendingDelete}
+        />
 
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
 
@@ -2568,83 +2437,16 @@ export default function WallView() {
 
           {/* A minimap only earns its space once there is something to lose track
               of, so it appears with the fourth item rather than sitting empty. */}
-          {doc.items.length > 3 && (() => {
-            const b = wallBounds(doc.items)
-            const rect = viewportRef.current?.getBoundingClientRect()
-            if (!b || !rect) return null
-
-            const W = 150
-            const H = 110
-            const pad = 8
-            const contentW = Math.max(1, b.maxX - b.minX)
-            const contentH = Math.max(1, b.maxY - b.minY)
-            const k = Math.min((W - pad * 2) / contentW, (H - pad * 2) / contentH)
-            const ox = pad - b.minX * k
-            const oy = pad - b.minY * k
-
-            // The camera's own window onto the wall, drawn in the same space.
-            const viewX = (-camera.x / camera.zoom) * k + ox
-            const viewY = (-camera.y / camera.zoom) * k + oy
-            const viewW = (rect.width / camera.zoom) * k
-            const viewH = (rect.height / camera.zoom) * k
-
-            return (
-              <div
-                onPointerDown={e => {
-                  e.stopPropagation()
-                  // Click the map, go there: the wall point under the click
-                  // becomes the centre of the view.
-                  const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                  const wx = (e.clientX - box.left - ox) / k
-                  const wy = (e.clientY - box.top - oy) / k
-                  setCamera({
-                    ...docRef.current.camera,
-                    x: rect.width / 2 - wx * docRef.current.camera.zoom,
-                    y: rect.height / 2 - wy * docRef.current.camera.zoom
-                  })
-                }}
-                data-wall-ui
-                title="Click to jump"
-                style={{
-                  position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
-                  width: `${W}px`, height: `${H}px`, zIndex: 20, cursor: 'pointer',
-                  background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  overflow: 'hidden'
-                }}
-              >
-                {doc.items.filter(i => i.kind !== 'arrow').map(i => (
-                  <div
-                    key={i.id}
-                    style={{
-                      position: 'absolute',
-                      left: `${i.x * k + ox}px`, top: `${i.y * k + oy}px`,
-                      width: `${Math.max(2, i.width * k)}px`, height: `${Math.max(2, i.height * k)}px`,
-                      background: i.color || 'var(--color-surface-offset)',
-                      borderRadius: '1px',
-                      opacity: selectedIds.has(i.id) ? 1 : 0.7
-                    }}
-                  />
-                ))}
-                <div
-                  data-wall-minimap-view
-                  // Scale, offsets and the size of the viewport, so a pan can
-                  // move this without recomputing the whole map.
-                  data-geom={`${k},${ox},${oy},${rect.width},${rect.height}`}
-                  style={{
-                    position: 'absolute',
-                    left: `${viewX}px`, top: `${viewY}px`,
-                    width: `${viewW}px`, height: `${viewH}px`,
-                    border: '1px solid var(--color-secondary)',
-                    background: 'var(--color-secondary-muted)',
-                    pointerEvents: 'none'
-                  }}
-                />
-              </div>
-            )
-          })()}
+          {doc.items.length > 3 && (
+            <WallMinimap
+              items={doc.items}
+              selectedIds={selectedIds}
+              camera={camera}
+              viewportRef={viewportRef}
+              docRef={docRef}
+              setCamera={setCamera}
+            />
+          )}
 
           {tool !== 'select' && (
             <div
