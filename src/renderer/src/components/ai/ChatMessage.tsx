@@ -22,7 +22,7 @@ import type { Item, Tag } from '@shared/types'
 import { AI_DIALOGUE_EVENT } from '../gamedev/useDialogueTool'
 import { faultTolerantParseJSON, linkifyCardTitles, normalizeCardJson, normalizeColumnJson, parseBatchBoardJson, resolveColor } from './aiActionParse'
 import { tagResolver } from '../../data/tags'
-import { readItems } from '../../data/items'
+import { bulkUpdateItems, createItem, readItems, updateItem } from '../../data/items'
 
 interface ChatMessageProps {
   message: {
@@ -211,7 +211,7 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
             const tagIds = await resolveTagIds(card.tags)
             // Optional AI-provided deadline (ISO date string, validated upstream)
             const dueMs = card.due && !Number.isNaN(Date.parse(card.due)) ? Date.parse(card.due) : null
-            const createdCard = await window.electronAPI.db.createItem({
+            const createdCard = await createItem({
               context: validContext, type: 'card',
               title: card.title, body: card.body,
               status: finalStatus, priority: card.priority,
@@ -511,38 +511,38 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
                 const col = resolveCol(op.toColumn || '')
                 if (!col) { notFound.push(`column "${op.toColumn}" (for "${op.target}")`); continue }
                 if (item.status === col.id) { noops++; continue }
-                await window.electronAPI.db.updateItem(item.id, { status: col.id })
+                await updateItem(item.id, { status: col.id })
                 inverse.push({ id: item.id, patch: { status: item.status } })
                 applied.push(`Moved "${item.title}" → ${col.name}`)
                 item.status = col.id
               } else if (op.op === 'set_priority') {
                 if (item.priority === op.priority) { noops++; continue }
-                await window.electronAPI.db.updateItem(item.id, { priority: op.priority })
+                await updateItem(item.id, { priority: op.priority })
                 inverse.push({ id: item.id, patch: { priority: item.priority } })
                 applied.push(`"${item.title}" priority → ${op.priority === 3 ? 'High' : op.priority === 2 ? 'Medium' : 'Low'}`)
                 item.priority = op.priority
               } else if (op.op === 'retitle') {
                 if (item.title.trim() === (op.newTitle || '').trim()) { noops++; continue }
-                await window.electronAPI.db.updateItem(item.id, { title: op.newTitle })
+                await updateItem(item.id, { title: op.newTitle })
                 inverse.push({ id: item.id, patch: { title: item.title } })
                 applied.push(`Renamed "${item.title}" → "${op.newTitle}"`)
                 item.title = op.newTitle
               } else if (op.op === 'update_body') {
-                await window.electronAPI.db.updateItem(item.id, { body: op.newBody })
+                await updateItem(item.id, { body: op.newBody })
                 inverse.push({ id: item.id, patch: { body: item.body || '' } })
                 applied.push(`Updated description of "${item.title}"`)
               } else if (op.op === 'set_due_date') {
                 const dueMs = op.due ? Date.parse(op.due) : null
                 if (op.due && Number.isNaN(dueMs)) { failed.push(`set due date "${item.title}": unparseable date "${op.due}"`); continue }
                 if ((item.due_at ?? null) === dueMs) { noops++; continue }
-                await window.electronAPI.db.updateItem(item.id, { due_at: dueMs })
+                await updateItem(item.id, { due_at: dueMs })
                 inverse.push({ id: item.id, patch: { due_at: item.due_at ?? null } })
                 applied.push(dueMs
                   ? `"${item.title}" due → ${new Date(dueMs).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`
                   : `Cleared due date of "${item.title}"`)
                 item.due_at = dueMs
               } else if (op.op === 'archive') {
-                await window.electronAPI.db.updateItem(item.id, { status: 'archived' })
+                await updateItem(item.id, { status: 'archived' })
                 inverse.push({ id: item.id, patch: { status: item.status } })
                 applied.push(`Archived "${item.title}"`)
                 // Remove from whichever list holds it so later ops can't target it
@@ -587,7 +587,7 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
     setUndoing(true)
     try {
       for (const inv of [...result.inverse].reverse()) {
-        await window.electronAPI.db.updateItem(inv.id, inv.patch).catch(() => {})
+        await updateItem(inv.id, inv.patch).catch(() => {})
       }
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       window.dispatchEvent(new CustomEvent('item-updated'))
@@ -790,7 +790,7 @@ function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: stri
               const affected = page.filter(i => i.status === move.fromColumn)
               if (affected.length === 0) continue
               movedCards.push(...affected.map(i => ({ id: i.id, status: move.fromColumn })))
-              await window.electronAPI.db.bulkUpdateItems({
+              await bulkUpdateItems({
                 ids: affected.map(i => i.id),
                 patch: { status: move.toColumn }
               })
@@ -825,7 +825,7 @@ function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: stri
       })
       // Cards go back to the column they came from, now that it exists again.
       for (const card of outcome.movedCards) {
-        await window.electronAPI.db.updateItem(card.id, { status: card.status }).catch(() => {})
+        await updateItem(card.id, { status: card.status }).catch(() => {})
       }
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       if (outcome.movedCards.length > 0) window.dispatchEvent(new CustomEvent('item-updated'))
@@ -1000,7 +1000,7 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
             : []
           const tagIds = createdTagsList.map(tag => tag.id)
 
-          const newItem = await window.electronAPI.db.createItem({
+          const newItem = await createItem({
             context: validContext,
             type: 'card',
             title,
@@ -1459,7 +1459,7 @@ function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
     const posBase = Date.now() // ascending positions keep plan order on the board
     for (const step of approvedSteps) {
       try {
-        await window.electronAPI.db.createItem({
+        await createItem({
           context, type: 'card',
           title: step.title || 'Plan Step',
           body: step.details || '',

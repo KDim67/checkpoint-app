@@ -32,6 +32,7 @@ import CardTextureTools from './CardTextureTools'
 import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
+import { getRelations } from '../../data/relations'
 
 interface CardDetailModalProps {
   cardId: string
@@ -162,7 +163,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           // shared board does not fill up with entries credited to nobody.
           if (active) setDisplayName(resolveAuthor(rawName, window.electronAPI.app.osUserName))
 
-          const rels = await window.electronAPI.db.getRelations(cardId)
+          const rels = await getRelations(cardId)
           setRelations(rels)
         }
       } catch (err) {

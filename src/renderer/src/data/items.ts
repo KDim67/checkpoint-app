@@ -52,3 +52,33 @@ export async function latestItem(context: string, type: ItemType): Promise<Item 
   const res = await itemPage(context, type, 1, 1)
   return res.items[0] ?? null
 }
+
+// Writes and queries. They pass straight through, typed off the bridge so the
+// two cannot drift apart; what they give is one place in the renderer that
+// reaches the database for items.
+
+type Db = typeof window.electronAPI.db
+
+export const createItem = (...args: Parameters<Db['createItem']>): ReturnType<Db['createItem']> =>
+  window.electronAPI.db.createItem(...args)
+
+export const updateItem = (...args: Parameters<Db['updateItem']>): ReturnType<Db['updateItem']> =>
+  window.electronAPI.db.updateItem(...args)
+
+export const deleteItem = (...args: Parameters<Db['deleteItem']>): ReturnType<Db['deleteItem']> =>
+  window.electronAPI.db.deleteItem(...args)
+
+export const bulkUpdateItems = (...args: Parameters<Db['bulkUpdateItems']>): ReturnType<Db['bulkUpdateItems']> =>
+  window.electronAPI.db.bulkUpdateItems(...args)
+
+export const bulkDeleteItems = (...args: Parameters<Db['bulkDeleteItems']>): ReturnType<Db['bulkDeleteItems']> =>
+  window.electronAPI.db.bulkDeleteItems(...args)
+
+export const rebalancePositions = (...args: Parameters<Db['rebalancePositions']>): ReturnType<Db['rebalancePositions']> =>
+  window.electronAPI.db.rebalancePositions(...args)
+
+export const searchItems = (...args: Parameters<Db['searchItems']>): ReturnType<Db['searchItems']> =>
+  window.electronAPI.db.searchItems(...args)
+
+export const queryTasks = (...args: Parameters<Db['queryTasks']>): ReturnType<Db['queryTasks']> =>
+  window.electronAPI.db.queryTasks(...args)

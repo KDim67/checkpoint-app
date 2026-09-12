@@ -25,6 +25,7 @@ import { getStringSetting, setStringSetting } from '../lib/settings'
 import { findTool } from './gamedev/toolCatalogue'
 import GameDevLauncher from './gamedev/GameDevLauncher'
 import ToolSwitcher from './gamedev/ToolSwitcher'
+import { updateItem } from '../data/items'
 
 const RECENT_KEY = 'gamedev_recent_tools'
 /** Enough to cover a session's worth of switching without becoming a second menu. */
@@ -86,7 +87,7 @@ export default function GameDevView() {
       const { columns } = await loadBoardConfig(activeWorkspace)
       const doneCol = columns.find(c => c.id === 'done' || c.name.toLowerCase().includes('done'))
       const doneColId = doneCol?.id ?? 'done'
-      await window.electronAPI.db.updateItem(cardId, { status: doneColId })
+      await updateItem(cardId, { status: doneColId })
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       toast('Success: Ticket moved to Done!', { type: 'success' })
     } catch (err) {

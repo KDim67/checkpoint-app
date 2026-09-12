@@ -56,7 +56,7 @@ import {
 } from '../../../shared/cardDrop'
 import { getTextColorForBackground } from '../lib/contrast'
 import { listTags } from '../data/tags'
-import { readItems } from '../data/items'
+import { bulkUpdateItems, createItem, deleteItem, readItems, rebalancePositions, updateItem } from '../data/items'
 import MenuItem, { MenuDivider, MenuPanel } from './ui/MenuItem'
 import CollabPanel from './kanban/CollabPanel'
 import HeaderBtn from './kanban/HeaderBtn'
@@ -756,9 +756,9 @@ export default function KanbanView() {
 
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...patch } : c))
     try {
-      await window.electronAPI.db.updateItem(cardId, patch)
+      await updateItem(cardId, patch)
       if (needsRebalance) {
-        await window.electronAPI.db.rebalancePositions(activeWorkspace, newStatus)
+        await rebalancePositions(activeWorkspace, newStatus)
         loadCards()
       }
     } catch (err) {
@@ -797,7 +797,7 @@ export default function KanbanView() {
       const cardsToMove = cards.filter(c => c.status === colId)
       if (cardsToMove.length > 0) {
         const fallbackColId = updatedCols[0]?.id ?? 'open'
-        await window.electronAPI.db.bulkUpdateItems({
+        await bulkUpdateItems({
           ids: cardsToMove.map(c => c.id),
           patch: { status: fallbackColId }
         })
@@ -827,7 +827,7 @@ export default function KanbanView() {
     if (colCards.length === 0) return
 
     try {
-      await window.electronAPI.db.bulkUpdateItems({
+      await bulkUpdateItems({
         ids: colCards.map(c => c.id),
         patch: { status: 'archived' }
       })
@@ -875,7 +875,7 @@ export default function KanbanView() {
         }
         return c
       }))
-      await window.electronAPI.db.updateItem(id, patch, tagIds)
+      await updateItem(id, patch, tagIds)
       loadCards()
     } catch (err) {
       console.error('Failed to update card details:', err)
@@ -887,7 +887,7 @@ export default function KanbanView() {
       const originalIndex = cards.findIndex(c => c.id === id)
       if (originalIndex === -1) return
       const targetCard = cards[originalIndex]
-      await window.electronAPI.db.updateItem(id, { status: 'archived' })
+      await updateItem(id, { status: 'archived' })
       setCards(prev => prev.filter(c => c.id !== id))
       
       toast('Card archived.', {
@@ -895,7 +895,7 @@ export default function KanbanView() {
           label: 'Undo',
           onClick: async () => {
             try {
-              await window.electronAPI.db.updateItem(id, { status: targetCard.status })
+              await updateItem(id, { status: targetCard.status })
               setCards(prev => {
                 const updated = [...prev]
                 updated.splice(originalIndex, 0, targetCard)
@@ -916,7 +916,7 @@ export default function KanbanView() {
   const handleCardConvertToTask = useCallback(async (id: string) => {
     try {
       const targetCard = cards.find(c => c.id === id)
-      await window.electronAPI.db.updateItem(id, { type: 'task', status: 'open' })
+      await updateItem(id, { type: 'task', status: 'open' })
       setCards(prev => prev.filter(c => c.id !== id))
       toast(`Card "${targetCard?.title}" converted to Backlog Task`)
     } catch (err) {
@@ -930,7 +930,7 @@ export default function KanbanView() {
       const defaultPos = colCards.length > 0
         ? Math.max(...colCards.map(c => c.position)) + 1000.0
         : 1000.0
-      const created = await window.electronAPI.db.createItem({
+      const created = await createItem({
         type: 'card',
         context: activeWorkspace,
         title: 'New card',
@@ -958,7 +958,7 @@ export default function KanbanView() {
         return
       }
 
-      const created = await window.electronAPI.db.createItem(made.payload, made.tagIds)
+      const created = await createItem(made.payload, made.tagIds)
 
       setCards(prev => [...prev, created])
       setActiveCardId(created.id)
@@ -1024,7 +1024,7 @@ export default function KanbanView() {
       : fallbackCol.id
 
     try {
-      await window.electronAPI.db.updateItem(cardId, { status: destColId })
+      await updateItem(cardId, { status: destColId })
       loadCards()
       toast(`Card "${targetCard.title}" restored`)
     } catch (err) {
@@ -1044,7 +1044,7 @@ export default function KanbanView() {
     })
     if (!confirmed) return
     try {
-      await Promise.all(ids.map(id => window.electronAPI.db.deleteItem(id)))
+      await Promise.all(ids.map(id => deleteItem(id)))
       setCards(prev => prev.filter(c => !selectedArchived.has(c.id)))
       setSelectedArchived(new Set())
       toast(`${ids.length} card${ids.length > 1 ? 's' : ''} deleted permanently`)
@@ -1066,7 +1066,7 @@ export default function KanbanView() {
       await Promise.all(ids.map(id => {
         const card = cards.find(c => c.id === id)
         const dest = card && columns.some(c => c.id === card.status) ? card.status : fallbackCol.id
-        return window.electronAPI.db.updateItem(id, { status: dest })
+        return updateItem(id, { status: dest })
       }))
       setSelectedArchived(new Set())
       loadCards()
@@ -1086,7 +1086,7 @@ export default function KanbanView() {
     })
     if (confirmed) {
       try {
-        await window.electronAPI.db.deleteItem(card.id)
+        await deleteItem(card.id)
         setCards(prev => prev.filter(c => c.id !== card.id))
         setSelectedArchived(prev => { const n = new Set(prev); n.delete(card.id); return n })
         toast('Card deleted permanently')

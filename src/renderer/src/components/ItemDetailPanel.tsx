@@ -21,6 +21,7 @@ import { loadBoardConfig } from '../lib/boardConfig'
 import TagRow from './ui/TagRow'
 import TagCreator from './ui/TagCreator'
 import { listTags } from '../data/tags'
+import { searchItems, updateItem } from '../data/items'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
@@ -96,7 +97,7 @@ export default function ItemDetailPanel() {
       setLoading(true)
       setIsEditingBody(false)
       try {
-        const res = await window.electronAPI.db.searchItems({
+        const res = await searchItems({
           query: selectedItemId,
           context: activeWorkspace
         })
@@ -165,7 +166,7 @@ export default function ItemDetailPanel() {
   const handleUpdateField = async (patch: Partial<Item>, updatedTagIds?: string[]) => {
     try {
       const tagsToSave = updatedTagIds ?? selectedTagIds
-      await window.electronAPI.db.updateItem(item.id, patch, tagsToSave)
+      await updateItem(item.id, patch, tagsToSave)
       
       // Update local state
       setItem(prev => prev ? { ...prev, ...patch, tags: allTags.filter(t => tagsToSave.includes(t.id)) } : null)

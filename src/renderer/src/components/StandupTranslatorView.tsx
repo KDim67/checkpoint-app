@@ -8,7 +8,7 @@ import { useToast } from './ui/Toast'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getNumberSetting } from '../lib/settings'
-import { readItems } from '../data/items'
+import { createItem, readItems } from '../data/items'
 import { createStreamBuffer } from '../lib/streamBuffer'
 
 // Zero-dependency SVG Icons
@@ -383,7 +383,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
     setPosting(true)
     try {
       const title = `AI Daily Standup Report (${style})`
-      await window.electronAPI.db.createItem({
+      await createItem({
         type: 'log',
         context: activeWorkspace,
         title,

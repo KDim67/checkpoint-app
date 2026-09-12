@@ -16,7 +16,7 @@ import { ToggleSwitch } from './settings/SettingsSection'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { isTypingTarget } from '../lib/shortcuts'
 import { useViewShortcuts } from '../lib/useViewShortcuts'
-import { itemPage } from '../data/items'
+import { createItem, itemPage, updateItem } from '../data/items'
 
 interface SelectedTask {
   id: string
@@ -269,7 +269,7 @@ export default function FocusView() {
 
     try {
       // 1. Update status in Database
-      await window.electronAPI.db.updateItem(task.id, { status: newStatus })
+      await updateItem(task.id, { status: newStatus })
 
       // 2. Update local state
       focusSetSelectedTasks(prev =>
@@ -301,7 +301,7 @@ export default function FocusView() {
     if (!title) return
     setAddingTask(true)
     try {
-      const created = await window.electronAPI.db.createItem({
+      const created = await createItem({
         type: 'task',
         context: activeWorkspace,
         title,
@@ -349,7 +349,7 @@ export default function FocusView() {
         const dbItem = dbItems.find(item => item.id === t.id)
         const expectedStatus = t.completed ? 'done' : 'open'
         if (dbItem && dbItem.status !== expectedStatus) {
-          await window.electronAPI.db.updateItem(t.id, { status: expectedStatus })
+          await updateItem(t.id, { status: expectedStatus })
         }
       }
 
@@ -374,7 +374,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
       const title = `Focus Session (${totalMinutes}m)`
 
       // 4. Create log entry in DB
-      await window.electronAPI.db.createItem({
+      await createItem({
         type: 'log',
         context: activeWorkspace,
         title,

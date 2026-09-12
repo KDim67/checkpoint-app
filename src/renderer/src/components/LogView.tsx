@@ -9,7 +9,7 @@ import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import { FileText } from 'lucide-react'
 import StandupTranslatorView from './StandupTranslatorView'
-import { itemPage } from '../data/items'
+import { createItem, itemPage, updateItem } from '../data/items'
 import MenuItem, { MenuDivider, MenuPanel } from './ui/MenuItem'
 
 export default function LogView() {
@@ -99,7 +99,7 @@ export default function LogView() {
   const handleSubmitLog = async (body: string, tagIds: string[]) => {
     try {
       const title = body.split('\n')[0].replace(/^[#\s*>-]+/, '').trim().substring(0, 80) || 'Untitled Log'
-      const newItem = await window.electronAPI.db.createItem({
+      const newItem = await createItem({
         type: 'log',
         context: activeWorkspace,
         title,
@@ -122,7 +122,7 @@ export default function LogView() {
   const handleTogglePin = async (id: string, currentPriority: number) => {
     const newPriority = currentPriority === 3 ? 0 : 3
     try {
-      await window.electronAPI.db.updateItem(id, { priority: newPriority })
+      await updateItem(id, { priority: newPriority })
       setItems(prev => prev.map(item => item.id === id ? { ...item, priority: newPriority } : item))
       toast(newPriority === 3 ? 'Log entry pinned to top' : 'Log entry unpinned')
     } catch (err) {
@@ -137,7 +137,7 @@ export default function LogView() {
       if (!targetItem) return
 
       // Archive in DB
-      await window.electronAPI.db.updateItem(id, { status: 'archived' })
+      await updateItem(id, { status: 'archived' })
       
       // Update UI state
       setItems(prev => prev.filter(item => item.id !== id))
@@ -148,7 +148,7 @@ export default function LogView() {
           label: 'Undo',
           onClick: async () => {
             try {
-              await window.electronAPI.db.updateItem(id, { status: 'open' })
+              await updateItem(id, { status: 'open' })
               setItems(prev => {
                 const updated = [...prev, targetItem]
                 return updated.sort((a, b) => a.created_at - b.created_at)
@@ -168,7 +168,7 @@ export default function LogView() {
   // Convert Log Entry into Kanban Card
   const handleConvertToCard = async (id: string, title: string, tagIds: string[]) => {
     try {
-      await window.electronAPI.db.updateItem(id, {
+      await updateItem(id, {
         type: 'card',
         status: 'open',
         title

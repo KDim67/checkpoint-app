@@ -23,6 +23,7 @@ import {
 } from '../../../shared/savedViews'
 import { getJsonSetting, getStringSetting, setJsonSetting } from '../lib/settings'
 import { listTags } from '../data/tags'
+import { bulkDeleteItems, bulkUpdateItems, createItem, queryTasks, updateItem } from '../data/items'
 
 interface WorkflowColumn {
   id: string
@@ -253,7 +254,7 @@ export default function BacklogView() {
             page,
             pageSize
           }
-      const res = await window.electronAPI.db.queryTasks(activeWorkspace, params)
+      const res = await queryTasks(activeWorkspace, params)
       setTasks(res.items)
       setTotalTasks(res.total)
     } catch (err) {
@@ -314,7 +315,7 @@ export default function BacklogView() {
   // Update specific field on cell/popup double-click updates
   const handleUpdateField = async (id: string, patch: Partial<Item>, tagIds?: string[]) => {
     try {
-      await window.electronAPI.db.updateItem(id, patch, tagIds)
+      await updateItem(id, patch, tagIds)
       await loadTasks()
     } catch (err) {
       console.error('Failed to update task field:', err)
@@ -329,7 +330,7 @@ export default function BacklogView() {
   // Bulk Actions
   const handleBulkUpdateStatus = async (status: string) => {
     try {
-      await window.electronAPI.db.bulkUpdateItems({
+      await bulkUpdateItems({
         ids: selectedIds,
         patch: { status }
       })
@@ -343,7 +344,7 @@ export default function BacklogView() {
 
   const handleBulkUpdatePriority = async (priority: number) => {
     try {
-      await window.electronAPI.db.bulkUpdateItems({
+      await bulkUpdateItems({
         ids: selectedIds,
         patch: { priority: priority as Item['priority'] }
       })
@@ -361,7 +362,7 @@ export default function BacklogView() {
         selectedItems.map(item => {
           const existingTags = item.tags?.map(t => t.id) || []
           if (existingTags.includes(tagId)) return Promise.resolve()
-          return window.electronAPI.db.updateItem(item.id, {}, [
+          return updateItem(item.id, {}, [
             ...existingTags,
             tagId
           ])
@@ -387,7 +388,7 @@ export default function BacklogView() {
   const loadArchivedTasks = useCallback(async () => {
     setArchiveLoading(true)
     try {
-      const res = await window.electronAPI.db.queryTasks(activeWorkspace, {
+      const res = await queryTasks(activeWorkspace, {
         archivedOnly: true,
         sortBy: 'created_at',
         sortDesc: true,
@@ -409,7 +410,7 @@ export default function BacklogView() {
   const handleRestoreArchivedTask = async (id: string) => {
     try {
       const restoredStatus = workflowColumns[0]?.id || 'open'
-      await window.electronAPI.db.updateItem(id, { status: restoredStatus })
+      await updateItem(id, { status: restoredStatus })
       setArchivedTasks(prev => prev.filter(t => t.id !== id))
       toast('Task restored to ' + (workflowColumns[0]?.name || 'Backlog'))
       await loadTasks()
@@ -420,7 +421,7 @@ export default function BacklogView() {
 
   const handlePermanentlyDeleteArchivedTask = async (id: string) => {
     try {
-      await window.electronAPI.db.bulkDeleteItems([id])
+      await bulkDeleteItems([id])
       setArchivedTasks(prev => prev.filter(t => t.id !== id))
       setDeleteArchivedId(null)
       toast('Task permanently deleted')
@@ -440,7 +441,7 @@ export default function BacklogView() {
       const deletedItems = [...selectedItems]
 
       // Soft delete by updating status to 'archived'
-      await window.electronAPI.db.bulkUpdateItems({
+      await bulkUpdateItems({
         ids: deletedIds,
         patch: { status: 'archived' }
       })
@@ -455,7 +456,7 @@ export default function BacklogView() {
             try {
               await Promise.all(
                 originalStatuses.map(os =>
-                  window.electronAPI.db.updateItem(os.id, { status: os.status })
+                  updateItem(os.id, { status: os.status })
                 )
               )
               await loadTasks()
@@ -527,7 +528,7 @@ export default function BacklogView() {
   // Create New Task Shortcut
   const handleCreateTask = async () => {
     try {
-      const newTask = await window.electronAPI.db.createItem({
+      const newTask = await createItem({
         type: 'task',
         context: activeWorkspace,
         title: 'New Task',
