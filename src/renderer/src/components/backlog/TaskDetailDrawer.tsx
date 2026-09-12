@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
-import { X, Tag, Link2, Sparkles, Check, CheckSquare, Square, Plus } from 'lucide-react'
+import { X, Tag, Link2, Sparkles, Check, CheckSquare, Square, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAiEnabled } from '../../lib/useAiEnabled'
 import type { Item, Tag as TagType, Relation, RelationType } from '../../../../shared/types'
@@ -14,6 +14,7 @@ import {
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import ColorPicker from '../ui/ColorPicker'
+import { useConfirm } from '../ui/ConfirmDialog'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -38,6 +39,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const aiEnabled = useAiEnabled()
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const confirm = useConfirm()
 
   const [task, setTask] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
@@ -657,6 +659,38 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                               }
                             }}
                           />
+                          <button
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: `Delete "${tag.name}"?`,
+                                message: 'The label goes with it, off every card and task that carries it.',
+                                confirmText: 'Delete',
+                                isDestructive: true
+                              })
+                              if (!ok) return
+                              try {
+                                await window.electronAPI.db.deleteTag(tag.id)
+                                setSelectedTagIds(prev => prev.filter(id => id !== tag.id))
+                                setAllTags(await window.electronAPI.db.getTags())
+                              } catch (err) {
+                                console.error(err)
+                              }
+                            }}
+                            title="Delete label"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--color-text-faint)',
+                              cursor: 'pointer',
+                              padding: 0,
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-error)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-faint)')}
+                          >
+                            <Trash2 size={12} />
+                          </button>
                           {isSelected && <Check size={12} style={{ color: 'var(--color-secondary)' }} />}
                         </div>
                       </div>

@@ -11,19 +11,22 @@ import {
   Tag as TagIcon,
   Check,
   ChevronDown,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { Item, Tag as TagType } from '../../../shared/types'
 import Skeleton from './ui/Skeleton'
 import { useToast } from './ui/Toast'
 import ColorPicker from './ui/ColorPicker'
+import { useConfirm } from './ui/ConfirmDialog'
 import { loadBoardConfig } from '../lib/boardConfig'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const { toast } = useToast()
+  const confirm = useConfirm()
 
   const [item, setItem] = useState<Item | null>(null)
   const [loading, setLoading] = useState(false)
@@ -443,6 +446,38 @@ export default function ItemDetailPanel() {
                               }
                             }}
                           />
+                          <button
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: `Delete "${tag.name}"?`,
+                                message: 'The label goes with it, off every card and task that carries it.',
+                                confirmText: 'Delete',
+                                isDestructive: true
+                              })
+                              if (!ok) return
+                              try {
+                                await window.electronAPI.db.deleteTag(tag.id)
+                                setSelectedTagIds(prev => prev.filter(id => id !== tag.id))
+                                setAllTags(await window.electronAPI.db.getTags())
+                              } catch (err) {
+                                console.error(err)
+                              }
+                            }}
+                            title="Delete label"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--color-text-faint)',
+                              cursor: 'pointer',
+                              padding: 0,
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-error)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-faint)')}
+                          >
+                            <Trash2 size={12} />
+                          </button>
                           {isSel && <Check size={12} style={{ color: 'var(--color-secondary)' }} />}
                         </div>
                       </div>
