@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { formatDistanceToNow } from 'date-fns'
 import { Copy, Pin, Trash2, ArrowRightLeft, Check } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
+import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 
 interface LogEntryProps {
   item: Item
@@ -18,7 +19,7 @@ export function CustomCodeBlock({ language, value }: { language?: string; value:
   const handleCopy = async () => {
     await navigator.clipboard.writeText(value)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
   }
 
   return (
@@ -90,7 +91,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
   const handleCopyRaw = async () => {
     await navigator.clipboard.writeText(item.body)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
   }
 
   const handleConvertSubmit = (e: React.FormEvent) => {

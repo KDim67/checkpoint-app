@@ -6,6 +6,7 @@ import type { Item } from '../../../shared/types'
 import { loadProviders, isLocalUrl } from './ai/aiProviders'
 import { useToast } from './ui/Toast'
 import { errorMessage } from '../../../shared/errors'
+import { COPIED_FEEDBACK_MS } from '../lib/timings'
 
 // Zero-dependency SVG Icons
 const SparklesIcon = () => (
@@ -379,7 +380,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
       await navigator.clipboard.writeText(streamingText)
       setCopied(true)
       toast('Report copied to clipboard!')
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
     } catch (err) {
       console.error('Failed to copy text:', err)
       toast('Failed to copy to clipboard')

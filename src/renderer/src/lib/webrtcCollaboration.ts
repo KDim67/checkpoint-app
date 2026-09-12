@@ -28,6 +28,7 @@ import { describeMerge, mergeBoards, mergeImpact, type MergeImpact } from '../..
 import type { Item } from '../../../shared/types'
 import { INSTALL_ID_KEY, newInstallId, readInstallId } from '../../../shared/identity'
 import { readSignalingMessage, signalingPublishError } from '../../../shared/signalingPayload'
+import { signalingPublishUrl, signalingStreamUrl } from '../../../shared/signalingHost'
 import { registerSharedWorkspace } from './createWorkspace'
 import { BOARD_CONFIG_EVENT, loadBoardConfig, saveBoardConfig } from './boardConfig'
 import { normalizeBoardConfig } from '../../../shared/boardModel'
@@ -380,7 +381,7 @@ export class WebRTCCollaborationCoordinator {
     // each reopening left the previous stream running: a leaked connection per
     // guest, and two live handlers racing to answer the next offer.
     this.sse?.close()
-    this.sse = new EventSource(`https://ntfy.sh/${room}/sse`)
+    this.sse = new EventSource(signalingStreamUrl(room))
     this.options.onProgress('Waiting for someone to join...')
 
     this.sse.onmessage = async (e) => {
@@ -452,7 +453,7 @@ export class WebRTCCollaborationCoordinator {
       const sdpData = JSON.stringify({ sdp: link.pc.localDescription?.sdp })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      const res = await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(signalingPublishUrl(room), {
         method: 'POST',
         headers: { 'Title': legacy ? 'host-reply' : `answer:${link.id}` },
         body: encryptedSdp
@@ -478,7 +479,7 @@ export class WebRTCCollaborationCoordinator {
 
     // Subscribe before publishing: ntfy's SSE stream only carries messages
     // posted after subscription, so publishing first can miss the host's reply.
-    this.sse = new EventSource(`https://ntfy.sh/${room}/sse`)
+    this.sse = new EventSource(signalingStreamUrl(room))
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
@@ -531,7 +532,7 @@ export class WebRTCCollaborationCoordinator {
       })
       const encryptedSdp = await encryptData(sdpData, this.key)
 
-      const res = await fetch(`https://ntfy.sh/${room}`, {
+      const res = await fetch(signalingPublishUrl(room), {
         method: 'POST',
         // Named, so the host's answer can come back to this guest and not to
         // whoever else happens to be joining at the same moment.

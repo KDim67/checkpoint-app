@@ -49,6 +49,7 @@ import CookbookModal from './ai/CookbookModal'
 import RevertConfirmModal from './ai/RevertConfirmModal'
 import CustomModelPromptModal from './ai/CustomModelPromptModal'
 import { errorMessage } from '../../../shared/errors'
+import { COPIED_FEEDBACK_MS } from '../lib/timings'
 
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 const STORAGE_KEY_ACTIVE_SKILL = 'checkpoint_ai_active_skill'
@@ -1206,7 +1207,7 @@ export default function AiStreamPanel() {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedMsgIndex(index)
-      setTimeout(() => setCopiedMsgIndex(null), 2000)
+      setTimeout(() => setCopiedMsgIndex(null), COPIED_FEEDBACK_MS)
     } catch {
       // fallback for environments without clipboard API
     }

@@ -1,26 +1,12 @@
 import type OpenAI from 'openai'
 import type { AiStreamParams, AiUsage } from '../shared/types'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
-import { getSetting } from './db'
+import { getAiConfig } from './aiConfig'
 
 /**
  * Resolves the configured OpenAI-compatible endpoint (base URL + API key) from
  * the settings DB, applying sane Ollama defaults when unset.
  */
-export function getAiConfig(): { baseURL: string; apiKey: string; isOllama: boolean } {
-  let baseURL = getSetting<string>('ai_base_url', 'http://localhost:11434/v1')
-  if (!baseURL || baseURL.trim() === '') {
-    baseURL = 'http://localhost:11434/v1'
-  }
-  let apiKey = getSetting<string>('ai_api_key', 'ollama')
-  if (!apiKey || apiKey.trim() === '') {
-    apiKey = 'ollama'
-  }
-  const isOllama =
-    baseURL.includes('localhost') || baseURL.includes('127.0.0.1') || apiKey === 'ollama'
-  return { baseURL, apiKey, isOllama }
-}
-
 /**
  * Turns a raw provider/SDK error into an actionable, human-readable message.
  * A bare "404 status code (no body)" tells the user nothing; this names the

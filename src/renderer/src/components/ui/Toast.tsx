@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import { TOAST_DISMISS_MS } from '../../lib/timings'
 
 interface ToastAction {
   label: string
@@ -50,7 +51,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const resumeToast = useCallback((id: string) => {
     if (timersRef.current[id]) return
-    timersRef.current[id] = setTimeout(() => removeToast(id), 2000)
+    timersRef.current[id] = setTimeout(() => removeToast(id), TOAST_DISMISS_MS)
   }, [removeToast])
 
   const toast = useCallback((
