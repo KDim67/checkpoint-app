@@ -65,6 +65,7 @@ import { getTextColorForBackground } from '../lib/contrast'
 import { writeWorkspaceList } from '../lib/workspaceList'
 import { getStringSetting, setStringSetting } from '../lib/settings'
 import { listTags } from '../data/tags'
+import { readItems } from '../data/items'
 
 
 // Re-exported rather than declared: the shape now belongs to lib/boardConfig,
@@ -902,8 +903,7 @@ export default function KanbanView() {
 
   const loadCards = useCallback(async () => {
     try {
-      const res = await window.electronAPI.db.getItems(activeWorkspace, 'card', 1, 1000)
-      setCards(res.items)
+      setCards(await readItems(activeWorkspace, 'card'))
     } catch (err) {
       console.error('Failed to load Kanban cards:', err)
     }

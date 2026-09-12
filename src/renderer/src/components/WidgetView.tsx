@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Logo from './ui/Logo'
 import { getStringSetting } from '../lib/settings'
+import { readItems, latestItem } from '../data/items'
 
 interface WidgetData {
   totalCount: number
@@ -18,11 +19,11 @@ function formatTime(): string {
 async function fetchWidgetData(context: string): Promise<WidgetData> {
   try {
     const [taskRes, cardRes] = await Promise.all([
-      window.electronAPI.db.getItems(context, 'task', 1, 500),
-      window.electronAPI.db.getItems(context, 'card', 1, 500)
+      readItems(context, 'task'),
+      readItems(context, 'card')
     ])
 
-    const allItems = [...taskRes.items, ...cardRes.items]
+    const allItems = [...taskRes, ...cardRes]
     const activeItems = allItems.filter(i => i.status !== 'archived')
 
     const doneCount = activeItems.filter(i => i.status === 'done').length
@@ -31,8 +32,7 @@ async function fetchWidgetData(context: string): Promise<WidgetData> {
     const totalCount = activeItems.length
 
     // Fetch the most recent log entry
-    const logRes = await window.electronAPI.db.getItems(context, 'log', 1, 1)
-    const rawLog = logRes.items[0]?.title ?? null
+    const rawLog = (await latestItem(context, 'log'))?.title ?? null
     const recentLog = rawLog
       ? rawLog.length > 38
         ? rawLog.substring(0, 35) + '…'

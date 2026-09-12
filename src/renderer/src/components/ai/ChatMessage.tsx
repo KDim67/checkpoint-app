@@ -25,6 +25,7 @@ import { asArray, asObject, str, tagColorOf, tagNameOf, toColorMode, toItemPrior
 import type { Item, Tag } from '@shared/types'
 import { AI_DIALOGUE_EVENT } from '../gamedev/useDialogueTool'
 import { tagResolver } from '../../data/tags'
+import { readItems } from '../../data/items'
 
 interface ChatMessageProps {
   message: {
@@ -386,10 +387,10 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
         //    both seeing "no existing card with this title" and inserting
         //    duplicates. A classic check-then-act race).
         const { newCards, skippedCards } = await withLock(`kanban-cards:${validContext}`, async () => {
-          const existingItemsRes = await window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
+          const existingCards = await readItems(validContext, 'card').catch(() => [])
           // Exclude archived cards: the archive bin is invisible to the AI, so a
           // title that only exists in the archive must NOT block a fresh create.
-          const existingCardsList = [...(existingItemsRes?.items || [])].filter(ci => ci.status !== 'archived')
+          const existingCardsList = [...existingCards].filter(ci => ci.status !== 'archived')
           const newCards: BatchCard[] = []
           let skippedCards = 0
 
@@ -653,15 +654,15 @@ function UpdateBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string;
 
         const outcome = await withLock(`kanban-cards:${validContext}`, async () => {
           const [tasksRes, cardsRes] = await Promise.all([
-            window.electronAPI.db.getItems(validContext, 'task', 1, 1000).catch(() => ({ items: [] })),
-            window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
+            readItems(validContext, 'task').catch(() => []),
+            readItems(validContext, 'card').catch(() => [])
           ])
           // Kept separate on purpose: the Kanban board renders ONLY 'card'
           // items, so board edits must prefer cards. A Backlog task with the
           // same title must never shadow the visible card (that "moved"
           // something invisible and left the board looking untouched).
-          const cardItems = (cardsRes?.items || []).filter(i => i.status !== 'archived')
-          const taskItems = (tasksRes?.items || []).filter(i => i.status !== 'archived')
+          const cardItems = (cardsRes || []).filter(i => i.status !== 'archived')
+          const taskItems = (tasksRes || []).filter(i => i.status !== 'archived')
 
           // Unified board document, read unlocked because this block already
           // holds the board lock. The legacy key it used to read stopped being
@@ -1009,9 +1010,9 @@ function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: stri
           // undo can put them back.
           const movedCards: { id: string; status: string }[] = []
           if (applied.cardMoves.length > 0) {
-            const page = await window.electronAPI.db.getItems(context, 'card', 1, 1000)
+            const page = await readItems(context, 'card')
             for (const move of applied.cardMoves) {
-              const affected = page.items.filter(i => i.status === move.fromColumn)
+              const affected = page.filter(i => i.status === move.fromColumn)
               if (affected.length === 0) continue
               movedCards.push(...affected.map(i => ({ id: i.id, status: move.fromColumn })))
               await window.electronAPI.db.bulkUpdateItems({
@@ -1172,8 +1173,8 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
         const validContext = activeWorkspace || 'default'
 
         const created = await withLock(`kanban-cards:${validContext}`, async () => {
-          const existingItemsRes = await window.electronAPI.db.getItems(validContext, 'card', 1, 1000).catch(() => ({ items: [] }))
-          const existingCard = (existingItemsRes?.items || []).find(ci => ci.status !== 'archived' && ci.title.trim().toLowerCase() === title.trim().toLowerCase())
+          const existingCards = await readItems(validContext, 'card').catch(() => [])
+          const existingCard = existingCards.find(ci => ci.status !== 'archived' && ci.title.trim().toLowerCase() === title.trim().toLowerCase())
 
           if (existingCard) {
             createdItemsCacheMap.set(signature, { item: existingCard, tags: [] })
@@ -2362,10 +2363,10 @@ function fetchBoardTitles(context: string): Promise<Array<{ title: string; id: s
   const promise = (async () => {
     try {
       const [t, c] = await Promise.all([
-        window.electronAPI.db.getItems(context, 'task', 1, 500).catch(() => ({ items: [] })),
-        window.electronAPI.db.getItems(context, 'card', 1, 500).catch(() => ({ items: [] }))
+        readItems(context, 'task').catch(() => []),
+        readItems(context, 'card').catch(() => [])
       ])
-      const items = [...(t?.items || []), ...(c?.items || [])].filter(i => i.status !== 'archived')
+      const items = [...(t || []), ...(c || [])].filter(i => i.status !== 'archived')
       const list = items
         .map(i => ({ title: str(i.title).trim(), id: i.id }))
         // Short titles false-positive on prose; markdown-special chars break link syntax.

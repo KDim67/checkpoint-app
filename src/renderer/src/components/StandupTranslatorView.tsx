@@ -8,6 +8,7 @@ import { useToast } from './ui/Toast'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getNumberSetting } from '../lib/settings'
+import { readItems } from '../data/items'
 
 // Zero-dependency SVG Icons
 const SparklesIcon = () => (
@@ -133,13 +134,13 @@ export default function StandupTranslatorView({
   const fetchLogs = async () => {
     setLoadingLogs(true)
     try {
-      const res = await window.electronAPI.db.getItems(activeWorkspace, 'log', 1, 500)
+      const res = await readItems(activeWorkspace, 'log')
       
       const now = Date.now()
       const hoursMs = timeRange * 60 * 60 * 1000
       
       // Filter logs by the time range (newest first as returned, we preserve this)
-      const filtered = res.items.filter(item => {
+      const filtered = res.filter(item => {
         const diff = now - item.created_at
         return diff >= 0 && diff <= hoursMs
       })

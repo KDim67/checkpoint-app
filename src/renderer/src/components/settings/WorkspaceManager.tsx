@@ -22,6 +22,7 @@ import {
   describeTemplate
 } from '../../../../shared/projectTemplates'
 import { readWorkspaceList, writeWorkspaceList } from '../../lib/workspaceList'
+import { countItems } from '../../data/items'
 
 
 const PRESET_COLORS = [
@@ -280,9 +281,7 @@ export default function WorkspaceManager() {
 
   const handleDeleteRequest = async (slug: string) => {
     try {
-      const res = await window.electronAPI.db.getItems(slug, 'task', 1, 1)
-      const cardRes = await window.electronAPI.db.getItems(slug, 'card', 1, 1)
-      const count = (res.total ?? 0) + (cardRes.total ?? 0)
+      const count = (await countItems(slug, 'task')) + (await countItems(slug, 'card'))
       setDeleteWarning({ slug, count })
     } catch {
       setDeleteWarning({ slug, count: 0 })
