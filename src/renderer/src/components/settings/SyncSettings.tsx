@@ -5,6 +5,7 @@ import { WebRTCSyncCoordinator } from '../../lib/webrtcSync'
 import ModalShell from '../ui/ModalShell'
 import TurnRelaySettings from './TurnRelaySettings'
 import { errorMessage } from '../../../../shared/errors'
+import { SYNC_TCP_PORT } from '../../../../shared/ports'
 
 interface Peer {
   name: string
@@ -20,7 +21,7 @@ export default function SyncSettings() {
   const [syncEnabled, setSyncEnabled] = useState(false)
   const [hostStatus, setHostStatus] = useState({
     active: false,
-    port: 5739,
+    port: SYNC_TCP_PORT,
     pairingCode: '',
     progress: 'Idle',
     isSyncing: false
@@ -29,7 +30,7 @@ export default function SyncSettings() {
   
   // Manual Connect Inputs
   const [manualIp, setManualIp] = useState('')
-  const [manualPort, setManualPort] = useState('5739')
+  const [manualPort, setManualPort] = useState(String(SYNC_TCP_PORT))
   const [manualCode, setManualCode] = useState('')
   const [isManualSyncing, setIsManualSyncing] = useState(false)
 
@@ -140,7 +141,7 @@ export default function SyncSettings() {
       
       const stats = await window.electronAPI.sync.connectAndSync(
         manualIp,
-        parseInt(manualPort, 10) || 5739,
+        parseInt(manualPort, 10) || SYNC_TCP_PORT,
         manualCode
       )
       

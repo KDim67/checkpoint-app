@@ -65,8 +65,6 @@ interface AppState {
   rightPanelOpen: boolean
   rightPanelContent: 'item-detail' | 'ai-chat' | 'git' | null
   selectedItemId: string | null
-  // Global UI
-  isLoading: boolean
   // Preselected task for Pomodoro Navigation
   preselectedTaskId: string | null
   /** Note the palette asked for. Consumed and cleared by NotesView on mount. */
@@ -103,7 +101,6 @@ interface AppState {
   selectItem: (id: string | null) => void
   setAvailableWorkspaces: (slugs: string[]) => void
   setWorkspaceList: (list: WorkspaceEntry[]) => void
-  setLoading: (loading: boolean) => void
   setPreselectedTaskId: (id: string | null) => void
   setPendingNoteTitle: (title: string | null) => void
   setPendingViewId: (id: string | null) => void
@@ -137,7 +134,6 @@ export const useAppStore = create<AppState>()(
     rightPanelOpen: false,
     rightPanelContent: null,
     selectedItemId: null,
-    isLoading: false,
     preselectedTaskId: null,
     pendingNoteTitle: null,
     pendingViewId: null,
@@ -233,11 +229,6 @@ export const useAppStore = create<AppState>()(
     setWorkspaceList: (list: WorkspaceEntry[]) =>
       set(state => {
         state.workspaceList = list
-      }),
-
-    setLoading: (loading: boolean) =>
-      set(state => {
-        state.isLoading = loading
       }),
 
     setPreselectedTaskId: (id: string | null) =>

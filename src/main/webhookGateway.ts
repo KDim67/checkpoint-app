@@ -4,8 +4,6 @@ import { Socket } from 'net'
 import { z } from 'zod'
 import { getDb, createItem } from './db'
 import { ensureWebhookToken, offeredToken, tokenMatches } from './webhookAuth'
-import { mainWindow } from './index'
-import { IpcChannels } from '../shared/ipcChannels'
 
 // Webhook Schema
 
@@ -120,14 +118,6 @@ export function startWebhookServer(requestedPort: number): Promise<number> {
             due_at: parsed.data.due_at
           })
 
-          // Broadcast event to renderer shell
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send(IpcChannels.WEBHOOK_EVENT, {
-              type: 'item_created',
-              item
-            })
-          }
-
           notify({
             category: 'webhook',
             title: `Checkpoint Webhook Received (${type})`,
@@ -224,11 +214,4 @@ export async function toggleWebhookGateway(active: boolean, port: number): Promi
     await stopWebhookServer()
     return null
   }
-}
-
-/**
- * Returns the currently active port, or null if server is stopped.
- */
-export function getWebhookPort(): number | null {
-  return currentListeningPort
 }

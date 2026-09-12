@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Eye } from 'lucide-react'
 import type { Item, Tag as TagType } from '../../../../shared/types'
 import BacklogRow from './BacklogRow'
-import { PRIORITY_LABELS_LONG as PRIORITY_LABELS } from '../../lib/priority'
+import { PRIORITY_LABELS_LONG as PRIORITY_LABELS, PRIORITY_LEVELS } from '../../lib/priority'
 
 interface BacklogTableProps {
   items: Item[]
@@ -193,7 +193,7 @@ export default function BacklogTable({
         }
       })
 
-      ;[3, 2, 1, 0].forEach((p) => {
+      ;[...PRIORITY_LEVELS].forEach((p) => {
         const list = priorityBuckets[p]
         if (list.length === 0) return
         const key = `priority-${p}`

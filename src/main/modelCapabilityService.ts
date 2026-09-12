@@ -146,15 +146,6 @@ interface CloudModelEntry {
   supported_parameters?: string[]
 }
 
-export async function listCloudModels(baseURL: string, apiKey: string): Promise<string[]> {
-  const headers: Record<string, string> = {}
-  if (apiKey && apiKey !== 'ollama') headers['Authorization'] = `Bearer ${apiKey}`
-  const data = (await fetchJson(`${baseURL.replace(/\/+$/, '')}/models`, { headers })) as {
-    data?: CloudModelEntry[]
-  }
-  return (data.data || []).map(m => m.id || '').filter(Boolean).sort()
-}
-
 async function probeCloud(
   baseURL: string,
   apiKey: string,
@@ -247,10 +238,4 @@ export async function getModelCapabilities(
     sessionFallbacks.set(key, merged)
   }
   return merged
-}
-
-/** Clears cached capabilities so the next lookup re-probes. */
-export function clearCapabilityCache(): void {
-  sessionFallbacks.clear()
-  setSetting(CACHE_SETTING_KEY, JSON.stringify({}))
 }

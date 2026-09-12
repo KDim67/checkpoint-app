@@ -143,15 +143,6 @@ export interface Context {
   icon?: string          // emoji or icon name
 }
 
-export interface ActivityLog {
-  id: string
-  context: string
-  window_title: string
-  process_name: string
-  duration_ms: number
-  captured_at: number
-}
-
 // Pagination
 
 export interface PaginatedResult<T> {
@@ -455,8 +446,3 @@ export type UpdateCheckResult =
   | { status: 'current'; version: string }
   | { status: 'available'; version: string }
   | { status: 'error'; message: string }
-
-
-
-
-

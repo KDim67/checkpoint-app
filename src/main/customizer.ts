@@ -176,10 +176,6 @@ export async function disableCustomizer(): Promise<void> {
   console.log('[customizer] Customization engine deactivated cleanly.')
 }
 
-export function isCustomizerRunning(): boolean {
-  return isEngineRunning
-}
-
 function handleFileChange(filePath: string): void {
   const themePath = getThemePath()
   if (filePath === themePath) {

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Check, Calendar, Link2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item } from '../../../../shared/types'
-import { PRIORITY_ICONS, PRIORITY_LABELS } from '../../lib/priority'
+import { PRIORITY_ICONS, PRIORITY_LABELS, PRIORITY_LEVELS } from '../../lib/priority'
 
 interface BacklogRowProps {
   item: Item
@@ -187,7 +187,7 @@ export default function BacklogRow({
                 flexDirection: 'column',
                 padding: '4px 0'
               }}>
-                {[3, 2, 1, 0].map(p => (
+                {PRIORITY_LEVELS.map(p => (
                   <button
                     key={p}
                     onClick={() => handlePrioritySelect(p)}

@@ -1322,6 +1322,3 @@ export async function toggleMcpServer(active: boolean, port: number): Promise<nu
 export function getMcpPort(): number | null {
   return activePort
 }
-
-/** Unused today; kept so a future tool can mint per-client session ids. */
-export const newSessionId = randomUUID
