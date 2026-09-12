@@ -62,6 +62,8 @@ import CollabPanel from './kanban/CollabPanel'
 import HeaderBtn from './kanban/HeaderBtn'
 import { useCollabSession } from './kanban/useCollabSession'
 import ArchiveBin from './kanban/ArchiveBin'
+import TemplateMenu from './kanban/TemplateMenu'
+import { cardFromTemplate, isTemplateCard } from '../../../shared/cardTemplates'
 
 
 // Re-exported rather than declared: the shape now belongs to lib/boardConfig,
@@ -416,7 +418,6 @@ export default function KanbanView() {
   const isReadOnlyMode = collab.isReadOnly
   readOnlyRef.current = isReadOnlyMode
 
-  const templateSelectorRef = useRef<HTMLDivElement>(null)
   const bgSelectorRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -446,9 +447,6 @@ export default function KanbanView() {
   // Click Outside Closures
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (templateSelectorRef.current && !templateSelectorRef.current.contains(e.target as Node)) {
-        setShowTemplateSelector(false)
-      }
       if (bgSelectorRef.current && !bgSelectorRef.current.contains(e.target as Node)) {
         setShowBgSelector(false)
       }
@@ -956,47 +954,13 @@ export default function KanbanView() {
   const handleCreateCardFromTemplate = async (templateCard: Item) => {
     setShowTemplateSelector(false)
     try {
-      const fallbackCol = columns[0]
-      if (!fallbackCol) {
+      const made = cardFromTemplate(templateCard, columns, cards, activeWorkspace, Date.now())
+      if (!made) {
         toast('Add a column first.', { type: 'info' })
         return
       }
-      
-      const colId = columns.some(c => c.id === templateCard.status)
-        ? templateCard.status
-        : fallbackCol.id
 
-      const colCards = cards.filter(c => c.status === colId)
-      const defaultPos = colCards.length > 0
-        ? Math.max(...colCards.map(c => c.position)) + 1000.0
-        : 1000.0
-
-      // Duplicate metadata but clear comments & activity log
-      let originalMeta = {}
-      try {
-        originalMeta = JSON.parse(templateCard.metadata || '{}')
-      } catch {}
-
-      const cleanMeta = {
-        ...originalMeta,
-        isTemplate: false,
-        comments: [],
-        activities: [{ id: `act-${Date.now()}`, text: `Card created from template "${templateCard.title}"`, createdAt: Date.now() }]
-      }
-
-      const tagIds = templateCard.tags?.map(t => t.id) || []
-
-      const created = await window.electronAPI.db.createItem({
-        type: 'card',
-        context: activeWorkspace,
-        title: `${templateCard.title} (Copy)`,
-        body: templateCard.body,
-        status: colId,
-        priority: templateCard.priority,
-        position: defaultPos,
-        due_at: templateCard.due_at,
-        metadata: JSON.stringify(cleanMeta)
-      }, tagIds)
+      const created = await window.electronAPI.db.createItem(made.payload, made.tagIds)
 
       setCards(prev => [...prev, created])
       setActiveCardId(created.id)
@@ -1139,14 +1103,7 @@ export default function KanbanView() {
     if (!showArchiveBin) setSelectedArchived(new Set())
   }, [showArchiveBin])
 
-  const templateCards = cards.filter(c => {
-    try {
-      const meta = JSON.parse(c.metadata || '{}')
-      return meta.isTemplate === true
-    } catch {
-      return false
-    }
-  })
+  const templateCards = cards.filter(isTemplateCard)
 
   // Loading skeleton view
   if (loading) {
@@ -1955,63 +1912,12 @@ export default function KanbanView() {
 
           {/* From Template Dropdown */}
           {templateCards.length > 0 && (
-            <div style={{ position: 'relative' }} ref={templateSelectorRef}>
-              <HeaderBtn
-                onClick={() => setShowTemplateSelector(v => !v)}
-                title="Create card from a reusable template"
-                icon={
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect width="18" height="18" x="3" y="3" rx="2"/>
-                    <path d="M9 17h6M9 13h6M9 9h6"/>
-                  </svg>
-                }
-                active={showTemplateSelector}
-              >
-                From Template
-              </HeaderBtn>
-              
-              {showTemplateSelector && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 4px)',
-                    right: 0,
-                    zIndex: 100,
-                    background: 'var(--color-surface-elevated)',
-                    border: '1px solid var(--color-surface-offset)',
-                    borderRadius: 'var(--radius-md)',
-                    boxShadow: 'var(--shadow-md)',
-                    minWidth: '220px',
-                    padding: '4px 0'
-                  }}
-                >
-                  <span style={{ display: 'block', fontSize: '9px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', padding: '6px 12px 4px' }}>
-                    Select Template
-                  </span>
-                  {templateCards.map(tc => (
-                    <button
-                      key={tc.id}
-                      onClick={() => handleCreateCardFromTemplate(tc)}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '6px 12px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-base)',
-                        textAlign: 'left'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                    >
-                      {tc.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <TemplateMenu
+              templates={templateCards}
+              open={showTemplateSelector}
+              setOpen={setShowTemplateSelector}
+              onPick={handleCreateCardFromTemplate}
+            />
           )}
 
           {/* Adding a column lives at the end of the column row, where the
