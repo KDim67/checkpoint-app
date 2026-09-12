@@ -3,7 +3,7 @@
 // tone, priorities, and output format toward that workflow. Without
 // losing any of the base Checkpoint action-block capabilities.
 
-export interface AiSkill {
+interface AiSkill {
   id: string
   label: string
   shortLabel: string

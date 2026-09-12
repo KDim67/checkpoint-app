@@ -18,7 +18,7 @@ import { existsSync, renameSync } from 'fs'
 /** SQLite keeps the write-ahead log and shared-memory file beside the database. */
 const SIDECARS = ['', '-wal', '-shm']
 
-export interface QuarantineResult {
+interface QuarantineResult {
   /** Where the unreadable database was moved to, for the message to the user. */
   movedTo: string
   /** Sidecars that moved with it. A stale WAL would corrupt the fresh file. */

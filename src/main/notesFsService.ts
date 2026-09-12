@@ -8,7 +8,7 @@ import { getConfigDir, getNotesDir, ensureDir, resolveSafePath as resolveInDir }
  * Initializes the notes directory. Idempotent and fast after first call.
  */
 let _notesFsReady = false
-export function initNotesFs(): void {
+function initNotesFs(): void {
   if (_notesFsReady) return
   ensureDir(getConfigDir())
   ensureDir(getNotesDir())

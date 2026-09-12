@@ -28,7 +28,7 @@ export const STUN_SERVERS: IceServer[] = [
   { urls: 'stun:stun1.l.google.com:19302' }
 ]
 
-export interface TurnSettings {
+interface TurnSettings {
   url?: string
   username?: string
   credential?: string

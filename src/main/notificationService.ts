@@ -38,7 +38,7 @@ const DEDUPE_SETTING_KEY = 'notification_dedupe'
 /** Dedupe entries older than this are forgotten. */
 const DEDUPE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
-export interface NotifyInput {
+interface NotifyInput {
   category: NotificationCategory
   title: string
   body: string

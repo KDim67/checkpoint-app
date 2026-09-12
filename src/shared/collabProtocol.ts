@@ -119,7 +119,7 @@ export interface BoardBaselineMessage {
  * Guests are connected to the host and not to each other, so the list has to
  * come from the middle and be sent on every change.
  */
-export interface RosterMessage {
+interface RosterMessage {
   type: 'roster'
   members: { id: string; name: string }[]
 }
@@ -131,13 +131,13 @@ export interface RosterMessage {
  * session reached nobody, and a card moved into it arrived addressed to a
  * column the other side did not have and rendered nowhere.
  */
-export interface BoardConfigMessage {
+interface BoardConfigMessage {
   type: 'board-config'
   context: string
   board: BoardConfig
 }
 
-export interface DbMutationMessage {
+interface DbMutationMessage {
   type: 'db-mutation-event'
   mutation: RemoteMutation
 }
@@ -149,7 +149,7 @@ export interface DbMutationMessage {
  * A peer that crashes or loses its network sends nothing, which is the
  * difference the receiver is being told about: a message means they chose to.
  */
-export interface PeerLeavingMessage {
+interface PeerLeavingMessage {
   type: 'peer-leaving'
   /** May be empty. The receiver falls back to something readable. */
   by: string
@@ -161,7 +161,7 @@ export interface PeerLeavingMessage {
  * Without it the host knows only that somebody is in, which is no basis for
  * deciding whether to let them stay.
  */
-export interface PeerHelloMessage {
+interface PeerHelloMessage {
   type: 'peer-hello'
   /** May be empty. The receiver falls back to something readable. */
   by: string
@@ -174,13 +174,13 @@ export interface PeerHelloMessage {
  * the other end: one is someone saying goodbye, the other is being shown the
  * door, and a connection that just goes quiet is neither.
  */
-export interface PeerRemovedMessage {
+interface PeerRemovedMessage {
   type: 'peer-removed'
   by: string
 }
 
 /** The host changing what the guest may do, without ending the session. */
-export interface ModeChangeMessage {
+interface ModeChangeMessage {
   type: 'mode-change'
   mode: CollabMode
 }
@@ -232,7 +232,7 @@ export interface BoardResetMessage {
 }
 
 /** Whether the other side took the merge. A no is an answer, not a failure. */
-export interface MergeAnswerMessage {
+interface MergeAnswerMessage {
   type: 'merge-answer'
   accepted: boolean
   by: string

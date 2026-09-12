@@ -80,7 +80,7 @@ export function temperatureParam(caps: ModelCapabilities, requested: number): Re
  * model reserve four times its trained window while capping a 128k model at a
  * quarter of its own. Ask for what the model actually has.
  */
-export function ollamaContextParam(caps: ModelCapabilities, isOllama: boolean): object {
+function ollamaContextParam(caps: ModelCapabilities, isOllama: boolean): object {
   if (!isOllama) return {}
   return { extra_body: { num_ctx: caps.contextTokens } }
 }

@@ -10,9 +10,9 @@
 
 import type { TaskQueryParams } from './types'
 
-export type DueFilter = 'any' | 'overdue' | 'today' | 'week' | 'none'
+type DueFilter = 'any' | 'overdue' | 'today' | 'week' | 'none'
 
-export const DUE_FILTERS: { id: DueFilter; label: string }[] = [
+const DUE_FILTERS: { id: DueFilter; label: string }[] = [
   { id: 'any', label: 'Any due date' },
   { id: 'overdue', label: 'Overdue' },
   { id: 'today', label: 'Due today' },

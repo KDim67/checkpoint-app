@@ -7,7 +7,7 @@
  * whole API, so the folder doubles as the documentation.
  */
 
-export interface ExamplePlugin {
+interface ExamplePlugin {
   filename: string
   name: string
   description: string

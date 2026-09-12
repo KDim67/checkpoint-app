@@ -13,7 +13,7 @@
  * caller should skip.
  */
 
-export interface SignalingMessage {
+interface SignalingMessage {
   /** The publisher's Title header, or '' when it sent none. */
   title: string
   /** The published body: an encrypted SDP. */

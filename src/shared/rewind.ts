@@ -13,7 +13,7 @@
 import type { ClipboardItem, FocusSession, GitCommit, Item } from './types'
 
 /** A task or card as a focus session recorded it. */
-export interface FocusTaskRef {
+interface FocusTaskRef {
   id: string
   title: string
   completed?: boolean
@@ -23,7 +23,7 @@ export interface FocusTaskRef {
  * One continuous stretch of work: focus sessions close enough together to be
  * the same sitting rather than separate visits.
  */
-export interface Sitting {
+interface Sitting {
   start: number
   end: number
   /** Time actually focused, not wall-clock across the gaps. */
@@ -48,7 +48,7 @@ export interface RewindInput {
   now: number
 }
 
-export type SignalKind =
+type SignalKind =
   | 'stopped-mid-problem'
   | 'work-in-progress-commit'
   | 'nothing-committed'

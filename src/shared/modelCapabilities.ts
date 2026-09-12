@@ -14,7 +14,7 @@
 export type ModelTier = 'tiny' | 'small' | 'mid' | 'large' | 'frontier'
 
 /** How a model exposes its chain-of-thought, so the panel knows what to read. */
-export type ReasoningStyle = 'none' | 'think_tags' | 'reasoning_field'
+type ReasoningStyle = 'none' | 'think_tags' | 'reasoning_field'
 
 export interface ModelCapabilities {
   /** Model id as the endpoint knows it. */
@@ -61,7 +61,7 @@ export function tierForParams(paramsB: number | null): ModelTier {
 
 const TIER_ORDER: ModelTier[] = ['tiny', 'small', 'mid', 'large', 'frontier']
 
-export function demoteTier(tier: ModelTier, steps = 1): ModelTier {
+function demoteTier(tier: ModelTier, steps = 1): ModelTier {
   const i = TIER_ORDER.indexOf(tier)
   return TIER_ORDER[Math.max(0, i - steps)]
 }

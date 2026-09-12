@@ -59,7 +59,7 @@ if (typeof window !== 'undefined') {
   })
 }
 
-export interface ViewShortcuts {
+interface ViewShortcuts {
   bindings: ShortcutBindings
   match: (e: KeyboardEvent | React.KeyboardEvent) => string | null
 }

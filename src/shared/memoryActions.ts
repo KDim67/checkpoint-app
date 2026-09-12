@@ -11,7 +11,7 @@
  * wallModel. Zod stays out of the renderer bundle on purpose.
  */
 
-export type MemoryActionKind = 'save' | 'update' | 'delete'
+type MemoryActionKind = 'save' | 'update' | 'delete'
 export type MemoryCategory = 'semantic' | 'episodic' | 'working'
 
 export interface MemoryAction {

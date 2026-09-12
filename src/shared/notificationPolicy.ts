@@ -96,7 +96,7 @@ export interface DedupeEntry {
   at: number
 }
 
-export interface NotifyDecision {
+interface NotifyDecision {
   allow: boolean
   /** Why it was suppressed. Useful in the log, and for explaining silence. */
   reason?: 'disabled' | 'category-off' | 'quiet-hours' | 'duplicate'

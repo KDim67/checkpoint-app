@@ -20,7 +20,7 @@ export function normalizeDisplayName(raw: unknown): string {
 }
 
 /** Last resort, for an entry written by a build that recorded no name at all. */
-export const UNKNOWN_AUTHOR = 'Someone'
+const UNKNOWN_AUTHOR = 'Someone'
 
 export function authorLabel(name: string): string {
   return normalizeDisplayName(name) || UNKNOWN_AUTHOR

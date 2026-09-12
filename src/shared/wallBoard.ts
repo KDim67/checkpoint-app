@@ -12,7 +12,7 @@ import type { ColumnConfig } from './boardModel'
 /** Private type, so a drop from a browser or file manager cannot look like a card. */
 export const WALL_DRAG_MIME = 'application/x-checkpoint-wall-item'
 
-export interface WallDragPayload {
+interface WallDragPayload {
   kind: 'card' | 'doc'
   /** An item id for a card, a note title for a doc. As `WallItem.ref`. */
   ref: string
@@ -49,7 +49,7 @@ export interface BoardGroup {
  */
 export const ORPHAN_COLUMN_ID = '__orphaned__'
 
-export const ORPHAN_COLUMN: ColumnConfig = {
+const ORPHAN_COLUMN: ColumnConfig = {
   id: ORPHAN_COLUMN_ID,
   name: 'No column',
   wipLimit: null

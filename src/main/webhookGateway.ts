@@ -28,7 +28,7 @@ const activeSockets = new Set<Socket>()
  * Starts the webhook gateway HTTP server.
  * Resolves with the actual port the server bound to.
  */
-export function startWebhookServer(requestedPort: number): Promise<number> {
+function startWebhookServer(requestedPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
     if (serverInstance) {
       resolve(currentListeningPort || requestedPort)

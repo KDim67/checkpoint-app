@@ -139,7 +139,7 @@ export const MCP_WRITE_TOOLS = [
   'set_subtask_done'
 ] as const
 
-export type McpWriteTool = (typeof MCP_WRITE_TOOLS)[number]
+type McpWriteTool = (typeof MCP_WRITE_TOOLS)[number]
 
 export function isWriteTool(tool: string): tool is McpWriteTool {
   return (MCP_WRITE_TOOLS as readonly string[]).includes(tool)

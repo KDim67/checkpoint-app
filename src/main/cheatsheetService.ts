@@ -254,7 +254,7 @@ export async function getCheatsheetText(name: string): Promise<string> {
 
 // Cross-document full-text search
 
-export interface CheatsheetSearchResult {
+interface CheatsheetSearchResult {
   name: string
   matchCount: number
   /** Up to 3 contextual snippets around the first matches. */

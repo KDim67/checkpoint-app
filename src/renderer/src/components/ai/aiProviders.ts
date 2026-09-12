@@ -95,7 +95,7 @@ async function setSetting(key: string, val: string): Promise<void> {
 }
 
 /** Writes the active provider's fields into the flat settings the backend reads. */
-export async function mirrorToFlat(p: AiProvider): Promise<void> {
+async function mirrorToFlat(p: AiProvider): Promise<void> {
   await setSetting('ai_base_url', p.baseURL.trim())
   await setSetting('ai_api_key', p.apiKey.trim())
   await setSetting('ai_model', p.model.trim())

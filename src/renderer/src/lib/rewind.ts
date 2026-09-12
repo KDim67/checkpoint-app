@@ -16,7 +16,7 @@ import {
 import type { Item } from '../../../shared/types'
 import { errorMessage } from '../../../shared/errors'
 
-export interface RewindResult {
+interface RewindResult {
   rewind: Rewind
   /** Streams that could not contribute, so the panel can say why it is thin. */
   unavailable: string[]

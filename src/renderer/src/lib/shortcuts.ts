@@ -7,12 +7,12 @@ import { getStringSetting, setStringSetting } from './settings'
  * customizer/HotkeyBinder: those need the customization engine running and are
  * registered with Electron, these only fire while the window has focus.
  */
-export type ShortcutAction =
+type ShortcutAction =
   | { kind: 'view'; view: ActiveView }
   | { kind: 'toggleAiPanel' }
   | { kind: 'openSettings' }
 
-export interface AppShortcut {
+interface AppShortcut {
   id: string
   label: string
   defaultCombo: string
@@ -62,7 +62,7 @@ export const APP_SHORTCUTS: AppShortcut[] = [
  */
 export type ShortcutScope = 'wall' | 'kanban' | 'focus'
 
-export interface ViewShortcut {
+interface ViewShortcut {
   id: string
   label: string
   scope: ShortcutScope

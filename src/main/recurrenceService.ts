@@ -48,7 +48,7 @@ export function ruleFromRow(row: RecurrenceRow): RecurrenceRule | null {
   })
 }
 
-export interface CreateRecurrenceInput {
+interface CreateRecurrenceInput {
   context: string
   title: string
   body?: string
@@ -186,7 +186,7 @@ export function initializeRecurrenceScheduler(): void {
   timer = setInterval(() => materialiseDueRecurrences(), CHECK_INTERVAL_MS)
 }
 
-export function shutdownRecurrenceScheduler(): void {
+function shutdownRecurrenceScheduler(): void {
   if (timer) { clearInterval(timer); timer = null }
   if (startupTimer) { clearTimeout(startupTimer); startupTimer = null }
 }

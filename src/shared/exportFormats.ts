@@ -107,7 +107,7 @@ export function itemsToMarkdown(items: Item[], title = 'Checkpoint export'): str
   return out.join('\n')
 }
 
-export interface JsonExport {
+interface JsonExport {
   exportedAt: string
   context: string | null
   itemCount: number

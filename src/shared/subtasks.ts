@@ -16,7 +16,7 @@ export interface Subtask {
   position: number
 }
 
-export interface SubtaskProgress {
+interface SubtaskProgress {
   total: number
   done: number
   /** 0–1. Zero when there are no subtasks, so callers can render a bar directly. */
@@ -73,7 +73,7 @@ export function nextPosition(existing: Subtask[]): number {
 /** Matches a markdown task list line, capturing its state and text. */
 const CHECKLIST_LINE = /^\s*[-*]\s+\[([ xX])\]\s*(.*)$/
 
-export interface ParsedChecklist {
+interface ParsedChecklist {
   /** The checkbox lines found, in document order. */
   items: { title: string; done: boolean }[]
   /** The body with those lines removed, for when they are converted. */

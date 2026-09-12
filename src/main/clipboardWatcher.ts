@@ -14,7 +14,7 @@ export function configureClipboardWatcher(recordCopyFn: (text: string) => void):
   recordCopy = recordCopyFn
 }
 
-export function startClipboardWatcher(recordCopyFn?: (text: string) => void): void {
+function startClipboardWatcher(recordCopyFn?: (text: string) => void): void {
   if (recordCopyFn) recordCopy = recordCopyFn
   // Starting twice would orphan the first interval and double-record every copy.
   if (intervalId) return

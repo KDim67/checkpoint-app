@@ -4,7 +4,7 @@ import { existsSync } from 'fs'
 import { dialog } from 'electron'
 import { errorMessage } from '../shared/errors'
 
-export interface RenameResult {
+interface RenameResult {
   success: boolean
   renamedCount: number
   errors: Array<{ oldPath: string; newPath: string; error: string }>

@@ -24,7 +24,7 @@ export interface CardSnapshot {
   tagIds: string[]
 }
 
-export interface CardEdit {
+interface CardEdit {
   patch: Partial<Item>
   /** Left out entirely when the tags were not touched: passing them rewrites the join table. */
   tagIds?: string[]

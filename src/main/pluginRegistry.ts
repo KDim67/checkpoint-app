@@ -14,7 +14,7 @@ import { notify } from './notificationService'
 import type { CreateItemPayload, Item } from '../shared/types'
 
 /** What a load attempt reports back, so a failure can reach the user. */
-export type PluginLoadResult = { ok: true } | { ok: false; error: string }
+type PluginLoadResult = { ok: true } | { ok: false; error: string }
 
 export function ensurePluginsDir(): void {
   ensureDir(getPluginsDir())

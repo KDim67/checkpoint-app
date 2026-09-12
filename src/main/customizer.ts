@@ -54,7 +54,7 @@ export function broadcastTheme(css: string): void {
 /**
  * Parses CSS variable declarations from a CSS variables string.
  */
-export function parseVarsFromCss(css: string): Record<string, string> {
+function parseVarsFromCss(css: string): Record<string, string> {
   const vars: Record<string, string> = {}
   const regex = /(--[\w-]+)\s*:\s*([^;}\n]+)/g
   let match

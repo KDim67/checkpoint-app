@@ -1091,7 +1091,7 @@ export function deleteRelation(id: string): void {
 
 // Subtasks
 
-export interface SubtaskRow {
+interface SubtaskRow {
   id: string
   item_id: string
   title: string
@@ -1134,7 +1134,7 @@ export function deleteSubtask(id: string): void {
 // init block because these run rarely, only when the MCP server is switched on
 //, and there is no reason to pay for them on every launch.
 
-export interface McpActivityRow {
+interface McpActivityRow {
   id: string
   tool: string
   context: string | null
@@ -1533,7 +1533,7 @@ export function recordClipboardCopy(content: string): void {
   }
 }
 
-export function createClipboardSnippet(content: string, label: string | null): void {
+function createClipboardSnippet(content: string, label: string | null): void {
   const existing = stmtFindClipboardItemByContent.get(content) as { id: string; is_pinned: number } | undefined
   const now = Date.now()
   if (existing) {
@@ -1549,19 +1549,19 @@ export function createClipboardSnippet(content: string, label: string | null): v
   }
 }
 
-export function toggleClipboardPin(id: string, isPinned: boolean): void {
+function toggleClipboardPin(id: string, isPinned: boolean): void {
   stmtUpdateClipboardItemPin.run(isPinned ? 1 : 0, id)
 }
 
-export function updateClipboardLabel(id: string, label: string | null): void {
+function updateClipboardLabel(id: string, label: string | null): void {
   stmtUpdateClipboardItemLabel.run(label || null, id)
 }
 
-export function deleteClipboardItem(id: string): void {
+function deleteClipboardItem(id: string): void {
   stmtDeleteClipboardItem.run(id)
 }
 
-export function restoreClipboardItem(content: string, isPinned: boolean, label: string | null): void {
+function restoreClipboardItem(content: string, isPinned: boolean, label: string | null): void {
   const existing = stmtFindClipboardItemByContent.get(content) as { id: string; is_pinned: number } | undefined
   const now = Date.now()
   if (existing) {
@@ -1575,7 +1575,7 @@ export function restoreClipboardItem(content: string, isPinned: boolean, label: 
   }
 }
 
-export function clearClipboardHistory(): void {
+function clearClipboardHistory(): void {
   stmtClearClipboardHistory.run()
 }
 

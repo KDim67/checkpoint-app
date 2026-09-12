@@ -9,7 +9,7 @@
 
 import type { Item } from '../shared/types'
 
-export interface PluginEventMap {
+interface PluginEventMap {
   /** A card, task or log entry was created, by anyone. UI, agent or webhook. */
   'item:created': { item: Item }
   /** An item moved into a finished state. */

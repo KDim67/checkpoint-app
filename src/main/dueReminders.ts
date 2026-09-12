@@ -89,7 +89,7 @@ export function initializeDueReminders(): void {
   timer = setInterval(() => checkDueItems(), CHECK_INTERVAL_MS)
 }
 
-export function shutdownDueReminders(): void {
+function shutdownDueReminders(): void {
   if (timer) { clearInterval(timer); timer = null }
   if (startupTimer) { clearTimeout(startupTimer); startupTimer = null }
 }

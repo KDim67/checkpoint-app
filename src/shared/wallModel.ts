@@ -128,7 +128,7 @@ export const WALL_COLORS = [
   '#d7b3e8', '#f5b78c', '#9fdfd5', '#cfd3da'
 ]
 
-export const DEFAULT_CAMERA: WallCamera = { x: 0, y: 0, zoom: 1 }
+const DEFAULT_CAMERA: WallCamera = { x: 0, y: 0, zoom: 1 }
 
 /**
  * The first wall keeps the original single-wall key so old walls are still
@@ -136,7 +136,7 @@ export const DEFAULT_CAMERA: WallCamera = { x: 0, y: 0, zoom: 1 }
  * `wall_${context}_${id}` could collide with another workspace's wall.
  */
 export const DEFAULT_WALL_ID = 'main'
-export const DEFAULT_WALL_NAME = 'Wall'
+const DEFAULT_WALL_NAME = 'Wall'
 
 export const wallDocKey = (context: string, wallId: string = DEFAULT_WALL_ID): string =>
   wallId === DEFAULT_WALL_ID ? `wall_${context}` : `wall_doc_${wallId}`
@@ -586,7 +586,7 @@ export function cameraCentredOn(
  * Titles live on the referenced record, not the wall item, so the caller
  * resolves them and passes them in.
  */
-export function searchableText(item: WallItem, resolvedTitle?: string): string {
+function searchableText(item: WallItem, resolvedTitle?: string): string {
   return [item.text ?? '', resolvedTitle ?? ''].join(' ').trim().toLowerCase()
 }
 
@@ -993,7 +993,7 @@ export function roundedPath(points: Point[], radius: number): string {
  * same geometry as an attached one. A box with no size has its edge at its
  * centre, which is what a point is.
  */
-export function pointAnchor(p: Point): WallItem {
+function pointAnchor(p: Point): WallItem {
   return { id: '', kind: 'note', x: p.x, y: p.y, width: 0, height: 0, z: 0 }
 }
 
@@ -1011,12 +1011,12 @@ export function arrowAnchors(
 }
 
 /** How much shorter to draw the line at each end than it really is. */
-export interface ArrowTrim {
+interface ArrowTrim {
   start?: number
   end?: number
 }
 
-export interface ArrowGeometry {
+interface ArrowGeometry {
   /** Where the connector really begins and ends. The heads go here. */
   start: Point
   end: Point
