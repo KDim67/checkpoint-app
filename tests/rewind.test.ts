@@ -16,6 +16,7 @@ import {
   type RewindInput
 } from '../src/shared/rewind'
 import type { ClipboardItem, FocusSession, GitCommit } from '../src/shared/types'
+import { defined } from './helpers/defined'
 
 const MIN = 60_000
 const HOUR = 60 * MIN
@@ -160,18 +161,18 @@ describe('clusterSittings', () => {
 
 describe('lastSittingFor', () => {
   it('returns the most recent sitting, not the first', () => {
-    const sit = lastSittingFor([
+    const sit = defined(lastSittingFor([
       session({ id: 'old', completed_at: T - 5 * DAY }),
       session({ id: 'recent', completed_at: T })
-    ], 'card-1')!
+    ], 'card-1'))
     expect(sit.end).toBe(T)
   })
 
   it('reports whether the card was ticked off in the final session', () => {
-    const sit = lastSittingFor([
+    const sit = defined(lastSittingFor([
       session({ id: 'a', completed_at: T, tasks_json: JSON.stringify([{ id: 'card-1', completed: false }]) }),
       session({ id: 'b', completed_at: T + 30 * MIN, tasks_json: JSON.stringify([{ id: 'card-1', completed: true }]) })
-    ], 'card-1')!
+    ], 'card-1'))
     expect(sit.completed).toBe(true)
   })
 

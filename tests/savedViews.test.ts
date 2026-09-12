@@ -9,6 +9,7 @@ import {
   toQueryParams,
   type SavedView
 } from '../src/shared/savedViews'
+import { defined } from './helpers/defined'
 
 const at = (y: number, m: number, d: number, h = 12, min = 0) =>
   new Date(y, m - 1, d, h, min, 0, 0).getTime()
@@ -35,16 +36,16 @@ describe('resolveDueRange', () => {
 
   it('bounds today to the calendar day', () => {
     const range = resolveDueRange('today', now)
-    expect(new Date(range.dueStart!).getHours()).toBe(0)
-    expect(new Date(range.dueEnd!).getHours()).toBe(23)
-    expect(new Date(range.dueStart!).getDate()).toBe(15)
-    expect(new Date(range.dueEnd!).getDate()).toBe(15)
+    expect(new Date(defined(range.dueStart)).getHours()).toBe(0)
+    expect(new Date(defined(range.dueEnd)).getHours()).toBe(23)
+    expect(new Date(defined(range.dueStart)).getDate()).toBe(15)
+    expect(new Date(defined(range.dueEnd)).getDate()).toBe(15)
   })
 
   it('rolls the week forward rather than emptying every Sunday', () => {
     const range = resolveDueRange('week', now)
-    expect(new Date(range.dueStart!).getDate()).toBe(15)
-    expect(new Date(range.dueEnd!).getDate()).toBe(21)
+    expect(new Date(defined(range.dueStart)).getDate()).toBe(15)
+    expect(new Date(defined(range.dueEnd)).getDate()).toBe(21)
   })
 
   it('asks for the absence of a date rather than an open range', () => {
@@ -56,7 +57,7 @@ describe('resolveDueRange', () => {
   it('re-resolves against the moment it is asked, not the one it was saved at', () => {
     const monday = resolveDueRange('overdue', at(2026, 6, 15))
     const friday = resolveDueRange('overdue', at(2026, 6, 19))
-    expect(friday.dueEnd).toBeGreaterThan(monday.dueEnd!)
+    expect(friday.dueEnd).toBeGreaterThan(defined(monday.dueEnd))
   })
 })
 

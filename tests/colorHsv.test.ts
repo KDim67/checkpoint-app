@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { hexToHsv, hsvToHex, isHex } from '../src/shared/color'
+import { defined } from './helpers/defined'
 
 // The picker converts on every pointer move, so a round trip that drifts would
 // walk the colour away from itself while the user just holds still.
@@ -18,14 +19,14 @@ describe('hex to HSV and back', () => {
 
   for (const [hex, name] of cases) {
     it(`survives a round trip: ${name}`, () => {
-      expect(hsvToHex(hexToHsv(hex)!)).toBe(hex)
+      expect(hsvToHex(defined(hexToHsv(hex)))).toBe(hex)
     })
   }
 
   it('reads the primaries as the hues they are', () => {
-    expect(hexToHsv('#ff0000')!.h).toBe(0)
-    expect(hexToHsv('#00ff00')!.h).toBe(120)
-    expect(hexToHsv('#0000ff')!.h).toBe(240)
+    expect(defined(hexToHsv('#ff0000')).h).toBe(0)
+    expect(defined(hexToHsv('#00ff00')).h).toBe(120)
+    expect(defined(hexToHsv('#0000ff')).h).toBe(240)
   })
 
   it('reads white and black as the extremes of value and saturation', () => {

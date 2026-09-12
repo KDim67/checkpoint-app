@@ -16,6 +16,7 @@ import {
   materialiseDueRecurrences,
   onInstanceClosed
 } from '../src/main/recurrenceService'
+import { defined } from './helpers/defined'
 
 // The invariant under test is the one the whole design rests on: at most one
 // unfinished instance per rule. Get it wrong and a daily task left alone for a
@@ -49,8 +50,8 @@ describe('createRecurrence', () => {
   it('stores a rule and works out when it first fires', () => {
     const row = daily(Date.now() + DAY)
     expect(row).not.toBeNull()
-    expect(row!.next_due).toBeGreaterThan(Date.now())
-    expect(row!.active).toBe(1)
+    expect(defined(row).next_due).toBeGreaterThan(Date.now())
+    expect(defined(row).active).toBe(1)
   })
 
   it('refuses a rule it cannot understand', () => {
@@ -61,7 +62,7 @@ describe('createRecurrence', () => {
   it('does not backfill a rule that started long ago', () => {
     // A rule anchored a year back should be due once, not 365 times.
     const row = daily(Date.now() - 365 * DAY)
-    expect(row!.next_due).toBeGreaterThan(Date.now() - DAY)
+    expect(defined(row).next_due).toBeGreaterThan(Date.now() - DAY)
   })
 })
 
@@ -78,7 +79,7 @@ describe('materialising', () => {
   it('stamps the instance so it can be traced back to its rule', () => {
     const row = daily(Date.now() - DAY)
     materialiseDueRecurrences()
-    expect(JSON.parse(tasks()[0].metadata)).toMatchObject({ recurrenceId: row!.id })
+    expect(JSON.parse(tasks()[0].metadata)).toMatchObject({ recurrenceId: defined(row).id })
   })
 
   it('creates nothing while the previous instance is still open', () => {
@@ -121,9 +122,9 @@ describe('materialising', () => {
 
   it('advances next_due past the occurrence it just created', () => {
     const row = daily(Date.now() - DAY)
-    const before = getRecurrenceById(row!.id)!.next_due!
+    const before = defined(defined(getRecurrenceById(defined(row).id)).next_due)
     materialiseDueRecurrences()
-    expect(getRecurrenceById(row!.id)!.next_due!).toBeGreaterThan(before)
+    expect(defined(defined(getRecurrenceById(defined(row).id)).next_due)).toBeGreaterThan(before)
   })
 
   it('deactivates a rule once it passes its end date', () => {
@@ -134,7 +135,7 @@ describe('materialising', () => {
       rule: { freq: 'daily', interval: 1, startAt: start, untilAt: start + DAY }
     })
     materialiseDueRecurrences()
-    expect(getRecurrenceById(row!.id)!.active).toBe(0)
+    expect(defined(getRecurrenceById(defined(row).id)).active).toBe(0)
   })
 })
 
@@ -158,13 +159,13 @@ describe('completing an instance', () => {
 
     // Sweeps while the instance sits open must skip it AND leave next_due alone,
     // which is what makes the rule overdue by the time it is finally completed.
-    const dueBefore = getRecurrenceById(row!.id)!.next_due
+    const dueBefore = defined(getRecurrenceById(defined(row).id)).next_due
     materialiseDueRecurrences(Date.now() + 3 * DAY)
-    expect(getRecurrenceById(row!.id)!.next_due).toBe(dueBefore)
+    expect(defined(getRecurrenceById(defined(row).id)).next_due).toBe(dueBefore)
     expect(tasks()).toHaveLength(1)
 
     updateItem(getDb(), open.id, { status: 'done' })
-    onInstanceClosed(row!.id, Date.now() + 3 * DAY)
+    onInstanceClosed(defined(row).id, Date.now() + 3 * DAY)
 
     expect(tasks()).toHaveLength(2)
     expect(tasks().filter(i => i.status === 'open')).toHaveLength(1)

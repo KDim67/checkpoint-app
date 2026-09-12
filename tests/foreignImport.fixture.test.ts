@@ -6,6 +6,7 @@ import {
   describeImport,
   parseForeignBoard
 } from '../src/shared/foreignImport'
+import { defined } from './helpers/defined'
 
 /**
  * The unit tests use hand-made objects; this one runs a whole realistic export
@@ -21,7 +22,7 @@ const board = JSON.parse(
 )
 
 describe('a whole Trello export', () => {
-  const parsed = parseForeignBoard(board)!
+  const parsed = defined(parseForeignBoard(board))
 
   it('is recognised', () => {
     expect(parsed).not.toBeNull()
@@ -47,24 +48,24 @@ describe('a whole Trello export', () => {
   })
 
   it('archives the card that was archived', () => {
-    const abandoned = parsed.cards.find(c => c.title.startsWith('Abandoned'))!
+    const abandoned = defined(parsed.cards.find(c => c.title.startsWith('Abandoned')))
     expect(abandoned.status).toBe('archived')
   })
 
   it('rescues the card whose list was archived into the first column', () => {
-    const orphan = parsed.cards.find(c => c.title.startsWith('Isometric'))!
+    const orphan = defined(parsed.cards.find(c => c.title.startsWith('Isometric')))
     expect(orphan.status).toBe('to_do')
     expect(parsed.notes.some(n => n.includes('"To Do"'))).toBe(true)
   })
 
   it('carries due dates across and leaves the others null', () => {
-    const dungeon = parsed.cards.find(c => c.title.startsWith('Procedural'))!
+    const dungeon = defined(parsed.cards.find(c => c.title.startsWith('Procedural')))
     expect(dungeon.due_at).toBe(Date.parse('2026-10-15T17:00:00.000Z'))
-    expect(parsed.cards.find(c => c.title.startsWith('Enemy AI'))!.due_at).toBeNull()
+    expect(defined(parsed.cards.find(c => c.title.startsWith('Enemy AI'))).due_at).toBeNull()
   })
 
   it('carries checklists with their done state', () => {
-    const dungeon = parsed.cards.find(c => c.title.startsWith('Procedural'))!
+    const dungeon = defined(parsed.cards.find(c => c.title.startsWith('Procedural')))
     expect(dungeon.checklist).toEqual([
       { text: 'BSP split', done: true },
       { text: 'Carve corridors', done: true },
@@ -85,7 +86,7 @@ describe('a whole Trello export', () => {
   })
 
   it('keeps both labels on the card that has two', () => {
-    const torches = parsed.cards.find(c => c.title.startsWith('Torches'))!
+    const torches = defined(parsed.cards.find(c => c.title.startsWith('Torches')))
     expect(torches.labels.map(l => l.name).sort()).toEqual(['bug', 'code'])
   })
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { normalizeMemoryAction, normalizeMemoryActions } from '../src/shared/memoryActions'
+import { defined } from './helpers/defined'
 
 // These actions delete and rewrite rows in the memory store, and they come out
 // of a language model. What survives normalisation is what gets to touch the
@@ -43,9 +44,9 @@ describe('an action the model returned', () => {
   })
 
   it('caps a key and its content instead of trusting their length', () => {
-    const action = normalizeMemoryAction({
+    const action = defined(normalizeMemoryAction({
       action: 'save', memory_key: 'k'.repeat(500), content: 'c'.repeat(9000)
-    })!
+    }))
     expect(action.memory_key).toHaveLength(120)
     expect(action.content).toHaveLength(2000)
   })

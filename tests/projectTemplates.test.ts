@@ -10,6 +10,7 @@ import {
   templateColumnId,
   type ProjectTemplate
 } from '../src/shared/projectTemplates'
+import { defined } from './helpers/defined'
 
 describe('the shipped templates', () => {
   it('all have a unique id', () => {
@@ -149,12 +150,12 @@ describe('buildTemplateCards', () => {
 
 describe('describeTemplate', () => {
   it('mentions cards only when there are some', () => {
-    const blank = findProjectTemplate('blank')!
+    const blank = defined(findProjectTemplate('blank'))
     expect(describeTemplate(blank)).toBe('4 columns')
   })
 
   it('counts both when a template seeds cards', () => {
-    const software = findProjectTemplate('software')!
+    const software = defined(findProjectTemplate('software'))
     expect(describeTemplate(software)).toBe('5 columns · 3 cards')
   })
 })

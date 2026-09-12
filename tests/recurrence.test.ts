@@ -5,6 +5,7 @@ import {
   describeRule,
   type RecurrenceRule
 } from '../src/shared/recurrence'
+import { defined } from './helpers/defined'
 
 /** Local-time constructor, so the tests mean the same thing the rules do. */
 const at = (y: number, m: number, d: number, h = 9, min = 0) =>
@@ -81,14 +82,14 @@ describe('nextOccurrence: daily', () => {
     // Started 1 Jan every 3 days; 1 Mar is day 59, so the grid gives 2 Mar.
     const r = rule({ interval: 3 })
     const next = nextOccurrence(r, at(2026, 3, 1, 12))
-    const daysSinceStart = Math.round((next! - r.startAt) / 86_400_000)
+    const daysSinceStart = Math.round((defined(next) - r.startAt) / 86_400_000)
     expect(daysSinceStart % 3).toBe(0)
-    expect(next!).toBeGreaterThan(at(2026, 3, 1, 12))
+    expect(defined(next)).toBeGreaterThan(at(2026, 3, 1, 12))
   })
 
   it('keeps the anchor time of day', () => {
     const r = rule({ startAt: at(2026, 1, 1, 14, 30) })
-    const next = new Date(nextOccurrence(r, at(2026, 3, 5))!)
+    const next = new Date(defined(nextOccurrence(r, at(2026, 3, 5))))
     expect([next.getHours(), next.getMinutes()]).toEqual([14, 30])
   })
 
@@ -102,16 +103,16 @@ describe('nextOccurrence: weekly', () => {
   it('repeats on the start weekday when none are named', () => {
     const r = rule({ freq: 'weekly', startAt: at(2026, 1, 1) })
     const next = nextOccurrence(r, at(2026, 1, 1))
-    expect(new Date(next!).getDay()).toBe(new Date(r.startAt).getDay())
+    expect(new Date(defined(next)).getDay()).toBe(new Date(r.startAt).getDay())
     expect(show(next)).toBe(show(at(2026, 1, 8)))
   })
 
   it('fires on each named weekday', () => {
     // 1 Jan 2026 is a Thursday. Mondays and Fridays only.
     const r = rule({ freq: 'weekly', startAt: at(2026, 1, 1), byWeekday: [1, 5] })
-    const first = nextOccurrence(r, at(2026, 1, 1))!
+    const first = defined(nextOccurrence(r, at(2026, 1, 1)))
     expect(new Date(first).getDay()).toBe(5)
-    const second = nextOccurrence(r, first)!
+    const second = defined(nextOccurrence(r, first))
     expect(new Date(second).getDay()).toBe(1)
   })
 
@@ -119,7 +120,7 @@ describe('nextOccurrence: weekly', () => {
     const r = rule({ freq: 'weekly', startAt: at(2026, 1, 1), byWeekday: [2, 4] })
     let cursor = at(2026, 1, 1)
     for (let i = 0; i < 12; i++) {
-      cursor = nextOccurrence(r, cursor)!
+      cursor = defined(nextOccurrence(r, cursor))
       expect([2, 4]).toContain(new Date(cursor).getDay())
     }
   })
@@ -140,21 +141,21 @@ describe('nextOccurrence: monthly', () => {
     // The classic bug: 31 Jan + 1 month rolls to 2 or 3 March and then every
     // later occurrence is permanently shifted.
     const r = rule({ freq: 'monthly', startAt: at(2026, 1, 31) })
-    const feb = nextOccurrence(r, at(2026, 1, 31))!
+    const feb = defined(nextOccurrence(r, at(2026, 1, 31)))
     expect(new Date(feb).getMonth()).toBe(1)
     expect(new Date(feb).getDate()).toBe(28)
   })
 
   it('returns to the anchor day after a short month', () => {
     const r = rule({ freq: 'monthly', startAt: at(2026, 1, 31) })
-    const feb = nextOccurrence(r, at(2026, 1, 31))!
-    const mar = nextOccurrence(r, feb)!
+    const feb = defined(nextOccurrence(r, at(2026, 1, 31)))
+    const mar = defined(nextOccurrence(r, feb))
     expect(new Date(mar).getDate()).toBe(31)
   })
 
   it('handles a leap February', () => {
     const r = rule({ freq: 'monthly', startAt: at(2024, 1, 31) })
-    const feb = nextOccurrence(r, at(2024, 1, 31))!
+    const feb = defined(nextOccurrence(r, at(2024, 1, 31)))
     expect(new Date(feb).getDate()).toBe(29)
   })
 
@@ -176,7 +177,7 @@ describe('nextOccurrence: termination', () => {
       const after = at(2026, 6, 15, 13, 7)
       const next = nextOccurrence(r, after)
       expect(next, freq).not.toBeNull()
-      expect(next!, freq).toBeGreaterThan(after)
+      expect(defined(next), freq).toBeGreaterThan(after)
     }
   })
 
@@ -196,7 +197,7 @@ describe('nextOccurrence: termination', () => {
     const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6
 
     expect(next).not.toBeNull()
-    expect(next!).toBeGreaterThan(at(2200, 1, 1))
+    expect(defined(next)).toBeGreaterThan(at(2200, 1, 1))
     expect(elapsedMs).toBeLessThan(50)
   })
 })
