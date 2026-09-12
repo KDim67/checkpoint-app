@@ -1488,6 +1488,7 @@ export function createFocusSession(payload: CreateFocusSessionPayload): FocusSes
     payload.notes,
     payload.tasks_json
   )
+  emitPluginEvent('focus:completed', { context: payload.context, durationMs: payload.duration_ms })
   return {
     id,
     context: payload.context,

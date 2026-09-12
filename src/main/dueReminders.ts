@@ -10,6 +10,7 @@
 
 import { getDb } from './db'
 import { notify } from './notificationService'
+import { emitPluginEvent } from './pluginEvents'
 
 const CHECK_INTERVAL_MS = 15 * 60 * 1000
 const STARTUP_DELAY_MS = 12_000
@@ -72,7 +73,10 @@ export function checkDueItems(now = Date.now()): number {
         itemId: row.id,
         now
       })
-      if (delivered) fired++
+      if (delivered) {
+        fired++
+        emitPluginEvent('due:reminded', { itemId: row.id, title: row.title || 'Untitled' })
+      }
     }
   } catch (err) {
     console.error('[due] Check failed:', err)

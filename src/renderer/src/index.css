@@ -410,19 +410,6 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   text-transform: uppercase;
 }
 
-.surface-card {
-  background-color: var(--color-surface-1);
-  border: 1px solid var(--color-surface-offset);
-  border-radius: var(--radius-md);
-}
-
-.surface-card:hover {
-  background-color: var(--color-surface-2);
-  border-color: var(--color-balance);
-  transition: background-color var(--duration-fast) var(--ease-default),
-              border-color var(--duration-fast) var(--ease-default);
-}
-
 .btn-primary {
   background-color: var(--color-primary);
   color: var(--color-text-inverted);
