@@ -14,7 +14,7 @@ import { initDb, closeDb, getDb, searchItems } from '../src/main/db'
 // binding. The migrations are plain SQL and pragmas, so what is under test here
 // is unaffected; what a plain-Node runner cannot check is the binding itself.
 
-// Deliberately a literal rather than an import from db.ts: asserting the
+// Deliberately a literal rather than an import from the db module: asserting the
 // pragma against the same constant that set it would pass no matter what. Bump
 // this by hand whenever a migration is added.
 const CURRENT_VERSION = 9

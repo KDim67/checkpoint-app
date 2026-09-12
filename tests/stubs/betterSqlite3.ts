@@ -10,7 +10,7 @@
  * SQLite file rather than a mock.
  *
  * WHAT this is NOT: a general better-sqlite3 replacement. It implements only
- * the surface src/main/db.ts actually touches. Anything it does not implement
+ * the surface src/main/db actually touches. Anything it does not implement
  * throws rather than silently succeeding, so a test can never pass because a
  * call quietly did nothing.
  */
@@ -47,7 +47,7 @@ class StatementFacade {
 export default class DatabaseFacade {
   readonly #db: DatabaseSync
   /**
-   * better-sqlite3 transactions nest by promoting to SAVEPOINTs. db.ts nests
+   * better-sqlite3 transactions nest by promoting to SAVEPOINTs. The db module nests
    * them (initDb's migration transaction wraps table rebuilds, IPC handlers
    * wrap helper writes), so an inner transaction must join the outer one
    * instead of failing on "cannot start a transaction within a transaction".

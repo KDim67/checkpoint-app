@@ -4,7 +4,7 @@
  *
  * In main out of necessity: better-sqlite3 is built against Electron's ABI, so
  * plain Node cannot open checkpoint.db (it fails with ERR_DLOPEN_FAILED). It
- * also means every tool goes through the same `db.ts` functions the app uses.
+ * also means every tool goes through the same `db` functions the app uses.
  *
  * Separate from the webhook gateway, which is unauthenticated with wildcard
  * CORS. Defensible for "append a log line", wrong for something that reads
