@@ -232,6 +232,12 @@ export default function AiStreamPanel() {
   const [waitingLabel, setWaitingLabel] = useState('Thinking…')
   const consolidationTurnRef = useRef(0) // Only consolidate every N turns to save API calls
   const auditTurnRef = useRef(0)
+  /**
+   * The stream listeners are registered once, so they reach the consolidation
+   * pass through this. It always holds the one from the latest render, and with
+   * it the current workspace, model and memory vault.
+   */
+  const consolidateRef = useRef<(messages: Message[]) => Promise<void>>(async () => {})
 
   const vault = useMemoryVault({ activeWorkspace, selectedModel, toast })
   // Only what the stream and header still touch; the rest reaches the modal
@@ -461,7 +467,7 @@ export default function AiStreamPanel() {
             timestamp: Date.now()
           }]
           // Kick off background memory consolidation after message is committed
-          setTimeout(() => triggerMemoryConsolidation(updated), 100)
+          setTimeout(() => consolidateRef.current(updated), 100)
           return updated
         })
         setStreamingText('')
@@ -1012,7 +1018,7 @@ export default function AiStreamPanel() {
               if (streamingChatIdRef.current === currentChatIdRef.current) {
                 setMessages(prev => {
                   const updated = [...prev, { role: 'assistant' as const, content, timestamp: Date.now() }]
-                  setTimeout(() => triggerMemoryConsolidation(updated), 100)
+                  setTimeout(() => consolidateRef.current(updated), 100)
                   return updated
                 })
               }
@@ -1167,7 +1173,8 @@ export default function AiStreamPanel() {
     } finally {
       setMemoryConsolidating(false)
     }
-  }, [activeWorkspace, selectedModel, showMemoryPanel])
+  }, [activeWorkspace, selectedModel, showMemoryPanel, setMemories, setMemoryConsolidating])
+  consolidateRef.current = triggerMemoryConsolidation
 
   // Copy message
   const handleCopyMessage = async (content: string, index: number) => {
