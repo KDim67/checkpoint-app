@@ -10,6 +10,7 @@ import { searchEverything, MIN_QUERY_LENGTH } from '../lib/globalSearch'
 import { kindLabel, type SearchHit } from '../../../shared/searchResults'
 import { BUILT_IN_VIEWS, normalizeSavedViews, type SavedView } from '../../../shared/savedViews'
 import type { ActiveView } from '../store/appStore'
+import { getStringSetting } from '../lib/settings'
 
 interface Props {
   open: boolean
@@ -54,7 +55,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
       )
       if (!cancelled) setEnabledViews(Object.fromEntries(entries) as Partial<Record<ActiveView, boolean>>)
 
-      const stored = await window.electronAPI.db.getSetting('saved_views').catch(() => null)
+      const stored = await getStringSetting('saved_views', '').catch(() => '')
       if (!cancelled) setSavedViews([...BUILT_IN_VIEWS, ...normalizeSavedViews(stored)])
     }
     load()

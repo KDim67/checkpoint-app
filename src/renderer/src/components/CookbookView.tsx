@@ -22,6 +22,7 @@ import Skeleton from './ui/Skeleton'
 import EmptyState from './ui/EmptyState'
 import { useToast } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
+import { getBoolSetting, setBoolSetting } from '../lib/settings'
 
 // Capability filters + display metadata for badges.
 const CAP_FILTERS: { id: string; label: string }[] = [
@@ -207,9 +208,8 @@ export default function CookbookView() {
 
     const loadSafeModeSetting = async () => {
       try {
-        const val = await window.electronAPI.db.getSetting('unitySafeMode')
-        if (val !== null && val !== undefined) {
-          setSafeMode(val === true || val === 'true')
+        {
+          setSafeMode(await getBoolSetting('unitySafeMode', false))
         }
       } catch (err) {
         console.error('Failed to load the safe mode setting:', err)
@@ -257,7 +257,7 @@ export default function CookbookView() {
   const handleToggleSafeMode = async (newValue: boolean) => {
     setSafeMode(newValue)
     try {
-      await window.electronAPI.db.setSetting('unitySafeMode', newValue)
+      await setBoolSetting('unitySafeMode', newValue)
     } catch (err) {
       console.error('Failed to save the safe mode setting:', err)
     }

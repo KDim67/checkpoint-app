@@ -6,6 +6,7 @@ import { useAppStore } from '../store/appStore'
 import { useAiEnabled } from '../lib/useAiEnabled'
 import { errorMessage } from '../../../shared/errors'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
+import { getJsonSetting, setJsonSetting } from '../lib/settings'
 
 interface CheatsheetFile {
   name: string
@@ -82,12 +83,8 @@ export default function CheatsheetsView() {
 
   useEffect(() => {
     loadCheatsheets()
-    window.electronAPI.db.getSetting('cheatsheet_pins').then(raw => {
-      if (typeof raw !== 'string' || !raw) return
-      try {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) setPinned(parsed.filter(p => typeof p === 'string'))
-      } catch { /* corrupt setting. Ignore */ }
+    getJsonSetting<string[]>('cheatsheet_pins', []).then(list => {
+      if (Array.isArray(list)) setPinned(list.filter(p => typeof p === 'string'))
     }).catch(() => {})
   }, [loadCheatsheets])
 
@@ -95,7 +92,7 @@ export default function CheatsheetsView() {
     e?.stopPropagation()
     setPinned(prev => {
       const next = prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]
-      window.electronAPI.db.setSetting('cheatsheet_pins', JSON.stringify(next)).catch(() => {})
+      setJsonSetting('cheatsheet_pins', next).catch(() => {})
       return next
     })
   }
@@ -330,7 +327,7 @@ export default function CheatsheetsView() {
       if (pinned.includes(renamePdf.name)) {
         setPinned(prev => {
           const next = prev.map(p => p === renamePdf.name ? newFileName : p)
-          window.electronAPI.db.setSetting('cheatsheet_pins', JSON.stringify(next)).catch(() => {})
+          setJsonSetting('cheatsheet_pins', next).catch(() => {})
           return next
         })
       }
@@ -362,7 +359,7 @@ export default function CheatsheetsView() {
       if (pinned.includes(deletePdf.name)) {
         setPinned(prev => {
           const next = prev.filter(p => p !== deletePdf.name)
-          window.electronAPI.db.setSetting('cheatsheet_pins', JSON.stringify(next)).catch(() => {})
+          setJsonSetting('cheatsheet_pins', next).catch(() => {})
           return next
         })
       }

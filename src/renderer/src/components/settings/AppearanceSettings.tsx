@@ -6,6 +6,7 @@ import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 // Refresh falls back to a full page reload on every edit. Import applyFontSize
 // from lib/fontScale directly.
 import { applyFontSize, type FontSize } from '../../lib/fontScale'
+import { getBoolSetting, getEnumSetting, setBoolSetting, setStringSetting } from '../../lib/settings'
 
 function applyCompactMode(enabled: boolean): void {
   if (enabled) {
@@ -23,10 +24,12 @@ export default function AppearanceSettings() {
   useEffect(() => {
     const load = async () => {
       try {
-        const fs = await window.electronAPI.db.getSetting('appearance_font_size')
-        const cm = await window.electronAPI.db.getSetting('appearance_compact')
-        if (fs) { setFontSize(fs as FontSize); applyFontSize(fs as FontSize) }
-        if (cm) { setCompactMode(cm === 'true'); applyCompactMode(cm === 'true') }
+        const size = await getEnumSetting('appearance_font_size', ['small', 'medium', 'large'] as const, 'medium')
+        setFontSize(size)
+        applyFontSize(size)
+        const compact = await getBoolSetting('appearance_compact', false)
+        setCompactMode(compact)
+        applyCompactMode(compact)
 
         const home = await window.electronAPI.app.getDataPath()
         // Theme file is at ~/.config/checkpoint/theme.css
@@ -45,13 +48,13 @@ export default function AppearanceSettings() {
   const handleFontSize = async (size: FontSize) => {
     setFontSize(size)
     applyFontSize(size)
-    await window.electronAPI.db.setSetting('appearance_font_size', size)
+    await setStringSetting('appearance_font_size', size)
   }
 
   const handleCompact = async (enabled: boolean) => {
     setCompactMode(enabled)
     applyCompactMode(enabled)
-    await window.electronAPI.db.setSetting('appearance_compact', String(enabled))
+    await setBoolSetting('appearance_compact', enabled)
   }
 
   const FONT_OPTIONS: { value: FontSize; label: string; desc: string }[] = [

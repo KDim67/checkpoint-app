@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid } from 'lucide-react'
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature } from '../../lib/features'
-import { getBoolSetting } from '../../lib/settings'
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
+import { getBoolSetting, getNumberSetting, getStringSetting, setBoolSetting } from '../../lib/settings'
 
 interface ToggleConfig {
   key: string
@@ -30,8 +30,8 @@ function WebhookToken(): React.JSX.Element | null {
 
   useEffect(() => {
     let cancelled = false
-    window.electronAPI.db.getSetting('webhook_token').then(value => {
-      if (!cancelled) setToken(typeof value === 'string' ? value : '')
+    getStringSetting('webhook_token', '').then(value => {
+      if (!cancelled) setToken(value)
     }).catch(() => {})
     return () => { cancelled = true }
   }, [])
@@ -91,16 +91,14 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     description: 'Receives events from external tools via a local HTTP port. Requires the token below.',
     warning: 'Disabling closes the active socket immediately (server.close()).',
     getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_webhook')
-      return v !== 'false'
+      return getBoolSetting('feature_webhook', true)
     },
     toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_webhook', String(active))
+      await setBoolSetting('feature_webhook', active)
       // Reuse whichever port the gateway is already listening on. A literal
       // here moved it off the port main had started it on, so every external
       // tool posting to the documented port stopped being delivered.
-      const stored = await window.electronAPI.db.getSetting('webhook_port')
-      const port = parseInt(String(stored ?? ''), 10) || WEBHOOK_DEFAULT_PORT
+      const port = await getNumberSetting('webhook_port', WEBHOOK_DEFAULT_PORT)
       await window.electronAPI.webhook.toggle(active, port)
     }
   },
@@ -111,11 +109,10 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     description: 'Borderless overlay launched via a global hotkey for rapid task capture.',
     warning: 'Disabling unregisters the hotkey and destroys the HUD window.',
     getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_hud')
-      return v !== 'false'
+      return getBoolSetting('feature_hud', true)
     },
     toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_hud', String(active))
+      await setBoolSetting('feature_hud', active)
       await window.electronAPI.hud.toggle(active)
     }
   },
@@ -126,11 +123,10 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     description: 'Automatically creates timestamped SQLite database snapshots.',
     warning: 'Disabling clears all scheduled backup intervals immediately.',
     getState: async () => {
-      const v = await window.electronAPI.db.getSetting('feature_backup')
-      return v !== 'false'
+      return getBoolSetting('feature_backup', true)
     },
     toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_backup', String(active))
+      await setBoolSetting('feature_backup', active)
       // Persisting the flag alone left the old timers running and armed no new
       // ones, so the warning above only came true on the next launch.
       // initializeBackupScheduler clears then re-arms, so it is right either way.
@@ -148,7 +144,7 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
       catch { return false }
     },
     toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('feature_tracker', String(active))
+      await setBoolSetting('feature_tracker', active)
       await window.electronAPI.tracker.toggle(active)
     }
   },
@@ -159,11 +155,10 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     description: 'Keeps your own machines in step, over your network or the internet, with no cloud in between.',
     warning: 'Disabling closes all active network listeners and WebRTC signaling tunnels.',
     getState: async () => {
-      const v = await window.electronAPI.db.getSetting('sync_enabled')
-      return v === 'true' || v === true
+      return getBoolSetting('sync_enabled', false)
     },
     toggle: async (active: boolean) => {
-      await window.electronAPI.db.setSetting('sync_enabled', String(active))
+      await setBoolSetting('sync_enabled', active)
       if (active) {
         await window.electronAPI.sync.startHost()
       } else {

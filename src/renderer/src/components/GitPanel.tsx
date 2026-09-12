@@ -3,6 +3,7 @@ import { RefreshCw, GitBranch, AlertTriangle, Copy, Check, FileText, Settings, F
 import { useAppStore } from '../store/appStore'
 import type { GitCommit, GitStatusResult } from '../../../shared/types'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
+import { readWorkspaceList } from '../lib/workspaceList'
 
 function formatGitDate(dateStr: string): string {
   if (!dateStr || dateStr === 'unknown') return dateStr
@@ -39,14 +40,8 @@ export default function GitPanel() {
   const fetchContextConfig = useCallback(async () => {
     setLoading(true)
     try {
-      const raw = await window.electronAPI.db.getSetting('contexts_list')
-      if (raw) {
-        const parsed = JSON.parse(raw as string) as Array<{ slug: string; gitPath?: string }>
-        const ctx = parsed.find(c => c.slug === activeWorkspace)
-        setGitPath(ctx?.gitPath || null)
-      } else {
-        setGitPath(null)
-      }
+      const ctx = (await readWorkspaceList()).find(c => c.slug === activeWorkspace)
+      setGitPath(ctx?.gitPath || null)
     } catch (err) {
       console.error('Failed to load contexts list in GitPanel:', err)
       setGitPath(null)

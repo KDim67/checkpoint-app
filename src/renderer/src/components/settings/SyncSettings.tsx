@@ -6,6 +6,7 @@ import ModalShell from '../ui/ModalShell'
 import TurnRelaySettings from './TurnRelaySettings'
 import { errorMessage } from '../../../../shared/errors'
 import { SYNC_TCP_PORT } from '../../../../shared/ports'
+import { getBoolSetting, getJsonSetting, setBoolSetting, setJsonSetting } from '../../lib/settings'
 
 interface Peer {
   name: string
@@ -60,13 +61,12 @@ export default function SyncSettings() {
   const saveSyncSuccess = async (mode: string, dbUpdates: number, filesSynced: number) => {
     const stats = { time: Date.now(), mode, dbUpdates, filesSynced }
     setLastSyncStats(stats)
-    await window.electronAPI.db.setSetting('sync_last_run', JSON.stringify(stats))
+    await setJsonSetting('sync_last_run', stats)
   }
 
   useEffect(() => {
     async function loadSetting() {
-      const rawEnabled = await window.electronAPI.db.getSetting('sync_enabled')
-      const isEnabled = rawEnabled === 'true' || rawEnabled === true
+      const isEnabled = await getBoolSetting('sync_enabled', false)
       setSyncEnabled(isEnabled)
       
       if (isEnabled) {
@@ -74,12 +74,7 @@ export default function SyncSettings() {
         addLog('Sync engine enabled. LAN TCP Host started.')
       }
 
-      const rawStats = await window.electronAPI.db.getSetting('sync_last_run')
-      if (rawStats && typeof rawStats === 'string') {
-        try {
-          setLastSyncStats(JSON.parse(rawStats))
-        } catch {}
-      }
+      setLastSyncStats(await getJsonSetting('sync_last_run', null))
     }
     loadSetting()
   }, [])
@@ -108,7 +103,7 @@ export default function SyncSettings() {
   const handleToggleSync = async (checked: boolean) => {
     try {
       setSyncEnabled(checked)
-      await window.electronAPI.db.setSetting('sync_enabled', checked)
+      await setBoolSetting('sync_enabled', checked)
       
       if (checked) {
         await window.electronAPI.sync.startHost()

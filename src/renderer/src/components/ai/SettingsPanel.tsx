@@ -8,6 +8,7 @@
  */
 
 import React from 'react'
+import { setNumberSetting } from '../../lib/settings'
 
 interface Props {
   temperature: number
@@ -56,7 +57,7 @@ export default function SettingsPanel({
                 onChange={e => {
                   const v = parseFloat(e.target.value)
                   setTemperature(v)
-                  window.electronAPI.db.setSetting('ai_temperature', String(v)).catch(() => {})
+                  setNumberSetting('ai_temperature', v).catch(() => {})
                 }}
                 style={{ width: '100%', accentColor: 'var(--color-secondary)', cursor: 'pointer' }}
               />
@@ -81,7 +82,7 @@ export default function SettingsPanel({
                 onChange={e => {
                   const v = parseInt(e.target.value)
                   setMaxTokens(v)
-                  window.electronAPI.db.setSetting('ai_max_tokens', String(v)).catch(() => {})
+                  setNumberSetting('ai_max_tokens', v).catch(() => {})
                 }}
                 style={{ width: '100%', accentColor: 'var(--color-secondary)', cursor: 'pointer' }}
               />

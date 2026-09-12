@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { parseNaturalDate, describeDue } from '../../../shared/naturalDate'
+import { readWorkspaceList } from '../lib/workspaceList'
 
 // SVG Icons
 
@@ -187,8 +188,7 @@ export default function HudView() {
       try {
         // Context validation
         if (parsed.context !== 'default') {
-          const rawContexts = await window.electronAPI.db.getSetting('contexts_list')
-          const contexts = rawContexts ? JSON.parse(rawContexts as string) as Array<{ slug: string }> : []
+          const contexts = await readWorkspaceList()
           const exists = contexts.some(c => c.slug.toLowerCase() === parsed.context.toLowerCase())
           if (!exists) {
             setError(`Workspace '@${parsed.context}' does not exist.`)

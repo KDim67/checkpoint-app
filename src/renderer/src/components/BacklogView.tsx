@@ -21,6 +21,7 @@ import {
   describeView,
   type SavedView
 } from '../../../shared/savedViews'
+import { getJsonSetting, getStringSetting, setJsonSetting } from '../lib/settings'
 
 interface WorkflowColumn {
   id: string
@@ -40,7 +41,7 @@ export default function BacklogView() {
     useAppStore.getState().setPendingViewId(null)
     let cancelled = false
     ;(async () => {
-      const stored = await window.electronAPI.db.getSetting('saved_views').catch(() => null)
+      const stored = await getStringSetting('saved_views', '').catch(() => '')
       const all = [...BUILT_IN_VIEWS, ...normalizeSavedViews(stored)]
       const found = all.find(v => v.id === pendingViewId) ?? null
       if (!cancelled) {
@@ -182,9 +183,12 @@ export default function BacklogView() {
   const loadColumnLayout = useCallback(async () => {
     try {
       const key = `backlog_columns_layout_${activeWorkspace}`
-      const val = await window.electronAPI.db.getSetting(key)
-      if (val) {
-        const config = JSON.parse(val as string)
+      const config = await getJsonSetting<{
+        widths?: Record<string, number>
+        order?: string[]
+        visibility?: Record<string, boolean>
+      } | null>(key, null)
+      if (config) {
         if (config.widths) setColumnWidths(config.widths)
         if (config.order) setColumnOrder(config.order)
         if (config.visibility) setVisibleColumns(config.visibility)
@@ -202,9 +206,9 @@ export default function BacklogView() {
   ) => {
     try {
       const key = `backlog_columns_layout_${activeWorkspace}`
-      await window.electronAPI.db.setSetting(
+      await setJsonSetting(
         key,
-        JSON.stringify({ widths, order, visibility })
+        ({ widths, order, visibility })
       )
     } catch (err) {
       console.error('Failed to save column layout:', err)

@@ -9,6 +9,7 @@ import {
   type ThemePreset,
   type ThemeVariables
 } from '../../../../shared/themePresets'
+import { getStringSetting, setJsonSetting } from '../../lib/settings'
 
 const PRESETS_SETTING_KEY = 'customizer_theme_presets'
 
@@ -36,8 +37,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
   useEffect(() => {
     const load = async () => {
       try {
-        const stored = await window.electronAPI.db.getSetting(PRESETS_SETTING_KEY)
-        setSaved(normalizePresets(stored))
+        setSaved(normalizePresets(await getStringSetting(PRESETS_SETTING_KEY, '')))
       } catch (err) {
         console.error('Failed to load theme presets:', err)
       }
@@ -48,7 +48,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
   const persist = useCallback(async (next: ThemePreset[]) => {
     setSaved(next)
     try {
-      await window.electronAPI.db.setSetting(PRESETS_SETTING_KEY, next)
+      await setJsonSetting(PRESETS_SETTING_KEY, next)
     } catch (err) {
       console.error('Failed to save theme presets:', err)
       toast('Could not save presets')
