@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { CheckCircle2, Layout, RefreshCw, ArrowRight } from 'lucide-react'
+import { CheckCircle2, RefreshCw } from 'lucide-react'
 import { useAppStore } from '../../../store/appStore'
 import { withLock } from '../../../lib/asyncMutex'
 import { readBoardConfigUnlocked, loadBoardConfig } from '../../../lib/boardConfig'
@@ -9,6 +9,7 @@ import { normalizeCardJson } from '../aiActionParse'
 import { tagResolver } from '../../../data/tags'
 import { createItem, readItems } from '../../../data/items'
 import { executedActionSignaturesSet, createdItemsCacheMap, errorText } from './shared'
+import ViewOnKanbanButton from './ViewOnKanbanButton'
 
 export default function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
@@ -297,33 +298,12 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
 
       {/* View Action Button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
-        <button
+        <ViewOnKanbanButton
           onClick={() => {
             if (currentItem) selectItem(currentItem.id)
             setView('kanban')
           }}
-          style={{
-            background: 'var(--color-secondary)',
-            border: 'none',
-            color: 'var(--color-text-inverted)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '4px 10px',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-            transition: 'opacity 150ms ease'
-          }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-        >
-          <Layout size={12} />
-          <span>View on Kanban</span>
-          <ArrowRight size={11} />
-        </button>
+        />
       </div>
     </div>
   )

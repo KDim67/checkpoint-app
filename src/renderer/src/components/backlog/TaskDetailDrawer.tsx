@@ -20,6 +20,7 @@ import { listTags } from '../../data/tags'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
 import { searchItems } from '../../data/items'
 import { getRelations } from '../../data/relations'
+import DetailTitleInput from '../ui/DetailTitleInput'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -346,28 +347,13 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
         }}>
           {/* Editable Title */}
           <div>
-            <input
-              ref={titleInputRef}
+            <DetailTitleInput
+              inputRef={titleInputRef}
               id="task-modal-title"
-              type="text"
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={setTitle}
               onBlur={handleTitleBlur}
               placeholder="Enter task title..."
-              style={{
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: '1px solid transparent',
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--weight-bold)',
-                color: 'var(--color-text-base)',
-                outline: 'none',
-                padding: '4px 0',
-                transition: 'border-color var(--duration-fast)'
-              }}
-              onFocus={e => (e.target.style.borderBottomColor = 'var(--color-surface-offset)')}
-              onBlurCapture={e => (e.currentTarget.style.borderBottomColor = 'transparent')}
             />
           </div>
 

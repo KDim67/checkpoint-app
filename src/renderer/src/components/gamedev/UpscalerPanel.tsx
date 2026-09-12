@@ -4,6 +4,7 @@ import { CheckCircle, Download, Loader, Maximize2 } from 'lucide-react'
 import type { UpscalerTool } from './useUpscalerTool'
 import FilePickerButton from './FilePickerButton'
 import SettingsColumn from './SettingsColumn'
+import NoImageLoaded from './NoImageLoaded'
 
 export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
   return (
@@ -121,28 +122,11 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               }}
             >
               {!tool.upscaleUrl ? (
-                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
-                  <Maximize2 size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>No Image Loaded</span>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Drop a pixel-art image here, or browse for one.</span>
-                  </div>
-                  <button
-                    onClick={tool.handleSelectUpscaleFile}
-                    style={{
-                      background: 'var(--color-primary)',
-                      border: 'none',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'white',
-                      fontWeight: 'var(--weight-semibold)',
-                      fontSize: 'var(--text-xs)',
-                      padding: '10px 20px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Choose Image
-                  </button>
-                </div>
+                <NoImageLoaded
+                  icon={<Maximize2 size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />}
+                  hint="Drop a pixel-art image here, or browse for one."
+                  onChoose={tool.handleSelectUpscaleFile}
+                />
               ) : (
                 // imageRendering: pixelated. Without it the browser's smooth
                 // downscale blurs the crisp result, defeating the whole tool
