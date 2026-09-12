@@ -4,8 +4,9 @@
  * `currentChatId` is what marks the live conversation in the list; the drawer
  * never reads the messages themselves.
  *
- * Lifted out of AiStreamPanel with its JSX unchanged. State stays in the panel
- * and arrives as props: this unmounts every time it closes, so it must not own
+ * Lifted out of AiStreamPanel with its JSX unchanged. State lives in
+ * useSavedChats and arrives as one `chats` prop, beside the panel handlers that
+ * also reset the stream: this unmounts every time it closes, so it must not own
  * anything worth keeping.
  */
 
@@ -13,38 +14,28 @@ import React from 'react'
 import { Edit2, MessageSquare, Plus, Search, Trash2 } from 'lucide-react'
 import ChatPanelModal from './ChatPanelModal'
 import type { SavedChat } from './types'
+import type { SavedChats } from './useSavedChats'
 
 interface Props {
-  savedChats: SavedChat[]
-  currentChatId: string
-  chatSearchQuery: string
-  setChatSearchQuery: React.Dispatch<React.SetStateAction<string>>
-  editingChatId: string | null
-  setEditingChatId: React.Dispatch<React.SetStateAction<string | null>>
-  editingTitle: string
-  setEditingTitle: React.Dispatch<React.SetStateAction<string>>
+  chats: SavedChats
   handleNewChat: () => void
   handleLoadChat: (chat: SavedChat) => void
   handleDeleteChat: (id: string, e: React.MouseEvent) => void
-  handleSaveRename: (id: string) => void
-  setShowSavedChatsModal: React.Dispatch<React.SetStateAction<boolean>>
 }
 
-export default function SavedChatsModal({
-  savedChats,
-  currentChatId,
-  chatSearchQuery,
-  setChatSearchQuery,
-  editingChatId,
-  setEditingChatId,
-  editingTitle,
-  setEditingTitle,
-  handleNewChat,
-  handleLoadChat,
-  handleDeleteChat,
-  handleSaveRename,
-  setShowSavedChatsModal
-}: Props) {
+export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, handleDeleteChat }: Props) {
+  const {
+    savedChats,
+    currentChatId,
+    chatSearchQuery,
+    setChatSearchQuery,
+    editingChatId,
+    setEditingChatId,
+    editingTitle,
+    setEditingTitle,
+    handleSaveRename,
+    setShowSavedChatsModal
+  } = chats
   return (
     <ChatPanelModal
       icon={<MessageSquare size={14} style={{ color: 'var(--color-secondary)' }} />}
