@@ -45,3 +45,31 @@ export default function MenuItem({ onClick, children, icon }: MenuItemProps) {
 export function MenuDivider() {
   return <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
 }
+
+/**
+ * The panel a menu drops into: anchored under its trigger, above the content.
+ *
+ * The parent has to be positioned, which every caller already is because the
+ * trigger sits in it.
+ */
+export function MenuPanel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 'calc(100% + 4px)',
+        left: 0,
+        zIndex: 100,
+        background: 'var(--color-surface-elevated)',
+        border: '1px solid var(--color-surface-offset)',
+        borderRadius: 'var(--radius-md)',
+        boxShadow: 'var(--shadow-md)',
+        minWidth: '180px',
+        padding: '4px 0',
+        animation: 'dropdown-in 150ms var(--ease-enter)'
+      }}
+    >
+      {children}
+    </div>
+  )
+}
