@@ -471,7 +471,9 @@ app.whenReady().then(async () => {
   // saved bounds through getSetting. initDb is synchronous, and the window is
   // created hidden regardless. It is not revealed until ready-to-show, which
   // waits on the renderer bundle and dwarfs the cost of opening SQLite.
-  const { initDb, registerDbHandlers } = await import('./db')
+  const { initDb } = await import('./db')
+  const { registerDbHandlers } = await import('./ipc/db')
+  const { registerClipboardVaultHandlers } = await import('./ipc/clipboardVault')
 
   /**
    * A database that will not open used to take the window with it: the throw
@@ -508,6 +510,7 @@ app.whenReady().then(async () => {
       }).catch(() => {})
       registerIpcHandlers()
       registerDbHandlers(db)
+  registerClipboardVaultHandlers()
 
   // Last, and only when packaged. Nothing else waits on it.
   void import('./updater').then(({ initializeUpdater }) => initializeUpdater())

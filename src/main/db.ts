@@ -12,20 +12,7 @@
 import Database from 'better-sqlite3'
 import { join } from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { ipcMain } from 'electron'
-import { z } from 'zod'
 import { emitPluginEvent } from './pluginEvents'
-import {
-  CreateItemSchema,
-  UpdateItemSchema,
-  CreateTagSchema,
-  RelationTypeSchema,
-  BulkUpdateSchema,
-  SearchQuerySchema,
-  TaskQueryParamsSchema,
-  CreateFocusSessionSchema
-} from './validation'
-import { IpcChannels } from '../shared/ipcChannels'
 import { contextSettingKeys, remapContextSettings } from '../shared/contextSettings'
 import type { RemoteMutation } from '../shared/collabProtocol'
 import { wallIndexKey } from '../shared/wallModel'
@@ -990,6 +977,19 @@ export function deleteItem(id: string): string | null {
   return context
 }
 
+/**
+ * Deletes many items in one transaction.
+ *
+ * Runs the statement directly rather than looping deleteItem, which is what the
+ * bulk handler has always done: no tombstone is recorded for these.
+ */
+export function bulkDeleteItems(db: Database.Database, ids: string[]): number {
+  db.transaction(() => {
+    for (const id of ids) stmtDeleteItem.run(id)
+  })()
+  return ids.length
+}
+
 export function getAllTags(): Tag[] {
   return stmtGetAllTags.all() as Tag[]
 }
@@ -1534,7 +1534,7 @@ export function recordClipboardCopy(content: string): void {
   }
 }
 
-function createClipboardSnippet(content: string, label: string | null): void {
+export function createClipboardSnippet(content: string, label: string | null): void {
   const existing = stmtFindClipboardItemByContent.get(content) as { id: string; is_pinned: number } | undefined
   const now = Date.now()
   if (existing) {
@@ -1550,19 +1550,19 @@ function createClipboardSnippet(content: string, label: string | null): void {
   }
 }
 
-function toggleClipboardPin(id: string, isPinned: boolean): void {
+export function toggleClipboardPin(id: string, isPinned: boolean): void {
   stmtUpdateClipboardItemPin.run(isPinned ? 1 : 0, id)
 }
 
-function updateClipboardLabel(id: string, label: string | null): void {
+export function updateClipboardLabel(id: string, label: string | null): void {
   stmtUpdateClipboardItemLabel.run(label || null, id)
 }
 
-function deleteClipboardItem(id: string): void {
+export function deleteClipboardItem(id: string): void {
   stmtDeleteClipboardItem.run(id)
 }
 
-function restoreClipboardItem(content: string, isPinned: boolean, label: string | null): void {
+export function restoreClipboardItem(content: string, isPinned: boolean, label: string | null): void {
   const existing = stmtFindClipboardItemByContent.get(content) as { id: string; is_pinned: number } | undefined
   const now = Date.now()
   if (existing) {
@@ -1576,7 +1576,7 @@ function restoreClipboardItem(content: string, isPinned: boolean, label: string 
   }
 }
 
-function clearClipboardHistory(): void {
+export function clearClipboardHistory(): void {
   stmtClearClipboardHistory.run()
 }
 
@@ -1765,269 +1765,3 @@ export function importContextData(db: Database.Database, newContextSlug: string,
   })()
 }
 
-// IPC Handler Registration
-
-// Helper to wrap IPC actions in a safe result object that never throws over the bridge
-async function handleSafe<T>(fn: () => T | Promise<T>) {
-  try {
-    const data = await fn()
-    return { success: true, data }
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err)
-    console.error('IPC Database error:', err)
-    return { success: false, error: errorMessage }
-  }
-}
-
-export function registerDbHandlers(db: Database.Database): void {
-  ipcMain.handle(IpcChannels.DB_GET_ITEMS, (_event, context: unknown, type: unknown, page: unknown, pageSize: unknown) => {
-    return handleSafe(() => {
-      const parsedContext = z.string().parse(context)
-      const parsedType = z.string().parse(type)
-      const parsedPage = z.number().int().nonnegative().parse(page)
-      const parsedPageSize = z.number().int().positive().parse(pageSize)
-      return getItemsPaginated(parsedContext, parsedType, parsedPage, parsedPageSize)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_CREATE_ITEM, (_event, payload: unknown, tagIds: unknown) => {
-    return handleSafe(() => {
-      const parsedPayload = CreateItemSchema.parse(payload)
-      const parsedTagIds = z.array(z.string()).default([]).parse(tagIds)
-      return createItem(db, parsedPayload, parsedTagIds)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_UPDATE_ITEM, (_event, id: unknown, patch: unknown, tagIds?: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      const parsedPatch = UpdateItemSchema.parse(patch)
-      const parsedTagIds = tagIds !== undefined ? z.array(z.string()).parse(tagIds) : undefined
-      return updateItem(db, parsedId, parsedPatch, parsedTagIds)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_DELETE_ITEM, (_event, id: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      return { context: deleteItem(parsedId) }
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_GET_TAGS, () => {
-    return handleSafe(() => getAllTags())
-  })
-
-  ipcMain.handle(IpcChannels.DB_CREATE_TAG, (_event, payload: unknown) => {
-    return handleSafe(() => {
-      const parsedPayload = CreateTagSchema.parse(payload)
-      return createTag(parsedPayload)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_UPDATE_TAG, (_event, id: unknown, payload: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      const parsedPayload = CreateTagSchema.partial().parse(payload)
-      return updateTag(parsedId, parsedPayload)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_DELETE_TAG, (_event, id: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      deleteTag(parsedId)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_GET_SETTING, (_event, key: unknown) => {
-    return handleSafe(() => {
-      const parsedKey = z.string().parse(key)
-      return getSetting(parsedKey, null)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_SET_SETTING, (_event, key: unknown, value: unknown) => {
-    return handleSafe(() => {
-      const parsedKey = z.string().parse(key)
-      setSetting(parsedKey, value)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_DELETE_SETTING, (_event, key: unknown) => {
-    return handleSafe(() => {
-      const parsedKey = z.string().parse(key)
-      deleteSetting(parsedKey)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_GET_RELATIONS, (_event, itemId: unknown) => {
-    return handleSafe(() => {
-      const parsedItemId = z.string().parse(itemId)
-      return getRelations(parsedItemId)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_CREATE_RELATION, (_event, fromId: unknown, toId: unknown, type: unknown) => {
-    return handleSafe(() => {
-      const parsedFromId = z.string().parse(fromId)
-      const parsedToId = z.string().parse(toId)
-      const parsedType = RelationTypeSchema.parse(type)
-      return createRelation(parsedFromId, parsedToId, parsedType)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_DELETE_RELATION, (_event, id: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      deleteRelation(parsedId)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_SEARCH_ITEMS, (_event, query: unknown) => {
-    return handleSafe(() => {
-      const parsedQuery = SearchQuerySchema.parse(query)
-      return searchItems(parsedQuery)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_GET_CONTEXTS, () => {
-    return handleSafe(() => getContextSlugs())
-  })
-
-  ipcMain.handle(IpcChannels.DB_BULK_UPDATE_ITEMS, (_event, payload: unknown) => {
-    return handleSafe(() => {
-      const parsedPayload = BulkUpdateSchema.parse(payload)
-      const now = Date.now()
-
-      // Build the SET clause once from whichever fields were actually provided,
-      // so bulk status/priority/context updates all persist (not just status).
-      const setFields: string[] = []
-      const baseParams: Record<string, unknown> = { updated_at: now }
-      if (parsedPayload.patch.status !== undefined) {
-        setFields.push('status = @status')
-        baseParams.status = parsedPayload.patch.status
-      }
-      if (parsedPayload.patch.priority !== undefined) {
-        setFields.push('priority = @priority')
-        baseParams.priority = parsedPayload.patch.priority
-      }
-      if (parsedPayload.patch.context !== undefined) {
-        setFields.push('context = @context')
-        baseParams.context = parsedPayload.patch.context
-      }
-
-      if (setFields.length > 0) {
-        setFields.push('updated_at = @updated_at')
-        const stmtBulkUpdate = db.prepare(
-          `UPDATE items SET ${setFields.join(', ')} WHERE id = @id`
-        )
-        db.transaction(() => {
-          for (const id of parsedPayload.ids) {
-            stmtBulkUpdate.run({ ...baseParams, id })
-          }
-        })()
-      }
-
-      return { updated: parsedPayload.ids.length }
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_BULK_DELETE_ITEMS, (_event, ids: unknown) => {
-    return handleSafe(() => {
-      const parsedIds = z.array(z.string()).parse(ids)
-      db.transaction(() => {
-        for (const id of parsedIds) stmtDeleteItem.run(id)
-      })()
-      return { deleted: parsedIds.length }
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_REBALANCE_POSITIONS, (_event, context: unknown, status: unknown) => {
-    return handleSafe(() => {
-      const parsedContext = z.string().parse(context)
-      const parsedStatus = z.string().parse(status)
-      rebalancePositions(db, parsedContext, parsedStatus)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_QUERY_TASKS, (_event, context: unknown, params: unknown) => {
-    return handleSafe(() => {
-      const parsedContext = z.string().parse(context)
-      const parsedParams = TaskQueryParamsSchema.parse(params)
-      return queryTasks(db, parsedContext, parsedParams)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_CREATE_FOCUS_SESSION, (_event, payload: unknown) => {
-    return handleSafe(() => {
-      const parsedPayload = CreateFocusSessionSchema.parse(payload)
-      return createFocusSession(parsedPayload)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.DB_GET_FOCUS_SESSIONS, (_event, context: unknown) => {
-    return handleSafe(() => {
-      const parsedContext = z.string().parse(context)
-      return getFocusSessions(parsedContext)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.TRACKER_GET_STATS, (_event, context: unknown, timeStart: unknown, timeEnd: unknown) => {
-    return handleSafe(() => {
-      const parsedContext = z.string().nullable().parse(context)
-      const parsedStart = z.number().parse(timeStart)
-      const parsedEnd = z.number().parse(timeEnd)
-      return getActivityStats(parsedContext, parsedStart, parsedEnd)
-    })
-  })
-
-  // Clipboard History Handlers
-  ipcMain.handle(IpcChannels.CLIPBOARD_GET_HISTORY, () => {
-    return handleSafe(() => getClipboardHistory())
-  })
-
-  ipcMain.handle(IpcChannels.CLIPBOARD_TOGGLE_PIN, (_event, id: unknown, isPinned: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      const parsedPin = z.boolean().parse(isPinned)
-      toggleClipboardPin(parsedId, parsedPin)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.CLIPBOARD_UPDATE_LABEL, (_event, id: unknown, label: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      const parsedLabel = z.string().nullable().parse(label)
-      updateClipboardLabel(parsedId, parsedLabel)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.CLIPBOARD_DELETE_ITEM, (_event, id: unknown) => {
-    return handleSafe(() => {
-      const parsedId = z.string().parse(id)
-      deleteClipboardItem(parsedId)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.CLIPBOARD_RESTORE_ITEM, (_event, content: unknown, isPinned: unknown, label: unknown) => {
-    return handleSafe(() => {
-      const parsedContent = z.string().parse(content)
-      const parsedPin = z.boolean().parse(isPinned)
-      const parsedLabel = z.string().nullable().parse(label)
-      restoreClipboardItem(parsedContent, parsedPin, parsedLabel)
-    })
-  })
-
-  ipcMain.handle(IpcChannels.CLIPBOARD_CLEAR_HISTORY, () => {
-    return handleSafe(() => clearClipboardHistory())
-  })
-
-  ipcMain.handle(IpcChannels.CLIPBOARD_CREATE_SNIPPET, (_event, content: unknown, label: unknown) => {
-    return handleSafe(() => {
-      const parsedContent = z.string().parse(content)
-      const parsedLabel = z.string().nullable().parse(label)
-      createClipboardSnippet(parsedContent, parsedLabel)
-    })
-  })
-}
