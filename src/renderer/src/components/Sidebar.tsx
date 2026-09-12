@@ -4,6 +4,7 @@ import { getBoolSetting } from '../lib/settings'
 import SharedBadge from './ui/SharedBadge'
 import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
+import MenuItem, { MenuDivider } from './ui/MenuItem'
 
 // Icons (SVG inline: no icon-lib dependency)
 
@@ -319,32 +320,17 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
           )
         })}
       </div>
-      <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
-      <button
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)',
-          width: '100%',
-          padding: '6px 12px',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: 'var(--text-sm)',
-          color: 'var(--color-text-muted)',
-          textAlign: 'left'
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+      <MenuDivider />
+      <MenuItem
+        icon={<IconPlus style={{ opacity: 0.7 }} />}
         onClick={() => {
           setView('settings')
           setSettingsTab('workspaces')
           onClose()
         }}
       >
-        <IconPlus style={{ opacity: 0.7 }} />
         Manage / New Workspace
-      </button>
+      </MenuItem>
     </div>
   )
 }
