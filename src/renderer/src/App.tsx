@@ -34,6 +34,7 @@ import {
   type ShortcutBindings
 } from './lib/shortcuts'
 import { readWorkspaceList, writeWorkspaceList } from './lib/workspaceList'
+import { getContexts } from './data/workspaces'
 
 // Lazy-loaded views (code split per view)
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
@@ -673,7 +674,7 @@ export default function App() {
   // last-active one. Previously that setting was saved but never read.
   const loadContexts = useCallback(async () => {
     try {
-      const contexts = await window.electronAPI.db.getContexts()
+      const contexts = await getContexts()
       if (contexts.length > 0) {
         setAvailableWorkspaces(contexts)
 

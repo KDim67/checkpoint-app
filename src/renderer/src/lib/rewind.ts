@@ -15,6 +15,7 @@ import {
 } from '../../../shared/rewind'
 import type { Item } from '../../../shared/types'
 import { errorMessage } from '../../../shared/errors'
+import { getFocusSessions } from '../data/focus'
 
 interface RewindResult {
   rewind: Rewind
@@ -37,7 +38,7 @@ async function gitPathFor(context: string): Promise<string | null> {
 export async function loadRewind(item: Item): Promise<RewindResult> {
   const unavailable: string[] = []
 
-  const sessions = await window.electronAPI.db.getFocusSessions(item.context).catch(() => [])
+  const sessions = await getFocusSessions(item.context).catch(() => [])
 
   // No sitting means nothing to filter the other streams to, so they are never
   // queried. The panel shows its empty state instead.

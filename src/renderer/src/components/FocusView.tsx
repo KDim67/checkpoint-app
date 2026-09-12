@@ -17,6 +17,7 @@ import ConfirmDialog from './ui/ConfirmDialog'
 import { isTypingTarget } from '../lib/shortcuts'
 import { useViewShortcuts } from '../lib/useViewShortcuts'
 import { createItem, itemPage, updateItem } from '../data/items'
+import { createFocusSession, getFocusSessions } from '../data/focus'
 
 interface SelectedTask {
   id: string
@@ -105,7 +106,7 @@ export default function FocusView() {
       setDbItems(merged)
 
       // 2. Fetch past focus sessions
-      const sessions = await window.electronAPI.db.getFocusSessions(activeWorkspace)
+      const sessions = await getFocusSessions(activeWorkspace)
       setPastSessions(sessions.slice(0, 5)) // show top 5 recent sessions
 
       // 3. Handle preselected task navigation for immediate Pomodoro timer start
@@ -337,7 +338,7 @@ export default function FocusView() {
       )
 
       // 1. Write session row to focus_sessions
-      await window.electronAPI.db.createFocusSession({
+      await createFocusSession({
         context: activeWorkspace,
         duration_ms: elapsedTimeMs,
         notes: retroNotes.trim(),
