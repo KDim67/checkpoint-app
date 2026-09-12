@@ -694,6 +694,18 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* The gap a dragged card would land in. It is a different element every time
+   the target changes, so it arrives rather than slides, and a short fade is
+   what stops that reading as a flicker. */
+@keyframes card-drop-slot-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.card-drop-slot {
+  animation: card-drop-slot-in var(--duration-fast) var(--ease-default);
+}
+
 @keyframes breathe {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.015); }

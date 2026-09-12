@@ -10,7 +10,7 @@ import {
   visibleCardHistory,
   type CardChange
 } from '../../../../shared/cardHistory'
-import { DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
+import { authorLabel, DISPLAY_NAME_KEY, resolveAuthor } from '../../../../shared/identity'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CustomCodeBlock } from '../log/LogEntry'
@@ -70,6 +70,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const [activities, setActivities] = useState<CardChange[]>([])
   /** Read once per card open. Whoever is named here is credited with the save. */
   const [displayName, setDisplayName] = useState('')
+  /** Drop feedback for the attachments section. */
+  const [draggingAttachment, setDraggingAttachment] = useState(false)
   const [attachments, setAttachments] = useState<Array<{ id: string; name: string; path: string; isImage: boolean; createdAt: number }>>([])
   const [isTemplate, setIsTemplate] = useState(false)
   const [dueDateCompleted, setDueDateCompleted] = useState(false)
@@ -380,7 +382,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     if (!commentInput.trim()) return
     const newComment = {
       id: `com-${Date.now()}`,
-      user: 'Developer',
+      user: displayName,
       text: commentInput.trim(),
       createdAt: Date.now()
     }
@@ -414,26 +416,39 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     addActivity(`Attached link: "${url.trim()}"`)
   }
 
-  const handleAddFileAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0]
-      const name = file.name
-      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
-      const path = window.electronAPI.app.getPathForFile(file)
-      const isImage = file.type.startsWith('image/')
-      
-      const newAttachment = {
-        id: `att-${Date.now()}`,
-        name,
-        path,
-        isImage,
-        createdAt: Date.now()
-      }
-      const updated = [...attachments, newAttachment]
-      setAttachments(updated)
-      updateMetadata({ attachments: updated })
-      addActivity(`Attached file: "${name}"`)
-    }
+  /**
+   * Shared by the file picker and the drop zone, and it takes more than one:
+   * dropping a handful of files at once is the whole point of dropping them.
+   */
+  const attachFiles = (files: FileList | File[]) => {
+    const at = Date.now()
+    const added = Array.from(files)
+      .map((file, i) => ({
+        // Indexed, because a drop of several files lands in one millisecond.
+        id: `att-${at}-${i}`,
+        name: file.name,
+        // Electron >= 32: File.path no longer exists. Resolve via preload webUtils.
+        path: window.electronAPI.app.getPathForFile(file),
+        isImage: file.type.startsWith('image/'),
+        createdAt: at
+      }))
+      // Anything not on this disk, such as a file dragged out of a browser,
+      // resolves to no path, and an attachment that points nowhere is worse
+      // than one that was never added.
+      .filter(a => a.path)
+
+    if (added.length === 0) return
+
+    const updated = [...attachments, ...added]
+    setAttachments(updated)
+    updateMetadata({ attachments: updated })
+    addActivity(
+      added.length === 1 ? `Attached file: "${added[0].name}"` : `Attached ${added.length} files`
+    )
+  }
+
+  const handleAddFileAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) attachFiles(e.target.files)
   }
 
   const handleSetCoverImage = (urlOrPath: string) => {
@@ -1730,11 +1745,48 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </div>
           </div>
 
-          {/* Attachments Segment */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
+          {/* Attachments Segment. The whole section is the drop target, not
+              just the button: dragging a file at a small button is a worse
+              version of clicking it. */}
+          <div
+            onDragOver={e => {
+              if (isReadOnly) return
+              e.preventDefault()
+              setDraggingAttachment(true)
+            }}
+            onDragLeave={e => {
+              // Fires when crossing into a child, so only a leave that actually
+              // exits the section counts.
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDraggingAttachment(false)
+            }}
+            onDrop={e => {
+              // First, and whatever the drop turns out to be. Letting a drop
+              // run its default is how a window navigates to what was dropped
+              // on it, and a card modal replaced by a text file is not a state
+              // there is a way back from.
+              e.preventDefault()
+              setDraggingAttachment(false)
+              if (isReadOnly || e.dataTransfer.files.length === 0) return
+              attachFiles(e.dataTransfer.files)
+            }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-3)',
+              borderTop: '1px solid var(--color-surface-offset)',
+              paddingTop: 'var(--space-4)',
+              marginTop: 'var(--space-2)',
+              outline: draggingAttachment ? '2px dashed var(--color-secondary)' : 'none',
+              outlineOffset: 'var(--space-2)',
+              borderRadius: 'var(--radius-md)'
+            }}
+          >
             <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Paperclip size={13} style={{ color: 'var(--color-secondary)' }} />
               Attachments
+              <span style={{ fontWeight: 'var(--weight-regular)', textTransform: 'none', color: 'var(--color-text-faint)' }}>
+                {draggingAttachment ? 'drop to attach' : 'or drop files here'}
+              </span>
             </span>
 
             {/* List of Attachments */}
@@ -1980,7 +2032,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                     }}
                   >
                     <div className="row-between">
-                      <strong style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>{c.user}</strong>
+                      <strong style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>{authorLabel(c.user)}</strong>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
                           {new Date(c.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}

@@ -48,11 +48,24 @@ async function readUnlocked(context: string): Promise<{ config: BoardConfig; mig
   }
 }
 
+/**
+ * Raised on every write of a board document, so a live sharing session can pass
+ * it on.
+ *
+ * The same shape as the `db-mutation` event the item layer raises, and for the
+ * same reason: the writer should not have to know a session exists, and the
+ * session should not have to poll. Board settings do not go through the item
+ * mutation path, which is why they used to reach a peer exactly once, with the
+ * opening baseline, and never again.
+ */
+export const BOARD_CONFIG_EVENT = 'board-config-written'
+
 async function writeUnlocked(context: string, config: BoardConfig): Promise<void> {
   // Passed as an object, so setSetting encodes it exactly once. The legacy
   // column key was stringified by its caller as well, producing a
   // double-encoded value; not repeating that is what keeps reads simple.
   await window.electronAPI.db.setSetting(boardConfigKey(context), config)
+  window.dispatchEvent(new CustomEvent(BOARD_CONFIG_EVENT, { detail: { context, board: config } }))
 }
 
 /**

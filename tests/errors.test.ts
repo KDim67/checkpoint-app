@@ -43,6 +43,35 @@ describe('errorMessage', () => {
   })
 })
 
+// This is the shape a WebRTC failure arrives in: an Event, not an Error, with
+// the text one level down. Read as-is it came out as the fallback, and a dead
+// sharing session reported nothing about why it died.
+describe('errorMessage, an event carrying an error', () => {
+  it('reads the error hanging off an event', () => {
+    expect(errorMessage({ type: 'error', error: new Error('sctp-failure') })).toBe('sctp-failure')
+  })
+
+  it('reads one that is a plain object rather than an Error', () => {
+    expect(errorMessage({ type: 'error', error: { message: 'User-Initiated Abort' } }))
+      .toBe('User-Initiated Abort')
+  })
+
+  it('prefers the message the event carries itself', () => {
+    expect(errorMessage({ message: 'outer', error: { message: 'inner' } })).toBe('outer')
+  })
+
+  it('falls back when the nested error says nothing either', () => {
+    expect(errorMessage({ type: 'error', error: {} })).toBe('Something went wrong.')
+    expect(errorMessage({ type: 'error', error: null })).toBe('Something went wrong.')
+  })
+
+  it('does not spin on a value that points at itself', () => {
+    const loop: Record<string, unknown> = { type: 'error' }
+    loop.error = loop
+    expect(errorMessage(loop)).toBe('Something went wrong.')
+  })
+})
+
 describe('isAbortError', () => {
   it('recognises a DOM abort', () => {
     const err = new Error('The operation was aborted')

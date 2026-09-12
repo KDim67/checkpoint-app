@@ -128,7 +128,10 @@ function KanbanCard({
       : '0 1px 3px rgba(0,0,0,0.2)',
     zIndex: isDragging ? 999 : 1,
     overflow: 'hidden',
-    flexShrink: 0
+    flexShrink: 0,
+    // The whole card is the drag handle, so a drag that starts on the title
+    // would otherwise sweep a text selection across the board behind it.
+    userSelect: 'none'
   }
 
   const plainText = stripMarkdown(card.body)
@@ -225,6 +228,8 @@ function KanbanCard({
   return (
     <div
       ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       style={{ ...cardStyle, outline: 'none' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -276,6 +281,9 @@ function KanbanCard({
               {display.doneCheckbox && (
               <button
                 title={card.status === 'done' ? "Mark as Incomplete (X)" : "Mark as Done (X)"}
+                // As with the action buttons: ticking a card should never turn
+                // into picking it up.
+                onPointerDown={e => e.stopPropagation()}
                 onClick={async (e) => {
                   e.stopPropagation()
                   if (onUpdate) {
@@ -389,9 +397,11 @@ function KanbanCard({
                 </ActionBtn>
               </div>
 
+              {/* The whole card drags now, so this is only the sign that says
+                  so. Kept because without it nothing tells you the card is
+                  draggable until you try. */}
               <div
-                {...attributes}
-                {...listeners}
+                aria-hidden
                 style={{
                   color: hovered ? (isFullCover ? coverTextColor : 'var(--color-text-muted)') : 'transparent',
                   cursor: 'grab',
@@ -400,7 +410,7 @@ function KanbanCard({
                   display: 'flex',
                   alignItems: 'center'
                 }}
-                title="Drag to reorder card"
+                title="Drag from anywhere on the card"
               >
                 <GripVertical size={14} />
               </div>
@@ -552,6 +562,10 @@ function ActionBtn({
     <button
       title={title}
       onClick={onClick}
+      // The card drags from anywhere, which includes these. A slightly shaky
+      // press on Delete would otherwise pick the card up instead of pressing
+      // it, so the drag is never armed from a button.
+      onPointerDown={e => e.stopPropagation()}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
