@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { parseNaturalDate, describeDue } from '../../../shared/naturalDate'
 import { readWorkspaceList } from '../lib/workspaceList'
+import { resolveTagIds } from '../data/tags'
 
 // SVG Icons
 
@@ -198,22 +199,9 @@ export default function HudView() {
         }
 
         // 1. Resolve and create tags as needed
-        const existingTags = await window.electronAPI.db.getTags()
-        const tagIds: string[] = []
-
-        for (const tagName of parsed.tags) {
-          const matched = existingTags.find(t => t.name.toLowerCase() === tagName.toLowerCase())
-          if (matched) {
-            tagIds.push(matched.id)
-          } else {
-            // Create tag dynamically
-            const newTag = await window.electronAPI.db.createTag({
-              name: tagName.toLowerCase(),
-              color: '#535e85'
-            })
-            tagIds.push(newTag.id)
-          }
-        }
+        const tagIds = await resolveTagIds(
+          parsed.tags.map(name => ({ name: name.toLowerCase(), color: '#535e85' }))
+        )
 
         // 2. Insert item into SQLite database
         await window.electronAPI.db.createItem({

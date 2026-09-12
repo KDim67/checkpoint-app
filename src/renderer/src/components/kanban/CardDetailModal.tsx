@@ -24,6 +24,7 @@ import RewindPanel from './RewindPanel'
 import { getStringSetting } from '../../lib/settings'
 import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
+import { listTags } from '../../data/tags'
 
 interface CardDetailModalProps {
   cardId: string
@@ -150,7 +151,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           }
 
 
-          const tags = await window.electronAPI.db.getTags()
+          const tags = await listTags()
           setAllTags(tags)
 
           const rawName = await getStringSetting(DISPLAY_NAME_KEY, '')

@@ -10,6 +10,7 @@
 import React, { useState } from 'react'
 import type { Tag } from '../../../../shared/types'
 import ColorPicker from './ColorPicker'
+import { createTag, listTags } from '../../data/tags'
 
 /** Enough colours to tell labels apart at a glance, few enough to pick from. */
 const SWATCHES = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#cdf12b', '#ff45b5']
@@ -27,8 +28,8 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
     const trimmed = name.trim()
     if (!trimmed) return
     try {
-      const created = await window.electronAPI.db.createTag({ name: trimmed, color })
-      onCreated(created, await window.electronAPI.db.getTags())
+      const created = await createTag(trimmed, color)
+      onCreated(created, await listTags())
       setName('')
     } catch (err) {
       console.error(err)

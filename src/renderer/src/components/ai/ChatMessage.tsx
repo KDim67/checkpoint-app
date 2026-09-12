@@ -24,6 +24,7 @@ import type {
 import { asArray, asObject, str, tagColorOf, tagNameOf, toColorMode, toItemPriority } from './aiActionTypes'
 import type { Item, Tag } from '@shared/types'
 import { AI_DIALOGUE_EVENT } from '../gamedev/useDialogueTool'
+import { tagResolver } from '../../data/tags'
 
 interface ChatMessageProps {
   message: {
@@ -394,26 +395,15 @@ function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
 
           // Load tags once and reuse/extend as we create cards, so colored tags
           // from the AI are actually applied in the batch path (previously dropped).
-          const existingTags: Tag[] = await window.electronAPI.db.getTags().catch(() => [])
+          const resolve = await tagResolver()
           const resolveTagIds = async (tags: unknown[]): Promise<string[]> => {
-            if (!Array.isArray(tags) || tags.length === 0) return []
-            const ids: string[] = []
-            for (const t of tags) {
-              const tagName = tagNameOf(t)
-              if (!tagName) continue
-              const tagColor = tagColorOf(t, '#3b82f6')
-              let found = existingTags.find(et => et.name.toLowerCase() === tagName.toLowerCase())
-              if (!found) {
-                try {
-                  found = await window.electronAPI.db.createTag({ name: tagName, color: tagColor })
-                  if (found) existingTags.push(found)
-                } catch (err) {
-                  console.warn('Failed to create tag:', err)
-                }
-              }
-              if (found) ids.push(found.id)
-            }
-            return ids
+            if (!Array.isArray(tags)) return []
+            const found = await resolve(
+              tags
+                .map(t => ({ name: tagNameOf(t) ?? '', color: tagColorOf(t, '#3b82f6') }))
+                .filter(t => t.name)
+            )
+            return found.map(tag => tag.id)
           }
 
           // Position base: explicit ascending positions keep the batch in order
@@ -1217,30 +1207,16 @@ function CreateTaskActionBlock({ jsonString }: { jsonString: string }) {
           finalStatus = matchedCol ? matchedCol.id : (cols[0]?.id || 'open')
 
           // Handle Tags if provided
-          const tagIds: string[] = []
-          const createdTagsList: Tag[] = []
-          if (Array.isArray(normalized.tags) && normalized.tags.length > 0) {
-            const existingTags = await window.electronAPI.db.getTags().catch(() => [])
-            for (const t of normalized.tags) {
-              // Skipping nameless tags matches the batch path. Reading `.name` off
-              // whatever the model sent used to throw here and fail the whole card.
-              const tagName = tagNameOf(t)
-              if (!tagName) continue
-              const tagColor = tagColorOf(t, '#3b82f6')
-              let found = existingTags.find(et => et.name.toLowerCase() === tagName.toLowerCase())
-              if (!found) {
-                try {
-                  found = await window.electronAPI.db.createTag({ name: tagName, color: tagColor })
-                } catch (err) {
-                  console.warn('Failed to create tag:', err)
-                }
-              }
-              if (found) {
-                tagIds.push(found.id)
-                createdTagsList.push(found)
-              }
-            }
-          }
+          // Nameless tags are skipped rather than thrown on: reading `.name` off
+          // whatever the model sent used to fail the whole card.
+          const createdTagsList: Tag[] = Array.isArray(normalized.tags)
+            ? await (await tagResolver())(
+                normalized.tags
+                  .map(t => ({ name: tagNameOf(t) ?? '', color: tagColorOf(t, '#3b82f6') }))
+                  .filter(t => t.name)
+              )
+            : []
+          const tagIds = createdTagsList.map(tag => tag.id)
 
           const newItem = await window.electronAPI.db.createItem({
             context: validContext,

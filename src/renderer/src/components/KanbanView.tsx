@@ -64,6 +64,7 @@ import { errorMessage } from '../../../shared/errors'
 import { getTextColorForBackground } from '../lib/contrast'
 import { writeWorkspaceList } from '../lib/workspaceList'
 import { getStringSetting, setStringSetting } from '../lib/settings'
+import { listTags } from '../data/tags'
 
 
 // Re-exported rather than declared: the shape now belongs to lib/boardConfig,
@@ -910,7 +911,7 @@ export default function KanbanView() {
 
   const loadTags = useCallback(async () => {
     try {
-      const tags = await window.electronAPI.db.getTags()
+      const tags = await listTags()
       setAllTags(tags)
     } catch (err) {
       console.error('Failed to load tags:', err)
