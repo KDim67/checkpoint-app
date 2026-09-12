@@ -399,6 +399,13 @@ export default function KanbanView() {
   const [allTags, setAllTags] = useState<Tag[]>([])
 
   const [archivedColumns, setArchivedColumns] = useState<ColumnConfig[]>([])
+  /**
+   * The archive list as it stands. The columns keep whichever archive handler
+   * they last rendered with, so a handler reading state would see the list as
+   * it was when the board loaded and write that back over the real one.
+   */
+  const archivedColumnsRef = useRef<ColumnConfig[]>([])
+  useEffect(() => { archivedColumnsRef.current = archivedColumns }, [archivedColumns])
   const [showArchiveBin, setShowArchiveBin] = useState(false)
   const closeArchiveBin = useCallback(() => setShowArchiveBin(false), [])
   const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set())
@@ -844,20 +851,19 @@ export default function KanbanView() {
       // Both halves in one patch: archiving moves a column between two lists,
       // and writing them separately left a window where the column existed in
       // neither if the second write failed.
-      const updatedArchived = [...archivedColumns, colToArchive]
+      const updatedArchived = [...archivedColumnsRef.current, colToArchive]
       const updatedCols = current.filter(c => c.id !== colId)
       columnsRef.current = updatedCols
+      archivedColumnsRef.current = updatedArchived
       setColumns(updatedCols)
       setArchivedColumns(updatedArchived)
       await persistConfig({ columns: updatedCols, archivedColumns: updatedArchived })
-
-      setArchivedColumns(updatedArchived)
       loadCards()
       toast(`Column "${colToArchive.name}" archived`)
     } catch (err) {
       console.error(err)
     }
-  }, [activeWorkspace, persistColumns, loadCards, toast])
+  }, [persistConfig, loadCards, toast])
 
   // Card Management
 
