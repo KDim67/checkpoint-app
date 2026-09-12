@@ -4,10 +4,10 @@ import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { IpcChannels } from '../shared/ipcChannels'
 import { getSetting, setSetting, closeDb } from './db'
-import { enableHud, disableHud } from './hud'
 import { initTitleBarSync, updateNativeTitleBarFromSettings } from './titleBarSync'
 import { initCheatsheets, getCheatsheetsDir } from './cheatsheetService'
 import { beginQuit, getMainWindow, isQuitting, sendToWindow, setMainWindow } from './windows'
+import { registerAppShortcuts } from './appShortcuts'
 import { getStartupSettings, launchedMinimised } from './tray'
 
 // Pure constants with no dependencies of their own, so importing them
@@ -69,7 +69,6 @@ app.commandLine.appendSwitch('log-level', '3')
 // Suppress default Electron menu bar entirely
 Menu.setApplicationMenu(null)
 
-let activeClipboardHotkey = ''
 
 // Single Instance Lock
 /**
@@ -98,60 +97,6 @@ if (!gotTheLock) {
       win.focus()
     }
   })
-}
-
-function registerAppShortcuts(): void {
-  // Unregister existing custom shortcut if any
-  if (activeClipboardHotkey) {
-    globalShortcut.unregister(activeClipboardHotkey)
-    activeClipboardHotkey = ''
-  }
-
-  // Load customizer status
-  const customizerEnabled = getSetting<string>('customizer_enabled', 'false') === 'true'
-
-  let hudKey = 'CommandOrControl+Shift+Space'
-  let clipboardKey = 'CommandOrControl+Shift+V'
-
-  if (customizerEnabled) {
-    try {
-      const rawShortcuts = getSetting<string>('customizer_shortcuts', '{}')
-      const shortcuts = JSON.parse(rawShortcuts)
-      if (shortcuts.hud_toggle) hudKey = shortcuts.hud_toggle
-      if (shortcuts.clipboard_toggle) clipboardKey = shortcuts.clipboard_toggle
-    } catch (err) {
-      console.error('[index.ts] Failed to parse customizer_shortcuts:', err)
-    }
-  }
-
-  // 1. HUD Toggle shortcut (via hud module)
-  try {
-    const featureHud = getSetting<string>('feature_hud', 'true')
-    if (featureHud !== 'false') {
-      enableHud(hudKey)
-    } else {
-      disableHud()
-    }
-  } catch (err) {
-    console.error('[index.ts] Failed to bind HUD shortcut:', err)
-  }
-
-  // 2. Clipboard Toggle shortcut
-  activeClipboardHotkey = clipboardKey
-  const registered = globalShortcut.register(activeClipboardHotkey, () => {
-    const win = getMainWindow()
-    if (win) {
-      if (win.isMinimized()) win.restore()
-      win.show()
-      win.focus()
-      win.webContents.send(IpcChannels.APP_NAVIGATE_TO_VIEW, 'clipboard')
-    }
-  })
-
-  if (!registered) {
-    console.error(`Failed to register global clipboard hotkey: ${activeClipboardHotkey}`)
-    activeClipboardHotkey = ''
-  }
 }
 
 /**
