@@ -44,6 +44,12 @@ interface KanbanColumnProps {
   dropHeight?: number
 }
 
+interface ColumnBodyProps extends KanbanColumnProps {
+  nodeRef: (element: HTMLElement | null) => void
+  /** the pointer is on the column itself, not one of its cards */
+  pointedAt: boolean
+}
+
 function MenuItem({ label, onClick, danger = false }: { label: string; onClick: () => void; danger?: boolean }) {
   const [hover, setHover] = useState(false)
   return (
@@ -87,7 +93,7 @@ function DropPlaceholder({ height, warn }: { height: number; warn: boolean }) {
   )
 }
 
-function KanbanColumn({
+function ColumnBody({
   id,
   name,
   wipLimit,
@@ -112,9 +118,10 @@ function KanbanColumn({
   description,
   cardDisplay,
   dropSlot = null,
-  dropHeight = 0
-}: KanbanColumnProps) {
-  const { setNodeRef, isOver: pointedAt } = useDroppable({ id })
+  dropHeight = 0,
+  nodeRef,
+  pointedAt
+}: ColumnBodyProps) {
   const confirm = useConfirm()
 
   const [isEditing, setIsEditing] = useState(false)
@@ -207,7 +214,7 @@ function KanbanColumn({
   if (collapsed) {
     return (
       <div
-        ref={setNodeRef}
+        ref={nodeRef}
         id={`kanban-col-${id}`}
         style={{
           width: '48px',
@@ -276,7 +283,7 @@ function KanbanColumn({
   return (
     <div
       // the whole column: header and Add card count as aimed at it
-      ref={setNodeRef}
+      ref={nodeRef}
       id={`kanban-col-${id}`}
       style={{
         width: '300px',
@@ -844,6 +851,16 @@ function areKanbanColumnPropsEqual(prev: KanbanColumnProps, next: KanbanColumnPr
     if (prev.cards[i] !== next.cards[i]) return false
   }
   return true
+}
+
+const MemoColumnBody = React.memo(ColumnBody, (prev: ColumnBodyProps, next: ColumnBodyProps) =>
+  prev.pointedAt === next.pointedAt && prev.nodeRef === next.nodeRef && areKanbanColumnPropsEqual(prev, next)
+)
+
+function KanbanColumn(props: KanbanColumnProps) {
+  // useDroppable re-renders on every drag start and hover change, the body only when this column's look does
+  const { setNodeRef, isOver } = useDroppable({ id: props.id })
+  return <MemoColumnBody {...props} nodeRef={setNodeRef} pointedAt={isOver} />
 }
 
 export default React.memo(KanbanColumn, areKanbanColumnPropsEqual)
