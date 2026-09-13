@@ -7,6 +7,7 @@ import {
 import { plainWallText } from '../../../shared/wallText'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../shared/wallShape'
 import { HIGHLIGHT_OPACITY } from '../../../shared/wallInk'
+import { languageLabel } from '../../../shared/wallCode'
 import { getTextColorForBackground } from './contrast'
 import { wrapLines } from './wallWrap'
 
@@ -125,6 +126,20 @@ function drawItem(item: WallItem, byId: Map<string, WallItem>, ctx: SvgContext):
     const fill = item.color ? getTextColorForBackground(item.color) : ctx.textColor
     const side = textAlignOf(item)
     return path + lines(words, anchorX(side, left, innerWidth), firstBaseline, 20, 14, fill, { side })
+  }
+
+  if (item.kind === 'code') {
+    const box = `x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}"`
+    const clip = `wall-code-${esc(item.id)}`
+    // as many lines as the box shows; spaces kept, indentation is part of the code
+    const shown = (item.text ?? '').split('\n').slice(0, Math.max(0, Math.floor((item.height - 34) / 18)))
+    const spans = shown.map((line, i) => `<tspan x="${n(item.x + 10)}" y="${n(item.y + 46 + i * 18)}">${esc(line)}</tspan>`).join('')
+    return `<clipPath id="${clip}"><rect ${box}/></clipPath>` +
+      `<rect ${box} rx="8" fill="${esc(ctx.surfaceColor)}" stroke="${esc(ctx.borderColor)}"/>` +
+      `<g clip-path="url(#${clip})">` +
+      lines([languageLabel(item.language).toUpperCase()], item.x + 10, item.y + 16, 0, 10, ctx.borderColor) +
+      (spans ? `<text font-family="monospace" font-size="12" fill="${esc(ctx.textColor)}" xml:space="preserve" style="white-space:pre">${spans}</text>` : '') +
+      '</g>'
   }
 
   if (item.kind === 'frame') {

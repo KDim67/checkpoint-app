@@ -17,12 +17,24 @@ describe('buildPdf', () => {
   })
 
   it('lays each page\'s words over its picture as invisible text, so they can be selected and searched', () => {
-    const pdf = read(buildPdf([{ jpeg, width: 800, height: 600, texts: [{ text: 'Plan (v2) \\ café 東', x: 40, y: 100, size: 20 }] }]))
-    expect(pdf).toContain('/BaseFont /Helvetica')
+    const pdf = read(buildPdf([{ jpeg, width: 800, height: 600, texts: [{ text: 'Plan (v2)', x: 40, y: 100, size: 20, width: 90 }] }]))
     expect(pdf).toContain('3 Tr')
     expect(pdf).toContain('15 Tf')
     expect(pdf).toContain('1 0 0 1 30 375 Tm')
-    expect(pdf).toContain('(Plan \\(v2\\) \\\\ café ?) Tj')
+    // nine units an em wide at 20px is 180px, squeezed into the 90 the picture used
+    expect(pdf).toContain('50 Tz')
+    expect(pdf).toContain('<0050006c0061006e00200028007600320029> Tj')
+  })
+
+  it('spells any letter, Greek and CJK included, through a font that maps its numbers back to Unicode', () => {
+    const pdf = read(buildPdf([{ jpeg, width: 100, height: 100, texts: [{ text: 'αβ 東\tx', x: 0, y: 10, size: 10 }] }]))
+    expect(pdf).toContain('/Subtype /Type0')
+    expect(pdf).toContain('/Encoding /Identity-H')
+    expect(pdf).toContain('/ToUnicode 6 0 R')
+    expect(pdf).toContain('<ff00> <ffff> <ff00>')
+    // the tab reads as a space
+    expect(pdf).toContain('<03b103b20020677100200078> Tj')
+    expect(pdf).not.toContain('?')
   })
 
   it('points every cross-reference at the object it names', () => {
@@ -31,8 +43,8 @@ describe('buildPdf', () => {
     const table = pdf.slice(pdf.lastIndexOf('\nxref\n'))
     const offsets = [...table.matchAll(/^(\d{10}) 00000 n/gm)].map(m => Number(m[1]))
 
-    // the catalogue, the page list, the font, and a page, drawing and image a sheet
-    expect(offsets).toHaveLength(9)
+    // the catalogue, the page list, the font's four parts, and a page, drawing and image a sheet
+    expect(offsets).toHaveLength(12)
     offsets.forEach((offset, i) => expect(pdf.slice(offset)).toMatch(new RegExp(`^${i + 1} 0 obj`)))
     const start = Number(/startxref\s+(\d+)/.exec(pdf)?.[1])
     expect(pdf.slice(start, start + 4)).toBe('xref')

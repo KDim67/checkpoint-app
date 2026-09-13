@@ -1,17 +1,11 @@
 /** frames as the wall's pages: their order, their names, a frame around a selection, and what each one holds */
 
 import { boundsOf, createWallItem, withFrameContents, type WallItem } from './wallModel'
+import { inReadingOrder } from './wallNavigate'
 
-/** a chosen order first; the rest row by row, a frame whose top sits in the upper half of a row's first frame joining that row */
+/** a chosen order first; the rest row by row, as the keyboard steps through the wall */
 export function framesInOrder(items: WallItem[], order?: string[]): WallItem[] {
-  const frames = items.filter(i => i.kind === 'frame').sort((a, b) => a.y - b.y || a.x - b.x)
-  const rows: WallItem[][] = []
-  for (const frame of frames) {
-    const row = rows[rows.length - 1]
-    if (row && frame.y < row[0].y + row[0].height / 2) row.push(frame)
-    else rows.push([frame])
-  }
-  const reading = rows.flatMap(row => row.sort((a, b) => a.x - b.x))
+  const reading = inReadingOrder(items.filter(i => i.kind === 'frame'))
   if (!order || order.length === 0) return reading
 
   // a deleted frame's id is skipped, a new frame joins after the chosen ones

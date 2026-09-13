@@ -71,6 +71,24 @@ export const wallShortcutSections = (
     ]
   },
   {
+    // with nothing being written, so the keys move round the wall itself
+    group: 'Keyboard',
+    rows: [
+      ['Tab or Shift+Tab', 'Select the next or previous item'],
+      ['Ctrl+Arrows', 'Select the nearest item that way'],
+      ['Enter', 'Write in or open the selected item']
+    ]
+  },
+  {
+    // while writing in a topic
+    group: 'Mind map',
+    rows: [
+      ['Tab', 'Add a topic under this one'],
+      ['Enter', 'Add a topic beside this one'],
+      ['Shift+Enter', 'Start a new line in the topic']
+    ]
+  },
+  {
     // while writing in a sticky or text box
     group: 'Text',
     rows: [

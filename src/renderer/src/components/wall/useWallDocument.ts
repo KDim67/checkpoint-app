@@ -33,6 +33,15 @@ import { ERASER_MODES, type EraserMode, type WallTool } from './wallTools'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
+/** what an undo step puts back: the items, and the order frames present in, which belongs to the wall too */
+export interface WallStep {
+  items: WallItem[]
+  frameOrder?: string[]
+}
+
+const stepOf = (doc: { items: WallItem[]; frameOrder?: string[] }): WallStep =>
+  ({ items: doc.items, ...(doc.frameOrder ? { frameOrder: doc.frameOrder } : {}) })
+
 export function useWallDocument() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const selectItem = useAppStore(s => s.selectItem)
@@ -155,8 +164,8 @@ export function useWallDocument() {
   const selectedRef = useRef(selectedIds)
   selectedRef.current = selectedIds
 
-  /** items only, the camera is a view */
-  const historyRef = useRef<History<WallItem[]>>(initHistory([]))
+  /** items and frame order, the camera is a view */
+  const historyRef = useRef<History<WallStep>>(initHistory({ items: [] }))
 
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards])
   const itemsById = useMemo(() => new Map(doc.items.map(i => [i.id, i])), [doc.items])
@@ -287,7 +296,7 @@ export function useWallDocument() {
           setDoc(loaded)
           if (jump) toast('The linked item was deleted. Edit the link to point somewhere else.')
         }
-        historyRef.current = initHistory(loaded.items)
+        historyRef.current = initHistory(stepOf(loaded))
         setHistoryTick(t => t + 1)
       })
       .catch(err => !cancelled && toast(`Could not open the wall: ${errorMessage(err)}`, { type: 'error' }))
@@ -313,7 +322,7 @@ export function useWallDocument() {
       if (dragRef.current || editingId) return
       void loadWallDoc(docKey).then(loaded => {
         setDoc(loaded)
-        historyRef.current = initHistory(loaded.items)
+        historyRef.current = initHistory(stepOf(loaded))
         setHistoryTick(t => t + 1)
       })
     }
@@ -396,9 +405,10 @@ export function useWallDocument() {
     items: WallItem[],
     { record = true, camera, removed, bin }: { record?: boolean; camera?: WallCamera; removed?: WallItem[]; bin?: WallBinEntry[] } = {}
   ) => {
+    const step = stepOf({ items, frameOrder: docRef.current.frameOrder })
     historyRef.current = record
-      ? pushHistory(historyRef.current, items)
-      : replacePresent(historyRef.current, items)
+      ? pushHistory(historyRef.current, step)
+      : replacePresent(historyRef.current, step)
     if (record) setHistoryTick(t => t + 1)
     // in the same write, a setCamera after this would start from the doc without these items
     if (camera) panCameraRef.current = null
@@ -431,13 +441,20 @@ export function useWallDocument() {
     setItems(items.map(i => (i.id === id ? { ...i, height: next } : i)), { record: false })
   }, [setItems])
 
-  const applyHistory = useCallback((next: History<WallItem[]>) => {
+  const applyHistory = useCallback((next: History<WallStep>) => {
     historyRef.current = next
     setHistoryTick(t => t + 1)
-    write({ ...docRef.current, items: next.present })
+    const { items, frameOrder } = next.present
+    const doc: WallDoc = { ...docRef.current, items }
+    if (frameOrder) doc.frameOrder = frameOrder
+    else delete doc.frameOrder
+    write(doc)
     // the step may have removed selected items
-    setSelectedIds(prev => new Set([...prev].filter(id => next.present.some(i => i.id === id))))
+    setSelectedIds(prev => new Set([...prev].filter(id => items.some(i => i.id === id))))
   }, [write])
+
+  /** a gesture's own before and after, taken with the frame order as it stands */
+  const stepWith = useCallback((items: WallItem[]): WallStep => stepOf({ items, frameOrder: docRef.current.frameOrder }), [])
 
   const centreOfView = useCallback((): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -872,11 +889,13 @@ export function useWallDocument() {
     }
   }, [presenting, showFrame])
 
-  /** undefined goes back to reading order; not an undo step, the wall's items don't change */
+  /** undefined goes back to reading order; an undo step like moving an item */
   const setFrameOrder = useCallback((order: string[] | undefined) => {
     const next = { ...docRef.current }
     if (order && order.length > 0) next.frameOrder = order
     else delete next.frameOrder
+    historyRef.current = pushHistory(historyRef.current, stepOf(next))
+    setHistoryTick(t => t + 1)
     write(next)
   }, [write])
 
@@ -1029,6 +1048,7 @@ export function useWallDocument() {
     docRef,
     selectedRef,
     historyRef,
+    stepWith,
     cardsById,
     itemsById,
     notesByTitle,

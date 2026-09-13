@@ -17,7 +17,7 @@ interface WallBinMenuProps {
 
 const KIND_NAMES: Record<WallItemKind, string> = {
   note: 'A sticky', text: 'Some text', shape: 'A shape', frame: 'A frame', image: 'An image',
-  ink: 'A drawing', arrow: 'An arrow', card: 'A card', doc: 'A note', bookmark: 'A link'
+  ink: 'A drawing', arrow: 'An arrow', card: 'A card', doc: 'A note', bookmark: 'A link', code: 'Some code'
 }
 
 /** the first thing in it by its words, or by what it was; arrows only count when they're all that went */

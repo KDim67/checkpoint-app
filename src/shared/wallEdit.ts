@@ -1,10 +1,11 @@
 /** changing what's already on a wall, for the assistant; every refusal is decided before anything changes */
 
 import {
-  createWallItem, moveItems, pruneArrows, withFrameContents, ARROW_HEAD_MODES, ARROW_LINES, ARROW_SHAPES, SHAPE_TYPES,
+  cleanTags, createWallItem, moveItems, pruneArrows, withFrameContents, ARROW_HEAD_MODES, ARROW_LINES, ARROW_SHAPES, SHAPE_TYPES,
   type ArrowHeads, type ArrowLine, type ArrowShape, type ShapeType, type TextAlign, type WallItem
 } from './wallModel'
 import { isLinkable, normalizeLinkInput } from './wallLink'
+import { CODE_LANGUAGES, isCodeLanguage } from './wallCode'
 
 export type WallEdit = { items: WallItem[]; item: WallItem } | { error: string }
 
@@ -27,6 +28,10 @@ export interface WallItemPatch {
   borderColor?: string | null
   radius?: number
   opacity?: number
+  /** a sticky's whole list; an empty one takes them all off */
+  tags?: string[]
+  /** a code block's language, null for plain text */
+  language?: string | null
 }
 
 export interface ArrowStyle {
@@ -38,7 +43,7 @@ export interface ArrowStyle {
 }
 
 /** words of their own; a card or doc shows another record's title */
-const WORDED: WallItem['kind'][] = ['note', 'text', 'shape', 'frame', 'arrow', 'bookmark']
+const WORDED: WallItem['kind'][] = ['note', 'text', 'shape', 'frame', 'arrow', 'bookmark', 'code']
 
 /** one message naming every id the wall doesn't have, null when it has them all */
 export function missingMessage(items: WallItem[], ids: string[]): string | null {
@@ -64,6 +69,11 @@ export function editWallItem(items: WallItem[], id: string, patch: WallItemPatch
   }
   if ((patch.borderColor !== undefined || patch.radius !== undefined || patch.opacity !== undefined) && item.kind !== 'shape') {
     return { error: 'Only a shape has a border, corners and a fill to style.' }
+  }
+  if (patch.tags !== undefined && item.kind !== 'note') return { error: 'Only sticky notes carry tags.' }
+  if (patch.language !== undefined && item.kind !== 'code') return { error: 'Only a code block has a language.' }
+  if (typeof patch.language === 'string' && !isCodeLanguage(patch.language)) {
+    return { error: `language '${patch.language}' isn't one of ${CODE_LANGUAGES.map(l => l.id).join(', ')}.` }
   }
   if (moves && item.kind === 'arrow') return { error: 'An arrow is drawn between its ends. Move the items it connects instead.' }
   if (moves && item.locked && patch.locked !== false) return { error: 'That item is locked. Pass locked: false in the same call to move it.' }
@@ -103,6 +113,13 @@ export function editWallItem(items: WallItem[], id: string, patch: WallItemPatch
     if (opacity >= 1) delete next.opacity
     else next.opacity = opacity
   }
+  if (patch.tags !== undefined) {
+    const tags = cleanTags(patch.tags)
+    if (tags.length > 0) next.tags = tags
+    else delete next.tags
+  }
+  if (patch.language === null) delete next.language
+  else if (patch.language !== undefined) next.language = patch.language
 
   // a frame carries what's in it, as when it's dragged; a resize alone leaves them
   const carried = item.kind === 'frame' && (dx !== 0 || dy !== 0)

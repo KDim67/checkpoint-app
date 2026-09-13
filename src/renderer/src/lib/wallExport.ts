@@ -8,6 +8,7 @@ import {
 import { plainWallText } from '../../../shared/wallText'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../shared/wallShape'
 import { HIGHLIGHT_OPACITY } from '../../../shared/wallInk'
+import { languageLabel } from '../../../shared/wallCode'
 import { getTextColorForBackground } from './contrast'
 import { wrapLines } from './wallWrap'
 import type { PdfText } from './pdfImages'
@@ -66,7 +67,7 @@ export async function renderWallCanvas(
     if (!texts || !text.trim()) return
     const w = measure(text)
     const left = side === 'center' ? anchor - w / 2 : side === 'right' ? anchor - w : anchor
-    texts.push({ text, x: left + offsetX, y: baseline + offsetY, size })
+    texts.push({ text, x: left + offsetX, y: baseline + offsetY, size, width: w })
   }
 
   ctx.fillStyle = ctxInfo.background
@@ -223,6 +224,27 @@ export async function renderWallCanvas(
         ctx.fillText(line, anchor, firstY + i * lineHeight)
         // a middle baseline sits about a third of the size above the alphabetic one
         record(line, item.x + anchor, item.y + firstY + i * lineHeight + 5, 14, side)
+      })
+    } else if (item.kind === 'code') {
+      ctx.fillStyle = ctxInfo.surfaceColor
+      ctx.fillRect(item.x, item.y, item.width, item.height)
+      ctx.strokeStyle = ctxInfo.borderColor
+      ctx.lineWidth = 1
+      ctx.strokeRect(item.x, item.y, item.width, item.height)
+      // cut at the box like the wall, long lines don't wrap in an editor either
+      ctx.beginPath()
+      ctx.rect(item.x, item.y, item.width, item.height)
+      ctx.clip()
+      ctx.fillStyle = ctxInfo.borderColor
+      ctx.font = '10px sans-serif'
+      ctx.fillText(languageLabel(item.language).toUpperCase(), item.x + 10, item.y + 16)
+      ctx.fillStyle = ctxInfo.textColor
+      ctx.font = '12px monospace'
+      ;(item.text ?? '').split('\n').forEach((line, i) => {
+        const baseline = item.y + 46 + i * 18
+        if (baseline > item.y + item.height) return
+        ctx.fillText(line, item.x + 10, baseline)
+        record(line, item.x + 10, baseline, 12)
       })
     } else if (item.kind === 'frame') {
       ctx.strokeStyle = item.color || ctxInfo.borderColor

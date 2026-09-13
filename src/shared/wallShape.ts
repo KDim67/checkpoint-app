@@ -64,6 +64,8 @@ export function switchKinds(items: WallItem[], ids: Set<string>, kind: WritableK
     const next: WallItem = { ...item, kind }
     delete next.shape
     if (item.kind === 'text' || kind === 'text') delete next.color
+    // tags belong to stickies
+    if (kind !== 'note') delete next.tags
 
     // a line of text is too thin for a sticky or a shape, it gets their size around the same centre
     if (item.kind === 'text') {

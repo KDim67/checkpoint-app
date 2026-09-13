@@ -7,7 +7,7 @@ import type { WallItem, WallItemKind } from '../../../shared/wallModel'
 /** strokes have no words; an arrow only counts once it has a label */
 const KIND_NAMES: Partial<Record<WallItemKind, string>> = {
   note: 'Sticky', text: 'Text', shape: 'Shape', frame: 'Frame', card: 'Card',
-  doc: 'Note', image: 'Image', bookmark: 'Link', arrow: 'Arrow'
+  doc: 'Note', image: 'Image', bookmark: 'Link', arrow: 'Arrow', code: 'Code'
 }
 
 /** a spreadsheet runs a cell that starts like a formula, a leading quote keeps it words */
@@ -37,10 +37,11 @@ export function wallToCsv(items: WallItem[], titleOf: (item: WallItem) => string
         Math.round(item.x),
         Math.round(item.y),
         Math.round(item.width),
-        Math.round(item.height)
+        Math.round(item.height),
+        defused((item.tags ?? []).join(', '))
       ].map(cell).join(',')
     })
 
   // CRLF, the line ending spreadsheets expect
-  return [['Kind', 'Text', 'Link', 'Colour', 'X', 'Y', 'Width', 'Height'].join(','), ...rows].join('\r\n') + '\r\n'
+  return [['Kind', 'Text', 'Link', 'Colour', 'X', 'Y', 'Width', 'Height', 'Tags'].join(','), ...rows].join('\r\n') + '\r\n'
 }

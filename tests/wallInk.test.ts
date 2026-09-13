@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eraseAlong, eraseParts, inkPoints, lassoPick } from '../src/shared/wallInk'
+import { eraseAlong, eraseParts, inkPoints, joinStrokes, lassoPick } from '../src/shared/wallInk'
 import { inkFromPath, type WallItem } from '../src/shared/wallModel'
 
 const item = (id: string, over: Partial<WallItem> = {}): WallItem =>
@@ -17,6 +17,45 @@ describe('inkPoints', () => {
 
     const wider = inkPoints({ ...line, width: line.width * 2 })
     expect(wider[1].x - wider[0].x).toBeCloseTo(200)
+  })
+})
+
+describe('what part erasing takes away', () => {
+  it('hands back the cut-away stretch as a stroke that meets both kept ends, so restoring it joins the line', () => {
+    const line = stroke('line', [{ x: 0, y: 50 }, { x: 200, y: 50 }], { z: 3, color: '#f28b82' })
+    let n = 0
+    const { items, erased } = eraseParts([line], { x: 100, y: 0 }, { x: 100, y: 120 }, 6, () => `piece${++n}`)
+
+    expect(items.map(i => i.id)).toStrictEqual(['piece1', 'piece2'])
+    expect(erased).toHaveLength(1)
+    expect(erased[0]).toMatchObject({ id: 'piece3', kind: 'ink', color: '#f28b82', z: 3 })
+    const [left, right] = items.map(inkPoints)
+    const gone = inkPoints(erased[0])
+    expect(gone[0].x).toBeCloseTo(left[left.length - 1].x)
+    expect(gone[gone.length - 1].x).toBeCloseTo(right[0].x)
+  })
+
+  it('hands back a stroke erased end to end as itself', () => {
+    const dot = stroke('dot', [{ x: 100, y: 50 }, { x: 102, y: 50 }])
+    const { items, erased } = eraseParts([dot], { x: 100, y: 0 }, { x: 100, y: 120 }, 6)
+    expect(items).toStrictEqual([])
+    expect(erased).toStrictEqual([dot])
+  })
+})
+
+describe('joinStrokes', () => {
+  it('joins cuts that meet end to start into one stroke, and leaves a different look apart', () => {
+    const a = stroke('a', [{ x: 0, y: 0 }, { x: 50, y: 0 }], { color: '#000000' })
+    const b = stroke('b', [{ x: 50, y: 0 }, { x: 100, y: 0 }], { color: '#000000' })
+    const other = stroke('c', [{ x: 100, y: 0 }, { x: 150, y: 0 }], { color: '#ffffff' })
+
+    const joined = joinStrokes([b, other, a], () => 'joined')
+
+    expect(joined.map(s => s.id)).toStrictEqual(['c', 'joined'])
+    const points = inkPoints(joined[1])
+    expect(points[0].x).toBeCloseTo(0)
+    expect(points[points.length - 1].x).toBeCloseTo(100)
+    expect(joined[0]).toBe(other)
   })
 })
 

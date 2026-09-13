@@ -47,6 +47,15 @@
   --color-priority-med:     #eab308;
   --color-priority-low:     #3b82f6;
   --color-priority-none:    #535e85;
+
+  /* code blocks on the wall, one colour per kind of piece */
+  --color-code-keyword:     #c792ea;
+  --color-code-string:      #c3e88d;
+  --color-code-comment:     #7a83a8;
+  --color-code-number:      #f78c6c;
+  --color-code-function:    #82aaff;
+  --color-code-type:        #ffcb6b;
+  --color-code-attr:        #89ddff;
   
   /* text scale */
   --color-text-base:        #f1f5f9;   /* near-white, primary text */
@@ -191,6 +200,15 @@ html[data-theme="light"] {
   --color-priority-med:     #b05109;   /* was #eab308 at 1.8:1, effectively invisible */
   --color-priority-low:     #2563eb;
   --color-priority-none:    #6f7a8c;
+
+  /* code darkened to read on the pale panel */
+  --color-code-keyword:     #7c3aed;
+  --color-code-string:      #15803d;
+  --color-code-comment:     #646c7e;
+  --color-code-number:      #c2410c;
+  --color-code-function:    #1d4ed8;
+  --color-code-type:        #a16207;
+  --color-code-attr:        #0e7490;
 
   /* text scale */
   --color-text-base:        #161d2b;   /* 14.9:1, softened off pure black, same undertone */
@@ -1784,6 +1802,155 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   padding: 0 0.25em;
   border-radius: var(--radius-sm);
   background: rgba(127, 127, 127, 0.2);
+}
+
+/* a code block: its language on top, the source under it in its own panel */
+.wall-code-block {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-base);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.wall-code-block-head {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--color-surface-offset);
+  color: var(--color-text-faint);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  line-height: 16px;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+/* long lines run off the edge like an editor's, wrapping would change what the code says */
+.wall-code-block-body {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  white-space: pre;
+  tab-size: 2;
+  font: inherit;
+}
+
+.wall-code-block-empty {
+  font-family: var(--font-sans);
+  opacity: 0.45;
+}
+
+.wall-code-keyword { color: var(--color-code-keyword); }
+.wall-code-string { color: var(--color-code-string); }
+.wall-code-comment { color: var(--color-code-comment); font-style: italic; }
+.wall-code-number,
+.wall-code-literal { color: var(--color-code-number); }
+.wall-code-function { color: var(--color-code-function); }
+.wall-code-type,
+.wall-code-tag { color: var(--color-code-type); }
+.wall-code-attr { color: var(--color-code-attr); }
+
+/* a sticky's tags along its foot, translucent so any sticky colour shows through */
+.wall-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-height: 38px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.wall-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.12);
+  color: #1a1a1a;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wall-tag-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* the tag editor's pills and the board's tags offered under the field */
+.wall-tag-pill,
+.wall-tag-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-offset);
+  color: var(--color-text-base);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+
+.wall-tag-pill { padding-right: 3px; }
+
+.wall-tag-suggestion {
+  border: 1px dashed var(--color-balance);
+  background: transparent;
+  cursor: pointer;
+}
+
+.wall-tag-suggestion:hover,
+.wall-tag-suggestion:focus-visible {
+  border-color: var(--color-secondary);
+  outline: none;
+}
+
+.wall-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.wall-tag-remove:hover,
+.wall-tag-remove:focus-visible {
+  background: var(--color-surface-elevated);
+  color: var(--color-text-base);
+  outline: none;
+}
+
+/* read out to screen readers as the keyboard moves the selection, never seen */
+.wall-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .wall-link-save {

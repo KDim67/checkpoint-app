@@ -70,17 +70,29 @@ function densify(points: Point[], step: number): Point[] {
 
 const pieceId = (): string => `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
-/** only what the eraser passes over goes; a stroke cut through the middle leaves a stroke each side */
+/** a stroke of its own along the points, in the look of the one it came from */
+function pieceOf(points: Point[], source: WallItem, strokeWidth: number, newId: () => string): WallItem | null {
+  const piece = inkFromPath(points, [], {
+    strokeWidth,
+    ...(source.color ? { color: source.color } : {}),
+    ...(source.smooth ? { smooth: source.smooth } : {}),
+    ...(source.highlight ? { highlight: true } : {})
+  })
+  return piece ? { ...piece, id: newId(), z: source.z } : null
+}
+
+/** only what the eraser passes over goes; a stroke cut through the middle leaves a stroke each side, and what was cut away comes back as strokes for Recently deleted */
 export function eraseParts(
   items: WallItem[],
   from: Point,
   to: Point,
   radius: number,
   newId: () => string = pieceId
-): { items: WallItem[]; touched: boolean } {
+): { items: WallItem[]; touched: boolean; erased: WallItem[] } {
   const hit = new Set(eraseAlong(items, from, to, radius))
-  if (hit.size === 0) return { items, touched: false }
+  if (hit.size === 0) return { items, touched: false, erased: [] }
 
+  const erased: WallItem[] = []
   const next = items.flatMap((item): WallItem[] => {
     if (!hit.has(item.id)) return [item]
     const natural = inkNaturalSize(item)
@@ -91,28 +103,77 @@ export function eraseParts(
     const reach = radius + strokeWidth / 2
 
     const runs: Point[][] = []
+    // each cut takes the kept point either side, so putting it back joins the line up again
+    const cuts: Point[][] = []
     let run: Point[] = []
+    let cut: Point[] = []
+    let previous: Point | null = null
     for (const point of densify(inkPoints(item), Math.max(1, radius / 2))) {
       if (distanceToSegment(point, from, to) <= reach) {
         if (run.length > 1) runs.push(run)
         run = []
+        if (cut.length === 0 && previous) cut.push(previous)
+        cut.push(point)
       } else {
+        if (cut.length > 0) {
+          cuts.push([...cut, point])
+          cut = []
+        }
         run.push(point)
       }
+      previous = point
     }
     if (run.length > 1) runs.push(run)
+    if (cut.length > 0) cuts.push(cut)
 
-    return runs.flatMap(points => {
-      const piece = inkFromPath(points, [], {
-        strokeWidth,
-        ...(item.color ? { color: item.color } : {}),
-        ...(item.smooth ? { smooth: item.smooth } : {}),
-        ...(item.highlight ? { highlight: true } : {})
-      })
-      return piece ? [{ ...piece, id: newId(), z: item.z }] : []
+    // nothing left of it, so the stroke itself is what went
+    if (runs.length === 0) {
+      erased.push(item)
+      return []
+    }
+    const kept = runs.flatMap(points => {
+      const piece = pieceOf(points, item, strokeWidth, newId)
+      return piece ? [piece] : []
     })
+    for (const points of cuts) {
+      const piece = pieceOf(points, item, strokeWidth, newId)
+      if (piece) erased.push(piece)
+    }
+    return kept
   })
-  return { items: next, touched: true }
+  return { items: next, touched: true, erased }
+}
+
+const sameLook = (a: WallItem, b: WallItem): boolean =>
+  a.color === b.color && !!a.highlight === !!b.highlight && (a.smooth ?? 0) === (b.smooth ?? 0) &&
+  Math.abs((a.strokeWidth ?? 4) - (b.strokeWidth ?? 4)) < 0.01
+
+/** cuts from one sweep that meet end to start become one stroke, so a long erase is one thing to bring back */
+export function joinStrokes(strokes: WallItem[], newId: () => string = pieceId): WallItem[] {
+  const lines = strokes.map(source => ({ source, points: inkPoints(source), joined: false }))
+  const meets = (a: Point, b: Point): boolean => Math.hypot(a.x - b.x, a.y - b.y) < 0.5
+
+  let merged = true
+  while (merged) {
+    merged = false
+    for (let i = 0; i < lines.length && !merged; i++) {
+      for (let j = 0; j < lines.length && !merged; j++) {
+        const a = lines[i]
+        const b = lines[j]
+        if (i === j || a.points.length === 0 || b.points.length === 0 || !sameLook(a.source, b.source)) continue
+        if (!meets(a.points[a.points.length - 1], b.points[0])) continue
+        lines[i] = { source: a.source, points: [...a.points, ...b.points.slice(1)], joined: true }
+        lines.splice(j, 1)
+        merged = true
+      }
+    }
+  }
+
+  return lines.flatMap(line => {
+    if (!line.joined) return [line.source]
+    const piece = pieceOf(line.points, line.source, line.source.strokeWidth ?? 4, newId)
+    return piece ? [piece] : []
+  })
 }
 
 /** even-odd ray cast */
