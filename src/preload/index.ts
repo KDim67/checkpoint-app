@@ -97,6 +97,8 @@ const api = {
     /** null when nothing's downloading */
     updateState: (): Promise<UpdateProgress | null> =>
       ipcRenderer.invoke(IpcChannels.APP_UPDATE_STATE),
+    installUpdate: (): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.APP_INSTALL_UPDATE),
     onUpdateProgress: (callback: (progress: UpdateProgress) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, progress: UpdateProgress) => callback(progress)
       ipcRenderer.on(IpcChannels.APP_UPDATE_PROGRESS, handler)

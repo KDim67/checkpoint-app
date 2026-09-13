@@ -15,6 +15,9 @@ export const getPathForFile = (...args: Parameters<Bridge['getPathForFile']>): R
 export const getVersion = (...args: Parameters<Bridge['getVersion']>): ReturnType<Bridge['getVersion']> =>
   window.electronAPI.app.getVersion(...args)
 
+export const installUpdate = (...args: Parameters<Bridge['installUpdate']>): ReturnType<Bridge['installUpdate']> =>
+  window.electronAPI.app.installUpdate(...args)
+
 export const maximize = (...args: Parameters<Bridge['maximize']>): ReturnType<Bridge['maximize']> =>
   window.electronAPI.app.maximize(...args)
 

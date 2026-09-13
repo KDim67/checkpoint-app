@@ -138,9 +138,18 @@ function ThemeToggle() {
 function Titlebar() {
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
+  const platform = appApi.platform()
+  const isWindows = platform === 'win32'
+  const isMac = platform === 'darwin'
 
   return (
-    <div className="titlebar">
+    <div
+      className="titlebar"
+      style={{
+        paddingLeft: isMac ? '76px' : undefined,
+        paddingRight: isWindows ? '144px' : undefined
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', userSelect: 'none' }}>
         <span
           style={{
@@ -162,7 +171,7 @@ function Titlebar() {
           }}
         />
         <ThemeToggle />
-        {appApi.platform() === 'linux' && (
+        {platform === 'linux' && (
           <div className="titlebar-controls" style={{ display: 'flex', gap: 'var(--space-0-5)' }}>
             <TitlebarButton onClick={() => appApi.minimize()} label="Minimize">
               <svg width="10" height="1" viewBox="0 0 10 1"><line x1="0" y1="0.5" x2="10" y2="0.5" stroke="currentColor" strokeWidth="1.5"/></svg>

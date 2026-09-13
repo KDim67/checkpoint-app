@@ -84,4 +84,9 @@ export function registerAppHandlers(): void {
     const { currentUpdateProgress } = await import('../updater')
     return currentUpdateProgress()
   })
+
+  ipcMain.handle(IpcChannels.APP_INSTALL_UPDATE, async () => {
+    const { installUpdateAndRestart } = await import('../updater')
+    await installUpdateAndRestart()
+  })
 }

@@ -3,6 +3,7 @@
 import { Download } from 'lucide-react'
 import { useUpdateProgress } from '../../lib/useUpdateProgress'
 import { describeUpdateProgress, etaSeconds, etaShort } from '../../../../shared/updateEta'
+import * as appApi from '../../data/app'
 
 export default function UpdateIndicator({ onOpen }: { onOpen: () => void }) {
   const progress = useUpdateProgress()
@@ -12,8 +13,16 @@ export default function UpdateIndicator({ onOpen }: { onOpen: () => void }) {
   // clamped, the fill width comes straight from it
   const percent = downloading ? Math.min(100, Math.max(0, downloading.percent)) : 0
   const eta = downloading ? etaShort(etaSeconds(downloading)) : ''
-  const label = downloading ? `${percent}%${eta ? ` · ${eta}` : ''}` : 'Update ready'
+  const label = downloading ? `${percent}%${eta ? ` · ${eta}` : ''}` : 'Restarting…'
   const description = describeUpdateProgress(progress)
+
+  const handleClick = () => {
+    if (progress.phase === 'ready') {
+      void appApi.installUpdate()
+    } else {
+      onOpen()
+    }
+  }
 
   return (
     <button
@@ -21,7 +30,7 @@ export default function UpdateIndicator({ onOpen }: { onOpen: () => void }) {
       data-ready={downloading ? undefined : ''}
       title={description}
       aria-label={description}
-      onClick={onOpen}
+      onClick={handleClick}
     >
       {/* the pill is the bar, 32px has no room for both */}
       {downloading && <span aria-hidden className="update-indicator-fill" style={{ width: `${percent}%` }} />}
