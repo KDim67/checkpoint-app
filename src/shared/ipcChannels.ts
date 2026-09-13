@@ -155,6 +155,7 @@ export const enum IpcChannels {
   APP_CHECK_FOR_UPDATES   = 'app:checkForUpdates',
   APP_UPDATE_PROGRESS     = 'app:updateProgress',
   APP_UPDATE_STATE        = 'app:updateState',
+  APP_INSTALL_UPDATE      = 'app:installUpdate',
 
   // customizer and extensions
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',

@@ -209,7 +209,18 @@ export default function AboutPanel() {
               color: progress.phase === 'ready' ? 'var(--color-success)' : 'var(--color-text-muted)'
             }}
           >
-            {describeUpdateProgress(progress)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span>{describeUpdateProgress(progress)}</span>
+              {progress.phase === 'ready' && (
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 'var(--text-xs)', padding: '2px 8px' }}
+                  onClick={() => void appApi.installUpdate()}
+                >
+                  Restart now
+                </button>
+              )}
+            </div>
 
             {progress.phase === 'downloading' && (
               <div

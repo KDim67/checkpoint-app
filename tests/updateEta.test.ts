@@ -102,7 +102,7 @@ describe('formatBytes', () => {
 describe('describeUpdateProgress', () => {
   it('says what a finished download is waiting for', () => {
     expect(describeUpdateProgress({ phase: 'ready', version: '1.0.2' }))
-      .toBe('Version 1.0.2 is ready. It installs the next time you close Checkpoint.')
+      .toBe('Version 1.0.2 is ready. Restarting to install…')
   })
 
   it('gives the version, the percentage, the size and the time left', () => {

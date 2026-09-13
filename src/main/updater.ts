@@ -4,6 +4,7 @@ import { app, BrowserWindow } from 'electron'
 import { errorMessage } from '../shared/errors'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { UpdateCheckResult, UpdateProgress } from '../shared/types'
+import { beginQuit } from './windows'
 
 type Updater = typeof import('electron-updater').autoUpdater
 
@@ -79,13 +80,28 @@ export async function initializeUpdater(): Promise<void> {
       })
     })
     autoUpdater.on('update-downloaded', info => {
-      console.log(`[updater] ${info.version} is ready and will install on quit`)
+      console.log(`[updater] ${info.version} is ready; installing and relaunching`)
       announce({ phase: 'ready', version: info.version })
+      setTimeout(() => {
+        void installUpdateAndRestart()
+      }, 1000)
     })
 
     await autoUpdater.checkForUpdates()
   } catch (err) {
     console.error('[updater] could not start:', err)
+  }
+}
+
+export async function installUpdateAndRestart(): Promise<void> {
+  if (!shouldCheckForUpdates()) return
+  try {
+    const autoUpdater = await loadAutoUpdater()
+    if (!autoUpdater) return
+    beginQuit()
+    autoUpdater.quitAndInstall(false, true)
+  } catch (err) {
+    console.error('[updater] Failed to restart and install update:', err)
   }
 }
 

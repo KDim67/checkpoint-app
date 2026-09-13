@@ -46,7 +46,7 @@ export function formatBytes(bytes: number): string {
 /** version and estimate are both conditional early on */
 export function describeUpdateProgress(progress: UpdateProgress): string {
   if (progress.phase === 'ready') {
-    return `Version ${progress.version} is ready. It installs the next time you close Checkpoint.`
+    return `Version ${progress.version} is ready. Restarting to install…`
   }
   const named = progress.version ? ` version ${progress.version}` : ''
   const size = progress.total > 0
