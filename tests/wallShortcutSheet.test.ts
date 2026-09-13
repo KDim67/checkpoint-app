@@ -7,6 +7,16 @@ const bindings = { wall_tool_select: 'V', wall_tool_draw: 'P', wall_tool_connect
 const rowsOf = (group: string, panButtons: PanButtons = 'both', menuButton: MenuButton = 'right'): [string, string][] =>
   wallShortcutSections(bindings, panButtons, menuButton).find(s => s.group === group)?.rows ?? []
 
+describe('keyboard rows', () => {
+  it('lists moving round the wall by keyboard, and building a mind map', () => {
+    expect(rowsOf('Keyboard')).toContainEqual(['Tab or Shift+Tab', 'Select the next or previous item'])
+    expect(rowsOf('Keyboard')).toContainEqual(['Ctrl+Arrows', 'Select the nearest item that way'])
+    expect(rowsOf('Keyboard')).toContainEqual(['Enter', 'Write in or open the selected item'])
+    expect(rowsOf('Mind map')).toContainEqual(['Tab', 'Add a topic under this one'])
+    expect(rowsOf('Mind map')).toContainEqual(['Enter', 'Add a topic beside this one'])
+  })
+})
+
 describe('wallShortcutSections', () => {
   it('lists the tools that are bound, under the keys they are bound to', () => {
     expect(rowsOf('Tools')).toContainEqual(['V', 'Select'])

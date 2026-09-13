@@ -10,6 +10,7 @@ export const SEARCH_KINDS: { kind: SearchKind; label: string }[] = [
   { kind: 'note', label: 'Stickies' },
   { kind: 'text', label: 'Text' },
   { kind: 'shape', label: 'Shapes' },
+  { kind: 'code', label: 'Code' },
   { kind: 'card', label: 'Cards' },
   { kind: 'doc', label: 'Notes' },
   { kind: 'image', label: 'Images' },

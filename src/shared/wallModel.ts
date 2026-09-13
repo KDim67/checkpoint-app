@@ -2,10 +2,11 @@
 
 import { isLinkable, parseWallLink } from './wallLink'
 import { pruneGroups, regroupCopies } from './wallGroup'
+import { isCodeLanguage } from './wallCode'
 
 /** note is a sticky, doc a real note; stored names can't be migrated apart */
-// bookmark is a pasted page's card, shape holds words inside an outline
-export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow' | 'bookmark' | 'shape'
+// bookmark is a pasted page's card, shape holds words inside an outline, code is a block of source
+export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow' | 'bookmark' | 'shape' | 'code'
 
 export interface WallItem {
   /** wall-local, two placements of one card are two items */
@@ -60,6 +61,12 @@ export interface WallItem {
   link?: string
   /** items sharing one select, move and line up together, read through wallGroup */
   group?: string
+  /** a sticky's labels by name, so they match the board's tags without breaking when one is deleted */
+  tags?: string[]
+  /** a code block's language, absent for plain text */
+  language?: string
+  /** the mind map a topic is part of, read through wallMindMap */
+  map?: string
 }
 
 /** contents live under wallDocKey */
@@ -117,6 +124,8 @@ export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number
   // icon row, two title lines and two of description
   bookmark: { width: 300, height: 128 },
   shape: { width: 160, height: 100 },
+  // about ten lines of sixty characters
+  code: { width: 420, height: 200 },
   // sized from their contents
   ink: { width: 120, height: 120 },
   arrow: { width: 1, height: 1 }
@@ -149,7 +158,24 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow', 'bookmark', 'shape']
+const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow', 'bookmark', 'shape', 'code']
+
+export const MAX_TAGS = 10
+
+/** trimmed names up to 40 characters, the same name in any case once, ten at most */
+export function cleanTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const value of raw) {
+    const name = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 40) : ''
+    if (!name || seen.has(name.toLowerCase())) continue
+    seen.add(name.toLowerCase())
+    out.push(name)
+    if (out.length === MAX_TAGS) break
+  }
+  return out
+}
 
 /** wall units, three is enough */
 export const STROKE_WIDTHS = [2, 4, 8]
@@ -232,6 +258,9 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const ownAlign: TextAlign = kind === 'shape' ? 'center' : 'left'
   const radius = kind === 'shape' ? num(o.radius, NaN) : NaN
   const opacity = kind === 'shape' ? num(o.opacity, NaN) : NaN
+  const tags = kind === 'note' ? cleanTags(o.tags) : []
+  // a topic holds words, so only the kinds that do can be one
+  const map = kind === 'note' || kind === 'text' || kind === 'shape' ? str(o.map).trim() : ''
 
   // a hand-edited doc can't plant a link main would refuse
   const link = (isLinkable(kind) || kind === 'bookmark') && parseWallLink(o.link) ? str(o.link).trim() : ''
@@ -273,6 +302,9 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(link ? { link } : {}),
     // an arrow moves with its ends, never as a member
     ...(kind !== 'arrow' && str(o.group).trim() ? { group: str(o.group).trim() } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
+    ...(kind === 'code' && isCodeLanguage(o.language) ? { language: o.language } : {}),
+    ...(map ? { map } : {}),
     z: num(o.z, index)
   }
 }
@@ -574,7 +606,7 @@ export function cameraCentredOn(
 function searchableText(item: WallItem, resolvedTitle?: string): string {
   // web addresses only, an item link's ids mean nothing to type
   const link = parseWallLink(item.link)
-  return [item.text ?? '', item.summary ?? '', resolvedTitle ?? '', link?.type === 'url' ? link.url : '']
+  return [item.text ?? '', item.summary ?? '', resolvedTitle ?? '', link?.type === 'url' ? link.url : '', ...(item.tags ?? [])]
     .join(' ').trim().toLowerCase()
 }
 

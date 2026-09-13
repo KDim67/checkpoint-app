@@ -10,7 +10,7 @@ import { itemLink } from '../../../../shared/wallLink'
 import { SIDES } from '../../../../shared/wallGrow'
 import { alignGuides, GUIDE_SNAP_PX, type GapMark, type Guide } from '../../../../shared/wallAlign'
 import { groupOf, withGroups } from '../../../../shared/wallGroup'
-import { eraseAlong, eraseParts, lassoPick, HIGHLIGHT_SCALE } from '../../../../shared/wallInk'
+import { eraseAlong, eraseParts, joinStrokes, lassoPick, HIGHLIGHT_SCALE } from '../../../../shared/wallInk'
 import { wallToCsv } from '../../lib/wallCsv'
 import { nextZoom, zoomToward } from '../../../../shared/wallZoom'
 import { frameContents, framesInOrder } from '../../../../shared/wallFrames'
@@ -40,7 +40,7 @@ export function useWallPointer(wallDocument: WallDocument) {
     dragRef, pendingMoveRef, moveFrameRef, panCameraRef, zoomCommitRef, liveItemsRef, marqueeRectRef,
     marqueeSelRef, paintedSelRef, movingRef, rightPressRef, railHoverRef, labelRef, docRef,
     selectedRef, historyRef, itemsById, single, activeWall, handOffToColumn, setItems, setCamera,
-    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef, growFrom, eraserMode
+    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef, growFrom, eraserMode, stepWith
   } = wallDocument
   const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -402,6 +402,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       drag.last = at
       if (!cut.touched) return
       drag.items = cut.items
+      drag.removed.push(...cut.erased)
       drag.cut = true
       setItems(drag.items, { record: false })
       return
@@ -681,9 +682,10 @@ export function useWallPointer(wallDocument: WallDocument) {
 
     if (drag?.mode === 'erase') {
       if (drag.removed.length > 0 || drag.cut) {
-        // the whole sweep is one undo step; strokes taken whole are one bin entry, cut pieces are undo's to bring back
-        setItems(drag.items, { record: false, ...(drag.removed.length > 0 ? { removed: drag.removed } : {}) })
-        historyRef.current = pushHistory(replacePresent(historyRef.current, drag.before), drag.items)
+        // the whole sweep is one undo step and one bin entry; the cuts a sweep along a line made are one stroke again
+        const removed = drag.cut ? joinStrokes(drag.removed) : drag.removed
+        setItems(drag.items, { record: false, ...(removed.length > 0 ? { removed } : {}) })
+        historyRef.current = pushHistory(replacePresent(historyRef.current, stepWith(drag.before)), stepWith(drag.items))
         setHistoryTick(t => t + 1)
       }
       return
@@ -748,9 +750,9 @@ export function useWallPointer(wallDocument: WallDocument) {
     if (recordsHistory(drag)) {
       // an alt-drag undoes to before the copies, not to copies stacked on the originals
       const base = drag?.mode === 'move' && drag.before
-        ? replacePresent(historyRef.current, drag.before.items)
+        ? replacePresent(historyRef.current, stepWith(drag.before.items))
         : historyRef.current
-      historyRef.current = pushHistory(base, movedItems ?? docRef.current.items)
+      historyRef.current = pushHistory(base, stepWith(movedItems ?? docRef.current.items))
       setHistoryTick(t => t + 1)
     }
   }

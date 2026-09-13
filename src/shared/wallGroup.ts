@@ -62,13 +62,16 @@ export function groupOf(items: WallItem[], id: string): string[] {
   return items.filter(i => i.id === id || (i.group === group && !i.locked)).map(i => i.id)
 }
 
-/** one fresh id per group among the copies, so a copy never joins its original's group */
+/** one fresh id per group and per mind map among the copies, so a copy never joins its original's */
 export function regroupCopies(copies: WallItem[], newId: () => string = newGroupId): WallItem[] {
   const fresh = new Map<string, string>()
+  const renamed = (id: string): string => {
+    if (!fresh.has(id)) fresh.set(id, newId())
+    return fresh.get(id) as string
+  }
   return copies.map(copy => {
-    if (!copy.group) return copy
-    if (!fresh.has(copy.group)) fresh.set(copy.group, newId())
-    return { ...copy, group: fresh.get(copy.group) as string }
+    if (!copy.group && !copy.map) return copy
+    return { ...copy, ...(copy.group ? { group: renamed(copy.group) } : {}), ...(copy.map ? { map: renamed(`map:${copy.map}`) } : {}) }
   })
 }
 

@@ -11,6 +11,21 @@ const ok = <T extends object>(result: T | { error: string }): T => {
   return result
 }
 
+describe('editWallItem with tags and code', () => {
+  it('sets a sticky\'s tags and a code block\'s source and language, refusing them on other kinds', () => {
+    const items = [item('n', { tags: ['Old'] }), item('c', { kind: 'code', language: 'python' }), item('s', { kind: 'shape' })]
+
+    expect(ok(editWallItem(items, 'n', { tags: [' Bug', 'bug', 'UI'] })).item.tags).toStrictEqual(['Bug', 'UI'])
+    expect(ok(editWallItem(items, 'n', { tags: [] })).item).not.toHaveProperty('tags')
+    expect(ok(editWallItem(items, 'c', { text: 'fn main() {}', language: 'rust' })).item).toMatchObject({ text: 'fn main() {}', language: 'rust' })
+    expect(ok(editWallItem(items, 'c', { language: null })).item).not.toHaveProperty('language')
+
+    expect(editWallItem(items, 's', { tags: ['Bug'] })).toStrictEqual({ error: 'Only sticky notes carry tags.' })
+    expect(editWallItem(items, 'n', { language: 'rust' })).toStrictEqual({ error: 'Only a code block has a language.' })
+    expect(editWallItem(items, 'c', { language: 'klingon' })).toMatchObject({ error: expect.stringContaining("language 'klingon' isn't one of typescript, python") })
+  })
+})
+
 describe('editWallItem', () => {
   it('moves by centre, resizes around the centre, and changes only what is given', () => {
     const items = [item('a', { text: 'hi', color: '#f6c453' })]

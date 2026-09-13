@@ -162,4 +162,40 @@ describe('styleOf and applyStyle', () => {
     expect(note).not.toHaveProperty('arrowShape')
     expect(note).not.toHaveProperty('strokeWidth')
   })
+
+  it('carries where the words sit as it looks, so a centred sticky makes a shape centred and a note left', () => {
+    const [shape, sticky, text] = applyStyle(
+      [item('sh', { kind: 'shape', align: 'right' }), item('st', { align: 'right' }), item('tx', { kind: 'text' })],
+      new Set(['sh', 'st', 'tx']),
+      styleOf(item('src', { align: 'center' }))
+    )
+    // centre is a shape's own, so it's left unwritten
+    expect(shape.align).toBeUndefined()
+    expect(sticky.align).toBe('center')
+    expect(text.align).toBe('center')
+
+    const [fromShape] = applyStyle([item('st', { align: 'right' })], new Set(['st']), styleOf(item('src', { kind: 'shape' })))
+    expect(fromShape.align).toBe('center')
+  })
+
+  it('carries a shape\'s border, corners and fill to shapes only, resetting what the source leaves at its default', () => {
+    const source = item('src', { kind: 'shape', borderColor: '#000000', radius: 30, opacity: 0.5 })
+    const [shape, plain, note] = applyStyle(
+      [item('a', { kind: 'shape' }), item('b', { kind: 'shape', borderColor: '#ffffff', opacity: 0.2 }), item('c')],
+      new Set(['a', 'b', 'c']),
+      styleOf(source)
+    )
+    expect(shape).toMatchObject({ borderColor: '#000000', radius: 30, opacity: 0.5 })
+    expect(plain).toMatchObject({ borderColor: '#000000', radius: 30, opacity: 0.5 })
+    expect(note).not.toHaveProperty('borderColor')
+
+    const [reset] = applyStyle([item('b', { kind: 'shape', borderColor: '#ffffff', opacity: 0.2 })], new Set(['b']), styleOf(item('src', { kind: 'shape' })))
+    expect(reset).not.toHaveProperty('borderColor')
+    expect(reset).not.toHaveProperty('opacity')
+  })
+
+  it('leaves a shape\'s looks alone when the source is a sticky', () => {
+    const [shape] = applyStyle([item('a', { kind: 'shape', borderColor: '#ffffff', radius: 8 })], new Set(['a']), styleOf(item('src')))
+    expect(shape).toMatchObject({ borderColor: '#ffffff', radius: 8 })
+  })
 })

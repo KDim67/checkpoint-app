@@ -2,11 +2,12 @@
 
 import {
   boundsOf, inPaintOrder, normalizeWallItem, pruneArrows, topZ, withFrameContents,
-  type ArrowHeads, type ArrowLine, type ArrowShape, type Point, type WallItem
+  type ArrowHeads, type ArrowLine, type ArrowShape, type Point, type TextAlign, type WallItem
 } from './wallModel'
 import { parseWallLink } from './wallLink'
 import { plainWallText } from './wallText'
 import { regroupCopies } from './wallGroup'
+import { isWritable, textAlignOf } from './wallShape'
 
 // private, so a paste from another app can't pose as wall items
 export const WALL_CLIP_MIME = 'application/x-checkpoint-wall-items'
@@ -147,6 +148,11 @@ export interface WallStyle {
   arrowShape?: ArrowShape
   arrowLine?: ArrowLine
   arrowHeads?: ArrowHeads
+  /** the side the words sit on as it looks, since each kind has its own default */
+  align?: TextAlign
+  borderColor?: string
+  radius?: number
+  opacity?: number
 }
 
 const drawsLines = (item: WallItem): boolean => item.kind === 'arrow' || item.kind === 'ink'
@@ -156,7 +162,9 @@ export function styleOf(item: WallItem): WallStyle {
   return {
     color: item.color,
     ...(drawsLines(item) ? { strokeWidth: item.strokeWidth } : {}),
-    ...(item.kind === 'arrow' ? { arrowShape: item.arrowShape, arrowLine: item.arrowLine, arrowHeads: item.arrowHeads } : {})
+    ...(item.kind === 'arrow' ? { arrowShape: item.arrowShape, arrowLine: item.arrowLine, arrowHeads: item.arrowHeads } : {}),
+    ...(isWritable(item.kind) ? { align: textAlignOf(item) } : {}),
+    ...(item.kind === 'shape' ? { borderColor: item.borderColor, radius: item.radius, opacity: item.opacity } : {})
   }
 }
 
@@ -177,6 +185,16 @@ export function applyStyle(items: WallItem[], ids: Set<string>, style: WallStyle
       take(next, 'arrowShape')
       take(next, 'arrowLine')
       take(next, 'arrowHeads')
+    }
+    if (isWritable(item.kind) && style.align) {
+      // stored only off the kind's own side, the way a load keeps it
+      if (style.align === (item.kind === 'shape' ? 'center' : 'left')) delete next.align
+      else next.align = style.align
+    }
+    if (item.kind === 'shape') {
+      take(next, 'borderColor')
+      take(next, 'radius')
+      take(next, 'opacity')
     }
     return next
   })
