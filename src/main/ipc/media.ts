@@ -35,6 +35,13 @@ export function registerMediaHandlers(): void {
     }
   })
 
+  // the page is read and dropped, only its favicon is kept in media
+  ipcMain.handle(IpcChannels.MEDIA_LINK_PREVIEW, async (_event, url: unknown) => {
+    if (typeof url !== 'string') return null
+    const { fetchLinkPreview } = await import('../linkPreview')
+    return fetchLinkPreview(url)
+  })
+
   ipcMain.handle(IpcChannels.MEDIA_GET_STORAGE_INFO, async () => {
     try {
       const { getStorageInfo } = await import('../mediaService')

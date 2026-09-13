@@ -1694,6 +1694,81 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 .wall-lock-selected { display: none; }
 [data-wall-item][data-wall-selected] .wall-lock-selected { display: block; }
 
+/* a link hangs under its item; hover in CSS so a busy wall doesn't re-render */
+.wall-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.wall-link-chip:hover {
+  color: var(--color-secondary);
+  border-color: var(--color-secondary);
+}
+
+.wall-link-chip:focus-visible,
+.wall-link-save:focus-visible,
+.wall-link-action:focus-visible {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+/* dashed and faint, still clickable so it can say what went */
+.wall-link-chip[data-missing] {
+  color: var(--color-text-faint);
+  border-style: dashed;
+}
+
+.wall-text-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.wall-link-save {
+  height: 28px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-inverted);
+  background: var(--color-secondary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.wall-link-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.wall-link-action:hover {
+  color: var(--color-text-base);
+  background: var(--color-surface-offset);
+}
+
+.wall-link-action[data-destructive]:hover {
+  color: var(--color-error);
+}
+
 /* container queries since the bar isn't the window; content-box widths measured; labels go first, the chip never */
 .kanban-header {
   container-type: inline-size;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
@@ -18,6 +18,8 @@ import { updateItem, itemPage } from '../../data/items'
 import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, clampRail } from './wallPreferences'
 import * as notesApi from '../../data/notes'
 import * as mediaApi from '../../data/media'
+import * as appApi from '../../data/app'
+import { itemLink, parseWallLink } from '../../../../shared/wallLink'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
@@ -81,6 +83,14 @@ export function useWallDocument() {
   /** space pans without putting the tool down */
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [swatchOpen, setSwatchOpen] = useState(false)
+  /** the selection bar's link field */
+  const [linkOpen, setLinkOpen] = useState(false)
+  /** the item waiting for a click on what it should link to */
+  const [linkPickFor, setLinkPickFor] = useState<string | null>(null)
+  /** an item on another wall, centred once that wall has loaded */
+  const pendingJumpRef = useRef<string | null>(null)
+  /** bookmarks whose page main is still reading; a view state, never saved */
+  const [previewing, setPreviewing] = useState<Set<string>>(new Set())
   const { bindings: keys, match: matchKey } = useViewShortcuts('wall')
   const [panButtons, setPanButtons] = useState<PanButtons>(PAN_BUTTON_MODES[0])
   const [menuButton, setMenuButton] = useState<MenuButton>(MENU_BUTTON_MODES[0])
@@ -232,7 +242,18 @@ export function useWallDocument() {
     loadWallDoc(docKey)
       .then(loaded => {
         if (cancelled) return
-        setDoc(loaded)
+        const jump = pendingJumpRef.current
+        pendingJumpRef.current = null
+        const target = jump ? loaded.items.find(i => i.id === jump) : undefined
+        const rect = viewportRef.current?.getBoundingClientRect()
+        if (target && rect) {
+          // same zoom as you left it, a link shouldn't change how close you are
+          setDoc({ ...loaded, camera: cameraCentredOn(target, { width: rect.width, height: rect.height }, loaded.camera.zoom) })
+          setSelectedIds(new Set([target.id]))
+        } else {
+          setDoc(loaded)
+          if (jump) toast('The linked item was deleted. Edit the link to point somewhere else.')
+        }
         historyRef.current = initHistory(loaded.items)
         setHistoryTick(t => t + 1)
       })
@@ -452,6 +473,103 @@ export function useWallDocument() {
     if (item.kind === 'card' && item.ref) selectItem(item.ref)
   }, [selectItem])
 
+  /** web links leave through main, which checks the scheme again; item links pan at the current zoom */
+  const followLink = useCallback((link: string) => {
+    const parsed = parseWallLink(link)
+    if (!parsed) { toast('That link can\'t be opened. Edit it to fix the address.', { type: 'error' }); return }
+
+    if (parsed.type === 'url') {
+      appApi.openExternal(parsed.url).catch(err => toast(`Could not open the link: ${errorMessage(err)}`, { type: 'error' }))
+      return
+    }
+
+    if (!wallIndex) return
+    if (parsed.wallId !== wallIndex.activeId) {
+      if (!wallIndex.walls.some(w => w.id === parsed.wallId)) {
+        toast('The linked wall was deleted. Edit the link to point somewhere else.')
+        return
+      }
+      // the doc load centres it once that wall is open
+      pendingJumpRef.current = parsed.itemId
+      commitIndex(setActiveWall(wallIndex, parsed.wallId))
+      return
+    }
+
+    const target = docRef.current.items.find(i => i.id === parsed.itemId)
+    if (!target) { toast('The linked item was deleted. Edit the link to point somewhere else.'); return }
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setCamera(cameraCentredOn(target, { width: rect.width, height: rect.height }, docRef.current.camera.zoom))
+    setSelectedIds(new Set([target.id]))
+  }, [wallIndex, commitIndex, setCamera, toast])
+
+  /** one undo step; undefined removes it; a locked item keeps its link like its text */
+  const setItemLink = useCallback((id: string, link: string | undefined) => {
+    setItems(docRef.current.items.map(i => {
+      if (i.id !== id || i.locked) return i
+      const next = { ...i, link }
+      if (!link) delete next.link
+      return next
+    }))
+  }, [setItems])
+
+  const copyItemLink = useCallback((item: WallItem) => {
+    if (!activeWall) return
+    navigator.clipboard.writeText(itemLink(activeWall.id, item.id))
+      .then(() => toast('Link copied. Paste it into another item\'s link, on any wall.'))
+      .catch(err => toast(`Could not copy the link: ${errorMessage(err)}`, { type: 'error' }))
+  }, [activeWall, toast])
+
+  /** the next click on an item becomes the link target */
+  const startLinkPick = useCallback((id: string) => {
+    setLinkOpen(false)
+    setTool('select')
+    setLinkPickFor(id)
+  }, [])
+
+  /** main reads the page; the card is already placed, so a slow or failed read only leaves it plain */
+  const refreshPreview = useCallback(async (id: string) => {
+    const link = parseWallLink(docRef.current.items.find(i => i.id === id)?.link)
+    // mailto has no page to read, the address is the card
+    if (link?.type !== 'url' || !/^https?:/.test(link.url)) return
+
+    setPreviewing(prev => new Set(prev).add(id))
+    try {
+      const preview = await mediaApi.linkPreview(link.url)
+      const current = docRef.current.items.find(i => i.id === id)
+      // gone, or another wall is open by now
+      if (!current || current.link !== link.url) return
+      if (!preview) {
+        toast(`Could not read ${link.host}. The card still opens it, and Refresh preview tries again.`)
+        return
+      }
+      // folded into the paste's undo step, not one of its own
+      setItems(docRef.current.items.map(i => i.id === id
+        ? { ...i, text: preview.title ?? i.text, summary: preview.description ?? i.summary, ref: preview.icon ?? i.ref }
+        : i
+      ), { record: false })
+    } catch (err) {
+      toast(`Could not read ${link.host}: ${errorMessage(err)}`, { type: 'error' })
+    } finally {
+      setPreviewing(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }, [setItems, toast])
+
+  /** a pasted or dropped address becomes a card that fills in once main has read the page */
+  const addBookmark = useCallback((link: string, at?: { x: number; y: number }) => {
+    const parsed = parseWallLink(link)
+    if (parsed?.type !== 'url') return
+    const items = docRef.current.items
+    const created = createWallItem('bookmark', at ?? centreOfView(), items, { link: parsed.url, text: parsed.host })
+    setItems([...items, created])
+    setSelectedIds(new Set([created.id]))
+    void refreshPreview(created.id)
+  }, [centreOfView, setItems, refreshPreview])
+
   const placeImageFiles = useCallback(async (files: File[], at?: { x: number; y: number }) => {
     const images = files.filter(f => f.type.startsWith('image/'))
     if (images.length === 0) return
@@ -589,7 +707,18 @@ export function useWallDocument() {
     placeDerived,
     runImageOp,
     openCard,
-    placeImageFiles
+    placeImageFiles,
+    linkOpen,
+    setLinkOpen,
+    linkPickFor,
+    setLinkPickFor,
+    followLink,
+    setItemLink,
+    copyItemLink,
+    startLinkPick,
+    previewing,
+    refreshPreview,
+    addBookmark
   }
 }
 

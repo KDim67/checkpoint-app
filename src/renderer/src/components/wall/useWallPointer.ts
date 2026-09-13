@@ -3,6 +3,7 @@ import { bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPo
 import { arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedSize, rotationAngle, rotationStart, snapMoving } from '../../../../shared/wallPointer'
 import { pushHistory } from '../../../../shared/history'
 import { exportWallToPng } from '../../lib/wallExport'
+import { itemLink } from '../../../../shared/wallLink'
 import { errorMessage } from '../../../../shared/errors'
 import * as appApi from '../../data/app'
 import { paintWallCamera, paintWallItems, paintWallSelection } from './wallPaint'
@@ -24,7 +25,7 @@ export function useWallPointer(wallDocument: WallDocument) {
     dragRef, pendingMoveRef, moveFrameRef, panCameraRef, zoomCommitRef, liveItemsRef, marqueeRectRef,
     marqueeSelRef, paintedSelRef, movingRef, rightPressRef, railHoverRef, labelRef, docRef,
     selectedRef, historyRef, itemsById, single, activeWall, handOffToColumn, setItems, setCamera,
-    addItem
+    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink
   } = wallDocument
   const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -116,6 +117,9 @@ export function useWallPointer(wallDocument: WallDocument) {
     // floating panels are children; capture used to steal their clicks
     if (target.closest('[data-wall-ui]')) return
 
+    // a link chip is a button, capture would swallow its click
+    if (target.closest('[data-wall-link]')) return
+
     const handle = target.closest<HTMLElement>('[data-wall-handle]')
     const itemEl = target.closest<HTMLElement>('[data-wall-item]')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -152,6 +156,26 @@ export function useWallPointer(wallDocument: WallDocument) {
       const cam = panCameraRef.current ?? docRef.current.camera
       dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, camX: cam.x, camY: cam.y }
       return
+    }
+
+    const pressedItem = itemEl ? docRef.current.items.find(i => i.id === itemEl.dataset.wallItem) : undefined
+
+    // Pick an item: this press names the target, a press anywhere else calls it off
+    if (linkPickFor && e.button === 0) {
+      setLinkPickFor(null)
+      if (pressedItem && pressedItem.id === linkPickFor) {
+        toast('An item can\'t link to itself. Pick a different one.')
+      } else if (pressedItem && activeWall) {
+        setItemLink(linkPickFor, itemLink(activeWall.id, pressedItem.id))
+        toast(`Linked to ${labelRef.current(pressedItem)?.trim() || 'that item'}.`)
+      }
+      return
+    }
+
+    // ctrl or cmd follows a link; an address in the text wins over the item's own
+    if ((e.ctrlKey || e.metaKey) && e.button === 0 && tool === 'select') {
+      const linked = target.closest<HTMLElement>('[data-wall-url]')?.dataset.wallUrl ?? pressedItem?.link
+      if (linked) { followLink(linked); return }
     }
 
     // connect handles sit on items, check first; same drag as the arrow tool

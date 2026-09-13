@@ -49,7 +49,37 @@ const item = (over: Partial<WallItem> = {}): WallItem => ({
   ...over
 })
 
+describe('searching a wall by link', () => {
+  it('finds an item by the address it links to, but not by an item link', () => {
+    const items = [item({ id: 'a', link: 'https://github.com/KDim67' }), item({ id: 'b', link: 'wall:main/a' })]
+    expect(searchItems(items, 'github', () => undefined).map(i => i.id)).toEqual(['a'])
+    expect(searchItems(items, 'wall', () => undefined)).toEqual([])
+  })
+
+  it('finds a bookmark by what its page says about itself', () => {
+    const items = [item({ id: 'a', kind: 'bookmark', link: 'https://example.com/', summary: 'Release notes for 2.0' })]
+    expect(searchItems(items, 'release', () => undefined).map(i => i.id)).toEqual(['a'])
+  })
+})
+
 describe('normalizeWallItem', () => {
+  it('keeps a link it can follow and drops one it cannot', () => {
+    expect(defined(normalizeWallItem({ kind: 'note', link: 'https://example.com/' }, 0)).link).toBe('https://example.com/')
+    expect(defined(normalizeWallItem({ kind: 'note', link: 'wall:main/w-1' }, 0)).link).toBe('wall:main/w-1')
+    // a hand-edited doc can't plant a script link
+    expect(defined(normalizeWallItem({ kind: 'note', link: 'javascript:alert(1)' }, 0)).link).toBeUndefined()
+    // no box for the chip
+    expect(defined(normalizeWallItem({ kind: 'ink', points: [0, 0, 10, 10], link: 'https://example.com/' }, 0)).link).toBeUndefined()
+  })
+
+  it('keeps a bookmark only when it has a web address to open', () => {
+    const kept = defined(normalizeWallItem({ kind: 'bookmark', link: 'https://example.com/', text: 'Example', summary: 'A page', ref: 'icon.png' }, 0))
+    expect(kept).toMatchObject({ kind: 'bookmark', link: 'https://example.com/', text: 'Example', summary: 'A page', ref: 'icon.png' })
+    // nothing to open
+    expect(normalizeWallItem({ kind: 'bookmark' }, 0)).toBeNull()
+    expect(normalizeWallItem({ kind: 'bookmark', link: 'wall:main/w-1' }, 0)).toBeNull()
+  })
+
   it('keeps a well-formed item', () => {
     const raw = { id: 'a', kind: 'note', x: 10, y: 20, width: 100, height: 50, z: 3 }
     expect(normalizeWallItem(raw, 0)).toMatchObject({ id: 'a', kind: 'note', x: 10, y: 20, z: 3 })

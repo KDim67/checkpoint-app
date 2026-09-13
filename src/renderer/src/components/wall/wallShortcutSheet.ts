@@ -31,7 +31,8 @@ export const wallShortcutSections = (
             'Menu for what is under the pointer'] as [string, string]]),
       ['Wheel', 'Zoom where the pointer is'],
       ['Double-click', 'New sticky note, or open what was clicked'],
-      ['Shift-click', 'Add to or take from the selection']
+      ['Shift-click', 'Add to or take from the selection'],
+      ['Ctrl+click', 'Follow an item\'s link, or an address in its text']
     ]
   },
   {
@@ -40,6 +41,7 @@ export const wallShortcutSections = (
       ['Ctrl+Z', 'Undo'],
       ['Ctrl+Shift+Z', 'Redo'],
       [bindings.wall_duplicate || 'Unbound', 'Duplicate the selection'],
+      [bindings.wall_link || 'Unbound', 'Link the selected item'],
       ['Ctrl+A', 'Select everything unlocked'],
       // the bound key is a preference, Delete is a fact
       [bindings.wall_delete ? `${bindings.wall_delete} or Delete` : 'Delete', 'Remove the selection'],

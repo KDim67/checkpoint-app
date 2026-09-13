@@ -8,15 +8,24 @@ import { bringToFront, patchItems, sendToBack, type WallItem } from '../src/shar
 afterEach(cleanup)
 
 type Props = Parameters<typeof WallSelectionBar>[0]
-type Given = Omit<Props, 'swatchOpen' | 'setSwatchOpen'>
+type Given = Omit<Props, 'swatchOpen' | 'setSwatchOpen' | 'linkOpen' | 'setLinkOpen'>
 
 const item = (id: string, over: Partial<WallItem> = {}): WallItem => ({ id, kind: 'note', z: 0, ...over } as WallItem)
 const notes = [item('a', { z: 1 }), item('b', { z: 2 }), item('c', { z: 3 })]
 
-/** the swatch toggles on Wall state */
+/** the swatch and link field toggle on Wall state */
 function Bar(props: Given) {
   const [swatchOpen, setSwatchOpen] = useState(false)
-  return <WallSelectionBar {...props} swatchOpen={swatchOpen} setSwatchOpen={setSwatchOpen} />
+  const [linkOpen, setLinkOpen] = useState(false)
+  return (
+    <WallSelectionBar
+      {...props}
+      swatchOpen={swatchOpen}
+      setSwatchOpen={setSwatchOpen}
+      linkOpen={linkOpen}
+      setLinkOpen={setLinkOpen}
+    />
+  )
 }
 
 const renderBar = (over: Partial<Given> = {}) => {
@@ -25,7 +34,10 @@ const renderBar = (over: Partial<Given> = {}) => {
     setEditingId: vi.fn<Props['setEditingId']>(),
     duplicateSelected: vi.fn<Props['duplicateSelected']>(),
     toggleLock: vi.fn<Props['toggleLock']>(),
-    removeSelected: vi.fn<Props['removeSelected']>()
+    removeSelected: vi.fn<Props['removeSelected']>(),
+    setItemLink: vi.fn<Props['setItemLink']>(),
+    startLinkPick: vi.fn<Props['startLinkPick']>(),
+    followLink: vi.fn<Props['followLink']>()
   }
   render(
     <Bar
@@ -112,5 +124,42 @@ describe('WallSelectionBar', () => {
     expect(handlers.toggleLock).toHaveBeenCalledTimes(1)
     expect(handlers.duplicateSelected).toHaveBeenCalledTimes(1)
     expect(handlers.removeSelected).toHaveBeenCalledTimes(1)
+  })
+
+  it('links a single item from its link field, then closes the field', () => {
+    const note = item('a')
+    const { setItemLink } = renderBar({ items: [note], selectedIds: new Set(['a']), single: note })
+
+    fireEvent.click(button('Add a link'))
+    fireEvent.change(screen.getByLabelText('Link address'), { target: { value: 'example.com' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    expect(setItemLink).toHaveBeenCalledWith('a', 'https://example.com/')
+    expect(screen.queryByLabelText('Link address')).toBeNull()
+  })
+
+  it('hands Pick an item to the Wall for the selected item', () => {
+    const note = item('a')
+    const { startLinkPick } = renderBar({ items: [note], selectedIds: new Set(['a']), single: note })
+
+    fireEvent.click(button('Add a link'))
+    fireEvent.click(screen.getByText('Pick an item on this wall'))
+
+    expect(startLinkPick).toHaveBeenCalledWith('a')
+  })
+
+  it('keeps a locked item\'s link as it is, and offers none for several items or an arrow', () => {
+    const locked = item('a', { locked: true, link: 'https://example.com/' })
+    renderBar({ items: [locked], selectedIds: new Set(['a']), single: locked })
+    expect(button('Edit link').disabled).toBe(true)
+    cleanup()
+
+    renderBar()
+    expect(screen.queryByLabelText('Add a link')).toBeNull()
+    cleanup()
+
+    const arrow = item('a', { kind: 'arrow' })
+    renderBar({ items: [arrow], selectedIds: new Set(['a']), single: arrow, arrowsSelected: true })
+    expect(screen.queryByLabelText('Add a link')).toBeNull()
   })
 })
