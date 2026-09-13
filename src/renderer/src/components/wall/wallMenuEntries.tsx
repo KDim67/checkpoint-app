@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw } from 'lucide-react'
+import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket } from 'lucide-react'
 import { bringToFront, createWallItem, sendToBack, type WallDoc, type WallItem, type WallItemKind } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImageOps'
@@ -29,6 +29,14 @@ export interface WallMenuContext {
   refreshPreview: (id: string) => Promise<void>
   /** the selection bar's field, the item is already selected */
   openLinkEditor: () => void
+  copyItems: () => void
+  cutItems: () => void
+  copyStyle: () => void
+  pasteStyle: () => void
+  /** greyed out rather than offering what can't happen */
+  canPasteStyle: boolean
+  pasteHere: (at: { x: number; y: number }) => void
+  canPaste: boolean
 }
 
 /** item menu for an item, canvas menu for a spot */
@@ -36,7 +44,8 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
   const {
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
     duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast,
-    followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor
+    followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor, copyItems, cutItems,
+    copyStyle, pasteStyle, canPasteStyle, pasteHere, canPaste
   } = ctx
   if (!menu) return []
 
@@ -117,6 +126,10 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
         ? [{ label: 'Open card', icon: <ExternalLink size={13} />, onClick: () => openCard(item) }]
         : []),
       ...linkEntries,
+      { label: many ? `Copy ${selectedIds.size} items` : 'Copy', icon: <ClipboardCopy size={13} />, hint: 'Ctrl C', onClick: copyItems },
+      { label: many ? `Cut ${selectedIds.size} items` : 'Cut', icon: <Scissors size={13} />, hint: 'Ctrl X', onClick: cutItems },
+      ...(many ? [] : [{ label: 'Copy style', icon: <Paintbrush size={13} />, onClick: copyStyle }]),
+      { label: 'Paste style', icon: <PaintBucket size={13} />, onClick: pasteStyle, disabled: !canPasteStyle },
       { label: many ? `Duplicate ${selectedIds.size} items` : 'Duplicate', icon: <Copy size={13} />, hint: 'Ctrl D', onClick: duplicateSelected },
       { label: 'Bring to front', icon: <ArrowUp size={13} />, onClick: () => setItems(bringToFront(doc.items, item.id)) },
       { label: 'Send to back', icon: <ArrowDown size={13} />, onClick: () => setItems(sendToBack(doc.items, item.id)) },
@@ -133,6 +146,7 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
     { label: 'Sticky note here', icon: <StickyNote size={13} />, onClick: () => addItem('note', {}, menu.at) },
     { label: 'Text here', icon: <Type size={13} />, onClick: () => addItem('text', {}, menu.at) },
     { label: 'Frame here', icon: <Square size={13} />, onClick: () => addItem('frame', {}, menu.at) },
+    { label: 'Paste here', icon: <ClipboardPaste size={13} />, hint: 'Ctrl V', onClick: () => pasteHere(menu.at), disabled: !canPaste },
     { label: 'Select all', icon: <Layers size={13} />, hint: 'Ctrl A', onClick: () => setSelectedIds(new Set(doc.items.filter(i => !i.locked).map(i => i.id))) },
     { label: 'Fit to content', icon: <Maximize2 size={13} />, onClick: fitToContent, disabled: doc.items.length === 0 }
   ]

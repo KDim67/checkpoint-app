@@ -26,7 +26,7 @@ export function useWallView() {
   } = wallDocument
   const {
     screenPoint, onWheel, jumpTo, exportPng, fitToContent, arrowAt, onPointerDown, onPointerMove,
-    endDrag
+    onPointerLeave, endDrag
   } = wallPointer
   const {
     menuEntries, camera, custom, canvasBackground, dotColor, placed, pickerRows, labelOf, matches,
@@ -136,6 +136,7 @@ export function useWallView() {
     arrowAt,
     onPointerDown,
     onPointerMove,
+    onPointerLeave,
     endDrag,
     menuEntries,
     camera,

@@ -60,6 +60,9 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   { id: 'wall_delete',           label: 'Delete the selection',    scope: 'wall',   defaultCombo: 'Ctrl+D' },
   // K for link, as in most editors
   { id: 'wall_link',             label: 'Link the selected item',  scope: 'wall',   defaultCombo: 'Ctrl+K' },
+  // Alt beside copy and paste, their styled cousins
+  { id: 'wall_copy_style',       label: 'Copy style',              scope: 'wall',   defaultCombo: 'Ctrl+Alt+C' },
+  { id: 'wall_paste_style',      label: 'Paste style',             scope: 'wall',   defaultCombo: 'Ctrl+Alt+V' },
 
   { id: 'kanban_focus_session',  label: 'Start a focus session',   scope: 'kanban', defaultCombo: 'Space' },
   { id: 'kanban_open_details',   label: 'Open the card',           scope: 'kanban', defaultCombo: 'E' },

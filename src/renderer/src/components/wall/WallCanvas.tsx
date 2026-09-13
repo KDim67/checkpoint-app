@@ -16,7 +16,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     viewportRef, marqueeRectRef, docRef, cardsById, itemsById, notesByTitle, selectedItems, single,
     arrowsSelected, setItems, setCamera, onItemTextChange, onItemFinishEditing, onItemAutoSize, addItem,
     removeSelected, duplicateSelected, toggleLock, openCard, placeImageFiles, screenPoint, onWheel,
-    arrowAt, onPointerDown, onPointerMove, endDrag, camera, canvasBackground, dotColor, floatingRef,
+    arrowAt, onPointerDown, onPointerMove, onPointerLeave, endDrag, camera, canvasBackground, dotColor, floatingRef,
     floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
     wallIndex, activeWall, labelOf, previewing, addBookmark
   } = wallView
@@ -38,6 +38,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       // the menu opens on release, the only place a click differs from a pan

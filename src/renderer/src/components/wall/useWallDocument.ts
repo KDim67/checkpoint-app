@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, withFrameContents, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
@@ -20,6 +20,8 @@ import * as notesApi from '../../data/notes'
 import * as mediaApi from '../../data/media'
 import * as appApi from '../../data/app'
 import { itemLink, parseWallLink } from '../../../../shared/wallLink'
+import { applyStyle, placeClip, styleOf, type WallClip } from '../../../../shared/wallClipboard'
+import { rememberStyle, rememberedStyle } from './wallClipboardMemory'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
@@ -91,6 +93,10 @@ export function useWallDocument() {
   const pendingJumpRef = useRef<string | null>(null)
   /** bookmarks whose page main is still reading; a view state, never saved */
   const [previewing, setPreviewing] = useState<Set<string>>(new Set())
+  /** the last pointer over the wall, so a paste lands under it */
+  const pointerRef = useRef<{ clientX: number; clientY: number } | null>(null)
+  /** pasting again without moving steps the copies down-right instead of stacking them */
+  const lastPasteRef = useRef<{ key: string; count: number } | null>(null)
   const { bindings: keys, match: matchKey } = useViewShortcuts('wall')
   const [panButtons, setPanButtons] = useState<PanButtons>(PAN_BUTTON_MODES[0])
   const [menuButton, setMenuButton] = useState<MenuButton>(MENU_BUTTON_MODES[0])
@@ -580,6 +586,74 @@ export function useWallDocument() {
     void refreshPreview(created.id)
   }, [centreOfView, setItems, refreshPreview])
 
+  /** under the pointer while it's over the wall, else the middle of the view */
+  const pastePoint = useCallback((): { x: number; y: number } => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    const pointer = pointerRef.current
+    const overWall = rect && pointer &&
+      pointer.clientX >= rect.left && pointer.clientX <= rect.right &&
+      pointer.clientY >= rect.top && pointer.clientY <= rect.bottom
+    const at = rect && pointer && overWall
+      ? toWallPoint({ x: pointer.clientX - rect.left, y: pointer.clientY - rect.top }, docRef.current.camera)
+      : centreOfView()
+
+    const key = `${Math.round(at.x)},${Math.round(at.y)}`
+    const count = lastPasteRef.current?.key === key ? lastPasteRef.current.count + 1 : 0
+    lastPasteRef.current = { key, count }
+    return { x: at.x + count * 24, y: at.y + count * 24 }
+  }, [centreOfView])
+
+  /** cards belong to their workspace's board; copied into another one they'd only say they're missing */
+  const pasteClip = useCallback((clip: WallClip, at?: { x: number; y: number }) => {
+    const items = docRef.current.items
+    const known = pruneArrows(clip.items.filter(i => i.kind !== 'card' || cardsById.has(i.ref ?? '')))
+    const leftBehind = clip.items.filter(i => i.kind === 'card').length - known.filter(i => i.kind === 'card').length
+    if (leftBehind > 0) {
+      toast(`${leftBehind} card${leftBehind === 1 ? '' : 's'} stayed behind. A card can only go on its own workspace's walls.`)
+    }
+
+    const placed = placeClip({ ...clip, items: known }, items, at ?? pastePoint())
+    if (placed.length === 0) return
+    setItems([...items, ...placed])
+    setEditingId(null)
+    setSelectedIds(new Set(placed.map(i => i.id)))
+  }, [cardsById, pastePoint, setItems, toast])
+
+  /** takes a frame's contents too, the same set the copy carried */
+  const cutSelected = useCallback(() => {
+    const items = docRef.current.items
+    const ids = withFrameContents(items, selectedRef.current)
+    const gone = items.filter(i => ids.has(i.id))
+    if (gone.length === 0) return
+    setItems(pruneArrows(items.filter(i => !ids.has(i.id))))
+    setSelectedIds(new Set())
+    toast(`Cut ${gone.length} item${gone.length === 1 ? '' : 's'}.`, {
+      action: { label: 'Undo', onClick: () => setItems([...docRef.current.items, ...gone]) }
+    })
+  }, [setItems, toast])
+
+  const copyStyle = useCallback(() => {
+    const chosen = docRef.current.items.filter(i => selectedRef.current.has(i.id))
+    if (chosen.length !== 1) {
+      toast('Select one item to copy its style.')
+      return
+    }
+    rememberStyle(styleOf(chosen[0]))
+    toast(keys.wall_paste_style
+      ? `Style copied. Select items and press ${keys.wall_paste_style} to paste it.`
+      : 'Style copied. Select items and use Paste style from the right-click menu.')
+  }, [keys.wall_paste_style, toast])
+
+  const pasteStyle = useCallback(() => {
+    const style = rememberedStyle()
+    if (!style) {
+      toast('Nothing to paste yet. Select an item and use Copy style first.')
+      return
+    }
+    if (selectedRef.current.size === 0) return
+    setItems(applyStyle(docRef.current.items, selectedRef.current, style))
+  }, [setItems, toast])
+
   const placeImageFiles = useCallback(async (files: File[], at?: { x: number; y: number }) => {
     const images = files.filter(f => f.type.startsWith('image/'))
     if (images.length === 0) return
@@ -729,7 +803,12 @@ export function useWallDocument() {
     startLinkPick,
     previewing,
     refreshPreview,
-    addBookmark
+    addBookmark,
+    pointerRef,
+    pasteClip,
+    cutSelected,
+    copyStyle,
+    pasteStyle
   }
 }
 

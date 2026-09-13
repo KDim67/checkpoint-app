@@ -1,7 +1,8 @@
 import React, { useCallback, useLayoutEffect } from 'react'
-import { bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallCamera, type WallItem } from '../../../../shared/wallModel'
+import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallCamera, type WallItem } from '../../../../shared/wallModel'
 import { arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedSize, rotationAngle, rotationStart, snapMoving } from '../../../../shared/wallPointer'
-import { pushHistory } from '../../../../shared/history'
+import { pushHistory, replacePresent } from '../../../../shared/history'
+import { clipSelection, placeClip } from '../../../../shared/wallClipboard'
 import { exportWallToPng } from '../../lib/wallExport'
 import { itemLink } from '../../../../shared/wallLink'
 import { errorMessage } from '../../../../shared/errors'
@@ -25,7 +26,7 @@ export function useWallPointer(wallDocument: WallDocument) {
     dragRef, pendingMoveRef, moveFrameRef, panCameraRef, zoomCommitRef, liveItemsRef, marqueeRectRef,
     marqueeSelRef, paintedSelRef, movingRef, rightPressRef, railHoverRef, labelRef, docRef,
     selectedRef, historyRef, itemsById, single, activeWall, handOffToColumn, setItems, setCamera,
-    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink
+    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef
   } = wallDocument
   const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -243,6 +244,22 @@ export function useWallPointer(wallDocument: WallDocument) {
     if (id && item && e.button === 0) {
       if (item.locked) { setSelectedIds(new Set()); return }
       const next = pressSelection(selectedRef.current, id, e.shiftKey)
+
+      // alt drags out a copy and leaves the originals where they are
+      const clip = e.altKey && next.has(id) ? clipSelection(docRef.current.items, next) : null
+      const bounds = clip ? boundsOf(clip.items) : null
+      if (clip && bounds) {
+        const before = { items: docRef.current.items, selected: next }
+        const copies = placeClip(clip, before.items, { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 })
+        const withCopies = [...before.items, ...copies]
+        const copyIds = new Set(copies.map(c => c.id))
+        setItems(withCopies, { record: false })
+        setSelectedIds(copyIds)
+        movingRef.current = copyIds
+        dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: withCopies, moved: false, before }
+        return
+      }
+
       setSelectedIds(next)
       if (!e.shiftKey) setItems(bringToFront(docRef.current.items, id), { record: false })
       movingRef.current = withFrameContents(docRef.current.items, next)
@@ -407,6 +424,8 @@ export function useWallPointer(wallDocument: WallDocument) {
 
   /** keep only the newest position for the frame */
   const onPointerMove = (e: React.PointerEvent) => {
+    // a paste lands under the pointer
+    pointerRef.current = { clientX: e.clientX, clientY: e.clientY }
     // tracked here: a menu-only button starts no drag and would open on a long sweep
     const press = rightPressRef.current
     if (press && !press.moved &&
@@ -512,24 +531,46 @@ export function useWallPointer(wallDocument: WallDocument) {
     railHoverRef.current = { overRail: false, columnId: null }
     setDropColumnId(null)
 
-    // items released over the rail go back, or they park behind it
+    // items released over the rail go back, or they park behind it; alt copies just go
     if (drag?.mode === 'move' && hover.overRail) {
+      if (drag.before) {
+        setItems(drag.before.items, { record: false })
+        setSelectedIds(drag.before.selected)
+        return
+      }
       setItems(drag.origin, { record: false })
       if (hover.columnId) void handOffToColumn(hover.columnId)
       return
     }
 
+    // an alt press that never moved made copies nobody asked for
+    if (drag?.mode === 'move' && drag.before && !drag.moved) {
+      setItems(drag.before.items, { record: false })
+      setSelectedIds(drag.before.selected)
+      return
+    }
+
     // one undo step per gesture, unmoved moves skip it
     if (recordsHistory(drag)) {
-      historyRef.current = pushHistory(historyRef.current, movedItems ?? docRef.current.items)
+      // an alt-drag undoes to before the copies, not to copies stacked on the originals
+      const base = drag?.mode === 'move' && drag.before
+        ? replacePresent(historyRef.current, drag.before.items)
+        : historyRef.current
+      historyRef.current = pushHistory(base, movedItems ?? docRef.current.items)
       setHistoryTick(t => t + 1)
     }
   }
 
 
+  /** off the wall, a paste goes to the middle of the view */
+  const onPointerLeave = (): void => {
+    pointerRef.current = null
+  }
+
   return {
     screenPoint,
     onWheel,
+    onPointerLeave,
     jumpTo,
     exportPng,
     fitToContent,
