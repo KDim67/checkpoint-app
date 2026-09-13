@@ -1,5 +1,7 @@
 /** one entry per tool call; undo stored at call time since that state is gone later */
 
+import { normalizeWallItem, type WallItem } from './wallModel'
+
 /** one reversing step, an entry holds an ordered list */
 export type McpUndoAction =
   | { kind: 'delete_item'; id: string }
@@ -14,6 +16,8 @@ export type McpUndoAction =
   | { kind: 'set_subtask_done'; id: string; done: boolean }
   /** by storage key, which survives wall renames */
   | { kind: 'remove_wall_item'; key: string; itemId: string }
+  /** items put back as they were and the ones the call added taken away, onto the wall as it is by then */
+  | { kind: 'restore_wall_items'; key: string; items: WallItem[]; removeIds: string[] }
 
 export interface McpActivityEntry {
   id: string
@@ -64,6 +68,13 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
       return str(o.key) && str(o.itemId)
         ? { kind: 'remove_wall_item', key: str(o.key), itemId: str(o.itemId) }
         : null
+    case 'restore_wall_items': {
+      if (!str(o.key) || !Array.isArray(o.items) || !Array.isArray(o.removeIds)) return null
+      const items = o.items.map((raw, i) => normalizeWallItem(raw, i))
+      // a snapshot missing an item would undo partway
+      if (items.some(i => i === null) || o.removeIds.some(id => typeof id !== 'string')) return null
+      return { kind: 'restore_wall_items', key: str(o.key), items: items as WallItem[], removeIds: o.removeIds as string[] }
+    }
     case 'delete_subtask':
       return str(o.id) ? { kind: 'delete_subtask', id: str(o.id) } : null
     case 'set_subtask_done':

@@ -1689,6 +1689,27 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   z-index: 4;
 }
 
+/* equal gaps a drag lines up with: ticks from the side borders, the bar from a centred background */
+.wall-gap-guide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  border-style: solid;
+  border-color: var(--color-secondary);
+  background-image: linear-gradient(var(--color-secondary), var(--color-secondary));
+  background-repeat: no-repeat;
+  background-position: center;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* while searching, what doesn't match steps back */
+[data-wall-item][data-wall-dimmed] {
+  opacity: 0.2;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+
 /* selection as an attribute, a prop re-rendered every item a marquee crossed */
 [data-wall-item][data-wall-selected] {
   outline: 2px solid var(--color-secondary);

@@ -43,13 +43,26 @@ describe('wallShortcutSections', () => {
   })
 
   it('lists grouping, picking one item out of a group, and moving past the guides', () => {
-    expect(rowsOf('Editing')).toContainEqual(['Unbound', 'Group the selection'])
+    expect(rowsOf('Editing')).toContainEqual(['Unbound', 'Group, or ungroup a group'])
     expect(rowsOf('Mouse')).toContainEqual(['Click a grouped item again', 'Pick just that item out of its group'])
     expect(rowsOf('Mouse')).toContainEqual(['Ctrl while dragging', 'Move without lining up on other items'])
     expect(
       wallShortcutSections({ ...bindings, wall_ungroup: 'Ctrl+Shift+G' }, 'both', 'right')
         .find(s => s.group === 'Editing')?.rows
     ).toContainEqual(['Ctrl+Shift+G', 'Ungroup'])
+  })
+
+  it('lists zooming, the new drawing tools, and the keys for presenting', () => {
+    expect(rowsOf('View')).toContainEqual(['Unbound', 'Zoom in'])
+    const sections = wallShortcutSections({ ...bindings, wall_zoom_selection: 'Alt+2', wall_tool_erase: 'E' }, 'both', 'right')
+    expect(sections.find(s => s.group === 'View')?.rows).toContainEqual(['Alt+2', 'Zoom to the selection'])
+    expect(sections.find(s => s.group === 'Tools')?.rows).toContainEqual(['E', 'Eraser'])
+    expect(rowsOf('Presenting')).toContainEqual(['Esc', 'Stop presenting'])
+  })
+
+  it('lists underlining and duplicating with Alt and the arrows', () => {
+    expect(rowsOf('Text')).toContainEqual(['Ctrl+U', 'Underline'])
+    expect(rowsOf('Editing')).toContainEqual(['Alt+Arrows', 'Duplicate beside the selection'])
   })
 
   it('lists the quick ways to add the next item', () => {

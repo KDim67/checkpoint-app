@@ -23,6 +23,14 @@ export interface WallItem {
   summary?: string
   /** a shape's outline, absent for a rectangle */
   shape?: ShapeType
+  /** the side words sit on in a sticky, text box or shape; absent for the kind's own */
+  align?: TextAlign
+  /** a shape's outline colour, absent for the default */
+  borderColor?: string
+  /** a rounded shape's corners in pixels, absent for the default curve */
+  radius?: number
+  /** a shape's fill from 0.1 to 1, absent when solid */
+  opacity?: number
   /** hex, or absent for the kind's default */
   color?: string
   /** flat [x0,y0,...] in the item's box, so move and resize work like everything else */
@@ -30,6 +38,8 @@ export interface WallItem {
   strokeWidth?: number
   /** 0-1 per stroke, so toggling smoothing later doesn't redraw old lines */
   smooth?: number
+  /** a highlighter stroke, drawn see-through */
+  highlight?: boolean
   /** item ids; arrows are redrawn from their items so they never drift */
   from?: string
   to?: string
@@ -70,6 +80,13 @@ export interface WallCamera {
   zoom: number
 }
 
+/** items that left the wall together, read through wallBin */
+export interface WallBinEntry {
+  id: string
+  at: number
+  items: WallItem[]
+}
+
 export interface WallDoc {
   version: 1
   items: WallItem[]
@@ -77,7 +94,14 @@ export interface WallDoc {
   camera: WallCamera
   /** hex or a preset name */
   background: string
+  /** recently deleted, newest first; absent when empty */
+  bin?: WallBinEntry[]
+  /** frame ids in the order they present, absent for reading order */
+  frameOrder?: string[]
 }
+
+export type TextAlign = 'left' | 'center' | 'right'
+export const TEXT_ALIGNS: readonly TextAlign[] = ['left', 'center', 'right']
 
 export const MIN_ZOOM = 0.2
 export const MAX_ZOOM = 3
@@ -203,6 +227,11 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const arrowLine = oneOf(o.arrowLine, ARROW_LINES)
   const arrowHeads = oneOf(o.arrowHeads, ARROW_HEAD_MODES)
   const shape = kind === 'shape' ? oneOf(o.shape, SHAPE_TYPES) : null
+  // a side only for words, and only when it isn't where the kind puts them anyway
+  const align = kind === 'note' || kind === 'text' || kind === 'shape' ? oneOf(o.align, TEXT_ALIGNS) : null
+  const ownAlign: TextAlign = kind === 'shape' ? 'center' : 'left'
+  const radius = kind === 'shape' ? num(o.radius, NaN) : NaN
+  const opacity = kind === 'shape' ? num(o.opacity, NaN) : NaN
 
   // a hand-edited doc can't plant a link main would refuse
   const link = (isLinkable(kind) || kind === 'bookmark') && parseWallLink(o.link) ? str(o.link).trim() : ''
@@ -223,6 +252,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(points ? { points } : {}),
     ...(num(o.strokeWidth, 0) > 0 ? { strokeWidth: num(o.strokeWidth, STROKE_WIDTHS[1]) } : {}),
     ...(smooth > 0 ? { smooth } : {}),
+    ...(kind === 'ink' && o.highlight === true ? { highlight: true } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
     // the item wins over a stale point
@@ -233,6 +263,11 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(arrowLine && arrowLine !== ARROW_LINES[0] ? { arrowLine } : {}),
     ...(arrowHeads && arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {}),
     ...(shape && shape !== SHAPE_TYPES[0] ? { shape } : {}),
+    ...(align && align !== ownAlign ? { align } : {}),
+    ...(kind === 'shape' && str(o.borderColor) ? { borderColor: str(o.borderColor) } : {}),
+    ...(Number.isFinite(radius) ? { radius: Math.min(200, Math.max(0, radius)) } : {}),
+    // a fill too faint to see can't be found to click
+    ...(Number.isFinite(opacity) && opacity < 1 ? { opacity: Math.max(0.1, opacity) } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
     ...(o.locked === true ? { locked: true } : {}),
     ...(link ? { link } : {}),
@@ -268,11 +303,27 @@ export function normalizeWallDoc(raw: unknown): WallDoc {
     .map((item, i) => normalizeWallItem(item, i))
     .filter((item): item is WallItem => item !== null))
 
+  const frameOrder = [...new Set((Array.isArray(o.frameOrder) ? o.frameOrder : [])
+    .filter((id): id is string => typeof id === 'string' && id.trim() !== ''))]
+
+  // whole entries only, a half-read deletion would restore the wrong things
+  const bin = (Array.isArray(o.bin) ? o.bin : []).flatMap((raw, n): WallBinEntry[] => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+    const e = raw as Record<string, unknown>
+    const at = num(e.at, NaN)
+    const kept = (Array.isArray(e.items) ? e.items : [])
+      .map((item, i) => normalizeWallItem(item, i))
+      .filter((item): item is WallItem => item !== null)
+    return Number.isFinite(at) && kept.length > 0 ? [{ id: str(e.id).trim() || `bin-${n}`, at, items: kept }] : []
+  })
+
   return {
     version: 1,
     items,
     camera: normalizeCamera(o.camera),
-    background: str(o.background) || 'default'
+    background: str(o.background) || 'default',
+    ...(bin.length > 0 ? { bin } : {}),
+    ...(frameOrder.length > 0 ? { frameOrder } : {})
   }
 }
 
@@ -396,15 +447,17 @@ export function createWallItem(
   items: WallItem[],
   extra: Partial<WallItem> = {}
 ): WallItem {
-  const size = DEFAULT_SIZES[kind]
+  // by the size it will have, a sized item centred by the default one landed off to a side
+  const width = extra.width ?? DEFAULT_SIZES[kind].width
+  const height = extra.height ?? DEFAULT_SIZES[kind].height
   return {
     id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     kind,
     // centred on the cursor, like a drop should feel
-    x: at.x - size.width / 2,
-    y: at.y - size.height / 2,
-    width: size.width,
-    height: size.height,
+    x: at.x - width / 2,
+    y: at.y - height / 2,
+    width,
+    height,
     z: topZ(items),
     ...extra
   }

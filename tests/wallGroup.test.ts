@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupItems, groupOf, groupState, regroupCopies, ungroupItems, withGroups } from '../src/shared/wallGroup'
+import { groupItems, groupOf, groupState, regroupCopies, toggleGroup, ungroupItems, withGroups } from '../src/shared/wallGroup'
 import { placeClip } from '../src/shared/wallClipboard'
 import { normalizeWallDoc, type WallItem } from '../src/shared/wallModel'
 
@@ -40,6 +40,31 @@ describe('ungroupItems', () => {
   it('leaves the wall alone when nothing picked is grouped', () => {
     const items = [item('a')]
     expect(ungroupItems(items, new Set(['a']))).toBe(items)
+  })
+})
+
+describe('toggleGroup', () => {
+  const wall = [item('a', { group: 'g' }), item('b', { group: 'g' }), item('c'), item('d')]
+
+  it('groups loose items, and a group with loose items into one', () => {
+    const loose = toggleGroup(wall, new Set(['c', 'd']))
+    expect(loose[2].group).toBeDefined()
+    expect(loose[3].group).toBe(loose[2].group)
+    expect(loose[0].group).toBe('g')
+
+    const merged = toggleGroup(wall, new Set(['a', 'b', 'c']))
+    expect(new Set(merged.slice(0, 3).map(i => i.group)).size).toBe(1)
+    expect(merged[0].group).not.toBe('g')
+    expect(merged[3]).not.toHaveProperty('group')
+  })
+
+  it('ungroups one whole group, or the group of a member picked out of it', () => {
+    expect(toggleGroup(wall, new Set(['a', 'b']))).toStrictEqual(ungroupItems(wall, new Set(['a', 'b'])))
+    expect(toggleGroup(wall, new Set(['a']))).toStrictEqual(ungroupItems(wall, new Set(['a'])))
+  })
+
+  it('leaves the wall alone for a single loose item', () => {
+    expect(toggleGroup(wall, new Set(['c']))).toBe(wall)
   })
 })
 

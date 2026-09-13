@@ -83,6 +83,26 @@ export function placeClip(clip: WallClip, existing: WallItem[], at: Point, newId
   return regroupCopies(placed)
 }
 
+export type Direction = 'up' | 'down' | 'left' | 'right'
+
+/** Alt and an arrow: a copy laid beside the selection a gap away, bringing what a copy would */
+export function duplicateToward(
+  items: WallItem[],
+  selected: Set<string>,
+  direction: Direction,
+  gap = 24,
+  newId: () => string = freshId
+): WallItem[] {
+  const clip = clipSelection(items, selected)
+  const bounds = clip ? boundsOf(clip.items) : null
+  if (!clip || !bounds) return []
+  const width = bounds.maxX - bounds.minX
+  const height = bounds.maxY - bounds.minY
+  const dx = direction === 'right' ? width + gap : direction === 'left' ? -(width + gap) : 0
+  const dy = direction === 'down' ? height + gap : direction === 'up' ? -(height + gap) : 0
+  return placeClip(clip, items, { x: (bounds.minX + bounds.maxX) / 2 + dx, y: (bounds.minY + bounds.maxY) / 2 + dy }, newId)
+}
+
 export const encodeClip = (clip: WallClip): string => JSON.stringify(clip)
 
 /** only what a copy wrote; items are normalised like a stored wall, so a crafted clip can't carry junk in */

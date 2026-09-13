@@ -207,6 +207,33 @@ describe('WallSelectionBar', () => {
     expect(button('Distribute horizontally').disabled).toBe(true)
   })
 
+  it('cycles the text side of every selected item that holds words', () => {
+    const { setItems } = renderBar()
+    fireEvent.click(button('Text alignment: Left'))
+    expect(setItems).toHaveBeenCalledWith(patchItems(notes, new Set(['a', 'b']), { align: 'center' }))
+    cleanup()
+
+    const arrows = [item('a', { kind: 'arrow' }), item('b', { kind: 'arrow' })]
+    renderBar({ items: arrows, selectedIds: new Set(['a', 'b']), arrowsSelected: true })
+    expect(screen.queryByLabelText(/^Text alignment/)).toBeNull()
+  })
+
+  it('styles a shape\'s border, corners and fill from the shape style panel', () => {
+    const shapes = [item('a', { kind: 'shape', shape: 'rounded' })]
+    const one = new Set(['a'])
+    const { setItems } = renderBar({ items: shapes, selectedIds: one, single: shapes[0] })
+
+    fireEvent.click(button('Shape style'))
+    fireEvent.click(button('#f28b82'))
+    expect(setItems).toHaveBeenLastCalledWith(patchItems(shapes, one, { borderColor: '#f28b82' }))
+
+    fireEvent.change(screen.getByLabelText('Corner radius'), { target: { value: '20' } })
+    expect(setItems).toHaveBeenLastCalledWith(patchItems(shapes, one, { radius: 20 }), { record: false })
+
+    fireEvent.change(screen.getByLabelText('Fill opacity'), { target: { value: '40' } })
+    expect(setItems).toHaveBeenLastCalledWith(patchItems(shapes, one, { opacity: 0.4 }), { record: false })
+  })
+
   it('groups loose items, and ungroups a group', () => {
     const { setItems } = renderBar()
     fireEvent.click(button('Group'))

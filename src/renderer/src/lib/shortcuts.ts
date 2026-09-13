@@ -54,6 +54,10 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   { id: 'wall_tool_select',      label: 'Select',                  scope: 'wall',   defaultCombo: 'V' },
   { id: 'wall_tool_draw',        label: 'Draw',                    scope: 'wall',   defaultCombo: 'P' },
   { id: 'wall_tool_connect',     label: 'Connect two items',       scope: 'wall',   defaultCombo: 'A' },
+  // the pen's panel switches between these too
+  { id: 'wall_tool_highlight',   label: 'Highlighter',             scope: 'wall',   defaultCombo: 'H' },
+  { id: 'wall_tool_erase',       label: 'Eraser',                  scope: 'wall',   defaultCombo: 'E' },
+  { id: 'wall_tool_lasso',       label: 'Lasso select',            scope: 'wall',   defaultCombo: 'L' },
   // Delete took Ctrl+D, duplicate shifts one modifier; either slip is one undo away
   { id: 'wall_duplicate',        label: 'Duplicate the selection', scope: 'wall',   defaultCombo: 'Ctrl+Shift+D' },
   // Delete and Backspace still work, this is for people who'd rather not reach
@@ -63,9 +67,15 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   // Alt beside copy and paste, their styled cousins
   { id: 'wall_copy_style',       label: 'Copy style',              scope: 'wall',   defaultCombo: 'Ctrl+Alt+C' },
   { id: 'wall_paste_style',      label: 'Paste style',             scope: 'wall',   defaultCombo: 'Ctrl+Alt+V' },
-  // the keys every canvas app uses
-  { id: 'wall_group',            label: 'Group the selection',     scope: 'wall',   defaultCombo: 'Ctrl+G' },
+  // G toggles; Shift+G stays for hands used to other canvas apps
+  { id: 'wall_group',            label: 'Group, or ungroup a group', scope: 'wall', defaultCombo: 'Ctrl+G' },
   { id: 'wall_ungroup',          label: 'Ungroup',                 scope: 'wall',   defaultCombo: 'Ctrl+Shift+G' },
+  // bare keys like the tools, Ctrl+- already opens Game Dev
+  { id: 'wall_zoom_in',          label: 'Zoom in',                 scope: 'wall',   defaultCombo: '=' },
+  { id: 'wall_zoom_out',         label: 'Zoom out',                scope: 'wall',   defaultCombo: '-' },
+  { id: 'wall_zoom_reset',       label: 'Zoom to 100%',            scope: 'wall',   defaultCombo: 'Alt+0' },
+  { id: 'wall_zoom_fit',         label: 'Fit everything in view',  scope: 'wall',   defaultCombo: 'Alt+1' },
+  { id: 'wall_zoom_selection',   label: 'Zoom to the selection',   scope: 'wall',   defaultCombo: 'Alt+2' },
 
   { id: 'kanban_focus_session',  label: 'Start a focus session',   scope: 'kanban', defaultCombo: 'Space' },
   { id: 'kanban_open_details',   label: 'Open the card',           scope: 'kanban', defaultCombo: 'E' },

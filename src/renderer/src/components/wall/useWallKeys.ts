@@ -1,15 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { boundsOf, moveItems, searchItems, withFrameContents, type WallItem } from '../../../../shared/wallModel'
+import { boundsOf, moveItems, withFrameContents, type WallItem } from '../../../../shared/wallModel'
 import { canRedo, canUndo, redo, undo } from '../../../../shared/history'
 import type { MenuEntry } from './WallContextMenu'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { NUDGE } from './wallShortcutSheet'
 import { wallMenuEntries } from './wallMenuEntries'
 import { isLinkable, pastedLink } from '../../../../shared/wallLink'
-import { clipSelection, clipText, decodeClip, encodeClip, WALL_CLIP_MIME } from '../../../../shared/wallClipboard'
+import { clipSelection, clipText, decodeClip, duplicateToward, encodeClip, WALL_CLIP_MIME, type Direction } from '../../../../shared/wallClipboard'
 import { rememberClip, rememberedClip, rememberedStyle } from './wallClipboardMemory'
 import { pastedCells } from '../../lib/wallCells'
-import { groupItems, ungroupItems } from '../../../../shared/wallGroup'
+import { toggleGroup, ungroupItems } from '../../../../shared/wallGroup'
+import { findItems, isSearching } from '../../../../shared/wallFind'
+import { framesInOrder, presentKey } from '../../../../shared/wallFrames'
+import { restorable } from '../../../../shared/wallBin'
 import type { WallDocument } from './useWallDocument'
 import type { WallPointer } from './useWallPointer'
 
@@ -22,10 +25,11 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     single, arrowsSelected, setItems, applyHistory, addItem, removeSelected, duplicateSelected,
     toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, setLinkPickFor, setLinkOpen,
     setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
-    copyStyle, pasteStyle, makeCards, pasteCells
+    copyStyle, pasteStyle, makeCards, pasteCells, searchKind, presenting, stepPresenting, frameSelection,
+    startPresenting, setFramesOpen, setExportOpen, setBinOpen
   } = wallDocument
   const {
-    fitToContent
+    fitToContent, zoomBy, zoomReset, zoomToSelection, exportWall
   } = wallPointer
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
@@ -59,6 +63,16 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
       if (el instanceof HTMLElement && el.isContentEditable) return
 
+      // a slideshow listens to its own keys and nothing else
+      if (presenting !== null) {
+        const action = presentKey(e.key)
+        if (action) {
+          e.preventDefault()
+          stepPresenting(action)
+        }
+        return
+      }
+
       const mod = e.ctrlKey || e.metaKey
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
@@ -70,6 +84,14 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (command === 'wall_tool_select') { setTool('select'); setArrowFrom(null); return }
       if (command === 'wall_tool_draw') { setTool('pen'); setArrowFrom(null); return }
       if (command === 'wall_tool_connect') { setTool('arrow'); setArrowFrom(null); return }
+      if (command === 'wall_tool_highlight') { setTool('highlighter'); setArrowFrom(null); return }
+      if (command === 'wall_tool_erase') { setTool('eraser'); setArrowFrom(null); return }
+      if (command === 'wall_tool_lasso') { setTool('lasso'); setArrowFrom(null); return }
+      if (command === 'wall_zoom_in') { e.preventDefault(); zoomBy(1); return }
+      if (command === 'wall_zoom_out') { e.preventDefault(); zoomBy(-1); return }
+      if (command === 'wall_zoom_reset') { e.preventDefault(); zoomReset(); return }
+      if (command === 'wall_zoom_fit') { e.preventDefault(); fitToContent(); return }
+      if (command === 'wall_zoom_selection') { e.preventDefault(); zoomToSelection(); return }
       if (command === 'wall_duplicate') { e.preventDefault(); duplicateSelected(); return }
       if (command === 'wall_delete') { e.preventDefault(); removeSelected(); return }
       if (command === 'wall_link') {
@@ -85,7 +107,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (command === 'wall_group' || command === 'wall_ungroup') {
         e.preventDefault()
         const items = docRef.current.items
-        const next = command === 'wall_group' ? groupItems(items, selectedRef.current) : ungroupItems(items, selectedRef.current)
+        const next = command === 'wall_group' ? toggleGroup(items, selectedRef.current) : ungroupItems(items, selectedRef.current)
         // nothing to change isn't an undo step
         if (next !== items) setItems(next)
         return
@@ -102,6 +124,9 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         setRenaming(null)
         setBgOpen(false)
         setShortcutsOpen(false)
+        setFramesOpen(false)
+        setExportOpen(false)
+        setBinOpen(false)
         setPicker(null)
         setTool('select')
         setArrowFrom(null)
@@ -122,6 +147,17 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step]
       }
       const delta = deltas[e.key]
+      if (delta && e.altKey) {
+        e.preventDefault()
+        const directions: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
+        const copies = duplicateToward(docRef.current.items, selectedRef.current, directions[e.key])
+        if (copies.length > 0) {
+          setItems([...docRef.current.items, ...copies])
+          // the copies are picked, so another press lays the next one beside them
+          setSelectedIds(new Set(copies.map(c => c.id)))
+        }
+        return
+      }
       if (delta) {
         e.preventDefault()
         // nudging matches dragging, frames take their contents
@@ -135,7 +171,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [applyHistory, copyStyle, docRef, duplicateSelected, historyRef, matchKey, pasteStyle, removeSelected, selectedRef, setArrowDrag, setArrowFrom, setBgOpen, setEditingId, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen])
+  }, [applyHistory, copyStyle, docRef, duplicateSelected, fitToContent, historyRef, matchKey, pasteStyle, presenting, removeSelected, selectedRef, setArrowDrag, setArrowFrom, setBgOpen, setBinOpen, setEditingId, setExportOpen, setFramesOpen, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen, stepPresenting, zoomBy, zoomReset, zoomToSelection])
 
   /** this app's private format beside plain words for any other; text selected on the page stays the page's to copy */
   useEffect(() => {
@@ -246,7 +282,10 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (clip) pasteClip(clip, at)
     },
     canPaste: rememberedClip() !== null,
-    makeCards
+    makeCards,
+    frameSelection,
+    presentFrom: frameId => startPresenting(Math.max(0, framesInOrder(docRef.current.items, docRef.current.frameOrder).findIndex(f => f.id === frameId))),
+    exportFrame: frame => void exportWall({ kind: 'frame', frame })
   })
 
   // live camera from the ref mid-pan, so a stray render agrees with what's painted
@@ -278,7 +317,11 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     return i.text
   }
   labelRef.current = labelOf
-  const matches = query.trim() ? searchItems(doc.items, query, labelOf) : []
+  const searching = isSearching(query, searchKind)
+  const matches = searching ? findItems(doc.items, query, searchKind, labelOf) : []
+  const matchIds = new Set(matches.map(i => i.id))
+  const frames = framesInOrder(doc.items, doc.frameOrder)
+  const binEntries = restorable(doc.bin, doc.items)
 
   // read after historyTick so buttons see the ref stack
   void historyTick
@@ -328,7 +371,11 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     undoable,
     redoable,
     floatingRef,
-    floatingPos
+    floatingPos,
+    searching,
+    matchIds,
+    frames,
+    binEntries
   }
 }
 

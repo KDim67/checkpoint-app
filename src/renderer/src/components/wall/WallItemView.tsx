@@ -2,14 +2,15 @@
 
 import React, { useLayoutEffect, useRef } from 'react'
 import { FileQuestion, FileText, Globe } from 'lucide-react'
-import { inkNaturalSize, inkPath, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
-import { shapeOutline, shapeTextBox } from '../../../../shared/wallShape'
+import { inkNaturalSize, inkPath, SHAPE_TYPES, type TextAlign, type WallItem } from '../../../../shared/wallModel'
+import { shapeOutline, shapeTextBox, textAlignOf } from '../../../../shared/wallShape'
 import { getTextColorForBackground } from '../../lib/contrast'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import { parseWallLink } from '../../../../shared/wallLink'
 import WallRichText from './WallRichText'
 import WallTextEditor from './WallTextEditor'
 import type { Side } from '../../../../shared/wallGrow'
+import { HIGHLIGHT_OPACITY } from '../../../../shared/wallInk'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
@@ -18,13 +19,15 @@ const SHAPE_FONT = 14
 const FIT_FONT_MIN = 8
 
 /** shrinks to fit instead of clipping the last lines, never past its size; set on the element, no re-render */
-function FittedText({ text, width, height, base, color, centred = false }: {
+function FittedText({ text, width, height, base, color, align = 'left', middle = false }: {
   text?: string
   width: number
   height: number
   base: number
   color: string
-  centred?: boolean
+  align?: TextAlign
+  /** down the middle as well, the way a shape holds its words */
+  middle?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -44,10 +47,10 @@ function FittedText({ text, width, height, base, color, centred = false }: {
     <div ref={ref} style={{
       display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
       color, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-      textAlign: centred ? 'center' : undefined
+      textAlign: align
     }}>
       {/* auto margins centre it, and give way to the top once the words overflow */}
-      <div style={centred ? { marginTop: 'auto', marginBottom: 'auto' } : undefined}>
+      <div style={middle ? { marginTop: 'auto', marginBottom: 'auto' } : undefined}>
         {text ? <WallRichText text={text} /> : <span style={{ opacity: 0.45 }}>Double-click to write</span>}
       </div>
     </div>
@@ -121,12 +124,12 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             onNext={onNext}
             style={{
               width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
-              outline: 'none', background: 'transparent', color: '#1a1a1a',
+              outline: 'none', background: 'transparent', color: '#1a1a1a', textAlign: textAlignOf(item),
               fontFamily: 'var(--font-sans)', fontSize: `${NOTE_FONT}px`, lineHeight: 1.45
             }}
           />
         ) : (
-          <FittedText text={item.text} width={item.width} height={item.height} base={NOTE_FONT} color="#1a1a1a" />
+          <FittedText text={item.text} width={item.width} height={item.height} base={NOTE_FONT} color="#1a1a1a" align={textAlignOf(item)} />
         )}
       </div>
     )
@@ -135,7 +138,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
   if (item.kind === 'text') {
     // one style for writing and reading, or the box jumps when editing ends
     const textStyle: React.CSSProperties = {
-      color: item.color || 'var(--color-text-base)',
+      color: item.color || 'var(--color-text-base)', textAlign: textAlignOf(item),
       fontFamily: 'var(--font-sans)', fontSize: '20px', fontWeight: 600, lineHeight: 1.3
     }
     return (
@@ -176,13 +179,15 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
           style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
         >
           <path
-            d={shapeOutline(outline, item.width, item.height)}
+            d={shapeOutline(outline, item.width, item.height, item.radius)}
             strokeWidth={2}
             strokeLinejoin="round"
             // presentation attributes can't read CSS variables, style can
             style={{
               fill: fill || 'var(--color-surface-1)',
-              stroke: fill ? 'rgba(0, 0, 0, 0.25)' : 'var(--color-text-muted)'
+              // the fill alone goes see-through, the border and the words stay readable
+              fillOpacity: item.opacity,
+              stroke: item.borderColor || (fill ? 'rgba(0, 0, 0, 0.25)' : 'var(--color-text-muted)')
             }}
           />
         </svg>
@@ -195,12 +200,12 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
               onNext={onNext}
               style={{
                 width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
-                outline: 'none', background: 'transparent', color, textAlign: 'center',
+                outline: 'none', background: 'transparent', color, textAlign: textAlignOf(item),
                 fontFamily: 'var(--font-sans)', fontSize: `${SHAPE_FONT}px`, lineHeight: 1.45
               }}
             />
           ) : (
-            <FittedText text={item.text} width={item.width} height={item.height} base={SHAPE_FONT} color={color} centred />
+            <FittedText text={item.text} width={item.width} height={item.height} base={SHAPE_FONT} color={color} align={textAlignOf(item)} middle />
           )}
         </div>
       </div>
@@ -370,6 +375,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         <path
           d={inkPath(item)}
           fill="none"
+          opacity={item.highlight ? HIGHLIGHT_OPACITY : undefined}
           stroke={item.color || 'var(--color-text-base)'}
           strokeWidth={item.strokeWidth ?? 4}
           strokeLinecap="round"

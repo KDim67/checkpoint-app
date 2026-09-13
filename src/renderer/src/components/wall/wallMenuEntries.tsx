@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket, Shapes, KanbanSquare, Group, Ungroup } from 'lucide-react'
+import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket, Shapes, KanbanSquare, Group, Ungroup, Frame, Presentation, ImageDown } from 'lucide-react'
 import { bringToFront, createWallItem, sendToBack, type WallDoc, type WallItem, type WallItemKind } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { isWritable, switchKinds, type WritableKind } from '../../../../shared/wallShape'
@@ -49,6 +49,10 @@ export interface WallMenuContext {
   pasteHere: (at: { x: number; y: number }) => void
   canPaste: boolean
   makeCards: () => Promise<void>
+  /** a frame round what's selected, behind it */
+  frameSelection: () => void
+  presentFrom: (frameId: string) => void
+  exportFrame: (frame: WallItem) => void
 }
 
 /** item menu for an item, canvas menu for a spot */
@@ -57,7 +61,7 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
     duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast,
     followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor, copyItems, cutItems,
-    copyStyle, pasteStyle, canPasteStyle, pasteHere, canPaste, makeCards
+    copyStyle, pasteStyle, canPasteStyle, pasteHere, canPaste, makeCards, frameSelection, presentFrom, exportFrame
   } = ctx
   if (!menu) return []
 
@@ -150,6 +154,20 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
       ...(canUngroup ? [{ label: 'Ungroup', icon: <Ungroup size={13} />, onClick: () => setItems(ungroupItems(doc.items, selectedIds)) }] : [])
     ]
 
+    // a frame on its own is already framed
+    const oneFrame = item.kind === 'frame' && !many
+    const frameEntries: MenuEntry[] = [
+      ...(oneFrame
+        ? [
+            { label: 'Present from this frame', icon: <Presentation size={13} />, onClick: () => presentFrom(item.id) },
+            { label: 'Export frame as PNG', icon: <ImageDown size={13} />, onClick: () => exportFrame(item) }
+          ]
+        : []),
+      ...(!oneFrame && chosen.some(i => i.kind !== 'arrow')
+        ? [{ label: 'Frame this selection', icon: <Frame size={13} />, onClick: frameSelection }]
+        : [])
+    ]
+
     return [
       ...imageOps,
       ...(item.kind === 'card' && !many
@@ -158,6 +176,7 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
       ...linkEntries,
       ...kindEntries,
       ...groupEntries,
+      ...frameEntries,
       { label: many ? `Copy ${selectedIds.size} items` : 'Copy', icon: <ClipboardCopy size={13} />, hint: 'Ctrl C', onClick: copyItems },
       { label: many ? `Cut ${selectedIds.size} items` : 'Cut', icon: <Scissors size={13} />, hint: 'Ctrl X', onClick: cutItems },
       ...(many ? [] : [{ label: 'Copy style', icon: <Paintbrush size={13} />, onClick: copyStyle }]),

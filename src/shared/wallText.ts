@@ -8,6 +8,7 @@ export interface TextSpan {
   italic?: boolean
   strike?: boolean
   code?: boolean
+  underline?: boolean
   url?: string
 }
 
@@ -19,7 +20,8 @@ export type TextBlock =
 type Style = Omit<TextSpan, 'text' | 'url'>
 
 // code first so its contents stay literal; an underscore needs a non-word edge, snake_case isn't italic
-const INLINE = /`([^`\n]+)`|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\*(?=[^\s*])([^*]*?[^\s*])\*|(?<!\w)_(?=[^\s_])([^_]*?[^\s_])_(?!\w)/g
+// ++underline++ is the one marker markdown lacks, so it borrows the common extension's
+const INLINE = /`([^`\n]+)`|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\+\+(?=\S)([\s\S]*?\S)\+\+|\*(?=[^\s*])([^*]*?[^\s*])\*|(?<!\w)_(?=[^\s_])([^_]*?[^\s_])_(?!\w)/g
 
 function styled(text: string, style: Style): TextSpan[] {
   if (!text) return []
@@ -29,7 +31,8 @@ function styled(text: string, style: Style): TextSpan[] {
 }
 
 const sameStyle = (a: TextSpan, b: TextSpan): boolean =>
-  !a.url && !b.url && !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike && !!a.code === !!b.code
+  !a.url && !b.url && !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike &&
+  !!a.code === !!b.code && !!a.underline === !!b.underline
 
 /** neighbours with one style become one span, the renderer draws fewer nodes */
 function merge(spans: TextSpan[]): TextSpan[] {
@@ -52,7 +55,8 @@ function inline(text: string, style: Style = {}): TextSpan[] {
     if (m[1] !== undefined) out.push(...styled(m[1], { ...style, code: true }))
     else if (m[2] !== undefined) out.push(...inline(m[2], { ...style, bold: true }))
     else if (m[3] !== undefined) out.push(...inline(m[3], { ...style, strike: true }))
-    else out.push(...inline(m[4] ?? m[5], { ...style, italic: true }))
+    else if (m[4] !== undefined) out.push(...inline(m[4], { ...style, underline: true }))
+    else out.push(...inline(m[5] ?? m[6], { ...style, italic: true }))
     last = start + m[0].length
   }
 

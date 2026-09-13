@@ -56,6 +56,33 @@ describe('distributeItems', () => {
   })
 })
 
+describe('spacing guides', () => {
+  it('snaps into the gap a row already uses, and marks both equal gaps', () => {
+    const snap = alignGuides([item('a'), item('b', { x: 150 }), item('m', { x: 303, y: 10 })], new Set(['m']), 6)
+    expect(snap.dx).toBe(-3)
+    expect(snap.gaps).toStrictEqual([
+      { axis: 'x', from: 100, to: 150, at: 50 },
+      { axis: 'x', from: 250, to: 300, at: 55 }
+    ])
+  })
+
+  it('centres between two neighbours, and spaces a column the same way', () => {
+    const row = alignGuides([item('l'), item('r', { x: 400 }), item('m', { x: 197 })], new Set(['m']), 6)
+    expect(row.dx).toBe(3)
+    expect(row.gaps).toStrictEqual([
+      { axis: 'x', from: 100, to: 200, at: 50 },
+      { axis: 'x', from: 300, to: 400, at: 50 }
+    ])
+
+    const column = alignGuides([item('t'), item('u', { y: 150 }), item('m', { x: 20, y: 304 })], new Set(['m']), 6)
+    expect(column.dy).toBe(-4)
+    expect(column.gaps).toStrictEqual([
+      { axis: 'y', from: 100, to: 150, at: 50 },
+      { axis: 'y', from: 250, to: 300, at: 60 }
+    ])
+  })
+})
+
 describe('alignGuides', () => {
   const still = item('still')
 
@@ -72,7 +99,7 @@ describe('alignGuides', () => {
   })
 
   it('leaves a drag alone out of reach, and ignores what is moving, arrows and anything out of view', () => {
-    const none = { dx: 0, dy: 0, guides: [] }
+    const none = { dx: 0, dy: 0, guides: [], gaps: [] }
     expect(alignGuides([still, item('m', { x: 20, y: 300 })], new Set(['m']), 6)).toStrictEqual(none)
     expect(alignGuides([item('m', { x: 4 }), item('n', { y: 300 })], new Set(['m', 'n']), 6)).toStrictEqual(none)
     const line = item('line', { kind: 'arrow', width: 1, height: 1, from: 'm', toPoint: { x: 0, y: 0 } })

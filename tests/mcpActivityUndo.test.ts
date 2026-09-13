@@ -15,6 +15,7 @@ import {
   setSetting
 } from '../src/main/db'
 import { listMcpActivity, recordMcpActivity, undoMcpActivity } from '../src/main/mcpActivity'
+import type { WallItem } from '../src/shared/wallModel'
 
 // record, list and undo against a real db: wrong ids or double runs are the risk
 
@@ -201,5 +202,35 @@ describe('taking something back off a wall', () => {
       { kind: 'remove_wall_item', key: 'wall_deleted', itemId: 'placed' }
     ])
     expect(() => undoMcpActivity(listMcpActivity(10)[0].id)).not.toThrow()
+  })
+
+  it('puts edited and removed items back and takes away what the call added, keeping later work', () => {
+    placeTwo()
+    const doc = getSetting<{ items: Record<string, unknown>[] }>(KEY, { items: [] })
+    const [kept, placed] = doc.items
+    // the agent moved one, removed the other and drew an arrow; then the user added one
+    setSetting(KEY, {
+      ...doc,
+      items: [
+        { ...kept, x: 500 },
+        { id: 'arrow', kind: 'arrow', from: 'kept', toPoint: { x: 0, y: 0 }, x: 0, y: 0, width: 1, height: 1, z: 3 },
+        { id: 'later', kind: 'text', x: 5, y: 5, width: 10, height: 10, z: 4 }
+      ]
+    })
+    recordMcpActivity('update_wall_item', 'work', 'Rearranged the wall', [
+      { kind: 'restore_wall_items', key: KEY, items: [kept, placed] as unknown as WallItem[], removeIds: ['arrow'] }
+    ])
+
+    undoMcpActivity(listMcpActivity(10)[0].id)
+    const items = getSetting<{ items: { id: string; x: number }[] }>(KEY, { items: [] }).items
+    expect(items.map(i => [i.id, i.x])).toStrictEqual([['kept', 0], ['later', 5], ['placed', 20]])
+  })
+
+  it('does not bring back a wall that was deleted', () => {
+    recordMcpActivity('remove_wall_items', 'work', 'Removed a note', [
+      { kind: 'restore_wall_items', key: 'wall_gone', items: [], removeIds: [] }
+    ])
+    undoMcpActivity(listMcpActivity(10)[0].id)
+    expect(getSetting<unknown>('wall_gone', null)).toBeNull()
   })
 })

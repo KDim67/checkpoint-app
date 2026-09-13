@@ -6,6 +6,7 @@ function Span({ span }: { span: TextSpan }) {
   let node: React.ReactNode = span.text
   if (span.code) node = <code className="wall-code">{node}</code>
   if (span.strike) node = <s>{node}</s>
+  if (span.underline) node = <u>{node}</u>
   if (span.italic) node = <em>{node}</em>
   if (span.bold) node = <strong>{node}</strong>
   if (span.url) {

@@ -1,13 +1,13 @@
 /** shapes on the wall, switching between the kinds that hold words, and those words becoming a card */
 
-import { DEFAULT_SIZES, type ShapeType, type WallItem } from './wallModel'
+import { DEFAULT_SIZES, type ShapeType, type TextAlign, type WallItem } from './wallModel'
 import { plainWallText } from './wallText'
 
 /** two decimals, paths stay short on odd sizes */
 const n = (value: number): number => Math.round(value * 100) / 100
 
-/** in the item's own box, a pixel in so a two-pixel border isn't clipped by it */
-export function shapeOutline(shape: ShapeType, width: number, height: number): string {
+/** in the item's own box, a pixel in so a two-pixel border isn't clipped by it; radius sets a rounded shape's corners */
+export function shapeOutline(shape: ShapeType, width: number, height: number, radius?: number): string {
   const l = 1
   const t = 1
   const r = n(width - 1)
@@ -20,7 +20,7 @@ export function shapeOutline(shape: ShapeType, width: number, height: number): s
   switch (shape) {
     case 'rounded': {
       // a deep corner on a thin box would meet itself
-      const k = Math.min(16, w / 4, h / 4)
+      const k = radius === undefined ? Math.min(16, w / 4, h / 4) : Math.min(Math.max(0, radius), w / 2, h / 2)
       return `M${n(l + k)},${t}H${n(r - k)}Q${r},${t} ${r},${n(t + k)}V${n(b - k)}Q${r},${b} ${n(r - k)},${b}` +
         `H${n(l + k)}Q${l},${b} ${l},${n(b - k)}V${n(t + k)}Q${l},${t} ${n(l + k)},${t}Z`
     }
@@ -48,6 +48,9 @@ export function shapeTextBox(shape: ShapeType): { top: number; right: number; bo
       return { top: 8, right: 8, bottom: 8, left: 8 }
   }
 }
+
+/** words sit left, and centred in a shape, unless a side was chosen */
+export const textAlignOf = (item: WallItem): TextAlign => item.align ?? (item.kind === 'shape' ? 'center' : 'left')
 
 export type WritableKind = 'note' | 'text' | 'shape'
 

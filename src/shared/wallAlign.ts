@@ -90,26 +90,111 @@ export interface Guide {
   to: number
 }
 
+/** a measured gap along a row (x) or a column (y), drawn from 'from' to 'to' at 'at' across */
+export interface GapMark {
+  axis: 'x' | 'y'
+  from: number
+  to: number
+  at: number
+}
+
+type Axis = 'x' | 'y'
+
 const boxOf = (i: WallItem): Bounds => ({ minX: i.x, minY: i.y, maxX: i.x + i.width, maxY: i.y + i.height })
 const xsOf = (b: Bounds): number[] => [b.minX, (b.minX + b.maxX) / 2, b.maxX]
 const ysOf = (b: Bounds): number[] => [b.minY, (b.minY + b.maxY) / 2, b.maxY]
 
-/** the nudge that lines the moving items' edges or centre up with another item's, and a line for each match */
+const sides = (axis: Axis) => axis === 'x'
+  ? { lo: (b: Bounds) => b.minX, hi: (b: Bounds) => b.maxX, crossLo: (b: Bounds) => b.minY, crossHi: (b: Bounds) => b.maxY }
+  : { lo: (b: Bounds) => b.minY, hi: (b: Bounds) => b.maxY, crossLo: (b: Bounds) => b.minX, crossHi: (b: Bounds) => b.maxX }
+
+/** what shares the box's row or column: its nearest neighbour each side, and the gaps already between neighbours */
+function lineUp(box: Bounds, others: Bounds[], axis: Axis): { before: Bounds | null; after: Bounds | null; pairs: [Bounds, Bounds][] } {
+  const { lo, hi, crossLo, crossHi } = sides(axis)
+  const line = others.filter(o => Math.min(crossHi(o), crossHi(box)) - Math.max(crossLo(o), crossLo(box)) > 0)
+  const before = line.filter(o => hi(o) <= lo(box)).reduce<Bounds | null>((best, o) => (!best || hi(o) > hi(best) ? o : best), null)
+  const after = line.filter(o => lo(o) >= hi(box)).reduce<Bounds | null>((best, o) => (!best || lo(o) < lo(best) ? o : best), null)
+
+  const sorted = [...line].sort((a, b) => lo(a) - lo(b))
+  const pairs: [Bounds, Bounds][] = []
+  for (let i = 1; i < sorted.length; i++) {
+    // touching items leave no gap worth measuring
+    if (lo(sorted[i]) - hi(sorted[i - 1]) > 0.5) pairs.push([sorted[i - 1], sorted[i]])
+  }
+  return { before, after, pairs }
+}
+
+/** the nudge into a gap the row or column already uses, or to equal gaps between two neighbours; null out of reach */
+function spacingSnap(box: Bounds, others: Bounds[], axis: Axis, threshold: number): number | null {
+  const { lo, hi } = sides(axis)
+  const { before, after, pairs } = lineUp(box, others, axis)
+  const size = hi(box) - lo(box)
+  const gaps = pairs.map(([a, b]) => lo(b) - hi(a))
+
+  const targets: number[] = []
+  if (before) gaps.forEach(g => targets.push(hi(before) + g))
+  if (after) gaps.forEach(g => targets.push(lo(after) - g - size))
+  if (before && after) targets.push((hi(before) + lo(after) - size) / 2)
+
+  let best: number | null = null
+  for (const target of targets) {
+    const d = target - lo(box)
+    if (Math.abs(d) <= threshold && (best === null || Math.abs(d) < Math.abs(best))) best = d
+  }
+  return best
+}
+
+/** each gap beside the box that matches another gap, with every gap it matches */
+function gapMarks(box: Bounds, others: Bounds[], axis: Axis): GapMark[] {
+  const { lo, hi, crossLo, crossHi } = sides(axis)
+  const { before, after, pairs } = lineUp(box, others, axis)
+  const width = ([a, b]: [Bounds, Bounds]): number => lo(b) - hi(a)
+  const mine: [Bounds, Bounds][] = [
+    ...(before ? [[before, box] as [Bounds, Bounds]] : []),
+    ...(after ? [[box, after] as [Bounds, Bounds]] : [])
+  ].filter(pair => width(pair) > 0.5)
+  const all = [...pairs, ...mine]
+
+  const marks = new Map<string, GapMark>()
+  for (const pair of mine) {
+    const equal = all.filter(other => Math.abs(width(other) - width(pair)) < 0.5)
+    if (equal.length < 2) continue
+    for (const [a, b] of equal) {
+      const mark: GapMark = {
+        axis,
+        from: hi(a),
+        to: lo(b),
+        at: (Math.max(crossLo(a), crossLo(b)) + Math.min(crossHi(a), crossHi(b))) / 2
+      }
+      marks.set(`${mark.from},${mark.to},${mark.at}`, mark)
+    }
+  }
+  return [...marks.values()].sort((a, b) => a.from - b.from)
+}
+
+/** the smaller nudge of two, either one missing */
+const nearer = (a: number | null, b: number | null): number => {
+  if (a === null) return b ?? 0
+  if (b === null) return a
+  return Math.abs(b) < Math.abs(a) ? b : a
+}
+
+/** the nudge that lines the moving items up with another item's edges or centre, or spaces them like their neighbours */
 export function alignGuides(
   items: WallItem[],
   moving: Set<string>,
   threshold: number,
   /** only what's on screen pulls, a far item's line would run off the view */
   view?: Rect
-): { dx: number; dy: number; guides: Guide[] } {
+): { dx: number; dy: number; guides: Guide[]; gaps: GapMark[] } {
   const box = boundsOf(items.filter(i => moving.has(i.id) && i.kind !== 'arrow'))
-  if (!box) return { dx: 0, dy: 0, guides: [] }
+  if (!box) return { dx: 0, dy: 0, guides: [], gaps: [] }
   const others = items
     .filter(i => !moving.has(i.id) && i.kind !== 'arrow' && i.kind !== 'ink')
     .filter(i => !view || (i.x < view.x + view.width && i.x + i.width > view.x && i.y < view.y + view.height && i.y + i.height > view.y))
     .map(boxOf)
 
-  const nearest = (mine: number[], theirs: (b: Bounds) => number[]): number => {
+  const nearest = (mine: number[], theirs: (b: Bounds) => number[]): number | null => {
     let best: number | null = null
     for (const other of others) {
       for (const t of theirs(other)) {
@@ -119,10 +204,10 @@ export function alignGuides(
         }
       }
     }
-    return best ?? 0
+    return best
   }
-  const dx = nearest(xsOf(box), xsOf)
-  const dy = nearest(ysOf(box), ysOf)
+  const dx = nearer(nearest(xsOf(box), xsOf), spacingSnap(box, others, 'x', threshold))
+  const dy = nearer(nearest(ysOf(box), ysOf), spacingSnap(box, others, 'y', threshold))
   const moved: Bounds = { minX: box.minX + dx, maxX: box.maxX + dx, minY: box.minY + dy, maxY: box.maxY + dy }
 
   const guides: Guide[] = []
@@ -141,5 +226,5 @@ export function alignGuides(
   }
   lines('x', xsOf(moved), xsOf, b => b.minY, b => b.maxY)
   lines('y', ysOf(moved), ysOf, b => b.minX, b => b.maxX)
-  return { dx, dy, guides }
+  return { dx, dy, guides, gaps: [...gapMarks(moved, others, 'x'), ...gapMarks(moved, others, 'y')] }
 }

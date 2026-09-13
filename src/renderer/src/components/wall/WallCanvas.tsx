@@ -3,7 +3,10 @@ import WallItemLayer from './WallItemLayer'
 import WallMinimap from './WallMinimap'
 import { decodeWallDrag, WALL_DRAG_MIME } from '../../../../shared/wallBoard'
 import WallSelectionBar from './WallSelectionBar'
-import { WALL_GUIDE_SLOTS } from './wallPaint'
+import { WALL_GAP_SLOTS, WALL_GUIDE_SLOTS } from './wallPaint'
+import WallPresenter from './WallPresenter'
+import { frameLabel } from '../../../../shared/wallFrames'
+import { HIGHLIGHT_OPACITY, HIGHLIGHT_SCALE } from '../../../../shared/wallInk'
 import WallPenSettings from './WallPenSettings'
 import { describeLink, isLinkable, pastedLink } from '../../../../shared/wallLink'
 import type { WallViewState } from './useWallView'
@@ -11,7 +14,7 @@ import type { WallViewState } from './useWallView'
 export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
   const {
     setView, setPendingNoteTitle, doc, loading, selectedIds, setSelectedIds, editingId,
-    setEditingId, picker, setPicker, tool, penColor, setPenColor, penWidth, setPenWidth, smoothing,
+    setEditingId, picker, setPicker, tool, penColor, penWidth, smoothing,
     setSmoothing, drawing, arrowFrom, arrowDrag, arrowEndHover, arrowShape, setArrowShape, arrowLine,
     setArrowLine, arrowHeads, setArrowHeads, marquee, busy, spaceHeld, swatchOpen, setSwatchOpen,
     viewportRef, marqueeRectRef, docRef, cardsById, itemsById, notesByTitle, selectedItems, single,
@@ -19,7 +22,9 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     removeSelected, duplicateSelected, toggleLock, openCard, placeImageFiles, screenPoint, onWheel,
     arrowAt, onPointerDown, onPointerMove, onPointerLeave, endDrag, camera, canvasBackground, dotColor, floatingRef,
     floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
-    wallIndex, activeWall, labelOf, previewing, addBookmark, growFrom
+    wallIndex, activeWall, labelOf, previewing, addBookmark, growFrom, searching, matchIds, presenting,
+    frames, stepPresenting, stopPresenting, setTool, eraserMode, setEraserMode, penPresets, choosePenColor,
+    choosePenWidth, pickPreset
   } = wallView
 
   /** the chip's words, from this wall's items and the wall list */
@@ -94,7 +99,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       }}
       style={{
         flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
-        cursor: spaceHeld ? 'grab' : linkPickFor ? 'alias' : tool === 'pen' ? 'crosshair' : tool === 'arrow' ? 'copy' : undefined,
+        cursor: spaceHeld ? 'grab' : linkPickFor ? 'alias' : tool === 'arrow' ? 'copy' : tool === 'eraser' ? 'cell' : tool !== 'select' ? 'crosshair' : undefined,
         background: canvasBackground,
         backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
         backgroundSize: `${gridSpacing(camera.zoom)}px ${gridSpacing(camera.zoom)}px`,
@@ -154,7 +159,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             })
 
             return (
-              <g key={arrow.id} data-wall-arrow={arrow.id} opacity={selected ? 1 : 0.85}>
+              <g key={arrow.id} data-wall-arrow={arrow.id} opacity={searching ? 0.2 : selected ? 1 : 0.85}>
                 <path
                   d={g.d}
                   fill="none"
@@ -216,11 +221,14 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         {/* not an item until the pointer comes up */}
         {drawing && drawing.length > 1 && (
           <svg style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', overflow: 'visible', pointerEvents: 'none', zIndex: 2 }}>
+            {/* the lasso is a dashed loop a screen pixel wide, the pens preview the stroke they'll leave */}
             <polyline
               points={drawing.map(pt => `${pt.x},${pt.y}`).join(' ')}
               fill="none"
-              stroke={penColor}
-              strokeWidth={penWidth}
+              stroke={tool === 'lasso' ? 'var(--color-secondary)' : penColor}
+              strokeWidth={tool === 'lasso' ? 1.5 / camera.zoom : tool === 'highlighter' ? penWidth * HIGHLIGHT_SCALE : penWidth}
+              strokeDasharray={tool === 'lasso' ? `${6 / camera.zoom} ${4 / camera.zoom}` : undefined}
+              opacity={tool === 'highlighter' ? HIGHLIGHT_OPACITY : undefined}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -238,7 +246,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               card={item.kind === 'card' ? cardsById.get(item.ref ?? '') : undefined}
               note={item.kind === 'doc' ? notesByTitle.get(item.ref ?? '') : undefined}
               editing={editingId === item.id}
-              connectable={tool === 'select' && !item.locked && item.kind !== 'frame'}
+              connectable={tool === 'select' && presenting === null && !item.locked && item.kind !== 'frame'}
               showHandles={isSelected && single?.id === item.id && !item.locked}
               arrowTarget={arrowDrag?.overId === item.id || arrowEndHover === item.id}
               arrowFrom={arrowFrom === item.id}
@@ -251,6 +259,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               linkExternal={link?.external}
               onFollowLink={followLink}
               previewing={previewing.has(item.id)}
+              dimmed={searching && !matchIds.has(item.id)}
             />
           )
         })}
@@ -258,6 +267,9 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         {/* lines a drag snaps to, shown and placed by hand while moving */}
         {WALL_GUIDE_SLOTS.map(slot => (
           <div key={slot} data-wall-guide={slot} className="wall-guide" style={{ display: 'none' }} />
+        ))}
+        {WALL_GAP_SLOTS.map(slot => (
+          <div key={slot} data-wall-gap={slot} className="wall-gap-guide" style={{ display: 'none' }} />
         ))}
       </div>
 
@@ -380,7 +392,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       })()}
 
       {/* floated above the selection */}
-      {floatingPos && selectedItems.length > 0 && (
+      {floatingPos && selectedItems.length > 0 && presenting === null && (
         <WallSelectionBar
           floatingPos={floatingPos}
           floatingRef={floatingRef}
@@ -409,7 +421,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       )}
 
       {/* minimap from the fourth item on */}
-      {doc.items.length > 3 && (
+      {doc.items.length > 3 && presenting === null && (
         <WallMinimap
           items={doc.items}
           selectedIds={selectedIds}
@@ -420,13 +432,19 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         />
       )}
 
-      {tool !== 'select' && (
+      {tool !== 'select' && presenting === null && (
         <WallPenSettings
           tool={tool}
+          setTool={setTool}
           penColor={penColor}
-          setPenColor={setPenColor}
+          setPenColor={choosePenColor}
           penWidth={penWidth}
-          setPenWidth={setPenWidth}
+          setPenWidth={choosePenWidth}
+          eraserMode={eraserMode}
+          setEraserMode={setEraserMode}
+          presets={tool === 'pen' || tool === 'highlighter' ? penPresets[tool] : undefined}
+          activePreset={tool === 'pen' || tool === 'highlighter' ? penPresets.active[tool] : undefined}
+          onPickPreset={pickPreset}
           arrowShape={arrowShape}
           setArrowShape={setArrowShape}
           arrowLine={arrowLine}
@@ -435,6 +453,16 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           setArrowHeads={setArrowHeads}
           smoothing={smoothing}
           setSmoothing={setSmoothing}
+        />
+      )}
+
+      {presenting !== null && frames[presenting] && (
+        <WallPresenter
+          index={presenting}
+          count={frames.length}
+          label={frameLabel(frames[presenting], presenting)}
+          onStep={stepPresenting}
+          onExit={stopPresenting}
         />
       )}
 

@@ -32,6 +32,13 @@ export function groupItems(items: WallItem[], ids: Set<string>, id: string = new
   return pruneGroups(items.map(i => (ids.has(i.id) && groupable(i) ? { ...i, group: id } : i)))
 }
 
+/** one key for both: groups never nest, so a pick that's already one group can only mean ungroup */
+export function toggleGroup(items: WallItem[], ids: Set<string>): WallItem[] {
+  const { canGroup, canUngroup } = groupState(items, ids)
+  if (canGroup) return groupItems(items, ids)
+  return canUngroup ? ungroupItems(items, ids) : items
+}
+
 /** every group a picked item is in, members picked or not */
 export function ungroupItems(items: WallItem[], ids: Set<string>): WallItem[] {
   const groups = new Set(items.filter(i => ids.has(i.id) && i.group).map(i => i.group))

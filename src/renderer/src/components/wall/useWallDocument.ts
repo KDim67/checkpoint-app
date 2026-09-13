@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
@@ -11,12 +11,13 @@ import type { RailTab } from './WallBoardRail'
 import { appendPosition, planHandoff } from '../../../../shared/wallBoard'
 import { cardFromText, isWritable } from '../../../../shared/wallShape'
 import { loadBoardConfig } from '../../lib/boardConfig'
-import { getBoolSetting, getNumberSetting, getEnumSetting, setBoolSetting } from '../../lib/settings'
+import { getBoolSetting, getNumberSetting, getEnumSetting, getJsonSetting, setBoolSetting, setJsonSetting, setStringSetting } from '../../lib/settings'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
 import { PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES, type PanButtons, type MenuButton } from '../../lib/wallInput'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
 import { createItem, deleteItem, updateItem, itemPage } from '../../data/items'
-import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, clampRail } from './wallPreferences'
+import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, ERASER_MODE_KEY, PEN_PRESETS_KEY, clampRail } from './wallPreferences'
+import { DEFAULT_PEN_PRESETS, normalizePenPresets, presetFor, withActivePreset, withPresetChange, type PenPresets } from './wallPenPresets'
 import * as notesApi from '../../data/notes'
 import * as mediaApi from '../../data/media'
 import * as appApi from '../../data/app'
@@ -25,6 +26,10 @@ import { applyStyle, placeClip, styleOf, type WallClip } from '../../../../share
 import { rememberStyle, rememberedStyle } from './wallClipboardMemory'
 import { cameraShowing, grownItem, type Side } from '../../../../shared/wallGrow'
 import { cellStickies, MAX_CELLS } from '../../lib/wallCells'
+import { binRemoved, restoreEntry } from '../../../../shared/wallBin'
+import { frameAround, framesInOrder, type PresentAction } from '../../../../shared/wallFrames'
+import type { SearchKind } from '../../../../shared/wallFind'
+import { ERASER_MODES, type EraserMode, type WallTool } from './wallTools'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
@@ -46,9 +51,14 @@ export function useWallDocument() {
   const [menu, setMenu] = useState<Menu | null>(null)
   const [snapping, setSnapping] = useState(false)
   /** the arrow is one-shot, the pen stays armed; Escape leaves either */
-  const [tool, setTool] = useState<'select' | 'pen' | 'arrow'>('select')
+  const [tool, setTool] = useState<WallTool>('select')
   const [penColor, setPenColor] = useState(WALL_COLORS[0])
   const [penWidth, setPenWidth] = useState(STROKE_WIDTHS[1])
+  const [eraserMode, setEraserModeState] = useState<EraserMode>('stroke')
+  const [penPresets, setPenPresets] = useState<PenPresets>(DEFAULT_PEN_PRESETS)
+  /** read when a tool is picked, the effect shouldn't re-run on every preset edit */
+  const presetsRef = useRef(penPresets)
+  presetsRef.current = penPresets
   /** hand-drawn lines are shaky */
   const [smoothing, setSmoothing] = useState(true)
   /** wall coordinates, null when idle */
@@ -66,6 +76,8 @@ export function useWallDocument() {
   /** so a slow job doesn't look frozen */
   const [busy, setBusy] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  /** Find narrowed to one kind of item */
+  const [searchKind, setSearchKind] = useState<SearchKind>('all')
   /** re-renders the buttons for the ref-held history */
   const [historyTick, setHistoryTick] = useState(0)
 
@@ -88,6 +100,11 @@ export function useWallDocument() {
   /** space pans without putting the tool down */
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [swatchOpen, setSwatchOpen] = useState(false)
+  const [framesOpen, setFramesOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [binOpen, setBinOpen] = useState(false)
+  /** which frame is up while presenting, in reading order */
+  const [presenting, setPresenting] = useState<number | null>(null)
   /** the selection bar's link field */
   const [linkOpen, setLinkOpen] = useState(false)
   /** the item waiting for a click on what it should link to */
@@ -191,18 +208,21 @@ export function useWallDocument() {
 
   /** matching the popover's subtree lets the dismissing click through; a backdrop ate it */
   useEffect(() => {
-    if (!wallMenuOpen && !bgOpen && !shortcutsOpen) return
+    if (!wallMenuOpen && !bgOpen && !shortcutsOpen && !framesOpen && !exportOpen && !binOpen) return
 
     const onDown = (e: PointerEvent): void => {
       const inside = (e.target as HTMLElement).closest('[data-wall-popover]')?.getAttribute('data-wall-popover')
       if (inside !== 'wall') { setWallMenuOpen(false); setRenaming(null) }
       if (inside !== 'bg') setBgOpen(false)
       if (inside !== 'keys') setShortcutsOpen(false)
+      if (inside !== 'frames') setFramesOpen(false)
+      if (inside !== 'export') setExportOpen(false)
+      if (inside !== 'bin') setBinOpen(false)
     }
 
     document.addEventListener('pointerdown', onDown)
     return () => document.removeEventListener('pointerdown', onDown)
-  }, [wallMenuOpen, bgOpen, shortcutsOpen])
+  }, [wallMenuOpen, bgOpen, shortcutsOpen, framesOpen, exportOpen, binOpen])
 
   /** a preference, not part of any wall */
   useEffect(() => {
@@ -215,9 +235,13 @@ export function useWallDocument() {
       getEnumSetting(ARROW_LINE_KEY, ARROW_LINES, ARROW_LINES[0]),
       getEnumSetting(ARROW_HEADS_KEY, ARROW_HEAD_MODES, ARROW_HEAD_MODES[0]),
       getEnumSetting(PAN_BUTTONS_KEY, PAN_BUTTON_MODES, PAN_BUTTON_MODES[0]),
-      getEnumSetting(MENU_BUTTON_KEY, MENU_BUTTON_MODES, MENU_BUTTON_MODES[0])
-    ]).then(([open, width, smooth, shape, line, heads, pan, menuOn]) => {
+      getEnumSetting(MENU_BUTTON_KEY, MENU_BUTTON_MODES, MENU_BUTTON_MODES[0]),
+      getEnumSetting(ERASER_MODE_KEY, ERASER_MODES, ERASER_MODES[0]),
+      getJsonSetting<unknown>(PEN_PRESETS_KEY, null)
+    ]).then(([open, width, smooth, shape, line, heads, pan, menuOn, eraser, presets]) => {
       if (cancelled) return
+      setEraserModeState(eraser)
+      setPenPresets(normalizePenPresets(presets))
       setRailOpen(open)
       setRailWidth(clampRail(width))
       setArrowShape(shape)
@@ -367,15 +391,19 @@ export function useWallDocument() {
     commitIndex(next)
   }, [pendingDelete, wallIndex, activeWorkspace, commitIndex])
 
-  /** record: false for drag frames, one undo step per gesture */
-  const setItems = useCallback((items: WallItem[], { record = true, camera }: { record?: boolean; camera?: WallCamera } = {}) => {
+  /** record: false for drag frames, one undo step per gesture; removed items go to Recently deleted in the same write */
+  const setItems = useCallback((
+    items: WallItem[],
+    { record = true, camera, removed, bin }: { record?: boolean; camera?: WallCamera; removed?: WallItem[]; bin?: WallBinEntry[] } = {}
+  ) => {
     historyRef.current = record
       ? pushHistory(historyRef.current, items)
       : replacePresent(historyRef.current, items)
     if (record) setHistoryTick(t => t + 1)
     // in the same write, a setCamera after this would start from the doc without these items
     if (camera) panCameraRef.current = null
-    write({ ...docRef.current, items, ...(camera ? { camera } : {}) })
+    const nextBin = bin ?? (removed && removed.length > 0 ? binRemoved(docRef.current.bin, removed, items, Date.now()) : undefined)
+    write({ ...docRef.current, items, ...(camera ? { camera } : {}), ...(nextBin ? { bin: nextBin } : {}) })
   }, [write])
 
   const setCamera = useCallback((camera: WallCamera) => {
@@ -452,7 +480,10 @@ export function useWallDocument() {
     const items = docRef.current.items
     const gone = items.filter(i => ids.has(i.id))
     // prune arrows too, or a dangling one stays invisible and unselectable
-    setItems(pruneArrows(items.filter(i => !ids.has(i.id))))
+    const kept = pruneArrows(items.filter(i => !ids.has(i.id)))
+    const keptIds = new Set(kept.map(i => i.id))
+    // the pruned arrows go in the bin too, so they come back with their items
+    setItems(kept, { removed: items.filter(i => !keptIds.has(i.id)) })
     setSelectedIds(new Set())
     toast(`Removed ${gone.length} item${gone.length === 1 ? '' : 's'}.`, {
       action: { label: 'Undo', onClick: () => setItems([...docRef.current.items, ...gone]) }
@@ -662,7 +693,9 @@ export function useWallDocument() {
     const ids = withFrameContents(items, selectedRef.current)
     const gone = items.filter(i => ids.has(i.id))
     if (gone.length === 0) return
-    setItems(pruneArrows(items.filter(i => !ids.has(i.id))))
+    const kept = pruneArrows(items.filter(i => !ids.has(i.id)))
+    const keptIds = new Set(kept.map(i => i.id))
+    setItems(kept, { removed: items.filter(i => !keptIds.has(i.id)) })
     setSelectedIds(new Set())
     toast(`Cut ${gone.length} item${gone.length === 1 ? '' : 's'}.`, {
       action: { label: 'Undo', onClick: () => setItems([...docRef.current.items, ...gone]) }
@@ -755,6 +788,135 @@ export function useWallDocument() {
       }
     })
   }, [columns, cards, activeWorkspace, setItems, toast])
+
+  /** back above everything and selected, so it's plain what came back */
+  const restoreDeleted = useCallback((entryId: string) => {
+    const result = restoreEntry(docRef.current.bin, docRef.current.items, entryId)
+    if (!result) return
+    setItems(result.items, { bin: result.bin })
+    setSelectedIds(new Set(result.restored.map(i => i.id)))
+    toast(`Brought back ${result.restored.length} item${result.restored.length === 1 ? '' : 's'}.`)
+  }, [setItems, toast])
+
+  /** named straight away, a frame is mostly its label */
+  const frameSelection = useCallback(() => {
+    const items = docRef.current.items
+    const frame = frameAround(items, withFrameContents(items, selectedRef.current))
+    if (!frame) return
+    setItems([...items, frame])
+    setSelectedIds(new Set([frame.id]))
+    setEditingId(frame.id)
+  }, [setItems])
+
+  /** the whole frame in view with a little room round it */
+  const showFrame = useCallback((frame: WallItem, padding = 48) => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setCamera(fitCamera([frame], { width: rect.width, height: rect.height }, padding))
+  }, [setCamera])
+
+  const startPresenting = useCallback((index = 0) => {
+    const count = framesInOrder(docRef.current.items, docRef.current.frameOrder).length
+    if (count === 0) {
+      toast('Add a frame first. Each frame is a slide.')
+      return
+    }
+    setSelectedIds(new Set())
+    setEditingId(null)
+    setMenu(null)
+    setTool('select')
+    setPresenting(Math.min(Math.max(0, index), count - 1))
+    // the canvas alone fills the screen; a window that won't go fullscreen presents in place
+    viewportRef.current?.requestFullscreen?.().catch(() => {})
+  }, [toast])
+
+  const stopPresenting = useCallback(() => {
+    setPresenting(null)
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+  }, [])
+
+  const stepPresenting = useCallback((action: PresentAction | 1 | -1) => {
+    if (action === 'exit') {
+      stopPresenting()
+      return
+    }
+    const count = framesInOrder(docRef.current.items, docRef.current.frameOrder).length
+    setPresenting(current => {
+      if (current === null || count === 0) return current
+      const next = action === 'first' ? 0
+        : action === 'last' ? count - 1
+        : current + (action === 'next' || action === 1 ? 1 : -1)
+      return Math.min(Math.max(0, next), count - 1)
+    })
+  }, [stopPresenting])
+
+  // the frame fills the view each step, and again once fullscreen or a resize changes the view's size
+  useEffect(() => {
+    if (presenting === null) return
+    const fit = (): void => {
+      const frame = framesInOrder(docRef.current.items, docRef.current.frameOrder)[presenting]
+      if (frame) showFrame(frame, 24)
+    }
+    const pending = requestAnimationFrame(fit)
+    const onFullscreen = (): void => {
+      // Esc in fullscreen is the browser's own and never reaches the page's keys
+      if (document.fullscreenElement) fit()
+      else setPresenting(null)
+    }
+    window.addEventListener('resize', fit)
+    document.addEventListener('fullscreenchange', onFullscreen)
+    return () => {
+      cancelAnimationFrame(pending)
+      window.removeEventListener('resize', fit)
+      document.removeEventListener('fullscreenchange', onFullscreen)
+    }
+  }, [presenting, showFrame])
+
+  /** undefined goes back to reading order; not an undo step, the wall's items don't change */
+  const setFrameOrder = useCallback((order: string[] | undefined) => {
+    const next = { ...docRef.current }
+    if (order && order.length > 0) next.frameOrder = order
+    else delete next.frameOrder
+    write(next)
+  }, [write])
+
+  const setEraserMode = useCallback((mode: EraserMode) => {
+    setEraserModeState(mode)
+    void setStringSetting(ERASER_MODE_KEY, mode)
+  }, [])
+
+  const savePresets = useCallback((next: PenPresets) => {
+    setPenPresets(next)
+    void setJsonSetting(PEN_PRESETS_KEY, next)
+  }, [])
+
+  // a pen or highlighter picks up where its preset left off
+  useEffect(() => {
+    if (tool !== 'pen' && tool !== 'highlighter') return
+    const preset = presetFor(presetsRef.current, tool)
+    setPenColor(preset.color)
+    setPenWidth(preset.width)
+  }, [tool])
+
+  /** colour and width edit the picked preset while a pen or highlighter is out */
+  const choosePenColor = useCallback((color: string) => {
+    setPenColor(color)
+    if (tool === 'pen' || tool === 'highlighter') savePresets(withPresetChange(presetsRef.current, tool, { color }))
+  }, [tool, savePresets])
+
+  const choosePenWidth = useCallback((width: number) => {
+    setPenWidth(width)
+    if (tool === 'pen' || tool === 'highlighter') savePresets(withPresetChange(presetsRef.current, tool, { width }))
+  }, [tool, savePresets])
+
+  const pickPreset = useCallback((index: number) => {
+    if (tool !== 'pen' && tool !== 'highlighter') return
+    const next = withActivePreset(presetsRef.current, tool, index)
+    savePresets(next)
+    const preset = presetFor(next, tool)
+    setPenColor(preset.color)
+    setPenWidth(preset.width)
+  }, [tool, savePresets])
 
   const placeImageFiles = useCallback(async (files: File[], at?: { x: number; y: number }) => {
     const images = files.filter(f => f.type.startsWith('image/'))
@@ -913,7 +1075,29 @@ export function useWallDocument() {
     cutSelected,
     copyStyle,
     pasteStyle,
-    makeCards
+    makeCards,
+    searchKind,
+    setSearchKind,
+    framesOpen,
+    setFramesOpen,
+    exportOpen,
+    setExportOpen,
+    binOpen,
+    setBinOpen,
+    presenting,
+    restoreDeleted,
+    frameSelection,
+    showFrame,
+    startPresenting,
+    stopPresenting,
+    stepPresenting,
+    setFrameOrder,
+    eraserMode,
+    setEraserMode,
+    penPresets,
+    choosePenColor,
+    choosePenWidth,
+    pickPreset
   }
 }
 
