@@ -1734,6 +1734,27 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   text-underline-offset: 2px;
 }
 
+/* list lines on the wall; the marker hangs so wrapped words line up with the first */
+.wall-list-item {
+  display: flex;
+  gap: 0.4em;
+}
+
+.wall-list-marker {
+  flex-shrink: 0;
+  min-width: 0.8em;
+  text-align: right;
+}
+
+/* translucent, it sits on any sticky colour and either theme */
+.wall-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0 0.25em;
+  border-radius: var(--radius-sm);
+  background: rgba(127, 127, 127, 0.2);
+}
+
 .wall-link-save {
   height: 28px;
   padding: 0 var(--space-3);

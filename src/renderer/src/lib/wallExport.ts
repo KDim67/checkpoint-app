@@ -5,6 +5,7 @@ import {
   boundsOf, inkNaturalSize, inPaintOrder,
   ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallItem
 } from '../../../shared/wallModel'
+import { plainWallText } from '../../../shared/wallText'
 
 /** in wall units */
 const MARGIN = 40
@@ -167,13 +168,16 @@ export async function exportWallToPng(
       ctx.fillRect(item.x, item.y, item.width, item.height)
       ctx.fillStyle = '#1a1a1a'
       ctx.font = '13px sans-serif'
-      wrap(ctx, item.text ?? '', item.width - 24).forEach((line, i) => {
+      wrap(ctx, plainWallText(item.text ?? ''), item.width - 24).forEach((line, i) => {
         ctx.fillText(line, item.x + 12, item.y + 26 + i * 18)
       })
     } else if (item.kind === 'text') {
       ctx.fillStyle = item.color || ctxInfo.textColor
       ctx.font = '600 20px sans-serif'
-      ctx.fillText(item.text ?? '', item.x, item.y + 24)
+      // styles don't survive the canvas, the words and their lines do
+      wrap(ctx, plainWallText(item.text ?? ''), item.width).forEach((line, i) => {
+        ctx.fillText(line, item.x, item.y + 20 + i * 26)
+      })
     } else if (item.kind === 'frame') {
       ctx.strokeStyle = item.color || ctxInfo.borderColor
       ctx.lineWidth = 2

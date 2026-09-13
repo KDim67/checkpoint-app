@@ -106,7 +106,7 @@ export function registerWallTools(mcp: McpServer): void {
         context,
         wall_id: z.string().optional(),
         kind: z.enum(['note', 'text', 'frame', 'card', 'doc', 'bookmark']),
-        text: z.string().optional().describe('Body for note and text; the label for frame.'),
+        text: z.string().optional().describe('Body for note and text, where new lines, **bold**, _italic_, ~~strike~~, `code`, "- " bullets and "1. " numbered items show as formatting; the label for frame.'),
         ref: z.string().optional().describe('Item id for kind=card, note title for kind=doc.'),
         x: z.number().optional(),
         y: z.number().optional(),

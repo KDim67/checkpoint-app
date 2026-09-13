@@ -32,6 +32,12 @@ describe('wallShortcutSections', () => {
     ).toContainEqual(['Ctrl+K', 'Link the selected item'])
   })
 
+  it('lists the formatting keys for writing in a sticky or text box', () => {
+    expect(rowsOf('Text')).toContainEqual(['Ctrl+B', 'Bold'])
+    expect(rowsOf('Text')).toContainEqual(['Ctrl+I', 'Italic'])
+    expect(rowsOf('Text')).toContainEqual(['Esc or Ctrl+Enter', 'Finish writing'])
+  })
+
   it('calls an unbound duplicate unbound, and keeps Delete beside a bound delete', () => {
     expect(rowsOf('Editing')).toContainEqual(['Unbound', 'Duplicate the selection'])
     expect(rowsOf('Editing')).toContainEqual(['Ctrl+D or Delete', 'Remove the selection'])

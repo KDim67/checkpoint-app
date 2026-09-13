@@ -1,22 +1,62 @@
 /** cards render from the live item, so renames follow and deletions say so */
 
-import React from 'react'
+import React, { useLayoutEffect, useRef } from 'react'
 import { FileQuestion, FileText, Globe } from 'lucide-react'
 import { inkNaturalSize, inkPath, type WallItem } from '../../../../shared/wallModel'
 import type { Item, NoteMetadata } from '../../../../shared/types'
-import { linkSegments, parseWallLink } from '../../../../shared/wallLink'
+import { parseWallLink } from '../../../../shared/wallLink'
+import WallRichText from './WallRichText'
+import WallTextEditor from './WallTextEditor'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
-/** addresses marked; ctrl or cmd click follows one, a plain press still picks the note up */
-function LinkedText({ text }: { text: string }) {
+const NOTE_FONT = 13
+const NOTE_FONT_MIN = 8
+
+/** shrinks to fit instead of clipping the last lines, never past the default size; set on the element, no re-render */
+function NoteText({ text, width, height }: { text?: string; width: number; height: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let size = NOTE_FONT
+    el.style.fontSize = `${size}px`
+    // one measure for a note that fits, which is most of them
+    while (size > NOTE_FONT_MIN && el.scrollHeight > el.clientHeight + 1) {
+      size -= 1
+      el.style.fontSize = `${size}px`
+    }
+  }, [text, width, height])
+
   return (
-    <>
-      {linkSegments(text).map((segment, i) => segment.url
-        ? <span key={i} data-wall-url={segment.url} className="wall-text-link" title="Ctrl+click to open">{segment.text}</span>
-        : <React.Fragment key={i}>{segment.text}</React.Fragment>
-      )}
-    </>
+    <div ref={ref} style={{
+      color: '#1a1a1a', lineHeight: 1.45, overflow: 'hidden',
+      whiteSpace: 'pre-wrap', wordBreak: 'break-word', height: '100%'
+    }}>
+      {text ? <WallRichText text={text} /> : <span style={{ opacity: 0.45 }}>Double-click to write</span>}
+    </div>
+  )
+}
+
+/** as tall as its words: dragging it wider reflows them and the box follows */
+function TextBox({ item, style, onAutoSize }: {
+  item: WallItem
+  style: React.CSSProperties
+  onAutoSize?: (id: string, height: number) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    // the words' own height, not the stored box around them
+    const height = ref.current?.offsetHeight
+    if (height && onAutoSize) onAutoSize(item.id, height)
+  }, [item.id, item.text, item.width, onAutoSize])
+
+  return (
+    <div ref={ref} style={{ ...style, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+      {item.text ? <WallRichText text={item.text} /> : <span style={{ opacity: 0.4 }}>Double-click to write</span>}
+    </div>
   )
 }
 
@@ -32,9 +72,11 @@ interface Props {
   onFinishEditing: () => void
   /** a bookmark whose page main is still reading */
   previewing?: boolean
+  /** a text box reporting the height of its words */
+  onAutoSize?: (id: string, height: number) => void
 }
 
-function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing }: Props) {
+function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize }: Props) {
   const base: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -54,54 +96,44 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         padding: '12px'
       }}>
         {editing ? (
-          <textarea
-            autoFocus
+          <WallTextEditor
             value={item.text ?? ''}
-            onChange={e => onTextChange(item.id, e.target.value)}
-            onBlur={onFinishEditing}
-            onKeyDown={e => { if (e.key === 'Escape') onFinishEditing() }}
+            onChange={text => onTextChange(item.id, text)}
+            onFinish={onFinishEditing}
             style={{
-              width: '100%', height: '100%', resize: 'none', border: 'none',
+              width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
               outline: 'none', background: 'transparent', color: '#1a1a1a',
-              fontFamily: 'var(--font-sans)', fontSize: '13px', lineHeight: 1.45
+              fontFamily: 'var(--font-sans)', fontSize: `${NOTE_FONT}px`, lineHeight: 1.45
             }}
           />
         ) : (
-          <div style={{
-            color: '#1a1a1a', fontSize: '13px', lineHeight: 1.45,
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word', height: '100%'
-          }}>
-            {item.text ? <LinkedText text={item.text} /> : <span style={{ opacity: 0.45 }}>Double-click to write</span>}
-          </div>
+          <NoteText text={item.text} width={item.width} height={item.height} />
         )}
       </div>
     )
   }
 
   if (item.kind === 'text') {
+    // one style for writing and reading, or the box jumps when editing ends
+    const textStyle: React.CSSProperties = {
+      color: item.color || 'var(--color-text-base)',
+      fontFamily: 'var(--font-sans)', fontSize: '20px', fontWeight: 600, lineHeight: 1.3
+    }
     return (
-      <div style={{ ...base, display: 'flex', alignItems: 'center' }}>
+      <div style={base}>
         {editing ? (
-          <input
-            autoFocus
+          <WallTextEditor
             value={item.text ?? ''}
-            onChange={e => onTextChange(item.id, e.target.value)}
-            onBlur={onFinishEditing}
-            onKeyDown={e => { if (e.key === 'Escape' || e.key === 'Enter') onFinishEditing() }}
+            onChange={text => onTextChange(item.id, text)}
+            onFinish={onFinishEditing}
+            onHeight={height => onAutoSize?.(item.id, height)}
             style={{
-              width: '100%', border: 'none', outline: 'none', background: 'transparent',
-              color: item.color || 'var(--color-text-base)',
-              fontFamily: 'var(--font-sans)', fontSize: '20px', fontWeight: 600
+              ...textStyle, display: 'block', width: '100%', height: '100%', padding: 0,
+              resize: 'none', border: 'none', outline: 'none', background: 'transparent', overflow: 'hidden'
             }}
           />
         ) : (
-          <span style={{
-            color: item.color || 'var(--color-text-base)',
-            fontSize: '20px', fontWeight: 600, lineHeight: 1.3,
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word'
-          }}>
-            {item.text ? <LinkedText text={item.text} /> : <span style={{ opacity: 0.4 }}>Double-click to write</span>}
-          </span>
+          <TextBox item={item} style={textStyle} onAutoSize={onAutoSize} />
         )}
       </div>
     )

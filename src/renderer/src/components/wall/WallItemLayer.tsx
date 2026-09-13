@@ -25,10 +25,11 @@ interface Props {
   linkExternal?: boolean
   onFollowLink: (link: string) => void
   previewing?: boolean
+  onAutoSize?: (id: string, height: number) => void
 }
 
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
-function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize }: Props) {
   const link = item.link
   const linkTitle = linkMissing
     ? `${linkLabel}. Edit the link to point somewhere else.`
@@ -65,6 +66,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         onTextChange={onTextChange}
         onFinishEditing={onFinishEditing}
         previewing={previewing}
+        onAutoSize={onAutoSize}
       />
 
       {/* under the item, a frame's label already owns the top edge */}

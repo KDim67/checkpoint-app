@@ -397,7 +397,8 @@ export function useWallPointer(wallDocument: WallDocument) {
       const size = resizedSize(drag.w, drag.h, dx, dy, snapping)
       setItems(
         docRef.current.items.map(i =>
-          i.id === drag.id ? { ...i, ...size } : i
+          // a text box's height follows its words, the drag only sets how wide they run
+          i.id === drag.id ? { ...i, ...(i.kind === 'text' ? { width: size.width } : size) } : i
         ),
         { record: false }
       )
