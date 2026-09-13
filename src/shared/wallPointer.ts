@@ -1,6 +1,7 @@
 /** the decisions, testable without the DOM; handlers keep hit-testing, capture and painting */
 
 import { itemAtPoint, snap, SNAP_GRID, type Point, type WallItem } from './wallModel'
+import type { Side } from './wallGrow'
 
 /** held until release */
 export type WallDrag =
@@ -13,6 +14,8 @@ export type WallDrag =
       moved: boolean
       /** an alt-drag's wall before its copies, put back when they never move */
       before?: { items: WallItem[]; selected: Set<string> }
+      /** a still click on one member of a group picked whole picks just that member */
+      narrowTo?: string
     }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
   | {
@@ -24,6 +27,8 @@ export type WallDrag =
       overId: string | null
       /** from a hover handle, not the arrow tool */
       viaHandle?: boolean
+      /** the handle's side, where a still click adds the next item */
+      side?: Side
     }
   | { mode: 'arrowEnd'; id: string; end: 'start' | 'end' }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
@@ -34,12 +39,12 @@ export type WallDrag =
 /** well past click slop so a slip doesn't leave a stub */
 export const LOOSE_END_SLOP = 24
 
-/** pressing a selected item keeps the same set, no render; shift toggles */
-export function pressSelection(selected: Set<string>, id: string, shift: boolean): Set<string> {
+/** pressing a selected item keeps the same set, no render; shift toggles; a group comes and goes whole */
+export function pressSelection(selected: Set<string>, id: string, shift: boolean, members: string[] = [id]): Set<string> {
   const already = selected.has(id)
   return shift
-    ? new Set(already ? [...selected].filter(x => x !== id) : [...selected, id])
-    : (already ? selected : new Set([id]))
+    ? new Set(already ? [...selected].filter(x => !members.includes(x)) : [...selected, ...members])
+    : (already ? selected : new Set(members))
 }
 
 /** pointer angle less rotation */
@@ -108,6 +113,8 @@ export interface ArrowRelease {
   armed: string | null | undefined
   /** back to select */
   handBack: boolean
+  /** a still press on a handle: the next item on its side instead of an arrow */
+  grow: boolean
 }
 
 export function arrowRelease(gesture: {
@@ -126,18 +133,18 @@ export function arrowRelease(gesture: {
       ? { from: gesture.fromId, to: gesture.overId }
       : gesture.travelled > LOOSE_END_SLOP ? { from: gesture.fromId, to: null } : null
     // a finished arrow hands back; a slip keeps the tool armed
-    return { draw, armed: null, handBack: draw !== null }
+    return { draw, armed: null, handBack: draw !== null, grow: false }
   }
 
-  // a still handle press is a misfire, nothing to wait in
-  if (gesture.viaHandle) return { draw: null, armed: undefined, handBack: false }
+  // a still handle press grows the next item, and has nothing to do with an armed arrow tool
+  if (gesture.viaHandle) return { draw: null, armed: undefined, handBack: false, grow: true }
 
   // a click: pick source then target, easier when items nearly touch
   if (gesture.armed && gesture.armed !== gesture.fromId) {
-    return { draw: { from: gesture.armed, to: gesture.fromId }, armed: null, handBack: true }
+    return { draw: { from: gesture.armed, to: gesture.fromId }, armed: null, handBack: true, grow: false }
   }
   // clicking the same item puts it down
-  return { draw: null, armed: gesture.armed === gesture.fromId ? null : gesture.fromId, handBack: false }
+  return { draw: null, armed: gesture.armed === gesture.fromId ? null : gesture.fromId, handBack: false, grow: false }
 }
 
 /** moves under the threshold changed nothing; strokes and connectors record as added */

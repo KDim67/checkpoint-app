@@ -1,6 +1,7 @@
 import React from 'react'
 import { ExternalLink, Link2, Lock, RotateCw } from 'lucide-react'
 import type { WallItem } from '../../../../shared/wallModel'
+import type { Side } from '../../../../shared/wallGrow'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
 
@@ -26,10 +27,12 @@ interface Props {
   onFollowLink: (link: string) => void
   previewing?: boolean
   onAutoSize?: (id: string, height: number) => void
+  /** Tab while writing, the next item beside this one */
+  onGrow?: (id: string, side: Side) => void
 }
 
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
-function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow }: Props) {
   const link = item.link
   const linkTitle = linkMissing
     ? `${linkLabel}. Edit the link to point somewhere else.`
@@ -67,6 +70,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         onFinishEditing={onFinishEditing}
         previewing={previewing}
         onAutoSize={onAutoSize}
+        onGrow={onGrow}
       />
 
       {/* under the item, a frame's label already owns the top edge */}
@@ -122,7 +126,8 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
               key={side}
               className="wall-connect"
               data-wall-connect={item.id}
-              title="Drag to connect this to something"
+              data-wall-side={side}
+              title="Click to add the next item here, or drag to connect this to something"
               style={{
                 position: 'absolute', ...position,
                 width: '18px', height: '18px',

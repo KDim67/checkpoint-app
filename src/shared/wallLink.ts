@@ -11,7 +11,7 @@ const WEB_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 const ITEM_LINK = /^wall:([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)$/
 
 // arrows and ink have no box to hang a chip on
-const LINKABLE = new Set(['note', 'text', 'frame', 'image', 'card', 'doc'])
+const LINKABLE = new Set(['note', 'text', 'frame', 'image', 'card', 'doc', 'shape'])
 
 export const isLinkable = (kind: string): boolean => LINKABLE.has(kind)
 

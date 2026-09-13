@@ -22,7 +22,7 @@ export function useWallView() {
     setBackground, toggleRail, confirmDeleteWall, setItems, setCamera, onItemTextChange,
     onItemFinishEditing, onItemAutoSize, applyHistory, addItem, removeSelected, duplicateSelected, toggleLock,
     openCard, placeImageFiles, linkOpen, setLinkOpen, linkPickFor, setLinkPickFor, followLink,
-    setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark
+    setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark, growFrom
   } = wallDocument
   const {
     screenPoint, onWheel, jumpTo, exportPng, fitToContent, arrowAt, onPointerDown, onPointerMove,
@@ -161,7 +161,8 @@ export function useWallView() {
     startLinkPick,
     previewing,
     refreshPreview,
-    addBookmark
+    addBookmark,
+    growFrom
   }
 }
 

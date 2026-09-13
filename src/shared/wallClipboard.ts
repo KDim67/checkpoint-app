@@ -6,6 +6,7 @@ import {
 } from './wallModel'
 import { parseWallLink } from './wallLink'
 import { plainWallText } from './wallText'
+import { regroupCopies } from './wallGroup'
 
 // private, so a paste from another app can't pose as wall items
 export const WALL_CLIP_MIME = 'application/x-checkpoint-wall-items'
@@ -79,7 +80,7 @@ export function placeClip(clip: WallClip, existing: WallItem[], at: Point, newId
     if (item.toPoint) copy.toPoint = { x: item.toPoint.x + dx, y: item.toPoint.y + dy }
     placed.push(copy)
   }
-  return placed
+  return regroupCopies(placed)
 }
 
 export const encodeClip = (clip: WallClip): string => JSON.stringify(clip)
@@ -110,7 +111,7 @@ export function clipText(clip: WallClip, titleOf: (item: WallItem) => string | u
     .filter(i => i.kind !== 'arrow' && i.kind !== 'ink' && i.kind !== 'image')
     .sort((a, b) => a.y - b.y || a.x - b.x)
     .map(item => {
-      const words = item.kind === 'note' || item.kind === 'text'
+      const words = item.kind === 'note' || item.kind === 'text' || item.kind === 'shape'
         ? plainWallText(item.text ?? '')
         : (titleOf(item) ?? item.text ?? '')
       const link = parseWallLink(item.link)

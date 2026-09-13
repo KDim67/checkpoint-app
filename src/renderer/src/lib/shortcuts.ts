@@ -27,8 +27,8 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_cookbook',    label: 'Go to Cookbook',    defaultCombo: 'Ctrl+8', action: { kind: 'view', view: 'cookbook' } },
   { id: 'view_analytics',   label: 'Go to Analytics',   defaultCombo: 'Ctrl+9', action: { kind: 'view', view: 'analytics' } },
   { id: 'view_cheatsheets', label: 'Go to Cheatsheets', defaultCombo: 'Ctrl+0', action: { kind: 'view', view: 'cheatsheets' } },
-  // eleventh view, out of digits: G for Game Dev
-  { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+G', action: { kind: 'view', view: 'gamedev' } },
+  // eleventh view, out of digits: the key after 0 on the same row
+  { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+-', action: { kind: 'view', view: 'gamedev' } },
   { id: 'toggle_ai_panel',  label: 'Toggle AI panel',   defaultCombo: 'Ctrl+L', action: { kind: 'toggleAiPanel' } },
   { id: 'open_settings',    label: 'Open Settings',     defaultCombo: 'Ctrl+,', action: { kind: 'openSettings' } }
 ]
@@ -63,6 +63,9 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   // Alt beside copy and paste, their styled cousins
   { id: 'wall_copy_style',       label: 'Copy style',              scope: 'wall',   defaultCombo: 'Ctrl+Alt+C' },
   { id: 'wall_paste_style',      label: 'Paste style',             scope: 'wall',   defaultCombo: 'Ctrl+Alt+V' },
+  // the keys every canvas app uses
+  { id: 'wall_group',            label: 'Group the selection',     scope: 'wall',   defaultCombo: 'Ctrl+G' },
+  { id: 'wall_ungroup',          label: 'Ungroup',                 scope: 'wall',   defaultCombo: 'Ctrl+Shift+G' },
 
   { id: 'kanban_focus_session',  label: 'Start a focus session',   scope: 'kanban', defaultCombo: 'Space' },
   { id: 'kanban_open_details',   label: 'Open the card',           scope: 'kanban', defaultCombo: 'E' },

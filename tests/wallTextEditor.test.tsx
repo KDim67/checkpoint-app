@@ -7,9 +7,13 @@ import WallTextEditor from '../src/renderer/src/components/wall/WallTextEditor'
 afterEach(cleanup)
 
 /** the Wall owns the text, the editor only reports it */
-function Harness({ initial, onFinish = () => {} }: { initial: string; onFinish?: () => void }) {
+function Harness({ initial, onFinish = () => {}, onNext }: {
+  initial: string
+  onFinish?: () => void
+  onNext?: (side: 'right' | 'bottom') => void
+}) {
   const [value, setValue] = useState(initial)
-  return <WallTextEditor value={value} onChange={setValue} onFinish={onFinish} />
+  return <WallTextEditor value={value} onChange={setValue} onFinish={onFinish} onNext={onNext} />
 }
 
 const box = () => screen.getByRole('textbox') as HTMLTextAreaElement
@@ -75,5 +79,36 @@ describe('WallTextEditor', () => {
 
     fireEvent.keyDown(box(), { key: 'Tab', shiftKey: true })
     expect(box().value).toBe('- a')
+  })
+
+  it('adds the next item beside with Tab and below with Shift+Tab, outside a list', () => {
+    const onNext = vi.fn()
+    render(<Harness initial="idea" onNext={onNext} />)
+    caretAt(4)
+
+    expect(fireEvent.keyDown(box(), { key: 'Tab' })).toBe(false)
+    fireEvent.keyDown(box(), { key: 'Tab', shiftKey: true })
+
+    expect(onNext.mock.calls).toStrictEqual([['right'], ['bottom']])
+    expect(box().value).toBe('idea')
+  })
+
+  it('still indents a list item, an indented line, or a selection across lines', () => {
+    const onNext = vi.fn()
+    render(<Harness initial={'- a\n  b\nc\nd'} onNext={onNext} />)
+
+    caretAt(3)
+    fireEvent.keyDown(box(), { key: 'Tab' })
+    expect(box().value).toBe('  - a\n  b\nc\nd')
+
+    caretAt(8)
+    fireEvent.keyDown(box(), { key: 'Tab', shiftKey: true })
+    expect(box().value).toBe('  - a\nb\nc\nd')
+
+    caretAt(8, 10)
+    fireEvent.keyDown(box(), { key: 'Tab' })
+    expect(box().value).toBe('  - a\nb\n  c\n  d')
+
+    expect(onNext).not.toHaveBeenCalled()
   })
 })

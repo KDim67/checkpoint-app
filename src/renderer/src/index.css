@@ -1679,6 +1679,16 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   transform: scale(1.35);
 }
 
+/* where a drag lines up with another item, placed by hand each frame */
+.wall-guide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--color-secondary);
+  pointer-events: none;
+  z-index: 4;
+}
+
 /* selection as an attribute, a prop re-rendered every item a marquee crossed */
 [data-wall-item][data-wall-selected] {
   outline: 2px solid var(--color-secondary);

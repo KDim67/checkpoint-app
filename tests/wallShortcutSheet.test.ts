@@ -42,6 +42,22 @@ describe('wallShortcutSections', () => {
     ).toContainEqual(['Ctrl+Alt+V', 'Paste style'])
   })
 
+  it('lists grouping, picking one item out of a group, and moving past the guides', () => {
+    expect(rowsOf('Editing')).toContainEqual(['Unbound', 'Group the selection'])
+    expect(rowsOf('Mouse')).toContainEqual(['Click a grouped item again', 'Pick just that item out of its group'])
+    expect(rowsOf('Mouse')).toContainEqual(['Ctrl while dragging', 'Move without lining up on other items'])
+    expect(
+      wallShortcutSections({ ...bindings, wall_ungroup: 'Ctrl+Shift+G' }, 'both', 'right')
+        .find(s => s.group === 'Editing')?.rows
+    ).toContainEqual(['Ctrl+Shift+G', 'Ungroup'])
+  })
+
+  it('lists the quick ways to add the next item', () => {
+    expect(rowsOf('Mouse')).toContainEqual(['Click a connect dot', 'Add the next item on that side, joined by an arrow'])
+    expect(rowsOf('Text')).toContainEqual(['Tab or Shift+Tab', 'Next item beside or below, outside a list'])
+    expect(rowsOf('Editing')).toContainEqual(['Ctrl+V', 'Paste spreadsheet cells, a sticky each'])
+  })
+
   it('lists the formatting keys for writing in a sticky or text box', () => {
     expect(rowsOf('Text')).toContainEqual(['Ctrl+B', 'Bold'])
     expect(rowsOf('Text')).toContainEqual(['Ctrl+I', 'Italic'])

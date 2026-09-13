@@ -1,5 +1,5 @@
 import React from 'react'
-import { ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads } from '../../../../shared/wallModel'
+import { ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type ArrowShape, type ArrowLine, type ArrowHeads, type ShapeType } from '../../../../shared/wallModel'
 
 /** buttons draw their option, no icon means "elbow" */
 const glyphProps = {
@@ -79,6 +79,18 @@ export const arrowStyleButtons = (
   cycleButton('Line', ARROW_LINES, line, lineGlyph, onLine, compact),
   cycleButton('Heads', ARROW_HEAD_MODES, heads, headsGlyph, onHeads, compact)
 ]
+
+const OUTLINE_GLYPHS: Record<ShapeType, React.JSX.Element> = {
+  rectangle: <rect x="2" y="3.5" width="11" height="8" />,
+  rounded: <rect x="2" y="3.5" width="11" height="8" rx="2.5" />,
+  oval: <ellipse cx="7.5" cy="7.5" rx="5.5" ry="4" />,
+  diamond: <path d="M7.5 2L13 7.5L7.5 13L2 7.5Z" />,
+  triangle: <path d="M7.5 2.5L13 12H2Z" />
+}
+
+/** one cycling button like the arrow styles, five outlines laid flat would crowd the bar */
+export const shapeButton = (current: ShapeType, onPick: (next: ShapeType) => void): React.JSX.Element =>
+  cycleButton('Shape', SHAPE_TYPES, current, shape => <svg {...glyphProps}>{OUTLINE_GLYPHS[shape]}</svg>, onPick)
 
 /** accent plus underline, hover already paints surface-offset */
 export const toolButton = (

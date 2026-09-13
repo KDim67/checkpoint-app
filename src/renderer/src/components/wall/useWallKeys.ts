@@ -8,6 +8,8 @@ import { wallMenuEntries } from './wallMenuEntries'
 import { isLinkable, pastedLink } from '../../../../shared/wallLink'
 import { clipSelection, clipText, decodeClip, encodeClip, WALL_CLIP_MIME } from '../../../../shared/wallClipboard'
 import { rememberClip, rememberedClip, rememberedStyle } from './wallClipboardMemory'
+import { pastedCells } from '../../lib/wallCells'
+import { groupItems, ungroupItems } from '../../../../shared/wallGroup'
 import type { WallDocument } from './useWallDocument'
 import type { WallPointer } from './useWallPointer'
 
@@ -20,7 +22,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     single, arrowsSelected, setItems, applyHistory, addItem, removeSelected, duplicateSelected,
     toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, setLinkPickFor, setLinkOpen,
     setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
-    copyStyle, pasteStyle
+    copyStyle, pasteStyle, makeCards, pasteCells
   } = wallDocument
   const {
     fitToContent
@@ -80,6 +82,14 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       }
       if (command === 'wall_copy_style') { e.preventDefault(); copyStyle(); return }
       if (command === 'wall_paste_style') { e.preventDefault(); pasteStyle(); return }
+      if (command === 'wall_group' || command === 'wall_ungroup') {
+        e.preventDefault()
+        const items = docRef.current.items
+        const next = command === 'wall_group' ? groupItems(items, selectedRef.current) : ungroupItems(items, selectedRef.current)
+        // nothing to change isn't an undo step
+        if (next !== items) setItems(next)
+        return
+      }
 
       if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault()
@@ -183,6 +193,13 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         return
       }
 
+      const cells = pastedCells(text, e.clipboardData?.getData('text/html') ?? '')
+      if (cells) {
+        e.preventDefault()
+        pasteCells(cells)
+        return
+      }
+
       const link = pastedLink(text)
       if (!link) return
       e.preventDefault()
@@ -203,7 +220,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [placeImageFiles, docRef, selectedRef, setItemLink, addBookmark, pasteClip, toast])
+  }, [placeImageFiles, docRef, selectedRef, setItemLink, addBookmark, pasteClip, pasteCells, toast])
 
   /** a menu click raises no copy event, so the clip is remembered and only its words reach the clipboard */
   const copyFromMenu = (cut: boolean): void => {
@@ -228,7 +245,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       const clip = rememberedClip()
       if (clip) pasteClip(clip, at)
     },
-    canPaste: rememberedClip() !== null
+    canPaste: rememberedClip() !== null,
+    makeCards
   })
 
   // live camera from the ref mid-pan, so a stray render agrees with what's painted

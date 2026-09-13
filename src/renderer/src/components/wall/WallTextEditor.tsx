@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react'
-import { continueList, indentLines, toggleWrap } from '../../../../shared/wallText'
+import { continueList, indentLines, takesIndent, toggleWrap } from '../../../../shared/wallText'
 
 interface Props {
   value: string
@@ -8,13 +8,15 @@ interface Props {
   style?: CSSProperties
   /** the words' height, so a text box can grow with them */
   onHeight?: (height: number) => void
+  /** Tab outside a list, the next item beside this one or below it */
+  onNext?: (side: 'right' | 'bottom') => void
 }
 
 // under ctrl or cmd; strikethrough takes shift too
 const MARKERS: Record<string, string> = { b: '**', i: '_', e: '`' }
 
 /** a plain textarea with list-aware Enter, Tab indents and formatting keys */
-export default function WallTextEditor({ value, onChange, onFinish, style, onHeight }: Props) {
+export default function WallTextEditor({ value, onChange, onFinish, style, onHeight, onNext }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
   /** set once the new value has rendered, or React leaves the caret at the end */
   const pendingSelection = useRef<[number, number] | null>(null)
@@ -65,10 +67,14 @@ export default function WallTextEditor({ value, onChange, onFinish, style, onHei
       }
     }
 
-    // Tab would leave the box, in a list it means a level
+    // Tab would leave the box; in a list or across lines it's a level, anywhere else the next item
     if (e.key === 'Tab') {
       e.preventDefault()
-      apply(indentLines(el.value, start, end, e.shiftKey))
+      if (onNext && !mod && !el.value.slice(start, end).includes('\n') && !takesIndent(el.value, start)) {
+        onNext(e.shiftKey ? 'bottom' : 'right')
+      } else {
+        apply(indentLines(el.value, start, end, e.shiftKey))
+      }
       return
     }
 

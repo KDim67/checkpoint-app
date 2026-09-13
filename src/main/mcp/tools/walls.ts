@@ -42,10 +42,12 @@ function describeWallItem(item: WallItem, titleOf: (item: WallItem) => string | 
     ...(item.ref ? { ref: item.ref, title: titleOf(item) } : {}),
     ...(item.text ? { text: item.text } : {}),
     ...(item.summary ? { summary: item.summary } : {}),
+    ...(item.shape ? { shape: item.shape } : {}),
     ...(item.color ? { color: item.color } : {}),
     ...(item.rotation ? { rotation: item.rotation } : {}),
     ...(item.locked ? { locked: true } : {}),
-    ...(item.link ? { link: item.link } : {})
+    ...(item.link ? { link: item.link } : {}),
+    ...(item.group ? { group: item.group } : {})
   }
 }
 
@@ -101,20 +103,22 @@ export function registerWallTools(mcp: McpServer): void {
     'place_on_wall',
     {
       description:
-        "Put something on a wall. 'note' is a sticky note and 'text' a bare label; both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. 'bookmark' is a card for a web page: give link, and the page's title, description and icon are read before it is placed. x and y are where the item is CENTRED, not its top-left corner, so the coordinates that come back are offset by half its size. Both are optional and default to the origin. link makes the item open a web address, or jump to another item when given wall:<wall_id>/<item_id> using ids from list_walls and get_wall.",
+        "Put something on a wall. 'note' is a sticky note and 'text' a bare label; both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. 'shape' holds text inside an outline picked with shape. 'bookmark' is a card for a web page: give link, and the page's title, description and icon are read before it is placed. x and y are where the item is CENTRED, not its top-left corner, so the coordinates that come back are offset by half its size. Both are optional and default to the origin. link makes the item open a web address, or jump to another item when given wall:<wall_id>/<item_id> using ids from list_walls and get_wall.",
       inputSchema: {
         context,
         wall_id: z.string().optional(),
-        kind: z.enum(['note', 'text', 'frame', 'card', 'doc', 'bookmark']),
+        kind: z.enum(['note', 'text', 'frame', 'card', 'doc', 'bookmark', 'shape']),
         text: z.string().optional().describe('Body for note and text, where new lines, **bold**, _italic_, ~~strike~~, `code`, "- " bullets and "1. " numbered items show as formatting; the label for frame.'),
         ref: z.string().optional().describe('Item id for kind=card, note title for kind=doc.'),
         x: z.number().optional(),
         y: z.number().optional(),
         color: z.string().optional().describe('Hex, e.g. #f6c453.'),
-        link: z.string().optional().describe('A web address like https://example.com, or wall:<wall_id>/<item_id>.')
+        link: z.string().optional().describe('A web address like https://example.com, or wall:<wall_id>/<item_id>.'),
+        shape: z.enum(['rectangle', 'rounded', 'oval', 'diamond', 'triangle']).optional()
+          .describe("The outline for kind 'shape', a rectangle when left out.")
       }
     },
-    async ({ context: ctx, wall_id, kind, text: body, ref, x, y, color, link }) => {
+    async ({ context: ctx, wall_id, kind, text: body, ref, x, y, color, link, shape }) => {
       if ((kind === 'card' || kind === 'doc') && !ref) {
         return text(`kind '${kind}' is a reference and needs ref: an item id for a card, a note title for a doc.`)
       }
@@ -147,7 +151,7 @@ export function registerWallTools(mcp: McpServer): void {
         kind as WallItemKind,
         { x: x ?? 0, y: y ?? 0 },
         doc.items,
-        { ...(body ? { text: body } : {}), ...(ref ? { ref } : {}), ...(color ? { color } : {}), ...(itemLinkValue ? { link: itemLinkValue } : {}), ...bookmark }
+        { ...(body ? { text: body } : {}), ...(ref ? { ref } : {}), ...(color ? { color } : {}), ...(itemLinkValue ? { link: itemLinkValue } : {}), ...bookmark, ...(kind === 'shape' && shape && shape !== 'rectangle' ? { shape } : {}) }
       )
 
       setSetting(wall.key, { ...doc, items: [...doc.items, created] })
