@@ -164,7 +164,7 @@ export default function AiSettings() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+    <div className="col-lg">
       {/* Provider profiles: keep several connections (local + cloud) and switch */}
       <FieldRow label="Provider">
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative', width: '100%' }}>
@@ -324,7 +324,7 @@ export default function AiSettings() {
           Add up to 5 email writing samples. When drafting emails, the AI assistant will combine your sample styles to match your exact tone, structure, and writing style.
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div className="col-md">
           {emailSamples.map((sample, idx) => (
             <div
               key={sample.id}
@@ -340,7 +340,7 @@ export default function AiSettings() {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-                  <Mail size={12} style={{ color: 'var(--color-secondary)' }} />
+                  <Mail size={12} className="text-accent" />
                   <input
                     type="text"
                     value={sample.title}

@@ -21,8 +21,8 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
           <SettingsColumn title="Upscale Settings">
 
             {/* File picker */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+            <div className="col-6px">
+              <span className="text-label-sm">
                 Source Image
               </span>
               <FilePickerButton
@@ -33,8 +33,8 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
             </div>
 
             {/* Algorithm selection dropdown */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+            <div className="col-4px">
+              <span className="text-label-sm">
                 Scaling Filter
               </span>
               <select
@@ -93,8 +93,8 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+              <div className="col-2px">
+                <span className="text-caption">
                   {tool.upscaleShowOriginal ? 'Viewing: Original (nearest-scaled for comparison)' : 'Viewing: Upscaled result'}
                 </span>
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', fontFamily: 'var(--font-mono)' }}>
@@ -149,19 +149,11 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
 
             {/* Export trigger */}
             {tool.upscalePath && tool.upscaleUrl && (
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-3)'
-              }}>
+              <div className="panel">
                 <div className="row-between">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export Upscaled</span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  <div className="col-2px">
+                    <span className="text-item-bold">Export Upscaled</span>
+                    <span className="text-caption">
                       Saves upscaled texture next to original image with an upscaled suffix.
                     </span>
                   </div>
@@ -208,7 +200,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                     flexDirection: 'column',
                     gap: '2px'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="row-6px">
                       <CheckCircle size={13} />
                       <strong>Upscaled successfully saved!</strong>
                     </div>

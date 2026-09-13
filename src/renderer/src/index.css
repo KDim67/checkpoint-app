@@ -410,6 +410,163 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   text-transform: uppercase;
 }
 
+/*
+ * Shared building blocks: the style objects written out by hand most often
+ * across the renderer, named once. Pixel sizes stay pixels. They were written
+ * that way, and turning them into spacing tokens would let the compact density
+ * setting start resizing them.
+ */
+.text-accent {
+  color: var(--color-secondary);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-faint {
+  color: var(--color-text-faint);
+}
+
+.text-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.text-hint-faint {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}
+
+.text-sub {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  margin-top: 2px;
+}
+
+.text-caption {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.text-micro {
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.text-item {
+  color: var(--color-text-base);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.text-item-strong {
+  color: var(--color-text-base);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.text-item-bold {
+  color: var(--color-text-base);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.text-label {
+  color: var(--color-text-base);
+  font-weight: var(--weight-medium);
+}
+
+.text-label-sm {
+  color: var(--color-text-base);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+}
+
+.text-label-xs {
+  color: var(--color-text-base);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.col-2px {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.col-4px {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.col-6px {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.col-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1.5);
+}
+
+.col-md {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.col-lg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.col-xl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.row-6px {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.relative {
+  position: relative;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fill {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.range-full {
+  accent-color: var(--color-primary);
+  width: 100%;
+}
+
 .btn-primary {
   background-color: var(--color-primary);
   color: var(--color-text-inverted);

@@ -1034,7 +1034,7 @@ export default function BacklogView() {
           paddingTop: 'var(--space-3)'
         }}
       >
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+        <span className="text-hint">
           {totalTasks > 0 ? (
             `Showing ${Math.min(totalTasks, (page - 1) * pageSize + 1)}–${Math.min(totalTasks, page * pageSize)} of ${totalTasks} tasks`
           ) : (
@@ -1069,7 +1069,7 @@ export default function BacklogView() {
               <ArrowLeft size={12} /> Previous
             </button>
 
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            <span className="text-hint">
               Page {page} of {totalPages}
             </span>
 
@@ -1214,8 +1214,8 @@ export default function BacklogView() {
                   padding: 'var(--space-8) var(--space-4)',
                   textAlign: 'center'
                 }}>
-                  <Archive size={28} style={{ color: 'var(--color-text-faint)' }} />
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+                  <Archive size={28} className="text-faint" />
+                  <span className="text-hint-faint">
                     No archived tasks. Deleted tasks show up here so you can restore them later.
                   </span>
                 </div>

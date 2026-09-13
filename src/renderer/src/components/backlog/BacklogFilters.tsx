@@ -150,7 +150,7 @@ export default function BacklogFilters({
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Priority
           </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div className="col-4px">
             {[
               { num: 3, label: 'High' },
               { num: 2, label: 'Medium' },
@@ -230,7 +230,7 @@ export default function BacklogFilters({
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Due Date Range
           </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="col-6px">
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', width: '30px' }}>From</span>
               <input

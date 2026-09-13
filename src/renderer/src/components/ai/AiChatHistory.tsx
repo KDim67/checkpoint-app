@@ -45,9 +45,9 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
             padding: 'var(--space-6)'
           }}
         >
-          <Sparkles size={26} style={{ color: 'var(--color-secondary)' }} />
+          <Sparkles size={26} className="text-accent" />
           <div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+            <div className="text-item-strong">
               Your project co-pilot
             </div>
             <div style={{ fontSize: '11px', marginTop: '2px' }}>

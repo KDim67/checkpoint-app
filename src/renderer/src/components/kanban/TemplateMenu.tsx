@@ -23,7 +23,7 @@ export default function TemplateMenu({ templates, open, setOpen, onPick }: Templ
   }, [setOpen])
 
   return (
-    <div style={{ position: 'relative' }} ref={menuRef}>
+    <div className="relative" ref={menuRef}>
       <HeaderBtn
         onClick={() => setOpen(v => !v)}
         title="Create card from a reusable template"

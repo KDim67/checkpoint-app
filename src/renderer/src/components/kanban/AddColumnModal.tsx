@@ -89,7 +89,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
         aria-labelledby="col-modal-title"
       >
         <div className="row">
-          <Plus style={{ color: 'var(--color-secondary)' }} size={20} />
+          <Plus className="text-accent" size={20} />
           <h2 id="col-modal-title" style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>
             Create Custom Column
           </h2>
@@ -114,7 +114,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
         )}
 
         {/* Column Name Input */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+        <div className="col-sm">
           <label htmlFor="col-name-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
             Column Title
           </label>
@@ -140,7 +140,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
         </div>
 
         {/* WIP Limit Input */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+        <div className="col-sm">
           <label htmlFor="col-wip-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
             WIP Limit (Optional)
           </label>
@@ -165,7 +165,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
 
         {/* Definition of done. Shown on the column name's tooltip, and the
             field the assistant fills in when it designs a workflow. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+        <div className="col-sm">
           <label htmlFor="col-desc-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
             Definition of Done (Optional)
           </label>

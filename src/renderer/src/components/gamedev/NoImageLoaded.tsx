@@ -10,9 +10,9 @@ export default function NoImageLoaded({ icon, hint, onChoose }: NoImageLoadedPro
   return (
     <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
       {icon}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>No Image Loaded</span>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{hint}</span>
+      <div className="col-2px">
+        <span className="text-item-bold">No Image Loaded</span>
+        <span className="text-hint">{hint}</span>
       </div>
       <button
         onClick={onChoose}

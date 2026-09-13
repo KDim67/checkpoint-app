@@ -60,13 +60,13 @@ export default function WidgetSettings() {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       <RowBetween>
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Show Desktop Widget
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+          <div className="text-sub">
             Transparent always-on-top overlay, never steals focus from your IDE.
           </div>
         </div>

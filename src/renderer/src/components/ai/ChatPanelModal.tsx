@@ -61,7 +61,7 @@ export default function ChatPanelModal({ icon, title, actions, onClose, children
         >
           <div className="row">
             {icon}
-            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+            <span className="text-label-xs">
               {title}
             </span>
           </div>

@@ -696,7 +696,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             border: '1px solid var(--color-surface-offset)'
           }}>
             {/* Status (Column) Selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Status
               </span>
@@ -720,7 +720,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </div>
 
             {/* Priority Selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Priority
               </span>
@@ -745,7 +745,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </div>
 
             {/* Due Date Picker & Done Checkbox */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Due Date
               </span>
@@ -859,7 +859,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             <CardCoverPicker cover={cover} onChange={handleCoverChange} />
 
             {/* Template Selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Is Template?
               </span>

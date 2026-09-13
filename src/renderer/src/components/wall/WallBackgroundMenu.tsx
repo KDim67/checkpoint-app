@@ -15,7 +15,7 @@ export default function WallBackgroundMenu({
   bgOpen, setBgOpen, custom, setBackground
 }: WallBackgroundMenuProps) {
   return (
-    <div data-wall-popover="bg" style={{ position: 'relative' }}>
+    <div data-wall-popover="bg" className="relative">
       {toolButton('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
 
       {bgOpen && (

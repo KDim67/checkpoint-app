@@ -13,7 +13,7 @@ export default function PalettePanel({
   const copyToClipboard = onCopy
 
   return (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+  <div className="col-lg">
     <div className="gamedev-info-banner">
       <Info size={15} className="gamedev-info-banner-icon" />
       <div>
@@ -24,15 +24,7 @@ export default function PalettePanel({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 'var(--space-4)' }}>
     
     {/* Color picker list */}
-    <div style={{
-      background: 'var(--color-surface-1)',
-      border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-4)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 'var(--space-3)'
-    }}>
+    <div className="panel">
       <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Color Palette Creator</h3>
       
       <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
@@ -117,19 +109,11 @@ export default function PalettePanel({
     </div>
 
     {/* Generated Code Snippets */}
-    <div style={{
-      background: 'var(--color-surface-1)',
-      border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-4)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 'var(--space-3)'
-    }}>
+    <div className="panel">
       <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Shader & Code Snippets</h3>
       
       {/* Unity Code Block */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div className="col-4px">
         <div className="row-between">
           <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>Unity C# Color Array</span>
           <button

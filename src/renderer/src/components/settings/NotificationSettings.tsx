@@ -51,19 +51,19 @@ export default function NotificationSettings(): React.JSX.Element {
   }
 
   if (!loaded) {
-    return <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>Loading…</div>
+    return <div className="text-hint-faint">Loading…</div>
   }
 
   const quietNow = isQuietHour(policy, new Date().getHours())
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       <RowBetween>
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Desktop Notifications
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+          <div className="text-sub">
             The master switch. Everything below is silenced while this is off.
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function NotificationSettings(): React.JSX.Element {
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', display: 'block' }}>
                 {category.label}
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+              <span className="text-caption">
                 {category.description}
               </span>
             </div>
@@ -121,7 +121,7 @@ export default function NotificationSettings(): React.JSX.Element {
 
         <RowBetween>
           <div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+            <div className="text-item">
               Quiet Hours
               {policy.quietEnabled && quietNow && (
                 <span style={{ marginLeft: 'var(--space-2)', fontSize: '11px', color: 'var(--color-secondary)' }}>
@@ -129,7 +129,7 @@ export default function NotificationSettings(): React.JSX.Element {
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+            <div className="text-sub">
               Nothing is raised during this window. It may cross midnight.
             </div>
           </div>
@@ -151,7 +151,7 @@ export default function NotificationSettings(): React.JSX.Element {
               >
                 {HOURS.map(h => <option key={h} value={h}>{hourLabel(h)}</option>)}
               </select>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>to</span>
+              <span className="text-hint">to</span>
               <select
                 value={policy.quietTo}
                 onChange={e => save({ ...policy, quietTo: Number(e.target.value) })}
@@ -168,10 +168,10 @@ export default function NotificationSettings(): React.JSX.Element {
 
         <RowBetween>
           <div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+            <div className="text-item">
               Send a test
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+            <div className="text-sub">
               Checks the settings above, and that the OS is letting them through.
             </div>
           </div>

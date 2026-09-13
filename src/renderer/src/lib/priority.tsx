@@ -27,7 +27,7 @@ export const PRIORITY_ICONS: Record<number, React.ReactNode> = {
   3: <ChevronUp size={14} style={{ color: 'var(--color-priority-high)' }} />,
   2: <ChevronUp size={14} style={{ color: 'var(--color-priority-med)' }} />,
   1: <ChevronDown size={14} style={{ color: 'var(--color-priority-low)' }} />,
-  0: <Minus size={14} style={{ color: 'var(--color-text-faint)' }} />
+  0: <Minus size={14} className="text-faint" />
 }
 
 /** Kanban's card accent: a bar colour plus the wash behind the priority chip. */

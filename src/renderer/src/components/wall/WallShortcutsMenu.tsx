@@ -17,7 +17,7 @@ export default function WallShortcutsMenu({
   shortcutsOpen, setShortcutsOpen, keys, panButtons, menuButton
 }: WallShortcutsMenuProps) {
   return (
-    <div data-wall-popover="keys" style={{ position: 'relative' }}>
+    <div data-wall-popover="keys" className="relative">
       {toolButton(
         'Keyboard shortcuts',
         <Keyboard size={14} />,

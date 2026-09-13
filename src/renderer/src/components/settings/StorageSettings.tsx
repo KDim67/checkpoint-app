@@ -62,7 +62,7 @@ export default function StorageSettings() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       <div style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)' }}>
         <ExportPanel />
       </div>
@@ -72,21 +72,21 @@ export default function StorageSettings() {
           Media Vault Statistics
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Files count</span>
+          <div className="col-4px">
+            <span className="text-micro">Files count</span>
             <span style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-secondary)' }}>
               {storageInfo?.fileCount ?? 0}
             </span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Active disk size</span>
+          <div className="col-4px">
+            <span className="text-micro">Active disk size</span>
             <span style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-secondary)' }}>
               {formatSize(storageInfo?.totalSize ?? 0)}
             </span>
           </div>
         </div>
         <div style={{ borderTop: '1px solid var(--color-surface-offset)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Vault Directory Path</span>
+          <span className="text-micro">Vault Directory Path</span>
           <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-base)', wordBreak: 'break-all' }}>
             {storageInfo?.path ?? ''}
           </span>
@@ -95,7 +95,7 @@ export default function StorageSettings() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-2)' }}>
         <div style={{ flex: 1, paddingRight: 'var(--space-4)' }}>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Prune Orphaned Media
           </div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px', maxWidth: '380px', lineHeight: 1.4 }}>
@@ -139,9 +139,9 @@ export default function StorageSettings() {
         }}>
           <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', display: 'flex', justifyContent: 'space-between' }}>
             <span>Cleanup Report</span>
-            <span style={{ color: 'var(--color-secondary)' }}>Saved {formatSize(prunedResult.spaceSavedBytes)}</span>
+            <span className="text-accent">Saved {formatSize(prunedResult.spaceSavedBytes)}</span>
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+          <div className="text-caption">
             Successfully deleted {prunedResult.prunedCount} orphaned image files:
           </div>
           <ul style={{ margin: 0, paddingLeft: 'var(--space-4)', fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-faint)', maxHeight: '100px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }} className="custom-scrollbar">

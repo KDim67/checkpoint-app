@@ -369,7 +369,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             border: '1px solid var(--color-surface-offset)'
           }}>
             {/* Status (Column) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Status
               </span>
@@ -393,7 +393,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </div>
 
             {/* Priority */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Priority
               </span>
@@ -418,7 +418,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </div>
 
             {/* Due Date */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Due Date
               </span>
@@ -439,7 +439,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </div>
 
             {/* Time Estimate */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+            <div className="col-sm">
               <span className="label-caps">
                 Time Estimate (Hours)
               </span>
@@ -604,9 +604,9 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                       }}
                     >
                       {t.done ? (
-                        <CheckSquare size={14} style={{ color: 'var(--color-secondary)' }} />
+                        <CheckSquare size={14} className="text-accent" />
                       ) : (
-                        <Square size={14} style={{ color: 'var(--color-text-muted)' }} />
+                        <Square size={14} className="text-muted" />
                       )}
                     </button>
                     <span style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>

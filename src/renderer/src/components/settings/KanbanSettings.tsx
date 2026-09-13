@@ -45,7 +45,7 @@ export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: s
   if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading…</div>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+    <div className="col-md">
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', margin: 0 }}>
         Set a WIP limit of 0 for unlimited. You can also rename columns by double-clicking their headers on the board itself.
       </p>

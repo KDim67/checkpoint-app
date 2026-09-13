@@ -41,20 +41,12 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           
           {/* Settings Card */}
-          <div style={{
-            background: 'var(--color-surface-1)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-4)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-3)'
-          }}>
+          <div className="panel">
             <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Naming Conventions</h3>
             
             {/* Preset Row */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Asset Type Prefix (Unity/Unreal)</label>
+            <div className="col-4px">
+              <label className="text-caption">Asset Type Prefix (Unity/Unreal)</label>
               <select
                 value={tool.renamerPreset}
                 onChange={e => tool.setRenamerPreset(e.target.value as RenamerPreset)}
@@ -75,8 +67,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
             </div>
 
             {/* Suffix Preset */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Texture Map Suffix</label>
+            <div className="col-4px">
+              <label className="text-caption">Texture Map Suffix</label>
               <select
                 value={tool.renamerSuffixPreset}
                 onChange={e => tool.setRenamerSuffixPreset(e.target.value as RenamerSuffixPreset)}
@@ -97,8 +89,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
 
             {/* Custom Prefix & Suffix */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Custom Prefix</label>
+              <div className="col-4px">
+                <label className="text-caption">Custom Prefix</label>
                 <input
                   type="text"
                   value={tool.customPrefix}
@@ -114,8 +106,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Custom Suffix</label>
+              <div className="col-4px">
+                <label className="text-caption">Custom Suffix</label>
                 <input
                   type="text"
                   value={tool.customSuffix}
@@ -135,8 +127,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
 
             {/* Search and Replace */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Search For</label>
+              <div className="col-4px">
+                <label className="text-caption">Search For</label>
                 <input
                   type="text"
                   value={tool.searchStr}
@@ -152,8 +144,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Replace With</label>
+              <div className="col-4px">
+                <label className="text-caption">Replace With</label>
                 <input
                   type="text"
                   value={tool.replaceStr}
@@ -191,8 +183,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               </label>
               {tool.enableIndexing && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginTop: '2px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Start Index</label>
+                  <div className="col-2px">
+                    <label className="text-micro">Start Index</label>
                     <input
                       type="number"
                       value={tool.startIndex}
@@ -207,8 +199,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                       }}
                     />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Digits Padding</label>
+                  <div className="col-2px">
+                    <label className="text-micro">Digits Padding</label>
                     <input
                       type="number"
                       value={tool.indexPadding}
@@ -358,7 +350,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-muted)' }} title={file.path}>
                       {file.name}
                     </span>
-                    <span style={{ color: 'var(--color-text-faint)' }}>➔</span>
+                    <span className="text-faint">➔</span>
                     <span style={{
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',

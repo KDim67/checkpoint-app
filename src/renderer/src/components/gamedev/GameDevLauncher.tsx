@@ -118,7 +118,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
       </div>
 
       {recentTools.length > 0 && (
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <section className="col-md">
           <h3 style={{
             margin: 0,
             fontSize: '10px',
@@ -146,7 +146,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
       )}
 
       {GAMEDEV_TOOLS.map(section => (
-        <section key={section.group} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <section key={section.group} className="col-md">
           <h3 style={{
             margin: 0,
             fontSize: '10px',
@@ -166,11 +166,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
                 onClick={() => onPick(tool.id)}
               >
                 <span className="gamedev-launch-icon">{tool.icon}</span>
-                <span style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--weight-semibold)',
-                  color: 'var(--color-text-base)'
-                }}>
+                <span className="text-item-strong">
                   {tool.label}
                 </span>
                 <span style={{

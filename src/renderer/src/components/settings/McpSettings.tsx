@@ -140,13 +140,13 @@ export default function McpSettings(): React.JSX.Element {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       <RowBetween>
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Enable MCP Server
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+          <div className="text-sub">
             Serves your workspaces, notes and boards to MCP clients on this machine only.
           </div>
         </div>
@@ -190,7 +190,7 @@ export default function McpSettings(): React.JSX.Element {
       </FieldRow>
 
       <RowBetween>
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+        <div className="text-hint">
           Status:{' '}
           <strong style={{ color: running ? 'var(--color-success)' : 'var(--color-text-faint)' }}>
             {running ? `Listening on 127.0.0.1:${port}` : 'Stopped'}
@@ -239,7 +239,7 @@ export default function McpSettings(): React.JSX.Element {
       <Divider />
 
       <FieldRow label="Client Configuration" hint="Paste into your MCP client's config, then restart it.">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div className="col">
           <pre style={{ ...mono, margin: 0, maxHeight: '190px', overflow: 'auto', whiteSpace: 'pre' }}>
             {revealed ? clientConfig : clientConfig.replace(token, '•'.repeat(48))}
           </pre>

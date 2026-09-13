@@ -98,7 +98,7 @@ const lineStyle: React.CSSProperties = {
 function Signals({ signals }: { signals: Signal[] }) {
   if (signals.length === 0) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div className="col-6px">
       {signals.map(s => (
         <div
           key={s.kind}
@@ -146,7 +146,7 @@ export default function RewindPanel({ item }: { item: Item }) {
 
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-      <History size={14} style={{ color: 'var(--color-secondary)' }} />
+      <History size={14} className="text-accent" />
       <span style={{
         fontSize: 'var(--text-xs)',
         fontWeight: 'var(--weight-semibold)',
@@ -170,7 +170,7 @@ export default function RewindPanel({ item }: { item: Item }) {
 
   if (loading) {
     return shell(
-      <div aria-live="polite" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+      <div aria-live="polite" className="text-hint-faint">
         Looking back…
       </div>
     )
@@ -190,11 +190,11 @@ export default function RewindPanel({ item }: { item: Item }) {
   const { sitting, daysSince, windows, clipboard, commits, boardMoves, signals } = rewind
 
   return shell(
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+    <div className="col-md">
 
       {/* When, and for how long */}
       <div>
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+        <div className="text-item">
           {formatWhen(sitting.start, sitting.end)}
         </div>
         <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
@@ -208,7 +208,7 @@ export default function RewindPanel({ item }: { item: Item }) {
 
       {/* What was written down at the time beats anything inferred. */}
       {sitting.notes.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="col-4px">
           {sitting.notes.map((note, i) => (
             <div
               key={i}

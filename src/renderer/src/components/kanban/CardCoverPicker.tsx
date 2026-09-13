@@ -4,7 +4,7 @@ export type CardCover = { type: 'color' | 'image'; value: string; size?: 'header
 
 export default function CardCoverPicker({ cover, onChange }: { cover: CardCover | null; onChange: (next: CardCover | null) => void }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)' }}>
+    <div className="col-sm">
       <span className="label-caps">
         Cover Color & Mode
       </span>

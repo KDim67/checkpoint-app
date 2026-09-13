@@ -124,7 +124,7 @@ export default function SettingsView() {
         return (
           <>
             <SettingsSection icon={<Palette size={14} />} title="Interface" description="Theme mode, text scale and density.">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+              <div className="col-xl">
                 <ThemeModeSettings />
                 <Divider />
                 <AppearanceSettings />

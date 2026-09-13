@@ -155,13 +155,13 @@ export default function BackupSettings() {
   if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading backup vault…</div>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       <RowBetween>
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Automated Backups
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+          <div className="text-sub">
             Periodically saves transactionally consistent snapshots of your active database.
           </div>
         </div>
@@ -236,7 +236,7 @@ export default function BackupSettings() {
                   textAlign: 'center'
                 }}
               />
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+              <span className="text-hint-faint">
                 Maximum number of rolling backup files kept before pruning.
               </span>
             </div>
@@ -246,7 +246,7 @@ export default function BackupSettings() {
 
           {/* Trigger & List */}
           <div className="row-between">
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+            <div className="text-item-strong">
               Backup Archives
             </div>
             <button

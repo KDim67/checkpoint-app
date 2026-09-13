@@ -37,7 +37,7 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
                 }}
               >
                 <span className="row">
-                  <Link2 size={12} style={{ color: 'var(--color-text-muted)' }} />
+                  <Link2 size={12} className="text-muted" />
                   <span style={{ color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>{label}</span>
                   <span style={{ color: 'var(--color-text-base)' }}>Item #{peerId.substring(0, 8)}</span>
                 </span>

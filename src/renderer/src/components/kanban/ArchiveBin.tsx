@@ -85,7 +85,7 @@ export default function ArchiveBin({
       >
         {/* Header */}
         <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+          <span className="text-item-strong">
             Archive Bin
           </span>
           <button

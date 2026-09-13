@@ -29,7 +29,7 @@ export default function CookbookModal({ models }: Props) {
   } = models
   return (
     <ChatPanelModal
-      icon={<BookOpen size={14} style={{ color: 'var(--color-secondary)' }} />}
+      icon={<BookOpen size={14} className="text-accent" />}
       title="Model Cookbook"
       onClose={() => setShowCookbookModal(false)}
     >
@@ -49,7 +49,7 @@ export default function CookbookModal({ models }: Props) {
               return <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No local Ollama models detected.</div>
             }
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div className="col-4px">
                 {effectiveModels.map(m => {
                   const isSelected = selectedModel === m
                   return (
@@ -97,7 +97,7 @@ export default function CookbookModal({ models }: Props) {
           <div style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
             Catalog Models
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="col-6px">
             {catalogData.map(cat => {
               const q4Tag = cat.variants?.q4?.ollamaTag || cat.id
               const effectiveModels = Array.from(new Set([...localModels, ...(selectedModel ? [selectedModel] : [])]))

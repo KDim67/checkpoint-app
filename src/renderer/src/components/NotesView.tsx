@@ -449,7 +449,7 @@ export default function NotesView(): React.JSX.Element {
             }}
           >
             <div className="row-between" style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)' }}>
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+              <span className="text-item-strong">
                 Note graph
                 <span style={{ marginLeft: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-regular)' }}>
                   {notes.length} note{notes.length === 1 ? '' : 's'} · click one to open it
@@ -630,7 +630,7 @@ export default function NotesView(): React.JSX.Element {
 
               {/* Outgoing links */}
               <div className="col">
-                <div className="notes-panel-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="notes-panel-label row-6px">
                   <ArrowRight size={11} /> Outgoing links
                 </div>
                 {currentNoteMetadata.links.length > 0 ? (
@@ -639,7 +639,7 @@ export default function NotesView(): React.JSX.Element {
                     return (
                       <button key={link} onClick={() => handleOpenWikiLink(link)} className="notes-link-chip">
                         {!exists && <FileWarning size={11} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</span>
+                        <span className="truncate">{link}</span>
                         {!exists && <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>new</span>}
                       </button>
                     )
@@ -651,13 +651,13 @@ export default function NotesView(): React.JSX.Element {
 
               {/* Backlinks */}
               <div className="col">
-                <div className="notes-panel-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="notes-panel-label row-6px">
                   <ArrowLeft size={11} /> Backlinks
                 </div>
                 {backlinks.length > 0 ? (
                   backlinks.map(link => (
                     <button key={link} onClick={() => handleSelectNote(link)} className="notes-link-chip">
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link}</span>
+                      <span className="truncate">{link}</span>
                     </button>
                   ))
                 ) : (

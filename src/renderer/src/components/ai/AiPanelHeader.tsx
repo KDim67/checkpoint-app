@@ -119,7 +119,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
         <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
           Actions
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="row-6px">
           <button
             onClick={handleImportWorkspace}
             disabled={workspaceIndexing}

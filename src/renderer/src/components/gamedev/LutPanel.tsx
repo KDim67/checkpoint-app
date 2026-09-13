@@ -25,17 +25,17 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
-              <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
+              <Settings size={14} className="text-muted" />
               <span className="label-caps">
                 Color Adjustments
               </span>
             </div>
 
             {/* Exposure Slider */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="col-4px">
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Exposure</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutExposure > 0 ? `+${tool.lutExposure}` : tool.lutExposure}%</span>
+                <span className="text-label">Exposure</span>
+                <span className="text-accent">{tool.lutExposure > 0 ? `+${tool.lutExposure}` : tool.lutExposure}%</span>
               </div>
               <input
                 type="range"
@@ -44,15 +44,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                 step="1"
                 value={tool.lutExposure}
                 onChange={e => tool.setLutExposure(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                className="range-full"
               />
             </div>
 
             {/* Brightness Slider */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="col-4px">
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Brightness</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutBrightness > 0 ? `+${tool.lutBrightness}` : tool.lutBrightness}%</span>
+                <span className="text-label">Brightness</span>
+                <span className="text-accent">{tool.lutBrightness > 0 ? `+${tool.lutBrightness}` : tool.lutBrightness}%</span>
               </div>
               <input
                 type="range"
@@ -61,15 +61,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                 step="1"
                 value={tool.lutBrightness}
                 onChange={e => tool.setLutBrightness(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                className="range-full"
               />
             </div>
 
             {/* Contrast Slider */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="col-4px">
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Contrast</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutContrast > 0 ? `+${tool.lutContrast}` : tool.lutContrast}%</span>
+                <span className="text-label">Contrast</span>
+                <span className="text-accent">{tool.lutContrast > 0 ? `+${tool.lutContrast}` : tool.lutContrast}%</span>
               </div>
               <input
                 type="range"
@@ -78,15 +78,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                 step="1"
                 value={tool.lutContrast}
                 onChange={e => tool.setLutContrast(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                className="range-full"
               />
             </div>
 
             {/* Saturation Slider */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="col-4px">
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Saturation</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutSaturation > 0 ? `+${tool.lutSaturation}` : tool.lutSaturation}%</span>
+                <span className="text-label">Saturation</span>
+                <span className="text-accent">{tool.lutSaturation > 0 ? `+${tool.lutSaturation}` : tool.lutSaturation}%</span>
               </div>
               <input
                 type="range"
@@ -95,15 +95,15 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                 step="1"
                 value={tool.lutSaturation}
                 onChange={e => tool.setLutSaturation(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                className="range-full"
               />
             </div>
 
             {/* Temperature Slider */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="col-4px">
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Temperature</span>
-                <span style={{ color: 'var(--color-secondary)' }}>{tool.lutTemperature > 0 ? `Warm (+${tool.lutTemperature})` : tool.lutTemperature < 0 ? `Cool (${tool.lutTemperature})` : 'Neutral'}</span>
+                <span className="text-label">Temperature</span>
+                <span className="text-accent">{tool.lutTemperature > 0 ? `Warm (+${tool.lutTemperature})` : tool.lutTemperature < 0 ? `Cool (${tool.lutTemperature})` : 'Neutral'}</span>
               </div>
               <input
                 type="range"
@@ -112,7 +112,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                 step="1"
                 value={tool.lutTemperature}
                 onChange={e => tool.setLutTemperature(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                className="range-full"
               />
             </div>
 
@@ -152,9 +152,9 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Grader Viewport:</span>
-                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+              <div className="col-2px">
+                <span className="text-caption">Grader Viewport:</span>
+                <span className="text-label-xs">
                   Color Spectrum (Left) | Demo Scene (Right) | LUT Strip (Bottom)
                 </span>
               </div>
@@ -176,19 +176,11 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             </div>
 
             {/* Export LUT Strip */}
-            <div style={{
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-4)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-3)'
-            }}>
+            <div className="panel">
               <div className="row-between">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export LUT Strip</span>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                <div className="col-2px">
+                  <span className="text-item-bold">Export LUT Strip</span>
+                  <span className="text-caption">
                     Saves standard neutral 3D lut slice strip ($256\times16$ px) next to currently loaded project assets.
                   </span>
                 </div>
@@ -235,7 +227,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                   flexDirection: 'column',
                   gap: '2px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="row-6px">
                     <CheckCircle size={13} />
                     <strong>LUT generated successfully!</strong>
                   </div>

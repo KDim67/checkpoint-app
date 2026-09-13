@@ -39,7 +39,7 @@ export default function SettingsPanel({
         }}>
           <div className="col">
             {/* Temperature Slider */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div className="col-4px">
               <div className="row-between">
                 <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Temperature
@@ -88,7 +88,7 @@ export default function SettingsPanel({
               />
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div className="col-4px">
             <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
               System Prompt Override (optional)
             </span>

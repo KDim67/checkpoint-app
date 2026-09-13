@@ -19,7 +19,7 @@ export default function ActiveTextureHeader({ label, path, onChange, onClear }: 
       justifyContent: 'space-between'
     }}>
       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{label}</span>
+        <span className="text-caption">{label}</span>
         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={path || ''}>
           {path ? path.split(/[\\/]/).pop() : 'Direct Memory'}
         </span>

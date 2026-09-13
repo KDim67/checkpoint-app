@@ -72,7 +72,7 @@ export default function CardAttachments({
       }}
     >
       <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <Paperclip size={13} style={{ color: 'var(--color-secondary)' }} />
+        <Paperclip size={13} className="text-accent" />
         Attachments
         <span style={{ fontWeight: 'var(--weight-regular)', textTransform: 'none', color: 'var(--color-text-faint)' }}>
           {dragging ? 'drop to attach' : 'or drop files here'}

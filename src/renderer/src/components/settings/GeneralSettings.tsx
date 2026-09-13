@@ -22,7 +22,7 @@ export default function GeneralSettings() {
   }, [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       <FieldRow
         label="Startup Workspace"
         hint="The workspace loaded when the app starts. Choose “Last used” to always resume where you left off."

@@ -752,7 +752,7 @@ export default function CheatsheetsView() {
           <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)' }}>
             Drop PDF here to upload
           </h3>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
+          <p className="text-hint">
             Files will be copied to your local cheatsheets catalog
           </p>
         </div>
@@ -812,8 +812,8 @@ export default function CheatsheetsView() {
             </div>
           ) : pinnedList.length === 0 && unpinnedList.length === 0 && contentOnlyHits.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: 'var(--space-4)', textAlign: 'center', gap: 'var(--space-2)' }}>
-              <BookOpen size={32} style={{ color: 'var(--color-text-faint)' }} />
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+              <BookOpen size={32} className="text-faint" />
+              <p className="text-hint">
                 {searchQuery ? 'No cheatsheets match your query.' : 'No cheatsheets added yet.'}
               </p>
               {!searchQuery && (
@@ -864,7 +864,7 @@ export default function CheatsheetsView() {
                     >
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <FileType2 size={12} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hit.name.replace(/\.pdf$/i, '')}</span>
+                        <span className="truncate">{hit.name.replace(/\.pdf$/i, '')}</span>
                         <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)', flexShrink: 0 }}>
                           {hit.matchCount} match{hit.matchCount > 1 ? 'es' : ''}
                         </span>
@@ -1058,7 +1058,7 @@ export default function CheatsheetsView() {
             >
               <FileText size={32} />
             </div>
-            <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+            <h3 className="text-item-strong">
               No Cheatsheet Selected
             </h3>
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textAlign: 'center', maxWidth: '320px', lineHeight: 1.6 }}>
@@ -1074,7 +1074,7 @@ export default function CheatsheetsView() {
         <div className="modal-overlay" onClick={() => setRenamePdf(null)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <div className="row-between">
-              <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+              <h3 className="text-item-bold">
                 Rename Cheatsheet
               </h3>
               <button onClick={() => setRenamePdf(null)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer' }}>

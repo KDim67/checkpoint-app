@@ -368,7 +368,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           }}>
             <Compass size={18} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+              <div className="text-item">
                 Would you like a quick tour?
               </div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
@@ -396,14 +396,14 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           >
             {palettePressed ? (
               <>
-                <Check size={22} style={{ color: 'var(--color-secondary)' }} />
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+                <Check size={22} className="text-accent" />
+                <span className="text-item">
                   That’s it. That is how you reach anything.
                 </span>
               </>
             ) : (
               <>
-                <Command size={22} style={{ color: 'var(--color-secondary)' }} />
+                <Command size={22} className="text-accent" />
                 <kbd style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: 'var(--text-base)',
@@ -440,7 +440,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           >
             <Check size={20} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+              <div className="text-item">
                 {created} is ready
               </div>
               <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
@@ -482,7 +482,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div className="col">
               <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
                 Start from
               </span>
@@ -508,7 +508,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                         width: '100%'
                       }}
                     >
-                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+                      <span className="text-item">
                         {t.name}
                       </span>
                       <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
@@ -524,7 +524,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
 
         {/* The keys */}
         {step.id === 'keys' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <div className="col">
             {KEYS.map(k => (
               <div
                 key={k.combo}
@@ -541,7 +541,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                 <span style={{ color: 'var(--color-secondary)', flexShrink: 0, marginTop: '2px' }}>{k.icon}</span>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+                    <span className="text-item">
                       {k.name}
                     </span>
                     <kbd style={{

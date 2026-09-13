@@ -77,7 +77,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
   const all = [...BUILT_IN_PRESETS, ...saved]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+    <div className="col-md">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h4 style={{
           margin: 0,

@@ -41,7 +41,7 @@ export default function WallPlacePicker({
           onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
         >
           <Plus size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.label}</span>
+          <span className="truncate">{row.label}</span>
         </button>
       ))}
     </div>

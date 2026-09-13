@@ -83,7 +83,7 @@ function ChoiceRow<T extends string>({
         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
           {label}
         </span>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{desc}</span>
+        <span className="text-hint">{desc}</span>
       </div>
       <select
         value={value}
@@ -149,7 +149,7 @@ function ShortcutRow({
           {label}
         </span>
         {desc && (
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+          <span className="text-hint">
             {desc}
           </span>
         )}
@@ -396,7 +396,7 @@ export default function HotkeyBinder() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       {!engineEnabled && (
         <div style={{
           background: 'rgba(249, 115, 22, 0.1)',
@@ -463,7 +463,7 @@ export default function HotkeyBinder() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="col-lg">
         <SectionHeading>In-App Shortcuts</SectionHeading>
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
           Fire only while the Checkpoint window has focus, and are ignored while typing. Changes apply immediately.
@@ -487,7 +487,7 @@ export default function HotkeyBinder() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="col-lg">
         <SectionHeading>View Shortcuts</SectionHeading>
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
           Work only while that view is open, so two of them can share a key without clashing.
@@ -495,7 +495,7 @@ export default function HotkeyBinder() {
         </span>
 
         {VIEW_SCOPES.map(scope => (
-          <div key={scope} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <div key={scope} className="col">
             <span style={{
               fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
               color: 'var(--color-text-muted)'
@@ -522,7 +522,7 @@ export default function HotkeyBinder() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="col-lg">
         <SectionHeading>Mouse</SectionHeading>
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
           On the Wall, where the right button both pans and opens the menu. Holding

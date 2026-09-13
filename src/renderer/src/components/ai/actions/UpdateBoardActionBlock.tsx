@@ -279,7 +279,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2dd4bf', fontSize: '12px', fontWeight: 'bold', minWidth: 0 }}>
           <RefreshCw size={14} style={{ flexShrink: 0, opacity: done ? 1 : 0.5 }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="truncate">
             {!done ? 'Editing board…'
               : result?.undone ? 'Edits undone'
               : result?.replayed ? 'Board edits (earlier run)'

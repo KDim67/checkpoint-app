@@ -13,7 +13,7 @@ export default function DialoguePanel({
   const copyToClipboard = onCopy
 
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="col-lg">
         <div className="gamedev-info-banner">
           <Info size={15} className="gamedev-info-banner-icon" />
           <div>
@@ -24,20 +24,12 @@ export default function DialoguePanel({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         
         {/* Editor Console */}
-        <div style={{
-          background: 'var(--color-surface-1)',
-          border: '1px solid var(--color-surface-offset)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--space-3)'
-        }}>
+        <div className="panel">
           <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Add Dialogue Node</h3>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Unique Node ID</label>
+            <div className="col-2px">
+              <label className="text-micro">Unique Node ID</label>
               <input
                 type="text"
                 value={tool.nodeId}
@@ -53,8 +45,8 @@ export default function DialoguePanel({
                 }}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Speaker Name</label>
+            <div className="col-2px">
+              <label className="text-micro">Speaker Name</label>
               <input
                 type="text"
                 value={tool.nodeSpeaker}
@@ -72,8 +64,8 @@ export default function DialoguePanel({
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <label style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Dialogue Line</label>
+          <div className="col-2px">
+            <label className="text-micro">Dialogue Line</label>
             <textarea
               value={tool.nodeText}
               onChange={e => tool.setNodeText(e.target.value)}
@@ -239,15 +231,7 @@ export default function DialoguePanel({
         </div>
 
         {/* Compiled Mermaid Output */}
-        <div style={{
-          background: 'var(--color-surface-1)',
-          border: '1px solid var(--color-surface-offset)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--space-3)'
-        }}>
+        <div className="panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
             <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Dialogue Graph</h3>
             <div className="row">

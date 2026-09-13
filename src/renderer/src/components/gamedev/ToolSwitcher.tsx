@@ -109,7 +109,7 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
         All tools
       </button>
 
-      <div ref={boxRef} style={{ position: 'relative' }}>
+      <div ref={boxRef} className="relative">
         <button
           type="button"
           className="gamedev-switch"
@@ -119,7 +119,7 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
         >
           <span style={{ color: 'var(--color-secondary)', display: 'flex' }}>{current?.icon}</span>
           {current?.label ?? 'Tool'}
-          <ChevronDown size={14} style={{ color: 'var(--color-text-faint)' }} />
+          <ChevronDown size={14} className="text-faint" />
         </button>
 
         {open && (
@@ -162,7 +162,7 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
         )}
       </div>
 
-      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+      <span className="text-hint-faint">
         {groupOf(activeTab)}
       </span>
     </div>

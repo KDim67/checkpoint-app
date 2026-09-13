@@ -15,7 +15,7 @@ function FocusOptionToggle({
 }) {
   return (
     <div className="row-between">
-      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{label}</span>
+      <span className="text-hint">{label}</span>
       <ToggleSwitch checked={checked} onChange={onChange} label={label} />
     </div>
   )
@@ -35,7 +35,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
         <div>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <div className="row">
-              <Timer style={{ color: 'var(--color-secondary)' }} />
+              <Timer className="text-accent" />
               <span>Daily Focus Session</span>
             </div>
             <span style={{
@@ -132,7 +132,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>{item.title}</div>
+                    <div className="text-label">{item.title}</div>
                     <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
                       <span style={{
                         fontSize: 'var(--text-2xs)',
@@ -180,9 +180,9 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
       </div>
 
       {/* Right panel: Controls & Stats */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="col-lg">
         {/* Presets Card */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <div className="glass-panel col-lg">
           <div className="row-between">
             <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', margin: 0 }}>Timer Config</h3>
             {/* Fills one dot per completed focus interval, resetting each time a long break comes due */}
@@ -297,7 +297,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
 
           <div style={{ borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <div className="row-between">
-              <label htmlFor="focus-cadence" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+              <label htmlFor="focus-cadence" className="text-hint">
                 Long break every
               </label>
               <div className="row" style={{ gap: 'var(--space-2)' }}>
@@ -320,7 +320,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                     textAlign: 'right'
                   }}
                 />
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>intervals</span>
+                <span className="text-hint-faint">intervals</span>
               </div>
             </div>
 
@@ -336,7 +336,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
             />
             {focusSettings.chimeEnabled && (
               <div className="row-between">
-                <label htmlFor="focus-volume" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                <label htmlFor="focus-volume" className="text-hint">
                   Chime volume
                 </label>
                 <input
@@ -411,10 +411,10 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
-                      <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+                      <span className="text-label">
                         {minutes}m Session
                       </span>
-                      <span style={{ color: 'var(--color-text-faint)' }}>{date}</span>
+                      <span className="text-faint">{date}</span>
                     </div>
                     {session.notes && (
                       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontStyle: 'italic', wordBreak: 'break-word' }}>

@@ -206,7 +206,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-accent-ai-soft)', fontSize: '12px', fontWeight: 'bold', minWidth: 0 }}>
           <CheckCircle2 size={15} style={{ flexShrink: 0, opacity: applied ? 1 : 0.45 }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="truncate">
             {!applied ? 'Adding to board…' : nothingNew ? 'Already up to date' : 'Added to board'}
           </span>
         </div>

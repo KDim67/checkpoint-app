@@ -65,7 +65,7 @@ export default function AppearanceSettings() {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       {/* Font size */}
       <FieldRow label="Font Size" hint="Scales all text proportionally across the entire app.">
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -104,10 +104,10 @@ export default function AppearanceSettings() {
       {/* Compact mode */}
       <RowBetween>
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Compact Mode
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+          <div className="text-sub">
             Reduces card padding and row heights for denser information density.
           </div>
         </div>

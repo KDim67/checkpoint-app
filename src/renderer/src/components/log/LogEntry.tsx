@@ -285,7 +285,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
             }}
           >
             <div className="row">
-              <ArrowRightLeft style={{ color: 'var(--color-secondary)' }} size={20} />
+              <ArrowRightLeft className="text-accent" size={20} />
               <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>
                 Promote to Kanban Card
               </h2>

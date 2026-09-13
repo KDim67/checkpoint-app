@@ -371,7 +371,7 @@ function KanbanColumn({
         </div>
 
         {/* Title / Edit Input */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="fill">
           {isEditing ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', padding: '2px 0' }}>
               {/* Row 1: Name, WIP, Save, Cancel */}
@@ -645,7 +645,7 @@ function KanbanColumn({
             </HeaderBtn>
             
             {/* Column Actions Dropdown */}
-            <div style={{ position: 'relative' }} ref={menuRef}>
+            <div className="relative" ref={menuRef}>
               <HeaderBtn title="List Actions" onClick={() => setShowMenu(!showMenu)} colTextColor={isFullCol ? colTextColor : undefined}>
                 <MoreHorizontal size={11} />
               </HeaderBtn>

@@ -91,7 +91,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+    <div className="col">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
@@ -127,7 +127,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
           />
 
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Every</span>
+            <span className="text-hint">Every</span>
             <input
               type="number"
               min={1}
@@ -192,7 +192,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
       )}
 
       {rules.length === 0 && !adding && (
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+        <div className="text-hint-faint">
           Nothing repeats yet. One task appears at a time, and the next only after you finish the last.
         </div>
       )}
@@ -209,7 +209,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
             opacity: rule.active ? 1 : 0.55
           }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="fill">
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {rule.title}
             </div>

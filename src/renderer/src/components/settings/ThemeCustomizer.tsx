@@ -117,7 +117,7 @@ export default function ThemeCustomizer() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       <div style={{
         background: 'var(--color-surface-2)',
         border: '1px solid var(--color-surface-offset)',
@@ -174,7 +174,7 @@ export default function ThemeCustomizer() {
                 <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
                   {info.label}
                 </span>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                <span className="text-caption">
                   {info.desc}
                 </span>
               </div>
@@ -204,7 +204,7 @@ export default function ThemeCustomizer() {
 
         <Divider />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div className="col-md">
           <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
             Typography Customization
           </h4>
@@ -224,7 +224,7 @@ export default function ThemeCustomizer() {
               <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
                 Primary Font Family
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+              <span className="text-caption">
                 Select the font family used across primary headers and text.
               </span>
             </div>
