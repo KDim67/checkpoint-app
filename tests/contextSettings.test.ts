@@ -102,6 +102,26 @@ describe('importing a workspace into a new one', () => {
     expect(index.activeId).toBe('new1')
   })
 
+  it('points links between items at the copied walls, not the originals', () => {
+    // a verbatim link would jump back into the workspace it was copied from
+    const settings = {
+      [wallIndexKey('old')]: JSON.stringify({
+        version: 1,
+        walls: [{ id: DEFAULT_WALL_ID, name: 'Wall' }, { id: 'abc', name: 'Ideas' }],
+        activeId: DEFAULT_WALL_ID
+      }),
+      'wall_old': JSON.stringify({ version: 1, items: [{ id: 'x', kind: 'note', link: 'wall:abc/w-2' }] }),
+      'wall_doc_abc': JSON.stringify({ version: 1, items: [{ id: 'w-2', kind: 'note', link: 'wall:main/x' }] })
+    }
+
+    const out = Object.fromEntries(
+      remapContextSettings(settings, 'old', 'new', counter()).map(e => [e.key, e.value])
+    )
+
+    expect(JSON.parse(out['wall_new']).items[0].link).toBe('wall:new1/w-2')
+    expect(JSON.parse(out['wall_doc_new1']).items[0].link).toBe('wall:main/x')
+  })
+
   it('keeps every wall name through the remap', () => {
     const settings = {
       [wallIndexKey('old')]: JSON.stringify({

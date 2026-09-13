@@ -1,7 +1,10 @@
 /** a card is a reference, never a copy; hand-normalised since user data outlives builds */
 
+import { isLinkable, parseWallLink } from './wallLink'
+
 /** note is a sticky, doc a real note; stored names can't be migrated apart */
-export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow'
+// bookmark is a pasted page's card
+export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow' | 'bookmark'
 
 export interface WallItem {
   /** wall-local, two placements of one card are two items */
@@ -11,10 +14,12 @@ export interface WallItem {
   y: number
   width: number
   height: number
-  /** item id for card, note title for doc, media filename for image */
+  /** item id for card, note title for doc, media filename for image and a bookmark's icon */
   ref?: string
-  /** body for note/text, label for frame and arrow */
+  /** body for note/text, label for frame and arrow, a bookmark's page title */
   text?: string
+  /** a bookmark's page description */
+  summary?: string
   /** hex, or absent for the kind's default */
   color?: string
   /** flat [x0,y0,...] in the item's box, so move and resize work like everything else */
@@ -38,6 +43,8 @@ export interface WallItem {
   z: number
   /** no drag, resize or marquee, so panning past a background image doesn't grab it */
   locked?: boolean
+  /** a web address or wall:<wallId>/<itemId>, read through wallLink */
+  link?: string
 }
 
 /** contents live under wallDocKey */
@@ -78,6 +85,8 @@ export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number
   image: { width: 280, height: 200 },
   text: { width: 240, height: 48 },
   frame: { width: 480, height: 360 },
+  // icon row, two title lines and two of description
+  bookmark: { width: 300, height: 128 },
   // sized from their contents
   ink: { width: 120, height: 120 },
   arrow: { width: 1, height: 1 }
@@ -110,7 +119,7 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow']
+const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow', 'bookmark']
 
 /** wall units, three is enough */
 export const STROKE_WIDTHS = [2, 4, 8]
@@ -160,6 +169,9 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const points = normalizePoints(o.points)
   if (kind === 'ink' && !points) return null
 
+  // a bookmark is its address, without a web one there's nothing to open
+  if (kind === 'bookmark' && parseWallLink(o.link)?.type !== 'url') return null
+
   const from = str(o.from).trim()
   const to = str(o.to).trim()
   const fromPoint = readPoint(o.fromPoint)
@@ -181,6 +193,9 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const arrowLine = oneOf(o.arrowLine, ARROW_LINES)
   const arrowHeads = oneOf(o.arrowHeads, ARROW_HEAD_MODES)
 
+  // a hand-edited doc can't plant a link main would refuse
+  const link = (isLinkable(kind) || kind === 'bookmark') && parseWallLink(o.link) ? str(o.link).trim() : ''
+
   const size = DEFAULT_SIZES[kind]
   return {
     id: str(o.id).trim() || `w${index}-${Math.random().toString(36).slice(2, 8)}`,
@@ -192,6 +207,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     height: Math.max(32, num(o.height, size.height)),
     ...(ref ? { ref } : {}),
     ...(typeof o.text === 'string' ? { text: o.text } : {}),
+    ...(str(o.summary).trim() ? { summary: str(o.summary) } : {}),
     ...(str(o.color) ? { color: str(o.color) } : {}),
     ...(points ? { points } : {}),
     ...(num(o.strokeWidth, 0) > 0 ? { strokeWidth: num(o.strokeWidth, STROKE_WIDTHS[1]) } : {}),
@@ -207,6 +223,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(arrowHeads && arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
     ...(o.locked === true ? { locked: true } : {}),
+    ...(link ? { link } : {}),
     z: num(o.z, index)
   }
 }
@@ -487,7 +504,10 @@ export function cameraCentredOn(
 
 /** titles live on the referenced record, the caller resolves them */
 function searchableText(item: WallItem, resolvedTitle?: string): string {
-  return [item.text ?? '', resolvedTitle ?? ''].join(' ').trim().toLowerCase()
+  // web addresses only, an item link's ids mean nothing to type
+  const link = parseWallLink(item.link)
+  return [item.text ?? '', item.summary ?? '', resolvedTitle ?? '', link?.type === 'url' ? link.url : '']
+    .join(' ').trim().toLowerCase()
 }
 
 /** every word, in paint order */

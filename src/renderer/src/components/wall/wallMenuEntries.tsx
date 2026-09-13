@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette } from 'lucide-react'
+import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw } from 'lucide-react'
 import { bringToFront, createWallItem, sendToBack, type WallDoc, type WallItem, type WallItemKind } from '../../../../shared/wallModel'
+import { isLinkable } from '../../../../shared/wallLink'
 import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImageOps'
 import type { useToast } from '../ui/Toast'
 import type { MenuEntry } from './WallContextMenu'
@@ -22,13 +23,20 @@ export interface WallMenuContext {
   placeDerived: (source: WallItem, made: { filename: string; label: string; width: number; height: number }[]) => void
   /** typed off useToast so they can't drift */
   toast: ReturnType<typeof useToast>['toast']
+  followLink: (link: string) => void
+  copyItemLink: (item: WallItem) => void
+  setItemLink: (id: string, link: string | undefined) => void
+  refreshPreview: (id: string) => Promise<void>
+  /** the selection bar's field, the item is already selected */
+  openLinkEditor: () => void
 }
 
 /** item menu for an item, canvas menu for a spot */
 export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
   const {
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
-    duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast
+    duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast,
+    followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor
   } = ctx
   if (!menu) return []
 
@@ -82,11 +90,33 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
         ]
       : []
 
+    const link = item.link
+    const linkEntries: MenuEntry[] = many
+      ? []
+      : [
+          ...(link ? [{ label: 'Open link', icon: <ExternalLink size={13} />, hint: 'Ctrl click', onClick: () => followLink(link) }] : []),
+          ...(isLinkable(item.kind) && !item.locked
+            ? [{ label: link ? 'Edit link' : 'Add a link', icon: <Link2 size={13} />, onClick: openLinkEditor }]
+            : []),
+          // an arrow has no place of its own to land on
+          ...(item.kind !== 'arrow'
+            ? [{ label: 'Copy link to this item', icon: <Copy size={13} />, onClick: () => copyItemLink(item) }]
+            : []),
+          ...(item.kind === 'bookmark' && !item.locked
+            ? [{ label: 'Refresh preview', icon: <RefreshCw size={13} />, onClick: () => void refreshPreview(item.id) }]
+            : []),
+          // a bookmark without its address is nothing
+          ...(link && isLinkable(item.kind) && !item.locked
+            ? [{ label: 'Remove link', icon: <Unlink size={13} />, onClick: () => setItemLink(item.id, undefined) }]
+            : [])
+        ]
+
     return [
       ...imageOps,
       ...(item.kind === 'card' && !many
         ? [{ label: 'Open card', icon: <ExternalLink size={13} />, onClick: () => openCard(item) }]
         : []),
+      ...linkEntries,
       { label: many ? `Duplicate ${selectedIds.size} items` : 'Duplicate', icon: <Copy size={13} />, hint: 'Ctrl D', onClick: duplicateSelected },
       { label: 'Bring to front', icon: <ArrowUp size={13} />, onClick: () => setItems(bringToFront(doc.items, item.id)) },
       { label: 'Send to back', icon: <ArrowDown size={13} />, onClick: () => setItems(sendToBack(doc.items, item.id)) },

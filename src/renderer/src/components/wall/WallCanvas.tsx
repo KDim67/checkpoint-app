@@ -4,6 +4,7 @@ import WallMinimap from './WallMinimap'
 import { decodeWallDrag, WALL_DRAG_MIME } from '../../../../shared/wallBoard'
 import WallSelectionBar from './WallSelectionBar'
 import WallPenSettings from './WallPenSettings'
+import { describeLink, isLinkable, pastedLink } from '../../../../shared/wallLink'
 import type { WallViewState } from './useWallView'
 
 export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
@@ -16,8 +17,21 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     arrowsSelected, setItems, setCamera, onItemTextChange, onItemFinishEditing, addItem,
     removeSelected, duplicateSelected, toggleLock, openCard, placeImageFiles, screenPoint, onWheel,
     arrowAt, onPointerDown, onPointerMove, endDrag, camera, canvasBackground, dotColor, floatingRef,
-    floatingPos
+    floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
+    wallIndex, activeWall, labelOf, previewing, addBookmark
   } = wallView
+
+  /** the chip's words, from this wall's items and the wall list */
+  const describe = (link: string) => describeLink(link, {
+    activeWallId: activeWall?.id ?? '',
+    wallName: id => wallIndex?.walls.find(w => w.id === id)?.name,
+    itemLabel: id => {
+      const target = itemsById.get(id)
+      return target ? labelOf(target) : undefined
+    },
+    itemExists: id => itemsById.has(id)
+  })
+
   return (
     <div
       ref={viewportRef}
@@ -34,7 +48,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
 
         // panels are canvas children; without this a palette dblclick made a note
-        if ((e.target as HTMLElement).closest('[data-wall-ui]')) return
+        if ((e.target as HTMLElement).closest('[data-wall-ui], [data-wall-link]')) return
         const at = toWallPoint(screenPoint(e), docRef.current.camera)
         const hit = itemAtPoint(docRef.current.items, at)
         if (!hit) {
@@ -53,6 +67,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             setView('notes')
           }
         }
+        else if (hit.kind === 'bookmark') { if (hit.link) followLink(hit.link) }
         else if (hit.kind !== 'image') setEditingId(hit.id)
       }}
       onDragOver={e => {
@@ -66,11 +81,18 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         const dragged = decodeWallDrag(e.dataTransfer.getData(WALL_DRAG_MIME))
       // at the cursor, the point of dragging
         if (dragged) { addItem(dragged.kind, { ref: dragged.ref }, at); return }
-        void placeImageFiles(Array.from(e.dataTransfer.files ?? []), at)
+
+        const files = Array.from(e.dataTransfer.files ?? [])
+        if (files.some(f => f.type.startsWith('image/'))) { void placeImageFiles(files, at); return }
+
+        // a link dragged out of a browser; uri-list lines starting with # are comments
+        const uri = e.dataTransfer.getData('text/uri-list').split(/\r?\n/).find(line => line && !line.startsWith('#'))
+        const link = pastedLink(uri ?? e.dataTransfer.getData('text/plain'))
+        if (link && !link.startsWith('wall:')) addBookmark(link, at)
       }}
       style={{
         flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
-        cursor: spaceHeld ? 'grab' : tool === 'pen' ? 'crosshair' : tool === 'arrow' ? 'copy' : undefined,
+        cursor: spaceHeld ? 'grab' : linkPickFor ? 'alias' : tool === 'pen' ? 'crosshair' : tool === 'arrow' ? 'copy' : undefined,
         background: canvasBackground,
         backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
         backgroundSize: `${gridSpacing(camera.zoom)}px ${gridSpacing(camera.zoom)}px`,
@@ -205,6 +227,8 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
 
         {inPaintOrder(doc.items).filter(i => i.kind !== 'arrow').map(item => {
           const isSelected = selectedIds.has(item.id)
+          // a bookmark is its own link, a chip would repeat it
+          const link = item.link && isLinkable(item.kind) ? describe(item.link) : null
           return (
             <WallItemLayer
               key={item.id}
@@ -218,6 +242,11 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               arrowFrom={arrowFrom === item.id}
               onTextChange={onItemTextChange}
               onFinishEditing={onItemFinishEditing}
+              linkLabel={link?.label}
+              linkMissing={link?.missing}
+              linkExternal={link?.external}
+              onFollowLink={followLink}
+              previewing={previewing.has(item.id)}
             />
           )
         })}
@@ -357,6 +386,12 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           duplicateSelected={duplicateSelected}
           toggleLock={toggleLock}
           removeSelected={removeSelected}
+          linkOpen={linkOpen}
+          setLinkOpen={setLinkOpen}
+          linkLabel={single?.link ? describe(single.link).label : undefined}
+          setItemLink={setItemLink}
+          startLinkPick={startLinkPick}
+          followLink={followLink}
         />
       )}
 

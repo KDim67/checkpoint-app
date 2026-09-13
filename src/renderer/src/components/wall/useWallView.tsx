@@ -21,7 +21,8 @@ export function useWallView() {
     notesByTitle, selectedItems, single, arrowsSelected, wallIndex, activeWall, commitIndex, addWall,
     setBackground, toggleRail, confirmDeleteWall, setItems, setCamera, onItemTextChange,
     onItemFinishEditing, applyHistory, addItem, removeSelected, duplicateSelected, toggleLock,
-    openCard, placeImageFiles
+    openCard, placeImageFiles, linkOpen, setLinkOpen, linkPickFor, setLinkPickFor, followLink,
+    setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark
   } = wallDocument
   const {
     screenPoint, onWheel, jumpTo, exportPng, fitToContent, arrowAt, onPointerDown, onPointerMove,
@@ -147,7 +148,18 @@ export function useWallView() {
     undoable,
     redoable,
     floatingRef,
-    floatingPos
+    floatingPos,
+    linkOpen,
+    setLinkOpen,
+    linkPickFor,
+    setLinkPickFor,
+    followLink,
+    setItemLink,
+    copyItemLink,
+    startLinkPick,
+    previewing,
+    refreshPreview,
+    addBookmark
   }
 }
 

@@ -4,6 +4,7 @@ import {
   boardConfigKey, legacyArchivedKey, legacyBackgroundKey, legacyColumnsKey, legacySwimlanesKey
 } from './boardModel'
 import { DEFAULT_WALL_ID, normalizeWallIndex, wallDocKey, wallIndexKey } from './wallModel'
+import { remapItemLinks } from './wallLink'
 
 export const backlogLayoutKey = (context: string): string => `backlog_columns_layout_${context}`
 
@@ -67,7 +68,8 @@ export function remapContextSettings(
   for (const wall of index.walls) {
     const value = settings[wallDocKey(fromContext, wall.id)]
     if (typeof value === 'string') {
-      out.set(wallDocKey(toContext, idMap.get(wall.id) as string), value)
+      // links between walls follow the new ids, or they'd jump back into the old workspace
+      out.set(wallDocKey(toContext, idMap.get(wall.id) as string), remapItemLinks(value, idMap))
     }
   }
 

@@ -5,6 +5,7 @@ import type { MenuEntry } from './WallContextMenu'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { NUDGE } from './wallShortcutSheet'
 import { wallMenuEntries } from './wallMenuEntries'
+import { isLinkable, pastedLink } from '../../../../shared/wallLink'
 import type { WallDocument } from './useWallDocument'
 import type { WallPointer } from './useWallPointer'
 
@@ -15,7 +16,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     setWallMenuOpen, setRenaming, setBgOpen, setShortcutsOpen, setSpaceHeld, setSwatchOpen, matchKey,
     viewportRef, panCameraRef, labelRef, docRef, selectedRef, historyRef, cardsById, selectedItems,
     single, arrowsSelected, setItems, applyHistory, addItem, removeSelected, duplicateSelected,
-    toggleLock, placeDerived, runImageOp, openCard, placeImageFiles
+    toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, setLinkPickFor, setLinkOpen,
+    setItemLink, addBookmark, refreshPreview, followLink, copyItemLink
   } = wallDocument
   const {
     fitToContent
@@ -65,6 +67,14 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (command === 'wall_tool_connect') { setTool('arrow'); setArrowFrom(null); return }
       if (command === 'wall_duplicate') { e.preventDefault(); duplicateSelected(); return }
       if (command === 'wall_delete') { e.preventDefault(); removeSelected(); return }
+      if (command === 'wall_link') {
+        const chosen = docRef.current.items.filter(i => selectedRef.current.has(i.id))
+        if (chosen.length === 1 && isLinkable(chosen[0].kind) && !chosen[0].locked) {
+          e.preventDefault()
+          setLinkOpen(true)
+        }
+        return
+      }
 
       if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault()
@@ -84,6 +94,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         setSelectedIds(new Set())
         setEditingId(null)
         setMenu(null)
+        setLinkPickFor(null)
+        setLinkOpen(false)
         return
       }
       if (selectedRef.current.size === 0) return
@@ -108,7 +120,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [applyHistory, docRef, duplicateSelected, historyRef, matchKey, removeSelected, selectedRef, setArrowDrag, setArrowFrom, setBgOpen, setEditingId, setItems, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen])
+  }, [applyHistory, docRef, duplicateSelected, historyRef, matchKey, removeSelected, selectedRef, setArrowDrag, setArrowFrom, setBgOpen, setEditingId, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen])
 
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
@@ -118,15 +130,35 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (files.some(f => f.type.startsWith('image/'))) {
         e.preventDefault()
         void placeImageFiles(files)
+        return
       }
+
+      const link = pastedLink(e.clipboardData?.getData('text/plain') ?? '')
+      if (!link) return
+      e.preventDefault()
+
+      const chosen = docRef.current.items.filter(i => selectedRef.current.has(i.id))
+      const target = chosen.length === 1 && isLinkable(chosen[0].kind) && !chosen[0].locked ? chosen[0] : null
+      if (target) {
+        setItemLink(target.id, link)
+        toast('Link added. Ctrl+click the item or click its chip to follow it.')
+        return
+      }
+      // an item link has nothing to show on its own
+      if (link.startsWith('wall:')) {
+        toast('Select an item first, then paste to link it there.')
+        return
+      }
+      addBookmark(link)
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [placeImageFiles])
+  }, [placeImageFiles, docRef, selectedRef, setItemLink, addBookmark, toast])
 
   const menuEntries = (): MenuEntry[] => wallMenuEntries({
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
-    duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast
+    duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast,
+    followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor: () => setLinkOpen(true)
   })
 
   // live camera from the ref mid-pan, so a stray render agrees with what's painted
@@ -193,7 +225,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
   }, [floatingWidth, selectedIds, arrowsSelected, single?.locked, single?.text])
 
   /** belongs to the selection that opened it */
-  useEffect(() => { setSwatchOpen(false) }, [selectedIds, setSwatchOpen])
+  useEffect(() => { setSwatchOpen(false); setLinkOpen(false) }, [selectedIds, setSwatchOpen, setLinkOpen])
 
   return {
     menuEntries,

@@ -23,6 +23,15 @@ describe('wallShortcutSections', () => {
     expect(rowsOf('Mouse', 'both', 'middle')).toContainEqual(['Middle-click', 'Menu for what is under the pointer'])
   })
 
+  it('lists following a link with Ctrl+click and the link key, unbound when it is', () => {
+    expect(rowsOf('Mouse')).toContainEqual(['Ctrl+click', 'Follow an item\'s link, or an address in its text'])
+    expect(rowsOf('Editing')).toContainEqual(['Unbound', 'Link the selected item'])
+    expect(
+      wallShortcutSections({ ...bindings, wall_link: 'Ctrl+K' }, 'both', 'right')
+        .find(s => s.group === 'Editing')?.rows
+    ).toContainEqual(['Ctrl+K', 'Link the selected item'])
+  })
+
   it('calls an unbound duplicate unbound, and keeps Delete beside a bound delete', () => {
     expect(rowsOf('Editing')).toContainEqual(['Unbound', 'Duplicate the selection'])
     expect(rowsOf('Editing')).toContainEqual(['Ctrl+D or Delete', 'Remove the selection'])

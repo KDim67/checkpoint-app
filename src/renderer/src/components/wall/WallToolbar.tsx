@@ -16,7 +16,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
     railOpen, bgOpen, setBgOpen, shortcutsOpen, setShortcutsOpen, keys, panButtons, menuButton,
     fileInputRef, docRef, historyRef, wallIndex, activeWall, commitIndex, addWall, setBackground,
     toggleRail, setCamera, applyHistory, addItem, placeImageFiles, jumpTo, exportPng, fitToContent,
-    camera, custom, pickerRows, labelOf, matches, undoable, redoable
+    camera, custom, pickerRows, labelOf, matches, undoable, redoable, linkPickFor
   } = wallView
   return (
     <div style={{
@@ -81,7 +81,9 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', position: 'relative' }}>
         {/* only what the armed tool does */}
         <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
-          {tool === 'pen'
+          {linkPickFor
+            ? 'Click the item to link to · Esc to cancel'
+            : tool === 'pen'
             ? 'Drag to draw · Esc to stop'
             : tool === 'arrow'
               ? (arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another, or to anywhere')

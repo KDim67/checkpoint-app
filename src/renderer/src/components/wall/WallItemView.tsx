@@ -1,11 +1,24 @@
 /** cards render from the live item, so renames follow and deletions say so */
 
 import React from 'react'
-import { FileQuestion, FileText } from 'lucide-react'
+import { FileQuestion, FileText, Globe } from 'lucide-react'
 import { inkNaturalSize, inkPath, type WallItem } from '../../../../shared/wallModel'
 import type { Item, NoteMetadata } from '../../../../shared/types'
+import { linkSegments, parseWallLink } from '../../../../shared/wallLink'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
+
+/** addresses marked; ctrl or cmd click follows one, a plain press still picks the note up */
+function LinkedText({ text }: { text: string }) {
+  return (
+    <>
+      {linkSegments(text).map((segment, i) => segment.url
+        ? <span key={i} data-wall-url={segment.url} className="wall-text-link" title="Ctrl+click to open">{segment.text}</span>
+        : <React.Fragment key={i}>{segment.text}</React.Fragment>
+      )}
+    </>
+  )
+}
 
 interface Props {
   item: WallItem
@@ -17,9 +30,11 @@ interface Props {
   editing: boolean
   onTextChange: (id: string, text: string) => void
   onFinishEditing: () => void
+  /** a bookmark whose page main is still reading */
+  previewing?: boolean
 }
 
-function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing }: Props) {
+function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing }: Props) {
   const base: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -56,7 +71,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             color: '#1a1a1a', fontSize: '13px', lineHeight: 1.45,
             whiteSpace: 'pre-wrap', wordBreak: 'break-word', height: '100%'
           }}>
-            {item.text || <span style={{ opacity: 0.45 }}>Double-click to write</span>}
+            {item.text ? <LinkedText text={item.text} /> : <span style={{ opacity: 0.45 }}>Double-click to write</span>}
           </div>
         )}
       </div>
@@ -85,7 +100,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             fontSize: '20px', fontWeight: 600, lineHeight: 1.3,
             whiteSpace: 'pre-wrap', wordBreak: 'break-word'
           }}>
-            {item.text || <span style={{ opacity: 0.4 }}>Double-click to write</span>}
+            {item.text ? <LinkedText text={item.text} /> : <span style={{ opacity: 0.4 }}>Double-click to write</span>}
           </span>
         )}
       </div>
@@ -174,6 +189,58 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         }}>
           {note.excerpt || 'Empty note'}
         </span>
+      </div>
+    )
+  }
+
+  // a pasted page; the whole card is its link, so it wears no chip
+  if (item.kind === 'bookmark') {
+    const link = parseWallLink(item.link)
+    const host = link?.type === 'url' ? link.host : ''
+    return (
+      <div className="wall-paper" style={{
+        ...base,
+        display: 'flex', flexDirection: 'column', gap: '6px',
+        padding: 'var(--space-3)',
+        background: 'var(--color-surface-1)',
+        border: `1px solid ${item.color || 'var(--color-surface-offset)'}`,
+        borderRadius: 'var(--radius-md)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+      }}>
+        <div className="row-6px">
+          {item.ref ? (
+            <img
+              src={`checkpoint-media://${item.ref}`}
+              alt=""
+              width={14}
+              height={14}
+              draggable={false}
+              style={{ flexShrink: 0, borderRadius: '3px', objectFit: 'contain' }}
+            />
+          ) : (
+            <Globe size={14} className="icon-faint" style={{ flexShrink: 0 }} />
+          )}
+          <span className="truncate" style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+            {host}
+          </span>
+        </div>
+        <span style={{
+          fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',
+          color: 'var(--color-text-base)', lineHeight: 1.35, wordBreak: 'break-word',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+        }}>
+          {item.text || host}
+        </span>
+        {previewing ? (
+          <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>Fetching the page…</span>
+        ) : item.summary && (
+          <span style={{
+            fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+          }}>
+            {item.summary}
+          </span>
+        )}
       </div>
     )
   }

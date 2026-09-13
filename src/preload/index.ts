@@ -11,6 +11,7 @@ import type { StartupSettings } from '../shared/startupSettings'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type { ImportedBoard } from '../shared/foreignImport'
 import type { VaultImportResult } from '../shared/obsidianImport'
+import type { PagePreview } from '../shared/linkPreview'
 import type {
   Item,
   Tag,
@@ -721,7 +722,9 @@ const api = {
       prunedFiles: string[]
     }> => ipcRenderer.invoke(IpcChannels.MEDIA_SCAN_AND_PRUNE),
     getStorageInfo: (): Promise<{ fileCount: number; totalSize: number; path: string }> =>
-      ipcRenderer.invoke(IpcChannels.MEDIA_GET_STORAGE_INFO)
+      ipcRenderer.invoke(IpcChannels.MEDIA_GET_STORAGE_INFO),
+    linkPreview: (url: string): Promise<PagePreview | null> =>
+      ipcRenderer.invoke(IpcChannels.MEDIA_LINK_PREVIEW, url)
   },
   sync: {
     startHost: (port?: number): Promise<void> =>

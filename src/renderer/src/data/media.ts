@@ -3,7 +3,10 @@ type Bridge = typeof window.electronAPI.media
 export const getStorageInfo = (...args: Parameters<Bridge['getStorageInfo']>): ReturnType<Bridge['getStorageInfo']> =>
   window.electronAPI.media.getStorageInfo(...args)
 
-export const saveFilePaths = (...args: Parameters<Bridge['saveFilePaths']>): ReturnType<Bridge['saveFilePaths']> =>
+export const linkPreview = (...args: Parameters<Bridge['linkPreview']>): ReturnType<Bridge['linkPreview']> =>
+  window.electronAPI.media.linkPreview(...args)
+
+export const saveFilePaths =(...args: Parameters<Bridge['saveFilePaths']>): ReturnType<Bridge['saveFilePaths']> =>
   window.electronAPI.media.saveFilePaths(...args)
 
 export const saveFromBuffer = (...args: Parameters<Bridge['saveFromBuffer']>): ReturnType<Bridge['saveFromBuffer']> =>

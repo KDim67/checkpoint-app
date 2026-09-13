@@ -10,6 +10,8 @@ import {
   type WallItem,
   type WallItemKind
 } from '../../../shared/wallModel'
+import { normalizeLinkInput, parseWallLink } from '../../../shared/wallLink'
+import { fetchLinkPreview } from '../../linkPreview'
 import { recordMcpActivity } from '../../mcpActivity'
 import { context, json, notifyRenderer, text, z } from '../toolKit'
 
@@ -39,9 +41,11 @@ function describeWallItem(item: WallItem, titleOf: (item: WallItem) => string | 
     height: Math.round(item.height),
     ...(item.ref ? { ref: item.ref, title: titleOf(item) } : {}),
     ...(item.text ? { text: item.text } : {}),
+    ...(item.summary ? { summary: item.summary } : {}),
     ...(item.color ? { color: item.color } : {}),
     ...(item.rotation ? { rotation: item.rotation } : {}),
-    ...(item.locked ? { locked: true } : {})
+    ...(item.locked ? { locked: true } : {}),
+    ...(item.link ? { link: item.link } : {})
   }
 }
 
@@ -97,22 +101,41 @@ export function registerWallTools(mcp: McpServer): void {
     'place_on_wall',
     {
       description:
-        "Put something on a wall. 'note' is a sticky note and 'text' a bare label; both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. x and y are where the item is CENTRED, not its top-left corner, so the coordinates that come back are offset by half its size. Both are optional and default to the origin.",
+        "Put something on a wall. 'note' is a sticky note and 'text' a bare label; both take text. 'card' and 'doc' are references: give ref an item id or a note title, and the wall shows the live thing rather than a copy. 'frame' is a labelled region. 'bookmark' is a card for a web page: give link, and the page's title, description and icon are read before it is placed. x and y are where the item is CENTRED, not its top-left corner, so the coordinates that come back are offset by half its size. Both are optional and default to the origin. link makes the item open a web address, or jump to another item when given wall:<wall_id>/<item_id> using ids from list_walls and get_wall.",
       inputSchema: {
         context,
         wall_id: z.string().optional(),
-        kind: z.enum(['note', 'text', 'frame', 'card', 'doc']),
+        kind: z.enum(['note', 'text', 'frame', 'card', 'doc', 'bookmark']),
         text: z.string().optional().describe('Body for note and text; the label for frame.'),
         ref: z.string().optional().describe('Item id for kind=card, note title for kind=doc.'),
         x: z.number().optional(),
         y: z.number().optional(),
-        color: z.string().optional().describe('Hex, e.g. #f6c453.')
+        color: z.string().optional().describe('Hex, e.g. #f6c453.'),
+        link: z.string().optional().describe('A web address like https://example.com, or wall:<wall_id>/<item_id>.')
       }
     },
-    async ({ context: ctx, wall_id, kind, text: body, ref, x, y, color }) => {
+    async ({ context: ctx, wall_id, kind, text: body, ref, x, y, color, link }) => {
       if ((kind === 'card' || kind === 'doc') && !ref) {
         return text(`kind '${kind}' is a reference and needs ref: an item id for a card, a note title for a doc.`)
       }
+      // stored as the Wall would store it, or refused before anything is written
+      const itemLinkValue = link ? normalizeLinkInput(link) : null
+      if (link && !itemLinkValue) {
+        return text(`link '${link}' is neither a web address nor a wall:<wall_id>/<item_id> link.`)
+      }
+      const page = parseWallLink(itemLinkValue)
+      if (kind === 'bookmark' && page?.type !== 'url') {
+        return text("kind 'bookmark' needs link: a web address like https://example.com.")
+      }
+      // read before placing so the card arrives whole; a page that won't load still gets a plain card
+      const preview = kind === 'bookmark' && page?.type === 'url' ? await fetchLinkPreview(page.url) : null
+      const bookmark: Partial<WallItem> = kind === 'bookmark' && page?.type === 'url'
+        ? {
+            text: body || preview?.title || page.host,
+            ...(preview?.description ? { summary: preview.description } : {}),
+            ...(preview?.icon ? { ref: preview.icon } : {})
+          }
+        : {}
       // a missing ref renders as "(missing)" and looks like a bug
       if (kind === 'card' && !getItemById(ref as string)) {
         return text(`No card with id '${ref}'. Use get_board or search_items to find one.`)
@@ -124,7 +147,7 @@ export function registerWallTools(mcp: McpServer): void {
         kind as WallItemKind,
         { x: x ?? 0, y: y ?? 0 },
         doc.items,
-        { ...(body ? { text: body } : {}), ...(ref ? { ref } : {}), ...(color ? { color } : {}) }
+        { ...(body ? { text: body } : {}), ...(ref ? { ref } : {}), ...(color ? { color } : {}), ...(itemLinkValue ? { link: itemLinkValue } : {}), ...bookmark }
       )
 
       setSetting(wall.key, { ...doc, items: [...doc.items, created] })

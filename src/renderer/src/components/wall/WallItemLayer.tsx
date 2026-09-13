@@ -1,5 +1,5 @@
 import React from 'react'
-import { Lock, RotateCw } from 'lucide-react'
+import { ExternalLink, Link2, Lock, RotateCw } from 'lucide-react'
 import type { WallItem } from '../../../../shared/wallModel'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
@@ -19,10 +19,21 @@ interface Props {
   arrowFrom: boolean
   onTextChange: (id: string, text: string) => void
   onFinishEditing: () => void
+  /** primitives, an object per render would undo the memo */
+  linkLabel?: string
+  linkMissing?: boolean
+  linkExternal?: boolean
+  onFollowLink: (link: string) => void
+  previewing?: boolean
 }
 
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
-function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing }: Props) {
+  const link = item.link
+  const linkTitle = linkMissing
+    ? `${linkLabel}. Edit the link to point somewhere else.`
+    : linkExternal ? `Open ${link}` : `Go to ${linkLabel}`
+
   return (
     <div
       data-wall-item={item.id}
@@ -53,7 +64,25 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         editing={editing}
         onTextChange={onTextChange}
         onFinishEditing={onFinishEditing}
+        previewing={previewing}
       />
+
+      {/* under the item, a frame's label already owns the top edge */}
+      {link && linkLabel !== undefined && (
+        <button
+          type="button"
+          data-wall-link
+          data-missing={linkMissing || undefined}
+          className="wall-link-chip"
+          title={linkTitle}
+          aria-label={linkTitle}
+          onClick={() => onFollowLink(link)}
+          style={{ position: 'absolute', left: 0, top: '100%', marginTop: '6px' }}
+        >
+          {linkExternal ? <ExternalLink size={11} /> : <Link2 size={11} />}
+          <span className="truncate">{linkLabel}</span>
+        </button>
+      )}
 
       {item.locked && (
         <div className="wall-lock-selected" style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>

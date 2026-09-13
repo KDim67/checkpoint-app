@@ -1,7 +1,9 @@
 import type { Dispatch, Ref, SetStateAction } from 'react'
-import { Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock } from 'lucide-react'
+import { Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Link2 } from 'lucide-react'
 import { bringToFront, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallItem } from '../../../../shared/wallModel'
+import { isLinkable } from '../../../../shared/wallLink'
 import WallColorPicker from './WallColorPicker'
+import WallLinkEditor from './WallLinkEditor'
 import { toolButton, arrowStyleButtons } from './wallButtons'
 
 interface WallSelectionBarProps {
@@ -9,7 +11,11 @@ interface WallSelectionBarProps {
   floatingRef: Ref<HTMLDivElement>
   swatchOpen: boolean
   setSwatchOpen: Dispatch<SetStateAction<boolean>>
+  linkOpen: boolean
+  setLinkOpen: Dispatch<SetStateAction<boolean>>
   single: WallItem | null
+  /** how the single item's link reads on its chip */
+  linkLabel?: string
   arrowsSelected: boolean
   items: WallItem[]
   selectedIds: Set<string>
@@ -18,11 +24,22 @@ interface WallSelectionBarProps {
   duplicateSelected: () => void
   toggleLock: () => void
   removeSelected: () => void
+  setItemLink: (id: string, link: string | undefined) => void
+  startLinkPick: (id: string) => void
+  followLink: (link: string) => void
 }
 
+const popover = {
+  position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 42,
+  background: 'var(--color-surface-elevated)',
+  border: '1px solid var(--color-surface-offset)',
+  borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
+} as const
+
 export default function WallSelectionBar({
-  floatingPos, floatingRef, swatchOpen, setSwatchOpen, single, arrowsSelected, items, selectedIds,
-  setItems, setEditingId, duplicateSelected, toggleLock, removeSelected
+  floatingPos, floatingRef, swatchOpen, setSwatchOpen, linkOpen, setLinkOpen, single, linkLabel,
+  arrowsSelected, items, selectedIds, setItems, setEditingId, duplicateSelected, toggleLock,
+  removeSelected, setItemLink, startLinkPick, followLink
 }: WallSelectionBarProps) {
   return (
     <div ref={floatingRef} data-wall-ui style={{
@@ -40,7 +57,7 @@ export default function WallSelectionBar({
       {/* one swatch, the full palette is one click in; laid out flat it covered the selection */}
       <div data-wall-swatch className="relative">
         <button
-          onClick={() => setSwatchOpen(v => !v)}
+          onClick={() => { setLinkOpen(false); setSwatchOpen(v => !v) }}
           title="Colour"
           aria-label="Colour"
           aria-expanded={swatchOpen}
@@ -65,13 +82,7 @@ export default function WallSelectionBar({
         </button>
 
         {swatchOpen && (
-          <div style={{
-            position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 42,
-            padding: 'var(--space-2)', width: '146px',
-            background: 'var(--color-surface-elevated)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
-          }}>
+          <div style={{ ...popover, padding: 'var(--space-2)', width: '146px' }}>
             <WallColorPicker
               colors={WALL_COLORS}
               value={single?.color}
@@ -85,6 +96,31 @@ export default function WallSelectionBar({
         )}
       </div>
       <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
+      {/* one item, one link; locked items keep theirs like their text */}
+      {single && isLinkable(single.kind) && (
+        <div className="relative">
+          {toolButton(
+            single.link ? 'Edit link' : 'Add a link',
+            <Link2 size={13} />,
+            () => { setSwatchOpen(false); setLinkOpen(v => !v) },
+            { active: linkOpen, disabled: single.locked }
+          )}
+          {linkOpen && !single.locked && (
+            <div style={{ ...popover, padding: 'var(--space-3)', width: '300px' }}>
+              <WallLinkEditor
+                key={single.id}
+                link={single.link}
+                label={linkLabel}
+                onSave={link => setItemLink(single.id, link)}
+                onRemove={() => setItemLink(single.id, undefined)}
+                onPick={() => startLinkPick(single.id)}
+                onOpen={followLink}
+                onClose={() => setLinkOpen(false)}
+              />
+            </div>
+          )}
+        </div>
+      )}
       {arrowsSelected && arrowStyleButtons(
         single?.arrowShape ?? ARROW_SHAPES[0],
         single?.arrowLine ?? ARROW_LINES[0],
