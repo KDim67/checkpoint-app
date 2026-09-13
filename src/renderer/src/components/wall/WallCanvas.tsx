@@ -3,6 +3,7 @@ import WallItemLayer from './WallItemLayer'
 import WallMinimap from './WallMinimap'
 import { decodeWallDrag, WALL_DRAG_MIME } from '../../../../shared/wallBoard'
 import WallSelectionBar from './WallSelectionBar'
+import { WALL_GUIDE_SLOTS } from './wallPaint'
 import WallPenSettings from './WallPenSettings'
 import { describeLink, isLinkable, pastedLink } from '../../../../shared/wallLink'
 import type { WallViewState } from './useWallView'
@@ -18,7 +19,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     removeSelected, duplicateSelected, toggleLock, openCard, placeImageFiles, screenPoint, onWheel,
     arrowAt, onPointerDown, onPointerMove, onPointerLeave, endDrag, camera, canvasBackground, dotColor, floatingRef,
     floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
-    wallIndex, activeWall, labelOf, previewing, addBookmark
+    wallIndex, activeWall, labelOf, previewing, addBookmark, growFrom
   } = wallView
 
   /** the chip's words, from this wall's items and the wall list */
@@ -244,6 +245,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               onTextChange={onItemTextChange}
               onFinishEditing={onItemFinishEditing}
               onAutoSize={onItemAutoSize}
+              onGrow={growFrom}
               linkLabel={link?.label}
               linkMissing={link?.missing}
               linkExternal={link?.external}
@@ -252,6 +254,11 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             />
           )
         })}
+
+        {/* lines a drag snaps to, shown and placed by hand while moving */}
+        {WALL_GUIDE_SLOTS.map(slot => (
+          <div key={slot} data-wall-guide={slot} className="wall-guide" style={{ display: 'none' }} />
+        ))}
       </div>
 
       {/* labels above lines and items; arrow labels live in text like frames */}

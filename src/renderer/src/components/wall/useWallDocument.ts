@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, withFrameContents, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
 import { errorMessage } from '../../../../shared/errors'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import type { RailTab } from './WallBoardRail'
-import { planHandoff } from '../../../../shared/wallBoard'
+import { appendPosition, planHandoff } from '../../../../shared/wallBoard'
+import { cardFromText, isWritable } from '../../../../shared/wallShape'
 import { loadBoardConfig } from '../../lib/boardConfig'
 import { getBoolSetting, getNumberSetting, getEnumSetting, setBoolSetting } from '../../lib/settings'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
 import { PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES, type PanButtons, type MenuButton } from '../../lib/wallInput'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
-import { updateItem, itemPage } from '../../data/items'
+import { createItem, deleteItem, updateItem, itemPage } from '../../data/items'
 import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, clampRail } from './wallPreferences'
 import * as notesApi from '../../data/notes'
 import * as mediaApi from '../../data/media'
@@ -22,6 +23,8 @@ import * as appApi from '../../data/app'
 import { itemLink, parseWallLink } from '../../../../shared/wallLink'
 import { applyStyle, placeClip, styleOf, type WallClip } from '../../../../shared/wallClipboard'
 import { rememberStyle, rememberedStyle } from './wallClipboardMemory'
+import { cameraShowing, grownItem, type Side } from '../../../../shared/wallGrow'
+import { cellStickies, MAX_CELLS } from '../../lib/wallCells'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
@@ -104,7 +107,7 @@ export function useWallDocument() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<WallDrag>(null)
   /** newest pointer position; a 1000Hz mouse fires ~16 moves a frame */
-  const pendingMoveRef = useRef<{ clientX: number; clientY: number; shiftKey: boolean } | null>(null)
+  const pendingMoveRef = useRef<{ clientX: number; clientY: number; shiftKey: boolean; ctrlKey: boolean } | null>(null)
   const moveFrameRef = useRef<number | null>(null)
   /** pan camera ahead of state; through state every item re-rendered for a moved view */
   const panCameraRef = useRef<WallCamera | null>(null)
@@ -365,12 +368,14 @@ export function useWallDocument() {
   }, [pendingDelete, wallIndex, activeWorkspace, commitIndex])
 
   /** record: false for drag frames, one undo step per gesture */
-  const setItems = useCallback((items: WallItem[], { record = true } = {}) => {
+  const setItems = useCallback((items: WallItem[], { record = true, camera }: { record?: boolean; camera?: WallCamera } = {}) => {
     historyRef.current = record
       ? pushHistory(historyRef.current, items)
       : replacePresent(historyRef.current, items)
     if (record) setHistoryTick(t => t + 1)
-    write({ ...docRef.current, items })
+    // in the same write, a setCamera after this would start from the doc without these items
+    if (camera) panCameraRef.current = null
+    write({ ...docRef.current, items, ...(camera ? { camera } : {}) })
   }, [write])
 
   const setCamera = useCallback((camera: WallCamera) => {
@@ -420,8 +425,26 @@ export function useWallDocument() {
     })
     setItems([...items, created])
     setSelectedIds(new Set([created.id]))
-    if (kind === 'note' || kind === 'text' || kind === 'frame') setEditingId(created.id)
+    if (kind === 'note' || kind === 'text' || kind === 'frame' || kind === 'shape') setEditingId(created.id)
   }, [centreOfView, setItems])
+
+  /** joined to the source when given an arrow's style; panned into view first, the editor's focus would scroll the wall */
+  const growFrom = useCallback((sourceId: string, side: Side, arrow?: Partial<WallItem>) => {
+    const items = docRef.current.items
+    const source = items.find(i => i.id === sourceId)
+    if (!source) return
+    const grown = grownItem(items, source, side)
+    const added = arrow
+      ? [grown, createWallItem('arrow', { x: grown.x, y: grown.y }, [...items, grown], { ...arrow, from: source.id, to: grown.id })]
+      : [grown]
+
+    const rect = viewportRef.current?.getBoundingClientRect()
+    const camera = panCameraRef.current ?? docRef.current.camera
+    const shown = rect ? cameraShowing(camera, { width: rect.width, height: rect.height }, grown) : camera
+    setItems([...items, ...added], { camera: shown === docRef.current.camera ? undefined : shown })
+    setSelectedIds(new Set([grown.id]))
+    setEditingId(grown.id)
+  }, [setItems])
 
   const removeSelected = useCallback(() => {
     const ids = selectedRef.current
@@ -619,6 +642,20 @@ export function useWallDocument() {
     setSelectedIds(new Set(placed.map(i => i.id)))
   }, [cardsById, pastePoint, setItems, toast])
 
+  /** a spreadsheet range, a sticky a cell in the grid they sat in */
+  const pasteCells = useCallback((rows: string[][]) => {
+    const filled = rows.flat().filter(cell => cell.trim()).length
+    if (filled > MAX_CELLS) {
+      toast(`That's ${filled} cells, more than the ${MAX_CELLS} one paste turns into stickies. Copy a smaller range.`)
+      return
+    }
+    const items = docRef.current.items
+    const made = cellStickies(rows, pastePoint(), items)
+    setItems([...items, ...made])
+    setEditingId(null)
+    setSelectedIds(new Set(made.map(i => i.id)))
+  }, [pastePoint, setItems, toast])
+
   /** takes a frame's contents too, the same set the copy carried */
   const cutSelected = useCallback(() => {
     const items = docRef.current.items
@@ -653,6 +690,71 @@ export function useWallDocument() {
     if (selectedRef.current.size === 0) return
     setItems(applyStyle(docRef.current.items, selectedRef.current, style))
   }, [setItems, toast])
+
+  /** each becomes a real card at the end of the board's first column, and stays on the wall as that card */
+  const makeCards = useCallback(async () => {
+    const column = columns[0]
+    if (!column) {
+      toast('Add a column to the board first, a card needs somewhere to go.')
+      return
+    }
+    const sources = docRef.current.items.filter(i => selectedRef.current.has(i.id) && isWritable(i.kind) && !i.locked)
+    if (sources.length === 0) return
+
+    const made: { source: WallItem; card: Item }[] = []
+    let position = appendPosition(cards.filter(c => c.status === column.id))
+    try {
+      for (const source of sources) {
+        const { title, body } = cardFromText(source.text ?? '')
+        const card = await createItem({
+          type: 'card', context: activeWorkspace, title, body, status: column.id,
+          priority: 0, position, due_at: null, metadata: '{}'
+        })
+        made.push({ source, card })
+        // the board's gap, so the cards keep the order they were picked in
+        position += 1000
+      }
+    } catch (err) {
+      toast(`Could not make ${made.length === 0 ? 'the card' : 'every card'}: ${errorMessage(err)}`, { type: 'error' })
+    }
+    if (made.length === 0) return
+
+    setCards(prev => [...prev, ...made.map(m => m.card)])
+    const cardFor = new Map(made.map(m => [m.source.id, m.card]))
+    const size = DEFAULT_SIZES.card
+    setItems(docRef.current.items.map((item): WallItem => {
+      const card = cardFor.get(item.id)
+      if (!card) return item
+      // the same id, so arrows to the sticky point at its card now
+      return {
+        id: item.id,
+        kind: 'card',
+        ref: card.id,
+        x: item.x + item.width / 2 - size.width / 2,
+        y: item.y + item.height / 2 - size.height / 2,
+        width: size.width,
+        height: size.height,
+        z: item.z,
+        ...(item.rotation ? { rotation: item.rotation } : {}),
+        ...(item.link ? { link: item.link } : {}),
+        ...(item.group ? { group: item.group } : {})
+      }
+    }))
+
+    const sourceById = new Map(made.map(m => [m.source.id, m.source]))
+    toast(`Made ${made.length} card${made.length === 1 ? '' : 's'} in ${column.name}.`, {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          // the cards only just exist, nothing on the board can depend on them yet
+          Promise.all(made.map(m => deleteItem(m.card.id)))
+            .catch(err => toast(`Could not remove the cards: ${errorMessage(err)}`, { type: 'error' }))
+          setCards(prev => prev.filter(c => !made.some(m => m.card.id === c.id)))
+          setItems(docRef.current.items.map(item => sourceById.get(item.id) ?? item))
+        }
+      }
+    })
+  }, [columns, cards, activeWorkspace, setItems, toast])
 
   const placeImageFiles = useCallback(async (files: File[], at?: { x: number; y: number }) => {
     const images = files.filter(f => f.type.startsWith('image/'))
@@ -784,6 +886,8 @@ export function useWallDocument() {
     onItemTextChange,
     onItemFinishEditing,
     onItemAutoSize,
+    growFrom,
+    pasteCells,
     applyHistory,
     addItem,
     removeSelected,
@@ -808,7 +912,8 @@ export function useWallDocument() {
     pasteClip,
     cutSelected,
     copyStyle,
-    pasteStyle
+    pasteStyle,
+    makeCards
   }
 }
 

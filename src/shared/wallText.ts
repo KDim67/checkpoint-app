@@ -165,3 +165,9 @@ export function continueList(value: string, caret: number): { value: string; car
   const insert = `\n${indent}${next} `
   return { value: value.slice(0, caret) + insert + value.slice(caret), caret: caret + insert.length }
 }
+
+/** where Tab means a level: a list item, or a line already indented */
+export function takesIndent(value: string, at: number): boolean {
+  const line = value.slice(lineStartOf(value, at), lineEndOf(value, at))
+  return LIST_ITEM.test(line) || /^[ \t]/.test(line)
+}

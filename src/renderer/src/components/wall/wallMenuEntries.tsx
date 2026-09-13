@@ -1,7 +1,18 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket } from 'lucide-react'
+import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket, Shapes, KanbanSquare, Group, Ungroup } from 'lucide-react'
 import { bringToFront, createWallItem, sendToBack, type WallDoc, type WallItem, type WallItemKind } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
+import { isWritable, switchKinds, type WritableKind } from '../../../../shared/wallShape'
+import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
+
+const TURN_INTO: { kind: WritableKind; label: string }[] = [
+  { kind: 'note', label: 'Turn into a sticky note' },
+  { kind: 'text', label: 'Turn into text' },
+  { kind: 'shape', label: 'Turn into a shape' }
+]
+
+const kindIcon = (kind: WritableKind) =>
+  kind === 'note' ? <StickyNote size={13} /> : kind === 'text' ? <Type size={13} /> : <Shapes size={13} />
 import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImageOps'
 import type { useToast } from '../ui/Toast'
 import type { MenuEntry } from './WallContextMenu'
@@ -37,6 +48,7 @@ export interface WallMenuContext {
   canPasteStyle: boolean
   pasteHere: (at: { x: number; y: number }) => void
   canPaste: boolean
+  makeCards: () => Promise<void>
 }
 
 /** item menu for an item, canvas menu for a spot */
@@ -45,7 +57,7 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
     duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast,
     followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor, copyItems, cutItems,
-    copyStyle, pasteStyle, canPasteStyle, pasteHere, canPaste
+    copyStyle, pasteStyle, canPasteStyle, pasteHere, canPaste, makeCards
   } = ctx
   if (!menu) return []
 
@@ -120,12 +132,32 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
             : [])
         ]
 
+    // turning into another kind or a card needs every picked item to hold words
+    const chosen = doc.items.filter(i => selectedIds.has(i.id))
+    const writable = chosen.length > 0 && chosen.every(i => isWritable(i.kind) && !i.locked)
+    const kindEntries: MenuEntry[] = writable
+      ? [
+          ...TURN_INTO
+            .filter(({ kind }) => !chosen.every(i => i.kind === kind))
+            .map(({ kind, label }) => ({ label, icon: kindIcon(kind), onClick: () => setItems(switchKinds(doc.items, selectedIds, kind)) })),
+          { label: many ? `Make ${selectedIds.size} cards` : 'Make a card', icon: <KanbanSquare size={13} />, onClick: () => void makeCards() }
+        ]
+      : []
+
+    const { canGroup, canUngroup } = groupState(doc.items, selectedIds)
+    const groupEntries: MenuEntry[] = [
+      ...(canGroup ? [{ label: 'Group', icon: <Group size={13} />, onClick: () => setItems(groupItems(doc.items, selectedIds)) }] : []),
+      ...(canUngroup ? [{ label: 'Ungroup', icon: <Ungroup size={13} />, onClick: () => setItems(ungroupItems(doc.items, selectedIds)) }] : [])
+    ]
+
     return [
       ...imageOps,
       ...(item.kind === 'card' && !many
         ? [{ label: 'Open card', icon: <ExternalLink size={13} />, onClick: () => openCard(item) }]
         : []),
       ...linkEntries,
+      ...kindEntries,
+      ...groupEntries,
       { label: many ? `Copy ${selectedIds.size} items` : 'Copy', icon: <ClipboardCopy size={13} />, hint: 'Ctrl C', onClick: copyItems },
       { label: many ? `Cut ${selectedIds.size} items` : 'Cut', icon: <Scissors size={13} />, hint: 'Ctrl X', onClick: cutItems },
       ...(many ? [] : [{ label: 'Copy style', icon: <Paintbrush size={13} />, onClick: copyStyle }]),
@@ -145,6 +177,7 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
   return [
     { label: 'Sticky note here', icon: <StickyNote size={13} />, onClick: () => addItem('note', {}, menu.at) },
     { label: 'Text here', icon: <Type size={13} />, onClick: () => addItem('text', {}, menu.at) },
+    { label: 'Shape here', icon: <Shapes size={13} />, onClick: () => addItem('shape', {}, menu.at) },
     { label: 'Frame here', icon: <Square size={13} />, onClick: () => addItem('frame', {}, menu.at) },
     { label: 'Paste here', icon: <ClipboardPaste size={13} />, hint: 'Ctrl V', onClick: () => pasteHere(menu.at), disabled: !canPaste },
     { label: 'Select all', icon: <Layers size={13} />, hint: 'Ctrl A', onClick: () => setSelectedIds(new Set(doc.items.filter(i => !i.locked).map(i => i.id))) },

@@ -2,39 +2,54 @@
 
 import React, { useLayoutEffect, useRef } from 'react'
 import { FileQuestion, FileText, Globe } from 'lucide-react'
-import { inkNaturalSize, inkPath, type WallItem } from '../../../../shared/wallModel'
+import { inkNaturalSize, inkPath, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
+import { shapeOutline, shapeTextBox } from '../../../../shared/wallShape'
+import { getTextColorForBackground } from '../../lib/contrast'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import { parseWallLink } from '../../../../shared/wallLink'
 import WallRichText from './WallRichText'
 import WallTextEditor from './WallTextEditor'
+import type { Side } from '../../../../shared/wallGrow'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
 const NOTE_FONT = 13
-const NOTE_FONT_MIN = 8
+const SHAPE_FONT = 14
+const FIT_FONT_MIN = 8
 
-/** shrinks to fit instead of clipping the last lines, never past the default size; set on the element, no re-render */
-function NoteText({ text, width, height }: { text?: string; width: number; height: number }) {
+/** shrinks to fit instead of clipping the last lines, never past its size; set on the element, no re-render */
+function FittedText({ text, width, height, base, color, centred = false }: {
+  text?: string
+  width: number
+  height: number
+  base: number
+  color: string
+  centred?: boolean
+}) {
   const ref = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    let size = NOTE_FONT
+    let size = base
     el.style.fontSize = `${size}px`
-    // one measure for a note that fits, which is most of them
-    while (size > NOTE_FONT_MIN && el.scrollHeight > el.clientHeight + 1) {
+    // one measure for words that fit, which is most of them
+    while (size > FIT_FONT_MIN && el.scrollHeight > el.clientHeight + 1) {
       size -= 1
       el.style.fontSize = `${size}px`
     }
-  }, [text, width, height])
+  }, [text, width, height, base])
 
   return (
     <div ref={ref} style={{
-      color: '#1a1a1a', lineHeight: 1.45, overflow: 'hidden',
-      whiteSpace: 'pre-wrap', wordBreak: 'break-word', height: '100%'
+      display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
+      color, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      textAlign: centred ? 'center' : undefined
     }}>
-      {text ? <WallRichText text={text} /> : <span style={{ opacity: 0.45 }}>Double-click to write</span>}
+      {/* auto margins centre it, and give way to the top once the words overflow */}
+      <div style={centred ? { marginTop: 'auto', marginBottom: 'auto' } : undefined}>
+        {text ? <WallRichText text={text} /> : <span style={{ opacity: 0.45 }}>Double-click to write</span>}
+      </div>
     </div>
   )
 }
@@ -74,9 +89,12 @@ interface Props {
   previewing?: boolean
   /** a text box reporting the height of its words */
   onAutoSize?: (id: string, height: number) => void
+  /** Tab while writing, the next item beside this one */
+  onGrow?: (id: string, side: Side) => void
 }
 
-function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize }: Props) {
+function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize, onGrow }: Props) {
+  const onNext = onGrow && ((side: Side) => onGrow(item.id, side))
   const base: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -100,6 +118,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             value={item.text ?? ''}
             onChange={text => onTextChange(item.id, text)}
             onFinish={onFinishEditing}
+            onNext={onNext}
             style={{
               width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
               outline: 'none', background: 'transparent', color: '#1a1a1a',
@@ -107,7 +126,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             }}
           />
         ) : (
-          <NoteText text={item.text} width={item.width} height={item.height} />
+          <FittedText text={item.text} width={item.width} height={item.height} base={NOTE_FONT} color="#1a1a1a" />
         )}
       </div>
     )
@@ -126,6 +145,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             value={item.text ?? ''}
             onChange={text => onTextChange(item.id, text)}
             onFinish={onFinishEditing}
+            onNext={onNext}
             onHeight={height => onAutoSize?.(item.id, height)}
             style={{
               ...textStyle, display: 'block', width: '100%', height: '100%', padding: 0,
@@ -135,6 +155,54 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         ) : (
           <TextBox item={item} style={textStyle} onAutoSize={onAutoSize} />
         )}
+      </div>
+    )
+  }
+
+  // words in an outline; the fill picks the letters' colour, so either theme reads
+  if (item.kind === 'shape') {
+    const outline = item.shape ?? SHAPE_TYPES[0]
+    const fill = item.color
+    const color = fill ? getTextColorForBackground(fill) : 'var(--color-text-base)'
+    const room = shapeTextBox(outline)
+    return (
+      <div style={{ ...base, position: 'relative', overflow: 'visible' }}>
+        {/* the item's own box as viewBox, so rounded corners stay round when it's stretched */}
+        <svg
+          aria-hidden
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${item.width} ${item.height}`}
+          style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+        >
+          <path
+            d={shapeOutline(outline, item.width, item.height)}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            // presentation attributes can't read CSS variables, style can
+            style={{
+              fill: fill || 'var(--color-surface-1)',
+              stroke: fill ? 'rgba(0, 0, 0, 0.25)' : 'var(--color-text-muted)'
+            }}
+          />
+        </svg>
+        <div style={{ position: 'absolute', top: `${room.top}%`, right: `${room.right}%`, bottom: `${room.bottom}%`, left: `${room.left}%` }}>
+          {editing ? (
+            <WallTextEditor
+              value={item.text ?? ''}
+              onChange={text => onTextChange(item.id, text)}
+              onFinish={onFinishEditing}
+              onNext={onNext}
+              style={{
+                width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
+                outline: 'none', background: 'transparent', color, textAlign: 'center',
+                fontFamily: 'var(--font-sans)', fontSize: `${SHAPE_FONT}px`, lineHeight: 1.45
+              }}
+            />
+          ) : (
+            <FittedText text={item.text} width={item.width} height={item.height} base={SHAPE_FONT} color={color} centred />
+          )}
+        </div>
       </div>
     )
   }

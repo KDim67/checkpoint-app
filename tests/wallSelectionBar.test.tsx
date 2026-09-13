@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import WallSelectionBar from '../src/renderer/src/components/wall/WallSelectionBar'
 import { bringToFront, patchItems, sendToBack, type WallItem } from '../src/shared/wallModel'
+import { alignItems, distributeItems } from '../src/shared/wallAlign'
+import { ungroupItems } from '../src/shared/wallGroup'
 
 afterEach(cleanup)
 
@@ -148,6 +150,19 @@ describe('WallSelectionBar', () => {
     expect(startLinkPick).toHaveBeenCalledWith('a')
   })
 
+  it('cycles the outline of every selected shape, and shows the button only for shapes', () => {
+    renderBar()
+    expect(screen.queryByLabelText('Shape: Rectangle')).toBeNull()
+    cleanup()
+
+    const shapes = [item('a', { kind: 'shape' }), item('b', { kind: 'shape', shape: 'oval' })]
+    const both = new Set(['a', 'b'])
+    const { setItems } = renderBar({ items: shapes, selectedIds: both })
+    fireEvent.click(button('Shape: Rectangle'))
+
+    expect(setItems).toHaveBeenCalledWith(patchItems(shapes, both, { shape: 'rounded' }))
+  })
+
   it('keeps a locked item\'s link as it is, and offers none for several items or an arrow', () => {
     const locked = item('a', { locked: true, link: 'https://example.com/' })
     renderBar({ items: [locked], selectedIds: new Set(['a']), single: locked })
@@ -161,5 +176,50 @@ describe('WallSelectionBar', () => {
     const arrow = item('a', { kind: 'arrow' })
     renderBar({ items: [arrow], selectedIds: new Set(['a']), single: arrow, arrowsSelected: true })
     expect(screen.queryByLabelText('Add a link')).toBeNull()
+  })
+
+  it('lines up and spaces out several items from the Align menu', () => {
+    const wall = [
+      item('a', { x: 0, y: 0, width: 100, height: 100 }),
+      item('b', { x: 300, y: 40, width: 100, height: 100 }),
+      item('c', { x: 900, y: 10, width: 100, height: 100 })
+    ]
+    const all = new Set(['a', 'b', 'c'])
+    const { setItems } = renderBar({ items: wall, selectedIds: all })
+
+    fireEvent.click(button('Align'))
+    fireEvent.click(button('Align top edges'))
+    fireEvent.click(button('Distribute horizontally'))
+
+    expect(setItems).toHaveBeenNthCalledWith(1, alignItems(wall, all, 'top'))
+    expect(setItems).toHaveBeenNthCalledWith(2, distributeItems(wall, all, 'horizontal'))
+  })
+
+  it('offers Align for two pieces or more, and spacing out for three', () => {
+    const note = item('a', { x: 0, y: 0, width: 100, height: 100 })
+    renderBar({ items: [note], selectedIds: new Set(['a']), single: note })
+    expect(screen.queryByLabelText('Align')).toBeNull()
+    cleanup()
+
+    const pair = [note, item('b', { x: 300, y: 0, width: 100, height: 100 })]
+    renderBar({ items: pair, selectedIds: new Set(['a', 'b']) })
+    fireEvent.click(button('Align'))
+    expect(button('Distribute horizontally').disabled).toBe(true)
+  })
+
+  it('groups loose items, and ungroups a group', () => {
+    const { setItems } = renderBar()
+    fireEvent.click(button('Group'))
+    const grouped = setItems.mock.calls[0][0]
+    expect(new Set(grouped.filter(i => i.id !== 'c').map(i => i.group)).size).toBe(1)
+    expect(grouped.find(i => i.id === 'a')?.group).toBeDefined()
+    expect(grouped.find(i => i.id === 'c')?.group).toBeUndefined()
+    cleanup()
+
+    const pair = [item('a', { group: 'g' }), item('b', { group: 'g' })]
+    const { setItems: again } = renderBar({ items: pair, selectedIds: new Set(['a', 'b']) })
+    expect(screen.queryByLabelText('Group')).toBeNull()
+    fireEvent.click(button('Ungroup'))
+    expect(again).toHaveBeenCalledWith(ungroupItems(pair, new Set(['a', 'b'])))
   })
 })

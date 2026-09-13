@@ -1,13 +1,16 @@
 import React, { useCallback, useLayoutEffect } from 'react'
-import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallCamera, type WallItem } from '../../../../shared/wallModel'
+import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
 import { arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedSize, rotationAngle, rotationStart, snapMoving } from '../../../../shared/wallPointer'
 import { pushHistory, replacePresent } from '../../../../shared/history'
 import { clipSelection, placeClip } from '../../../../shared/wallClipboard'
 import { exportWallToPng } from '../../lib/wallExport'
 import { itemLink } from '../../../../shared/wallLink'
+import { SIDES } from '../../../../shared/wallGrow'
+import { alignGuides, GUIDE_SNAP_PX, type Guide } from '../../../../shared/wallAlign'
+import { groupOf, withGroups } from '../../../../shared/wallGroup'
 import { errorMessage } from '../../../../shared/errors'
 import * as appApi from '../../data/app'
-import { paintWallCamera, paintWallItems, paintWallSelection } from './wallPaint'
+import { paintWallCamera, paintWallGuides, paintWallItems, paintWallSelection } from './wallPaint'
 import type { WallDocument } from './useWallDocument'
 
 /** travel still counted as a click */
@@ -26,7 +29,7 @@ export function useWallPointer(wallDocument: WallDocument) {
     dragRef, pendingMoveRef, moveFrameRef, panCameraRef, zoomCommitRef, liveItemsRef, marqueeRectRef,
     marqueeSelRef, paintedSelRef, movingRef, rightPressRef, railHoverRef, labelRef, docRef,
     selectedRef, historyRef, itemsById, single, activeWall, handOffToColumn, setItems, setCamera,
-    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef
+    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef, growFrom
   } = wallDocument
   const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -184,9 +187,10 @@ export function useWallPointer(wallDocument: WallDocument) {
     if (connectHandle && e.button === 0) {
       const fromId = connectHandle.dataset.wallConnect
       if (fromId) {
+        const side = SIDES.find(s => s === connectHandle.dataset.wallSide)
         dragRef.current = {
           mode: 'arrow', fromId,
-          startX: e.clientX, startY: e.clientY, moved: false, overId: null, viaHandle: true
+          startX: e.clientX, startY: e.clientY, moved: false, overId: null, viaHandle: true, side
         }
         setArrowDrag({ fromId, at: toWallPoint(screenPoint(e), docRef.current.camera), overId: null })
         return
@@ -243,7 +247,13 @@ export function useWallPointer(wallDocument: WallDocument) {
 
     if (id && item && e.button === 0) {
       if (item.locked) { setSelectedIds(new Set()); return }
-      const next = pressSelection(selectedRef.current, id, e.shiftKey)
+      const members = groupOf(docRef.current.items, id)
+      const selected = selectedRef.current
+      const next = pressSelection(selected, id, e.shiftKey, members)
+      // the group is already picked whole, so a click without a drag means this member
+      const narrowTo = !e.shiftKey && members.length > 1 && selected.size === members.length && members.every(m => selected.has(m))
+        ? id
+        : undefined
 
       // alt drags out a copy and leaves the originals where they are
       const clip = e.altKey && next.has(id) ? clipSelection(docRef.current.items, next) : null
@@ -263,7 +273,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       setSelectedIds(next)
       if (!e.shiftKey) setItems(bringToFront(docRef.current.items, id), { record: false })
       movingRef.current = withFrameContents(docRef.current.items, next)
-      dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: docRef.current.items, moved: false }
+      dragRef.current = { mode: 'move', startX: e.clientX, startY: e.clientY, origin: docRef.current.items, moved: false, narrowTo }
       return
     }
 
@@ -300,6 +310,18 @@ export function useWallPointer(wallDocument: WallDocument) {
     if (viewportRef.current) paintWallItems(viewportRef.current, items, ids)
   }
 
+  const paintGuides = (guides: Guide[], zoom: number): void => {
+    if (viewportRef.current) paintWallGuides(viewportRef.current, guides, zoom)
+  }
+
+  /** the part of the wall on screen */
+  const viewRect = (cam: WallCamera): Rect | undefined => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    return rect
+      ? rectFromPoints(toWallPoint({ x: 0, y: 0 }, cam), toWallPoint({ x: rect.width, y: rect.height }, cam))
+      : undefined
+  }
+
   // redraw after a mid-move render writes state positions back
   useLayoutEffect(() => {
     if (liveItemsRef.current) paintItems(liveItemsRef.current, movingRef.current)
@@ -308,7 +330,7 @@ export function useWallPointer(wallDocument: WallDocument) {
   })
 
   /** bare numbers so a position can be replayed later */
-  const applyPointerMove = (e: { clientX: number; clientY: number; shiftKey: boolean }) => {
+  const applyPointerMove = (e: { clientX: number; clientY: number; shiftKey: boolean; ctrlKey: boolean }) => {
     const drag = dragRef.current
     if (!drag) return
     // live camera, a recent zoom may not be state yet
@@ -371,7 +393,8 @@ export function useWallPointer(wallDocument: WallDocument) {
       const b = toWallPoint(p, cam)
       const hit = itemsInRect(docRef.current.items, rectFromPoints(a, b))
       // committed on release; state re-rendered outlines of every crossed item
-      const next = new Set([...drag.base, ...hit])
+      // touching one member sweeps up its group
+      const next = withGroups(docRef.current.items, new Set([...drag.base, ...hit]))
       paintSelection(next)
       marqueeSelRef.current = next
       return
@@ -406,10 +429,15 @@ export function useWallPointer(wallDocument: WallDocument) {
 
       const moving = movingRef.current
       const moved = moveItems(drag.origin, moving, dx, dy)
-      const live = snapMoving(moved, moving, snapping)
+      // the grid wins when it's on, and Ctrl moves freely
+      const guided = snapping || e.ctrlKey ? null : alignGuides(moved, moving, GUIDE_SNAP_PX / cam.zoom, viewRect(cam))
+      const live = guided && (guided.dx || guided.dy)
+        ? moveItems(moved, moving, guided.dx, guided.dy)
+        : snapMoving(moved, moving, snapping)
       // drawn by hand, committed on release like a pan
       liveItemsRef.current = live
       paintItems(live, moving)
+      paintGuides(guided?.guides ?? [], cam.zoom)
     } else {
       const size = resizedSize(drag.w, drag.h, dx, dy, snapping)
       setItems(
@@ -433,7 +461,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       press.moved = true
     }
     if (!dragRef.current) return
-    pendingMoveRef.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey }
+    pendingMoveRef.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey || e.metaKey }
     if (moveFrameRef.current !== null) return
     moveFrameRef.current = requestAnimationFrame(() => {
       moveFrameRef.current = null
@@ -452,6 +480,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       if (pending && dragRef.current) applyPointerMove(pending)
     }
     pendingMoveRef.current = null
+    paintGuides([], 1)
 
     // the hand-drawn pan becomes state here
     if (panCameraRef.current) {
@@ -505,6 +534,11 @@ export function useWallPointer(wallDocument: WallDocument) {
         travelled: Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY),
         armed: arrowFrom
       })
+      // joined in the style the next dragged arrow would have
+      if (release.grow && drag.side) {
+        growFrom(drag.fromId, drag.side, style)
+        return
+      }
       if (release.draw) {
         addItem('arrow', release.draw.to !== null
           ? { from: release.draw.from, to: release.draw.to, ...style }
@@ -547,6 +581,11 @@ export function useWallPointer(wallDocument: WallDocument) {
     if (drag?.mode === 'move' && drag.before && !drag.moved) {
       setItems(drag.before.items, { record: false })
       setSelectedIds(drag.before.selected)
+      return
+    }
+
+    if (drag?.mode === 'move' && !drag.moved && drag.narrowTo) {
+      setSelectedIds(new Set([drag.narrowTo]))
       return
     }
 

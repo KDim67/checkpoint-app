@@ -1,4 +1,4 @@
-import { StickyNote, Type, Square, Layers, Image as ImageIcon, Maximize2, Undo2, Redo2, Grid3x3, FileText, Download, PanelRight, PenLine, Spline, MousePointer2 } from 'lucide-react'
+import { StickyNote, Type, Shapes, Square, Layers, Image as ImageIcon, Maximize2, Undo2, Redo2, Grid3x3, FileText, Download, PanelRight, PenLine, Spline, MousePointer2 } from 'lucide-react'
 import { redo, undo } from '../../../../shared/history'
 import WallSwitcher from './WallSwitcher'
 import { panHintLabel } from '../../lib/wallInput'
@@ -49,6 +49,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
 
       {toolButton('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
       {toolButton('Text', <Type size={14} />, () => addItem('text'))}
+      {toolButton('Shape', <Shapes size={14} />, () => addItem('shape'))}
       {toolButton('Frame', <Square size={14} />, () => addItem('frame'))}
       {toolButton('Place a card', <Layers size={14} />, () => setPicker(p => (p === 'card' ? null : 'card')))}
       {toolButton('Place a note', <FileText size={14} />, () => setPicker(p => (p === 'doc' ? null : 'doc')))}

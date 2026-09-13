@@ -33,6 +33,9 @@ export const wallShortcutSections = (
       ['Double-click', 'New sticky note, or open what was clicked'],
       ['Shift-click', 'Add to or take from the selection'],
       ['Alt+drag', 'Drag out a copy'],
+      ['Click a grouped item again', 'Pick just that item out of its group'],
+      ['Ctrl while dragging', 'Move without lining up on other items'],
+      ['Click a connect dot', 'Add the next item on that side, joined by an arrow'],
       ['Ctrl+click', 'Follow an item\'s link, or an address in its text']
     ]
   },
@@ -44,8 +47,11 @@ export const wallShortcutSections = (
       [bindings.wall_duplicate || 'Unbound', 'Duplicate the selection'],
       [bindings.wall_link || 'Unbound', 'Link the selected item'],
       ['Ctrl+C, Ctrl+X, Ctrl+V', 'Copy, cut and paste under the pointer'],
+      ['Ctrl+V', 'Paste spreadsheet cells, a sticky each'],
       [bindings.wall_copy_style || 'Unbound', 'Copy style'],
       [bindings.wall_paste_style || 'Unbound', 'Paste style'],
+      [bindings.wall_group || 'Unbound', 'Group the selection'],
+      [bindings.wall_ungroup || 'Unbound', 'Ungroup'],
       ['Ctrl+A', 'Select everything unlocked'],
       // the bound key is a preference, Delete is a fact
       [bindings.wall_delete ? `${bindings.wall_delete} or Delete` : 'Delete', 'Remove the selection'],
@@ -63,6 +69,7 @@ export const wallShortcutSections = (
       ['Ctrl+E', 'Code'],
       ['- or 1. then Space', 'Start a list'],
       ['Tab or Shift+Tab', 'Indent or outdent a list item'],
+      ['Tab or Shift+Tab', 'Next item beside or below, outside a list'],
       ['Esc or Ctrl+Enter', 'Finish writing']
     ]
   }

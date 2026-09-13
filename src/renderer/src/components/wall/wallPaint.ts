@@ -2,8 +2,34 @@ import {
   arrowAnchors, arrowGeometry, arrowHeadInset, arrowHeadPoints, gridSpacing,
   ARROW_HEAD_MODES, ARROW_SHAPES, type WallCamera, type WallItem
 } from '../../../../shared/wallModel'
+import type { Guide } from '../../../../shared/wallAlign'
 
 /* painted onto the last render's elements; through React every move re-rendered the wall */
+
+/** three a direction, two edges and a centre can match at once */
+export const WALL_GUIDE_SLOTS = ['x0', 'x1', 'x2', 'y0', 'y1', 'y2'] as const
+
+/** one screen pixel thick at any zoom; a slot without a guide is hidden */
+export function paintWallGuides(viewport: HTMLElement, guides: Guide[], zoom: number): void {
+  const thick = 1 / zoom
+  for (const slot of WALL_GUIDE_SLOTS) {
+    const el = viewport.querySelector<HTMLElement>(`[data-wall-guide="${slot}"]`)
+    if (!el) continue
+    const axis = slot[0]
+    const guide = guides.filter(g => g.axis === axis)[Number(slot[1])]
+    if (!guide) {
+      el.style.display = 'none'
+      continue
+    }
+    const length = guide.to - guide.from
+    el.style.display = 'block'
+    el.style.transform = axis === 'x'
+      ? `translate(${guide.at - thick / 2}px, ${guide.from}px)`
+      : `translate(${guide.from}px, ${guide.at - thick / 2}px)`
+    el.style.width = `${axis === 'x' ? thick : length}px`
+    el.style.height = `${axis === 'x' ? length : thick}px`
+  }
+}
 
 export function paintWallCamera(viewport: HTMLElement, cam: WallCamera): void {
   const transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.zoom})`

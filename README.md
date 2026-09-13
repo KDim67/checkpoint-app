@@ -108,7 +108,7 @@ fix: renaming it would point an updated app at an empty folder.
 Backups to restore one. A copy of the current database is taken just before any
 restore, so a restore you didn't mean is undoable.
 
-**Keyboard.** `Ctrl+1` through `Ctrl+0` walk down the sidebar, `Ctrl+G` for the
+**Keyboard.** `Ctrl+1` through `Ctrl+0` walk down the sidebar, `Ctrl+-` for the
 game dev tools, `Ctrl+L` toggles the AI panel, `Ctrl+,` opens settings. All
 rebindable in Settings → Shortcuts.
 

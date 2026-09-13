@@ -72,6 +72,20 @@ describe('normalizeWallItem', () => {
     expect(defined(normalizeWallItem({ kind: 'ink', points: [0, 0, 10, 10], link: 'https://example.com/' }, 0)).link).toBeUndefined()
   })
 
+  it('keeps a shape\'s outline, leaving out the rectangle default and anything unknown', () => {
+    expect(defined(normalizeWallItem({ kind: 'shape', shape: 'diamond' }, 0)).shape).toBe('diamond')
+    expect(defined(normalizeWallItem({ kind: 'shape', shape: 'rectangle' }, 0))).not.toHaveProperty('shape')
+    expect(defined(normalizeWallItem({ kind: 'shape', shape: 'hexagon' }, 0))).not.toHaveProperty('shape')
+    // only shapes have an outline
+    expect(defined(normalizeWallItem({ kind: 'note', shape: 'oval' }, 0))).not.toHaveProperty('shape')
+  })
+
+  it('keeps the group an item belongs to, and never puts an arrow in one', () => {
+    expect(defined(normalizeWallItem({ kind: 'note', group: 'g-1' }, 0)).group).toBe('g-1')
+    expect(defined(normalizeWallItem({ kind: 'note', group: '  ' }, 0))).not.toHaveProperty('group')
+    expect(defined(normalizeWallItem({ kind: 'arrow', group: 'g-1', fromPoint: { x: 0, y: 0 }, toPoint: { x: 1, y: 1 } }, 0))).not.toHaveProperty('group')
+  })
+
   it('keeps a bookmark only when it has a web address to open', () => {
     const kept = defined(normalizeWallItem({ kind: 'bookmark', link: 'https://example.com/', text: 'Example', summary: 'A page', ref: 'icon.png' }, 0))
     expect(kept).toMatchObject({ kind: 'bookmark', link: 'https://example.com/', text: 'Example', summary: 'A page', ref: 'icon.png' })
@@ -404,6 +418,14 @@ describe('duplicateItems', () => {
     const many = Array.from({ length: 20 }, (_, i) => item({ id: 'i' + i }))
     const copies = duplicateItems(many, new Set(many.map(i => i.id)))
     expect(new Set(copies.map(c => c.id)).size).toBe(20)
+  })
+
+  it('gives a copied group a group of its own', () => {
+    const grouped = [item({ id: 'a', group: 'g' }), item({ id: 'b', group: 'g' })]
+    const copies = duplicateItems(grouped, new Set(['a', 'b']))
+    expect(copies[0].group).toBeDefined()
+    expect(copies[0].group).not.toBe('g')
+    expect(copies[1].group).toBe(copies[0].group)
   })
 })
 

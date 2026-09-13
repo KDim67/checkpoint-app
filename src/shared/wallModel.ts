@@ -1,10 +1,11 @@
 /** a card is a reference, never a copy; hand-normalised since user data outlives builds */
 
 import { isLinkable, parseWallLink } from './wallLink'
+import { pruneGroups, regroupCopies } from './wallGroup'
 
 /** note is a sticky, doc a real note; stored names can't be migrated apart */
-// bookmark is a pasted page's card
-export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow' | 'bookmark'
+// bookmark is a pasted page's card, shape holds words inside an outline
+export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow' | 'bookmark' | 'shape'
 
 export interface WallItem {
   /** wall-local, two placements of one card are two items */
@@ -20,6 +21,8 @@ export interface WallItem {
   text?: string
   /** a bookmark's page description */
   summary?: string
+  /** a shape's outline, absent for a rectangle */
+  shape?: ShapeType
   /** hex, or absent for the kind's default */
   color?: string
   /** flat [x0,y0,...] in the item's box, so move and resize work like everything else */
@@ -45,6 +48,8 @@ export interface WallItem {
   locked?: boolean
   /** a web address or wall:<wallId>/<itemId>, read through wallLink */
   link?: string
+  /** items sharing one select, move and line up together, read through wallGroup */
+  group?: string
 }
 
 /** contents live under wallDocKey */
@@ -87,6 +92,7 @@ export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number
   frame: { width: 480, height: 360 },
   // icon row, two title lines and two of description
   bookmark: { width: 300, height: 128 },
+  shape: { width: 160, height: 100 },
   // sized from their contents
   ink: { width: 120, height: 120 },
   arrow: { width: 1, height: 1 }
@@ -119,7 +125,7 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow', 'bookmark']
+const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow', 'bookmark', 'shape']
 
 /** wall units, three is enough */
 export const STROKE_WIDTHS = [2, 4, 8]
@@ -134,6 +140,10 @@ export type ArrowHeads = 'end' | 'both' | 'none'
 export const ARROW_SHAPES: readonly ArrowShape[] = ['straight', 'curved', 'elbow']
 export const ARROW_LINES: readonly ArrowLine[] = ['solid', 'dashed', 'dotted']
 export const ARROW_HEAD_MODES: readonly ArrowHeads[] = ['end', 'both', 'none']
+
+/** a shape's outline; like the arrow styles, the first is the unwritten default */
+export type ShapeType = 'rectangle' | 'rounded' | 'oval' | 'diamond' | 'triangle'
+export const SHAPE_TYPES: readonly ShapeType[] = ['rectangle', 'rounded', 'oval', 'diamond', 'triangle']
 
 /** smoothing is this strength or nothing */
 export const SMOOTHING_STRENGTH = 0.9
@@ -192,6 +202,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const arrowShape = oneOf(o.arrowShape, ARROW_SHAPES)
   const arrowLine = oneOf(o.arrowLine, ARROW_LINES)
   const arrowHeads = oneOf(o.arrowHeads, ARROW_HEAD_MODES)
+  const shape = kind === 'shape' ? oneOf(o.shape, SHAPE_TYPES) : null
 
   // a hand-edited doc can't plant a link main would refuse
   const link = (isLinkable(kind) || kind === 'bookmark') && parseWallLink(o.link) ? str(o.link).trim() : ''
@@ -221,9 +232,12 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(arrowShape && arrowShape !== ARROW_SHAPES[0] ? { arrowShape } : {}),
     ...(arrowLine && arrowLine !== ARROW_LINES[0] ? { arrowLine } : {}),
     ...(arrowHeads && arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {}),
+    ...(shape && shape !== SHAPE_TYPES[0] ? { shape } : {}),
     ...(Number.isFinite(num(o.rotation, NaN)) ? { rotation: num(o.rotation, 0) } : {}),
     ...(o.locked === true ? { locked: true } : {}),
     ...(link ? { link } : {}),
+    // an arrow moves with its ends, never as a member
+    ...(kind !== 'arrow' && str(o.group).trim() ? { group: str(o.group).trim() } : {}),
     z: num(o.z, index)
   }
 }
@@ -249,9 +263,10 @@ export function normalizeWallDoc(raw: unknown): WallDoc {
     ? (source as Record<string, unknown>)
     : {}
 
-  const items = (Array.isArray(o.items) ? o.items : [])
+  // a deleted member can leave a group of one
+  const items = pruneGroups((Array.isArray(o.items) ? o.items : [])
     .map((item, i) => normalizeWallItem(item, i))
-    .filter((item): item is WallItem => item !== null)
+    .filter((item): item is WallItem => item !== null))
 
   return {
     version: 1,
@@ -440,7 +455,7 @@ export function duplicateItems(
   offset = 24
 ): WallItem[] {
   let z = topZ(items)
-  return items
+  return regroupCopies(items
     .filter(i => ids.has(i.id))
     .map(i => {
       const copy: WallItem = {
@@ -453,7 +468,7 @@ export function duplicateItems(
       // copies arrive unlocked so a locked background's copy can be moved
       delete copy.locked
       return copy
-    })
+    }))
 }
 
 /** only when snapping is on */

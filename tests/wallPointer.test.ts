@@ -39,6 +39,12 @@ describe('pressSelection', () => {
     pressSelection(selected, 'a', true)
     expect([...selected]).toEqual(['a'])
   })
+
+  it('takes and gives back a whole group at once', () => {
+    expect([...pressSelection(new Set(), 'a', false, ['a', 'b'])]).toEqual(['a', 'b'])
+    expect([...pressSelection(new Set(['c']), 'a', true, ['a', 'b'])]).toEqual(['c', 'a', 'b'])
+    expect([...pressSelection(new Set(['a', 'b', 'c']), 'b', true, ['a', 'b'])]).toEqual(['c'])
+  })
 })
 
 describe('rotation', () => {
@@ -154,7 +160,8 @@ describe('arrowRelease', () => {
     expect(arrowRelease({ ...base, moved: true, overId: 'b', travelled: 10 })).toStrictEqual({
       draw: { from: 'a', to: 'b' },
       armed: null,
-      handBack: true
+      handBack: true,
+      grow: false
     })
   })
 
@@ -162,7 +169,8 @@ describe('arrowRelease', () => {
     expect(arrowRelease({ ...base, moved: true, travelled: LOOSE_END_SLOP + 1 })).toStrictEqual({
       draw: { from: 'a', to: null },
       armed: null,
-      handBack: true
+      handBack: true,
+      grow: false
     })
   })
 
@@ -170,29 +178,32 @@ describe('arrowRelease', () => {
     expect(arrowRelease({ ...base, moved: true, travelled: LOOSE_END_SLOP })).toStrictEqual({
       draw: null,
       armed: null,
-      handBack: false
+      handBack: false,
+      grow: false
     })
   })
 
-  it('changes nothing for a handle press that never moved', () => {
+  it('grows the next item from a handle press that never moved, and leaves the arrow tool as it was', () => {
     expect(arrowRelease({ ...base, viaHandle: true, armed: 'z' })).toStrictEqual({
       draw: null,
       armed: undefined,
-      handBack: false
+      handBack: false,
+      grow: true
     })
   })
 
   it('picks a source with one click and connects it with a click on another item', () => {
-    expect(arrowRelease(base)).toStrictEqual({ draw: null, armed: 'a', handBack: false })
+    expect(arrowRelease(base)).toStrictEqual({ draw: null, armed: 'a', handBack: false, grow: false })
     expect(arrowRelease({ ...base, fromId: 'b', armed: 'a' })).toStrictEqual({
       draw: { from: 'a', to: 'b' },
       armed: null,
-      handBack: true
+      handBack: true,
+      grow: false
     })
   })
 
   it('puts the source down when it is clicked again', () => {
-    expect(arrowRelease({ ...base, armed: 'a' })).toStrictEqual({ draw: null, armed: null, handBack: false })
+    expect(arrowRelease({ ...base, armed: 'a' })).toStrictEqual({ draw: null, armed: null, handBack: false, grow: false })
   })
 })
 

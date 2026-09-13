@@ -3,9 +3,11 @@
 import {
   arrowAnchors, arrowGeometry, arrowDash, arrowHeadPoints, arrowHeadInset,
   boundsOf, inkNaturalSize, inPaintOrder,
-  ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallItem
+  ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem
 } from '../../../shared/wallModel'
 import { plainWallText } from '../../../shared/wallText'
+import { shapeOutline, shapeTextBox } from '../../../shared/wallShape'
+import { getTextColorForBackground } from './contrast'
 
 /** in wall units */
 const MARGIN = 40
@@ -178,6 +180,31 @@ export async function exportWallToPng(
       wrap(ctx, plainWallText(item.text ?? ''), item.width).forEach((line, i) => {
         ctx.fillText(line, item.x, item.y + 20 + i * 26)
       })
+    } else if (item.kind === 'shape') {
+      const outline = item.shape ?? SHAPE_TYPES[0]
+      ctx.translate(item.x, item.y)
+      const path = new Path2D(shapeOutline(outline, item.width, item.height))
+      ctx.fillStyle = item.color || ctxInfo.surfaceColor
+      ctx.fill(path)
+      ctx.strokeStyle = item.color ? 'rgba(0, 0, 0, 0.25)' : ctxInfo.borderColor
+      ctx.lineWidth = 2
+      ctx.stroke(path)
+
+      // centred in the room the outline leaves, as on the wall
+      const room = shapeTextBox(outline)
+      const left = (item.width * room.left) / 100
+      const innerWidth = (item.width * (100 - room.left - room.right)) / 100
+      const top = (item.height * room.top) / 100
+      const innerHeight = (item.height * (100 - room.top - room.bottom)) / 100
+      const lineHeight = 20
+
+      ctx.fillStyle = item.color ? getTextColorForBackground(item.color) : ctxInfo.textColor
+      ctx.font = '14px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const lines = wrap(ctx, plainWallText(item.text ?? ''), innerWidth)
+      const firstY = top + innerHeight / 2 - ((lines.length - 1) * lineHeight) / 2
+      lines.forEach((line, i) => ctx.fillText(line, left + innerWidth / 2, firstY + i * lineHeight))
     } else if (item.kind === 'frame') {
       ctx.strokeStyle = item.color || ctxInfo.borderColor
       ctx.lineWidth = 2
