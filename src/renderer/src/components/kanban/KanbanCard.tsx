@@ -47,29 +47,25 @@ function stripMarkdown(md: string): string {
     .trim()
 }
 
-function KanbanCard({
+type Sortable = ReturnType<typeof useSortable>
+
+interface CardFaceProps extends Omit<KanbanCardProps, 'isOverlay'> {
+  dragAttributes?: Sortable['attributes']
+  isDragging: boolean
+}
+
+function CardFace({
   card,
   onClick,
   onDelete,
   onConvertToTask,
   onUpdate,
-  isOverlay = false,
-  display = DEFAULT_CARD_DISPLAY
-}: KanbanCardProps) {
+  display = DEFAULT_CARD_DISPLAY,
+  dragAttributes,
+  isDragging
+}: CardFaceProps) {
   const [hovered, setHovered] = useState(false)
   const { match: matchKey } = useViewShortcuts('kanban')
-
-  const sortable = useSortable({ id: card.id, disabled: isOverlay })
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = isOverlay
-    ? { attributes: {}, listeners: {}, setNodeRef: null, transform: null, transition: undefined, isDragging: false }
-    : sortable
 
   const priority = PRIORITY_COLORS[card.priority] ?? PRIORITY_COLORS[0]
 
@@ -105,10 +101,7 @@ function KanbanCard({
   const coverTextColor = isFullCover ? getTextColorForBackground(cover.value) : 'var(--color-text-base)'
 
   const cardStyle: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform) ?? undefined,
-    transition: transition && transition !== 'none'
-      ? `${transition}, height 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms ease, box-shadow 150ms ease`
-      : 'height 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms ease, box-shadow 150ms ease',
+    transition: 'height 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms ease, box-shadow 150ms ease',
     opacity: isDragging ? 0.4 : 1,
     position: 'relative',
     display: 'flex',
@@ -124,7 +117,6 @@ function KanbanCard({
     boxShadow: hovered && !isDragging
       ? '0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)'
       : '0 1px 3px rgba(0,0,0,0.2)',
-    zIndex: isDragging ? 999 : 1,
     overflow: 'hidden',
     flexShrink: 0,
     // the whole card drags, so no text selection sweeping the board
@@ -220,9 +212,7 @@ function KanbanCard({
 
   return (
     <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+      {...dragAttributes}
       style={{ ...cardStyle, outline: 'none' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -558,6 +548,32 @@ function ActionBtn({
     >
       {children}
     </button>
+  )
+}
+
+// memoized apart: dnd-kit re-renders every sortable when a drag starts and whenever the card under the pointer changes
+const MemoCardFace = React.memo(CardFace)
+
+function KanbanCard({ isOverlay = false, ...face }: KanbanCardProps) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: face.card.id, disabled: isOverlay })
+  // the overlay copy only borrows the look, it has no place in a list
+  if (isOverlay) return <MemoCardFace {...face} isDragging={false} />
+  return (
+    // sorting restyles every card's transform and transition, so they live out here where the face memo can't see them
+    <div
+      ref={setNodeRef}
+      // pointer only: the face's keydown always overrode dnd-kit's keyboard pickup
+      onPointerDown={listeners?.onPointerDown as React.PointerEventHandler<HTMLDivElement> | undefined}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        position: 'relative',
+        zIndex: isDragging ? 999 : 1,
+        flexShrink: 0
+      }}
+    >
+      <MemoCardFace {...face} dragAttributes={attributes} isDragging={isDragging} />
+    </div>
   )
 }
 

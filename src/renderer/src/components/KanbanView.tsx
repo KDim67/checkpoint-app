@@ -234,7 +234,8 @@ export default function KanbanView() {
                   col={col}
                   cards={colCards}
                   dropSlot={slot === -1 ? null : slot}
-                  dropHeight={dragHeight}
+                  // only the aimed column gets the height, or lifting a card redraws every column
+                  dropHeight={slot === -1 ? 0 : dragHeight}
                   onRename={handleRenameColumn}
                   onDelete={handleDeleteColumn}
                   onCardClick={setActiveCardId}
