@@ -14,7 +14,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     setSmoothing, drawing, arrowFrom, arrowDrag, arrowEndHover, arrowShape, setArrowShape, arrowLine,
     setArrowLine, arrowHeads, setArrowHeads, marquee, busy, spaceHeld, swatchOpen, setSwatchOpen,
     viewportRef, marqueeRectRef, docRef, cardsById, itemsById, notesByTitle, selectedItems, single,
-    arrowsSelected, setItems, setCamera, onItemTextChange, onItemFinishEditing, addItem,
+    arrowsSelected, setItems, setCamera, onItemTextChange, onItemFinishEditing, onItemAutoSize, addItem,
     removeSelected, duplicateSelected, toggleLock, openCard, placeImageFiles, screenPoint, onWheel,
     arrowAt, onPointerDown, onPointerMove, endDrag, camera, canvasBackground, dotColor, floatingRef,
     floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
@@ -242,6 +242,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               arrowFrom={arrowFrom === item.id}
               onTextChange={onItemTextChange}
               onFinishEditing={onItemFinishEditing}
+              onAutoSize={onItemAutoSize}
               linkLabel={link?.label}
               linkMissing={link?.missing}
               linkExternal={link?.external}

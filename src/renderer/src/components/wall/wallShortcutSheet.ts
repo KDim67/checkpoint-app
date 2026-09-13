@@ -48,5 +48,18 @@ export const wallShortcutSections = (
       ['Arrows', `Nudge by ${NUDGE}px`],
       ['Shift+Arrows', `Nudge by ${NUDGE * 5}px`]
     ]
+  },
+  {
+    // while writing in a sticky or text box
+    group: 'Text',
+    rows: [
+      ['Ctrl+B', 'Bold'],
+      ['Ctrl+I', 'Italic'],
+      ['Ctrl+Shift+X', 'Strikethrough'],
+      ['Ctrl+E', 'Code'],
+      ['- or 1. then Space', 'Start a list'],
+      ['Tab or Shift+Tab', 'Indent or outdent a list item'],
+      ['Esc or Ctrl+Enter', 'Finish writing']
+    ]
   }
 ]

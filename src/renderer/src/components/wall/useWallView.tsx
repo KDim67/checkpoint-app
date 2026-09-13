@@ -20,7 +20,7 @@ export function useWallView() {
     viewportRef, marqueeRectRef, fileInputRef, docRef, historyRef, cardsById, itemsById,
     notesByTitle, selectedItems, single, arrowsSelected, wallIndex, activeWall, commitIndex, addWall,
     setBackground, toggleRail, confirmDeleteWall, setItems, setCamera, onItemTextChange,
-    onItemFinishEditing, applyHistory, addItem, removeSelected, duplicateSelected, toggleLock,
+    onItemFinishEditing, onItemAutoSize, applyHistory, addItem, removeSelected, duplicateSelected, toggleLock,
     openCard, placeImageFiles, linkOpen, setLinkOpen, linkPickFor, setLinkPickFor, followLink,
     setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark
   } = wallDocument
@@ -120,6 +120,7 @@ export function useWallView() {
     setCamera,
     onItemTextChange,
     onItemFinishEditing,
+    onItemAutoSize,
     applyHistory,
     addItem,
     removeSelected,

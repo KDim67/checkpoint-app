@@ -382,6 +382,16 @@ export function useWallDocument() {
     setItems(docRef.current.items)
   }, [setItems])
 
+  /** a text box follows its words; part of the edit or resize that changed them, not an undo step of its own */
+  const onItemAutoSize = useCallback((id: string, height: number) => {
+    // the item floor, a one-line box would otherwise go below it
+    const next = Math.max(32, Math.ceil(height))
+    const items = docRef.current.items
+    const target = items.find(i => i.id === id)
+    if (!target || target.kind !== 'text' || Math.abs(target.height - next) < 1) return
+    setItems(items.map(i => (i.id === id ? { ...i, height: next } : i)), { record: false })
+  }, [setItems])
+
   const applyHistory = useCallback((next: History<WallItem[]>) => {
     historyRef.current = next
     setHistoryTick(t => t + 1)
@@ -699,6 +709,7 @@ export function useWallDocument() {
     setCamera,
     onItemTextChange,
     onItemFinishEditing,
+    onItemAutoSize,
     applyHistory,
     addItem,
     removeSelected,
