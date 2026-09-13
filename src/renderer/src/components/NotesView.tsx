@@ -638,7 +638,7 @@ export default function NotesView(): React.JSX.Element {
                     const exists = noteExists(link)
                     return (
                       <button key={link} onClick={() => handleOpenWikiLink(link)} className="notes-link-chip">
-                        {!exists && <FileWarning size={11} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />}
+                        {!exists && <FileWarning size={11} className="icon-warning" />}
                         <span className="truncate">{link}</span>
                         {!exists && <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>new</span>}
                       </button>
@@ -668,7 +668,7 @@ export default function NotesView(): React.JSX.Element {
           )}
 
           {!activeNoteTitle && (
-            <span className="notes-empty-hint" style={{ marginTop: 'var(--space-2)' }}>
+            <span className="notes-empty-hint mt-2">
               Select a note to see its links and metadata.
             </span>
           )}

@@ -82,26 +82,16 @@ export default function NotificationSettings(): React.JSX.Element {
         pointerEvents: policy.enabled ? 'auto' : 'none',
         transition: 'opacity 200ms ease'
       }}>
-        <h4 style={{
-          margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)',
-          color: 'var(--color-text-faint)', textTransform: 'uppercase',
-          letterSpacing: 'var(--tracking-wider)'
-        }}>
+        <h4 className="heading-caps">
           What to tell you about
         </h4>
 
         {NOTIFICATION_CATEGORIES.map(category => (
           <div
             key={category.id}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: 'var(--space-2) var(--space-3)',
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)'
-            }}
+            className="panel-row-sm"
           >
-            <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
+            <div className="flex-1-mr">
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', display: 'block' }}>
                 {category.label}
               </span>
@@ -142,7 +132,7 @@ export default function NotificationSettings(): React.JSX.Element {
 
         {policy.quietEnabled && (
           <FieldRow label="Window">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="row">
               <select
                 value={policy.quietFrom}
                 onChange={e => save({ ...policy, quietFrom: Number(e.target.value) })}

@@ -73,7 +73,7 @@ function ViewSkeleton() {
     <div style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
       <div className="skeleton" style={{ height: '24px', width: '180px' }} />
       <div className="skeleton" style={{ height: '14px', width: '320px', opacity: 0.6 }} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+      <div className="col-mt">
         {[1,2,3,4,5].map(i => (
           <div key={i} className="skeleton" style={{ height: '52px', borderRadius: 'var(--radius-md)', opacity: 1 - i * 0.1 }} />
         ))}

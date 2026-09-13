@@ -46,7 +46,7 @@ export default function TextureDropZone({ onDragOver, onDrop, onClick, processin
       {processing ? (
         <>
           <Loader size={32} className="animate-spin text-accent" />
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Processing texture...</span>
+          <span className="text-sm-muted">Processing texture...</span>
         </>
       ) : (
         <>

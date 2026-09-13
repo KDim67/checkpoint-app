@@ -296,10 +296,10 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '6px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
               {/* Timestamp */}
-              <span className="msg-hover-reveal" style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+              <span className="msg-hover-reveal text-nano-faint">
                 {relativeTime(message.timestamp)}
               </span>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div className="row-8px">
                 {onRewrite && !isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -373,7 +373,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 >
                   <Brain size={12} className="text-accent" />
                   <span>{showThinking ? 'Hide Thinking Process' : 'Show Thinking Process'}</span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+                  <span className="text-nano-faint">
                     ({Math.ceil(message.thinking.length / 4)} tokens)
                   </span>
                 </button>
@@ -515,7 +515,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 marginTop: '6px', paddingTop: '4px'
               }}
             >
-              <span className="msg-hover-reveal" style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+              <span className="msg-hover-reveal text-nano-faint">
                 {relativeTime(message.timestamp)}
               </span>
               {onCopy && messageIndex !== undefined && (

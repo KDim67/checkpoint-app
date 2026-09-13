@@ -240,8 +240,8 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
       }}>
         {TOOLBAR_GROUPS.map((group, gi) => (
           <React.Fragment key={gi}>
-            {gi > 0 && <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />}
-            <div style={{ display: 'flex', gap: '2px' }}>
+            {gi > 0 && <div className="divider-v" />}
+            <div className="flex-2px">
               {group.map(btn => (
                 <button
                   key={btn.action}

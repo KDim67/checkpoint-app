@@ -71,7 +71,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
             animation: 'dropdown-in 150ms var(--ease-enter)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
+          <div className="section-head-between">
             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Share This Board
             </span>
@@ -133,8 +133,8 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                   history credits this name, so it is worth setting before
                   a board is shared rather than after. */}
               <div className="col">
-                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Your Name</span>
-                <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
+                <span className="text-label-xs-medium">Your Name</span>
+                <p className="text-caption-flush">
                   Shown against your changes on a shared board.
                   {session.osUserName && ` Left empty, changes are credited to ${session.osUserName}.`}
                 </p>
@@ -161,10 +161,10 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
               {/* Host section */}
               <div className="col">
-                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Invite Someone</span>
-                <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>Give another person this board to read or edit, live, while you both have it open.</p>
+                <span className="text-label-xs-medium">Invite Someone</span>
+                <p className="text-caption-flush">Give another person this board to read or edit, live, while you both have it open.</p>
                 
-                <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
+                <div className="flex-gap-mt2">
                   <button
                     onClick={() => {
                       session.host('collaborative')
@@ -224,8 +224,8 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
               {/* Join section */}
               <div className="col">
-                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>Join Someone's Board</span>
-                <div style={{ display: 'flex', gap: '4px' }}>
+                <span className="text-label-xs-medium">Join Someone's Board</span>
+                <div className="flex-4px">
                   <input
                     type="text"
                     maxLength={6}
@@ -335,7 +335,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                       : `Also here (${session.roster.length})`}
                   </span>
                   {session.roster.length === 0 ? (
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+                    <span className="text-caption-faint">
                       Nobody yet
                     </span>
                   ) : (
@@ -381,7 +381,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 <div style={{ height: '1px', background: 'var(--color-surface-1)', margin: '4px 0' }} />
 
                 <div className="col-2px">
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>Status Logs:</span>
+                  <span className="text-micro-faint">Status Logs:</span>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {session.progress}
                   </span>

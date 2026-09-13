@@ -112,7 +112,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
         <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
           Game Development Workspace
         </h2>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+        <p className="text-hint-flush">
           Texture authoring, sprite pipeline and narrative tools. All processing runs locally.
         </p>
       </div>
@@ -129,7 +129,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
           }}>
             Recent
           </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+          <div className="flex-wrap-gap">
             {recentTools.map(tool => (
               <button
                 key={tool.id}

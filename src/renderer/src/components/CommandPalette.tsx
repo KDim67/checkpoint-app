@@ -219,7 +219,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
           padding: 'var(--space-3) var(--space-4)',
           borderBottom: '1px solid var(--color-surface-offset)'
         }}>
-          <Search size={15} style={{ color: 'var(--color-text-faint)', flexShrink: 0 }} />
+          <Search size={15} className="icon-faint" />
           <input
             ref={inputRef}
             autoFocus
@@ -307,7 +307,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
                     {row.type === 'hit' && <FileText size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
-                    <span style={{ minWidth: 0 }}>
+                    <span className="min-w-0">
                       <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {label}
                       </span>

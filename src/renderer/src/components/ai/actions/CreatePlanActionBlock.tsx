@@ -156,7 +156,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
         marginBottom: '12px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: phase === 'committed' ? 'var(--color-success-soft)' : 'var(--color-info)' }}>
-          <Sparkles size={14} style={{ flexShrink: 0 }} />
+          <Sparkles size={14} className="no-shrink" />
           <span>Implementation Plan</span>
           {phase === 'review' && (
             <span style={{ background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: '#7dd3fc', fontSize: '9px', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
@@ -169,7 +169,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="row-wrap-6px">
           <button
             onClick={() => setShowModal(true)}
             style={{
@@ -448,7 +448,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                       >
                         {isApproved && <Check size={10} color="#fff" strokeWidth={3} />}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                      <div className="col-fill">
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: isSelected ? 'var(--color-secondary)' : 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
                           Step 0{idx + 1}
                         </span>

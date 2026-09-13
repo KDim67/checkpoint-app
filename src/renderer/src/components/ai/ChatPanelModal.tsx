@@ -14,7 +14,7 @@ export default function ChatPanelModal({ icon, title, actions, onClose, children
   const close = (
     <button
       onClick={onClose}
-      style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px' }}
+      className="icon-btn"
     >
       <X size={14} />
     </button>

@@ -42,7 +42,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
       </div>
 
       {/* Filters Group */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+      <div className="row-lg">
         {/* Priority filter */}
         <div className="row-6px">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Priority:</span>

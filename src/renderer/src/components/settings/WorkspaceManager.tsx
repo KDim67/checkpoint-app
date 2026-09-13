@@ -314,7 +314,7 @@ export default function WorkspaceManager() {
     await persist(updated)
   }
 
-  if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading workspaces…</div>
+  if (loading) return <div className="text-sm-faint">Loading workspaces…</div>
 
   return (
     <div className="col-md">
@@ -347,7 +347,7 @@ export default function WorkspaceManager() {
           {editingSlug === ctx.slug ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1 }}>
               <div className="row">
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Name:</span>
+                <span className="text-caption-60">Name:</span>
                 <input
                   autoFocus
                   value={editName}
@@ -369,7 +369,7 @@ export default function WorkspaceManager() {
                 />
               </div>
               <div className="row">
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Slug (#):</span>
+                <span className="text-caption-60">Slug (#):</span>
                 <input
                   value={editSlugVal}
                   onChange={e => setEditSlugVal(slugifyWorkspace(e.target.value))}
@@ -390,7 +390,7 @@ export default function WorkspaceManager() {
                 />
               </div>
               <div className="row">
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Git Path:</span>
+                <span className="text-caption-60">Git Path:</span>
                 <input
                   value={editGitPath}
                   onChange={e => setEditGitPath(e.target.value)}
@@ -411,9 +411,9 @@ export default function WorkspaceManager() {
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', width: '60px' }}>Color:</span>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="row-wrap">
+                <span className="text-caption-60">Color:</span>
+                <div className="row-wrap-6px">
                   {PRESET_COLORS.map(c => (
                     <button
                       key={c}
@@ -502,7 +502,7 @@ export default function WorkspaceManager() {
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div className="row-4px">
                 {/* Reorder */}
                 <button
                   className="btn-icon"
@@ -606,9 +606,9 @@ export default function WorkspaceManager() {
               boxSizing: 'border-box'
             }}
           />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="row-wrap">
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', flexShrink: 0 }}>Color:</span>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="row-wrap-6px">
               {PRESET_COLORS.map(c => (
                 <button
                   key={c}
@@ -668,7 +668,7 @@ export default function WorkspaceManager() {
                     <span className="text-caption">
                       {t.description}
                     </span>
-                    <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>
+                    <span className="text-mono-micro">
                       {describeTemplate(t)}
                     </span>
                   </button>
@@ -678,11 +678,11 @@ export default function WorkspaceManager() {
           </div>
 
           {addName.trim() && (
-            <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
-              Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{slugifyWorkspace(addName)}</code>
+            <div className="text-caption-faint">
+              Slug: <code className="mono">#{slugifyWorkspace(addName)}</code>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div className="flex-gap">
             <button
               className="btn-primary"
               style={{
@@ -747,7 +747,7 @@ export default function WorkspaceManager() {
       {/* Delete confirmation modal */}
       {deleteWarning && (
         <ModalShell label="Delete workspace" onClose={() => setDeleteWarning(null)} width="380px" closeOnBackdrop={false}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div className="row-md">
             <AlertTriangle size={20} color="var(--color-warning)" />
             <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
               Delete workspace?
@@ -755,7 +755,7 @@ export default function WorkspaceManager() {
           </div>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
             This will hide all{' '}
-            <strong style={{ color: 'var(--color-text-base)' }}>
+            <strong className="text-base">
               {deleteWarning.count} item{deleteWarning.count !== 1 ? 's' : ''}
             </strong>{' '}
             in <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-secondary)' }}>
@@ -789,7 +789,7 @@ export default function WorkspaceManager() {
       {/* Import confirmation modal */}
       {(importPayload || importBoard) && (
         <ModalShell label="Import workspace" onClose={() => { setImportPayload(null); setImportBoard(null) }} closeOnBackdrop={false}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div className="row-md">
             <Plus size={20} color="var(--color-secondary)" />
             <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-base)' }}>
               Import Workspace
@@ -797,8 +797,8 @@ export default function WorkspaceManager() {
           </div>
           
           <div className="col-md">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-              <label htmlFor="import-context-name" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+            <div className="col-xs">
+              <label htmlFor="import-context-name" className="text-hint-strong">
                 Workspace Name
               </label>
               <input
@@ -822,8 +822,8 @@ export default function WorkspaceManager() {
               />
             </div>
 
-            <div style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
-              Slug: <code style={{ fontFamily: 'var(--font-mono)' }}>#{importSlug}</code>
+            <div className="text-caption-faint">
+              Slug: <code className="mono">#{importSlug}</code>
             </div>
 
             {contexts.some(c => c.slug === importSlug) && (
@@ -852,7 +852,7 @@ export default function WorkspaceManager() {
             </div>
           </div>
 
-          <div style={{ marginTop: 'var(--space-2)' }}>
+          <div className="mt-2">
             <RowBetween>
               <button className="btn-secondary" style={{ fontSize: 'var(--text-sm)' }}
                 onClick={() => { setImportPayload(null); setImportBoard(null) }}>

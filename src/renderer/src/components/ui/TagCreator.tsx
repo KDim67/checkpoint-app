@@ -53,7 +53,7 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
       }}>
         Create Label
       </span>
-      <div style={{ display: 'flex', gap: '4px' }}>
+      <div className="flex-4px">
         <input
           type="text"
           placeholder="Label name..."
@@ -94,8 +94,8 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
           Create
         </button>
       </div>
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+      <div className="row-wrap-6px">
+        <div className="row-4px">
           {SWATCHES.map(swatch => (
             <button
               key={swatch}

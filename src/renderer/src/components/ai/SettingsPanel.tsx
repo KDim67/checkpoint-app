@@ -59,7 +59,7 @@ export default function SettingsPanel({
                   setTemperature(v)
                   setNumberSetting('ai_temperature', v).catch(() => {})
                 }}
-                style={{ width: '100%', accentColor: 'var(--color-secondary)', cursor: 'pointer' }}
+                className="range-accent"
               />
             </div>
 
@@ -84,7 +84,7 @@ export default function SettingsPanel({
                   setMaxTokens(v)
                   setNumberSetting('ai_max_tokens', v).catch(() => {})
                 }}
-                style={{ width: '100%', accentColor: 'var(--color-secondary)', cursor: 'pointer' }}
+                className="range-accent"
               />
             </div>
           </div>

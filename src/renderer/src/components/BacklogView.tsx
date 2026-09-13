@@ -859,7 +859,7 @@ export default function BacklogView() {
 
       {/* Filter panel (collapsible) */}
       {showFilters && (
-        <div style={{ flexShrink: 0 }}>
+        <div className="no-shrink">
           <BacklogFilters
             columns={workflowColumns}
             allTags={allTags}
@@ -1044,11 +1044,7 @@ export default function BacklogView() {
 
         {totalPages > 1 && (
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-4)'
-            }}
+            className="row-lg"
           >
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -1233,7 +1229,7 @@ export default function BacklogView() {
                       padding: 'var(--space-3)'
                     }}
                   >
-                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+                    <span className="text-label-xs-semibold">
                       {task.title || 'Untitled Task'}
                     </span>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>

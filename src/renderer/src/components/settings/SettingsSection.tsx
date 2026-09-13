@@ -108,11 +108,7 @@ export function FieldRow({
   const hintId = `${fieldId}-hint`
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 'var(--space-1-5)'
-    }}>
+    <div className="col-1-5">
       <label
         htmlFor={fieldId}
         style={{
@@ -131,10 +127,7 @@ export function FieldRow({
       {hint && (
         <span
           id={hintId}
-          style={{
-            fontSize: '11px',
-            color: 'var(--color-text-faint)'
-          }}
+          className="text-caption-faint"
         >
           {hint}
         </span>

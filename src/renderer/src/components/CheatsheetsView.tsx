@@ -425,7 +425,7 @@ export default function CheatsheetsView() {
       >
         <FileText size={18} style={{ color: isActive ? 'var(--color-secondary)' : 'var(--color-text-muted)', flexShrink: 0 }} />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div className="col-fill">
           <span
             style={{
               fontSize: 'var(--text-xs)',
@@ -785,11 +785,11 @@ export default function CheatsheetsView() {
 
           {/* Sort row */}
           <div className="row-between">
-            <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
+            <span className="text-micro-faint">
               {cheatsheets.length} sheet{cheatsheets.length !== 1 ? 's' : ''}
               {searching && ' · searching…'}
             </span>
-            <div style={{ display: 'flex', gap: '2px' }}>
+            <div className="flex-2px">
               {(Object.keys(SORT_LABELS) as SortMode[]).map(mode => (
                 <button
                   key={mode}
@@ -844,7 +844,7 @@ export default function CheatsheetsView() {
               )}
               {unpinnedList.length > 0 && (
                 <>
-                  {pinnedList.length > 0 && <div className="list-section-label" style={{ marginTop: 'var(--space-2)' }}>All sheets</div>}
+                  {pinnedList.length > 0 && <div className="list-section-label mt-2">All sheets</div>}
                   {unpinnedList.map(renderSheetItem)}
                 </>
               )}
@@ -863,7 +863,7 @@ export default function CheatsheetsView() {
                       title="Open in text view with matches highlighted"
                     >
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <FileType2 size={12} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
+                        <FileType2 size={12} className="icon-accent" />
                         <span className="truncate">{hit.name.replace(/\.pdf$/i, '')}</span>
                         <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)', flexShrink: 0 }}>
                           {hit.matchCount} match{hit.matchCount > 1 ? 'es' : ''}
@@ -911,7 +911,7 @@ export default function CheatsheetsView() {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="row-wrap">
                 {/* PDF / Text mode toggle */}
                 <div style={{ display: 'flex', gap: '2px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: '2px' }}>
                   <button
@@ -984,11 +984,11 @@ export default function CheatsheetsView() {
                 </button>
 
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
+                  <span className="text-micro-faint">
                     {textContent ? `${textContent.split(/\s+/).filter(Boolean).length.toLocaleString()} words` : ''}
                   </span>
                   <button className="viewer-toolbar-btn" onClick={handleCopyText} disabled={!textContent}>
-                    {copied ? <Check size={12} style={{ color: 'var(--color-success)' }} /> : <Copy size={12} />}
+                    {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
                     {copied ? 'Copied!' : 'Copy Text'}
                   </button>
                 </div>
@@ -1018,7 +1018,7 @@ export default function CheatsheetsView() {
                     Extracting text…
                   </div>
                 ) : !textContent ? (
-                  <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)', fontStyle: 'italic' }}>
+                  <div className="text-empty">
                     No extractable text found in this PDF (it may be a scanned image).
                   </div>
                 ) : (
@@ -1112,7 +1112,7 @@ export default function CheatsheetsView() {
               >
                 Cancel
               </button>
-              <button onClick={handleRenameSubmit} className="btn-glow" style={{ fontSize: 'var(--text-xs)' }}>
+              <button onClick={handleRenameSubmit} className="btn-glow text-xs">
                 Save Name
               </button>
             </div>

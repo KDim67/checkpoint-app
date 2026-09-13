@@ -39,7 +39,7 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
                 <span className="row">
                   <Link2 size={12} className="text-muted" />
                   <span style={{ color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>{label}</span>
-                  <span style={{ color: 'var(--color-text-base)' }}>Item #{peerId.substring(0, 8)}</span>
+                  <span className="text-base">Item #{peerId.substring(0, 8)}</span>
                 </span>
 
                 <button
@@ -86,16 +86,7 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
           value={links.query}
           onChange={e => links.setQuery(e.target.value)}
           placeholder={placeholder}
-          style={{
-            flex: 1,
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-surface-offset)',
-            color: 'var(--color-text-base)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-2) var(--space-3)',
-            fontSize: 'var(--text-xs)',
-            outline: 'none'
-          }}
+          className="input-fill"
         />
 
         {/* Autocomplete Search Results */}
@@ -137,7 +128,7 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <strong style={{ fontSize: '11px' }}>{res.title}</strong>
-                <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>#{res.id.substring(0, 8)} | context: {res.context}</span>
+                <span className="text-nano">#{res.id.substring(0, 8)} | context: {res.context}</span>
               </button>
             ))}
           </div>

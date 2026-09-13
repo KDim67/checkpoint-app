@@ -199,7 +199,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
 
           {/* TAB 2: SOLID COLOR */}
           {customBgTab === 'solid' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="col-10px">
               <div
                 id="kanban-solid-bg-preview"
                 style={{
@@ -266,7 +266,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
 
           {/* TAB 3: CUSTOM GRADIENT (WITH ANGLE & DIRECTION EDITING) */}
           {customBgTab === 'gradient' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="col-10px">
               {(() => {
                 const gradStr = customGradType === 'radial'
                   ? `radial-gradient(circle, ${customGradStart} 0%, ${customGradEnd} 100%)`
@@ -339,7 +339,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div className="row-between-8px">
                       <span className="text-micro">Gradient Style</span>
                       <div style={{ display: 'flex', gap: '4px', background: 'var(--color-surface-2)', padding: '2px', borderRadius: 'var(--radius-sm)' }}>
                         <button
@@ -385,7 +385,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                           max="360"
                           value={customGradAngle}
                           onChange={e => setCustomGradAngle(Number(e.target.value))}
-                          style={{ width: '100%', accentColor: 'var(--color-secondary)', cursor: 'pointer' }}
+                          className="range-accent"
                         />
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginTop: '2px' }}>
                           {[0, 90, 135, 180].map(ang => (
@@ -440,12 +440,12 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
 
           {/* TAB 3: CUSTOM IMAGE (FILE UPLOAD OR URL) */}
           {customBgTab === 'image' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="col-10px">
               <input
                 type="file"
                 ref={fileInputRef}
                 accept="image/*"
-                style={{ display: 'none' }}
+                className="is-hidden"
                 onChange={handleFileUpload}
               />
 
@@ -478,9 +478,9 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
-                <div style={{ flex: 1, height: '1px', background: 'var(--color-surface-offset)' }} />
+                <div className="rule-fill" />
                 <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>OR PASTE LINK</span>
-                <div style={{ flex: 1, height: '1px', background: 'var(--color-surface-offset)' }} />
+                <div className="rule-fill" />
               </div>
 
               <input

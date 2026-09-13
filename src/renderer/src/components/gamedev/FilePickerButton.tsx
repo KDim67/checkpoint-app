@@ -49,7 +49,7 @@ export default function FilePickerButton({ onClick, path, placeholder }: FilePic
       }}>
         {path ? nameOf(path) : placeholder}
       </span>
-      <Plus size={14} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
+      <Plus size={14} className="icon-accent" />
     </button>
   )
 }

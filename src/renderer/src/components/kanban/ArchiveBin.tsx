@@ -101,7 +101,7 @@ export default function ArchiveBin({
           
           {/* Archived Columns List */}
           <div className="col">
-            <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            <span className="label-caps-sm">
               Archived Columns ({archivedColumns.length})
             </span>
             {archivedColumns.map(col => (
@@ -117,10 +117,10 @@ export default function ArchiveBin({
                   borderRadius: 'var(--radius-md)'
                 }}
               >
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+                <span className="text-label-xs-medium">
                   {col.name}
                 </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div className="flex-6px">
                   <button
                     onClick={() => onRestoreColumn(col.id)}
                     style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', fontSize: '10px', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
@@ -148,8 +148,8 @@ export default function ArchiveBin({
             const selCount = archivedCards.reduce((n, c) => n + (selectedIds.has(c.id) ? 1 : 0), 0)
             return (
               <div className="col">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                <div className="row-between-8px">
+                  <span className="label-caps-sm">
                     Archived Cards ({archivedCards.length})
                   </span>
                   {archivedCards.length > 0 && (
@@ -165,10 +165,10 @@ export default function ArchiveBin({
                 {/* Bulk action bar. Appears when items are selected */}
                 {selCount > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--color-primary-muted)', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }}>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)' }}>
+                    <span className="text-label-xs-semibold">
                       {selCount} selected
                     </span>
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div className="flex-6px">
                       <button
                         onClick={onBulkRestore}
                         style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-secondary)', fontSize: '10px', fontWeight: 'var(--weight-semibold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}

@@ -276,7 +276,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
         gap: '8px'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+      <div className="row-between-8px">
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2dd4bf', fontSize: '12px', fontWeight: 'bold', minWidth: 0 }}>
           <RefreshCw size={14} style={{ flexShrink: 0, opacity: done ? 1 : 0.5 }} />
           <span className="truncate">
@@ -312,7 +312,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
             </div>
           )}
           {noops > 0 && (
-            <div style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
+            <div className="text-micro-faint">
               {noops} operation{noops > 1 ? 's were' : ' was'} already in the requested state.
             </div>
           )}

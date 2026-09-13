@@ -110,7 +110,7 @@ export default function BacklogFilters({
       }}>
         {/* Status Multi-Select */}
         <div className="col">
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+          <span className="label-caps-sm">
             Workflow Stages
           </span>
           <div style={{
@@ -124,20 +124,13 @@ export default function BacklogFilters({
             {columns.map(col => (
               <label
                 key={col.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--color-text-base)',
-                  cursor: 'pointer'
-                }}
+                className="check-row"
               >
                 <input
                   type="checkbox"
                   checked={selectedStatuses.includes(col.id)}
                   onChange={() => handleStatusToggle(col.id)}
-                  style={{ cursor: 'pointer' }}
+                  className="clickable"
                 />
                 <span>{col.name}</span>
               </label>
@@ -147,7 +140,7 @@ export default function BacklogFilters({
 
         {/* Priority Multi-Select */}
         <div className="col">
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+          <span className="label-caps-sm">
             Priority
           </span>
           <div className="col-4px">
@@ -159,20 +152,13 @@ export default function BacklogFilters({
             ].map(p => (
               <label
                 key={p.num}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--color-text-base)',
-                  cursor: 'pointer'
-                }}
+                className="check-row"
               >
                 <input
                   type="checkbox"
                   checked={selectedPriorities.includes(p.num)}
                   onChange={() => handlePriorityToggle(p.num)}
-                  style={{ cursor: 'pointer' }}
+                  className="clickable"
                 />
                 <span>{p.label}</span>
               </label>
@@ -182,7 +168,7 @@ export default function BacklogFilters({
 
         {/* Tags Multi-Select */}
         <div className="col">
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+          <span className="label-caps-sm">
             Tags
           </span>
           <div style={{
@@ -196,22 +182,15 @@ export default function BacklogFilters({
             {allTags.map(tag => (
               <label
                 key={tag.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--color-text-base)',
-                  cursor: 'pointer'
-                }}
+                className="check-row"
               >
                 <input
                   type="checkbox"
                   checked={selectedTagIds.includes(tag.id)}
                   onChange={() => handleTagToggle(tag.id)}
-                  style={{ cursor: 'pointer' }}
+                  className="clickable"
                 />
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span className="row-4px">
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: tag.color }} />
                   {tag.name}
                 </span>
@@ -227,11 +206,11 @@ export default function BacklogFilters({
 
         {/* Due Date Range */}
         <div className="col">
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+          <span className="label-caps-sm">
             Due Date Range
           </span>
           <div className="col-6px">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="row-4px">
               <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', width: '30px' }}>From</span>
               <input
                 type="date"
@@ -249,7 +228,7 @@ export default function BacklogFilters({
                 }}
               />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="row-4px">
               <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', width: '30px' }}>To</span>
               <input
                 type="date"
@@ -277,7 +256,7 @@ export default function BacklogFilters({
 
         {/* Links / Relations Filter */}
         <div className="col">
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+          <span className="label-caps-sm">
             Link Relations
           </span>
           <select

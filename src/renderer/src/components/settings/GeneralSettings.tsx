@@ -33,17 +33,7 @@ export default function GeneralSettings() {
             setDefaultContext(e.target.value)
             setStringSetting('default_context', e.target.value)
           }}
-          style={{
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-surface-offset)',
-            color: 'var(--color-text-base)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-2) var(--space-3)',
-            fontSize: 'var(--text-sm)',
-            outline: 'none',
-            cursor: 'pointer',
-            width: '100%'
-          }}
+          className="select-md"
         >
           <option value="">Last used (default)</option>
           {availableWorkspaces.map(ctx => (
@@ -64,17 +54,7 @@ export default function GeneralSettings() {
               console.error('Failed to save start_view setting:', err)
             })
           }}
-          style={{
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-surface-offset)',
-            color: 'var(--color-text-base)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-2) var(--space-3)',
-            fontSize: 'var(--text-sm)',
-            outline: 'none',
-            cursor: 'pointer',
-            width: '100%'
-          }}
+          className="select-md"
         >
           <option value={START_VIEW_LAST_USED}>Last used (default)</option>
           {VIEW_FEATURES.filter(f => enabledViews[f.view]).map(f => (

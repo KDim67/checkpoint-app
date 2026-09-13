@@ -79,7 +79,7 @@ export default function ExtensionsTab() {
   }
 
   if (loading) {
-    return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Scanning plugins…</div>
+    return <div className="text-sm-faint">Scanning plugins…</div>
   }
 
   return (
@@ -151,7 +151,7 @@ export default function ExtensionsTab() {
           alignItems: 'center',
           gap: 'var(--space-3)'
         }}>
-          <AlertTriangle size={18} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+          <AlertTriangle size={18} className="icon-warning" />
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', flex: 1 }}>
             The Customization Engine is disabled, so plugin hooks are inactive. It also powers the Theme Builder in <strong>Appearance &amp; Theme</strong>.
           </div>
@@ -185,7 +185,7 @@ export default function ExtensionsTab() {
 
       <div className="row-between">
         <div>
-          <h3 style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)' }}>
+          <h3 className="heading-sm-strong">
             User Plugins
           </h3>
           <p style={{ margin: '2px 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
@@ -244,7 +244,7 @@ export default function ExtensionsTab() {
               }}
             >
               <div className="fill">
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{example.name}</div>
+                <div className="text-xs-base">{example.name}</div>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '1px' }}>
                   {example.description}
                 </div>
@@ -342,7 +342,7 @@ export default function ExtensionsTab() {
                   borderRadius: 'var(--radius-md)'
                 }}
               >
-                <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
+                <div className="flex-1-mr">
                   <div className="row">
                     <span className="text-item-strong">
                       {p.name}

@@ -41,7 +41,7 @@ export default function WallSwitcher({
           {activeWall?.name ?? '…'}
         </span>
         {/* Just a hint that there is a choice. */}
-        <ChevronDown size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
+        <ChevronDown size={12} className="icon-faint" />
       </button>
 
       {wallMenuOpen && wallIndex && (
@@ -145,7 +145,7 @@ export default function WallSwitcher({
               )
             })}
 
-            <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+            <div className="rule" />
 
             <button
               onClick={addWall}

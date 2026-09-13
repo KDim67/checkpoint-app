@@ -125,7 +125,7 @@ export default function McpSettings(): React.JSX.Element {
   }
 
   if (loading) {
-    return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading…</div>
+    return <div className="text-sm-faint">Loading…</div>
   }
 
   const mono: React.CSSProperties = {

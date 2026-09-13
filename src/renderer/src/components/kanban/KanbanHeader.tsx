@@ -145,7 +145,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
 
       {/* Never shrinks. A button pushed past the right edge is a button
           nobody can press, and this row has gone over it before. */}
-      <div className="row" style={{ flexShrink: 0 }}>
+      <div className="row no-shrink">
         <CollabPanel session={collab} />
 
         {/* Background Theme Customizer */}

@@ -77,7 +77,7 @@ export default function WidgetSettings() {
         <>
           <Divider />
           <FieldRow label="Position">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            <div className="flex-wrap-gap">
               {POSITIONS.map(p => (
                 <button
                   key={p.value}
@@ -107,7 +107,7 @@ export default function WidgetSettings() {
               step={0.05}
               value={opacity}
               onChange={e => handleOpacity(parseFloat(e.target.value))}
-              style={{ accentColor: 'var(--color-secondary)', cursor: 'pointer', width: '100%' }}
+              className="range-accent"
             />
           </FieldRow>
         </>

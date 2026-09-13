@@ -185,11 +185,11 @@ export default function TrayPanel(): React.JSX.Element {
 
       <div style={{ padding: '0 var(--space-2)', display: 'flex', flexDirection: 'column' }}>
         <button style={actionRow} onMouseEnter={hover(true)} onMouseLeave={hover(false)} onClick={() => act('open')}>
-          <LayoutGrid size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+          <LayoutGrid size={14} className="icon-muted" />
           Open Checkpoint
         </button>
         <button style={actionRow} onMouseEnter={hover(true)} onMouseLeave={hover(false)} onClick={() => act('capture')}>
-          <Zap size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+          <Zap size={14} className="icon-muted" />
           Quick capture
         </button>
       </div>
@@ -217,8 +217,8 @@ export default function TrayPanel(): React.JSX.Element {
                 gap: 'var(--space-3)', opacity: disabled ? 0.45 : 1
               }}
             >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{label}</div>
+              <div className="min-w-0">
+                <div className="text-xs-base">{label}</div>
                 <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginTop: '1px' }}>{hint}</div>
               </div>
               <ToggleSwitch
@@ -239,7 +239,7 @@ export default function TrayPanel(): React.JSX.Element {
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           onClick={() => act('quit')}
         >
-          <Power size={14} style={{ flexShrink: 0 }} />
+          <Power size={14} className="no-shrink" />
           Quit Checkpoint
         </button>
       </div>

@@ -52,7 +52,7 @@ export default function ExportPanel(): React.JSX.Element {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+      <div className="flex-wrap-gap">
         <button onClick={() => setScope('current')} style={choice(scope === 'current')}>
           {activeWorkspace}
         </button>
@@ -61,7 +61,7 @@ export default function ExportPanel(): React.JSX.Element {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+      <div className="flex-wrap-gap">
         {EXPORT_FORMATS.map(f => (
           <button key={f.id} onClick={() => setFormat(f.id)} style={choice(format === f.id)}>
             {f.label}

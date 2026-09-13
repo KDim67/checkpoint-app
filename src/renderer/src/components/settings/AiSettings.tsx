@@ -268,7 +268,7 @@ export default function AiSettings() {
           aria-label="Temperature"
           aria-valuetext={temperature.toFixed(1)}
           onChange={e => { setTemperature(parseFloat(e.target.value)); save('ai_temperature', parseFloat(e.target.value)) }}
-          style={{ accentColor: 'var(--color-secondary)', cursor: 'pointer', width: '100%' }}
+          className="range-accent"
         />
       </FieldRow>
 
@@ -295,7 +295,7 @@ export default function AiSettings() {
 
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+          <div className="text-label-xs-semibold">
             Email Writing Voice Context & Sample Drafts ({emailSamples.length}/5)
           </div>
           {emailSamples.length < 5 && (
@@ -338,7 +338,7 @@ export default function AiSettings() {
                 gap: 'var(--space-2)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+              <div className="row-between-gap">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                   <Mail size={12} className="text-accent" />
                   <input
@@ -429,7 +429,7 @@ export default function AiSettings() {
           }}
         >
           {connectionStatus === 'testing' && (
-            <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
+            <RefreshCw size={12} className="animate-spin" />
           )}
           Test Connection
         </button>
@@ -447,7 +447,7 @@ export default function AiSettings() {
               Connection Failed
             </div>
             {connectionError && (
-              <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>{connectionError}</span>
+              <span className="text-micro-faint">{connectionError}</span>
             )}
           </div>
         )}

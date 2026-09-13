@@ -543,7 +543,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
             >
               {/* Time Range */}
               <div>
-                <label style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 'var(--space-2)' }}>
+                <label className="label-caps-block">
                   Timeframe
                 </label>
                 <div style={{ display: 'flex', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: '2px', width: '100%', gap: '2px' }}>
@@ -579,7 +579,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
 
               {/* Style Selection */}
               <div>
-                <label style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 'var(--space-2)' }}>
+                <label className="label-caps-block">
                   Output Summary Format
                 </label>
                 <select
@@ -606,7 +606,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
 
               {/* Model status selector */}
               <div>
-                <label style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: 'var(--space-2)' }}>
+                <label className="label-caps-block">
                   AI Model
                 </label>
                 {useOllamaSelector ? (
@@ -697,7 +697,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               ) : logs.length === 0 ? (
                 <div style={{ padding: 'var(--space-8) 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                   <p style={{ fontSize: 'var(--text-xs)', margin: '0 0 var(--space-2)' }}>No logs found in the past {timeRange} hours.</p>
-                  <span style={{ fontSize: '10px', opacity: 0.6 }}>Add scratchpad logs to populate the list.</span>
+                  <span className="text-micro-dim">Add scratchpad logs to populate the list.</span>
                 </div>
               ) : (
                 <div className="col">
@@ -842,7 +842,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               </span>
 
               {streamingText && !isStreaming && (
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <div className="flex-gap">
                   <button
                     onClick={handleCopy}
                     style={{
@@ -912,7 +912,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                       <SparklesIcon />
                     </div>
                   </div>
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>Generating your standup…</span>
+                  <span className="text-label-xs-semibold">Generating your standup…</span>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-secondary)' }} />
                     {selectedModel}
@@ -923,11 +923,11 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                   <div style={{ width: '52px', height: '52px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-offset)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
                     <SparklesIcon />
                   </div>
-                  <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', margin: 0 }}>
+                  <p className="heading-sm-strong">
                     No report yet
                   </p>
                   <span style={{ fontSize: '11px', maxWidth: '280px', lineHeight: 1.6, color: 'var(--color-text-muted)' }}>
-                    Pick the log entries you want summarised on the left, then hit <strong style={{ color: 'var(--color-text-base)' }}>Generate</strong> to stream your standup here.
+                    Pick the log entries you want summarised on the left, then hit <strong className="text-base">Generate</strong> to stream your standup here.
                   </span>
                 </div>
               ) : (

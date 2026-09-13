@@ -543,7 +543,7 @@ export default function ChatInput({
                   {cmd.name}
                 </span>
               </div>
-              <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>
+              <span className="text-nano">
                 {cmd.desc}
               </span>
             </button>
@@ -592,9 +592,9 @@ export default function ChatInput({
               onMouseLeave={e => (e.currentTarget.style.background = attachedCheatsheets.includes(cs.name) ? 'var(--color-surface-offset)' : 'transparent')}
             >
               <BookOpen size={13} style={{ color: 'var(--color-primary-soft)', flexShrink: 0 }} />
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.name}</span>
+              <span className="truncate-fill">{cs.name}</span>
               {attachedCheatsheets.includes(cs.name) && (
-                <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
+                <span className="text-accent-nano">Attached</span>
               )}
             </button>
           ))}
@@ -618,9 +618,9 @@ export default function ChatInput({
               onMouseLeave={e => (e.currentTarget.style.background = attachedNotes.includes(title) ? 'var(--color-surface-offset)' : 'transparent')}
             >
               <FileText size={13} style={{ color: 'var(--color-success-soft)', flexShrink: 0 }} />
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+              <span className="truncate-fill">{title}</span>
               {attachedNotes.includes(title) && (
-                <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
+                <span className="text-accent-nano">Attached</span>
               )}
             </button>
           ))}
@@ -645,12 +645,12 @@ export default function ChatInput({
               onMouseLeave={e => (e.currentTarget.style.background = attachedFiles.includes(f.relativePath) ? 'var(--color-surface-offset)' : 'transparent')}
             >
               <FileCode size={13} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              <div className="col-fill">
                 <span className="truncate">{f.name}</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
               </div>
               {attachedFiles.includes(f.relativePath) && (
-                <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold' }}>Attached</span>
+                <span className="text-accent-nano">Attached</span>
               )}
             </button>
           ))}
@@ -770,11 +770,11 @@ export default function ChatInput({
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                 onMouseLeave={e => (e.currentTarget.style.background = showCheatsheetSubmenu ? 'var(--color-surface-2)' : 'transparent')}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="row-8px">
                   <BookOpen size={13} style={{ color: 'var(--color-primary-soft)' }} />
                   <span>Attach Cheatsheet...</span>
                 </div>
-                <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>({attachedCheatsheets.length})</span>
+                <span className="text-nano-faint">({attachedCheatsheets.length})</span>
               </button>
 
               {/* Submenu for Cheatsheet attachment selection */}
@@ -815,7 +815,7 @@ export default function ChatInput({
                           textAlign: 'left'
                         }}
                       >
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.name}</span>
+                        <span className="truncate-fill">{cs.name}</span>
                         {attachedCheatsheets.includes(cs.name) && <X size={10} />}
                       </button>
                     ))
@@ -846,7 +846,7 @@ export default function ChatInput({
                 <ImageIcon size={13} style={{ color: visionCapable ? '#f472b6' : 'var(--color-text-faint)' }} />
                 <span>
                   Attach Image…{' '}
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+                  <span className="text-nano-faint">
                     {visionCapable ? '(vision)' : '(model not vision-capable)'}
                   </span>
                 </span>
@@ -854,7 +854,7 @@ export default function ChatInput({
 
               {(customActions.length > 0 || onManageCustomActions) && (
                 <>
-                  <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+                  <div className="rule" />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 8px 4px' }}>
                     <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       My prompts
@@ -875,11 +875,7 @@ export default function ChatInput({
                       key={a.id}
                       onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, a.intent) }}
                       title={a.prompt}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', width: '100%',
-                        background: 'transparent', border: 'none', color: 'var(--color-text-base)',
-                        borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left'
-                      }}
+                      className="menu-row-btn"
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
@@ -890,7 +886,7 @@ export default function ChatInput({
                 </>
               )}
 
-              <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+              <div className="rule" />
               <div style={{ padding: '2px 8px 4px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Create on the board
               </div>
@@ -900,7 +896,7 @@ export default function ChatInput({
                   <button
                     key={a.label}
                     onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, 'create') }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', width: '100%', background: 'transparent', border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left' }}
+                    className="menu-row-btn"
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
@@ -910,7 +906,7 @@ export default function ChatInput({
                 )
               })}
 
-              <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+              <div className="rule" />
               <div style={{ padding: '2px 8px 4px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Analyze &amp; advise
               </div>
@@ -920,7 +916,7 @@ export default function ChatInput({
                   <button
                     key={a.label}
                     onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, 'analyze') }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', width: '100%', background: 'transparent', border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left' }}
+                    className="menu-row-btn"
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
@@ -1017,7 +1013,7 @@ export default function ChatInput({
           type="file"
           accept="image/*"
           multiple
-          style={{ display: 'none' }}
+          className="is-hidden"
           onChange={e => {
             const files = Array.from(e.target.files || [])
             files.slice(0, 4).forEach(f => addImageFile(f))

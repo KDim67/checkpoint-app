@@ -9,15 +9,7 @@ interface ActiveTextureHeaderProps {
 
 export default function ActiveTextureHeader({ label, path, onChange, onClear }: ActiveTextureHeaderProps) {
   return (
-    <div style={{
-      background: 'var(--color-surface-1)',
-      border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-3) var(--space-4)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between'
-    }}>
+    <div className="panel-row">
       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <span className="text-caption">{label}</span>
         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={path || ''}>
@@ -25,7 +17,7 @@ export default function ActiveTextureHeader({ label, path, onChange, onClear }: 
         </span>
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+      <div className="flex-gap">
         <button
           onClick={onChange}
           style={{

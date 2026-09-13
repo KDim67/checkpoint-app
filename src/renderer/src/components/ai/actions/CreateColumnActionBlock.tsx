@@ -100,7 +100,7 @@ export default function CreateColumnActionBlock({ jsonString }: { jsonString: st
     return (
       <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', margin: '8px 0' }}>
         <div style={{ padding: '4px 0', color: 'var(--color-text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
+          <RefreshCw size={12} className="animate-spin" />
           <span>Generating column block...</span>
         </div>
       </div>
@@ -123,7 +123,7 @@ export default function CreateColumnActionBlock({ jsonString }: { jsonString: st
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: colData.color || '#3b82f6', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.02em', flexShrink: 0 }}>
-          <Columns size={14} style={{ flexShrink: 0 }} />
+          <Columns size={14} className="no-shrink" />
           <span>Created column</span>
         </div>
         {colData.wipLimit !== null && (

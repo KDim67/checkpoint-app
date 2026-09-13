@@ -50,7 +50,7 @@ export default function CustomActionsModal({ actions }: Props) {
               </div>
               <button
                 onClick={() => setShowCustomActionsModal(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px' }}
+                className="icon-btn"
               >
                 <X size={14} />
               </button>
@@ -121,7 +121,7 @@ export default function CustomActionsModal({ actions }: Props) {
                     fontSize: '11px', outline: 'none', resize: 'vertical', fontFamily: 'inherit'
                   }}
                 />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div className="row-between-8px">
                   <select
                     value={caIntent}
                     onChange={e => setCaIntent(e.target.value as 'create' | 'analyze')}

@@ -192,7 +192,7 @@ export default function KanbanView() {
 
       {/* Board Area */}
       {columns.length === 0 ? (
-        <div style={{ flex: 1 }}>
+        <div className="flex-1">
           <EmptyState
             icon={<KanbanSquare size={48} />}
             title="No Columns Defined"

@@ -75,7 +75,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
               {totalCount}
             </span>
           </span>
-          <div style={{ display: 'flex', gap: '2px' }}>
+          <div className="flex-2px">
             <button
               className="notes-icon-btn"
               title="Import an Obsidian vault"
@@ -156,8 +156,8 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
                   onClick={() => { setTemplateMenu(false); onCreate(t.id) }}
                   className="notes-menu-item"
                 >
-                  <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{t.label}</span>
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>{t.description}</span>
+                  <span className="text-label-xs-semibold">{t.label}</span>
+                  <span className="text-micro-faint">{t.description}</span>
                 </button>
               ))}
             </div>
@@ -165,10 +165,10 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
         </div>
 
         {/* Search */}
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div className="row-relative">
           {searching
             ? <Loader2 size={14} className="notes-spin" style={{ position: 'absolute', left: '10px', color: 'var(--color-primary)' }} />
-            : <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--color-text-faint)' }} />}
+            : <Search size={14} className="input-icon" />}
           <input
             type="text"
             placeholder="Search title, tags & text…"
@@ -233,7 +233,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
                       style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', color: s.key === sort ? 'var(--color-secondary)' : 'var(--color-text-base)' }}
                     >
                       {s.icon}
-                      <span style={{ fontSize: 'var(--text-xs)' }}>{s.label}</span>
+                      <span className="text-xs">{s.label}</span>
                     </button>
                   ))}
                 </div>
@@ -265,7 +265,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '6px' }}>
                   <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {isPinned && <Pin size={11} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} fill="var(--color-secondary)" />}
+                    {isPinned && <Pin size={11} className="icon-accent" fill="var(--color-secondary)" />}
                     {note.title}
                   </span>
                   <button

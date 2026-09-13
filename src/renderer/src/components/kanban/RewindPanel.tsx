@@ -69,11 +69,11 @@ function Group({ icon, label, count, children }: GroupProps) {
             flexShrink: 0
           }}
         />
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        <span className="row-6px-fixed">
           {icon}
           {label}
         </span>
-        <span style={{ color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+        <span className="text-mono-micro">
           {count}
         </span>
       </button>
@@ -197,7 +197,7 @@ export default function RewindPanel({ item }: { item: Item }) {
         <div className="text-item">
           {formatWhen(sitting.start, sitting.end)}
         </div>
-        <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+        <div className="text-caption-sub">
           {formatDuration(sitting.durationMs)} focused across {sitting.sessionCount} session
           {sitting.sessionCount === 1 ? '' : 's'} · {agoLabel(daysSince)}
           {sitting.completed && ' · you ticked it off'}

@@ -424,7 +424,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             padding: 'var(--space-2) var(--space-4)',
             background: 'var(--color-surface-elevated)',
             border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-full, 999px)',
+            borderRadius: 'var(--radius-full)',
             boxShadow: 'var(--shadow-lg)',
             fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)',
             zIndex: 30

@@ -31,7 +31,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
   const clashCount = [...targetCounts.values()].filter(n => n > 1).length
 
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
+      <div className="col-lg-full">
         <div className="gamedev-info-banner">
           <Info size={15} className="gamedev-info-banner-icon" />
           <div>
@@ -42,7 +42,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
           
           {/* Settings Card */}
           <div className="panel">
-            <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Naming Conventions</h3>
+            <h3 className="heading-sm">Naming Conventions</h3>
             
             {/* Preset Row */}
             <div className="col-4px">
@@ -50,14 +50,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               <select
                 value={tool.renamerPreset}
                 onChange={e => tool.setRenamerPreset(e.target.value as RenamerPreset)}
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: 'var(--space-2)',
-                  fontSize: 'var(--text-xs)'
-                }}
+                className="input-sm"
               >
                 <option value="none">No Preset Prefix</option>
                 <option value="texture">Texture (T_)</option>
@@ -72,14 +65,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               <select
                 value={tool.renamerSuffixPreset}
                 onChange={e => tool.setRenamerSuffixPreset(e.target.value as RenamerSuffixPreset)}
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: 'var(--space-2)',
-                  fontSize: 'var(--text-xs)'
-                }}
+                className="input-sm"
               >
                 <option value="none">No Preset Suffix</option>
                 <option value="diffuse">Diffuse (_D)</option>
@@ -88,7 +74,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
             </div>
 
             {/* Custom Prefix & Suffix */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+            <div className="grid-2">
               <div className="col-4px">
                 <label className="text-caption">Custom Prefix</label>
                 <input
@@ -96,14 +82,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   value={tool.customPrefix}
                   onChange={e => tool.setCustomPrefix(e.target.value)}
                   placeholder="e.g. Env_"
-                  style={{
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: 'var(--space-2)',
-                    fontSize: 'var(--text-xs)'
-                  }}
+                  className="input-sm"
                 />
               </div>
               <div className="col-4px">
@@ -113,20 +92,13 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   value={tool.customSuffix}
                   onChange={e => tool.setCustomSuffix(e.target.value)}
                   placeholder="e.g. _low"
-                  style={{
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: 'var(--space-2)',
-                    fontSize: 'var(--text-xs)'
-                  }}
+                  className="input-sm"
                 />
               </div>
             </div>
 
             {/* Search and Replace */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+            <div className="grid-2">
               <div className="col-4px">
                 <label className="text-caption">Search For</label>
                 <input
@@ -134,14 +106,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   value={tool.searchStr}
                   onChange={e => tool.setSearchStr(e.target.value)}
                   placeholder="e.g. temp"
-                  style={{
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: 'var(--space-2)',
-                    fontSize: 'var(--text-xs)'
-                  }}
+                  className="input-sm"
                 />
               </div>
               <div className="col-4px">
@@ -151,14 +116,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   value={tool.replaceStr}
                   onChange={e => tool.setReplaceStr(e.target.value)}
                   placeholder="e.g. final"
-                  style={{
-                    background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: 'var(--space-2)',
-                    fontSize: 'var(--text-xs)'
-                  }}
+                  className="input-sm"
                 />
               </div>
             </div>
@@ -245,7 +203,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               type="file"
               id="renamer-file-picker"
               multiple
-              style={{ display: 'none' }}
+              className="is-hidden"
               onChange={tool.handleFileSelect}
             />
             <Layers size={36} style={{ color: tool.isDragOver ? 'var(--color-secondary)' : 'var(--color-text-faint)', marginBottom: 'var(--space-2)' }} />
@@ -275,7 +233,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
               <div className="row">
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Renaming Preview ({files.length} items)</span>
+                <span className="text-sm-semibold">Renaming Preview ({files.length} items)</span>
                 <button
                   onClick={() => tool.setFiles([])}
                   style={{

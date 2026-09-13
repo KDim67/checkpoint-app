@@ -89,7 +89,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
         </span>
         {active && (
           <span style={{
-            padding: '1px 6px', borderRadius: 'var(--radius-full, 999px)',
+            padding: '1px 6px', borderRadius: 'var(--radius-full)',
             background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)',
             fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em'
           }}>
@@ -119,8 +119,8 @@ export default function TurnRelaySettings(): React.JSX.Element {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <div style={{ flex: 1 }}>
+        <div className="flex-gap">
+          <div className="flex-1">
             <label style={label} htmlFor="turn-user">Username</label>
             <input
               id="turn-user"
@@ -130,7 +130,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
               style={field}
             />
           </div>
-          <div style={{ flex: 1 }}>
+          <div className="flex-1">
             <label style={label} htmlFor="turn-pass">Password</label>
             <input
               id="turn-pass"
@@ -156,7 +156,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
           Save
         </button>
         {saved && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: 'var(--color-success, var(--color-secondary))' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>
             <Check size={12} /> Saved
           </span>
         )}

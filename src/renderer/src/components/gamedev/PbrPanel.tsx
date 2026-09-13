@@ -27,7 +27,7 @@ function MapPreview({ label, children }: { label: string; children: React.ReactN
       borderRadius: 'var(--radius-md)',
       padding: 'var(--space-3)'
     }}>
-      <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+      <span className="text-caption-strong">
         {label}
       </span>
       {/* Square, and sized from the column it sits in. The box used to be a
@@ -51,7 +51,7 @@ function MapPreview({ label, children }: { label: string; children: React.ReactN
 
 export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDone: (cardId: string) => Promise<void> }) {
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
+      <div className="col-lg-full">
         <div className="gamedev-info-banner">
           <Sparkles size={15} className="gamedev-info-banner-icon" />
           <div>
@@ -74,16 +74,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
           <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>
             
             {/* Left Column: 3D Preview & Sliders */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-4)',
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-4)',
-              overflowY: 'auto'
-            }}>
+            <div className="panel-scroll">
               {/* ThreeJS Container */}
               <div style={{ position: 'relative', width: '100%', height: '300px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-surface-offset)' }}>
                 <canvas ref={tool.previewCanvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
@@ -134,7 +125,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
               </div>
 
               {/* Sliders Title */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
+              <div className="section-head">
                 <Settings size={14} className="text-muted" />
                 <span className="label-caps">
                   Map Generation Tweak Settings
@@ -159,7 +150,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                     <span className="text-label-sm">Invert Height</span>
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>Treat dark pixels as raised instead of recessed</span>
+                    <span className="text-nano-faint">Treat dark pixels as raised instead of recessed</span>
                   </div>
                   <input
                     type="checkbox"
@@ -171,7 +162,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
 
                 {/* Normal Intensity */}
                 <div className="col-4px">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <div className="row-caption">
                     <span className="text-label">Normal Intensity</span>
                     <span className="text-accent">{tool.normalIntensity.toFixed(1)}</span>
                   </div>
@@ -188,7 +179,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
 
                 {/* Height Depth */}
                 <div className="col-4px">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <div className="row-caption">
                     <span className="text-label">Height/Bump Depth</span>
                     <span className="text-accent">{tool.heightDepth.toFixed(2)}</span>
                   </div>
@@ -205,7 +196,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
 
                 {/* Roughness Contrast */}
                 <div className="col-4px">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <div className="row-caption">
                     <span className="text-label">Roughness Contrast</span>
                     <span className="text-accent">{tool.roughnessContrast.toFixed(1)}</span>
                   </div>
@@ -222,7 +213,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
 
                 {/* Roughness Base */}
                 <div className="col-4px">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <div className="row-caption">
                     <span className="text-label">Roughness Base (Shininess)</span>
                     <span className="text-accent">{tool.roughnessBase.toFixed(2)}</span>
                   </div>
@@ -239,7 +230,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
 
                 {/* AO Intensity */}
                 <div className="col-4px">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <div className="row-caption">
                     <span className="text-label">AO Crevice Darkness</span>
                     <span className="text-accent">{tool.aoIntensity.toFixed(1)}</span>
                   </div>
@@ -257,7 +248,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
             </div>
 
             {/* Right Column: 2D Grid & Export Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
+            <div className="col-lg-min">
               
               {/* File Metadata Header */}
               <ActiveTextureHeader
@@ -363,11 +354,11 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                         Maps Saved next to original texture!
                       </span>
                     </div>
-                    <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
+                    <p className="text-caption-flush">
                       Since you came from a Kanban ticket, would you like to automatically mark it as Done?
                     </p>
                     
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
+                    <div className="flex-gap-mt2">
                       <button
                         onClick={async () => {
                           const cardId = tool.preloadCardId

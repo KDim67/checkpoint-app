@@ -7,7 +7,7 @@ import ActiveTextureHeader from './ActiveTextureHeader'
 
 export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool; onCardDone: (cardId: string) => Promise<void> }) {
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
+      <div className="col-lg-full">
         <div className="gamedev-info-banner">
           <Repeat size={15} className="gamedev-info-banner-icon" />
           <div>
@@ -29,18 +29,9 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
           <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>
             
             {/* Left Column: Tweak Sliders */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-4)',
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-4)',
-              overflowY: 'auto'
-            }}>
+            <div className="panel-scroll">
               {/* Settings Title */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
+              <div className="section-head">
                 <Settings size={14} className="text-muted" />
                 <span className="label-caps">
                   Stitching Configuration
@@ -93,8 +84,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
 
                 {/* Blend Width (only if feathering is selected) */}
                 {tool.seamlessAlgorithm === 'feather' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <div className="col-4px-mt">
+                    <div className="row-caption">
                       <span className="text-label">Blend/Overlap Width</span>
                       <span className="text-accent">{Math.round(tool.seamlessBlendWidth * 100)}%</span>
                     </div>
@@ -111,8 +102,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 )}
 
                 {/* Luminance Equalizer */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                <div className="col-4px-mt">
+                  <div className="row-caption">
                     <span className="text-label">Luminance Equalizer</span>
                     <span className="text-accent">{Math.round(tool.seamlessEqualizer * 100)}%</span>
                   </div>
@@ -129,8 +120,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
 
                 {/* Wavy Seams (only if feathering is selected) */}
                 {tool.seamlessAlgorithm === 'feather' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                  <div className="col-4px-mt">
+                    <div className="row-caption">
                       <span className="text-label">Wavy Seams (Mask Warping)</span>
                       <span className="text-accent">{Math.round(tool.seamlessWavySeams * 100)}%</span>
                     </div>
@@ -195,7 +186,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
             </div>
 
             {/* Right Column: 3x3 Canvas Grid & Export */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
+            <div className="col-lg-min">
               
               {/* Metadata Header */}
               <ActiveTextureHeader
@@ -318,11 +309,11 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                         Seamless texture saved next to original!
                       </span>
                     </div>
-                    <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
+                    <p className="text-caption-flush">
                       Since you came from a Kanban ticket, would you like to automatically mark it as Done?
                     </p>
                     
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
+                    <div className="flex-gap-mt2">
                       <button
                         onClick={async () => {
                           const cardId = tool.preloadSeamlessCardId

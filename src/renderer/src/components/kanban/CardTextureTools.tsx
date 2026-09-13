@@ -24,22 +24,14 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
           Game Dev: Texture Tooling Detected
         </span>
       </div>
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+      <p className="text-hint-flush">
         This ticket references local texture files. You can generate Normal/Height/Roughness/AO maps, or blend them into seamless tiling textures.
       </p>
       <div className="col">
         {paths.map((path, idx) => {
           const fileName = path.split('/').pop() || path;
           return (
-            <div key={idx} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2) var(--space-3)',
-            }}>
+            <div key={idx} className="panel-row-sm">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1, marginRight: 'var(--space-2)' }}>
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {fileName}

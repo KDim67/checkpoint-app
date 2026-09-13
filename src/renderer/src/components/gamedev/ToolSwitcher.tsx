@@ -44,7 +44,7 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+    <div className="row-md">
       <style>{`
         .gamedev-crumb {
           display: flex;
@@ -152,7 +152,7 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
                     onClick={() => pick(tool.id)}
                   >
                     {tool.icon}
-                    <span style={{ flex: 1 }}>{tool.label}</span>
+                    <span className="flex-1">{tool.label}</span>
                     {tool.id === activeTab && <Check size={13} />}
                   </button>
                 ))}

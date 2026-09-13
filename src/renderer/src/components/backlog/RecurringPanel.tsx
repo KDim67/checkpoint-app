@@ -126,7 +126,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
             style={{ ...fieldStyle, fontSize: 'var(--text-sm)' }}
           />
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="row-wrap">
             <span className="text-hint">Every</span>
             <input
               type="number"
@@ -150,7 +150,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
           </div>
 
           {freq === 'weekly' && (
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div className="flex-4px">
               {WEEKDAYS.map((label, day) => {
                 const on = byWeekday.includes(day)
                 return (
@@ -184,7 +184,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
             />
           </label>
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div className="flex-gap">
             <button className="btn-primary" onClick={handleCreate}>Create</button>
             <button className="btn-secondary" onClick={reset} aria-label="Cancel"><X size={13} /></button>
           </div>
@@ -213,7 +213,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {rule.title}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+            <div className="text-caption-sub">
               {rule.description}
               {rule.active && rule.nextDue ? ` · next ${new Date(rule.nextDue).toLocaleDateString()}` : ''}
               {!rule.active ? ' · paused' : ''}
