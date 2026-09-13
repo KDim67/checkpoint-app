@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { TOAST_DISMISS_MS } from '../../lib/timings'
 
-interface ToastAction {
+export interface ToastAction {
   label: string
   onClick: () => void
 }
