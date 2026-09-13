@@ -258,7 +258,7 @@ function PickRow({ choice, onClick }: { choice: PickChoice; onClick: () => void 
   )
 }
 
-interface ConfirmOptions {
+export interface ConfirmOptions {
   title: string
   message: string
   confirmText?: string
