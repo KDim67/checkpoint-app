@@ -36,8 +36,10 @@ export function removeTag(items: WallItem[], ids: Set<string>, name: string): Wa
   const next = items.map(item => {
     if (!ids.has(item.id) || !taggable(item) || !item.tags?.some(t => sameName(t, name))) return item
     changed = true
-    const copy = { ...item, tags: item.tags.filter(t => !sameName(t, name)) }
-    if (copy.tags.length === 0) delete copy.tags
+    const tags = item.tags.filter(t => !sameName(t, name))
+    const copy: WallItem = { ...item }
+    if (tags.length > 0) copy.tags = tags
+    else delete copy.tags
     return copy
   })
   return changed ? next : items
