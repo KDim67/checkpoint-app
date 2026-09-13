@@ -40,6 +40,16 @@ export const wallShortcutSections = (
     ]
   },
   {
+    group: 'View',
+    rows: [
+      [bindings.wall_zoom_in || 'Unbound', 'Zoom in'],
+      [bindings.wall_zoom_out || 'Unbound', 'Zoom out'],
+      [bindings.wall_zoom_reset || 'Unbound', 'Zoom to 100%'],
+      [bindings.wall_zoom_fit || 'Unbound', 'Fit everything in view'],
+      [bindings.wall_zoom_selection || 'Unbound', 'Zoom to the selection']
+    ]
+  },
+  {
     group: 'Editing',
     rows: [
       ['Ctrl+Z', 'Undo'],
@@ -50,13 +60,14 @@ export const wallShortcutSections = (
       ['Ctrl+V', 'Paste spreadsheet cells, a sticky each'],
       [bindings.wall_copy_style || 'Unbound', 'Copy style'],
       [bindings.wall_paste_style || 'Unbound', 'Paste style'],
-      [bindings.wall_group || 'Unbound', 'Group the selection'],
+      [bindings.wall_group || 'Unbound', 'Group, or ungroup a group'],
       [bindings.wall_ungroup || 'Unbound', 'Ungroup'],
       ['Ctrl+A', 'Select everything unlocked'],
       // the bound key is a preference, Delete is a fact
       [bindings.wall_delete ? `${bindings.wall_delete} or Delete` : 'Delete', 'Remove the selection'],
       ['Arrows', `Nudge by ${NUDGE}px`],
-      ['Shift+Arrows', `Nudge by ${NUDGE * 5}px`]
+      ['Shift+Arrows', `Nudge by ${NUDGE * 5}px`],
+      ['Alt+Arrows', 'Duplicate beside the selection']
     ]
   },
   {
@@ -67,10 +78,21 @@ export const wallShortcutSections = (
       ['Ctrl+I', 'Italic'],
       ['Ctrl+Shift+X', 'Strikethrough'],
       ['Ctrl+E', 'Code'],
+      ['Ctrl+U', 'Underline'],
       ['- or 1. then Space', 'Start a list'],
       ['Tab or Shift+Tab', 'Indent or outdent a list item'],
       ['Tab or Shift+Tab', 'Next item beside or below, outside a list'],
       ['Esc or Ctrl+Enter', 'Finish writing']
+    ]
+  },
+  {
+    // started from the Frames menu or a frame's right-click menu
+    group: 'Presenting',
+    rows: [
+      ['Right, Down or Space', 'Next frame'],
+      ['Left or Up', 'Previous frame'],
+      ['Home or End', 'First or last frame'],
+      ['Esc', 'Stop presenting']
     ]
   }
 ]

@@ -36,7 +36,10 @@ const labelsFor = (items: WallItem[], selected: string[], itemId: string | null 
     canPasteStyle: false,
     pasteHere: vi.fn(),
     canPaste: false,
-    makeCards: vi.fn(async () => {})
+    makeCards: vi.fn(async () => {}),
+    frameSelection: vi.fn(),
+    presentFrom: vi.fn(),
+    exportFrame: vi.fn()
   }
   return wallMenuEntries(ctx).map(e => e.label)
 }
@@ -59,6 +62,17 @@ describe('wall item menu', () => {
   it('leaves them out once a locked item or an image is in the pick', () => {
     expect(labelsFor([item('a', { locked: true })], ['a'])).not.toContain('Make a card')
     expect(labelsFor([item('a'), item('b', { kind: 'image' })], ['a', 'b'])).not.toContain('Make 2 cards')
+  })
+
+  it('frames a selection, and presents or exports a frame', () => {
+    expect(labelsFor([item('a'), item('b', { x: 300 })], ['a', 'b'])).toContain('Frame this selection')
+
+    const frameLabels = labelsFor([item('f', { kind: 'frame', width: 400, height: 400 })], ['f'])
+    expect(frameLabels).toContain('Present from this frame')
+    expect(frameLabels).toContain('Export frame as PNG')
+    expect(frameLabels).not.toContain('Frame this selection')
+
+    expect(labelsFor([item('a')], ['a'])).not.toContain('Present from this frame')
   })
 
   it('groups loose items and ungroups a group', () => {

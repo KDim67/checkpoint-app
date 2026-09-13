@@ -29,10 +29,12 @@ interface Props {
   onAutoSize?: (id: string, height: number) => void
   /** Tab while writing, the next item beside this one */
   onGrow?: (id: string, side: Side) => void
+  /** a search is on and this isn't in it */
+  dimmed?: boolean
 }
 
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
-function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow, dimmed }: Props) {
   const link = item.link
   const linkTitle = linkMissing
     ? `${linkLabel}. Edit the link to point somewhere else.`
@@ -43,6 +45,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
       data-wall-item={item.id}
       data-wall-arrow-target={arrowTarget || undefined}
       data-wall-arrow-from={arrowFrom || undefined}
+      data-wall-dimmed={dimmed || undefined}
       style={{
         position: 'absolute',
         left: 0, top: 0,

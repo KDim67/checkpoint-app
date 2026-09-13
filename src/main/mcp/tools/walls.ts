@@ -11,6 +11,11 @@ import {
   type WallItemKind
 } from '../../../shared/wallModel'
 import { normalizeLinkInput, parseWallLink } from '../../../shared/wallLink'
+import { addedIds, changedItems, connectWallItems, editWallItem, missingMessage, removeWallItems } from '../../../shared/wallEdit'
+import { groupItems, ungroupItems } from '../../../shared/wallGroup'
+import { alignableUnits, alignItems, distributeItems } from '../../../shared/wallAlign'
+import { binRemoved } from '../../../shared/wallBin'
+import type { McpUndoAction } from '../../../shared/mcpActivity'
 import { fetchLinkPreview } from '../../linkPreview'
 import { recordMcpActivity } from '../../mcpActivity'
 import { context, json, notifyRenderer, text, z } from '../toolKit'
@@ -47,9 +52,20 @@ function describeWallItem(item: WallItem, titleOf: (item: WallItem) => string | 
     ...(item.rotation ? { rotation: item.rotation } : {}),
     ...(item.locked ? { locked: true } : {}),
     ...(item.link ? { link: item.link } : {}),
-    ...(item.group ? { group: item.group } : {})
+    ...(item.group ? { group: item.group } : {}),
+    ...(item.from ? { from: item.from } : {}),
+    ...(item.to ? { to: item.to } : {})
   }
 }
+
+/** read back at undo time, so only this call reverses and later edits stay */
+function undoFor(key: string, before: WallItem[], after: WallItem[]): McpUndoAction[] {
+  return [{ kind: 'restore_wall_items', key, items: changedItems(before, after), removeIds: addedIds(before, after) }]
+}
+
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+
+const itemIds = z.array(z.string()).min(1).describe('Item ids from get_wall.')
 
 /** freeform canvases and what's on them */
 export function registerWallTools(mcp: McpServer): void {
@@ -57,7 +73,7 @@ export function registerWallTools(mcp: McpServer): void {
     'list_walls',
     {
       description:
-        "List a workspace's walls. A wall is a freeform canvas holding sticky notes, text, frames, images and references to cards and notes.",
+        "List a workspace's walls. A wall is a freeform canvas holding sticky notes, text, shapes, frames, images, arrows and references to cards and notes.",
       inputSchema: { context }
     },
     async ({ context: ctx }) => {
@@ -78,7 +94,7 @@ export function registerWallTools(mcp: McpServer): void {
     'get_wall',
     {
       description:
-        "Read one wall: every item on it with its position, size and kind. Cards and notes are references, so each also carries the title of the thing it points at. Omit wall_id for the wall the workspace was last on.",
+        "Read one wall: every item on it with its position (top-left corner), size and kind. Cards and notes are references, so each also carries the title of the thing it points at. Arrows carry the ids they run from and to, and grouped items share a group id. Omit wall_id for the wall the workspace was last on.",
       inputSchema: {
         context,
         wall_id: z.string().optional().describe('From list_walls. Defaults to the workspace\'s active wall.')
@@ -163,6 +179,186 @@ export function registerWallTools(mcp: McpServer): void {
       )
       notifyRenderer()
       return json({ placed: describeWallItem(created, () => undefined), wall: { id: wall.id, name: wall.name } })
+    }
+  )
+
+  mcp.registerTool(
+    'update_wall_item',
+    {
+      description:
+        "Change one item already on a wall; only the fields given change. x and y move it, and like place_on_wall they are its CENTRE. width and height resize it around its centre. text rewrites a sticky, text box, shape or bookmark, and relabels a frame or arrow. color recolours it, shape changes a shape's outline, link sets or clears where it leads, rotation turns it and locked pins it. align puts the words left, center or right in a sticky, text box or shape, and border_color, radius and opacity style a shape's outline, corners and fill. Moving a frame brings what's inside it. A locked item only moves when the same call passes locked: false. Card and doc items show a real card or note, so change those with update_item or write_note.",
+      inputSchema: {
+        context,
+        wall_id: z.string().optional(),
+        item_id: z.string().describe('From get_wall.'),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        width: z.number().optional(),
+        height: z.number().optional(),
+        text: z.string().optional().describe('New lines, **bold**, _italic_, ~~strike~~, `code`, "- " bullets and "1. " numbered items show as formatting in stickies, text and shapes.'),
+        color: z.string().optional().describe("Hex, e.g. #f6c453. An empty string goes back to the item's default colour."),
+        shape: z.enum(['rectangle', 'rounded', 'oval', 'diamond', 'triangle']).optional(),
+        link: z.string().optional().describe('A web address or wall:<wall_id>/<item_id>. An empty string removes the link.'),
+        rotation: z.number().optional().describe('Degrees, clockwise.'),
+        locked: z.boolean().optional(),
+        align: z.enum(['left', 'center', 'right']).optional(),
+        border_color: z.string().optional().describe("A shape's outline colour as hex. An empty string goes back to the default."),
+        radius: z.number().optional().describe("A rounded shape's corner radius in pixels, 0 to 200."),
+        opacity: z.number().min(0).max(1).optional().describe("A shape's fill opacity, from 0.1 to 1.")
+      }
+    },
+    async ({ context: ctx, wall_id, item_id, x, y, width, height, text: words, color, shape, link, rotation, locked, align, border_color, radius, opacity }) => {
+      const wall = resolveWall(ctx, wall_id)
+      const doc = readWallDoc(wall.key)
+      const result = editWallItem(doc.items, item_id, {
+        x, y, width, height, text: words, shape, rotation, locked, align, radius, opacity,
+        ...(border_color !== undefined ? { borderColor: border_color || null } : {}),
+        ...(color !== undefined ? { color: color || null } : {}),
+        ...(link !== undefined ? { link: link || null } : {})
+      })
+      if ('error' in result) return text(result.error)
+
+      setSetting(wall.key, { ...doc, items: result.items })
+      recordMcpActivity('update_wall_item', ctx, `Changed a ${result.item.kind} on the wall "${wall.name}"`, undoFor(wall.key, doc.items, result.items))
+      notifyRenderer()
+      return json({ updated: describeWallItem(result.item, () => undefined), wall: { id: wall.id, name: wall.name } })
+    }
+  )
+
+  mcp.registerTool(
+    'connect_wall_items',
+    {
+      description:
+        'Draw an arrow from one item on a wall to another. It stays attached as either item moves. route, line and heads style it, label puts words on it and color tints it.',
+      inputSchema: {
+        context,
+        wall_id: z.string().optional(),
+        from_id: z.string().describe('From get_wall.'),
+        to_id: z.string().describe('From get_wall.'),
+        label: z.string().optional(),
+        color: z.string().optional().describe('Hex, e.g. #f28b82.'),
+        route: z.enum(['straight', 'curved', 'elbow']).optional().describe('Straight when left out.'),
+        line: z.enum(['solid', 'dashed', 'dotted']).optional().describe('Solid when left out.'),
+        heads: z.enum(['end', 'both', 'none']).optional().describe('A head at the to end when left out.')
+      }
+    },
+    async ({ context: ctx, wall_id, from_id, to_id, label, color, route, line, heads }) => {
+      const wall = resolveWall(ctx, wall_id)
+      const doc = readWallDoc(wall.key)
+      const result = connectWallItems(doc.items, from_id, to_id, { route, line, heads, label, color })
+      if ('error' in result) return text(result.error)
+
+      setSetting(wall.key, { ...doc, items: result.items })
+      recordMcpActivity('connect_wall_items', ctx, `Connected two items on the wall "${wall.name}"`, undoFor(wall.key, doc.items, result.items))
+      notifyRenderer()
+      return json({ connected: describeWallItem(result.item, () => undefined), wall: { id: wall.id, name: wall.name } })
+    }
+  )
+
+  mcp.registerTool(
+    'remove_wall_items',
+    {
+      description:
+        "Remove items from a wall by id. Arrows attached to a removed item go with it. What's removed stays in the wall's Recently deleted list for 30 days, so it can be brought back from the Wall, and the removal can also be undone from the activity log. Locked items are refused.",
+      inputSchema: { context, wall_id: z.string().optional(), item_ids: itemIds }
+    },
+    async ({ context: ctx, wall_id, item_ids }) => {
+      const wall = resolveWall(ctx, wall_id)
+      const doc = readWallDoc(wall.key)
+      const result = removeWallItems(doc.items, item_ids)
+      if ('error' in result) return text(result.error)
+
+      setSetting(wall.key, { ...doc, items: result.items, bin: binRemoved(doc.bin, result.removed, result.items, Date.now()) })
+      recordMcpActivity(
+        'remove_wall_items',
+        ctx,
+        `Removed ${plural(result.removed.length, 'item')} from the wall "${wall.name}"`,
+        undoFor(wall.key, doc.items, result.items)
+      )
+      notifyRenderer()
+      return json({ removed: result.removed.map(i => i.id), wall: { id: wall.id, name: wall.name } })
+    }
+  )
+
+  mcp.registerTool(
+    'group_wall_items',
+    {
+      description:
+        'Group items on a wall so they select, move and line up as one. Grouping items that are already in groups joins them all into one new group. Pass ungroup: true to break up the groups the given items belong to instead. Arrows and locked items are never grouped.',
+      inputSchema: {
+        context,
+        wall_id: z.string().optional(),
+        item_ids: itemIds,
+        ungroup: z.boolean().optional().describe('Break up the groups these items are in.')
+      }
+    },
+    async ({ context: ctx, wall_id, item_ids, ungroup }) => {
+      const wall = resolveWall(ctx, wall_id)
+      const doc = readWallDoc(wall.key)
+      const missing = missingMessage(doc.items, item_ids)
+      if (missing) return text(missing)
+
+      const ids = new Set(item_ids)
+      const next = ungroup ? ungroupItems(doc.items, ids) : groupItems(doc.items, ids)
+      if (next === doc.items) {
+        return text(ungroup ? 'None of those items is in a group.' : 'Grouping needs two or more items that are neither arrows nor locked.')
+      }
+
+      setSetting(wall.key, { ...doc, items: next })
+      recordMcpActivity(
+        'group_wall_items',
+        ctx,
+        `${ungroup ? 'Ungrouped' : 'Grouped'} items on the wall "${wall.name}"`,
+        undoFor(wall.key, doc.items, next)
+      )
+      notifyRenderer()
+      return json({
+        items: next.filter(i => ids.has(i.id)).map(i => ({ id: i.id, group: i.group ?? null })),
+        wall: { id: wall.id, name: wall.name }
+      })
+    }
+  )
+
+  mcp.registerTool(
+    'align_wall_items',
+    {
+      description:
+        "Line items up or space them out on a wall. align puts every item's edge or centre on the matching edge of the items taken together: left, right, top or bottom edges, centre to stack them in a column, or middle to set them in a row. distribute leaves the outermost two where they are and makes the gaps between the rest equal, horizontally or vertically, and needs three or more. A group counts as one piece and a frame brings what's inside it; arrows and locked items stay put. Give align or distribute, not both.",
+      inputSchema: {
+        context,
+        wall_id: z.string().optional(),
+        item_ids: z.array(z.string()).min(2).describe('Item ids from get_wall.'),
+        align: z.enum(['left', 'centre', 'right', 'top', 'middle', 'bottom']).optional(),
+        distribute: z.enum(['horizontal', 'vertical']).optional()
+      }
+    },
+    async ({ context: ctx, wall_id, item_ids, align, distribute }) => {
+      if ((align === undefined) === (distribute === undefined)) return text('Give either align or distribute.')
+      const wall = resolveWall(ctx, wall_id)
+      const doc = readWallDoc(wall.key)
+      const missing = missingMessage(doc.items, item_ids)
+      if (missing) return text(missing)
+
+      const ids = new Set(item_ids)
+      const needed = align ? 2 : 3
+      if (alignableUnits(doc.items, ids) < needed) {
+        return text(`${align ? 'Lining up' : 'Spacing out'} needs ${needed} or more pieces that are neither arrows nor locked, and a group counts as one.`)
+      }
+      const next = align ? alignItems(doc.items, ids, align) : distributeItems(doc.items, ids, distribute ?? 'horizontal')
+      if (next === doc.items) return text('Those items are already in place.')
+
+      setSetting(wall.key, { ...doc, items: next })
+      recordMcpActivity(
+        'align_wall_items',
+        ctx,
+        `${align ? 'Lined up' : 'Spaced out'} items on the wall "${wall.name}"`,
+        undoFor(wall.key, doc.items, next)
+      )
+      notifyRenderer()
+      return json({
+        items: next.filter(i => ids.has(i.id)).map(i => describeWallItem(i, () => undefined)),
+        wall: { id: wall.id, name: wall.name }
+      })
     }
   )
 }

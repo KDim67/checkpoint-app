@@ -3,18 +3,21 @@
 import {
   arrowAnchors, arrowGeometry, arrowDash, arrowHeadPoints, arrowHeadInset,
   boundsOf, inkNaturalSize, inPaintOrder,
-  ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem
+  ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type TextAlign, type WallItem
 } from '../../../shared/wallModel'
 import { plainWallText } from '../../../shared/wallText'
-import { shapeOutline, shapeTextBox } from '../../../shared/wallShape'
+import { shapeOutline, shapeTextBox, textAlignOf } from '../../../shared/wallShape'
+import { HIGHLIGHT_OPACITY } from '../../../shared/wallInk'
 import { getTextColorForBackground } from './contrast'
+import { wrapLines } from './wallWrap'
+import type { PdfText } from './pdfImages'
 
 /** in wall units */
 const MARGIN = 40
 /** caps what the GPU will allocate */
 const MAX_EDGE = 8000
 
-interface ExportContext {
+export interface ExportContext {
   /** live titles, the wall stores references */
   titleOf: (item: WallItem) => string | undefined
   /** from the live theme */
@@ -33,30 +36,16 @@ function loadImage(filename: string): Promise<HTMLImageElement | null> {
   })
 }
 
-/** greedy wrap */
-function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const lines: string[] = []
-  for (const paragraph of text.split('\n')) {
-    let line = ''
-    for (const word of paragraph.split(/\s+/)) {
-      const candidate = line ? `${line} ${word}` : word
-      if (ctx.measureText(candidate).width > maxWidth && line) {
-        lines.push(line)
-        line = word
-      } else {
-        line = candidate
-      }
-    }
-    lines.push(line)
-  }
-  return lines
-}
+/** where a line of that side is drawn from, inside a box from left to left + width */
+const anchorX = (side: TextAlign, left: number, width: number): number =>
+  side === 'center' ? left + width / 2 : side === 'right' ? left + width : left
 
-/** null when there's nothing to draw */
-export async function exportWallToPng(
+/** the drawing on a canvas, and each line of words where it lands for a PDF's text layer; null when there's nothing to draw */
+export async function renderWallCanvas(
   items: WallItem[],
-  ctxInfo: ExportContext
-): Promise<Blob | null> {
+  ctxInfo: ExportContext,
+  texts?: PdfText[]
+): Promise<HTMLCanvasElement | null> {
   const bounds = boundsOf(items)
   if (!bounds) return null
 
@@ -68,12 +57,23 @@ export async function exportWallToPng(
   canvas.height = Math.max(1, Math.round(height))
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
+  const measure = (text: string): number => ctx.measureText(text).width
+
+  const offsetX = MARGIN - bounds.minX
+  const offsetY = MARGIN - bounds.minY
+  // unrotated, a selectable layer only has to be near its words
+  const record = (text: string, anchor: number, baseline: number, size: number, side: TextAlign = 'left'): void => {
+    if (!texts || !text.trim()) return
+    const w = measure(text)
+    const left = side === 'center' ? anchor - w / 2 : side === 'right' ? anchor - w : anchor
+    texts.push({ text, x: left + offsetX, y: baseline + offsetY, size })
+  }
 
   ctx.fillStyle = ctxInfo.background
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
   // the camera's translation, shifted to the margin
-  ctx.translate(MARGIN - bounds.minX, MARGIN - bounds.minY)
+  ctx.translate(offsetX, offsetY)
 
   // arrows need their ends findable
   const byId = new Map(items.map(i => [i.id, i]))
@@ -140,6 +140,7 @@ export async function exportWallToPng(
 
           ctx.fillStyle = ctxInfo.textColor
           ctx.fillText(item.text, g.mid.x - boxW / 2 + padX, g.mid.y)
+          record(item.text, g.mid.x - boxW / 2 + padX, g.mid.y + 4, 12)
           ctx.textBaseline = 'alphabetic'
         }
       }
@@ -150,6 +151,7 @@ export async function exportWallToPng(
       const scaleX = natural.width === 0 ? 1 : item.width / natural.width
       const scaleY = natural.height === 0 ? 1 : item.height / natural.height
 
+      if (item.highlight) ctx.globalAlpha = HIGHLIGHT_OPACITY
       ctx.strokeStyle = item.color || ctxInfo.textColor
       ctx.lineWidth = item.strokeWidth ?? 4
       ctx.lineCap = 'round'
@@ -170,23 +172,34 @@ export async function exportWallToPng(
       ctx.fillRect(item.x, item.y, item.width, item.height)
       ctx.fillStyle = '#1a1a1a'
       ctx.font = '13px sans-serif'
-      wrap(ctx, plainWallText(item.text ?? ''), item.width - 24).forEach((line, i) => {
-        ctx.fillText(line, item.x + 12, item.y + 26 + i * 18)
+      const side = textAlignOf(item)
+      const anchor = anchorX(side, item.x + 12, item.width - 24)
+      ctx.textAlign = side
+      wrapLines(plainWallText(item.text ?? ''), item.width - 24, measure).forEach((line, i) => {
+        ctx.fillText(line, anchor, item.y + 26 + i * 18)
+        record(line, anchor, item.y + 26 + i * 18, 13, side)
       })
     } else if (item.kind === 'text') {
       ctx.fillStyle = item.color || ctxInfo.textColor
       ctx.font = '600 20px sans-serif'
+      const side = textAlignOf(item)
+      const anchor = anchorX(side, item.x, item.width)
+      ctx.textAlign = side
       // styles don't survive the canvas, the words and their lines do
-      wrap(ctx, plainWallText(item.text ?? ''), item.width).forEach((line, i) => {
-        ctx.fillText(line, item.x, item.y + 20 + i * 26)
+      wrapLines(plainWallText(item.text ?? ''), item.width, measure).forEach((line, i) => {
+        ctx.fillText(line, anchor, item.y + 20 + i * 26)
+        record(line, anchor, item.y + 20 + i * 26, 20, side)
       })
     } else if (item.kind === 'shape') {
       const outline = item.shape ?? SHAPE_TYPES[0]
       ctx.translate(item.x, item.y)
-      const path = new Path2D(shapeOutline(outline, item.width, item.height))
+      const path = new Path2D(shapeOutline(outline, item.width, item.height, item.radius))
       ctx.fillStyle = item.color || ctxInfo.surfaceColor
+      // the fill alone goes see-through, the border and words stay solid
+      ctx.globalAlpha = item.opacity ?? 1
       ctx.fill(path)
-      ctx.strokeStyle = item.color ? 'rgba(0, 0, 0, 0.25)' : ctxInfo.borderColor
+      ctx.globalAlpha = 1
+      ctx.strokeStyle = item.borderColor || (item.color ? 'rgba(0, 0, 0, 0.25)' : ctxInfo.borderColor)
       ctx.lineWidth = 2
       ctx.stroke(path)
 
@@ -197,14 +210,20 @@ export async function exportWallToPng(
       const top = (item.height * room.top) / 100
       const innerHeight = (item.height * (100 - room.top - room.bottom)) / 100
       const lineHeight = 20
+      const side = textAlignOf(item)
+      const anchor = anchorX(side, left, innerWidth)
 
       ctx.fillStyle = item.color ? getTextColorForBackground(item.color) : ctxInfo.textColor
       ctx.font = '14px sans-serif'
-      ctx.textAlign = 'center'
+      ctx.textAlign = side
       ctx.textBaseline = 'middle'
-      const lines = wrap(ctx, plainWallText(item.text ?? ''), innerWidth)
+      const lines = wrapLines(plainWallText(item.text ?? ''), innerWidth, measure)
       const firstY = top + innerHeight / 2 - ((lines.length - 1) * lineHeight) / 2
-      lines.forEach((line, i) => ctx.fillText(line, left + innerWidth / 2, firstY + i * lineHeight))
+      lines.forEach((line, i) => {
+        ctx.fillText(line, anchor, firstY + i * lineHeight)
+        // a middle baseline sits about a third of the size above the alphabetic one
+        record(line, item.x + anchor, item.y + firstY + i * lineHeight + 5, 14, side)
+      })
     } else if (item.kind === 'frame') {
       ctx.strokeStyle = item.color || ctxInfo.borderColor
       ctx.lineWidth = 2
@@ -212,6 +231,7 @@ export async function exportWallToPng(
       ctx.fillStyle = item.color || ctxInfo.borderColor
       ctx.font = '600 13px sans-serif'
       ctx.fillText(item.text || 'Frame', item.x, item.y - 6)
+      record(item.text || 'Frame', item.x, item.y - 6, 13)
     } else {
       // tile with the name
       ctx.fillStyle = ctxInfo.surfaceColor
@@ -221,13 +241,60 @@ export async function exportWallToPng(
       ctx.strokeRect(item.x, item.y, item.width, item.height)
       ctx.fillStyle = ctxInfo.textColor
       ctx.font = '500 14px sans-serif'
-      wrap(ctx, ctxInfo.titleOf(item) ?? '(missing)', item.width - 24)
+      wrapLines(ctxInfo.titleOf(item) ?? '(missing)', item.width - 24, measure)
         .slice(0, 3)
-        .forEach((line, i) => ctx.fillText(line, item.x + 12, item.y + 26 + i * 18))
+        .forEach((line, i) => {
+          ctx.fillText(line, item.x + 12, item.y + 26 + i * 18)
+          record(line, item.x + 12, item.y + 26 + i * 18, 14)
+        })
     }
 
     ctx.restore()
   }
 
-  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+  return canvas
+}
+
+/** null when there's nothing to draw */
+export async function exportWallToPng(items: WallItem[], ctxInfo: ExportContext): Promise<Blob | null> {
+  const canvas = await renderWallCanvas(items, ctxInfo)
+  return canvas ? new Promise(resolve => canvas.toBlob(resolve, 'image/png')) : null
+}
+
+/** a PDF page takes JPEG as it is; the painted background leaves nothing see-through to lose */
+export async function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array | null> {
+  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+  return blob ? new Uint8Array(await blob.arrayBuffer()) : null
+}
+
+/** the SVG carries its pictures inside, saved elsewhere it can't reach the media folder */
+export async function imageDataUris(items: WallItem[]): Promise<Map<string, string>> {
+  const refs = [...new Set(items.filter(i => i.kind === 'image' && i.ref).map(i => i.ref as string))]
+  const out = new Map<string, string>()
+  for (const ref of refs) {
+    const img = await loadImage(ref)
+    if (!img) continue
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) continue
+    ctx.drawImage(img, 0, 0)
+    try {
+      out.set(ref, canvas.toDataURL('image/png'))
+    } catch {
+      // a canvas the browser won't read back leaves that picture a placeholder
+    }
+  }
+  return out
+}
+
+/** canvas metrics, so the SVG breaks lines where the PNG does */
+export function textMeasurer(): (text: string, size: number) => number {
+  const ctx = document.createElement('canvas').getContext('2d')
+  return (text, size) => {
+    if (!ctx) return text.length * size * 0.55
+    ctx.font = `${size}px sans-serif`
+    return ctx.measureText(text).width
+  }
 }

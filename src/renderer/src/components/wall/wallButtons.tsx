@@ -1,5 +1,5 @@
 import React from 'react'
-import { ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type ArrowShape, type ArrowLine, type ArrowHeads, type ShapeType } from '../../../../shared/wallModel'
+import { ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, TEXT_ALIGNS, type ArrowShape, type ArrowLine, type ArrowHeads, type ShapeType, type TextAlign } from '../../../../shared/wallModel'
 
 /** buttons draw their option, no icon means "elbow" */
 const glyphProps = {
@@ -42,16 +42,19 @@ const cycleButton = <T extends string>(
   current: T,
   glyph: (value: T) => React.ReactNode,
   onPick: (next: T) => void,
-  compact = false
+  compact = false,
+  /** when the stored value isn't the word people say */
+  names: Partial<Record<T, string>> = {}
 ): React.JSX.Element => {
   const next = options[(options.indexOf(current) + 1) % options.length]
   const size = compact ? '26px' : '30px'
+  const name = (value: T): string => names[value] ?? nameOf(value)
   return (
     <button
       key={label}
       onClick={() => onPick(next)}
-      title={`${label}: ${nameOf(current)}. Click for ${nameOf(next)}.`}
-      aria-label={`${label}: ${nameOf(current)}`}
+      title={`${label}: ${name(current)}. Click for ${name(next)}.`}
+      aria-label={`${label}: ${name(current)}`}
       className="bg-clear text-muted hover-text-accent wall-cycle-button"
       style={{
         width: size, height: size,
@@ -91,6 +94,16 @@ const OUTLINE_GLYPHS: Record<ShapeType, React.JSX.Element> = {
 /** one cycling button like the arrow styles, five outlines laid flat would crowd the bar */
 export const shapeButton = (current: ShapeType, onPick: (next: ShapeType) => void): React.JSX.Element =>
   cycleButton('Shape', SHAPE_TYPES, current, shape => <svg {...glyphProps}>{OUTLINE_GLYPHS[shape]}</svg>, onPick)
+
+const ALIGN_GLYPHS: Record<TextAlign, string> = {
+  left: 'M2 4H13M2 7.5H9M2 11H11',
+  center: 'M2 4H13M4 7.5H11M3 11H12',
+  right: 'M2 4H13M6 7.5H13M4 11H13'
+}
+
+/** the side words sit on, cycled like the other looks; stored as CSS spells it */
+export const textAlignButton = (current: TextAlign, onPick: (next: TextAlign) => void): React.JSX.Element =>
+  cycleButton('Text alignment', TEXT_ALIGNS, current, side => <svg {...glyphProps}><path d={ALIGN_GLYPHS[side]} /></svg>, onPick, false, { center: 'Centre' })
 
 /** accent plus underline, hover already paints surface-offset */
 export const toolButton = (

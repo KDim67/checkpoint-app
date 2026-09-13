@@ -80,6 +80,12 @@ describe('normalizeWallItem', () => {
     expect(defined(normalizeWallItem({ kind: 'note', shape: 'oval' }, 0))).not.toHaveProperty('shape')
   })
 
+  it('keeps a highlighter stroke as one, and only on ink', () => {
+    expect(defined(normalizeWallItem({ kind: 'ink', points: [0, 0, 10, 10], highlight: true }, 0)).highlight).toBe(true)
+    expect(defined(normalizeWallItem({ kind: 'ink', points: [0, 0, 10, 10], highlight: 'yes' }, 0))).not.toHaveProperty('highlight')
+    expect(defined(normalizeWallItem({ kind: 'note', highlight: true }, 0))).not.toHaveProperty('highlight')
+  })
+
   it('keeps the group an item belongs to, and never puts an arrow in one', () => {
     expect(defined(normalizeWallItem({ kind: 'note', group: 'g-1' }, 0)).group).toBe('g-1')
     expect(defined(normalizeWallItem({ kind: 'note', group: '  ' }, 0))).not.toHaveProperty('group')
@@ -290,6 +296,11 @@ describe('createWallItem', () => {
     const created = createWallItem('note', { x: 500, y: 400 }, [])
     expect(created.x).toBe(500 - DEFAULT_SIZES.note.width / 2)
     expect(created.y).toBe(400 - DEFAULT_SIZES.note.height / 2)
+  })
+
+  it('centres an item given its own size by that size, not the default', () => {
+    const created = createWallItem('frame', { x: 300, y: 250 }, [], { width: 480, height: 380 })
+    expect(created).toMatchObject({ x: 60, y: 60, width: 480, height: 380 })
   })
 
   it('places it above everything already there', () => {

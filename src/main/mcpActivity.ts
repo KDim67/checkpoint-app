@@ -2,6 +2,7 @@
 
 import { v4 as uuidv4 } from 'uuid'
 import { normalizeWallDoc } from '../shared/wallModel'
+import { restoreWallSnapshot } from '../shared/wallEdit'
 import {
   deleteItem,
   deleteRecurrence,
@@ -98,6 +99,14 @@ function runUndoAction(action: McpUndoAction): void {
       // read back, the wall may have changed since and only the placement should reverse
       const doc = normalizeWallDoc(getSetting<unknown>(action.key, null))
       setSetting(action.key, { ...doc, items: doc.items.filter(i => i.id !== action.itemId) })
+      break
+    }
+    case 'restore_wall_items': {
+      const stored = getSetting<unknown>(action.key, null)
+      // a deleted wall stays deleted, writing the snapshot would leave it orphaned under its old key
+      if (stored === null) break
+      const doc = normalizeWallDoc(stored)
+      setSetting(action.key, { ...doc, items: restoreWallSnapshot(doc.items, action.items, action.removeIds) })
       break
     }
     case 'delete_note':

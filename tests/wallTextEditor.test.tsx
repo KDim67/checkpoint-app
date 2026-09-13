@@ -70,6 +70,15 @@ describe('WallTextEditor', () => {
     expect(box().value).toBe('~~old~~ `new`')
   })
 
+  it('underlines the selection with Ctrl+U', () => {
+    render(<Harness initial="under" />)
+    caretAt(0, 5)
+
+    fireEvent.keyDown(box(), { key: 'u', ctrlKey: true })
+
+    expect(box().value).toBe('++under++')
+  })
+
   it('indents with Tab and outdents with Shift+Tab instead of leaving the box', () => {
     render(<Harness initial="- a" />)
     caretAt(3)

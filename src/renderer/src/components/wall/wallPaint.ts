@@ -2,7 +2,7 @@ import {
   arrowAnchors, arrowGeometry, arrowHeadInset, arrowHeadPoints, gridSpacing,
   ARROW_HEAD_MODES, ARROW_SHAPES, type WallCamera, type WallItem
 } from '../../../../shared/wallModel'
-import type { Guide } from '../../../../shared/wallAlign'
+import type { GapMark, Guide } from '../../../../shared/wallAlign'
 
 /* painted onto the last render's elements; through React every move re-rendered the wall */
 
@@ -29,6 +29,39 @@ export function paintWallGuides(viewport: HTMLElement, guides: Guide[], zoom: nu
     el.style.width = `${axis === 'x' ? thick : length}px`
     el.style.height = `${axis === 'x' ? length : thick}px`
   }
+}
+
+/** a row of three equal gaps is the most a drag shows at once, each way */
+export const WALL_GAP_SLOTS = ['gap0', 'gap1', 'gap2', 'gap3', 'gap4', 'gap5'] as const
+
+/** a bar across each equal gap with a tick at either end, so it reads as a measurement and not an edge */
+export function paintWallGaps(viewport: HTMLElement, gaps: GapMark[], zoom: number): void {
+  const thick = 1 / zoom
+  const tick = 7 / zoom
+  WALL_GAP_SLOTS.forEach((slot, i) => {
+    const el = viewport.querySelector<HTMLElement>(`[data-wall-gap="${slot}"]`)
+    if (!el) return
+    const gap = gaps[i]
+    if (!gap) {
+      el.style.display = 'none'
+      return
+    }
+    const length = gap.to - gap.from
+    el.style.display = 'block'
+    if (gap.axis === 'x') {
+      el.style.transform = `translate(${gap.from}px, ${gap.at - tick / 2}px)`
+      el.style.width = `${length}px`
+      el.style.height = `${tick}px`
+      el.style.borderWidth = `0 ${thick}px`
+      el.style.backgroundSize = `100% ${thick}px`
+    } else {
+      el.style.transform = `translate(${gap.at - tick / 2}px, ${gap.from}px)`
+      el.style.width = `${tick}px`
+      el.style.height = `${length}px`
+      el.style.borderWidth = `${thick}px 0`
+      el.style.backgroundSize = `${thick}px 100%`
+    }
+  })
 }
 
 export function paintWallCamera(viewport: HTMLElement, cam: WallCamera): void {

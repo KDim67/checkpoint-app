@@ -13,7 +13,7 @@ interface Props {
 }
 
 // under ctrl or cmd; strikethrough takes shift too
-const MARKERS: Record<string, string> = { b: '**', i: '_', e: '`' }
+const MARKERS: Record<string, string> = { b: '**', i: '_', e: '`', u: '++' }
 
 /** a plain textarea with list-aware Enter, Tab indents and formatting keys */
 export default function WallTextEditor({ value, onChange, onFinish, style, onHeight, onNext }: Props) {

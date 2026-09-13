@@ -34,6 +34,16 @@ export type WallDrag =
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
   | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
   | { mode: 'draw' }
+  /** strokes go as they're touched; before and removed make the sweep one undo step and one bin entry */
+  | {
+      mode: 'erase'
+      last: Point
+      items: WallItem[]
+      before: WallItem[]
+      removed: WallItem[]
+      /** a stroke was cut rather than taken whole, still an undo step */
+      cut: boolean
+    }
   | null
 
 /** well past click slop so a slip doesn't leave a stub */

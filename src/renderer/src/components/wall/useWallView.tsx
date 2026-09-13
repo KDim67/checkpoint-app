@@ -22,15 +22,18 @@ export function useWallView() {
     setBackground, toggleRail, confirmDeleteWall, setItems, setCamera, onItemTextChange,
     onItemFinishEditing, onItemAutoSize, applyHistory, addItem, removeSelected, duplicateSelected, toggleLock,
     openCard, placeImageFiles, linkOpen, setLinkOpen, linkPickFor, setLinkPickFor, followLink,
-    setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark, growFrom
+    setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark, growFrom,
+    searchKind, setSearchKind, framesOpen, setFramesOpen, exportOpen, setExportOpen, binOpen, setBinOpen,
+    presenting, restoreDeleted, frameSelection, showFrame, startPresenting, stopPresenting, stepPresenting,
+    setFrameOrder, eraserMode, setEraserMode, penPresets, choosePenColor, choosePenWidth, pickPreset
   } = wallDocument
   const {
-    screenPoint, onWheel, jumpTo, exportPng, fitToContent, arrowAt, onPointerDown, onPointerMove,
-    onPointerLeave, endDrag
+    screenPoint, onWheel, jumpTo, exportWall, zoomBy, zoomReset, zoomToSelection, fitToContent, arrowAt,
+    onPointerDown, onPointerMove, onPointerLeave, endDrag
   } = wallPointer
   const {
     menuEntries, camera, custom, canvasBackground, dotColor, placed, pickerRows, labelOf, matches,
-    undoable, redoable, floatingRef, floatingPos
+    undoable, redoable, floatingRef, floatingPos, searching, matchIds, frames, binEntries
   } = wallKeys
 
   return {
@@ -131,7 +134,10 @@ export function useWallView() {
     screenPoint,
     onWheel,
     jumpTo,
-    exportPng,
+    exportWall,
+    zoomBy,
+    zoomReset,
+    zoomToSelection,
     fitToContent,
     arrowAt,
     onPointerDown,
@@ -162,7 +168,33 @@ export function useWallView() {
     previewing,
     refreshPreview,
     addBookmark,
-    growFrom
+    growFrom,
+    searchKind,
+    setSearchKind,
+    framesOpen,
+    setFramesOpen,
+    exportOpen,
+    setExportOpen,
+    binOpen,
+    setBinOpen,
+    presenting,
+    restoreDeleted,
+    frameSelection,
+    showFrame,
+    startPresenting,
+    stopPresenting,
+    stepPresenting,
+    searching,
+    matchIds,
+    frames,
+    binEntries,
+    setFrameOrder,
+    eraserMode,
+    setEraserMode,
+    penPresets,
+    choosePenColor,
+    choosePenWidth,
+    pickPreset
   }
 }
 

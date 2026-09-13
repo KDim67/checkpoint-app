@@ -1,6 +1,6 @@
-import { useState, type Dispatch, type ReactNode, type Ref, type SetStateAction } from 'react'
+import { useState, type CSSProperties, type Dispatch, type ReactNode, type Ref, type SetStateAction } from 'react'
 import {
-  Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Link2, Group, Ungroup,
+  Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Link2, Group, Ungroup, SlidersHorizontal,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter
@@ -9,9 +9,10 @@ import { bringToFront, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_
 import { isLinkable } from '../../../../shared/wallLink'
 import { alignableUnits, alignItems, distributeItems, type AlignEdge } from '../../../../shared/wallAlign'
 import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
+import { isWritable, textAlignOf } from '../../../../shared/wallShape'
 import WallColorPicker from './WallColorPicker'
 import WallLinkEditor from './WallLinkEditor'
-import { toolButton, arrowStyleButtons, shapeButton } from './wallButtons'
+import { toolButton, arrowStyleButtons, shapeButton, textAlignButton } from './wallButtons'
 
 interface WallSelectionBarProps {
   floatingPos: { left: number; top: number }
@@ -26,7 +27,8 @@ interface WallSelectionBarProps {
   arrowsSelected: boolean
   items: WallItem[]
   selectedIds: Set<string>
-  setItems: (items: WallItem[]) => void
+  /** record: false while a slider moves, one undo step when it's let go */
+  setItems: (items: WallItem[], opts?: { record?: boolean }) => void
   setEditingId: Dispatch<SetStateAction<string | null>>
   duplicateSelected: () => void
   toggleLock: () => void
@@ -42,6 +44,11 @@ const popover = {
   border: '1px solid var(--color-surface-offset)',
   borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
 } as const
+
+const fieldLabel: CSSProperties = {
+  display: 'flex', flexDirection: 'column', gap: '4px',
+  fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)'
+}
 
 /** a row across, a row down, laid out like the lines they make */
 const ALIGN: { edge: AlignEdge; label: string; icon: ReactNode }[] = [
@@ -61,12 +68,25 @@ export default function WallSelectionBar({
   // restyling an outline needs every selected item to be a shape, like the arrow styles
   const chosen = items.filter(i => selectedIds.has(i.id))
   const shapesSelected = chosen.length > 0 && chosen.every(i => i.kind === 'shape')
+  const wordsSelected = chosen.length > 0 && chosen.every(i => isWritable(i.kind))
+  const roundedSelected = chosen.some(i => i.kind === 'shape' && i.shape === 'rounded')
   // a group is one piece; a single item has nothing to line up with, so skip the count
   const pieces = chosen.length >= 2 ? alignableUnits(items, selectedIds) : chosen.length
   const { canGroup, canUngroup } = groupState(items, selectedIds)
-  // tied to the selection that opened it, a new pick closes it without an effect
+  // tied to the selection that opened them, a new pick closes them without an effect
   const [alignFor, setAlignFor] = useState<Set<string> | null>(null)
+  const [styleFor, setStyleFor] = useState<Set<string> | null>(null)
   const alignOpen = alignFor === selectedIds
+  const styleOpen = styleFor === selectedIds
+  const closeOthers = (): void => {
+    setSwatchOpen(false)
+    setLinkOpen(false)
+    setAlignFor(null)
+    setStyleFor(null)
+  }
+  const first = chosen[0]
+  // the drag was record: false, letting go makes it one undo step
+  const commitSlider = (): void => setItems(items)
 
   return (
     <div ref={floatingRef} data-wall-ui style={{
@@ -84,7 +104,7 @@ export default function WallSelectionBar({
       {/* one swatch, the full palette is one click in; laid out flat it covered the selection */}
       <div data-wall-swatch className="relative">
         <button
-          onClick={() => { setLinkOpen(false); setAlignFor(null); setSwatchOpen(v => !v) }}
+          onClick={() => { const open = swatchOpen; closeOthers(); setSwatchOpen(!open) }}
           title="Colour"
           aria-label="Colour"
           aria-expanded={swatchOpen}
@@ -129,7 +149,7 @@ export default function WallSelectionBar({
           {toolButton(
             single.link ? 'Edit link' : 'Add a link',
             <Link2 size={13} />,
-            () => { setSwatchOpen(false); setAlignFor(null); setLinkOpen(v => !v) },
+            () => { const open = linkOpen; closeOthers(); setLinkOpen(!open) },
             { active: linkOpen, disabled: single.locked }
           )}
           {linkOpen && !single.locked && (
@@ -156,9 +176,67 @@ export default function WallSelectionBar({
         v => setItems(patchItems(items, selectedIds, { arrowLine: v })),
         v => setItems(patchItems(items, selectedIds, { arrowHeads: v }))
       )}
+      {wordsSelected && textAlignButton(
+        textAlignOf(first),
+        v => setItems(patchItems(items, selectedIds, { align: v }))
+      )}
       {shapesSelected && shapeButton(
         single?.shape ?? SHAPE_TYPES[0],
         v => setItems(patchItems(items, selectedIds, { shape: v }))
+      )}
+      {shapesSelected && (
+        <div className="relative">
+          {toolButton(
+            'Shape style',
+            <SlidersHorizontal size={13} />,
+            () => { const open = styleOpen; closeOthers(); setStyleFor(open ? null : selectedIds) },
+            { active: styleOpen }
+          )}
+          {styleOpen && (
+            <div style={{ ...popover, padding: 'var(--space-3)', width: '160px', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div role="group" aria-label="Border" style={fieldLabel}>
+                Border
+                <WallColorPicker
+                  colors={WALL_COLORS}
+                  value={first.borderColor}
+                  onChange={c => setItems(patchItems(items, selectedIds, { borderColor: c }))}
+                  defaultLabel="Default"
+                  onDefault={() => setItems(patchItems(items, selectedIds, { borderColor: undefined }))}
+                  columns={4}
+                />
+              </div>
+              {roundedSelected && (
+                <label style={fieldLabel}>
+                  Corners
+                  <input
+                    type="range"
+                    aria-label="Corner radius"
+                    min={0}
+                    max={60}
+                    value={first.radius ?? 16}
+                    onChange={e => setItems(patchItems(items, selectedIds, { radius: Number(e.target.value) }), { record: false })}
+                    onPointerUp={commitSlider}
+                    onKeyUp={commitSlider}
+                  />
+                </label>
+              )}
+              <label style={fieldLabel}>
+                Fill
+                <input
+                  type="range"
+                  aria-label="Fill opacity"
+                  min={10}
+                  max={100}
+                  step={5}
+                  value={Math.round((first.opacity ?? 1) * 100)}
+                  onChange={e => setItems(patchItems(items, selectedIds, { opacity: Number(e.target.value) / 100 }), { record: false })}
+                  onPointerUp={commitSlider}
+                  onKeyUp={commitSlider}
+                />
+              </label>
+            </div>
+          )}
+        </div>
       )}
       {arrowsSelected && single && toolButton(
         single.text ? 'Edit label' : 'Add a label',
@@ -174,7 +252,7 @@ export default function WallSelectionBar({
           {toolButton(
             'Align',
             <AlignStartVertical size={13} />,
-            () => { setSwatchOpen(false); setLinkOpen(false); setAlignFor(alignOpen ? null : selectedIds) },
+            () => { const open = alignOpen; closeOthers(); setAlignFor(open ? null : selectedIds) },
             { active: alignOpen }
           )}
           {alignOpen && (

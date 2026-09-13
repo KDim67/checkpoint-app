@@ -1,16 +1,23 @@
 import React, { useCallback, useLayoutEffect } from 'react'
-import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
-import { arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedSize, rotationAngle, rotationStart, snapMoving } from '../../../../shared/wallPointer'
+import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Point, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
+import { arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedSize, rotationAngle, rotationStart, snapMoving, type WallDrag } from '../../../../shared/wallPointer'
 import { pushHistory, replacePresent } from '../../../../shared/history'
 import { clipSelection, placeClip } from '../../../../shared/wallClipboard'
-import { exportWallToPng } from '../../lib/wallExport'
+import { canvasToJpeg, exportWallToPng, imageDataUris, renderWallCanvas, textMeasurer, type ExportContext } from '../../lib/wallExport'
+import { wallToSvg } from '../../lib/wallSvg'
+import { buildPdf, type PdfPage, type PdfText } from '../../lib/pdfImages'
 import { itemLink } from '../../../../shared/wallLink'
 import { SIDES } from '../../../../shared/wallGrow'
-import { alignGuides, GUIDE_SNAP_PX, type Guide } from '../../../../shared/wallAlign'
+import { alignGuides, GUIDE_SNAP_PX, type GapMark, type Guide } from '../../../../shared/wallAlign'
 import { groupOf, withGroups } from '../../../../shared/wallGroup'
+import { eraseAlong, eraseParts, lassoPick, HIGHLIGHT_SCALE } from '../../../../shared/wallInk'
+import { wallToCsv } from '../../lib/wallCsv'
+import { nextZoom, zoomToward } from '../../../../shared/wallZoom'
+import { frameContents, framesInOrder } from '../../../../shared/wallFrames'
+import { ERASER_RADIUS } from './wallTools'
 import { errorMessage } from '../../../../shared/errors'
 import * as appApi from '../../data/app'
-import { paintWallCamera, paintWallGuides, paintWallItems, paintWallSelection } from './wallPaint'
+import { paintWallCamera, paintWallGaps, paintWallGuides, paintWallItems, paintWallSelection } from './wallPaint'
 import type { WallDocument } from './useWallDocument'
 
 /** travel still counted as a click */
@@ -18,6 +25,10 @@ const CLICK_SLOP = 4
 
 /** wheel idle time before zoom becomes state */
 const ZOOM_SETTLE_MS = 150
+
+export type WallExport = { kind: 'png' | 'selection' | 'svg' | 'pdf' | 'csv' } | { kind: 'frame'; frame: WallItem }
+
+type EraseDrag = Extract<WallDrag, { mode: 'erase' }>
 
 /** drags paint the DOM between renders, hence the refs */
 export function useWallPointer(wallDocument: WallDocument) {
@@ -29,7 +40,7 @@ export function useWallPointer(wallDocument: WallDocument) {
     dragRef, pendingMoveRef, moveFrameRef, panCameraRef, zoomCommitRef, liveItemsRef, marqueeRectRef,
     marqueeSelRef, paintedSelRef, movingRef, rightPressRef, railHoverRef, labelRef, docRef,
     selectedRef, historyRef, itemsById, single, activeWall, handOffToColumn, setItems, setCamera,
-    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef, growFrom
+    addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef, growFrom, eraserMode
   } = wallDocument
   const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -63,32 +74,110 @@ export function useWallPointer(wallDocument: WallDocument) {
     setSelectedIds(new Set([item.id]))
   }, [docRef, setCamera, setSelectedIds, viewportRef])
 
-  const exportPng = useCallback(async () => {
-    const items = docRef.current.items
-    if (items.length === 0) { toast('Nothing on this wall to export yet.'); return }
+  /** colours from the live theme, so the export looks like the wall on screen */
+  const exportContext = useCallback((): ExportContext => {
+    const style = getComputedStyle(document.documentElement)
     const wallBackground = docRef.current.background
+    return {
+      titleOf: labelRef.current,
+      background: wallBackground !== 'default'
+        ? wallBackground
+        : style.getPropertyValue('--color-background').trim() || '#0b0c10',
+      textColor: style.getPropertyValue('--color-text-base').trim() || '#ffffff',
+      surfaceColor: style.getPropertyValue('--color-surface-1').trim() || '#131622',
+      borderColor: style.getPropertyValue('--color-surface-offset').trim() || '#24293f'
+    }
+  }, [docRef, labelRef])
+
+  const exportWall = useCallback(async (choice: WallExport) => {
+    const all = docRef.current.items
+    const items = choice.kind === 'frame'
+      ? frameContents(all, choice.frame)
+      : choice.kind === 'selection' ? clipSelection(all, selectedRef.current)?.items ?? [] : all
+    if (items.length === 0) {
+      toast(choice.kind === 'selection' ? 'Select something to export first.' : 'Nothing on this wall to export yet.')
+      return
+    }
+
+    const base = `${activeWorkspace}-${activeWall?.name ?? 'wall'}`
+    const save = async (name: string, data: ArrayBuffer, extension: string): Promise<void> => {
+      if (await appApi.saveBinaryFile(`${name}.${extension}`.replace(/[^\w.-]+/g, '-'), data, extension)) toast('Exported.')
+    }
+
     setBusy('Rendering')
     try {
-      // colours from the live theme so the export matches
-      const style = getComputedStyle(document.documentElement)
-      const png = await exportWallToPng(items, {
-        titleOf: labelRef.current,
-        background: wallBackground !== 'default'
-          ? wallBackground
-          : style.getPropertyValue('--color-background').trim() || '#0b0c10',
-        textColor: style.getPropertyValue('--color-text-base').trim() || '#ffffff',
-        surfaceColor: style.getPropertyValue('--color-surface-1').trim() || '#131622',
-        borderColor: style.getPropertyValue('--color-surface-offset').trim() || '#24293f'
-      })
-      if (!png) { toast('Could not render the wall.', { type: 'error' }); return }
-      const saved = await appApi.saveBinaryFile(`${activeWorkspace}-${activeWall?.name ?? 'wall'}.png`.replace(/[^\w.-]+/g, '-'), await png.arrayBuffer(), 'png')
-      if (saved) toast('Wall exported.')
+      const context = exportContext()
+
+      if (choice.kind === 'csv') {
+        // the byte order mark tells a spreadsheet the file is UTF-8
+        await save(base, new TextEncoder().encode(`﻿${wallToCsv(items, context.titleOf)}`).buffer as ArrayBuffer, 'csv')
+        return
+      }
+
+      if (choice.kind === 'svg') {
+        const images = await imageDataUris(items)
+        const svg = wallToSvg(items, { ...context, measure: textMeasurer(), imageData: ref => images.get(ref) })
+        if (svg) await save(base, new TextEncoder().encode(svg).buffer as ArrayBuffer, 'svg')
+        return
+      }
+
+      if (choice.kind === 'pdf') {
+        // a page a frame in reading order, or the whole wall on one
+        const frames = framesInOrder(items, docRef.current.frameOrder)
+        const pageSets = frames.length > 0 ? frames.map(frame => frameContents(items, frame)) : [items]
+        const pages: PdfPage[] = []
+        for (const set of pageSets) {
+          const texts: PdfText[] = []
+          const canvas = await renderWallCanvas(set, context, texts)
+          const jpeg = canvas ? await canvasToJpeg(canvas) : null
+          if (canvas && jpeg) pages.push({ jpeg, width: canvas.width, height: canvas.height, texts })
+        }
+        if (pages.length === 0) {
+          toast('Could not render the wall.', { type: 'error' })
+          return
+        }
+        const pdf = buildPdf(pages)
+        await save(base, pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer, 'pdf')
+        return
+      }
+
+      const png = await exportWallToPng(items, context)
+      if (!png) {
+        toast('Could not render the wall.', { type: 'error' })
+        return
+      }
+      const suffix = choice.kind === 'selection' ? '-selection' : choice.kind === 'frame' ? `-${choice.frame.text?.trim() || 'frame'}` : ''
+      await save(`${base}${suffix}`, await png.arrayBuffer(), 'png')
     } catch (err) {
       toast(`Export failed: ${errorMessage(err)}`, { type: 'error' })
     } finally {
       setBusy(null)
     }
-  }, [docRef, setBusy, toast, labelRef, activeWorkspace, activeWall?.name])
+  }, [docRef, selectedRef, toast, setBusy, exportContext, activeWorkspace, activeWall?.name])
+
+  const viewportSize = useCallback((): { width: number; height: number } | null => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    return rect ? { width: rect.width, height: rect.height } : null
+  }, [viewportRef])
+
+  /** a level up or down, around the middle of the view */
+  const zoomBy = useCallback((direction: 1 | -1) => {
+    const size = viewportSize()
+    if (!size) return
+    const camera = panCameraRef.current ?? docRef.current.camera
+    setCamera(zoomToward(camera, size, nextZoom(camera.zoom, direction)))
+  }, [docRef, panCameraRef, setCamera, viewportSize])
+
+  const zoomReset = useCallback(() => {
+    const size = viewportSize()
+    if (size) setCamera(zoomToward(panCameraRef.current ?? docRef.current.camera, size, 1))
+  }, [docRef, panCameraRef, setCamera, viewportSize])
+
+  const zoomToSelection = useCallback(() => {
+    const size = viewportSize()
+    const chosen = docRef.current.items.filter(i => selectedRef.current.has(i.id))
+    if (size && chosen.length > 0) setCamera(fitCamera(chosen, size))
+  }, [docRef, selectedRef, setCamera, viewportSize])
 
   const fitToContent = useCallback(() => {
     const rect = viewportRef.current?.getBoundingClientRect()
@@ -238,10 +327,19 @@ export function useWallPointer(wallDocument: WallDocument) {
       return
     }
 
-    // the pen owns the gesture over items too; the move branch used to win
-    if (tool === 'pen' && e.button === 0) {
+    // the pen family owns the gesture over items too; the move branch used to win
+    if ((tool === 'pen' || tool === 'highlighter' || tool === 'lasso') && e.button === 0) {
       dragRef.current = { mode: 'draw' }
       setDrawing([toWallPoint(screenPoint(e), docRef.current.camera)])
+      return
+    }
+
+    if (tool === 'eraser' && e.button === 0) {
+      const at = toWallPoint(screenPoint(e), docRef.current.camera)
+      const items = docRef.current.items
+      const erasing: EraseDrag = { mode: 'erase', last: at, items, before: items, removed: [], cut: false }
+      dragRef.current = erasing
+      eraseTo(erasing, at, docRef.current.camera.zoom)
       return
     }
 
@@ -296,6 +394,27 @@ export function useWallPointer(wallDocument: WallDocument) {
     setMarquee({ x: p.x, y: p.y, width: 0, height: 0 })
   }
 
+  /** a stroke goes the moment it's touched; the drag keeps the wall, so a release before the next render loses none */
+  const eraseTo = (drag: EraseDrag, at: Point, zoom: number): void => {
+    const radius = ERASER_RADIUS / zoom
+    if (eraserMode === 'part') {
+      const cut = eraseParts(drag.items, drag.last, at, radius)
+      drag.last = at
+      if (!cut.touched) return
+      drag.items = cut.items
+      drag.cut = true
+      setItems(drag.items, { record: false })
+      return
+    }
+
+    const hit = new Set(eraseAlong(drag.items, drag.last, at, radius))
+    drag.last = at
+    if (hit.size === 0) return
+    drag.removed.push(...drag.items.filter(i => hit.has(i.id)))
+    drag.items = drag.items.filter(i => !hit.has(i.id))
+    setItems(drag.items, { record: false })
+  }
+
   const paintCamera = (cam: WallCamera): void => {
     if (viewportRef.current) paintWallCamera(viewportRef.current, cam)
   }
@@ -312,6 +431,10 @@ export function useWallPointer(wallDocument: WallDocument) {
 
   const paintGuides = (guides: Guide[], zoom: number): void => {
     if (viewportRef.current) paintWallGuides(viewportRef.current, guides, zoom)
+  }
+
+  const paintGaps = (gaps: GapMark[], zoom: number): void => {
+    if (viewportRef.current) paintWallGaps(viewportRef.current, gaps, zoom)
   }
 
   /** the part of the wall on screen */
@@ -377,6 +500,11 @@ export function useWallPointer(wallDocument: WallDocument) {
       return
     }
 
+    if (drag.mode === 'erase') {
+      eraseTo(drag, toWallPoint(screenPoint(e), cam), cam.zoom)
+      return
+    }
+
     if (drag.mode === 'marquee') {
       const p = screenPoint(e)
       // drawn by hand, state re-rendered the wall per frame
@@ -438,6 +566,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       liveItemsRef.current = live
       paintItems(live, moving)
       paintGuides(guided?.guides ?? [], cam.zoom)
+      paintGaps(guided?.gaps ?? [], cam.zoom)
     } else {
       const size = resizedSize(drag.w, drag.h, dx, dy, snapping)
       setItems(
@@ -481,6 +610,7 @@ export function useWallPointer(wallDocument: WallDocument) {
     }
     pendingMoveRef.current = null
     paintGuides([], 1)
+    paintGaps([], 1)
 
     // the hand-drawn pan becomes state here
     if (panCameraRef.current) {
@@ -549,11 +679,36 @@ export function useWallPointer(wallDocument: WallDocument) {
       return
     }
 
+    if (drag?.mode === 'erase') {
+      if (drag.removed.length > 0 || drag.cut) {
+        // the whole sweep is one undo step; strokes taken whole are one bin entry, cut pieces are undo's to bring back
+        setItems(drag.items, { record: false, ...(drag.removed.length > 0 ? { removed: drag.removed } : {}) })
+        historyRef.current = pushHistory(replacePresent(historyRef.current, drag.before), drag.items)
+        setHistoryTick(t => t + 1)
+      }
+      return
+    }
+
     if (drag?.mode === 'draw') {
-      const ink = drawing && inkFromPath(drawing, docRef.current.items, {
-        color: penColor, strokeWidth: penWidth, ...(smoothing ? { smooth: SMOOTHING_STRENGTH } : {})
-      })
+      const path = drawing
       setDrawing(null)
+
+      if (tool === 'lasso') {
+        const items = docRef.current.items
+        const picked = path ? withGroups(items, new Set(lassoPick(items, path))) : new Set<string>()
+        setSelectedIds(picked)
+        // what was caught moves with the select tool
+        if (picked.size > 0) setTool('select')
+        return
+      }
+
+      const highlight = tool === 'highlighter'
+      const ink = path && inkFromPath(path, docRef.current.items, {
+        color: penColor,
+        strokeWidth: highlight ? penWidth * HIGHLIGHT_SCALE : penWidth,
+        ...(highlight ? { highlight: true } : {}),
+        ...(smoothing ? { smooth: SMOOTHING_STRENGTH } : {})
+      })
       if (ink) {
         setItems([...docRef.current.items, ink])
         setSelectedIds(new Set())
@@ -611,7 +766,10 @@ export function useWallPointer(wallDocument: WallDocument) {
     onWheel,
     onPointerLeave,
     jumpTo,
-    exportPng,
+    exportWall,
+    zoomBy,
+    zoomReset,
+    zoomToSelection,
     fitToContent,
     arrowAt,
     onPointerDown,

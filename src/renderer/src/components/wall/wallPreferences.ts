@@ -8,5 +8,7 @@ export const SMOOTHING_KEY = 'wallview_pen_smoothing'
 export const ARROW_SHAPE_KEY = 'wallview_arrow_shape'
 export const ARROW_LINE_KEY = 'wallview_arrow_line'
 export const ARROW_HEADS_KEY = 'wallview_arrow_heads'
+export const ERASER_MODE_KEY = 'wallview_eraser_mode'
+export const PEN_PRESETS_KEY = 'wallview_pen_presets'
 
 export const clampRail = (width: number): number => Math.min(RAIL_MAX, Math.max(RAIL_MIN, Math.round(width)))

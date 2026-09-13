@@ -32,7 +32,7 @@ describe('grownItem', () => {
 
   it('keeps a text box one line tall, it grows with its words', () => {
     const source = item('a', { kind: 'text', width: 320, height: 140 })
-    expect(grownItem([source], source, 'bottom')).toMatchObject({ kind: 'text', width: 320, height: 48 })
+    expect(grownItem([source], source, 'bottom')).toMatchObject({ kind: 'text', width: 320, height: 48, x: 0, y: 140 + GROW_GAP })
   })
 
   it('fans out along the side when the spot is taken, rather than stacking', () => {
