@@ -32,6 +32,16 @@ describe('wallShortcutSections', () => {
     ).toContainEqual(['Ctrl+K', 'Link the selected item'])
   })
 
+  it('lists copying: the clipboard keys, alt-drag, and the style keys unbound when they are', () => {
+    expect(rowsOf('Editing')).toContainEqual(['Ctrl+C, Ctrl+X, Ctrl+V', 'Copy, cut and paste under the pointer'])
+    expect(rowsOf('Editing')).toContainEqual(['Unbound', 'Copy style'])
+    expect(rowsOf('Mouse')).toContainEqual(['Alt+drag', 'Drag out a copy'])
+    expect(
+      wallShortcutSections({ ...bindings, wall_paste_style: 'Ctrl+Alt+V' }, 'both', 'right')
+        .find(s => s.group === 'Editing')?.rows
+    ).toContainEqual(['Ctrl+Alt+V', 'Paste style'])
+  })
+
   it('lists the formatting keys for writing in a sticky or text box', () => {
     expect(rowsOf('Text')).toContainEqual(['Ctrl+B', 'Bold'])
     expect(rowsOf('Text')).toContainEqual(['Ctrl+I', 'Italic'])

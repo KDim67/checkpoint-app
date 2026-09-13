@@ -6,6 +6,8 @@ import { getTextColorForBackground } from '../../lib/contrast'
 import { NUDGE } from './wallShortcutSheet'
 import { wallMenuEntries } from './wallMenuEntries'
 import { isLinkable, pastedLink } from '../../../../shared/wallLink'
+import { clipSelection, clipText, decodeClip, encodeClip, WALL_CLIP_MIME } from '../../../../shared/wallClipboard'
+import { rememberClip, rememberedClip, rememberedStyle } from './wallClipboardMemory'
 import type { WallDocument } from './useWallDocument'
 import type { WallPointer } from './useWallPointer'
 
@@ -17,7 +19,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     viewportRef, panCameraRef, labelRef, docRef, selectedRef, historyRef, cardsById, selectedItems,
     single, arrowsSelected, setItems, applyHistory, addItem, removeSelected, duplicateSelected,
     toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, setLinkPickFor, setLinkOpen,
-    setItemLink, addBookmark, refreshPreview, followLink, copyItemLink
+    setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
+    copyStyle, pasteStyle
   } = wallDocument
   const {
     fitToContent
@@ -75,6 +78,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         }
         return
       }
+      if (command === 'wall_copy_style') { e.preventDefault(); copyStyle(); return }
+      if (command === 'wall_paste_style') { e.preventDefault(); pasteStyle(); return }
 
       if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault()
@@ -120,12 +125,48 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [applyHistory, docRef, duplicateSelected, historyRef, matchKey, removeSelected, selectedRef, setArrowDrag, setArrowFrom, setBgOpen, setEditingId, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen])
+  }, [applyHistory, copyStyle, docRef, duplicateSelected, historyRef, matchKey, pasteStyle, removeSelected, selectedRef, setArrowDrag, setArrowFrom, setBgOpen, setEditingId, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen])
+
+  /** this app's private format beside plain words for any other; text selected on the page stays the page's to copy */
+  useEffect(() => {
+    const onCopy = (e: ClipboardEvent): void => {
+      const el = document.activeElement
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+      if (el instanceof HTMLElement && el.isContentEditable) return
+      if (window.getSelection()?.toString()) return
+
+      const clip = clipSelection(docRef.current.items, selectedRef.current)
+      if (!clip || !e.clipboardData) return
+      e.preventDefault()
+
+      const text = clipText(clip, labelRef.current)
+      e.clipboardData.setData(WALL_CLIP_MIME, encodeClip(clip))
+      e.clipboardData.setData('text/plain', text)
+      rememberClip(clip, text)
+      if (e.type === 'cut') cutSelected()
+    }
+
+    window.addEventListener('copy', onCopy)
+    window.addEventListener('cut', onCopy)
+    return () => {
+      window.removeEventListener('copy', onCopy)
+      window.removeEventListener('cut', onCopy)
+    }
+  }, [docRef, selectedRef, labelRef, cutSelected])
 
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const el = document.activeElement
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+
+      // wall items first: their copy also left words on the clipboard, which would paste as something else
+      const copied = decodeClip(e.clipboardData?.getData(WALL_CLIP_MIME))
+      if (copied) {
+        e.preventDefault()
+        pasteClip(copied)
+        return
+      }
+
       const files = e.clipboardData?.files ? Array.from(e.clipboardData.files) : []
       if (files.some(f => f.type.startsWith('image/'))) {
         e.preventDefault()
@@ -133,7 +174,16 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         return
       }
 
-      const link = pastedLink(e.clipboardData?.getData('text/plain') ?? '')
+      const text = e.clipboardData?.getData('text/plain') ?? ''
+      // copied from the menu, the clipboard only got the words
+      const remembered = rememberedClip(text)
+      if (remembered) {
+        e.preventDefault()
+        pasteClip(remembered)
+        return
+      }
+
+      const link = pastedLink(text)
       if (!link) return
       e.preventDefault()
 
@@ -153,12 +203,32 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [placeImageFiles, docRef, selectedRef, setItemLink, addBookmark, toast])
+  }, [placeImageFiles, docRef, selectedRef, setItemLink, addBookmark, pasteClip, toast])
+
+  /** a menu click raises no copy event, so the clip is remembered and only its words reach the clipboard */
+  const copyFromMenu = (cut: boolean): void => {
+    const clip = clipSelection(docRef.current.items, selectedRef.current)
+    if (!clip) return
+    const text = clipText(clip, labelRef.current)
+    rememberClip(clip, text)
+    navigator.clipboard.writeText(text).catch(() => {})
+    if (cut) cutSelected()
+  }
 
   const menuEntries = (): MenuEntry[] => wallMenuEntries({
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
     duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast,
-    followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor: () => setLinkOpen(true)
+    followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor: () => setLinkOpen(true),
+    copyItems: () => copyFromMenu(false),
+    cutItems: () => copyFromMenu(true),
+    copyStyle,
+    pasteStyle,
+    canPasteStyle: rememberedStyle() !== null,
+    pasteHere: at => {
+      const clip = rememberedClip()
+      if (clip) pasteClip(clip, at)
+    },
+    canPaste: rememberedClip() !== null
   })
 
   // live camera from the ref mid-pan, so a stray render agrees with what's painted

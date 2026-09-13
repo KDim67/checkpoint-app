@@ -5,7 +5,15 @@ import { itemAtPoint, snap, SNAP_GRID, type Point, type WallItem } from './wallM
 /** held until release */
 export type WallDrag =
   | { mode: 'pan'; startX: number; startY: number; camX: number; camY: number }
-  | { mode: 'move'; startX: number; startY: number; origin: WallItem[]; moved: boolean }
+  | {
+      mode: 'move'
+      startX: number
+      startY: number
+      origin: WallItem[]
+      moved: boolean
+      /** an alt-drag's wall before its copies, put back when they never move */
+      before?: { items: WallItem[]; selected: Set<string> }
+    }
   | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
   | {
       mode: 'arrow'
