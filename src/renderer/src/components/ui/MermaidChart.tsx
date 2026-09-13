@@ -2,14 +2,7 @@ import React, { useState, useEffect, useId } from 'react'
 import mermaid from 'mermaid'
 import { themeToken, useThemeVersion } from '../../lib/themeTokens'
 
-/**
- * Mermaid's settings, rebuilt from the theme every time a diagram is drawn.
- *
- * These colours used to be literals, on the correct observation that mermaid
- * resolves them outside the DOM where var(--token) means nothing. The cost was
- * that every diagram in the app stayed the default dark blue whatever theme was
- * selected. Reading the tokens off the document first answers both.
- */
+/** rebuilt from theme tokens per render; literals left every diagram dark blue */
 function mermaidConfig() {
   const surface = themeToken('--color-surface-1', '#1b1f30')
   const canvas = themeToken('--color-surface-2', '#131622')
@@ -18,21 +11,9 @@ function mermaidConfig() {
 
   return {
     startOnLoad: false,
-    // 'base' is the theme that honours themeVariables. 'dark' lays its own
-    // palette over the top and ignores most of what it is handed.
+    // 'base' honours themeVariables, 'dark' ignores most of them
     theme: 'base' as const,
-    /**
-     * Diagrams are rendered with `dangerouslySetInnerHTML`, and the text they
-     * are built from is not always the user's own: a ```mermaid fence can
-     * arrive in an AI reply, in a note synced from another machine, or in an
-     * imported Obsidian vault.
-     *
-     * 'loose' lets that text carry raw HTML and click handlers, which in a
-     * renderer holding `window.electronAPI` means the database and the file
-     * system. 'strict' escapes the HTML and drops the handlers. The cost is
-     * that HTML markup inside a node label shows as text, which is the right
-     * trade for markup nobody in this app writes on purpose.
-     */
+    /** strict: fences come from AI replies, synced notes and vaults, and loose HTML could reach electronAPI */
     securityLevel: 'strict' as const,
     themeVariables: {
       background: canvas,
@@ -54,31 +35,23 @@ function mermaidConfig() {
 
 interface MermaidChartProps {
   code: string
-  /** Merged over the frame style. Callers use it to cap height in dense panels. */
+  /** callers cap height in dense panels */
   style?: React.CSSProperties
 }
 
-/**
- * How long the code has to stop changing before it is worth rendering.
- *
- * The note preview re-renders on every keystroke, so a diagram being typed
- * arrives here character by character. Half of those are not valid mermaid, and
- * each one used to be rendered, fail, and log. Typing `B[Next]` reported a parse
- * error on every character before the closing bracket landed.
- */
+/** wait for typing to settle, half-typed mermaid failed and logged per keystroke */
 const SETTLE_MS = 300
 
 export default function MermaidChart({ code, style }: MermaidChartProps): React.JSX.Element {
   const [svg, setSvg] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const reactId = useId()
-  // useId returns ':r0:' style ids; mermaid injects this into a DOM id and a
-  // CSS selector, where the colons are invalid.
+  // useId's colons are invalid in a DOM id and CSS selector
   const elementId = `mermaid-${reactId.replace(/:/g, '')}`
 
   const themeVersion = useThemeVersion()
 
-  // Only the code someone has stopped typing gets rendered.
+  // only render code the user stopped typing
   const [settledCode, setSettledCode] = useState(code)
   useEffect(() => {
     const timer = setTimeout(() => setSettledCode(code), SETTLE_MS)
@@ -90,8 +63,7 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
 
     const renderChart = async (): Promise<void> => {
       try {
-        // Global config, so it is set immediately before the render that needs
-        // it rather than once at import.
+        // global config, so set right before the render
         mermaid.initialize(mermaidConfig())
         const { svg: renderedSvg } = await mermaid.render(elementId, settledCode)
         if (isMounted) {
@@ -99,8 +71,7 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
           setError(null)
         }
       } catch (err) {
-        // Not logged. A diagram in progress fails here as a matter of course,
-        // and the message below says so on screen where it belongs.
+        // not logged, half-written diagrams fail routinely
         if (isMounted) {
           const errMsg = err instanceof Error ? err.message : String(err)
           setError(errMsg || 'Failed to render Mermaid chart')
@@ -114,9 +85,7 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
     }
   }, [settledCode, elementId, themeVersion])
 
-  // A diagram that rendered once stays on screen while the next version is
-  // broken. Replacing a working picture with a stack trace on the way to the
-  // next working picture is the wrong thing to show someone mid-edit.
+  // keep the last good diagram while the next version is broken
   if (error && svg) {
     return (
       <div className="relative">

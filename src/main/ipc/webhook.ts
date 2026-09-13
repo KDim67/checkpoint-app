@@ -1,4 +1,4 @@
-/** The local HTTP gateway for external automation. */
+/** local HTTP gateway for external automation */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

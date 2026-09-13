@@ -1,10 +1,4 @@
-/**
- * Where the AI endpoint is and how to talk to it.
- *
- * Its own module because everything that touches the endpoint needs it, and
- * putting it next to the streaming client made the capability probe import the
- * streamer, which imports the probe back.
- */
+/** own module: beside the streamer it made the capability probe an import cycle */
 
 import { getSetting } from './db'
 

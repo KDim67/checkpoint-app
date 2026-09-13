@@ -28,30 +28,23 @@ import ToolSwitcher from './gamedev/ToolSwitcher'
 import { updateItem } from '../data/items'
 
 const RECENT_KEY = 'gamedev_recent_tools'
-/** Enough to cover a session's worth of switching without becoming a second menu. */
+/** covers a session's switching without becoming a second menu */
 const RECENT_MAX = 4
 
 export default function GameDevView() {
   const { toast } = useToast()
-  // null is the launcher. The workspace opens there rather than dropping
-  // someone into one of ten tools they did not choose.
+  // null is the launcher, don't drop someone into a tool they didn't pick
   const [activeTab, setActiveTab] = useState<GameDevTab | null>(null)
   const [recent, setRecent] = useState<GameDevTab[]>([])
 
   useEffect(() => {
     void getStringSetting(RECENT_KEY, '').then(raw => {
-      // Ids of tools that no longer exist are dropped rather than rendered as
-      // a blank card, which is what a renamed tool would otherwise leave behind.
+      // drop ids of tools that no longer exist instead of blank cards
       setRecent(raw.split(',').filter(id => findTool(id as GameDevTab)) as GameDevTab[])
     })
   }, [])
 
-  /**
-   * Opens a tool and remembers it.
-   *
-   * The launcher costs a click that the old strip of tabs did not, so the tools
-   * someone actually uses come back to the top of it.
-   */
+  /** the launcher costs a click, so recently used tools float up */
   const openTool = useCallback((id: GameDevTab) => {
     setActiveTab(id)
     setRecent(prev => {
@@ -73,7 +66,7 @@ export default function GameDevView() {
   )
   const pbrTool = usePbrTool(activeTab === 'pbr', useCallback(() => setActiveTab('pbr'), []))
 
-  // The grader writes next to whichever asset a sibling tool has open.
+  // the grader writes next to whatever asset a sibling tool has open
   const lutTool = useLutTool(
     activeTab === 'lut',
     slicerTool.slicerPath || seamlessTool.seamlessPath || pbrTool.albedoPath || upscalerTool.upscalePath
@@ -82,8 +75,7 @@ export default function GameDevView() {
   const moveCardToDone = useCallback(async (cardId: string) => {
     try {
       const activeWorkspace = useAppStore.getState().activeWorkspace
-      // Reads the unified board document rather than the legacy column key,
-      // which stopped being written once board configuration was unified.
+      // unified board doc, the legacy column key stopped being written
       const { columns } = await loadBoardConfig(activeWorkspace)
       const doneCol = columns.find(c => c.id === 'done' || c.name.toLowerCase().includes('done'))
       const doneColId = doneCol?.id ?? 'done'
@@ -114,7 +106,6 @@ export default function GameDevView() {
       fontFamily: 'var(--font-sans)',
       boxSizing: 'border-box'
     }}>
-      {/* Grouped tool navigation */}
       <style>{`
         .gamedev-tab-btn {
           background: transparent;
@@ -169,50 +160,40 @@ export default function GameDevView() {
 
       {!activeTab && <GameDevLauncher onPick={openTool} recent={recent} />}
 
-      {/* Tab Panels */}
       <div style={{ flex: 1, minHeight: 0 }}>
         
-        {/* TAB 1: BATCH ASSET RENAMER */}
         {activeTab === 'renamer' && (
           <RenamerPanel tool={renamerTool} />
         )}
 
-        {/* TAB 3: DIALOGUE & QUEST TREE BUILDER */}
         {activeTab === 'dialogue' && (
           <DialoguePanel tool={dialogueTool} onCopy={copyToClipboard} />
         )}
 
-        {/* TAB 4: SHADER PALETTE CODE GENERATOR */}
         {activeTab === 'palette' && (
           <PalettePanel tool={paletteTool} onCopy={copyToClipboard} />
         )}
 
-        {/* TAB 5: PBR MAP GENERATOR */}
         {activeTab === 'pbr' && (
           <PbrPanel tool={pbrTool} onCardDone={moveCardToDone} />
         )}
 
-        {/* TAB 6: SEAMLESS TEXTURE GENERATOR */}
         {activeTab === 'seamless' && (
           <SeamlessPanel tool={seamlessTool} onCardDone={moveCardToDone} />
         )}
 
-        {/* TAB 7: ATLAS FORGE (SPRITE PACKER) */}
         {activeTab === 'atlas' && (
           <AtlasPanel tool={atlasTool} />
         )}
 
-        {/* TAB 8: SPRITE SLICER */}
         {activeTab === 'slicer' && (
           <SlicerPanel tool={slicerTool} />
         )}
 
-        {/* TAB 9: LUT COLOR GRADER */}
         {activeTab === 'lut' && (
           <LutPanel tool={lutTool} />
         )}
 
-        {/* TAB 10: PIXEL ART UPSCALER */}
         {activeTab === 'upscaler' && (
           <UpscalerPanel tool={upscalerTool} />
         )}

@@ -4,7 +4,6 @@ import { VIEW_FEATURES, readViewFeatures, defaultViewEnabledMap, START_VIEW_LAST
 import { getStringSetting, setStringSetting } from '../../lib/settings'
 import { useAppStore } from '../../store/appStore'
 
-// General Settings
 export default function GeneralSettings() {
   const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
 

@@ -66,7 +66,6 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
 
   return (
     <div className="notes-sidebar">
-      {/* Header */}
       <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderBottom: '1px solid var(--color-surface-offset)', flexShrink: 0 }}>
         <div className="row-between">
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -95,7 +94,6 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
           </div>
         </div>
 
-        {/* New note split-button */}
         <div style={{ display: 'flex', position: 'relative' }} ref={menuRef}>
           <button
             onClick={() => onCreate()}
@@ -164,7 +162,6 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
           )}
         </div>
 
-        {/* Search */}
         <div className="row-relative">
           {searching
             ? <Loader2 size={14} className="notes-spin" style={{ position: 'absolute', left: '10px', color: 'var(--color-primary)' }} />
@@ -197,7 +194,6 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
           )}
         </div>
 
-        {/* Sort control */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }} ref={sortRef}>
           <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
             {searchQuery ? 'Search results' : 'Sorted by'}
@@ -243,7 +239,6 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
         </div>
       </div>
 
-      {/* List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {loading ? (
           <div style={{ padding: 'var(--space-4)', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)', textAlign: 'center' }}>
@@ -312,7 +307,6 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
         )}
       </div>
 
-      {/* Tag filter */}
       {allTags.length > 0 && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--color-surface-offset)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '180px', overflowY: 'auto', flexShrink: 0 }}>
           <div className="row-between">

@@ -1,5 +1,3 @@
-/** The bridge's `cheatsheets` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.cheatsheets
 
 export const add = (...args: Parameters<Bridge['add']>): ReturnType<Bridge['add']> =>

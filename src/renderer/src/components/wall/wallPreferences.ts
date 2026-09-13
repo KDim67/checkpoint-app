@@ -1,10 +1,7 @@
-/** What the wall remembers between sessions, and how wide the board panel may get. */
-
-/** Narrow enough not to crowd the wall, wide enough for a real card title. */
+/** narrow enough not to crowd, wide enough for a real title */
 const RAIL_MIN = 190
 const RAIL_MAX = 460
-// Deliberately not under the `wall_` prefix: those keys name a workspace,
-// and a workspace called "rail_open" would own this one. These are preferences.
+// not under wall_, those keys name workspaces
 export const RAIL_OPEN_KEY = 'wallview_rail_open'
 export const RAIL_WIDTH_KEY = 'wallview_rail_width'
 export const SMOOTHING_KEY = 'wallview_pen_smoothing'

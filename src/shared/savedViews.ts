@@ -1,12 +1,4 @@
-/**
- * Named filters over the task list.
- *
- * A view stores intent, not resolved dates: "overdue" saved on Monday still
- * means overdue on Friday. Storing timestamps gives a view that rots quietly,
- * still returning results, just the wrong ones.
- *
- * In shared/ so the renderer and MCP build the same query.
- */
+/** stores intent, not dates, so "overdue" stays right; shared by renderer and MCP */
 
 import type { TaskQueryParams } from './types'
 
@@ -23,7 +15,7 @@ const DUE_FILTERS: { id: DueFilter; label: string }[] = [
 export interface SavedView {
   id: string
   name: string
-  /** Whether the view is pinned to one workspace or follows the active one. */
+  /** pinned workspace, or the active one */
   scope: 'current' | 'all'
   query?: string
   status?: string[]
@@ -31,7 +23,7 @@ export interface SavedView {
   tagIds?: string[]
   due: DueFilter
   untagged?: boolean
-  /** Built-ins ship with the app and cannot be renamed or deleted. */
+  /** can't be renamed or deleted */
   builtIn?: boolean
 }
 
@@ -47,13 +39,7 @@ const endOfDay = (now: number): number => {
   return d.getTime()
 }
 
-/**
- * Turns a due filter into a concrete range for the given moment.
- *
- * Returns the fields to merge into a query. `overdue` deliberately excludes
- * today's not-yet-passed work by ending at the current instant rather than at
- * midnight. Something due at 5pm is not overdue at 9am.
- */
+/** overdue ends now, not midnight: due at 5pm isn't overdue at 9am */
 export function resolveDueRange(
   due: DueFilter,
   now: number
@@ -64,8 +50,7 @@ export function resolveDueRange(
     case 'today':
       return { dueStart: startOfDay(now), dueEnd: endOfDay(now) }
     case 'week':
-      // From now to the end of the seventh day, so "this week" is a rolling
-      // window rather than one that empties out every Sunday night.
+      // rolling seven days, not a week that empties on Sunday
       return { dueStart: startOfDay(now), dueEnd: endOfDay(now + 6 * 86_400_000) }
     case 'none':
       return { noDueDate: true }
@@ -74,7 +59,7 @@ export function resolveDueRange(
   }
 }
 
-/** Builds the query for a view at a given moment. */
+/** at a given moment */
 export function toQueryParams(view: SavedView, now: number): TaskQueryParams {
   return {
     ...(view.query ? { query: view.query } : {}),
@@ -88,7 +73,7 @@ export function toQueryParams(view: SavedView, now: number): TaskQueryParams {
 
 const PRIORITY_LABELS: Record<number, string> = { 0: 'none', 1: 'low', 2: 'medium', 3: 'high' }
 
-/** A sentence describing what a view selects, for the UI and for MCP output. */
+/** for the UI and MCP */
 export function describeView(view: SavedView): string {
   const parts: string[] = []
   if (view.priority && view.priority.length > 0) {
@@ -109,12 +94,7 @@ export function describeView(view: SavedView): string {
 const asStringArray = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length > 0) : []
 
-/**
- * Coerces one stored view, or null if it has no usable identity.
- *
- * Filters that cannot be read are dropped rather than defaulted, because a view
- * that quietly widened its own filter would return more than its name promises.
- */
+/** unreadable filters dropped, not widened */
 export function normalizeSavedView(raw: unknown): SavedView | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -164,12 +144,7 @@ export function normalizeSavedViews(raw: unknown): SavedView[] {
   return out
 }
 
-/**
- * The views that ship with the app.
- *
- * These are the questions worth a single keystroke, and each is one the filter
- * dimensions already supported but nothing named.
- */
+/** one-keystroke questions the filters already supported */
 export const BUILT_IN_VIEWS: SavedView[] = [
   { id: 'view-overdue', name: 'Overdue', scope: 'current', due: 'overdue', builtIn: true },
   { id: 'view-today', name: 'Due today', scope: 'current', due: 'today', builtIn: true },
@@ -179,7 +154,7 @@ export const BUILT_IN_VIEWS: SavedView[] = [
   { id: 'view-no-due', name: 'No due date', scope: 'current', due: 'none', builtIn: true }
 ]
 
-/** Validates a new view and gives it an id. */
+/** validates and assigns an id */
 export function createSavedView(
   name: string,
   base: Omit<SavedView, 'id' | 'name' | 'builtIn'>,

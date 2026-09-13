@@ -1,10 +1,4 @@
-/**
- * The one place a notification is raised. Everything goes through `notify`,
- * which applies the user's policy and remembers what it has already said.
- *
- * The dedupe memory is persisted, not a variable: the app restarts most days,
- * and an in-memory map re-announces every overdue task on every launch.
- */
+/** single choke point: applies policy and a persisted dedupe, since restarts would re-announce everything */
 
 import { Notification, BrowserWindow, nativeImage } from 'electron'
 import { join } from 'path'
@@ -19,41 +13,24 @@ import {
 
 export const POLICY_SETTING_KEY = 'notification_policy'
 
-/**
- * The toast icon.
- *
- * Set explicitly rather than relying on the AppUserModelID alone: the AUMID only
- * resolves to an icon once an installed shortcut is registered under it, so an
- * unpackaged run would otherwise show no logo at all. PNG rather than the .ico,
- * which Windows toasts render inconsistently.
- *
- * Resolved once. The file does not change while the app is running, and reading
- * it per notification would be work for nothing.
- */
+/** explicit icon: AUMID needs an installed shortcut; PNG since toasts render .ico badly; loaded once */
 const NOTIFICATION_ICON = nativeImage.createFromPath(
   join(__dirname, '../../resources/icon.png')
 )
 const DEDUPE_SETTING_KEY = 'notification_dedupe'
 
-/** Dedupe entries older than this are forgotten. */
 const DEDUPE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 interface NotifyInput {
   category: NotificationCategory
   title: string
   body: string
-  /** Suppresses repeats of the same thing. Omit for events that are genuinely new each time. */
+  /** omit for events that are new each time */
   dedupeKey?: string
   dedupeWindowMs?: number
-  /** Item to open when the notification is clicked. */
+  /** opened on click */
   itemId?: string
-  /**
-   * The moment to judge against, for quiet hours and dedupe.
-   *
-   * Defaults to now. A caller sweeping on a schedule passes the same instant it
-   * used to select rows, so the decision cannot be made against a different
-   * clock than the query was.
-   */
+  /** defaults to now; sweeps pass the instant they queried with so both use one clock */
   now?: number
 }
 
@@ -87,12 +64,7 @@ export function getNotificationPolicy() {
   return normalizePolicy(getSetting<unknown>(POLICY_SETTING_KEY, null))
 }
 
-/**
- * Raises a notification if the policy allows it. Returns whether it fired.
- *
- * Never throws: a notification failing must not take down whatever was doing
- * real work when it asked for one.
- */
+/** never throws, a failed notification mustn't take down real work */
 export function notify(input: NotifyInput): boolean {
   try {
     if (!Notification.isSupported()) return false
@@ -112,8 +84,7 @@ export function notify(input: NotifyInput): boolean {
       title: input.title,
       body: input.body,
       silent: false,
-      // An empty image would blank the icon rather than fall back, so it is only
-      // passed when the file actually loaded.
+      // an empty image blanks the icon instead of falling back
       ...(NOTIFICATION_ICON.isEmpty() ? {} : { icon: NOTIFICATION_ICON })
     })
 
@@ -139,12 +110,7 @@ export function notify(input: NotifyInput): boolean {
   }
 }
 
-/**
- * Clears the memory of what has been announced.
- *
- * Exposed because the dedupe window for due dates is a day: without a way to
- * reset, testing a change to a reminder means waiting until tomorrow.
- */
+/** due-date dedupe lasts a day, so testing a reminder change needs a reset */
 export function resetNotificationDedupe(): void {
   saveDedupe(new Map())
 }

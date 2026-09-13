@@ -15,10 +15,6 @@ import { createStreamBuffer } from '../../lib/streamBuffer'
 import * as aiApi from '../../data/ai'
 import { ASSISTANT_STREAM_ID, STORAGE_KEY_ACTIVE_SKILL } from './panelConstants'
 
-/**
- * The conversation and what surrounds it: messages, the saved chats, the model,
- * memory, skills, the project folder, quick actions and the scroll position.
- */
 export function useAiChat() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
   const selectItem = useAppStore(s => s.selectItem)
@@ -27,16 +23,13 @@ export function useAiChat() {
   const setWorkspace = useAppStore(s => s.setWorkspace)
   const { toast } = useToast()
 
-  // Chat message history
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState('')
 
-  // Context pre-seeding
   const [contextItem, setContextItem] = useState<Item | null>(null)
 
-  // Configuration settings loaded from DB
   const modelConfig = useModelConfig()
   const {
     selectedModel, localModels, temperature, setTemperature, maxTokens, setMaxTokens,
@@ -44,8 +37,7 @@ export function useAiChat() {
     handleModelChange
   } = modelConfig
   const { caps: modelCaps, budget: modelBudget, refresh: refreshModelCaps } = useModelCapabilities(selectedModel)
-  // Mirrored into a ref because the submit path is a long async function; it
-  // must read the capabilities current at send time, not at closure creation.
+  // mirrored into a ref: the long async submit must read caps at send time
   const [reportedPromptTokens, setReportedPromptTokens] = useState<number | null>(null)
   const modelCapsRef = useRef(modelCaps)
   useEffect(() => {
@@ -53,10 +45,8 @@ export function useAiChat() {
     setReportedPromptTokens(null)
   }, [modelCaps])
 
-  // Saved Chats State
   const chatHistory = useSavedChats(messages)
-  // Only what the panel still touches; the rest reaches the drawer through the
-  // object itself.
+  // only what the panel still touches, the drawer gets the rest via the object
   const { savedChats, currentChatId, setCurrentChatId, showSavedChatsModal, setShowSavedChatsModal, setChatSearchQuery, removeChat } = chatHistory
   const [revertConfirmData, setRevertConfirmData] = useState<{ cardTitles: string[]; columnNames: string[]; index: number } | null>(null)
 
@@ -75,7 +65,7 @@ export function useAiChat() {
     setRecalledMemCount(0)
     setCurrentChatId(`chat_${Date.now()}`)
     setShowSavedChatsModal(false)
-    // Clear action caches so cards/columns can be re-created in a fresh chat
+    // so cards and columns can be re-created in a fresh chat
     clearActionCaches()
   }
 
@@ -100,7 +90,6 @@ export function useAiChat() {
     }
   }
 
-  // Buffering and throttling references
   const streamRef = useRef(createStreamBuffer(text => setStreamingText(text)))
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const currentChatIdRef = useRef(currentChatId)
@@ -108,30 +97,21 @@ export function useAiChat() {
   const isAbortedRef = useRef(false)
   const hasReceivedFirstChunkRef = useRef(false)
 
-  // Scroll tracking references
   const isAtBottomRef = useRef(true)
   const prevMessagesLengthRef = useRef(messages.length)
 
-  // Waiting-for-first-chunk indicator
   const [isWaitingForFirstChunk, setIsWaitingForFirstChunk] = useState(false)
 
-  // Recall count and waiting label belong to the stream, not the vault: they are
-  // written while a response arrives and read by the header, whether or not the
-  // vault has ever been opened.
+  // these belong to the stream, not the vault: written while replies arrive, read by the header
   const [recalledMemCount, setRecalledMemCount] = useState(0)
   const [waitingLabel, setWaitingLabel] = useState('Thinking…')
-  const consolidationTurnRef = useRef(0) // Only consolidate every N turns to save API calls
+  const consolidationTurnRef = useRef(0) // consolidate every N turns to save API calls
   const auditTurnRef = useRef(0)
-  /**
-   * The stream listeners are registered once, so they reach the consolidation
-   * pass through this. It always holds the one from the latest render, and with
-   * it the current workspace, model and memory vault.
-   */
+  /** listeners register once, so they reach the latest consolidation pass through this */
   const consolidateRef = useRef<(messages: Message[]) => Promise<void>>(async () => {})
 
   const vault = useMemoryVault({ activeWorkspace, selectedModel, toast })
-  // Only what the stream and header still touch; the rest reaches the modal
-  // through the vault object itself.
+  // only what the stream and header touch
   const {
     showMemoryPanel, setShowMemoryPanel,
     setMemories,
@@ -139,11 +119,9 @@ export function useAiChat() {
     handleOpenMemoryPanel
   } = vault
 
-  // Settings panel
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
   const [systemPromptOverride, setSystemPromptOverride] = useState('')
 
-  // Specialized Skill Workflows
   const [activeSkillId, setActiveSkillId] = useState<string | null>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY_ACTIVE_SKILL) || null
@@ -152,21 +130,17 @@ export function useAiChat() {
     }
   })
 
-  // Workspace Folder Import & Codebase Indexing
   const { workspaceFolder, workspaceFiles, workspaceIndexing, handleImportWorkspace, handleClearWorkspace } = useWorkspaceFolder()
 
-  // Custom quick actions (user-defined prompt library)
   const quickActions = useCustomActions()
   const { customActions, showCustomActionsModal, setShowCustomActionsModal } = quickActions
 
-  // Copy toast
   const [copiedMsgIndex, setCopiedMsgIndex] = useState<number | null>(null)
 
   useEffect(() => {
     currentChatIdRef.current = currentChatId
   }, [currentChatId])
 
-  // 1. Fetch Context Item details when selectedItemId changes
   useEffect(() => {
     if (!selectedItemId) {
       setContextItem(null)
@@ -190,14 +164,13 @@ export function useAiChat() {
     loadContextDetails()
   }, [selectedItemId, activeWorkspace])
 
-  // Auto-scroll to bottom of messages container
   const scrollToBottom = useCallback((force = false) => {
     if (scrollContainerRef.current && (isAtBottomRef.current || force)) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight
     }
   }, [])
 
-  // Floating "jump to latest" affordance while scrolled up (mirrors isAtBottomRef in state)
+  // mirrors isAtBottomRef in state
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
 
   const handleScroll = () => {

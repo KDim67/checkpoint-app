@@ -1,5 +1,3 @@
-/** The bridge's `ai` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.ai
 
 export const abortStream = (...args: Parameters<Bridge['abortStream']>): ReturnType<Bridge['abortStream']> =>

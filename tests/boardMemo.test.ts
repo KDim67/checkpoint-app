@@ -8,10 +8,7 @@ import {
   type ColumnConfig
 } from '../src/shared/boardModel'
 
-// Both column components are memoised, and both comparators listed the fields
-// they cared about by hand. Neither listed cardDisplay, so the Card Fields
-// toggles updated their own checkboxes and nothing else: the board never
-// re-rendered. collapsed, sort and description were missed the same way.
+// hand-listed memo comparators missed cardDisplay, collapsed, sort and description
 
 const column = (over: Partial<ColumnConfig> = {}): ColumnConfig => ({
   id: 'todo', name: 'To Do', wipLimit: null, ...over
@@ -32,8 +29,7 @@ describe('sameCardDisplay', () => {
   }
 
   it('covers every switch there is, including ones added later', () => {
-    // Read off the defaults rather than written out, so a fifth toggle cannot
-    // be added without this comparing it. That omission is the bug.
+    // read off the defaults so a new toggle can't be skipped
     const keys = Object.keys(DEFAULT_CARD_DISPLAY)
     expect(keys.length).toBeGreaterThan(0)
     for (const key of keys) {
@@ -53,7 +49,7 @@ describe('sameColumnConfig', () => {
   })
 
   it('is true across a rebuilt object with the same values', () => {
-    // Every config change rebuilds the array, so identity is never equal.
+    // rebuilt on every change, identity never equal
     expect(sameColumnConfig(column(), { ...column() })).toBe(true)
   })
 
@@ -75,15 +71,13 @@ describe('sameColumnConfig', () => {
   })
 
   it('reads undefined and absent as the same thing', () => {
-    // JSON off disk gives one, a fresh object the other. This is why the
-    // comparison cannot take the cheap shortcut of counting keys.
+    // JSON vs fresh objects, why key counting fails
     expect(sameColumnConfig(column(), column({ description: undefined }))).toBe(true)
     expect(sameColumnConfig(column({ description: undefined }), column())).toBe(true)
   })
 
   it('notices a field only the second one has', () => {
-    // The first walk only covers the keys the first object has, so a key that
-    // exists solely on the second would slip past a one-way comparison.
+    // a key only on the second would slip a one-way walk
     expect(sameColumnConfig(column(), { ...column(), sort: 'due' })).toBe(false)
   })
 
@@ -93,9 +87,7 @@ describe('sameColumnConfig', () => {
   })
 })
 
-// The loader listed the four original switches by hand, so four more added to
-// the type would have been dropped on every read and the toggles would have
-// looked broken again the moment the app restarted.
+// hand-listed switches would drop new ones on every read
 describe('normalizeBoardConfig, card display', () => {
   it('keeps every switch the type has, not just the ones someone remembered', () => {
     const keys = Object.keys(DEFAULT_CARD_DISPLAY)
@@ -107,7 +99,7 @@ describe('normalizeBoardConfig, card display', () => {
   })
 
   it('defaults a switch the stored document has never heard of', () => {
-    // A board saved before these existed has four keys, not eight.
+    // saved before these existed, four keys not eight
     const out = normalizeBoardConfig({ cardDisplay: { priority: false } }).cardDisplay
     expect(out.priority).toBe(false)
     expect(out.cover).toBe(true)

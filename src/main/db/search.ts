@@ -14,8 +14,7 @@ export function searchItems(query: SearchQuery): PaginatedResult<Item> {
     return { items: [], total: 0, page, pageSize }
   }
 
-  // If the query is exactly a UUID, return the direct item lookup (still honoring
-  // any context/type/status scoping so callers can't accidentally link across contexts)
+  // exact UUID: direct lookup, still scoped so callers can't link across contexts
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawQuery)
   if (isUuid) {
     const item = getItemById(rawQuery)
@@ -32,12 +31,11 @@ export function searchItems(query: SearchQuery): PaginatedResult<Item> {
     }
   }
 
-  // Split by whitespace, escape double quotes, and wrap each term in double quotes with prefix match wildcard
+  // quote each term so user input isn't parsed as FTS syntax
   const terms = rawQuery.split(/\s+/).filter(Boolean)
   const ftsQuery = terms.map(t => `"${t.replace(/"/g, '""')}*"`).join(' AND ')
 
-  // Apply optional context/type/status scoping on top of the FTS match so search
-  // (e.g. relation linking from the Backlog task drawer) stays within the intended scope.
+  // scoped on top of the FTS match, e.g. relation linking from the backlog drawer
   let sql = `
     SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
     FROM items i
@@ -90,7 +88,6 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
   `
   const args: (string | number | null)[] = [context]
 
-  // Filters
   if (params.status && params.status.length > 0) {
     sql += ` AND i.status IN (${params.status.map(() => '?').join(',')})`
     args.push(...params.status)
@@ -110,8 +107,7 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
     args.push(params.dueEnd)
   }
 
-  // Distinct from a date range: a task with no due date satisfies no range, so
-  // "has no due date" needs its own clause rather than an open-ended one.
+  // no due date matches no range, so it needs its own clause
   if (params.noDueDate) {
     sql += ` AND i.due_at IS NULL`
   }
@@ -134,7 +130,7 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
     args.push(likePattern, likePattern)
   }
 
-  // Tag filter (AND intersection)
+  // tags AND, not OR
   if (params.tagIds && params.tagIds.length > 0) {
     sql += ` AND i.id IN (
       SELECT item_id FROM item_tags 
@@ -147,7 +143,6 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
 
   sql += ` GROUP BY i.id`
 
-  // Sorting
   const allowedSortFields = ['status', 'priority', 'title', 'created_at', 'due_at', 'relations_count']
   const sortBy = allowedSortFields.includes(params.sortBy ?? '') ? params.sortBy : 'created_at'
   const sortDirection = params.sortDesc ? 'DESC' : 'ASC'
@@ -158,11 +153,9 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
     sql += ` ORDER BY i.${sortBy} ${sortDirection}`
   }
 
-  // Count query
   const countSql = `SELECT COUNT(*) as count FROM (${sql})`
   const countArgs = [...args]
 
-  // Pagination
   sql += ` LIMIT ? OFFSET ?`
   args.push(pageSize, offset)
 

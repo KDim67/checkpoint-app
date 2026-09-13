@@ -1,18 +1,4 @@
-/**
- * The Wall: a freeform canvas per workspace. The work here is mostly about not
- * being clever.
- *
- * - The dot grid scales with the camera. Without it, panning an infinite
- *   canvas looks like nothing happened.
- * - "Fit" is always reachable. Panning into empty space is the one mistake you
- *   cannot undo by looking harder.
- * - Cards are references. Moving one here means nothing to its column, which is
- *   what stops the Wall becoming a second, lying board.
- * - Left-drag selects, right-drag pans (Unity/Unreal, not Figma), and pans from
- *   anywhere. Hunting for empty space first makes a canvas feel cramped.
- *   So right-click does two jobs split by distance: barely moved opens a menu,
- *   further was a pan.
- */
+/** dot grid scales with the camera, Fit is always there, cards are references; right-drag pans */
 
 import WallContextMenu from './WallContextMenu'
 import ConfirmDialog from '../ui/ConfirmDialog'
@@ -47,12 +33,10 @@ export default function WallView() {
         onCancel={() => setPendingDelete(null)}
       />
 
-      {/* Toolbar */}
       <WallToolbar wallView={wallView} />
 
-      {/* Beside the canvas, not over it. The drag should be a straight line. */}
+      {/* beside the canvas, so the drag is a straight line */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Canvas */}
         <WallCanvas wallView={wallView} />
 
         {railOpen && (

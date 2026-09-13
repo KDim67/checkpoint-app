@@ -1,5 +1,3 @@
-/** The bridge's `notifications` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.notifications
 
 export const getPolicy = (...args: Parameters<Bridge['getPolicy']>): ReturnType<Bridge['getPolicy']> =>

@@ -13,33 +13,20 @@ import { createItem, getDb, getItemById, getItemsPaginated, getSetting, setSetti
 import { notify } from './notificationService'
 import type { CreateItemPayload, Item } from '../shared/types'
 
-/** What a load attempt reports back, so a failure can reach the user. */
+/** so a failure can reach the user */
 type PluginLoadResult = { ok: true } | { ok: false; error: string }
 
 export function ensurePluginsDir(): void {
   ensureDir(getPluginsDir())
 }
 
-// Keep track of loaded plugins and what each one registered
 const loadedPlugins = new Map<string, {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   exports: any
   lifecycle: PluginLifecycle
 }>()
 
-/**
- * Tracks what one plugin registered, so all of it can be undone.
- *
- * Named for the one thing it guarantees. It used to be called PluginSandbox,
- * which read as a security boundary and is not one: a plugin is `require`d
- * into the main process and can reach the database, the filesystem and the
- * network whatever this hands it. What it does provide is teardown, which is
- * what makes enable, disable and hot reload work.
- *
- * The API itself routes through the functions the app uses, so a plugin that
- * chooses to use it inherits their validation, sync tombstones and
- * notification policy.
- */
+/** teardown, not a sandbox: plugins are required into main and can reach everything */
 class PluginLifecycle {
   private ipcHandlers: string[] = []
   private unsubscribers: (() => void)[] = []
@@ -55,7 +42,7 @@ class PluginLifecycle {
       ipc: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handle: (channel: string, listener: (...args: any[]) => any) => {
-          // Prevent plugins from overwriting core system handlers or colliding
+          // don't let plugins overwrite core handlers or collide
           if (ipcMain.listenerCount(channel) > 0) {
             console.warn(`[Plugin] Handler already registered for channel: ${channel}`)
             return
@@ -65,12 +52,7 @@ class PluginLifecycle {
         }
       },
 
-      /**
-       * React to things happening in the app.
-       *
-       * Returns an unsubscribe, and the subscription is tracked either way, so a
-       * plugin that forgets to tidy up still stops firing when it is disabled.
-       */
+      /** tracked either way, so a plugin that never unsubscribes still stops when disabled */
       events: {
         on: <K extends PluginEventName>(name: K, handler: PluginEventHandler<K>): (() => void) => {
           const off = onPluginEvent(name, handler)
@@ -79,7 +61,7 @@ class PluginLifecycle {
         }
       },
 
-      /** Reading and writing work, through the app's own validated paths. */
+      /** through the app's own validated paths */
       items: {
         create: (payload: CreateItemPayload) => createItem(getDb(), payload),
         get: (id: string) => getItemById(id),
@@ -88,21 +70,11 @@ class PluginLifecycle {
         update: (id: string, patch: Partial<Item>) => updateItem(getDb(), id, patch)
       },
 
-      /**
-       * Raise a desktop notification.
-       *
-       * Goes through the shared policy, so a plugin obeys the user's quiet hours
-       * and category switches instead of talking over them.
-       */
+      /** through the shared policy, so quiet hours apply */
       notify: (title: string, body: string) =>
         notify({ category: 'agent', title, body, dedupeKey: `plugin:${filename}:${title}` }),
 
-      /**
-       * Storage scoped to this plugin.
-       *
-       * Namespaced by filename so two plugins cannot quietly overwrite each
-       * other, and so none of them can reach an app setting.
-       */
+      /** namespaced by filename, no clobbering each other or app settings */
       storage: {
         get: <T>(key: string, fallback: T): T =>
           getSetting<T>(`plugin:${filename}:${key}`, fallback),
@@ -127,9 +99,7 @@ class PluginLifecycle {
     }
     this.ipcHandlers = []
 
-    // Unsubscribed here rather than trusting onUnload: a plugin that throws on
-    // the way out, or never implements onUnload, would otherwise keep receiving
-    // events after being disabled.
+    // don't trust onUnload, it may throw or not exist
     for (const off of this.unsubscribers) {
       try {
         off()
@@ -141,9 +111,6 @@ class PluginLifecycle {
   }
 }
 
-/**
- * Scan all .js files in the plugins directory and read metadata.
- */
 export function scanPlugins(activeFilenames: string[]): PluginInfo[] {
   ensurePluginsDir()
   const dir = getPluginsDir()
@@ -155,9 +122,7 @@ export function scanPlugins(activeFilenames: string[]): PluginInfo[] {
     let version = '1.0.0'
 
     try {
-      // Read, do not require. This previously executed every file in the folder
-      // including plugins the user had switched off, just to read three
-      // strings, which made the off switch meaningless.
+      // read, don't require: requiring ran disabled plugins just to read three strings
       const source = readFileSync(join(dir, filename), 'utf8')
       const metadata = parsePluginMetadata(source)
       name = metadata.name || name
@@ -178,15 +143,10 @@ export function scanPlugins(activeFilenames: string[]): PluginInfo[] {
   })
 }
 
-/**
- * Hot-load a plugin JS entry point.
- */
 export function loadPlugin(filename: string): PluginLoadResult {
   if (loadedPlugins.has(filename)) return { ok: true }
 
-  // The name comes over IPC from the renderer. Without this a crafted value
-  // could walk out of the plugins folder and execute any file on disk with the
-  // main process's privileges.
+  // name comes over IPC, a crafted value could run any file with main's privileges
   if (!isSafePluginFilename(filename)) {
     const error = `Refused to load "${filename}": not a plain .js filename inside the plugins folder.`
     console.error(`[PluginRegistry] ${error}`)
@@ -204,7 +164,6 @@ export function loadPlugin(filename: string): PluginLoadResult {
   }
 
   try {
-    // Purge cache to load fresh file contents
     delete require.cache[require.resolve(fullPath)]
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const plugin = require(fullPath)
@@ -218,23 +177,19 @@ export function loadPlugin(filename: string): PluginLoadResult {
     console.log(`[PluginRegistry] Successfully loaded extension: ${filename}`)
     return { ok: true }
   } catch (err) {
-    // Reported rather than only logged: a plugin that throws on load used to
-    // fail silently while the UI still showed it as enabled.
+    // reported, not just logged; a throwing plugin used to look enabled
     const error = err instanceof Error ? err.message : String(err)
     console.error(`[PluginRegistry] Failed to load plugin ${filename}:`, err)
-    // Leave nothing half-registered behind.
+    // leave nothing half-registered
     try {
       delete require.cache[require.resolve(fullPath)]
     } catch {
-      // The file may not have resolved at all; nothing to purge.
+      // may not have resolved, nothing to purge
     }
     return { ok: false, error }
   }
 }
 
-/**
- * Hot-unload an active plugin instance and clean up listeners.
- */
 export function unloadPlugin(filename: string): void {
   const active = loadedPlugins.get(filename)
   if (!active) return
@@ -247,10 +202,8 @@ export function unloadPlugin(filename: string): void {
     console.error(`[PluginRegistry] Error calling onUnload for ${filename}:`, err)
   }
 
-  // Clean up registered IPC handlers
   active.lifecycle.cleanup()
 
-  // Purge Node require cache
   try {
     const dir = getPluginsDir()
     const fullPath = join(dir, filename)
@@ -263,9 +216,6 @@ export function unloadPlugin(filename: string): void {
   console.log(`[PluginRegistry] Successfully unloaded extension: ${filename}`)
 }
 
-/**
- * Unload all active plugins (for deconstruction / disabling engine).
- */
 export function unloadAllPlugins(): void {
   const filenames = Array.from(loadedPlugins.keys())
   for (const filename of filenames) {

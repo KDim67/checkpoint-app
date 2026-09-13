@@ -1,4 +1,4 @@
-/** Texture and sprite tools that write files. */
+/** texture and sprite tools that write files */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

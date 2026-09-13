@@ -32,7 +32,6 @@ export default function ItemDetailPanel() {
   const [loading, setLoading] = useState(false)
   const [columns, setColumns] = useState<Array<{ id: string; name: string }>>([])
 
-  // Edit states
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [status, setStatus] = useState('')
@@ -40,14 +39,12 @@ export default function ItemDetailPanel() {
   const [dueDate, setDueDate] = useState<string>('')
   const [isEditingBody, setIsEditingBody] = useState(false)
 
-  // Tags states
   const [allTags, setAllTags] = useState<TagType[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [showTagSelector, setShowTagSelector] = useState(false)
 
   const tagSelectorRef = useRef<HTMLDivElement>(null)
 
-  // 1. Close tag selector on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (tagSelectorRef.current && !tagSelectorRef.current.contains(e.target as Node)) {
@@ -58,25 +55,14 @@ export default function ItemDetailPanel() {
     return () => document.removeEventListener('mousedown', handleOutsideClick)
   }, [])
 
-  // 2. Fetch Columns and Tags. Re-runs on workspace change: columns are
-  //    per-workspace, so a list loaded once at mount would describe whichever
-  //    board happened to be open first.
+  // re-runs on workspace change, columns are per-workspace
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        // Load Kanban columns for the active workspace.
-        //
-        // This used to read 'kanban_columns', a key with no workspace suffix
-        // that nothing has ever written, so it always fell through to the
-        // hardcoded ids below ('backlog', 'todo') which exist on no real board.
-        //
-        // Not cosmetic: a card with status 'open' matched no <option>, so the
-        // select showed "Backlog" whatever the real status, and picking one
-        // wrote a status no column owns, dropping the card off the board.
+        // the old 'kanban_columns' key was never written, so status fell back to fake ids and cards fell off the board
         const { columns: boardColumns } = await loadBoardConfig(activeWorkspace)
         setColumns(boardColumns.map(c => ({ id: c.id, name: c.name })))
 
-        // Load all tags
         const tags = await listTags()
         setAllTags(tags)
       } catch (err) {
@@ -86,7 +72,6 @@ export default function ItemDetailPanel() {
     fetchMetadata()
   }, [activeWorkspace])
 
-  // 3. Load item details
   useEffect(() => {
     if (!selectedItemId) {
       setItem(null)
@@ -168,10 +153,9 @@ export default function ItemDetailPanel() {
       const tagsToSave = updatedTagIds ?? selectedTagIds
       await updateItem(item.id, patch, tagsToSave)
       
-      // Update local state
       setItem(prev => prev ? { ...prev, ...patch, tags: allTags.filter(t => tagsToSave.includes(t.id)) } : null)
 
-      // Notify parent views to refresh immediately
+      // tell other views to refresh now
       window.dispatchEvent(new CustomEvent('item-updated', { detail: { id: item.id, patch } }))
     } catch (err) {
       console.error('Failed to update field:', err)
@@ -191,10 +175,8 @@ export default function ItemDetailPanel() {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Scrollable details container */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
         
-        {/* Title Input */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
             {item.type === 'task' ? (
@@ -217,10 +199,10 @@ export default function ItemDetailPanel() {
                 setTitle(item.title)
               }
             }}
+            className="item-detail-panel-title"
             style={{
               width: '100%',
               background: 'transparent',
-              border: '1px solid transparent',
               color: 'var(--color-text-base)',
               fontSize: 'var(--text-md)',
               fontWeight: 'var(--weight-semibold)',
@@ -229,16 +211,12 @@ export default function ItemDetailPanel() {
               borderRadius: 'var(--radius-sm)',
               outline: 'none'
             }}
-            onFocus={e => (e.currentTarget.style.border = '1px solid var(--color-surface-offset)')}
-            onBlurCapture={e => (e.currentTarget.style.border = '1px solid transparent')}
             placeholder="Item title..."
           />
         </div>
 
-        {/* Fields list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', border: '1px solid var(--color-surface-offset)' }}>
           
-          {/* Status field */}
           <div className="row-between-gap">
             <span className="row-hint">
               <Clock size={12} /> Status
@@ -266,7 +244,6 @@ export default function ItemDetailPanel() {
             </select>
           </div>
 
-          {/* Priority field */}
           <div className="row-between-gap">
             <span className="row-hint">
               <AlertCircle size={12} /> Priority
@@ -297,7 +274,6 @@ export default function ItemDetailPanel() {
             </select>
           </div>
 
-          {/* Due date field */}
           <div className="row-between-gap">
             <span className="row-hint">
               <Calendar size={12} /> Due Date
@@ -329,7 +305,6 @@ export default function ItemDetailPanel() {
           </div>
         </div>
 
-        {/* Tags Section */}
         <div>
           <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', display: 'block', marginBottom: 'var(--space-2)' }}>
             Tags
@@ -354,7 +329,6 @@ export default function ItemDetailPanel() {
               </span>
             ))}
             
-            {/* Tag Selector dropdown */}
             <div className="relative" ref={tagSelectorRef}>
               <button
                 type="button"
@@ -419,7 +393,6 @@ export default function ItemDetailPanel() {
           </div>
         </div>
 
-        {/* Description Section */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="row-between-mb">
             <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)' }}>

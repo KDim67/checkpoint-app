@@ -9,12 +9,10 @@ module.exports = [
       'out/**',
       'dist/**',
       'node_modules/**',
-      // Nested checkouts and tool output land in dot-directories at the root.
-      // The patterns above are anchored to the repo root and do not reach them.
+      // nested checkouts and tool output land in root dot-dirs the anchored patterns miss
       '.*/**',
       '*.config.*',
-      // `tsc --build` on these composite projects emits .js/.jsx/.d.ts beside
-      // the sources. Ignored so a stray build can never turn into lint noise.
+      // tsc --build emits .js beside sources, ignore so strays never lint
       'src/**/*.js',
       'src/**/*.jsx'
     ]
@@ -35,26 +33,17 @@ module.exports = [
     },
     rules: {
       ...eslintPluginTypeScript.configs.recommended.rules,
-      // The codebase already carried 7 `eslint-disable react-hooks/exhaustive-deps`
-      // comments before this plugin was ever installed, so hook linting had never
-      // actually run. rules-of-hooks catches real crashes and is an error;
-      // exhaustive-deps is advisory and stays a warning.
+      // rules-of-hooks catches real crashes; exhaustive-deps is advisory
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      // An error again. It was a warning while the codebase carried ~226 of
-      // them, because 'error' meant `npm run lint` could never pass and so
-      // nobody ran it. They are gone now, bar one documented disable in the
-      // collaboration transport, so the gate holds the line rather than
-      // counting the damage.
+      // error again: backlog is gone bar one documented disable in the collab transport
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'warn'
     }
   },
   {
-    // The renderer reaches the main process through src/renderer/src/data and
-    // nowhere else. A screen that imports a data module can be tested against a
-    // stand-in for it; a screen that reads the global cannot.
+    // renderer reaches main only via data/, so screens can be tested against stand-ins
     files: ['src/renderer/src/**/*.{ts,tsx}'],
     ignores: ['src/renderer/src/data/**'],
     rules: {
@@ -66,10 +55,7 @@ module.exports = [
     }
   },
   {
-    // Tests live outside src/, so the block above does not reach them and they
-    // would otherwise hit the default parser and fail on the first annotation.
-    // no-explicit-any stays an error here: test code is new, so there is no
-    // backlog to grandfather in, and a stray any in a test hides a real gap.
+    // tests live outside src/ so they need their own parser block; any stays an error
     files: ['tests/**/*.{ts,tsx}'],
     languageOptions: {
       parser: parserTypeScript,

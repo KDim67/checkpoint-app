@@ -4,7 +4,7 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
 
 function focusableWithin(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    // offsetParent is null when the element or an ancestor is display:none.
+    // offsetParent is null under display:none
     el => !el.hasAttribute('disabled') && el.offsetParent !== null && el.tabIndex !== -1
   )
 }
@@ -18,12 +18,10 @@ export default function useFocusTrap(isOpen: boolean, defaultFocusRef?: React.Re
     const container = containerRef.current as HTMLElement | null
     if (!container) return
 
-    // Whatever opened the overlay gets focus back when it closes, otherwise the
-    // tab order restarts from the top of the document.
+    // hand focus back or tab order restarts at the top
     const previouslyFocused = document.activeElement as HTMLElement | null
 
-    // Deferred: on the opening frame the container may still be mid-layout, so
-    // offsetParent reads null and every candidate is filtered out.
+    // deferred: mid-layout offsetParent reads null
     const timer = setTimeout(() => {
       const target = defaultFocusRef?.current ?? focusableWithin(container)[0]
       target?.focus()
@@ -40,8 +38,7 @@ export default function useFocusTrap(isOpen: boolean, defaultFocusRef?: React.Re
     const container = containerRef.current as HTMLElement | null
     if (!container) return
 
-    // Bound to the container rather than the window: with the listener on the
-    // window, a nested overlay and its parent both trap and fight over Tab.
+    // on the container, window listeners let nested traps fight over Tab
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
 

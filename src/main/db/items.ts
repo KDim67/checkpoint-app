@@ -85,8 +85,6 @@ export function prepareItemStatements(db: Database.Database): void {
   `)
 }
 
-// Helper: parse concatenated tag data from JOIN
-
 function parseTagData(tagData: string | null): Tag[] {
   if (!tagData) return []
   return tagData.split(';;').map(chunk => {
@@ -94,8 +92,6 @@ function parseTagData(tagData: string | null): Tag[] {
     return { id, name, color }
   })
 }
-
-// Helper: parse a raw DB row into a typed Item
 
 export function rowToItem(row: Record<string, unknown>): Item {
   return {
@@ -129,12 +125,7 @@ export function getItemsPaginated(
   return { items: rows.map(rowToItem), total, page, pageSize }
 }
 
-/**
- * Every item of one type in a workspace, in the order a page of them comes in.
- *
- * For callers that need the whole board rather than a page of it. One page with
- * a large limit reads a board past that limit as though it ended there.
- */
+/** whole board, not a page; a big limit would still cut it off */
 export function getAllItems(context: string, type: string): Item[] {
   const order = type === 'log' ? 'i.position DESC' : 'i.position ASC'
   const rows = prepareOnce(getDb(), `
@@ -149,14 +140,7 @@ export function getAllItems(context: string, type: string): Item[] {
   return rows.map(rowToItem)
 }
 
-/**
- * Every item, for export. Unpaginated on purpose.
- *
- * An export that quietly stopped at a page boundary would be worse than none,
- * so this deliberately does not take a limit. It runs through the same tag join
- * and rowToItem mapping the rest of the app uses, so an exported row carries its
- * tags rather than a bare column dump.
- */
+/** unpaginated on purpose, an export cut at a page boundary is worse than none */
 export function getAllItemsForExport(context: string | null): Item[] {
   const sql = `
     SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
@@ -207,8 +191,7 @@ export function createItem(
   })()
 
   const created = { ...item, tags: tagIds.length ? (stmtGetTagsForItem.all(id) as Tag[]) : [] }
-  // Emitted for every creation path (the UI, an agent over MCP, a webhook),
-  // because a plugin cares that a card appeared, not who typed it.
+  // every creation path (UI, MCP, webhook); plugins care it appeared, not who made it
   emitPluginEvent('item:created', { item: created })
   return created
 }
@@ -250,9 +233,7 @@ export function updateItem(
   const row = stmtGetItemById.get(id) as Record<string, unknown>
   const item = rowToItem(row)
 
-  // Only on the transition into a finished state, so repeated edits to an
-  // already-done item do not each try to advance the rule, and a plugin
-  // listening for completions does not hear the same one repeatedly.
+  // only on the transition into done, so repeat edits don't re-advance or re-notify
   const wasOpen = existing.status !== 'done' && existing.status !== 'archived'
   const nowClosed = item.status === 'done' || item.status === 'archived'
   if (wasOpen && nowClosed) emitPluginEvent('item:completed', { item })
@@ -263,7 +244,7 @@ export function updateItem(
         onRecurrenceInstanceClosed(meta.recurrenceId)
       }
     } catch {
-      // Metadata that is not JSON simply has no recurrence to advance.
+      // non-JSON metadata has no recurrence to advance
     }
   }
 
@@ -272,27 +253,14 @@ export function updateItem(
 
 let onRecurrenceInstanceClosed: ((recurrenceId: string) => void) | null = null
 
-/**
- * Called when an item belonging to a recurrence reaches a finished state.
- *
- * Wired up from index.ts. Without it the next occurrence would still appear, but
- * only on the next hourly sweep. Completing today's task should offer
- * tomorrow's straight away.
- */
+/** without it the next occurrence waits for the hourly sweep */
 export function setRecurrenceInstanceClosedHandler(
   handler: ((recurrenceId: string) => void) | null
 ): void {
   onRecurrenceInstanceClosed = handler
 }
 
-/**
- * Deletes an item, returning the workspace it belonged to.
- *
- * The context is read before the row goes, because callers need it afterwards
- * and it is unrecoverable once deleted. Collaboration in particular filters
- * outgoing mutations by workspace, and a delete that cannot say which workspace
- * it came from gets broadcast from all of them.
- */
+/** read context before deleting; collab filters broadcasts by workspace */
 export function deleteItem(id: string): string | null {
   const existing = stmtGetItemById.get(id) as { context?: string } | undefined
   const context = existing?.context ?? null
@@ -301,13 +269,7 @@ export function deleteItem(id: string): string | null {
   return context
 }
 
-/**
- * Deletes many items in one transaction.
- *
- * Each leaves a tombstone, as deleting it alone does. Sync only skips an item it
- * has a tombstone for, so without one the next sync from a copy that still has
- * the item puts it straight back, and a merge cannot tell it was deleted.
- */
+/** tombstone each, or the next sync brings them back */
 export function bulkDeleteItems(db: Database.Database, ids: string[]): number {
   db.transaction(() => {
     for (const id of ids) {
@@ -331,7 +293,7 @@ export function getContextSlugs(): string[] {
     console.error('[db] Failed to parse contexts_list setting:', err)
   }
 
-  // Fallback to distinct contexts from items table
+  // fall back to distinct contexts in items
   const rows = stmtGetContexts.all() as { slug: string }[]
   const slugs = rows.map(r => r.slug).filter(Boolean)
   if (!slugs.includes('default')) {

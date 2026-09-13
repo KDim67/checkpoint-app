@@ -62,7 +62,7 @@ describe('normalizeWallItem', () => {
   })
 
   it('drops a card or image with nothing to point at', () => {
-    // An empty box the user cannot identify is worse than a missing one.
+    // worse than missing
     expect(normalizeWallItem({ kind: 'card' }, 0)).toBeNull()
     expect(normalizeWallItem({ kind: 'image', ref: '   ' }, 0)).toBeNull()
     expect(normalizeWallItem({ kind: 'card', ref: 'item-1' }, 0)).not.toBeNull()
@@ -80,8 +80,7 @@ describe('normalizeWallItem', () => {
   })
 
   it('floors size, so nothing becomes unclickable', () => {
-    // A zero-size item cannot be selected, and so cannot be fixed without
-    // editing the database by hand.
+    // unselectable, only fixable by editing the db
     const got = defined(normalizeWallItem({ kind: 'note', width: 0, height: -50 }, 0))
     expect(got.width).toBeGreaterThanOrEqual(40)
     expect(got.height).toBeGreaterThanOrEqual(32)
@@ -131,7 +130,7 @@ describe('normalizeWallDoc', () => {
   })
 
   it('drops only the bad items, keeping the rest', () => {
-    // One corrupt entry must not cost the user their whole wall.
+    // one corrupt entry mustn't cost the wall
     const doc = normalizeWallDoc({
       items: [{ kind: 'note', id: 'good' }, { kind: 'nonsense' }, null, { kind: 'card', ref: 'i1' }]
     })
@@ -190,8 +189,7 @@ describe('toWallPoint', () => {
 
 describe('zoomAt', () => {
   it('keeps the point under the cursor fixed', () => {
-    // The whole feel of zooming depends on this: the thing you are pointing at
-    // must not slide away while you scroll.
+    // what you point at mustn't slide while zooming
     const camera = { x: 0, y: 0, zoom: 1 }
     const cursor = { x: 400, y: 300 }
     const before = toWallPoint(cursor, camera)
@@ -227,7 +225,7 @@ describe('fitCamera', () => {
   it('centres what it frames', () => {
     const items = [item({ x: -100, y: -100, width: 200, height: 200 })]
     const cam = fitCamera(items, viewport)
-    // The content centre is (0,0), so it should land at the viewport centre.
+    // content centre (0,0) lands at the viewport centre
     expect(cam.x).toBeCloseTo(viewport.width / 2, 6)
     expect(cam.y).toBeCloseTo(viewport.height / 2, 6)
   })
@@ -275,7 +273,7 @@ describe('wallDocKey', () => {
 
 describe('rectFromPoints', () => {
   it('normalises a drag in any direction into a positive rectangle', () => {
-    // Marquees are dragged up-left as often as down-right.
+    // marquees go up-left as often as down-right
     expect(rectFromPoints({ x: 100, y: 100 }, { x: 20, y: 40 }))
       .toEqual({ x: 20, y: 40, width: 80, height: 60 })
   })
@@ -294,8 +292,7 @@ describe('itemsInRect', () => {
   ]
 
   it('selects anything the marquee touches, not only what it encloses', () => {
-    // Requiring full containment means zooming out to select a large frame,
-    // which is the thing that makes a marquee feel broken.
+    // full containment makes marquees feel broken
     const got = itemsInRect(items, { x: 90, y: 90, width: 20, height: 20 })
     expect(got.sort()).toEqual(['a', 'c'])
   })
@@ -368,7 +365,7 @@ describe('duplicateItems', () => {
   })
 
   it('unlocks the copy, so it can be moved into place', () => {
-    // A locked background you duplicate is one you want to reposition.
+    // a duplicated locked background is meant to be moved
     const locked = [item({ id: 'a', locked: true })]
     expect(duplicateItems(locked, new Set(['a']))[0].locked).toBeUndefined()
   })
@@ -399,7 +396,7 @@ describe('itemAtPoint', () => {
   ]
 
   it('returns the topmost item under the point', () => {
-    // Both contain (100,100); the one painted last is the one clicked.
+    // both contain it, the last painted wins
     expect(itemAtPoint(items, { x: 100, y: 100 })?.id).toBe('front')
   })
 
@@ -427,7 +424,7 @@ describe('cameraCentredOn', () => {
   it('puts the item in the middle of the viewport', () => {
     const target = item({ x: 500, y: 500, width: 100, height: 100 })
     const cam = cameraCentredOn(target, viewport, 1)
-    // Centre of the item, through the camera, should land at viewport centre.
+    // the item centre lands at the viewport centre
     expect((target.x + 50) * cam.zoom + cam.x).toBeCloseTo(500, 6)
     expect((target.y + 50) * cam.zoom + cam.y).toBeCloseTo(400, 6)
   })
@@ -450,7 +447,7 @@ describe('searchItems', () => {
   })
 
   it('matches a card by the title of the card it references', () => {
-    // The title is not stored on the wall item, so the caller resolves it.
+    // titles aren't stored on the item
     expect(searchItems(items, 'fix', titles).map(i => i.id)).toEqual(['b'])
   })
 
@@ -475,15 +472,14 @@ describe('searchItems', () => {
 
 describe('several walls per workspace', () => {
   it('keys the first wall the way a single wall was always keyed', () => {
-    // Walls made before this existed live at the old key. Changing it would
-    // lose every one of them.
+    // old walls live at the old key
     expect(wallDocKey('work')).toBe('wall_work')
     expect(wallDocKey('work', DEFAULT_WALL_ID)).toBe('wall_work')
   })
 
   it('keys later walls by id alone, so a workspace name cannot collide', () => {
     expect(wallDocKey('work', 'abc123')).toBe('wall_doc_abc123')
-    // The naive scheme would give these two the same key.
+    // the naive scheme collides here
     expect(wallDocKey('work', 'side')).not.toBe(wallDocKey('work_side'))
   })
 
@@ -504,8 +500,7 @@ describe('several walls per workspace', () => {
   })
 
   it('leaves a deleted original wall deleted', () => {
-    // The seeding rule only applies to an empty list, or removing the first
-    // wall would bring it back on the next read.
+    // seeding only for an empty list, or a removed first wall returns
     const index = normalizeWallIndex({ walls: [{ id: 'a', name: 'Ideas' }], activeId: 'a' })
     expect(index.walls.map(w => w.id)).toEqual(['a'])
   })
@@ -587,9 +582,7 @@ describe('a frame carries what is inside it', () => {
   })
 
   it('holds one hanging over the edge, since that still reads as inside', () => {
-    // Requiring full enclosure would make a frame quietly drop things at its
-    // border, which is the opposite of what dragging a frame should do.
-    // Centre at 195, inside; right edge at 210, hanging over.
+    // centre inside at 195, edge hangs to 210; full enclosure would drop it
     const straddling = item({ id: 'a', x: 180, y: 50, width: 30, height: 20 })
     expect(itemsInFrame([frame(), straddling], frame())).toEqual(['a'])
   })
@@ -638,8 +631,7 @@ describe('what actually moves when a frame is dragged', () => {
   })
 
   it('terminates when two frames sit inside each other', () => {
-    // Overlapping frames each contain the other's centre. The set only grows,
-    // so this settles rather than looping.
+    // overlapping frames contain each other's centres; the set only grows
     const items = [
       item({ id: 'f1', kind: 'frame', x: 0, y: 0, width: 100, height: 100 }),
       item({ id: 'f2', kind: 'frame', x: 10, y: 10, width: 100, height: 100 })

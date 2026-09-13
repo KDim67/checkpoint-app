@@ -1,9 +1,4 @@
-/**
- * A fenced code block with its language and a copy button.
- *
- * Lived inside LogEntry, which three other screens then imported it from. It is
- * a UI primitive, so it sits with the rest of them.
- */
+/** a UI primitive, moved out of LogEntry which three screens imported it from */
 
 import React, { useState } from 'react'
 import { Copy, Check } from 'lucide-react'
@@ -39,18 +34,16 @@ export default function CodeBlock({ language, value }: { language?: string; valu
         <span>{language || 'code'}</span>
         <button
           onClick={handleCopy}
+          className="text-muted hover-text-base"
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--color-text-muted)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--space-1)',
             padding: 0
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
         >
           {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
           <span>{copied ? 'Copied!' : 'Copy'}</span>

@@ -1,10 +1,4 @@
-/**
- * Materialises recurring work into real items. At most one unfinished instance
- * per recurrence, so a daily task left for a month gives one card, not thirty.
- *
- * Scheduled like backups (see backupVault.initializeBackupScheduler): a sweep at
- * startup, then hourly. A recurrence is not a reminder, so an hour late is fine.
- */
+/** one open instance per rule, so an ignored daily task makes one card; hourly sweep is fine, it's not a reminder */
 
 import { v4 as uuidv4 } from 'uuid'
 import {
@@ -31,7 +25,6 @@ export function setRecurrenceSpawnHandler(handler: (() => void) | null): void {
   onSpawned = handler
 }
 
-/** Reassembles the rule from its stored columns. */
 export function ruleFromRow(row: RecurrenceRow): RecurrenceRule | null {
   let byWeekday: unknown = []
   try {
@@ -58,22 +51,13 @@ interface CreateRecurrenceInput {
   rule: unknown
 }
 
-/**
- * Stores a new recurrence and works out when it should first fire.
- *
- * Returns null when the rule cannot be understood. Better than accepting it and
- * producing work at an unpredictable time.
- */
+/** null for rules it can't parse, better than firing at an unpredictable time */
 export function createRecurrence(input: CreateRecurrenceInput): RecurrenceRow | null {
   const rule = normalizeRule(input.rule)
   if (!rule || !input.title.trim()) return null
 
   const now = Date.now()
-  // A rule starting in the future waits for that moment. One whose start has
-  // already passed is due immediately, not at its next future occurrence, which
-  // would mean creating a daily task today and seeing nothing until tomorrow,
-  // and not backfilled, which would spawn every occurrence it ever missed.
-  // A rule whose window has already closed is stored inactive.
+  // past start is due now, not backfilled; closed window stored inactive
   const nextDue =
     rule.startAt > now
       ? rule.startAt
@@ -102,18 +86,16 @@ export function createRecurrence(input: CreateRecurrenceInput): RecurrenceRow | 
   return row
 }
 
-/** Creates the item for one occurrence and advances the rule. */
 function spawn(row: RecurrenceRow, now: number): Item | null {
   const rule = ruleFromRow(row)
   if (!rule) {
-    // An unreadable rule is deactivated rather than retried every hour.
+    // deactivate unreadable rules instead of retrying hourly
     console.error(`[recurrence] Rule ${row.id} is unusable; deactivating.`)
     setRecurrenceNextDue(row.id, null)
     return null
   }
 
-  // The guard that bounds the table. Checked here rather than in the query so a
-  // rule whose instance is still open still gets its next_due advanced below.
+  // checked here, not in the query, so a rule with an open instance still advances next_due
   if (hasOpenRecurrenceInstance(row.id)) return null
 
   const payload: CreateItemPayload = {
@@ -125,8 +107,7 @@ function spawn(row: RecurrenceRow, now: number): Item | null {
     priority: row.priority as Item['priority'],
     position: now,
     due_at: row.next_due,
-    // Stamped so hasOpenRecurrenceInstance can find it, and so the UI can show
-    // an item as belonging to a rule.
+    // lets hasOpenRecurrenceInstance and the UI find the rule
     metadata: JSON.stringify({ recurrenceId: row.id })
   }
 
@@ -136,12 +117,7 @@ function spawn(row: RecurrenceRow, now: number): Item | null {
   return created
 }
 
-/**
- * Creates every occurrence that has come due. Returns how many were made.
- *
- * Safe to call at any time: rules with an instance still open are skipped, and
- * each rule advances by exactly one occurrence per sweep.
- */
+/** safe anytime: open instances skip, each rule advances one occurrence per sweep */
 export function materialiseDueRecurrences(now = Date.now()): number {
   let created = 0
   try {
@@ -161,14 +137,7 @@ export function materialiseDueRecurrences(now = Date.now()): number {
   return created
 }
 
-/**
- * Advances a rule whose instance was just completed, but only when it is
- * already overdue. The sweep skips an open instance without advancing next_due,
- * so a daily task ignored since Monday is still due Tuesday when ticked off on
- * Thursday, and its replacement should appear at once.
- *
- * Completing one that is merely on schedule creates nothing.
- */
+/** only when overdue: the sweep doesn't advance past an open instance, so the replacement shows at once */
 export function onInstanceClosed(recurrenceId: string, now = Date.now()): void {
   const row = getRecurrenceById(recurrenceId)
   if (!row || row.active !== 1) return

@@ -14,8 +14,7 @@ describe('gridSpacing', () => {
 
   it('doubles the snap grid rather than picking an arbitrary step', () => {
     for (let z = MIN_ZOOM; z <= MAX_ZOOM; z += 0.05) {
-      // Checked against the exact value: dividing back out reintroduces the
-      // float error the multiply just made.
+      // exact comparison, dividing back reintroduces float error
       const doublings = Math.round(Math.log2(gridSpacing(z) / z / SNAP_GRID))
       expect(doublings).toBeGreaterThanOrEqual(0)
       expect(gridSpacing(z)).toBeCloseTo(SNAP_GRID * 2 ** doublings * z, 9)
@@ -23,7 +22,7 @@ describe('gridSpacing', () => {
   })
 
   it('opens the grid up rather than letting it turn to mush zoomed out', () => {
-    // What the screenshot showed: 24 * 0.2 is 4.8px apart.
+    // the screenshot: 24 x 0.2 is 4.8px
     expect(gridSpacing(MIN_ZOOM)).toBeGreaterThan(SNAP_GRID * MIN_ZOOM)
   })
 

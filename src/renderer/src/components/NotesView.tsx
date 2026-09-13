@@ -20,7 +20,6 @@ import * as appApi from '../data/app'
 export default function NotesView(): React.JSX.Element {
   const { toast } = useToast()
 
-  // State
   const [notes, setNotes] = useState<NoteMetadata[]>([])
   const [activeNoteTitle, setActiveNoteTitle] = useState<string | null>(null)
   const [activeNoteContent, setActiveNoteContent] = useState<string>('')
@@ -36,9 +35,7 @@ export default function NotesView(): React.JSX.Element {
   const [loading, setLoading] = useState<boolean>(true)
   const [pendingDeleteTitle, setPendingDeleteTitle] = useState<string | null>(null)
   const [pins, setPins] = useState<string[]>(prefs.getPins())
-  // The graph has always existed, but only as a 220px thumbnail in the info
-  // panel. Too small to trace a link through, which is the point of having one.
-  // This opens the same component at a size you can actually read.
+  // the graph was only a 220px thumbnail, too small to trace a link
   const [graphExpanded, setGraphExpanded] = useState(false)
   const [sort, setSort] = useState<SortKey>(prefs.getSort())
 
@@ -48,14 +45,12 @@ export default function NotesView(): React.JSX.Element {
   const noteTitles = useMemo(() => notes.map(n => n.title), [notes])
   const titleLookup = useMemo(() => new Set(notes.map(n => n.title.toLowerCase())), [notes])
 
-  // Persist simple prefs
   useEffect(() => { prefs.setMode(mode) }, [mode])
   useEffect(() => { prefs.setShowInfo(showInfo) }, [showInfo])
   useEffect(() => { prefs.setSort(sort) }, [sort])
   useEffect(() => { prefs.setPins(pins) }, [pins])
   useEffect(() => { prefs.setLastNote(activeNoteTitle) }, [activeNoteTitle])
 
-  // Load notes list
   const loadNotesList = useCallback(async (): Promise<NoteMetadata[]> => {
     try {
       const list = await notesApi.listNotes()
@@ -72,9 +67,7 @@ export default function NotesView(): React.JSX.Element {
     ;(async () => {
       setLoading(true)
       const list = await loadNotesList()
-      // Restore last-opened note if it still exists
-      // Skipped when the palette asked for a specific note: this runs after an
-      // IPC round trip, so restoring the last-opened one here would overwrite it.
+      // skip when the palette asked for a note, this lands after an IPC round trip and would overwrite it
       const last = prefs.getLastNote()
       if (!useAppStore.getState().pendingNoteTitle && last && list.some(n => n.title === last)) {
         setActiveNoteTitle(last)
@@ -83,7 +76,6 @@ export default function NotesView(): React.JSX.Element {
     })()
   }, [loadNotesList])
 
-  // Load note content on selection
   useEffect(() => {
     if (!activeNoteTitle) {
       setActiveNoteContent('')
@@ -107,7 +99,6 @@ export default function NotesView(): React.JSX.Element {
     return () => { cancelled = true }
   }, [activeNoteTitle, toast])
 
-  // Save current content (no rename)
   const saveContent = useCallback(async () => {
     if (!activeNoteTitle) return
     setSaving(true)
@@ -123,14 +114,13 @@ export default function NotesView(): React.JSX.Element {
     }
   }, [activeNoteTitle, activeNoteContent, loadNotesList, toast])
 
-  // Auto-save content 1.2s after typing stops
   useEffect(() => {
     if (!activeNoteTitle || !isDirty) return
     const timer = setTimeout(() => { saveContent() }, 1200)
     return () => clearTimeout(timer)
   }, [activeNoteContent, isDirty, activeNoteTitle, saveContent])
 
-  // Rename (collision-safe, explicit commit)
+  // collision-safe, explicit commit
   const commitRename = useCallback(async (desired: string): Promise<boolean> => {
     if (!activeNoteTitle || renamingRef.current) return false
     const next = desired.trim()
@@ -143,7 +133,7 @@ export default function NotesView(): React.JSX.Element {
     renamingRef.current = true
     try {
       await notesApi.writeNote(next, activeNoteContent, activeNoteTitle)
-      // Migrate pin + active selection to the new title
+      // move pin and selection to the new title
       setPins(p => p.map(t => (t === activeNoteTitle ? next : t)))
       setIsDirty(false)
       setActiveNoteTitle(next)
@@ -160,9 +150,7 @@ export default function NotesView(): React.JSX.Element {
     }
   }, [activeNoteTitle, activeNoteContent, titleLookup, loadNotesList, toast])
 
-  // Flush any pending title rename / content edits before navigating away.
-  // Serialized so a title blur and a sidebar click in the same gesture can't
-  // both fire a rename (which would duplicate the file).
+  // serialised so a title blur and a sidebar click can't both rename and duplicate the file
   const flushRef = useRef<Promise<void> | null>(null)
   const flushPending = useCallback((): Promise<void> => {
     if (flushRef.current) return flushRef.current
@@ -185,12 +173,7 @@ export default function NotesView(): React.JSX.Element {
     setActiveNoteTitle(title)
   }, [activeNoteTitle, flushPending])
 
-  // Open a note the command palette asked for
-  // Held in the store rather than sent as an event: navigation only schedules a
-  // render, so this view does not exist at the moment the palette acts and an
-  // event would land with nobody listening. Subscribed rather than read once,
-  // because the palette can also be used while Notes is already open. Cleared on
-  // arrival so returning here later does not reopen it.
+  // parked in the store since this view isn't mounted when the palette acts; cleared on arrival
   const pendingNoteTitle = useAppStore(s => s.pendingNoteTitle)
   useEffect(() => {
     if (!pendingNoteTitle) return
@@ -198,7 +181,6 @@ export default function NotesView(): React.JSX.Element {
     handleSelectNote(pendingNoteTitle)
   }, [pendingNoteTitle, handleSelectNote])
 
-  // Ctrl+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -213,7 +195,6 @@ export default function NotesView(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [saveContent, activeNoteTitle, isDirty, toast])
 
-  // Create / templates / daily
   const createNote = useCallback(async (title: string, content: string, activate = true) => {
     try {
       await notesApi.writeNote(title, content)
@@ -245,11 +226,7 @@ export default function NotesView(): React.JSX.Element {
     toast('Note created', { type: 'success' })
   }, [flushPending, uniqueTitle, createNote, toast])
 
-  /**
-   * A vault is a folder of Markdown, which is what Checkpoint's notes already
-   * are, so this copies rather than converting into some other shape. Whatever
-   * could not come across word for word is reported instead of being hidden.
-   */
+  /** a vault is already markdown, so copy as is and report what didn't come across */
   const handleImportVault = useCallback(async () => {
     const res = await notesApi.importVault()
     if (res.cancelled) return
@@ -265,8 +242,7 @@ export default function NotesView(): React.JSX.Element {
       ? ` and ${attachmentsCopied} attachment${attachmentsCopied === 1 ? '' : 's'}`
       : ''
     toast(`Imported ${notesImported} note${notesImported === 1 ? '' : 's'}${attachments} from ${res.vault}`, { type: 'success' })
-    // One toast per caveat rather than a wall of text, and only when there is
-    // something the user would want to know about.
+    // one toast per caveat, only when there's something to say
     for (const caveat of caveats) toast(caveat, { type: 'info' })
   }, [loadNotesList, toast])
 
@@ -281,7 +257,6 @@ export default function NotesView(): React.JSX.Element {
     toast(`Opened daily note for ${title}`, { type: 'success' })
   }, [flushPending, notes, createNote, toast])
 
-  // Wiki links
   const handleOpenWikiLink = useCallback((title: string) => {
     const match = notes.find(n => n.title.toLowerCase() === title.toLowerCase())
     if (match) {
@@ -295,7 +270,6 @@ export default function NotesView(): React.JSX.Element {
     }
   }, [notes, handleSelectNote, flushPending, createNote, toast])
 
-  // Delete
   const confirmDeleteNote = useCallback(async () => {
     if (!pendingDeleteTitle) return
     const title = pendingDeleteTitle
@@ -312,7 +286,6 @@ export default function NotesView(): React.JSX.Element {
     }
   }, [pendingDeleteTitle, activeNoteTitle, loadNotesList, toast])
 
-  // Export
   const handleExport = useCallback(async () => {
     if (!activeNoteTitle) return
     try {
@@ -328,7 +301,7 @@ export default function NotesView(): React.JSX.Element {
     setPins(p => (p.includes(title) ? p.filter(t => t !== title) : [...p, title]))
   }, [])
 
-  // Search (debounced full-text via main process)
+  // debounced full-text via main
   useEffect(() => {
     const q = searchQuery.trim()
     if (!q) {
@@ -351,7 +324,6 @@ export default function NotesView(): React.JSX.Element {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Derived: tags, display list, links
   const uniqueTags = useMemo(() => {
     const set = new Set<string>()
     notes.forEach(n => n.tags.forEach(t => set.add(t)))
@@ -365,14 +337,14 @@ export default function NotesView(): React.JSX.Element {
     if (q) {
       const items: SidebarItem[] = []
       const added = new Set<string>()
-      // 1) Backend full-text / title matches (ranked)
+      // backend matches first, ranked
       if (searchResults) {
         for (const r of searchResults) {
           const note = byTitle.get(r.title)
           if (note) { items.push({ note, snippet: r.snippet }); added.add(r.title) }
         }
       }
-      // 2) Supplement with tag matches the backend text search doesn't cover
+      // then tag matches the text search misses
       for (const note of notes) {
         if (added.has(note.title)) continue
         if (note.tags.some(t => t.toLowerCase().includes(q))) {
@@ -382,7 +354,7 @@ export default function NotesView(): React.JSX.Element {
       return items
     }
 
-    // No search: filter by tag, sort, pinned first
+    // no search: tag filter, sort, pinned first
     let list = notes.filter(n => (selectedTag ? n.tags.includes(selectedTag) : true))
     list = [...list].sort((a, b) => {
       if (sort === 'title') return a.title.localeCompare(b.title)
@@ -416,8 +388,7 @@ export default function NotesView(): React.JSX.Element {
     <div className={`notes-layout-grid ${showInfo ? '' : 'no-info'}`}>
       <style>{NOTES_CSS}</style>
 
-      {/* Rendered as a child rather than a sibling: it is position:fixed, so its
-          place in the tree does not matter and the layout grid stays intact. */}
+      {/* position:fixed, so its place in the tree doesn't matter */}
       {graphExpanded && (
         <div
           onMouseDown={e => { if (e.target === e.currentTarget) setGraphExpanded(false) }}
@@ -461,8 +432,7 @@ export default function NotesView(): React.JSX.Element {
             </div>
 
             <div style={{ flex: 1, minHeight: 0 }}>
-              {/* The same component. It sizes to its container, so the physics
-                  and the click-to-open behaviour are identical at both sizes. */}
+              {/* same component, sizes to its container */}
               <GraphView
                 notes={notes}
                 activeTitle={activeNoteTitle}
@@ -473,7 +443,6 @@ export default function NotesView(): React.JSX.Element {
         </div>
       )}
 
-      {/* COLUMN 1: SIDEBAR */}
       <NotesSidebar
         items={displayItems}
         allTags={uniqueTags}
@@ -495,11 +464,9 @@ export default function NotesView(): React.JSX.Element {
         onImportVault={handleImportVault}
       />
 
-      {/* COLUMN 2: EDITOR / PREVIEW */}
       <div className="notes-editor-panel">
         {activeNoteTitle ? (
           <>
-            {/* Header toolbar */}
             <div className="notes-editor-header">
               <input
                 type="text"
@@ -518,7 +485,6 @@ export default function NotesView(): React.JSX.Element {
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexShrink: 0 }}>
                 <span className="notes-save-status" data-dirty={isDirty}>{saveLabel}</span>
 
-                {/* View-mode segmented control */}
                 <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                   <button className={`segment-btn ${mode === 'edit' ? 'active' : ''}`} onClick={() => setMode('edit')} title="Edit"><Edit3 size={14} /></button>
                   <button className={`segment-btn ${mode === 'split' ? 'active' : ''}`} onClick={() => setMode('split')} title="Split view"><Columns size={14} /></button>
@@ -545,7 +511,6 @@ export default function NotesView(): React.JSX.Element {
               </div>
             </div>
 
-            {/* Editor + preview body */}
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
               {(mode === 'edit' || mode === 'split') && (
                 <NoteEditor
@@ -584,7 +549,6 @@ export default function NotesView(): React.JSX.Element {
         )}
       </div>
 
-      {/* COLUMN 3: INFO PANEL */}
       {showInfo && (
         <div className="notes-right-panel">
           <div className="row-between">
@@ -593,6 +557,7 @@ export default function NotesView(): React.JSX.Element {
               onClick={() => setGraphExpanded(true)}
               title="Open the graph full size"
               aria-label="Open the graph full size"
+              className="text-faint hover-text-accent"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -601,11 +566,8 @@ export default function NotesView(): React.JSX.Element {
                 border: 'none',
                 padding: '2px 4px',
                 cursor: 'pointer',
-                color: 'var(--color-text-faint)',
                 fontSize: '10px'
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-secondary)' }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-faint)' }}
             >
               <Maximize2 size={11} />
               Expand
@@ -621,14 +583,12 @@ export default function NotesView(): React.JSX.Element {
 
           {activeNoteTitle && currentNoteMetadata && (
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
-              {/* Metadata */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
                 <span title={new Date(currentNoteMetadata.updatedAt).toLocaleString()}>Updated {formatRelativeTime(currentNoteMetadata.updatedAt)}</span>
                 <span>{liveWordCount} words</span>
                 <span>{formatBytes(currentNoteMetadata.size)}</span>
               </div>
 
-              {/* Outgoing links */}
               <div className="col">
                 <div className="notes-panel-label row-6px">
                   <ArrowRight size={11} /> Outgoing links
@@ -649,7 +609,6 @@ export default function NotesView(): React.JSX.Element {
                 )}
               </div>
 
-              {/* Backlinks */}
               <div className="col">
                 <div className="notes-panel-label row-6px">
                   <ArrowLeft size={11} /> Backlinks
@@ -678,7 +637,7 @@ export default function NotesView(): React.JSX.Element {
   )
 }
 
-// Styles (single injected block, shared with subcomponents)
+// one injected block shared with subcomponents
 const NOTES_CSS = `
   .notes-layout-grid {
     display: grid;

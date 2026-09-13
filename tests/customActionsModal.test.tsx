@@ -19,7 +19,7 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-/** The real list, so what the form adds is what the drawer then shows. */
+/** the real list, so what the form adds shows up */
 function Library({ onClose }: { onClose: CustomActions['setShowCustomActionsModal'] }) {
   const actions = useCustomActions()
   return <CustomActionsModal actions={{ ...actions, setShowCustomActionsModal: onClose }} />

@@ -1,35 +1,20 @@
-/**
- * Recurrence rules and their date maths.
- *
- * A recurrence is a template with at most one unfinished instance at a time;
- * the next appears when that one is done or overdue. Generating a year ahead
- * floods the board, and rescheduling one row loses the history.
- *
- * Local time throughout: "every Tuesday at 9am" has to survive a DST change,
- * which fixed millisecond offsets do not.
- */
+/** at most one open instance; local time so DST doesn't shift "9am" */
 
 type Frequency = 'daily' | 'weekly' | 'monthly'
 
 export interface RecurrenceRule {
   freq: Frequency
-  /** Every N days/weeks/months. Always at least 1. */
+  /** at least 1 */
   interval: number
-  /** For weekly rules: 0 = Sunday … 6 = Saturday. Empty means "same weekday as the start". */
+  /** 0 Sunday to 6 Saturday; empty means the start's weekday */
   byWeekday: number[]
-  /** First occurrence, and the anchor for the time of day and day of month. */
+  /** anchors time of day and day of month */
   startAt: number
-  /** Inclusive end. Null means it repeats indefinitely. */
+  /** inclusive; null repeats forever */
   untilAt: number | null
 }
 
-/**
- * What the renderer needs to list a recurrence.
- *
- * The rule itself stays in main: the UI only ever shows the description main
- * already rendered, so shipping the raw rule across IPC would be one more shape
- * to keep in step for no benefit.
- */
+/** the rule stays in main, the UI only shows main's description */
 export interface RecurrenceSummary {
   id: string
   context: string
@@ -42,7 +27,7 @@ export interface RecurrenceSummary {
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-/** Guards the stepping loop. 4000 steps is over a decade of daily occurrences. */
+/** over a decade of dailies */
 const MAX_STEPS = 4000
 
 const clampInterval = (n: unknown): number => {
@@ -50,13 +35,7 @@ const clampInterval = (n: unknown): number => {
   return Number.isFinite(value) && value > 0 ? Math.min(value, 365) : 1
 }
 
-/**
- * Coerces stored or model-supplied input into a usable rule.
- *
- * Returns null rather than a patched-up guess when the frequency or start is
- * unusable: a recurrence with a meaningless rule would spawn work forever at the
- * wrong time, which is worse than one that refuses to be created.
- */
+/** null over a patched guess, a bad rule spawns work forever */
 export function normalizeRule(raw: unknown): RecurrenceRule | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -75,8 +54,7 @@ export function normalizeRule(raw: unknown): RecurrenceRule | null {
         ? Number(untilRaw)
         : null
 
-  // A window that closes before it opens can never fire; treat it as open-ended
-  // rather than silently creating a rule that does nothing.
+  // a window closing before it opens never fires
   if (untilAt !== null && untilAt < startAt) return null
 
   const byWeekday = Array.isArray(o.byWeekday)
@@ -88,15 +66,14 @@ export function normalizeRule(raw: unknown): RecurrenceRule | null {
   return {
     freq,
     interval: clampInterval(o.interval),
-    // Weekdays only mean anything for a weekly rule; carrying them on a daily or
-    // monthly one would imply a filter that is never applied.
+    // weekdays only for weekly rules
     byWeekday: freq === 'weekly' ? byWeekday : [],
     startAt,
     untilAt
   }
 }
 
-/** Copies the time of day from the anchor onto a date. */
+/** copies the anchor's time */
 function withAnchorTime(date: Date, anchor: Date): Date {
   const out = new Date(date)
   out.setHours(anchor.getHours(), anchor.getMinutes(), anchor.getSeconds(), anchor.getMilliseconds())
@@ -109,14 +86,7 @@ function addDays(date: Date, days: number): Date {
   return out
 }
 
-/**
- * Adds months while keeping the anchor's day of month where the target allows.
- *
- * A rule anchored on the 31st must fire on the 30th in April and the 28th in
- * February, and then return to the 31st in May. Letting Date roll over would
- * turn "31 January" into 2 or 3 March and permanently shift every later
- * occurrence, so the day is clamped to the target month's length each time.
- */
+/** clamp to the month's length so the 31st doesn't drift into March */
 function addMonthsClamped(date: Date, months: number, anchorDayOfMonth: number): Date {
   const out = new Date(date)
   out.setDate(1)
@@ -126,12 +96,7 @@ function addMonthsClamped(date: Date, months: number, anchorDayOfMonth: number):
   return out
 }
 
-/**
- * The first occurrence strictly after `after`, or null once the rule has ended.
- *
- * `after` is exclusive so that completing an instance and asking for the next
- * one cannot return the same moment again.
- */
+/** strictly after, so completing one can't return it again */
 export function nextOccurrence(rule: RecurrenceRule, after: number): number | null {
   const anchor = new Date(rule.startAt)
   const anchorDayOfMonth = anchor.getDate()
@@ -143,8 +108,7 @@ export function nextOccurrence(rule: RecurrenceRule, after: number): number | nu
   let cursor = new Date(rule.startAt)
   let steps = 0
 
-  // Fast-forward whole periods before stepping, so a daily rule started years
-  // ago does not walk day by day to reach today.
+  // fast-forward whole periods first
   if (rule.freq === 'daily') {
     const periodDays = rule.interval
     const elapsedDays = Math.floor((after - rule.startAt) / 86_400_000)
@@ -168,7 +132,7 @@ export function nextOccurrence(rule: RecurrenceRule, after: number): number | nu
     if (cursor.getTime() > after) {
       const time = cursor.getTime()
       if (rule.untilAt !== null && time > rule.untilAt) return null
-      // A weekly rule with explicit weekdays only fires on those days.
+      // only on the chosen weekdays
       if (rule.freq !== 'weekly' || rule.byWeekday.length === 0 || rule.byWeekday.includes(cursor.getDay())) {
         return time
       }
@@ -177,8 +141,7 @@ export function nextOccurrence(rule: RecurrenceRule, after: number): number | nu
     if (rule.freq === 'daily') {
       cursor = withAnchorTime(addDays(cursor, rule.interval), anchor)
     } else if (rule.freq === 'weekly') {
-      // With explicit weekdays the cursor walks a day at a time so it can land
-      // on each selected day; the interval then applies to whole weeks.
+      // walk days to land on each chosen one, interval applies per week
       cursor = rule.byWeekday.length > 0
         ? withAnchorTime(addDays(cursor, 1), anchor)
         : withAnchorTime(addDays(cursor, rule.interval * 7), anchor)
@@ -192,7 +155,7 @@ export function nextOccurrence(rule: RecurrenceRule, after: number): number | nu
   return null
 }
 
-/** Human description for the UI and for MCP tool output. */
+/** for the UI and MCP output */
 export function describeRule(rule: RecurrenceRule): string {
   const every = rule.interval === 1 ? '' : ` ${rule.interval}`
 

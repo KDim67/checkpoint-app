@@ -1,13 +1,4 @@
-/**
- * The last few changes to a card, in words.
- *
- * Written at save time from the difference between the card as it was loaded
- * and as it is being written, so one entry is one deliberate change rather
- * than one keystroke. That is the whole reason the modal buffers at all.
- *
- * Kept in the card's own metadata, so it travels with the card: a shared board
- * syncs it through the ordinary item update and needs no separate channel.
- */
+/** written at save from the diff, one entry per deliberate change; in metadata so it syncs with the card */
 
 import type { CardSnapshot } from './cardDraft'
 import { authorLabel } from './identity'
@@ -15,12 +6,12 @@ import { authorLabel } from './identity'
 export interface CardChange {
   id: string
   at: number
-  /** May be empty. An entry written before anyone set a name still reads correctly. */
+  /** may be empty for entries from before names */
   by: string
   what: string
 }
 
-/** What the friend asked for, and enough to see what just happened without becoming a log. */
+/** enough to see what just happened without becoming a log */
 export const CARD_HISTORY_LIMIT = 5
 
 const PRIORITY_LABELS: Record<number, string> = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' }
@@ -50,13 +41,7 @@ function coverLabel(cover: unknown): string {
   return 'Set the cover'
 }
 
-/**
- * One phrase per thing that moved. Plural because a single save can carry
- * several, and folding them into "edited the card" would say nothing.
- *
- * Column names are looked up rather than printed raw: the stored status is an
- * id, and "moved to in_review" is not what anybody called that column.
- */
+/** one phrase per change; column names looked up, not raw ids */
 export function describeCardChanges(
   before: CardSnapshot,
   after: CardSnapshot,
@@ -84,8 +69,7 @@ export function describeCardChanges(
   if (added > 0) changes.push(`Added ${added} tag${added === 1 ? '' : 's'}`)
   if (removed > 0) changes.push(`Removed ${removed} tag${removed === 1 ? '' : 's'}`)
 
-  // The buffered half of metadata only. Checklist items, comments and
-  // attachments write as they happen and log themselves at that moment.
+  // buffered metadata only, the rest logs as it happens
   const metaBefore = parseMeta(before.metadata)
   const metaAfter = parseMeta(after.metadata)
 
@@ -102,11 +86,7 @@ export function describeCardChanges(
   return changes
 }
 
-/**
- * Newest first, capped. The cap is what keeps this in the card's metadata
- * rather than needing a table of its own, and what stops a card that is edited
- * every day from carrying a year of noise to every peer it syncs with.
- */
+/** newest first, capped so it fits in metadata and doesn't sync a year of noise */
 export function appendCardChanges(
   existing: CardChange[],
   phrases: string[],
@@ -116,7 +96,7 @@ export function appendCardChanges(
   if (phrases.length === 0) return existing
   const author = by.trim()
   const fresh = phrases.map((what, i) => ({
-    // Index included because a single save can produce several in the same millisecond.
+    // indexed, one save can make several in one ms
     id: `chg-${at}-${i}`,
     at,
     by: author,
@@ -125,12 +105,7 @@ export function appendCardChanges(
   return [...fresh, ...existing].slice(0, CARD_HISTORY_LIMIT)
 }
 
-/**
- * Reads whatever is in metadata, which may be hand-edited or written by an
- * older build. Cards created before this existed store `{ text, createdAt }`
- * and no author, so both shapes are accepted rather than throwing that history
- * away on first open.
- */
+/** older builds stored { text, createdAt } without an author, accept both */
 export function readCardHistory(raw: unknown): CardChange[] {
   if (!Array.isArray(raw)) return []
   return raw
@@ -148,21 +123,14 @@ export function readCardHistory(raw: unknown): CardChange[] {
     .filter(e => e.what)
 }
 
-/**
- * Deliberately not capped on the way in.
- *
- * Reading trimmed to five, and the next comment or checklist tick wrote that
- * trimmed list straight back, so merely opening a card built before the cap
- * and then touching anything destroyed the rest of its history. The cap
- * belongs on what is written and what is shown, not on what is read.
- */
+/** not capped on read, a trimmed read got written back and destroyed history */
 export function visibleCardHistory(entries: CardChange[]): CardChange[] {
   return entries.slice(0, CARD_HISTORY_LIMIT)
 }
 
-/** "Dimitris renamed the card to X", or just the change when nobody is named. */
+/** "<name> renamed the card to X", or just the change */
 export function changeSentence(change: CardChange): string {
   if (!change.by) return change.what
-  // Lowercased so the name leads the sentence instead of the verb.
+  // lowercased so the name leads
   return `${authorLabel(change.by)} ${change.what.charAt(0).toLowerCase()}${change.what.slice(1)}`
 }

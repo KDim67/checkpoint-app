@@ -5,18 +5,15 @@ import MermaidChart from '../ui/MermaidChart'
 
 interface MarkdownPreviewProps {
   content: string
-  /** Opens (or creates) a note by title when a wiki-link is clicked. */
+  /** opens or creates */
   onOpenWikiLink: (title: string) => void
-  /** Returns true if a note with this title already exists (for broken-link styling). */
+  /** for broken-link styling */
   noteExists: (title: string) => boolean
 }
 
-/**
- * Renders markdown with GFM, inline Mermaid diagrams, and clickable
- * `[[wiki-links]]` (with optional `[[Target|Alias]]` aliases).
- */
+/** GFM, mermaid, and [[wiki-links]] with aliases */
 export default function MarkdownPreview({ content, onOpenWikiLink, noteExists }: MarkdownPreviewProps): React.JSX.Element {
-  // Transform [[Target]] / [[Target|Alias]] into markdown links the parser understands.
+  // [[Target|Alias]] into links the parser knows
   const processed = useMemo(() => {
     return content.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, target: string, alias?: string) => {
       const t = target.trim()

@@ -1,4 +1,4 @@
-/** The floating desktop widget. */
+/** floating desktop widget */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

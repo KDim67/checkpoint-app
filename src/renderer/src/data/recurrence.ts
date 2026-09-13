@@ -1,5 +1,3 @@
-/** The bridge's `recurrence` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.recurrence
 
 export const create = (...args: Parameters<Bridge['create']>): ReturnType<Bridge['create']> =>

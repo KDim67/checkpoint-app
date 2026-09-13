@@ -3,9 +3,7 @@ import {
   STUN_SERVERS, turnIceServer, iceServersWith, describeTurnSettings
 } from '../src/shared/iceConfig'
 
-// A relay is the difference between internet sync working and not working for
-// anyone behind a symmetric NAT, and it is credentials the user typed, so what
-// counts as a usable one is worth being exact about.
+// a relay decides whether symmetric-NAT users sync at all, and it's typed credentials
 
 describe('building a relay entry', () => {
   it('takes a turn: URL with credentials', () => {
@@ -27,13 +25,13 @@ describe('building a relay entry', () => {
   })
 
   it('refuses a half-filled form rather than sending a broken entry', () => {
-    // A username with no password is someone who got distracted, not a relay.
+    // half-filled, not a relay
     expect(turnIceServer({ url: 'turn:r.example.com', username: 'u' })).toBeNull()
     expect(turnIceServer({ url: 'turn:r.example.com', credential: 'p' })).toBeNull()
   })
 
   it('refuses a stun: URL in the relay field', () => {
-    // STUN is what already does not work in the case a relay is for.
+    // STUN is what fails when you need a relay
     expect(turnIceServer({ url: 'stun:stun.example.com:3478' })).toBeNull()
   })
 
@@ -59,8 +57,7 @@ describe('the list handed to a peer connection', () => {
   })
 
   it('keeps STUN and adds the relay, rather than replacing it', () => {
-    // A direct route is cheaper and faster than a relay whenever one exists,
-    // so STUN is still tried first.
+    // direct routes are cheaper, STUN still goes first
     const servers = iceServersWith({ url: 'turn:r.example.com', username: 'u', credential: 'p' })
     expect(servers).toHaveLength(STUN_SERVERS.length + 1)
     expect(servers.slice(0, STUN_SERVERS.length)).toEqual(STUN_SERVERS)

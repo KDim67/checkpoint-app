@@ -14,7 +14,7 @@ type Task = FocusViewState['retroTasks'][number]
 
 const task = (id: string, title: string, completed: boolean) => ({ id, title, completed }) as Task
 
-/** The notes are typed into the view's state, so the harness holds them. */
+/** the notes live in view state, the harness holds them */
 function Retrospective({ retro }: { retro: Retro }) {
   const [retroNotes, setRetroNotes] = useState('')
   return <FocusRetro focusView={{ ...retro, retroNotes, setRetroNotes } as FocusViewState} />

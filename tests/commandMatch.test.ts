@@ -20,8 +20,7 @@ describe('fuzzyScore', () => {
   })
 
   it('rewards word starts over letters buried mid-word', () => {
-    // "gtk" is the initials of Go To Kanban; the same letters buried inside a
-    // single word are a much weaker signal.
+    // initials score above the same letters inside a word
     expect(fuzzyScore('Go To Kanban', 'gtk')).toBeGreaterThan(fuzzyScore('gauntlet knack', 'gtk'))
   })
 
@@ -55,7 +54,7 @@ describe('scoreCommand', () => {
   })
 
   it('matches across group and label together', () => {
-    // Neither field answers "settings mcp" alone.
+    // neither field answers alone
     expect(scoreCommand(cmd('MCP Server', 'Settings'), 'settings mcp')).toBeGreaterThan(0)
   })
 

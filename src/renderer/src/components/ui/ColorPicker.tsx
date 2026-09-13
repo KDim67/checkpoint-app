@@ -25,18 +25,12 @@ export default function ColorPicker({
 }: ColorPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
-  /**
-   * Viewport coordinates for the panel, which goes in a portal on
-   * `document.body`. Several callers put this inside a scrolling modal or
-   * settings pane, and `position: fixed` alone is not enough to get out of one:
-   * any transformed ancestor becomes the containing block for it.
-   */
+  /** portal on body: a transformed ancestor traps position: fixed */
   const [openAt, setOpenAt] = useState<{ left: number; top: number } | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const open = openAt !== null
 
-  // Closes on a click anywhere else, rather than behind a full-screen backdrop
-  // that would sit above the caller's own controls.
+  // close on outside click, no backdrop above the caller's controls
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent): void => {
@@ -55,7 +49,7 @@ export default function ColorPicker({
   const isSelfUpdateRef = useRef(false)
   const [hex, setHex] = useState(value || '#3b82f6')
 
-  // Synchronize internal state with external prop updates if not self-triggered
+  // follow outside changes unless we made them
   useEffect(() => {
     if (isSelfUpdateRef.current) {
       isSelfUpdateRef.current = false

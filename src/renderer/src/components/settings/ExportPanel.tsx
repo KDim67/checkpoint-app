@@ -19,7 +19,7 @@ export default function ExportPanel(): React.JSX.Element {
         context: scope === 'all' ? null : activeWorkspace,
         format
       })
-      // A cancelled save dialog is not a failure and should not read like one.
+      // a cancelled dialog isn't a failure
       if (result.ok) toast(`Exported ${result.count} item${result.count === 1 ? '' : 's'}`)
       else if (result.reason !== 'cancelled') toast(result.reason ?? 'Export failed')
     } catch (err) {

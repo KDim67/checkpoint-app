@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { simplifyPath, inkFromPath, SIMPLIFY_TOLERANCE } from '../src/shared/wallModel'
 import { defined } from './helpers/defined'
 
-// A pointer emits a sample every few milliseconds, so one confident stroke
-// arrives as hundreds of nearly identical points. They are stored, synced and
-// exported, so what gets dropped matters.
+// hundreds of near-identical samples get stored, synced and exported
 
 const line = (n: number): { x: number; y: number }[] =>
   Array.from({ length: n }, (_, i) => ({ x: i, y: 0 }))
@@ -22,7 +20,7 @@ describe('thinning a stroke', () => {
   })
 
   it('never moves where a stroke starts or ends', () => {
-    // A line drawn to touch something has to keep touching it.
+    // must keep touching
     const path = [{ x: 3, y: 7 }, { x: 10, y: 40 }, { x: 60, y: 2 }, { x: 91, y: 33 }]
     const simplified = simplifyPath(path)
     expect(simplified[0]).toEqual(path[0])
@@ -46,13 +44,13 @@ describe('thinning a stroke', () => {
   })
 
   it('handles a stroke that never moved', () => {
-    // A tap, or a pointer that emitted the same coordinate repeatedly.
+    // a tap, or a stuck coordinate
     const stuck = Array.from({ length: 40 }, () => ({ x: 5, y: 5 }))
     expect(simplifyPath(stuck)).toEqual([{ x: 5, y: 5 }, { x: 5, y: 5 }])
   })
 
   it('does not blow the stack on a very long stroke', () => {
-    // Iterative rather than recursive, because the depth would follow the data.
+    // iterative, depth would follow the data
     const long = Array.from({ length: 20000 }, (_, i) => ({ x: i, y: Math.sin(i / 50) * 30 }))
     expect(() => simplifyPath(long)).not.toThrow()
     expect(simplifyPath(long).length).toBeLessThan(long.length)
@@ -72,8 +70,7 @@ describe('what actually gets stored', () => {
   })
 
   it('keeps a box that fits the points it kept', () => {
-    // Thinning before measuring, so a dropped sample cannot leave the box
-    // bigger than the stroke inside it.
+    // thin before measuring so the box isn't bigger than the stroke
     const ink = defined(inkFromPath([{ x: 0, y: 0 }, { x: 40, y: 3 }, { x: 80, y: 0 }], []))
     const xs = defined(ink.points).filter((_, i) => i % 2 === 0)
     const ys = defined(ink.points).filter((_, i) => i % 2 === 1)

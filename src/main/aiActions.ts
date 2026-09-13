@@ -6,26 +6,13 @@ import { validateStructured } from './aiSchemas'
 import { methodOrderForTier, TIER_BUDGETS, type ModelCapabilities } from '../shared/modelCapabilities'
 import type { AiStructuredParams, AiStructuredResult, AiStructuredKind } from '../shared/types'
 
-// Reliable structured generation.
-//
-// Instead of hoping a model emits valid fenced JSON inside a free-text stream
-// (which small local models cannot do), we force structured output through the
-// strongest mechanism the endpoint supports, falling back gracefully:
-//
-//   1. tool calling            (forced single function w/ JSON-schema params)
-//   2. response_format json_schema
-//   3. response_format json_object  (+ schema described in the prompt)
-//   4. plain text              (+ schema in prompt, robust extraction)
-//
-// The winning method is cached per (endpoint, model) so subsequent calls skip
-// straight to what works. Every path returns a parsed object; shape validation
-// and creative enrichment happen in the renderer.
+// structured output ladder: tools > json_schema > json_object > text, winner cached per endpoint+model
 
 type Method = 'tools' | 'json_schema' | 'json_object' | 'text'
 
 const capabilityCache = new Map<string, Method>()
 
-// JSON schemas (used both to constrain decoding and to describe the shape)
+// constrain decoding and describe the shape in the prompt
 
 const BOARD_SCHEMA = {
   type: 'object',
@@ -152,11 +139,7 @@ const UPDATE_SCHEMA = {
   required: ['message', 'operations']
 } as const
 
-/**
- * Board settings, as opposed to card edits. `target` is required only for the
- * column operations, but the schema asks for `op` alone so a background or
- * swimlane change is not forced to invent one.
- */
+/** board settings, not card edits; only op required so non-column ops don't invent a target */
 const CONFIG_SCHEMA = {
   type: 'object',
   properties: {
@@ -239,21 +222,11 @@ const FN_DESCRIPTIONS: Record<AiStructuredKind, string> = {
   config: 'Change board settings: add, rename, recolour, reorder, limit, collapse or delete columns; set the background, swimlanes, or which fields show on cards.'
 }
 
-// Helpers
-
 export function stripThink(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<\/?think>/gi, '').trim()
 }
 
-/**
- * Strips line and block comments that sit OUTSIDE string literals.
- *
- * Replaces two regexes that had no notion of string boundaries. Any URL in the
- * payload was truncated at its "//", so a single trailing comma in a response
- * containing "https://example.com" made the repair emit invalid JSON and the
- * whole generation was discarded. Card bodies carry links routinely, and a
- * trailing comma is exactly the defect this repair ladder exists to absorb.
- */
+/** comments outside strings only; the old regexes cut URLs at "//" and broke the trailing-comma repair */
 function stripJsonComments(input: string): string {
   let out = ''
   let inString = false
@@ -263,7 +236,7 @@ function stripJsonComments(input: string): string {
 
     if (inString) {
       out += c
-      // A backslash escapes what follows, so an escaped quote does not close it.
+      // escaped quote doesn't close the string
       if (c === '\\') {
         i++
         if (i < input.length) out += input[i]
@@ -277,7 +250,7 @@ function stripJsonComments(input: string): string {
 
     if (c === '/' && input[i + 1] === '/') {
       while (i < input.length && input[i] !== '\n') i++
-      // Newline preserved: the missing-comma repair above is line-oriented.
+      // keep the newline, the missing-comma repair is line-based
       if (i < input.length) out += '\n'
       continue
     }
@@ -303,7 +276,6 @@ export function repairJson(s: string): string {
   )
 }
 
-/** Robustly pull a JSON object/array out of arbitrary model text. */
 export function extractJson(raw: string): unknown {
   if (!raw) return null
   let text = stripThink(raw)
@@ -319,7 +291,7 @@ export function extractJson(raw: string): unknown {
   const direct = tryParse(text)
   if (direct !== undefined) return direct
 
-  // Fall back to the outermost brace/bracket span
+  // fall back to the outermost brace/bracket span
   const spans: string[] = []
   const fo = text.indexOf('{'), lo = text.lastIndexOf('}')
   if (fo !== -1 && lo > fo) spans.push(text.slice(fo, lo + 1))
@@ -341,28 +313,20 @@ export function isAbortError(err: unknown): boolean {
   )
 }
 
-/**
- * Errors that won't change across methods. Bail out immediately and let the
- * caller fall back to streaming (which surfaces a humanized message). Auth
- * failures and 404s (missing model / wrong URL) affect every method equally.
- */
+/** auth and 404s fail every method alike, bail and let the caller stream */
 export function isFatalError(err: unknown): boolean {
   const status = (err as { status?: number })?.status
   return status === 401 || status === 403 || status === 404
 }
 
-/**
- * Names the defect and restates the contract. Kept short on purpose: a long
- * correction competes for attention with the original request on the models
- * that need correcting most.
- */
+/** short on purpose: a long correction drowns out the request on weak models */
 function buildRepairPrompt(kind: AiStructuredKind, problem: string): string {
   return `Your previous reply could not be used: ${problem}.
 Reply again with ONLY the corrected JSON object. No prose, no markdown fences, no apology.
 ${SCHEMA_HINTS[kind]}`
 }
 
-// Per-method attempts (each returns a parsed object, or null on parse fail)
+// each returns a parsed object, or null on parse fail
 
 async function attemptTools(
   client: OpenAI, model: string, messages: OpenAI.Chat.ChatCompletionMessageParam[],
@@ -390,7 +354,7 @@ async function attemptTools(
   if (call && call.type === 'function' && call.function?.arguments) {
     return extractJson(call.function.arguments)
   }
-  // Some endpoints answer a forced tool call in content instead
+  // some endpoints answer a forced tool call in content instead
   return extractJson(resp.choices[0]?.message?.content || '')
 }
 
@@ -456,15 +420,9 @@ const ATTEMPTS: Record<Method, typeof attemptTools> = {
   text: attemptText
 }
 
-// Batched generation for the smallest models
-//
-// A 2B model can reliably emit one small object. It cannot reliably emit a
-// board of a dozen cards, each with a status, a priority and coloured tags, in
-// a single response. It truncates, drops required keys, or abandons JSON
-// partway. Splitting the work into an outline pass plus one small pass per item
-// trades several cheap round-trips for an answer that actually validates.
+// tiny models manage one small object, not a board: outline first, then one pass per item
 
-/** Hard ceiling on items requested from a tiny model, to bound the round-trips. */
+/** caps round-trips on tiny models */
 const BATCH_ITEM_CAP = 8
 
 const OUTLINE_HINT = `Respond with ONLY this JSON object and nothing else:
@@ -480,7 +438,7 @@ interface BatchContext {
   caps: ModelCapabilities
 }
 
-/** One small request, parsed and returned raw; null when it produced nothing usable. */
+/** null when the reply was unusable */
 async function askSmall(
   ctx: BatchContext,
   instruction: string,
@@ -504,8 +462,7 @@ ${hint}` }
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
   } catch (err) {
     if (isAbortError(err)) throw err
-    // A schema-constrained retry without response_format, for endpoints that
-    // reject the parameter outright rather than ignoring it.
+    // retry without response_format for endpoints that reject it outright
     try {
       const resp = await ctx.client.chat.completions.create({
         model: ctx.model,
@@ -523,11 +480,7 @@ ${hint}` }
 }
 
 
-/**
- * Board and plan in outline-then-detail passes. Dialogue is deliberately absent:
- * its nodes reference each other by id, so generating them independently would
- * produce dangling targets. Exactly the failure the schema exists to prevent.
- */
+/** no dialogue: nodes reference each other by id, separate passes leave dangling targets */
 async function generateBatched(
   ctx: BatchContext,
   kind: AiStructuredKind
@@ -564,8 +517,7 @@ async function generateBatched(
 { "title": "${title}", "details": "specific enough to start immediately" }`
         )
 
-    // A model that fumbles one item should not lose the whole board, so the
-    // title is kept with a placeholder body rather than dropped.
+    // keep a fumbled item's title with a placeholder body rather than losing the board
     items.push(detail && typeof detail.title === 'string'
       ? detail
       : kind === 'board'
@@ -583,10 +535,6 @@ async function generateBatched(
   return { ok: true, data: validation.data, method: 'batched' }
 }
 
-/**
- * Generates a structured result for the given kind, using the strongest method
- * the endpoint supports. Returns the parsed object plus which method worked.
- */
 export async function generateStructured(
   params: AiStructuredParams,
   signal: AbortSignal
@@ -600,9 +548,7 @@ export async function generateStructured(
   const caps = await getModelCapabilities(model)
   const budget = TIER_BUDGETS[caps.tier]
 
-  // Start from what the model is known to support rather than always probing
-  // tool calling first. A tiny model fails that twice before reaching prose,
-  // and each failure is a full round-trip on the slowest hardware in the range.
+  // start from known caps; probing tools first costs tiny models two slow round-trips
   if (budget.batchStructured && (kind === 'board' || kind === 'plan')) {
     try {
       const batched = await generateBatched(
@@ -645,9 +591,7 @@ export async function generateStructured(
         lastError = `Model returned invalid ${kind} output via ${method}, ${validation.error}`
         if (attempt === budget.repairAttempts) break
 
-        // Re-prompt with the specific defect. Small models overwhelmingly fail
-        // on shape rather than on understanding, and one corrective turn is far
-        // cheaper than dropping to a weaker method.
+        // small models fail on shape, one corrective turn beats dropping a method
         attemptMessages = [
           ...attemptMessages,
           { role: 'system', content: buildRepairPrompt(kind, validation.error || 'invalid output') }
@@ -655,9 +599,9 @@ export async function generateStructured(
       } catch (err) {
         if (isAbortError(err)) return { ok: false, error: 'aborted' }
         lastError = humanizeAiError(err, { model, baseURL })
-        // Auth / not-found errors won't change across methods. Stop and fall back.
+        // auth / not-found won't change across methods
         if (isFatalError(err)) return { ok: false, error: lastError }
-        // Anything else: stop repairing this method and let the ladder continue.
+        // stop repairing, let the ladder try the next method
         break
       }
     }

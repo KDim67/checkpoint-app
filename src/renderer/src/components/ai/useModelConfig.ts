@@ -1,10 +1,4 @@
-/**
- * The provider profiles, the chosen model with its sampling settings, and the
- * cookbook's install progress.
- *
- * Held by the panel rather than the modals that edit it, which unmount whenever
- * they close, while the header shows the provider and model all the time.
- */
+/** held by the panel: the modals unmount, the header shows provider and model always */
 
 import { useCallback, useEffect, useState } from 'react'
 import { activateProvider, isLocalUrl, loadProviders, persistProviders, type AiProvider } from './aiProviders'
@@ -25,9 +19,7 @@ export function useModelConfig() {
   const [pullingTag, setPullingTag] = useState<string | null>(null)
   const [pullProgress, setPullProgress] = useState<number>(0)
 
-  // Load provider profiles + models. Provider-aware: the model list and the
-  // Ollama dropdown only apply to LOCAL endpoints; cloud providers use the
-  // profile's typed model. Re-runs whenever the active provider changes.
+  // model list and ollama dropdown only for local endpoints; reruns on provider change
   const loadAiConfig = useCallback(async () => {
     try {
       const { providers: provs, activeId } = await loadProviders()
@@ -45,11 +37,11 @@ export function useModelConfig() {
       setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
 
       if (isLocalEndpoint) {
-        // Local endpoint: the model MUST be one Ollama actually has installed.
+        // local: must be a model ollama has installed
         const list = await ollamaApi.listLocal().catch(() => [] as string[])
         if (list && list.length > 0) {
           setLocalModels(list)
-          // Auto-heal the "default model not installed → 404" trap.
+          // heal the uninstalled default that 404s
           const savedInstalled = savedModel && list.includes(savedModel)
           if (!savedModel || !savedInstalled) {
             setSelectedModel(list[0])
@@ -61,7 +53,7 @@ export function useModelConfig() {
           setLocalModels([])
         }
       } else {
-        // Cloud provider: use the profile's typed model, no Ollama dropdown.
+        // cloud: the profile's typed model
         setLocalModels([])
       }
     } catch (err) {
@@ -82,7 +74,7 @@ export function useModelConfig() {
     await loadAiConfig()
   }, [providers, loadAiConfig])
 
-  // Set the model and keep the active provider profile (the source of truth) in sync.
+  // keep the active profile, the source of truth, in sync
   const applyModel = useCallback(async (val: string) => {
     setSelectedModel(val)
     await setStringSetting('ai_model', val)

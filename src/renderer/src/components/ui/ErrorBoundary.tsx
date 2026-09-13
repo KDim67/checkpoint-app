@@ -3,14 +3,9 @@ import { errorMessage } from '../../../../shared/errors'
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
-  /** Shown in the fallback so the user knows which part of the app failed. */
+  /** which part failed */
   label?: string
-  /**
-   * Changing this clears a caught error. Pass the active view id so navigating
-   * away from a broken view recovers on its own. Without it, one bad render
-   * would leave the boundary stuck showing the fallback for the rest of the
-   * session even after the user moved somewhere else entirely.
-   */
+  /** changing it clears the error; pass the view id so leaving a broken view recovers */
   resetKey?: string | number
 }
 
@@ -19,14 +14,7 @@ interface ErrorBoundaryState {
   componentStack: string
 }
 
-/**
- * Catches render-time errors so a single bad component can't blank the window.
- *
- * Checkpoint holds the user's logs, tasks and notes locally, and an uncaught
- * render error in Electron takes the whole window to white with no way back
- * except restarting the app, which reads as data loss even though nothing was
- * lost. Every view and side panel is wrapped in one of these instead.
- */
+/** a render error whitens the whole window and reads as data loss, so every view gets one */
 export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null, componentStack: '' }
 
@@ -35,8 +23,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    // Kept on console too: the details panel below is for the user, this is for
-    // whoever is looking at DevTools when it happens.
+    // console too, for whoever has DevTools open
     console.error('[ErrorBoundary]', this.props.label ?? 'app', error, info.componentStack)
     this.setState({ componentStack: info.componentStack ?? '' })
   }

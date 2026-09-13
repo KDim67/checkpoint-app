@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 
-// Not re-exported: this module must export components only, or React Fast
-// Refresh falls back to a full page reload on every edit. Import applyFontSize
-// from lib/fontScale directly.
+// components only, or Fast Refresh reloads the page; import applyFontSize from lib/fontScale
 import { applyFontSize, type FontSize } from '../../lib/fontScale'
 import { getBoolSetting, getEnumSetting, setBoolSetting, setStringSetting } from '../../lib/settings'
 import PathRow from './PathRow'
@@ -33,7 +31,7 @@ export default function AppearanceSettings() {
         applyCompactMode(compact)
 
         const home = await appApi.getDataPath()
-        // Theme file is at ~/.config/checkpoint/theme.css
+        // theme lives at ~/.config/checkpoint/theme.css
         const platform = appApi.platform()
         const configDir = platform === 'win32'
           ? home.replace(/\\AppData\\Roaming.*/, '') + '\\.config\\checkpoint'
@@ -66,7 +64,6 @@ export default function AppearanceSettings() {
 
   return (
     <div className="col-xl">
-      {/* Font size */}
       <FieldRow label="Font Size" hint="Scales all text proportionally across the entire app.">
         <div className="flex-gap">
           {FONT_OPTIONS.map(opt => (
@@ -101,7 +98,6 @@ export default function AppearanceSettings() {
 
       <Divider />
 
-      {/* Compact mode */}
       <RowBetween>
         <div>
           <div className="text-item">
@@ -116,7 +112,6 @@ export default function AppearanceSettings() {
 
       <Divider />
 
-      {/* Theme file path */}
       <FieldRow
         label="Custom Theme File"
         hint="Drop a theme.css here to override CSS tokens. Changes are hot-reloaded instantly."
@@ -124,7 +119,6 @@ export default function AppearanceSettings() {
         <PathRow
           openTitle="Open folder in Explorer"
           onOpen={() => {
-            // Open the parent directory of the theme file
             const dir = themePath.replace(/[/\\][^/\\]+$/, '')
             appApi.openExternal(`file://${dir}`)
           }}

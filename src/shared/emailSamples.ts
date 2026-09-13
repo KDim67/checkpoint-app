@@ -1,10 +1,4 @@
-/**
- * Saved email drafts, used to teach the model the user's writing voice.
- *
- * They once lived in localStorage, then gained a database write the reader
- * never followed, so a synced database held samples the panel could not see.
- * Parsing and formatting live here so the writer and reader cannot drift again.
- */
+/** parsing lives here so writer and reader can't drift again */
 
 export interface EmailSample {
   id: string
@@ -12,15 +6,9 @@ export interface EmailSample {
   body: string
 }
 
-/** How many the settings UI lets the user keep. */
 export const MAX_EMAIL_SAMPLES = 5
 
-/**
- * Accepts anything (a parsed JSON blob, a half-written row, undefined) and
- * returns samples that are safe to render and to put in a prompt. Rows without
- * a body are dropped rather than repaired: an empty sample teaches nothing and
- * only costs prompt tokens.
- */
+/** safe to render and prompt; empty bodies dropped, they teach nothing */
 export function normalizeEmailSamples(raw: unknown): EmailSample[] {
   if (!Array.isArray(raw)) return []
 
@@ -41,7 +29,7 @@ export function normalizeEmailSamples(raw: unknown): EmailSample[] {
   return out
 }
 
-/** Same, but from the JSON string the setting is stored as. */
+/** from the stored JSON string */
 export function parseEmailSamples(json: string | null | undefined): EmailSample[] {
   if (!json) return []
   try {
@@ -51,7 +39,7 @@ export function parseEmailSamples(json: string | null | undefined): EmailSample[
   }
 }
 
-/** Renders the samples as the block injected into the system prompt. */
+/** the system prompt block */
 export function formatSamplesForPrompt(samples: EmailSample[]): string {
   return normalizeEmailSamples(samples)
     .map((s, i) => `--- Sample ${i + 1} (${s.title}) ---\n${s.body}`)

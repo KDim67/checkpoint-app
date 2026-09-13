@@ -21,10 +21,6 @@ import * as mediaApi from '../../data/media'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
-/**
- * The wall document and what changes it: loading and saving, the wall index,
- * undo history, and adding, placing, duplicating and removing items.
- */
 export function useWallDocument() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const selectItem = useAppStore(s => s.selectItem)
@@ -38,78 +34,52 @@ export function useWallDocument() {
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
-  /** Which picker is open, if any. One at a time: they occupy the same corner. */
+  /** one at a time, same corner */
   const [picker, setPicker] = useState<'card' | 'doc' | null>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [snapping, setSnapping] = useState(false)
-  /**
-   * What a left-drag on empty canvas does. Select is the resting state, and the
-   * two others differ in how they leave it.
-   *
-   * The arrow is one-shot: drawing one hands the pointer straight back. A
-   * connector is a single deliberate act, and staying armed afterwards meant
-   * the next click on a card started another arrow instead of selecting it,
-   * with nothing on screen saying so. The pen stays armed, because a sketch is
-   * several strokes and re-arming between each of them is the annoying half of
-   * the same trade. Escape still leaves either one.
-   */
+  /** the arrow is one-shot, the pen stays armed; Escape leaves either */
   const [tool, setTool] = useState<'select' | 'pen' | 'arrow'>('select')
   const [penColor, setPenColor] = useState(WALL_COLORS[0])
   const [penWidth, setPenWidth] = useState(STROKE_WIDTHS[1])
-  /** On by default: a hand-drawn line is shaky and almost nobody wants that. */
+  /** hand-drawn lines are shaky */
   const [smoothing, setSmoothing] = useState(true)
-  /** The stroke being drawn, in wall coordinates. Null when not drawing. */
+  /** wall coordinates, null when idle */
   const [drawing, setDrawing] = useState<{ x: number; y: number }[] | null>(null)
-  /** The first item picked for an arrow, waiting for its second. */
+  /** first pick, waiting for the second */
   const [arrowFrom, setArrowFrom] = useState<string | null>(null)
-  /**
-   * The connector being dragged out, in wall coordinates. `overId` is the item
-   * under the pointer, so the preview can snap to it and the item can light up
-   * before the pointer is let go.
-   */
+  /** overId lets the preview snap and the item light up */
   const [arrowDrag, setArrowDrag] = useState<{ fromId: string; at: { x: number; y: number }; overId: string | null } | null>(null)
-  /** The item a dragged end is currently over, so it can light up. */
+  /** so it can light up */
   const [arrowEndHover, setArrowEndHover] = useState<string | null>(null)
   const [arrowShape, setArrowShape] = useState<ArrowShape>(ARROW_SHAPES[0])
   const [arrowLine, setArrowLine] = useState<ArrowLine>(ARROW_LINES[0])
   const [arrowHeads, setArrowHeads] = useState<ArrowHeads>(ARROW_HEAD_MODES[0])
   const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
-  /** Name of an image job in flight, shown so a slow one does not look frozen. */
+  /** so a slow job doesn't look frozen */
   const [busy, setBusy] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  /** Bumped whenever the ref-held history changes, so the buttons re-render. */
+  /** re-renders the buttons for the ref-held history */
   const [historyTick, setHistoryTick] = useState(0)
 
-  /**
-   * Tagged with the workspace it was read for: otherwise the moment after a
-   * switch still holds the old active wall id and opens the wrong wall.
-   */
+  /** tagged by workspace, or a switch briefly opens the old wall */
   const [index, setIndex] = useState<{ context: string; value: WallIndex } | null>(null)
   const [wallMenuOpen, setWallMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState<{ id: string; draft: string } | null>(null)
   const [pendingDelete, setPendingDelete] = useState<WallRef | null>(null)
 
-  /** The board, shown beside the wall so a card can be dragged straight onto it. */
+  /** board beside the wall for dragging cards on */
   const [railOpen, setRailOpen] = useState(false)
   const [railWidth, setRailWidth] = useState(260)
   const [railTab, setRailTab] = useState<RailTab>('board')
   const [railQuery, setRailQuery] = useState('')
   const [columns, setColumns] = useState<ColumnConfig[]>([])
-  /** The rail column a wall drag is over, if any. Mirrored in a ref: this is
-   *  read on every pointer move, and re-rendering on each one would stutter. */
+  /** mirrored in a ref, read every pointer move */
   const [dropColumnId, setDropColumnId] = useState<string | null>(null)
   const [bgOpen, setBgOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
-  /**
-   * Space is down, so the left button pans.
-   *
-   * This is the one pan that does not cost you the tool in your hand: the pen
-   * stays armed while you move the view and carry on drawing. It is also the
-   * first thing anyone who has used a canvas tool tries, which is why it is
-   * worth having on top of the two mouse buttons.
-   */
+  /** space pans without putting the tool down */
   const [spaceHeld, setSpaceHeld] = useState(false)
-  /** The selection toolbar's colour popover. */
   const [swatchOpen, setSwatchOpen] = useState(false)
   const { bindings: keys, match: matchKey } = useViewShortcuts('wall')
   const [panButtons, setPanButtons] = useState<PanButtons>(PAN_BUTTON_MODES[0])
@@ -117,55 +87,39 @@ export function useWallDocument() {
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<WallDrag>(null)
-  /**
-   * The newest pointer position, and the frame that will apply it.
-   *
-   * A pointer reports far faster than the screen paints. A 1000 Hz mouse fires
-   * roughly sixteen moves per frame, and each one re-rendered every item on the
-   * wall; fifteen of those renders were painted over before anyone saw them.
-   */
+  /** newest pointer position; a 1000Hz mouse fires ~16 moves a frame */
   const pendingMoveRef = useRef<{ clientX: number; clientY: number; shiftKey: boolean } | null>(null)
   const moveFrameRef = useRef<number | null>(null)
-  /**
-   * The camera while a pan is in flight, ahead of the one in state.
-   *
-   * A pan moves no item. It only changes where the whole board is drawn, and
-   * every layer that has to move is one element with one transform. Putting it
-   * through state re-rendered every card, note, image and arrow on the wall for
-   * a change that moved none of them, which is what a full board felt like.
-   */
+  /** pan camera ahead of state; through state every item re-rendered for a moved view */
   const panCameraRef = useRef<WallCamera | null>(null)
   const zoomCommitRef = useRef<number | null>(null)
-  /** The items while a move is in flight, ahead of the ones in state. */
+  /** ahead of state during a move */
   const liveItemsRef = useRef<WallItem[] | null>(null)
-  /** The marquee as drawn, ahead of the one in state. */
+  /** ahead of state */
   const marqueeRectRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
-  /** What the sweep has caught so far, ahead of the selection in state. */
+  /** caught so far, ahead of state */
   const marqueeSelRef = useRef<Set<string> | null>(null)
-  /** What the sweep has actually drawn, so a frame only writes the difference. */
+  /** so a frame only writes the difference */
   const paintedSelRef = useRef<Set<string> | null>(null)
   useEffect(() => () => {
     if (zoomCommitRef.current !== null) window.clearTimeout(zoomCommitRef.current)
   }, [])
-  /**
-   * What a drag moves, not the selection, since a frame brings its contents.
-   * Decided once at drag start, or items would join as the frame swept over them.
-   */
+  /** decided at drag start: frames bring contents, items mustn't join mid-sweep */
   const movingRef = useRef<Set<string>>(new Set())
-  /** A right-press in flight: becomes a menu on release if it barely moved. */
+  /** barely moved becomes a menu on release */
   const rightPressRef = useRef<{ clientX: number; clientY: number; itemId: string | null; at: { x: number; y: number }; moved: boolean } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  /** Just-deleted docs. The flush on the way out would otherwise restore them. */
+  /** or the exit flush restores them */
   const discardedRef = useRef<Set<string>>(new Set())
   const railHoverRef = useRef<{ overRail: boolean; columnId: string | null }>({ overRail: false, columnId: null })
-  /** In a ref because the export callback is created before the lookup maps. */
+  /** a ref, the export callback predates the lookup maps */
   const labelRef = useRef<(item: WallItem) => string | undefined>(() => undefined)
   const docRef = useRef(doc)
   docRef.current = doc
   const selectedRef = useRef(selectedIds)
   selectedRef.current = selectedIds
 
-  /** Undo covers the items only: the camera is a view, not an edit. */
+  /** items only, the camera is a view */
   const historyRef = useRef<History<WallItem[]>>(initHistory([]))
 
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards])
@@ -173,16 +127,15 @@ export function useWallDocument() {
   const notesByTitle = useMemo(() => new Map(notes.map(n => [n.title, n])), [notes])
   const selectedItems = doc.items.filter(i => selectedIds.has(i.id))
   const single = selectedItems.length === 1 ? selectedItems[0] : null
-  /** Restyling only makes sense when everything selected is a connector. */
+  /** restyling needs every selected item to be a connector */
   const arrowsSelected = selectedItems.length > 0 && selectedItems.every(i => i.kind === 'arrow')
 
   const wallIndex = index?.context === activeWorkspace ? index.value : null
   const activeWall = wallIndex?.walls.find(w => w.id === wallIndex.activeId) ?? null
-  /** Null until the index has been read: there is no wall to open before then. */
+  /** null until the index is read */
   const docKey = activeWall ? wallDocKey(activeWorkspace, activeWall.id) : null
 
-  // Load
-  /** What the walls can point at. Workspace-wide, so switching wall leaves it. */
+  /** workspace-wide, survives wall switches */
   useEffect(() => {
     let cancelled = false
 
@@ -193,18 +146,18 @@ export function useWallDocument() {
 
     void readCards()
     Promise.all([
-      // Notes are not per-workspace, so they are offered whole.
+      // notes aren't per-workspace
       notesApi.listNotes().catch(() => [] as NoteMetadata[]),
-      // The board's own columns, not whatever statuses happen to be in use.
+      // the board's columns, not statuses in use
       loadBoardConfig(activeWorkspace).catch(() => null)
     ]).then(([noteList, config]) => {
       if (cancelled) return
       setNotes(noteList ?? [])
-      // Not none: with no columns every card is an orphan and the board looks broken.
+      // defaults, with no columns every card is an orphan
       setColumns(config?.columns ?? DEFAULT_COLUMNS)
     })
 
-    // Rail, board and peer moves all arrive this way; without it the rail goes stale.
+    // rail, board and peer moves all arrive here
     const onMutation = (e: Event): void => {
       const type = (e as CustomEvent<{ type?: string }>).detail?.type ?? ''
       if (type === 'createItem' || type === 'updateItem' || type === 'deleteItem') void readCards()
@@ -217,14 +170,7 @@ export function useWallDocument() {
     }
   }, [activeWorkspace])
 
-  /**
-   * Closes a toolbar popover when the click lands elsewhere.
-   *
-   * These used to sit under a full-screen backdrop, which swallowed the click
-   * that dismissed them: reaching the other popover took two clicks, one to
-   * close and one to open. Matching on the popover's own subtree lets the click
-   * through to whatever it was aimed at, the way WallContextMenu already does.
-   */
+  /** matching the popover's subtree lets the dismissing click through; a backdrop ate it */
   useEffect(() => {
     if (!wallMenuOpen && !bgOpen && !shortcutsOpen) return
 
@@ -239,7 +185,7 @@ export function useWallDocument() {
     return () => document.removeEventListener('pointerdown', onDown)
   }, [wallMenuOpen, bgOpen, shortcutsOpen])
 
-  /** The rail's own state is a preference, not part of any wall. */
+  /** a preference, not part of any wall */
   useEffect(() => {
     let cancelled = false
     Promise.all([
@@ -260,8 +206,7 @@ export function useWallDocument() {
       setArrowHeads(heads)
       setPanButtons(pan)
       setMenuButton(menuOn)
-      // Still kept as a strength so the preference carries over from the build
-      // that had a dial. Anything above zero means on.
+      // stored as a strength from the dial build, above zero is on
       setSmoothing(smooth > 0)
     })
     return () => { cancelled = true }
@@ -300,17 +245,14 @@ export function useWallDocument() {
   useEffect(() => {
     if (!docKey) return
     const discarded = discardedRef.current
-    // Runs on the way out of *this* wall, while docRef still holds it.
+    // on the way out of this wall, while docRef still holds it
     return () => {
       if (discarded.delete(docKey)) return
       void flushWallDoc(docKey, docRef.current)
     }
   }, [docKey])
 
-  /**
-   * MCP writes the doc from the main process, so the open view has to re-read.
-   * Skipped mid-gesture. Being briefly stale beats losing a drag in progress.
-   */
+  /** MCP writes from main, so re-read; skipped mid-gesture */
   useEffect(() => {
     if (!docKey) return
     const refresh = (): void => {
@@ -325,7 +267,6 @@ export function useWallDocument() {
     return () => window.removeEventListener('wall-refresh', refresh)
   }, [docKey, editingId])
 
-  // Mutation
   const write = useCallback((next: WallDoc) => {
     setDoc(next)
     if (docKey) saveWallDoc(docKey, next)
@@ -337,16 +278,13 @@ export function useWallDocument() {
   }, [activeWorkspace])
 
   const addWall = useCallback(() => {
-    // From the loaded index, so a slow load cannot start a competing list.
+    // from the loaded index, so a slow load can't start a competing list
     if (!wallIndex) return
     commitIndex(createWall(wallIndex).index)
     setWallMenuOpen(false)
   }, [wallIndex, commitIndex])
 
-  /**
-   * The reverse direction. Position on the wall means nothing, but a drop onto
-   * a named column is an instruction, so it moves the card for real.
-   */
+  /** a drop onto a column is an instruction, so it really moves the card */
   const handOffToColumn = async (columnId: string): Promise<void> => {
     const refs = docRef.current.items
       .filter(i => selectedRef.current.has(i.id) && i.kind === 'card' && i.ref)
@@ -364,7 +302,7 @@ export function useWallDocument() {
     }
 
     try {
-      // One at a time. Each write fires the mutation event the app listens on.
+      // one at a time, each fires the mutation event
       for (const move of plan) {
         await updateItem(move.id, { status: move.status, position: move.position })
       }
@@ -394,12 +332,12 @@ export function useWallDocument() {
 
     const key = wallDocKey(activeWorkspace, pendingDelete.id)
     discardedRef.current.add(key)
-    // Before the switch: the flush on the way out would land after the delete.
+    // before the switch, or the exit flush lands after the delete
     await deleteWallDoc(key)
     commitIndex(next)
   }, [pendingDelete, wallIndex, activeWorkspace, commitIndex])
 
-  /** `record: false` for drag frames. The whole gesture is one undo step. */
+  /** record: false for drag frames, one undo step per gesture */
   const setItems = useCallback((items: WallItem[], { record = true } = {}) => {
     historyRef.current = record
       ? pushHistory(historyRef.current, items)
@@ -409,14 +347,12 @@ export function useWallDocument() {
   }, [write])
 
   const setCamera = useCallback((camera: WallCamera) => {
-    // Whatever was drawn by hand is now behind what is being committed.
+    // the hand-drawn camera is now behind the commit
     panCameraRef.current = null
     write({ ...docRef.current, camera })
   }, [write])
 
-  // Stable, so the memo on WallItemView holds. Made inline in the item loop
-  // these were new functions every render, which changed every item's props
-  // every frame and re-rendered the whole wall to move one card.
+  // stable so WallItemView's memo holds
   const onItemTextChange = useCallback((id: string, text: string) => {
     setItems(patchItems(docRef.current.items, new Set([id]), { text }), { record: false })
   }, [setItems])
@@ -429,11 +365,10 @@ export function useWallDocument() {
     historyRef.current = next
     setHistoryTick(t => t + 1)
     write({ ...docRef.current, items: next.present })
-    // A selection can point at items the step removed.
+    // the step may have removed selected items
     setSelectedIds(prev => new Set([...prev].filter(id => next.present.some(i => i.id === id))))
   }, [write])
 
-  // Placing
   const centreOfView = useCallback((): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
@@ -456,8 +391,7 @@ export function useWallDocument() {
     if (ids.size === 0) return
     const items = docRef.current.items
     const gone = items.filter(i => ids.has(i.id))
-    // Pruned as well as filtered: an arrow whose end just went would otherwise
-    // stay in the document, invisible and impossible to select.
+    // prune arrows too, or a dangling one stays invisible and unselectable
     setItems(pruneArrows(items.filter(i => !ids.has(i.id))))
     setSelectedIds(new Set())
     toast(`Removed ${gone.length} item${gone.length === 1 ? '' : 's'}.`, {
@@ -478,12 +412,12 @@ export function useWallDocument() {
     const items = docRef.current.items
     const chosen = items.filter(i => ids.has(i.id))
     if (chosen.length === 0) return
-    // A mixed selection locks everything, which is the less surprising direction.
+    // a mixed selection locks everything
     const lock = chosen.some(i => !i.locked)
     setItems(items.map(i => (ids.has(i.id) ? { ...i, locked: lock ? true : undefined } : i)))
   }, [setItems])
 
-  /** In a row below the source, so four PBR maps are a strip, not a stack. */
+  /** a row below the source, maps as a strip */
   const placeDerived = useCallback((source: WallItem, made: { filename: string; label: string; width: number; height: number }[]) => {
     const items = [...docRef.current.items]
     const created: WallItem[] = []
@@ -502,7 +436,7 @@ export function useWallDocument() {
     setSelectedIds(new Set(created.map(c => c.id)))
   }, [setItems])
 
-  /** Wraps a slow image job with a waiting toast and one error path. */
+  /** waiting toast and one error path */
   const runImageOp = useCallback(async (label: string, job: () => Promise<void>) => {
     setBusy(label)
     try {
@@ -518,7 +452,6 @@ export function useWallDocument() {
     if (item.kind === 'card' && item.ref) selectItem(item.ref)
   }, [selectItem])
 
-  // Images
   const placeImageFiles = useCallback(async (files: File[], at?: { x: number; y: number }) => {
     const images = files.filter(f => f.type.startsWith('image/'))
     if (images.length === 0) return

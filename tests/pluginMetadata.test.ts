@@ -34,7 +34,7 @@ describe('parsePluginMetadata', () => {
   })
 
   it('finds the closing brace past a nested object', () => {
-    // Scanning for the first '}' would stop inside `extra` and lose version.
+    // the first } would stop inside extra
     const source = plugin(`{
       name: "Nested",
       extra: { deep: { deeper: 1 } },
@@ -62,8 +62,7 @@ describe('parsePluginMetadata', () => {
   })
 
   it('does not execute what it reads', () => {
-    // The whole point: this runs over source text, so a listing cannot have
-    // side effects however hostile the file is.
+    // listing reads source text, so a hostile file can't run
     const hostile = `globalThis.__pwned = true; ${plugin('{ name: "Hostile" }')}`
     expect(parsePluginMetadata(hostile).name).toBe('Hostile')
     expect((globalThis as { __pwned?: boolean }).__pwned).toBeUndefined()
@@ -78,7 +77,7 @@ describe('isSafePluginFilename', () => {
   })
 
   it('rejects traversal', () => {
-    // This value arrives over IPC from the renderer.
+    // arrives over IPC
     for (const name of ['../evil.js', '../../etc/passwd.js', 'a/../../b.js', '..js.js/../x.js']) {
       expect(isSafePluginFilename(name), name).toBe(false)
     }

@@ -1,3 +1,2 @@
-# The two forms are a convenience, not a gate. Anything that does not fit them
-# is still worth opening.
+# the forms are a convenience, not a gate
 blank_issues_enabled: true

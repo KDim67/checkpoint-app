@@ -1,10 +1,4 @@
-/**
- * Everything the user attached, fetched and turned into system messages.
- *
- * The part worth noticing is that each source has a size budget, which is what
- * stops one attached PDF evicting the whole conversation from the context
- * window. Blocks moved verbatim; only the budget arithmetic is pulled out.
- */
+/** each source has a budget so one PDF can't evict the conversation */
 
 import type { Message } from './types'
 import * as cheatsheetsApi from '../../data/cheatsheets'
@@ -13,13 +7,7 @@ import * as workspaceApi from '../../data/workspaceFolder'
 
 type SystemMessage = { role: 'system'; content: string }
 
-/**
- * Characters of cheatsheet text to request per attached document.
- *
- * Split across the attached sheets rather than given to each, so attaching five
- * documents does not ask for five times the budget. The floor of 1500 means a
- * sheet is never quoted so thinly that it says nothing.
- */
+/** split across sheets, floor of 1500 so a sheet still says something */
 export function cheatsheetBudget(
   isSmallModel: boolean,
   contextWindowTokens: number,
@@ -29,7 +17,7 @@ export function cheatsheetBudget(
   return Math.max(1500, Math.floor(totalBudget / Math.max(1, sheetCount)))
 }
 
-/** Per-note and per-file caps. Small models get less of everything. */
+/** small models get less */
 export function noteCap(isSmallModel: boolean): number {
   return isSmallModel ? 3000 : 9000
 }
@@ -37,11 +25,7 @@ export function fileCap(isSmallModel: boolean): number {
   return isSmallModel ? 4000 : 12000
 }
 
-/**
- * Attachments accumulate across the whole conversation, not just the last
- * message: a document attached five turns ago is still what the user is asking
- * about.
- */
+/** across the whole chat, a doc from five turns ago is still the topic */
 export function collectAttachments(messages: Message[]): {
   cheatsheets: string[]
   notes: string[]
@@ -64,14 +48,13 @@ export function collectAttachments(messages: Message[]): {
 
 interface Options {
   messages: Message[]
-  /** The user's latest question, used to pull only relevant passages. */
+  /** pulls only relevant passages */
   text: string
   isSmallModel: boolean
   contextWindowTokens: number
   workspaceFolder: string | null
 }
 
-/** Reads every attachment and returns the system messages to inject, in order. */
 export async function gatherAttachmentMessages({
   messages,
   text,
@@ -85,10 +68,7 @@ export async function gatherAttachmentMessages({
   const allActiveFiles = new Set(filePaths)
   const apiMessages: SystemMessage[] = []
 
-  // Attach reference-document text as a system knowledge base. Rather than
-  // dumping every full PDF (which floods a small model's context and buries
-  // the relevant part), pull only the passages relevant to the user's
-  // question, sized to the model's context window and split across sheets.
+  // relevant passages only, sized to the model's window; whole PDFs bury the answer
   if (allActiveCheatsheets.size > 0) {
     const sheetNames = Array.from(allActiveCheatsheets)
     const perSheet = cheatsheetBudget(isSmallModel, contextWindowTokens, sheetNames.length)
@@ -112,7 +92,7 @@ export async function gatherAttachmentMessages({
     }
   }
 
-  // Attached NOTES (from the Notes feature). Full content, size-capped
+  // full content, size-capped
   if (allActiveNotes.size > 0) {
     const perNoteCap = noteCap(isSmallModel)
     let notesText = ''
@@ -132,8 +112,7 @@ export async function gatherAttachmentMessages({
       })
     }
   } else if (text.length > 12) {
-    // Auto-recall: no notes attached. Surface the 2 most relevant note
-    // snippets so lore/design decisions written in Notes stay consistent.
+    // nothing attached: surface the 2 most relevant notes so lore stays consistent
     try {
       const hits = await notesApi.searchNotes(text)
       const top = (hits || []).slice(0, 2).filter(h => h.snippet && h.snippet.trim())
@@ -147,7 +126,7 @@ export async function gatherAttachmentMessages({
     } catch { /* auto-recall is best-effort */ }
   }
 
-  // Attached WORKSPACE FILES. Actual source contents, size-capped
+  // source contents, size-capped
   if (allActiveFiles.size > 0 && workspaceFolder) {
     const perFileCap = fileCap(isSmallModel)
     let filesText = ''

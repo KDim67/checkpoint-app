@@ -30,7 +30,6 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
   } = focusView
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 'var(--space-6)', flex: 1, minHeight: 0 }}>
-      {/* Left panel: Task Picker */}
       <div className="col-lg-min">
         <div>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -71,7 +70,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
           </div>
         </div>
 
-        {/* Quick-add: jot a task straight into today's focus list without leaving the view */}
+        {/* quick-add straight into today's focus list */}
         <div className="flex-gap">
           <input
             className="quick-add-input"
@@ -179,13 +178,11 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
         </div>
       </div>
 
-      {/* Right panel: Controls & Stats */}
       <div className="col-lg">
-        {/* Presets Card */}
         <div className="glass-panel col-lg">
           <div className="row-between">
             <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', margin: 0 }}>Timer Config</h3>
-            {/* Fills one dot per completed focus interval, resetting each time a long break comes due */}
+            {/* one dot per focus interval, resets when a long break is due */}
             <div className="flex-4px" title={`${cyclesCompleted} focus intervals completed this session`}>
               {Array.from({ length: focusSettings.longBreakInterval }, (_, i) => i).map(i => (
                 <span key={i} className={`cycle-dot ${i < cycleDots || (cycleDots === 0 && cyclesCompleted > 0 && i < focusSettings.longBreakInterval) ? 'filled' : ''}`} />
@@ -371,7 +368,6 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
           </button>
         </div>
 
-        {/* History Panel */}
         <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minHeight: 0 }}>
           <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <BookOpen size={14} />
@@ -431,6 +427,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
             {pastSessions.length > 0 && (
               <button
                 onClick={() => setView('analytics')}
+                className="hover-brighten"
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -447,8 +444,6 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                   gap: '4px',
                   transition: 'filter 120ms ease'
                 }}
-                onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.15)'}
-                onMouseLeave={e => e.currentTarget.style.filter = 'none'}
               >
                 View all in Analytics <ArrowRight size={12} />
               </button>

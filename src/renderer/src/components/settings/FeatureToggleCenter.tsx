@@ -21,14 +21,7 @@ interface ToggleConfig {
   toggle: (active: boolean) => Promise<void>
 }
 
-/**
- * The gateway's shared secret, with the call that uses it.
- *
- * Shown rather than hidden: the port is on the loopback interface, which any
- * browser page can reach, so the token is the only thing separating the user's
- * database from any website they happen to have open. Anyone whose scripts
- * posted to this before needs to find it, and this is where they look.
- */
+/** shown, not hidden: loopback is reachable from any page, the token is the only guard */
 function WebhookToken(): React.JSX.Element | null {
   const [token, setToken] = useState<string>('')
   const [copied, setCopied] = useState(false)
@@ -100,9 +93,7 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     },
     toggle: async (active: boolean) => {
       await setBoolSetting('feature_webhook', active)
-      // Reuse whichever port the gateway is already listening on. A literal
-      // here moved it off the port main had started it on, so every external
-      // tool posting to the documented port stopped being delivered.
+      // reuse the running port, a literal moved it and broke external posts
       const port = await getNumberSetting('webhook_port', WEBHOOK_DEFAULT_PORT)
       await webhookApi.toggle(active, port)
     }
@@ -132,9 +123,7 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     },
     toggle: async (active: boolean) => {
       await setBoolSetting('feature_backup', active)
-      // Persisting the flag alone left the old timers running and armed no new
-      // ones, so the warning above only came true on the next launch.
-      // initializeBackupScheduler clears then re-arms, so it is right either way.
+      // re-arm now, persisting the flag left the old timers running
       await backupApi.run('init')
     }
   },
@@ -174,15 +163,7 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
   }
 ]
 
-/**
- * Per-view copy. The setting key, label and default live in lib/features so
- * this panel, the Sidebar and App's redirect guard cannot disagree about them.
- */
-/**
- * Per-view copy, keyed by settings key. The key, label and default live in
- * lib/features so this panel, the Sidebar and App's redirect guard cannot
- * disagree about them.
- */
+/** keyed by settings key; key, label and default live in lib/features so nothing disagrees */
 const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; description: string; warning: string }> = {
   'feature_view_kanban': {
     key: 'view_kanban',
@@ -254,12 +235,7 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
   }
 }
 
-/**
- * Copy is written by hand, so a view can be added to VIEW_FEATURES without one.
- * That used to read `undefined.key` and crash the whole Settings screen.
- * Losing every other toggle because one description was missing. A view with no
- * copy now renders with its own label instead.
- */
+/** a view without copy renders its label; missing copy used to crash Settings */
 const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = VIEW_FEATURES.map(feature => {
   const copy = VIEW_COPY[feature.key] ?? {
     key: feature.key,
@@ -278,11 +254,7 @@ const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = VIEW_FEATURES.map(feature => {
   }
 })
 
-/**
- * The assistant and everything that reaches it. Its own section because it is
- * not one view and not a background server: it cuts across the panel, the
- * Cookbook, the card and task buttons, Ask AI, and AI Standup.
- */
+/** its own section, it cuts across many views */
 const AI_CONFIG: ToggleConfig = {
   key: AI_FEATURE_KEY,
   icon: <Sparkles size={16} />,
@@ -295,7 +267,6 @@ const AI_CONFIG: ToggleConfig = {
 
 const TOGGLE_CONFIGS = [AI_CONFIG, ...BACKGROUND_CONFIGS, ...SIDEBAR_VIEW_CONFIGS]
 
-/** One toggle and its copy. Extracted because both sections drew it verbatim. */
 function FeatureRow({ cfg, on, busy, onChange }: {
   cfg: ToggleConfig
   on: boolean
@@ -400,7 +371,6 @@ export default function FeatureToggleCenter() {
 
       <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: 'var(--space-2) 0' }} />
 
-      {/* Background Subsystems Section */}
       <div>
         <div className="section-kicker">
           Background Subsystems
@@ -423,7 +393,6 @@ export default function FeatureToggleCenter() {
 
       <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: 'var(--space-2) 0' }} />
 
-      {/* Workspace Sidebar Views Section */}
       <div>
         <div className="section-kicker">
           Workspace Views & Sidebar Customization

@@ -1,5 +1,3 @@
-/** The bridge's `tracker` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.tracker
 
 export const getActivityStats = (...args: Parameters<Bridge['getActivityStats']>): ReturnType<Bridge['getActivityStats']> =>

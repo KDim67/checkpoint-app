@@ -1,13 +1,6 @@
-/**
- * Small colour helpers shared by the renderer and the theme model.
- *
- * The YIQ decision lived in `renderer/lib/contrast.ts` and is lifted here rather
- * than copied: the theme model needs the same answer when deriving a readable
- * foreground, and two implementations of "is this background light?" drifting
- * apart is exactly how a button ends up with unreadable text.
- */
+/** YIQ lifted from the renderer so theme and UI agree on light vs dark */
 
-/** Parses `#rrggbb` into channels, or null if it is not a six-digit hex. */
+/** null unless six-digit hex */
 function parseHex(hex: string): [number, number, number] | null {
   const h = hex.trim().replace('#', '')
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
@@ -21,49 +14,36 @@ function parseHex(hex: string): [number, number, number] | null {
 const toHex = (n: number): string =>
   Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')
 
-/**
- * Perceived brightness, 0–255.
- *
- * YIQ rather than WCAG relative luminance because the threshold below it was
- * tuned against the board's colour picker presets; switching formulas flips
- * several of them.
- */
+/** YIQ, not WCAG: the threshold was tuned on the picker presets */
 function perceivedBrightness(r: number, g: number, b: number): number {
   return (r * 299 + g * 587 + b * 114) / 1000
 }
 
-/** The brightness at or above which a background wants dark text. */
+/** at or above wants dark text */
 const LIGHT_BACKGROUND_THRESHOLD = 115
 
 const DARK_FOREGROUND = '#0f172a'
 export const LIGHT_FOREGROUND = '#ffffff'
 
-/**
- * Picks a readable foreground for a background colour.
- * Returns `fallback` when the input is not a usable hex value.
- */
+/** fallback for unusable input */
 export function readableForegroundOn(hex: string, fallback = LIGHT_FOREGROUND): string {
   const rgb = parseHex(hex)
   if (!rgb) return fallback
   return perceivedBrightness(...rgb) >= LIGHT_BACKGROUND_THRESHOLD ? DARK_FOREGROUND : LIGHT_FOREGROUND
 }
 
-/**
- * Moves a colour toward white by `amount` (0–1), leaving it untouched if the
- * input is not a hex value. Used for hover states, which sit a step brighter
- * than their base in this design system.
- */
+/** toward white by 0-1, hover states sit a step brighter */
 export function lighten(hex: string, amount: number): string {
   const rgb = parseHex(hex)
   if (!rgb) return hex
   return '#' + rgb.map(c => toHex(c + (255 - c) * amount)).join('')
 }
 
-// HSV, for a picker with a saturation square and a hue bar
+// HSV for the square-and-bar picker
 
 export interface Hsv { h: number; s: number; v: number }
 
-/** Null for anything unparseable, so a caller can keep its previous colour. */
+/** null so callers keep their colour */
 export function hexToHsv(hex: string): Hsv | null {
   const rgb = parseHex(hex)
   if (!rgb) return null
@@ -86,8 +66,7 @@ export function hexToHsv(hex: string): Hsv | null {
 }
 
 export function hsvToHex({ h, s, v }: Hsv): string {
-  // Normalised first, not just for the sector: a negative hue otherwise drives
-  // `x` negative and the channel renders as "-ff".
+  // normalised first, a negative hue renders "-ff"
   const hue = ((h % 360) + 360) % 360
 
   const c = v * s
@@ -110,19 +89,14 @@ export function hsvToHex({ h, s, v }: Hsv): string {
   return `#${channel(r)}${channel(g)}${channel(b)}`
 }
 
-/** True for the `#rrggbb` the pickers emit, so a half-typed hex is not applied. */
+/** so half-typed hex isn't applied */
 export function isHex(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value.trim())
 }
 
-// Flattening, for the places that cannot take an alpha channel
+// flattening for things without alpha
 
-/**
- * Parses the formats a theme token actually carries: `#rgb`, `#rrggbb`,
- * `rgb(...)` and `rgba(...)`, in the legacy comma form or the space form.
- * Alpha comes back as 0–1. Null for anything else, so a caller can fall back
- * rather than pass a value on to something that cannot read it.
- */
+/** #rgb, #rrggbb, rgb/rgba in comma or space form; alpha 0-1 */
 export function parseColor(value: string): [number, number, number, number] | null {
   const v = value.trim()
 
@@ -144,11 +118,7 @@ export function parseColor(value: string): [number, number, number, number] | nu
   return [parts[0], parts[1], parts[2], Math.max(0, Math.min(1, alpha))]
 }
 
-/**
- * Composites a colour onto an opaque backdrop and returns `#rrggbb`, so a
- * translucent token survives as the colour it looked like rather than as the
- * full-strength one underneath it. Null when either input is unparseable.
- */
+/** composited so a translucent token keeps its look */
 export function flattenToHex(value: string, over: string): string | null {
   const fg = parseColor(value)
   const bg = parseColor(over)

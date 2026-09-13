@@ -4,30 +4,19 @@ import type { GameDevTab } from './types'
 
 interface Props {
   onPick: (id: GameDevTab) => void
-  /** Most recently opened first. Empty until a tool has been used. */
+  /** most recent first */
   recent: GameDevTab[]
 }
 
-/**
- * The workspace with no tool open yet.
- *
- * Ten tools used to sit in three bordered clusters in a strip along the top,
- * which read as three unrelated widgets and left the rest of the window empty.
- * Here each one gets room for its name and a line saying what it does, which is
- * the question someone opening this view actually has.
- */
+/** each tool gets its name and what it does; the old strip read as three unrelated widgets */
 export default function GameDevLauncher({ onPick, recent }: Props) {
   const recentTools = recent.map(findTool).filter(t => t !== undefined)
   return (
-    // Capped and centred. Left to fill the window the grid reserved a column
-    // for every 240px going, so on a wide monitor ten cards sat in the first
-    // four of seven tracks and the rest of the row was held empty.
+    // capped and centred, a full-width grid left ten cards in four of seven tracks
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 'var(--space-6)',
       width: '100%', maxWidth: 'var(--gamedev-launcher-max)',
-      // Auto blocks centre the launcher in a tall window and collapse to
-      // nothing in a short one, so the space around it reads as margin rather
-      // than as the page having run out.
+      // auto margins centre it when tall and collapse when short
       margin: 'auto'
     }}>
       <style>{`
@@ -106,8 +95,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
         }
       `}</style>
 
-      {/* The title lives here rather than in GameDevView so it centres with the
-          rest of the block instead of being stranded at the top of the window. */}
+      {/* title here so it centres with the block */}
       <div>
         <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
           Game Development Workspace

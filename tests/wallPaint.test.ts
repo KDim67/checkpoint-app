@@ -58,7 +58,7 @@ describe('paintWallSelection', () => {
   it('touches only the items whose state changed since the last paint', () => {
     const viewport = viewportWith(html)
     paintWallSelection(viewport, null, items, new Set([a]))
-    // Marked by something else. Unchanged as far as the diff knows, so it stays.
+    // marked elsewhere, unchanged to the diff, so it stays
     defined(viewport.querySelector(`[data-wall-item="${c}"]`)).setAttribute('data-wall-selected', '')
 
     paintWallSelection(viewport, new Set([a]), items, new Set([b]))

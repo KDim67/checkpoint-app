@@ -1,11 +1,4 @@
-/**
- * Example plugins shipped with the app. Installed on request, never silently.
- * Writing executable files into someone's plugins folder behind their back sits
- * badly next to the "only enable code you trust" warning on the same screen.
- *
- * Each is a real plugin, not a hello-world, and between them they cover the
- * whole API, so the folder doubles as the documentation.
- */
+/** installed on request, never silently; together they cover the whole API */
 
 interface ExamplePlugin {
   filename: string

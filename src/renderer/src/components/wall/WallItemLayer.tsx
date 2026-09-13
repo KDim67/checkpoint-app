@@ -9,33 +9,19 @@ interface Props {
   card?: Item
   note?: NoteMetadata
   editing: boolean
-  /** Whether the four connect dots are offered on this item. */
+  /** four connect dots */
   connectable: boolean
-  /** Whether the resize and rotate handles are offered on this item. */
+  /** resize and rotate handles */
   showHandles: boolean
-  /** The item an arrow being dragged would land on. */
+  /** where a dragged arrow would land */
   arrowTarget: boolean
-  /** The item an arrow is being dragged from. */
+  /** where an arrow is dragged from */
   arrowFrom: boolean
   onTextChange: (id: string, text: string) => void
   onFinishEditing: () => void
 }
 
-/**
- * One item on the wall, with everything drawn around it.
- *
- * Split from WallView and memoised because this is where a render was going.
- * The item itself was already memoised, but the box around it was not, and it
- * carries ten more elements: the outline, the lock markers, four connect dots
- * and the resize handles. Rebuilding those for every item on the wall cost
- * around ninety milliseconds a render, so selecting, hovering or drawing
- * anything stuttered even though not one item had actually changed.
- *
- * Note what is not a prop: whether the item is selected. WallView writes that
- * onto the element as data-wall-selected and index.css draws it, so releasing a
- * marquee over fifty items touches fifty attributes rather than re-rendering
- * fifty of these.
- */
+/** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
 function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing }: Props) {
   return (
     <div
@@ -46,22 +32,14 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         position: 'absolute',
         left: 0, top: 0,
         width: `${item.width}px`, height: `${item.height}px`,
-        // translate, not left/top. Moving an item this way costs no
-        // layout, and a layout here repaints the whole canvas layer,
-        // which means resampling every image on the wall per frame.
-        // The 2D form, not translate3d: the 3D one gave every item
-        // a compositor layer of its own, and with hundreds of them
-        // each render paid to work out the overlaps between them
-        // all, which is what made a click on a full board stall.
+        // 2D translate: no layout, and translate3d gave hundreds of items their own layers
         transform: `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`,
-        // Images get their own compositor layer so a repaint of the
-        // canvas does not re-rasterise them. They are the expensive
-        // ones: a photo can be tens of megapixels behind a 280px box.
+        // own layer so canvas repaints don't re-rasterise big photos
         willChange: item.kind === 'image' ? 'transform' : undefined,
-        // Ink lets presses through: only its stroke takes them.
+        // ink lets presses through, only the stroke takes them
         pointerEvents: item.kind === 'ink' ? 'none' : undefined,
         cursor: item.locked ? 'default' : 'grab',
-        // The selected outline is in index.css, keyed off data-wall-selected.
+        // selected outline lives in index.css via data-wall-selected
         outline: arrowTarget
           ? '3px solid var(--color-secondary)'
           : arrowFrom ? '2px dashed var(--color-secondary)' : undefined,
@@ -83,8 +61,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         </div>
       )}
 
-      {/* A locked item ignores every press. Without a marker that
-          reads as the app being broken rather than as a choice. */}
+      {/* a marker, or a locked item ignoring presses reads as broken */}
       {item.locked && (
         <span
           title="Locked. Right-click to unlock."
@@ -101,9 +78,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         </span>
       )}
 
-      {/* Drag one of these to any other item to connect the two.
-          Only in select mode: the pen and the arrow already own
-          the whole gesture, and a locked item connects to nothing. */}
+      {/* select mode only: pen and arrow own the gesture, locked items connect to nothing */}
       {connectable && (
         <>
           {([
@@ -130,13 +105,10 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         </>
       )}
 
-      {/* Handles only for a single unlocked selection: dragging one
-          corner of five items has no obvious meaning. */}
+      {/* single unlocked selection only */}
       {showHandles && (
         <>
-          {/* A 22px grab area around a 12px dot. The handle used
-              to be exactly as big as it looked, which made resizing
-              a matter of hitting a 12px corner. */}
+          {/* 22px grab area around a 12px dot */}
           <div
             data-wall-handle="se"
             style={{

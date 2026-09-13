@@ -88,7 +88,6 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
             </span>
           </div>
 
-          {/* Sub-tabs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2px', background: 'var(--color-surface-2)', padding: '2px', borderRadius: 'var(--radius-md)' }}>
             <button
               onClick={() => setCustomBgTab('presets')}
@@ -152,7 +151,6 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
             </button>
           </div>
 
-          {/* TAB 1: PRESETS */}
           {customBgTab === 'presets' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto', paddingRight: '2px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
@@ -180,9 +178,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                         justifyContent: 'center',
                         fontSize: '10px',
                         fontWeight: 'var(--weight-bold)',
-                        // Not a token. This label sits on whatever image the
-                        // preset carries, not on a theme surface, and the
-                        // shadow below is what makes it legible there.
+                        // not a token: sits on the preset's image, the shadow keeps it legible
                         color: '#fff',
                         textShadow: '0 1px 3px rgba(0,0,0,0.8)',
                         textTransform: 'capitalize',
@@ -197,7 +193,6 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
             </div>
           )}
 
-          {/* TAB 2: SOLID COLOR */}
           {customBgTab === 'solid' && (
             <div className="col-10px">
               <div
@@ -264,7 +259,6 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
             </div>
           )}
 
-          {/* TAB 3: CUSTOM GRADIENT (WITH ANGLE & DIRECTION EDITING) */}
           {customBgTab === 'gradient' && (
             <div className="col-10px">
               {(() => {
@@ -283,8 +277,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        // On the gradient itself, which has no single
-                        // colour to pick a readable foreground from.
+                        // on the gradient, no single colour to contrast against
                         color: '#fff',
                         fontSize: '10px',
                         fontWeight: 'var(--weight-bold)',
@@ -438,7 +431,6 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
             </div>
           )}
 
-          {/* TAB 3: CUSTOM IMAGE (FILE UPLOAD OR URL) */}
           {customBgTab === 'image' && (
             <div className="col-10px">
               <input
@@ -449,15 +441,14 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                 onChange={handleFileUpload}
               />
 
-              {/* Upload File Button / Drop Zone */}
               <button
                 onClick={() => fileInputRef.current?.click()}
+                className="board-theme-menu-upload hover-border-accent"
                 style={{
                   width: '100%',
                   padding: '12px',
                   borderRadius: 'var(--radius-md)',
                   background: 'var(--color-surface-2)',
-                  border: '1px dashed var(--color-surface-offset)',
                   color: 'var(--color-text-base)',
                   cursor: 'pointer',
                   display: 'flex',
@@ -469,8 +460,6 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   fontWeight: 'var(--weight-semibold)',
                   transition: 'all 120ms ease'
                 }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-secondary)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-surface-offset)'}
               >
                 <Upload size={18} className="text-accent" />
                 <span>Upload Image from Computer</span>
@@ -508,7 +497,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
-                  {/* White on its own black scrim, so the theme does not reach it. */}
+                  {/* white on its own black scrim, outside the theme */}
                   <span style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '9px', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>Preview</span>
                 </div>
               )}

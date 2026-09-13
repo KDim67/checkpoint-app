@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { normalizeMemoryAction, normalizeMemoryActions } from '../src/shared/memoryActions'
 import { defined } from './helpers/defined'
 
-// These actions delete and rewrite rows in the memory store, and they come out
-// of a language model. What survives normalisation is what gets to touch the
-// database.
+// these delete rows and come from a model
 
 describe('an action the model returned', () => {
   it('keeps a well-formed save', () => {
@@ -19,7 +17,7 @@ describe('an action the model returned', () => {
   })
 
   it('drops an action nobody recognises', () => {
-    // A hallucinated verb must not fall through to a branch by accident.
+    // a made-up verb mustn't fall into a branch
     expect(normalizeMemoryAction({ action: 'drop_table', memory_key: 'x' })).toBeNull()
     expect(normalizeMemoryAction({ action: '', memory_key: 'x' })).toBeNull()
   })
@@ -30,7 +28,7 @@ describe('an action the model returned', () => {
   })
 
   it('drops a save with nothing to save', () => {
-    // Saving an empty string would blank a memory rather than write one.
+    // an empty save would blank a memory
     expect(normalizeMemoryAction({ action: 'save', memory_key: 'k' })).toBeNull()
     expect(normalizeMemoryAction({ action: 'save', memory_key: 'k', content: '   ' })).toBeNull()
     expect(normalizeMemoryAction({ action: 'update', memory_key: 'k', content: '' })).toBeNull()

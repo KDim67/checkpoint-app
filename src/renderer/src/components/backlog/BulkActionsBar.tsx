@@ -50,24 +50,21 @@ export default function BulkActionsBar({
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5)'
       }}
     >
-      {/* Selection count & clear */}
       <div className="row">
         <span className="text-label-xs">
           {selectedItems.length} selected
         </span>
         <button
           onClick={onClearSelection}
+          className="text-muted hover-text-base"
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--color-text-muted)',
             cursor: 'pointer',
             padding: '2px',
             display: 'flex',
             alignItems: 'center'
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
           title="Clear selection"
         >
           <X size={14} />
@@ -76,9 +73,7 @@ export default function BulkActionsBar({
 
       <div style={{ width: '1px', height: '20px', background: 'var(--color-surface-offset)' }} />
 
-      {/* Action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', position: 'relative' }}>
-        {/* Bulk Status Update */}
         <div className="relative">
           <button
             onClick={() => {
@@ -86,8 +81,8 @@ export default function BulkActionsBar({
               setShowPriorityMenu(false)
               setShowTagMenu(false)
             }}
+            className="bg-surface-2 hover-bg-offset"
             style={{
-              background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
@@ -99,8 +94,6 @@ export default function BulkActionsBar({
               alignItems: 'center',
               gap: '4px'
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
           >
             Move Status
           </button>
@@ -130,8 +123,8 @@ export default function BulkActionsBar({
                     await onBulkUpdateStatus(col.id)
                     setShowStatusMenu(false)
                   }}
+                  className="bg-clear hover-bg-offset"
                   style={{
-                    background: 'transparent',
                     border: 'none',
                     color: 'var(--color-text-base)',
                     padding: 'var(--space-1.5) var(--space-3)',
@@ -139,8 +132,6 @@ export default function BulkActionsBar({
                     textAlign: 'left',
                     cursor: 'pointer'
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   {col.name}
                 </button>
@@ -149,7 +140,6 @@ export default function BulkActionsBar({
           )}
         </div>
 
-        {/* Bulk Priority Update */}
         <div className="relative">
           <button
             onClick={() => {
@@ -157,8 +147,8 @@ export default function BulkActionsBar({
               setShowStatusMenu(false)
               setShowTagMenu(false)
             }}
+            className="bg-surface-2 hover-bg-offset"
             style={{
-              background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
@@ -170,8 +160,6 @@ export default function BulkActionsBar({
               alignItems: 'center',
               gap: '4px'
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
           >
             Set Priority
           </button>
@@ -201,8 +189,8 @@ export default function BulkActionsBar({
                     await onBulkUpdatePriority(p)
                     setShowPriorityMenu(false)
                   }}
+                  className="bg-clear hover-bg-offset"
                   style={{
-                    background: 'transparent',
                     border: 'none',
                     color: 'var(--color-text-base)',
                     padding: 'var(--space-1.5) var(--space-3)',
@@ -213,8 +201,6 @@ export default function BulkActionsBar({
                     alignItems: 'center',
                     gap: 'var(--space-2)'
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', width: '14px' }}>
                     {p === 3 && <ChevronUp size={12} style={{ color: 'var(--color-priority-high)' }} />}
@@ -229,7 +215,6 @@ export default function BulkActionsBar({
           )}
         </div>
 
-        {/* Bulk Add Tag */}
         <div className="relative">
           <button
             onClick={() => {
@@ -237,8 +222,8 @@ export default function BulkActionsBar({
               setShowStatusMenu(false)
               setShowPriorityMenu(false)
             }}
+            className="bg-surface-2 hover-bg-offset"
             style={{
-              background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
@@ -250,8 +235,6 @@ export default function BulkActionsBar({
               alignItems: 'center',
               gap: '6px'
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
           >
             <TagIcon size={12} />
             <span>Add Tag</span>
@@ -284,8 +267,8 @@ export default function BulkActionsBar({
                     await onBulkAddTag(tag.id)
                     setShowTagMenu(false)
                   }}
+                  className="bg-clear hover-bg-offset"
                   style={{
-                    background: 'transparent',
                     border: 'none',
                     color: 'var(--color-text-base)',
                     padding: 'var(--space-1.5) var(--space-3)',
@@ -296,8 +279,6 @@ export default function BulkActionsBar({
                     alignItems: 'center',
                     gap: 'var(--space-2)'
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: tag.color }} />
                   <span>{tag.name}</span>
@@ -315,12 +296,11 @@ export default function BulkActionsBar({
 
       <div style={{ width: '1px', height: '20px', background: 'var(--color-surface-offset)' }} />
 
-      {/* Export & Delete */}
       <div className="row">
         <button
           onClick={onExportMarkdown}
+          className="bg-surface-2 hover-bg-offset"
           style={{
-            background: 'var(--color-surface-2)',
             border: '1px solid var(--color-surface-offset)',
             color: 'var(--color-text-base)',
             borderRadius: 'var(--radius-md)',
@@ -332,8 +312,6 @@ export default function BulkActionsBar({
             alignItems: 'center',
             gap: '6px'
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
           title="Export to Markdown Checklist"
         >
           <Download size={12} />
@@ -342,6 +320,7 @@ export default function BulkActionsBar({
 
         <button
           onClick={onBulkDelete}
+          className="hover-brighten"
           style={{
             background: 'var(--color-error-muted)',
             border: '1px solid var(--color-error)',
@@ -355,8 +334,6 @@ export default function BulkActionsBar({
             alignItems: 'center',
             gap: '6px'
           }}
-          onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-          onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
         >
           <Trash2 size={12} />
           <span>Delete</span>

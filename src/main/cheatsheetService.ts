@@ -1,14 +1,6 @@
 import { app, dialog } from 'electron'
 
-/**
- * pdf-parse, as far as this file is concerned.
- *
- * It ships no type declarations and has changed shape across major versions:
- * newer builds export a `PDFParse` class returning pages, older ones export a
- * function returning one blob of text, and either can sit on `default` or on
- * the module itself. All four arrangements are described here so the reader
- * below can tell them apart honestly rather than being cast into one of them.
- */
+/** pdf-parse ships no types and changed shape across majors, all four export shapes described */
 interface PdfParseResult {
   text?: string
   pages?: Array<{ text?: string }>
@@ -26,21 +18,14 @@ interface PdfParseClass {
 
 type PdfParseFunction = (data: Buffer) => Promise<PdfParseResult | undefined>
 
-/** Whatever the import turned out to be, before it has been told apart. */
 type PdfParseExport = Record<string, unknown> | PdfParseClass | PdfParseFunction | undefined
 import { join, basename, extname } from 'path'
 import { existsSync, promises as fs } from 'fs'
 
-/**
- * Returns the path to the cheatsheets folder inside the application's userData directory.
- */
 export function getCheatsheetsDir(): string {
   return join(app.getPath('userData'), 'cheatsheets')
 }
 
-/**
- * Ensures the cheatsheets directory exists on disk.
- */
 export async function initCheatsheets(): Promise<void> {
   const dir = getCheatsheetsDir()
   if (!existsSync(dir)) {
@@ -48,9 +33,6 @@ export async function initCheatsheets(): Promise<void> {
   }
 }
 
-/**
- * Lists all PDF cheatsheets in the directory.
- */
 export async function listCheatsheets(): Promise<Array<{ name: string; path: string; size: number; mtime: number }>> {
   const dir = getCheatsheetsDir()
   await initCheatsheets()
@@ -76,7 +58,6 @@ export async function listCheatsheets(): Promise<Array<{ name: string; path: str
       }
     }
 
-    // Sort by modification time descending (newest first)
     return results.sort((a, b) => b.mtime - a.mtime)
   } catch (err) {
     console.error('Failed to list cheatsheets:', err)
@@ -84,10 +65,7 @@ export async function listCheatsheets(): Promise<Array<{ name: string; path: str
   }
 }
 
-/**
- * Safely copy a PDF from an external location to the cheatsheets directory.
- * If a name collision occurs, appends a counter suffix.
- */
+/** counter suffix on name clash */
 export async function addCheatsheet(srcPath: string): Promise<string> {
   await initCheatsheets()
   const dir = getCheatsheetsDir()
@@ -104,7 +82,6 @@ export async function addCheatsheet(srcPath: string): Promise<string> {
   let targetPath = join(dir, targetName)
   let counter = 1
 
-  // Loop to find a unique filename
   while (existsSync(targetPath)) {
     targetName = `${baseNameWithoutExt} (${counter})${ext}`
     targetPath = join(dir, targetName)
@@ -115,14 +92,10 @@ export async function addCheatsheet(srcPath: string): Promise<string> {
   return targetName
 }
 
-/**
- * Safely renames a cheatsheet.
- */
 export async function renameCheatsheet(oldName: string, newName: string): Promise<void> {
   const dir = getCheatsheetsDir()
   const oldPath = join(dir, oldName)
   
-  // Clean newName and ensure .pdf extension
   let cleanNewName = newName.trim()
   if (!cleanNewName) {
     throw new Error('Cheatsheet name cannot be empty.')
@@ -144,9 +117,6 @@ export async function renameCheatsheet(oldName: string, newName: string): Promis
   await fs.rename(oldPath, newPath)
 }
 
-/**
- * Deletes a cheatsheet from disk.
- */
 export async function removeCheatsheet(name: string): Promise<void> {
   const dir = getCheatsheetsDir()
   const filePath = join(dir, name)
@@ -156,9 +126,6 @@ export async function removeCheatsheet(name: string): Promise<void> {
   }
 }
 
-/**
- * Opens a native file dialog to let the user select a PDF file.
- */
 export async function selectFile(): Promise<string | null> {
   const result = await dialog.showOpenDialog({
     title: 'Select PDF Cheatsheet',
@@ -175,13 +142,9 @@ export async function selectFile(): Promise<string | null> {
   return result.filePaths[0]
 }
 
-// Parsing a PDF is expensive, and the same cheatsheet is read on every AI turn.
-// Cache the extracted text keyed by file + mtime so we only parse once per edit.
+// parsing is slow and runs every AI turn, cache by file + mtime
 const textCache = new Map<string, { mtime: number; text: string }>()
 
-/**
- * Reads and extracts full text content from a PDF cheatsheet on disk (cached).
- */
 export async function getCheatsheetText(name: string): Promise<string> {
   const dir = getCheatsheetsDir()
   const filePath = join(dir, name)
@@ -208,8 +171,7 @@ export async function getCheatsheetText(name: string): Promise<string> {
   try {
     const dataBuffer = await fs.readFile(filePath)
     const uint8 = new Uint8Array(dataBuffer)
-    // pdf-parse ships no types and its default export moved between major
-    // versions, so both shapes are declared rather than guessed at.
+    // default export moved between majors, see the types above
     const pdfModule = await import('pdf-parse') as unknown as Record<string, unknown>
     const asRecord = (v: unknown): Record<string, unknown> | undefined =>
       v && typeof v === 'object' ? v as Record<string, unknown> : undefined
@@ -220,8 +182,7 @@ export async function getCheatsheetText(name: string): Promise<string> {
       ?? (pdfModule.default as PdfParseExport)
       ?? pdfModule
 
-    // The class form announces itself by having load() on its prototype; the
-    // function form is called directly.
+    // class form has load() on its prototype; function form is called directly
     if (typeof PDFParseClass === 'function' && (PDFParseClass as PdfParseClass).prototype?.load) {
       const parser = new (PDFParseClass as PdfParseClass)(uint8)
       await parser.load()
@@ -252,19 +213,14 @@ export async function getCheatsheetText(name: string): Promise<string> {
   return text
 }
 
-// Cross-document full-text search
-
 interface CheatsheetSearchResult {
   name: string
   matchCount: number
-  /** Up to 3 contextual snippets around the first matches. */
+  /** up to 3 */
   snippets: string[]
 }
 
-/**
- * Case-insensitive literal search across every cheatsheet's extracted text
- * (served from the mtime-keyed cache, so repeat searches are cheap).
- */
+/** served from the mtime cache, repeats are cheap */
 export async function searchCheatsheets(query: string): Promise<CheatsheetSearchResult[]> {
   const q = query.trim().toLowerCase()
   if (q.length < 2) return []
@@ -298,8 +254,6 @@ export async function searchCheatsheets(query: string): Promise<CheatsheetSearch
   return results.sort((a, b) => b.matchCount - a.matchCount)
 }
 
-// Query-aware extraction (RAG-style)
-
 const STOP_WORDS = new Set([
   'the', 'and', 'for', 'that', 'this', 'with', 'are', 'was', 'have', 'has', 'not',
   'but', 'from', 'they', 'will', 'been', 'all', 'its', 'you', 'your', 'how', 'what',
@@ -310,7 +264,6 @@ function tokenize(text: string): string[] {
   return text.toLowerCase().split(/\W+/).filter(t => t.length > 2 && !STOP_WORDS.has(t))
 }
 
-/** Splits raw document text into reasonably-sized, paragraph-aligned chunks. */
 function chunkText(text: string, targetChars = 900): string[] {
   const paras = text.split(/\n\s*\n/).map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean)
   const chunks: string[] = []
@@ -320,7 +273,7 @@ function chunkText(text: string, targetChars = 900): string[] {
       chunks.push(buf)
       buf = ''
     }
-    // A single huge paragraph is hard-split to keep chunks bounded.
+    // hard-split huge paragraphs to keep chunks bounded
     if (p.length > targetChars * 1.6) {
       if (buf) { chunks.push(buf); buf = '' }
       for (let i = 0; i < p.length; i += targetChars) chunks.push(p.slice(i, i + targetChars))
@@ -332,12 +285,7 @@ function chunkText(text: string, targetChars = 900): string[] {
   return chunks
 }
 
-/**
- * Returns the portion of a cheatsheet most relevant to `query`, bounded by
- * `maxChars`. When the whole document fits in the budget it is returned intact;
- * otherwise chunks are TF-IDF ranked against the query and the best ones are
- * stitched back together in document order. With no query, returns the head.
- */
+/** whole doc if it fits, else TF-IDF ranked chunks restitched in doc order */
 export async function getCheatsheetRelevant(name: string, query: string, maxChars = 8000): Promise<string> {
   const full = await getCheatsheetText(name)
   if (!full) return ''
@@ -347,12 +295,12 @@ export async function getCheatsheetRelevant(name: string, query: string, maxChar
   const chunks = chunkText(full)
   if (chunks.length === 0) return full.slice(0, maxChars)
 
-  // No usable query → return the beginning of the document (usually the summary).
+  // no usable query: head of the doc, usually the summary
   if (queryTokens.length === 0) {
     return `${full.slice(0, maxChars).trim()}\n\n[… document truncated. Ask about a specific topic to surface deeper sections …]`
   }
 
-  // IDF over chunks
+  // idf over chunks
   const docFreq: Record<string, number> = {}
   const chunkTokens = chunks.map(c => {
     const toks = tokenize(c)
@@ -375,7 +323,7 @@ export async function getCheatsheetRelevant(name: string, query: string, maxChar
     return { i, chunk, score }
   })
 
-  // Take the highest-scoring chunks until the budget is spent, then restore order.
+  // best chunks until the budget's spent, then back to doc order
   const ranked = [...scored].filter(s => s.score > 0).sort((a, b) => b.score - a.score)
   const picked: typeof ranked = []
   let used = 0
@@ -385,7 +333,7 @@ export async function getCheatsheetRelevant(name: string, query: string, maxChar
     used += s.chunk.length + 4
     if (used >= maxChars) break
   }
-  // Nothing matched → fall back to the document head.
+  // nothing matched, fall back to the head
   if (picked.length === 0) {
     return `${full.slice(0, maxChars).trim()}\n\n[… document truncated …]`
   }

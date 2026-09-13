@@ -37,8 +37,7 @@ export default function BacklogView() {
   const [activeView, setActiveView] = useState<SavedView | null>(null)
   const pendingViewId = useAppStore(s => s.pendingViewId)
 
-  // Subscribed rather than read once: the palette can apply a view while this
-  // screen is already open, in which case no mount effect would fire.
+  // subscribed, not read once: the palette can apply a view while this screen is open
   useEffect(() => {
     if (!pendingViewId) return
     useAppStore.getState().setPendingViewId(null)
@@ -56,7 +55,6 @@ export default function BacklogView() {
   }, [pendingViewId])
   const { toast } = useToast()
 
-  // Items and Schema configurations
   const [tasks, setTasks] = useState<Item[]>([])
   const [totalTasks, setTotalTasks] = useState(0)
   const [workflowColumns, setWorkflowColumns] = useState<WorkflowColumn[]>([])
@@ -65,16 +63,13 @@ export default function BacklogView() {
   const [allTags, setAllTags] = useState<TagType[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Query & pagination state
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 50
 
-  // Collapsible Filters Panel
   const [showFilters, setShowFilters] = useState(false)
 
-  // Filter conditions
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedPriorities, setSelectedPriorities] = useState<number[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
@@ -83,14 +78,11 @@ export default function BacklogView() {
   const [hasRelations, setHasRelations] = useState('all') // 'all' | 'yes' | 'no'
   const [grouping, setGrouping] = useState<'none' | 'status' | 'priority' | 'tag'>('none')
 
-  // Sorting
   const [sortBy, setSortBy] = useState('created_at')
   const [sortDesc, setSortDesc] = useState(true)
 
-  // Selection
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
-  // Column settings
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     title: 250,
     status: 120,
@@ -119,7 +111,6 @@ export default function BacklogView() {
     created_at: true
   })
 
-  // Computed filter count
   const activeFilterCount = useMemo(() => {
     return (
       selectedStatuses.length +
@@ -138,12 +129,11 @@ export default function BacklogView() {
     hasRelations
   ])
 
-  // Selected item detail drawer
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
 
   const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
 
-  // Mutual exclusivity between Task details drawer and AI assistant panel
+  // task drawer and AI panel are mutually exclusive
   useEffect(() => {
     if (activeTaskId) {
       const store = useAppStore.getState()
@@ -157,22 +147,17 @@ export default function BacklogView() {
     if (rightPanelOpen) setActiveTaskId(null)
   }, [rightPanelOpen])
 
-  // 1. Debounce Search Input
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedQuery(searchQuery)
-      setPage(1) // Reset page when query changes
+      setPage(1) // back to page 1 on a new query
     }, 200)
     return () => clearTimeout(handler)
   }, [searchQuery])
 
-  // 2. Load Columns Configuration (Workflow Stages)
   const loadWorkflowColumns = useCallback(async () => {
     try {
-      // Reads the unified board document. This used to read the legacy
-      // kanban_columns_* key directly, which stopped being written once board
-      // configuration was unified, so every column added, renamed or removed
-      // after that migration was invisible here.
+      // unified board doc; the legacy kanban_columns_* key stopped being written
       const config = await loadBoardConfig(activeWorkspace)
       setWorkflowColumns(config.columns)
     } catch (err) {
@@ -180,7 +165,6 @@ export default function BacklogView() {
     }
   }, [activeWorkspace])
 
-  // 3. Load Column Layout settings (Widths, Order, Visibility)
   const loadColumnLayout = useCallback(async () => {
     try {
       const key = `backlog_columns_layout_${activeWorkspace}`
@@ -199,7 +183,6 @@ export default function BacklogView() {
     }
   }, [activeWorkspace])
 
-  // Save layout configurations
   const saveColumnLayout = async (
     widths: typeof columnWidths,
     order: typeof columnOrder,
@@ -216,7 +199,6 @@ export default function BacklogView() {
     }
   }
 
-  // 4. Load Tags
   const loadTags = useCallback(async () => {
     try {
       const tags = await listTags()
@@ -226,15 +208,13 @@ export default function BacklogView() {
     }
   }, [])
 
-  // 5. Load Tasks
   const loadTasks = useCallback(async () => {
     setLoading(true)
     try {
       const params = activeView
         ? {
             ...toQueryParams(activeView, Date.now()),
-            // The search box stays live on top of a view. Narrowing a view is
-            // a normal thing to want, and it does not change what the view is.
+            // search still narrows a view without changing it
             ...(debouncedQuery ? { query: debouncedQuery } : {}),
             sortBy,
             sortDesc,
@@ -278,7 +258,6 @@ export default function BacklogView() {
     page
   ])
 
-  // Initial trigger & context reload
   useEffect(() => {
     setSelectedIds([])
     setPage(1)
@@ -287,7 +266,6 @@ export default function BacklogView() {
     loadTags()
   }, [activeWorkspace, loadWorkflowColumns, loadColumnLayout, loadTags])
 
-  // Reload tasks when filter dependencies alter
   useEffect(() => {
     loadTasks()
   }, [loadTasks])
@@ -300,7 +278,6 @@ export default function BacklogView() {
     return () => window.removeEventListener('item-updated', handleItemUpdated)
   }, [loadTasks])
 
-  // Reset filters handler
   const handleResetFilters = () => {
     setSelectedStatuses([])
     setSelectedPriorities([])
@@ -313,7 +290,6 @@ export default function BacklogView() {
     setPage(1)
   }
 
-  // Update specific field on cell/popup double-click updates
   const handleUpdateField = async (id: string, patch: Partial<Item>, tagIds?: string[]) => {
     try {
       await updateItem(id, patch, tagIds)
@@ -323,12 +299,10 @@ export default function BacklogView() {
     }
   }
 
-  // Row selection aggregation
   const selectedItems = useMemo(() => {
     return tasks.filter(t => selectedIds.includes(t.id))
   }, [tasks, selectedIds])
 
-  // Bulk Actions
   const handleBulkUpdateStatus = async (status: string) => {
     try {
       await bulkUpdateItems({
@@ -379,8 +353,7 @@ export default function BacklogView() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Archived task browser. Lets people find and restore (or permanently delete) tasks
-  // that were removed via bulk delete, since the toast "Undo" only lasts a few seconds.
+  // archive browser, since the toast Undo only lasts seconds
   const [showArchive, setShowArchive] = useState(false)
   const [archivedTasks, setArchivedTasks] = useState<Item[]>([])
   const [archiveLoading, setArchiveLoading] = useState(false)
@@ -441,7 +414,7 @@ export default function BacklogView() {
       const deletedIds = [...selectedIds]
       const deletedItems = [...selectedItems]
 
-      // Soft delete by updating status to 'archived'
+      // soft delete via 'archived'
       await bulkUpdateItems({
         ids: deletedIds,
         patch: { status: 'archived' }
@@ -526,7 +499,6 @@ export default function BacklogView() {
     }
   }
 
-  // Create New Task Shortcut
   const handleCreateTask = async () => {
     try {
       const newTask = await createItem({
@@ -548,7 +520,6 @@ export default function BacklogView() {
     }
   }
 
-  // Layout updates persistence
   const handleColumnWidthChange = (colKey: string, width: number) => {
     const nextWidths = { ...columnWidths, [colKey]: width }
     setColumnWidths(nextWidths)
@@ -576,7 +547,6 @@ export default function BacklogView() {
     setPage(1)
   }
 
-  // Total page calculation
   const totalPages = Math.max(1, Math.ceil(totalTasks / pageSize))
 
   return (
@@ -591,7 +561,6 @@ export default function BacklogView() {
         gap: 0
       }}
     >
-      {/* Top Header */}
       <div
         style={{
           display: 'flex',
@@ -634,6 +603,7 @@ export default function BacklogView() {
         <div className="row">
           {aiEnabled && <button
             onClick={() => setShowStandupModal(true)}
+            className="hover-brighten hover-lift"
             style={{
               background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
@@ -648,14 +618,6 @@ export default function BacklogView() {
               gap: 'var(--space-1.5)',
               height: '32px',
               transition: 'filter 120ms ease, transform 120ms ease'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.filter = 'brightness(1.15)'
-              e.currentTarget.style.transform = 'translateY(-1px)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.filter = 'none'
-              e.currentTarget.style.transform = 'translateY(0)'
             }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-secondary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -667,6 +629,7 @@ export default function BacklogView() {
           <button
             onClick={() => setShowArchive(true)}
             title="View archived tasks"
+            className="hover-brighten hover-lift"
             style={{
               background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
@@ -682,14 +645,6 @@ export default function BacklogView() {
               height: '32px',
               transition: 'filter 120ms ease, transform 120ms ease'
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.filter = 'brightness(1.15)'
-              e.currentTarget.style.transform = 'translateY(-1px)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.filter = 'none'
-              e.currentTarget.style.transform = 'translateY(0)'
-            }}
           >
             <Archive size={13} />
             Archive
@@ -697,6 +652,7 @@ export default function BacklogView() {
 
           <button
             onClick={handleCreateTask}
+            className="hover-brighten hover-lift"
             style={{
               background: 'var(--color-secondary)',
               border: 'none',
@@ -713,14 +669,6 @@ export default function BacklogView() {
               letterSpacing: '0.01em',
               transition: 'filter 120ms ease, transform 120ms ease'
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.filter = 'brightness(1.15)'
-              e.currentTarget.style.transform = 'translateY(-1px)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.filter = 'none'
-              e.currentTarget.style.transform = 'translateY(0)'
-            }}
           >
             <Plus size={13} />
             New Task
@@ -728,7 +676,6 @@ export default function BacklogView() {
         </div>
       </div>
 
-      {/* Control bar */}
       <div
         style={{
           display: 'flex',
@@ -742,7 +689,6 @@ export default function BacklogView() {
           padding: 'var(--space-2) var(--space-3)'
         }}
       >
-        {/* Search Input */}
         <div
           style={{
             position: 'relative',
@@ -777,10 +723,8 @@ export default function BacklogView() {
           />
         </div>
 
-        {/* Divider */}
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)', flexShrink: 0 }} />
 
-        {/* Group By selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
             Group
@@ -806,17 +750,15 @@ export default function BacklogView() {
           </select>
         </div>
 
-        {/* Divider */}
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)', flexShrink: 0 }} />
 
-        {/* Filters Panel Toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}
+          className={showFilters ? 'text-base' : 'text-muted hover-text-base'}
           style={{
             background: showFilters ? 'var(--color-surface-offset)' : 'transparent',
             border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)',
-            color: showFilters ? 'var(--color-text-base)' : 'var(--color-text-muted)',
             padding: '6px 12px',
             cursor: 'pointer',
             display: 'flex',
@@ -824,12 +766,6 @@ export default function BacklogView() {
             gap: '6px',
             flexShrink: 0,
             transition: 'all 120ms ease'
-          }}
-          onMouseEnter={e => {
-            if (!showFilters) e.currentTarget.style.color = 'var(--color-text-base)'
-          }}
-          onMouseLeave={e => {
-            if (!showFilters) e.currentTarget.style.color = 'var(--color-text-muted)'
           }}
         >
           <SlidersHorizontal size={12} />
@@ -857,7 +793,6 @@ export default function BacklogView() {
         </button>
       </div>
 
-      {/* Filter panel (collapsible) */}
       {showFilters && (
         <div className="no-shrink">
           <BacklogFilters
@@ -924,7 +859,6 @@ export default function BacklogView() {
         )}
       </div>
 
-      {/* Main registry Table area */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {loading ? (
           <div style={{
@@ -937,7 +871,6 @@ export default function BacklogView() {
             overflow: 'hidden',
             boxSizing: 'border-box'
           }}>
-            {/* Mock Table Header */}
             <div style={{
               display: 'flex',
               height: '36px',
@@ -964,7 +897,6 @@ export default function BacklogView() {
               })}
             </div>
 
-            {/* Mock Table Rows */}
             <div style={{ flex: 1, overflow: 'hidden', padding: '0 var(--space-4)' }}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
                 <div key={i} style={{
@@ -973,11 +905,9 @@ export default function BacklogView() {
                   alignItems: 'center',
                   borderBottom: '1px solid var(--color-surface-offset)'
                 }}>
-                  {/* Checkbox */}
                   <div style={{ width: '30px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                     <Skeleton width={16} height={16} borderRadius="3px" />
                   </div>
-                  {/* Cells */}
                   {columnOrder.filter(k => visibleColumns[k]).map(colKey => {
                     const width = columnWidths[colKey] ?? 100
                     const skeletonW = colKey === 'title' ? `${Math.max(40, 80 - (i % 3) * 15)}%` : '60%'
@@ -1022,7 +952,6 @@ export default function BacklogView() {
         )}
       </div>
 
-      {/* Pagination control footer bar */}
       <div
         style={{
           display: 'flex',
@@ -1091,7 +1020,6 @@ export default function BacklogView() {
         )}
       </div>
 
-      {/* Task details drawer */}
       {activeTaskId && (
         <TaskDetailDrawer
           taskId={activeTaskId}
@@ -1104,7 +1032,6 @@ export default function BacklogView() {
         />
       )}
 
-      {/* Bulk operations bar */}
       <BulkActionsBar
         selectedItems={selectedItems}
         columns={workflowColumns}
@@ -1121,7 +1048,6 @@ export default function BacklogView() {
         isOpen={showStandupModal}
         onClose={() => setShowStandupModal(false)}
       />
-      {/* Confirm Bulk Delete Dialog */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         title="Confirm Bulk Deletion"
@@ -1132,7 +1058,7 @@ export default function BacklogView() {
         onCancel={() => setShowDeleteConfirm(false)}
       />
 
-      {/* Archived Tasks Panel */}
+      {/* archived tasks panel */}
       {showArchive && (
         <div
           style={{
@@ -1166,7 +1092,6 @@ export default function BacklogView() {
             aria-modal="true"
             aria-labelledby="archive-panel-title"
           >
-            {/* Header */}
             <div style={{
               height: '56px',
               padding: '0 var(--space-5)',
@@ -1184,15 +1109,13 @@ export default function BacklogView() {
               </span>
               <button
                 onClick={() => setShowArchive(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', padding: '4px' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
+                className="text-muted hover-text-base"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: '4px' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {archiveLoading ? (
                 <div className="col">
@@ -1274,7 +1197,7 @@ export default function BacklogView() {
         </div>
       )}
 
-      {/* Confirm Permanent Deletion of a single archived task */}
+      {/* permanent delete of one archived task */}
       <ConfirmDialog
         isOpen={!!deleteArchivedId}
         title="Delete Permanently"

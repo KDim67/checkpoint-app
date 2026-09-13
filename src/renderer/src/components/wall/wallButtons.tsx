@@ -1,11 +1,7 @@
 import React from 'react'
 import { ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads } from '../../../../shared/wallModel'
 
-/**
- * The style buttons draw their own option rather than borrowing an icon.
- * "Dashed" as a picture of a dashed line needs no legend, and there is no
- * icon in the set that means "elbow" without a caption next to it.
- */
+/** buttons draw their option, no icon means "elbow" */
 const glyphProps = {
   width: 15, height: 15, viewBox: '0 0 15 15',
   fill: 'none', stroke: 'currentColor', strokeWidth: 1.7,
@@ -36,14 +32,10 @@ const headsGlyph = (heads: ArrowHeads): React.JSX.Element => (
   </svg>
 )
 
-/** Sentence case for a tooltip, since the values are lower-case identifiers. */
+/** sentence case for tooltips */
 const nameOf = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
 
-/**
- * One button per property, showing the option in force and moving to the
- * next on click. Three buttons rather than nine, which is what keeps the
- * palette a single narrow column.
- */
+/** one cycling button per property keeps the palette one column */
 const cycleButton = <T extends string>(
   label: string,
   options: readonly T[],
@@ -60,20 +52,12 @@ const cycleButton = <T extends string>(
       onClick={() => onPick(next)}
       title={`${label}: ${nameOf(current)}. Click for ${nameOf(next)}.`}
       aria-label={`${label}: ${nameOf(current)}`}
+      className="bg-clear text-muted hover-text-accent wall-cycle-button"
       style={{
         width: size, height: size,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'none', color: 'var(--color-text-muted)',
         border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
         transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.background = 'var(--color-secondary-muted)'
-        e.currentTarget.style.color = 'var(--color-secondary)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.background = 'none'
-        e.currentTarget.style.color = 'var(--color-text-muted)'
       }}
     >
       {glyph(current)}
@@ -81,7 +65,7 @@ const cycleButton = <T extends string>(
   )
 }
 
-/** The three style controls, shared by the palette and the toolbar. */
+/** shared by palette and toolbar */
 export const arrowStyleButtons = (
   shape: ArrowShape,
   line: ArrowLine,
@@ -96,22 +80,14 @@ export const arrowStyleButtons = (
   cycleButton('Heads', ARROW_HEAD_MODES, heads, headsGlyph, onHeads, compact)
 ]
 
-/**
- * `.btn-icon:hover` already paints `--color-surface-offset`, so an active
- * state that only did the same was indistinguishable from hovering. Active is
- * now the accent colour plus an underline: legible without relying on colour,
- * which matters most for the pen and arrow, where being wrong about which
- * tool is armed changes what a click does.
- */
+/** accent plus underline, hover already paints surface-offset */
 export const toolButton = (
   label: string,
   icon: React.ReactNode,
   onClick: () => void,
   opts: { active?: boolean; disabled?: boolean; shortcut?: string } = {}
 ): React.JSX.Element => {
-  // The key rides in the tooltip rather than on the face of the button:
-  // thirty pixels square has room for the icon and nothing else. Anyone who
-  // wants the whole set at once opens the list beside the search box.
+  // key in the tooltip, 30px only fits the icon
   const described = opts.shortcut ? `${label} (${opts.shortcut})` : label
   return (
   <button

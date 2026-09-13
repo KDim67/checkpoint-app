@@ -5,24 +5,16 @@ import { BinaryTreePacker } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
 import * as gamedevApi from '../../data/gamedev'
 
-/**
- * Atlas Forge: folder selection, bin packing, and PNG/JSON export.
- *
- * A hook rather than state inside AtlasPanel. The panel unmounts on tab
- * switch, which would discard a packed sheet.
- */
-/**
- * One sprite on its way into the atlas: where it was cropped from, how big it
- * was before trimming, and where the packer decided to put it.
- */
+/** a hook, not panel state: the panel unmounts on tab switch and would drop a packed sheet */
+/** crop source, pre-trim size, packed position */
 interface AtlasBlock {
   name: string
   path: string
   img: HTMLImageElement
-  /** Placed size, the trimmed frame plus padding on every side. */
+  /** trimmed frame plus padding */
   w: number
   h: number
-  /** The used region within the source image, after transparent edges are cut. */
+  /** region left after cutting transparent edges */
   frameX: number
   frameY: number
   frameW: number
@@ -30,11 +22,11 @@ interface AtlasBlock {
   originalW: number
   originalH: number
   trimmed: boolean
-  /** Where the packer put it, or null when it did not fit at all. */
+  /** null when it didn't fit */
   fit: { x: number; y: number } | null
 }
 
-/** A frame in the exported JSON, in the shape TexturePacker writes. */
+/** TexturePacker's shape */
 interface AtlasFrame {
   frame: { x: number; y: number; w: number; h: number }
   rotated: boolean
@@ -46,7 +38,6 @@ interface AtlasFrame {
 export function useAtlasTool() {
   const { toast } = useToast()
 
-  // Tab 7: Atlas Forge (Sprite Packer) State
   const [atlasFolderPath, setAtlasFolderPath] = useState<string | null>(null)
   const [atlasSprites, setAtlasSprites] = useState<Array<{ name: string; path: string; dataUrl: string }>>([])
   const [atlasPadding, setAtlasPadding] = useState(2)
@@ -60,7 +51,6 @@ export function useAtlasTool() {
   const atlasPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
 
-  // Tab 7: Atlas Forge (Sprite Packer) Callbacks
   const handleSelectAtlasFolder = useCallback(async () => {
     try {
       const res = await gamedevApi.selectSpriteFolder()
@@ -83,7 +73,6 @@ export function useAtlasTool() {
 
     setIsAtlasPacking(true)
     try {
-      // 1. Asynchronously load all image sources
       const loaded = await Promise.all(
         atlasSprites.map(async (sprite) => {
           const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -96,7 +85,6 @@ export function useAtlasTool() {
         })
       )
 
-      // Helper to compute trimmed bounds
       const getTrimmedBounds = (imgData: ImageData) => {
         const { width, height, data } = imgData
         let minX = width, minY = height, maxX = -1, maxY = -1
@@ -115,9 +103,7 @@ export function useAtlasTool() {
         return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 }
       }
 
-      // 2. Compute trimmed bounds and packing blocks
-      // Annotated, or the literal below narrows fit to null and the packer
-      // cannot write a position into it.
+      // annotated, or the literal narrows fit to null
       const blocks: AtlasBlock[] = loaded.map(({ name, path, img }) => {
         let trimmed = false
         let frameX = 0, frameY = 0, frameW = img.width, frameH = img.height
@@ -157,17 +143,16 @@ export function useAtlasTool() {
         }
       })
 
-      // 3. Find smallest fitting size
+      // smallest size that fits
       const sizes = [128, 256, 512, 1024, 2048, 4096]
       const allowedSizes = sizes.filter(s => s <= atlasMaxSize)
       let finalSize: number = atlasMaxSize
       let fitsAll = false
 
-      // Sort blocks by max side descending (helps packing efficiency)
+      // biggest side first packs tighter
       blocks.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.h - a.h)
 
       for (const size of allowedSizes) {
-        // Reset fits
         blocks.forEach(b => b.fit = null)
 
         const packer = new BinaryTreePacker(size, size)
@@ -190,7 +175,7 @@ export function useAtlasTool() {
         }
       }
 
-      // If it doesn't fit in any, run packer on max size and let some remain unpacked
+      // nothing fits: pack at max and leave the rest out
       if (!fitsAll) {
         blocks.forEach(b => b.fit = null)
         const packer = new BinaryTreePacker(atlasMaxSize, atlasMaxSize)
@@ -200,7 +185,6 @@ export function useAtlasTool() {
         toast('Warning: Not all sprites fit in the maximum atlas size. Try increasing Max Atlas Size.', { type: 'warning' })
       }
 
-      // 4. Render to Preview Canvas
       const canvas = atlasPreviewCanvasRef.current
       if (canvas) {
         canvas.width = finalSize
@@ -209,7 +193,7 @@ export function useAtlasTool() {
         if (ctx) {
           ctx.clearRect(0, 0, finalSize, finalSize)
 
-          // Draw transparent checkerboard background
+          // checkerboard for transparency
           const chkSize = 8
           for (let y = 0; y < finalSize; y += chkSize * 2) {
             for (let x = 0; x < finalSize; x += chkSize * 2) {
@@ -222,26 +206,22 @@ export function useAtlasTool() {
             }
           }
 
-          // Draw sprites and outlines
           blocks.forEach(block => {
             if (!block.fit) return
 
             const dx = block.fit.x + atlasPadding
             const dy = block.fit.y + atlasPadding
 
-            // Draw Sprite
             ctx.drawImage(
               block.img,
               block.frameX, block.frameY, block.frameW, block.frameH,
               dx, dy, block.frameW, block.frameH
             )
 
-            // Draw bounding box outline
             ctx.strokeStyle = 'rgba(0, 255, 128, 0.4)'
             ctx.lineWidth = 1
             ctx.strokeRect(dx, dy, block.frameW, block.frameH)
 
-            // Draw padding/outer boundary
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
             ctx.strokeRect(block.fit.x, block.fit.y, block.w, block.h)
           })
@@ -337,9 +317,7 @@ export function useAtlasTool() {
     }
   }, [atlasFolderPath, atlasLayout, atlasPadding, toast])
 
-  // Run whenever sprites or packing settings change. No activeTab guard needed:
-  // runAtlasPack is a no-op when atlasSprites is empty, and this effect
-  // only fires when the listed deps change, not on every tab switch.
+  // no tab guard needed, empty sprites make it a no-op
   useEffect(() => {
     runAtlasPack()
   }, [atlasSprites, atlasPadding, atlasMaxSize, atlasAutoTrim, runAtlasPack])

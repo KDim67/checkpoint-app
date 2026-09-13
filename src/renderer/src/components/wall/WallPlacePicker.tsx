@@ -31,14 +31,13 @@ export default function WallPlacePicker({
         <button
           key={row.ref}
           onClick={() => { addItem(picker === 'card' ? 'card' : 'doc', { ref: row.ref }); setPicker(null) }}
+          className="bg-clear hover-bg-offset"
           style={{
             display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
-            textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
+            textAlign: 'left', border: 'none', cursor: 'pointer',
             padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
             color: 'var(--color-text-base)', fontSize: 'var(--text-xs)'
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
         >
           <Plus size={12} className="icon-faint" />
           <span className="truncate">{row.label}</span>

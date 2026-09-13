@@ -1,4 +1,4 @@
-/** Passive activity tracking and what it adds up to. */
+/** passive activity tracking and its totals */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

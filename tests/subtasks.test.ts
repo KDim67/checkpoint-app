@@ -46,7 +46,7 @@ describe('normalizeSubtask', () => {
   })
 
   it('treats SQLite 0/1 as a boolean', () => {
-    // There is no boolean column type, so this is what comes back.
+    // no boolean column type
     expect(normalizeSubtask({ id: 's', item_id: 'i', title: 't', done: 1 })?.done).toBe(true)
     expect(normalizeSubtask({ id: 's', item_id: 'i', title: 't', done: 0 })?.done).toBe(false)
   })
@@ -106,7 +106,7 @@ describe('parseChecklist', () => {
   })
 
   it('leaves an empty checkbox alone', () => {
-    // More likely a template about to be filled in than a subtask named "".
+    // likely a template, not a subtask named ""
     const { items, remainingBody } = parseChecklist('- [ ] ')
     expect(items).toHaveLength(0)
     expect(remainingBody).toBe('- [ ]')

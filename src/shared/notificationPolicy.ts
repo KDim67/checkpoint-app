@@ -1,12 +1,4 @@
-/**
- * Whether a notification is allowed to fire. Split from delivery because the
- * judgement is the part that goes subtly wrong: quiet hours wrapping midnight,
- * and dedupe.
- *
- * Dedupe is why this layer exists. The scheduler re-examines the same overdue
- * items every pass, so without a memory of what was already said, one overdue
- * task becomes an alert an hour forever.
- */
+/** judgement split from delivery; dedupe stops an overdue task alerting every sweep */
 
 export type NotificationCategory = 'due' | 'focus' | 'webhook' | 'recurrence' | 'agent'
 
@@ -24,11 +16,11 @@ export const NOTIFICATION_CATEGORIES: {
 ]
 
 export interface NotificationPolicy {
-  /** Master switch. Off silences every category. */
+  /** master switch */
   enabled: boolean
-  /** Per-category switches, keyed by category id. */
+  /** per category */
   categories: Record<string, boolean>
-  /** Suppress between these hours, 0–23. Equal values mean no quiet period. */
+  /** 0-23, equal means none */
   quietFrom: number
   quietTo: number
   quietEnabled: boolean
@@ -47,7 +39,7 @@ const clampHour = (n: unknown): number => {
   return Number.isFinite(v) && v >= 0 && v <= 23 ? v : 0
 }
 
-/** Coerces a stored policy, filling anything missing from the defaults. */
+/** fills gaps from the defaults */
 export function normalizePolicy(raw: unknown): NotificationPolicy {
   let parsed: unknown = raw
   if (typeof raw === 'string') {
@@ -77,13 +69,7 @@ export function normalizePolicy(raw: unknown): NotificationPolicy {
   }
 }
 
-/**
- * True while the given hour falls inside the quiet window.
- *
- * The window is allowed to wrap midnight, which is the normal case, 22:00 to
- * 08:00 is two disjoint ranges on the clock, and comparing `from <= h < to`
- * would silence exactly the hours it should let through.
- */
+/** the window can wrap midnight, from <= h < to would silence the wrong hours */
 export function isQuietHour(policy: NotificationPolicy, hour: number): boolean {
   if (!policy.quietEnabled) return false
   const { quietFrom: from, quietTo: to } = policy
@@ -92,24 +78,17 @@ export function isQuietHour(policy: NotificationPolicy, hour: number): boolean {
 }
 
 export interface DedupeEntry {
-  /** When this key was last delivered. */
+  /** last delivered */
   at: number
 }
 
 interface NotifyDecision {
   allow: boolean
-  /** Why it was suppressed. Useful in the log, and for explaining silence. */
+  /** for the log and for explaining silence */
   reason?: 'disabled' | 'category-off' | 'quiet-hours' | 'duplicate'
 }
 
-/**
- * Decides whether one notification should be delivered.
- *
- * `dedupeWindowMs` is how long a given key stays suppressed. A due-date reminder
- * uses a long window so an overdue item is mentioned once a day rather than once
- * a sweep; a focus alert passes no key at all, since two intervals ending really
- * are two separate things to say.
- */
+/** window per key: due dates once a day, focus alerts no key */
 export function shouldNotify(
   policy: NotificationPolicy,
   category: NotificationCategory,
@@ -123,7 +102,7 @@ export function shouldNotify(
   const { dedupeKey, seen, dedupeWindowMs } = options
   if (dedupeKey && seen) {
     const previous = seen.get(dedupeKey)
-    // A window of 0 or less means "never repeat", so any prior delivery blocks it.
+    // 0 or less means never repeat
     if (previous && (dedupeWindowMs === undefined || dedupeWindowMs <= 0 || now - previous.at < dedupeWindowMs)) {
       return { allow: false, reason: 'duplicate' }
     }
@@ -131,7 +110,7 @@ export function shouldNotify(
   return { allow: true }
 }
 
-/** Drops dedupe entries older than the window, so the map cannot grow forever. */
+/** so the map can't grow forever */
 export function pruneDedupe(seen: Map<string, DedupeEntry>, now: number, maxAgeMs: number): void {
   for (const [key, entry] of seen) {
     if (now - entry.at > maxAgeMs) seen.delete(key)

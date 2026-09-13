@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 interface ChatPanelModalProps {
   icon: ReactNode
   title: ReactNode
-  /** Buttons that sit before the close button in the header. */
+  /** buttons before the close button */
   actions?: ReactNode
   onClose: () => void
   children: ReactNode
@@ -47,7 +47,6 @@ export default function ChatPanelModal({ icon, title, actions, onClose, children
           overflow: 'hidden'
         }}
       >
-        {/* Header */}
         <div
           style={{
             padding: 'var(--space-3) var(--space-4)',

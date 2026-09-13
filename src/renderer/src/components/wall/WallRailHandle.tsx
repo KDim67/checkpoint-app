@@ -18,8 +18,7 @@ export default function WallRailHandle({ railWidth, setRailWidth }: WallRailHand
       }}
       onPointerMove={e => {
         const resize = railResizeRef.current
-        // Inverted: the handle is on the rail's left edge now, so
-        // dragging left has to widen it rather than shrink it.
+        // inverted: the handle is on the left edge, dragging left widens
         if (resize) setRailWidth(clampRail(resize.startWidth - (e.clientX - resize.startX)))
       }}
       onPointerUp={e => {

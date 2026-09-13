@@ -5,17 +5,13 @@ import type { PbrTool } from './usePbrTool'
 import TextureDropZone from './TextureDropZone'
 import ActiveTextureHeader from './ActiveTextureHeader'
 
-/** Shared by every map tile, so the sizing is fixed in one place. */
+/** one sizing for every map tile */
 const MAP_MEDIA: React.CSSProperties = {
   maxWidth: '100%',
   maxHeight: '100%',
   display: 'block'
 }
 
-/**
- * One map in the grid. There are five, and they differed only by their label
- * and whether they draw into an image or a canvas.
- */
 function MapPreview({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
   return (
     <div style={{
@@ -30,10 +26,7 @@ function MapPreview({ label, children }: { label: string; children: React.ReactN
       <span className="text-caption-strong">
         {label}
       </span>
-      {/* Square, and sized from the column it sits in. The box used to be a
-          grid row stretched to the full height of the panel while the map
-          inside it was capped at 160px, which left each map adrift in the
-          middle of a mostly empty rectangle. */}
+      {/* square from its column; a stretched grid row left the 160px map adrift */}
       <div style={{
         aspectRatio: '1',
         background: 'var(--color-background)',
@@ -60,7 +53,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
         </div>
 
         {!tool.albedoUrl ? (
-          /* Drop Zone */
           <TextureDropZone
             onDragOver={tool.handlePbrDragOver}
             onDrop={tool.handlePbrDrop}
@@ -70,16 +62,13 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
             outcome="Returns Normal, Height, Roughness and Ambient Occlusion, previewed on a 3D model"
           />
         ) : (
-          /* Generator Workspace */
           <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>
             
-            {/* Left Column: 3D Preview & Sliders */}
+            {/* left: 3D preview and sliders */}
             <div className="panel-scroll">
-              {/* ThreeJS Container */}
               <div style={{ position: 'relative', width: '100%', height: '300px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-surface-offset)' }}>
                 <canvas ref={tool.previewCanvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
                 
-                {/* Floating Controls */}
                 <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '6px' }}>
                   <button
                     onClick={() => tool.setShape(prev => prev === 'sphere' ? 'cube' : prev === 'cube' ? 'plane' : 'sphere')}
@@ -124,7 +113,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 </div>
               </div>
 
-              {/* Sliders Title */}
               <div className="section-head">
                 <Settings size={14} className="text-muted" />
                 <span className="label-caps">
@@ -132,10 +120,9 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 </span>
               </div>
 
-              {/* Sliders Container */}
               <div className="col-md">
 
-                {/* Invert height. Dark pixels read as crevices vs. ridges */}
+                {/* invert: dark pixels as crevices or ridges */}
                 <label style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -160,7 +147,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   />
                 </label>
 
-                {/* Normal Intensity */}
                 <div className="col-4px">
                   <div className="row-caption">
                     <span className="text-label">Normal Intensity</span>
@@ -177,7 +163,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   />
                 </div>
 
-                {/* Height Depth */}
                 <div className="col-4px">
                   <div className="row-caption">
                     <span className="text-label">Height/Bump Depth</span>
@@ -194,7 +179,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   />
                 </div>
 
-                {/* Roughness Contrast */}
                 <div className="col-4px">
                   <div className="row-caption">
                     <span className="text-label">Roughness Contrast</span>
@@ -211,7 +195,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   />
                 </div>
 
-                {/* Roughness Base */}
                 <div className="col-4px">
                   <div className="row-caption">
                     <span className="text-label">Roughness Base (Shininess)</span>
@@ -228,7 +211,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   />
                 </div>
 
-                {/* AO Intensity */}
                 <div className="col-4px">
                   <div className="row-caption">
                     <span className="text-label">AO Crevice Darkness</span>
@@ -247,10 +229,9 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
               </div>
             </div>
 
-            {/* Right Column: 2D Grid & Export Actions */}
+            {/* right: 2D maps and export */}
             <div className="col-lg-min">
               
-              {/* File Metadata Header */}
               <ActiveTextureHeader
                 label="Active Albedo File:"
                 path={tool.albedoPath}
@@ -263,14 +244,12 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 }}
               />
 
-              {/* 2D Previews Grid */}
               <div style={{
                 flex: 1,
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
                 gap: 'var(--space-3)',
-                // Rows take the height their contents need. Without this the
-                // grid divides the panel between them however tall that is.
+                // rows take their content height, or the grid splits the panel between them
                 alignContent: 'start',
                 overflowY: 'auto'
               }}>
@@ -296,7 +275,6 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 </MapPreview>
               </div>
 
-              {/* Export Trigger Block */}
               <div className="panel">
                 <div className="row-between">
                   <div className="col-2px">
@@ -336,7 +314,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   </button>
                 </div>
 
-                {/* Workflow Card Move Prompt */}
+                {/* offer to move the kanban card */}
                 {tool.preloadCardId && tool.exportedFiles.length > 0 && (
                   <div style={{
                     background: 'var(--color-secondary-muted)',

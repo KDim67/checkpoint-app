@@ -7,44 +7,23 @@ import { rebalancePositions, updateItem } from '../../data/items'
 import { canAimAtSlot } from './dropSlots'
 import type { BoardState } from './useBoardState'
 
-/**
- * What the collision detector needs to know that the rectangles do not say:
- * which droppables are columns, which are cards and whose column each card is
- * in.
- *
- * Worked out from the board's own state rather than from the ids, because the
- * ids do not carry it. Columns register under their own id and cards under
- * theirs, but so does each column's sortable, under a `col::` id, and reading
- * "not a column id" as "a card" is what silently sent every drop to the end of
- * the first column.
- */
+/** columns, cards and each card's column, from board state: a col:: sortable read as a card sent drops to the end */
 interface DropGeometry {
-  /** Column id to whether a drop can pick a slot in it rather than just land in it. */
+  /** whether a drop can pick a slot, or only land */
   columns: Map<string, boolean>
   cardColumn: Map<string, string>
 }
 
-// Shared stable reference for empty columns, so the memoized column never
-// re-renders just because it received a freshly-allocated [] each render.
+// shared empty array so memoized columns don't re-render on a fresh []
 const EMPTY_ITEMS: Item[] = []
 
-/** Dragging cards and columns: the order each column shows, where a drop can land, and what it writes. */
 export function useBoardDrag(boardState: BoardState) {
   const {
     activeWorkspace, cards, setCards, columns, swimlanesEnabled, columnsRef, persistColumns,
     setActiveDragCard, setDropTarget, setDragHeight, searchQuery, filterPriority, filterTagId,
     isReadOnlyMode, loadCards
   } = boardState
-  // Cards for a column, filtered and sorted appropriately
-  // Group + filter + sort all cards into their columns in a SINGLE pass, memoized
-  // on the inputs. Previously each column re-filtered the whole card list on every
-  // render, and a drag renders the board repeatedly, so that was O(columns × cards)
-  // per frame. The main source of drag lag. Now it's one pass, and card object refs
-  // are preserved so the memoized columns only re-render when their own cards
-  // actually change.
-  //
-  // It sits above the drag handlers because it is the order the user is looking
-  // at, and that is the order a drop has to be worked out against.
+  // one memoized pass groups, filters and sorts; per-column refiltering was O(columns x cards) per drag frame
   const cardsByColumn = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     const map = new Map<string, Item[]>()
@@ -61,13 +40,11 @@ export function useBoardDrag(boardState: BoardState) {
       if (!arr) { arr = []; map.set(c.status, arr) }
       arr.push(c)
     }
-    // Sorting stays inside this single pass. Applying a per-column order as a
-    // second pass over the map would reintroduce the per-frame work this memo
-    // exists to avoid during a drag.
+    // sorting stays in this pass, a second pass brings the per-frame work back
     const byPosition = (a: Item, b: Item): number => a.position - b.position
     const byPriority = (a: Item, b: Item): number =>
       b.priority !== a.priority ? b.priority - a.priority : a.position - b.position
-    // Cards with no due date sort last rather than reading as "due first".
+    // no due date sorts last, not "due first"
     const byDue = (a: Item, b: Item): number => {
       if (!a.due_at && !b.due_at) return a.position - b.position
       if (!a.due_at) return 1
@@ -77,8 +54,7 @@ export function useBoardDrag(boardState: BoardState) {
 
     const sortModes = new Map(columns.map(c => [c.id, c.sort ?? 'manual']))
     for (const [colId, arr] of map) {
-      // Swimlanes are a board-wide priority grouping and outrank a column's own
-      // order; without that the two settings would visibly contradict.
+      // swimlanes' priority grouping outranks the column's own order
       if (swimlanesEnabled) { arr.sort(byPriority); continue }
       const mode = sortModes.get(colId) ?? 'manual'
       arr.sort(mode === 'priority' ? byPriority : mode === 'due' ? byDue : byPosition)
@@ -91,12 +67,7 @@ export function useBoardDrag(boardState: BoardState) {
     [cardsByColumn]
   )
 
-  // Drag & Drop
-
-  /**
-   * Kept in a ref because the collision detector runs on every pointer move and
-   * must not be rebuilt under the drag each time a card changes.
-   */
+  /** a ref: the detector runs every pointer move and mustn't rebuild when a card changes */
   const dropGeometryRef = useRef<DropGeometry>({ columns: new Map(), cardColumn: new Map() })
   useEffect(() => {
     const columnOrder = new Map<string, boolean>()
@@ -106,23 +77,12 @@ export function useBoardDrag(boardState: BoardState) {
     dropGeometryRef.current = { columns: columnOrder, cardColumn }
   }, [columns, cards, swimlanesEnabled])
 
-  /**
-   * Which droppable the card in the air is aimed at.
-   *
-   * dnd-kit's own detectors answer "which rectangle is the pointer inside", and
-   * the gaps between cards are inside no card at all, so a pointer resting in
-   * one fell through to the column, and the column means the end of the list.
-   * That is the jump to the bottom. This asks the question the user is actually
-   * asking, which card would I end up above, and cardDrop answers it against
-   * the midpoints, so a gap belongs to the card either side of it.
-   */
+  /** aims at the card you'd land above by midpoints, so gaps between cards don't fall through to the column end */
   const collisionDetection = useCallback<CollisionDetection>(args => {
-    // Dragging a column is a different gesture with different targets: the
-    // other columns, hit by the dragged column's own rectangle.
+    // column drags hit the other columns by rectangle
     if (String(args.active.id).startsWith('col::')) return rectIntersection(args)
 
-    // The keyboard sensor moves a rectangle rather than a pointer, so its
-    // centre stands in for one and the same rules apply.
+    // the keyboard sensor moves a rect, its centre stands in for the pointer
     const point = args.pointerCoordinates ?? {
       x: args.collisionRect.left + args.collisionRect.width / 2,
       y: args.collisionRect.top + args.collisionRect.height / 2
@@ -139,10 +99,7 @@ export function useBoardDrag(boardState: BoardState) {
         columnBoxes.push({ id, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom })
         continue
       }
-      // Anything that is neither a known column nor a known card is left alone
-      // rather than guessed at. Each column registers a sortable of its own
-      // under a `col::` id, and reading those as cards is what once sent every
-      // drop to the end of the first column.
+      // neither known column nor card: leave it, col:: ids read as cards once broke every drop
       const column = cardColumn.get(id)
       if (column) cardBoxes.push({ id, column, top: rect.top, height: rect.height })
     }
@@ -151,12 +108,7 @@ export function useBoardDrag(boardState: BoardState) {
     if (!target) return []
     if (columnOrder.get(target.column) !== true) return [{ id: target.column }]
 
-    // Past the last card of the card's own column. dnd-kit can only preview a
-    // move onto another card, so naming the column here parts nothing and the
-    // drag looks dead. Aiming at the bottom card says the same thing: with this
-    // card lifted out of the list, taking the bottom card's slot is the end of
-    // it. A column holding nothing but the dragged card names the card itself,
-    // which is the drag that changes nothing.
+    // past the last card, aim at the bottom card: dnd-kit only previews moves onto cards
     const before = target.before ?? (
       cardColumn.get(String(args.active.id)) === target.column
         ? lastCardIn(cardBoxes, target.column)
@@ -175,22 +127,11 @@ export function useBoardDrag(boardState: BoardState) {
       if (found) setActiveDragCard(found)
       return currentCards
     })
-    // Read here because the card is about to be lifted out of the layout, and
-    // the gap held open for it should be the footprint it will really take.
+    // read before the card lifts out, so the gap matches its footprint
     setDragHeight(active.rect.current.initial?.height ?? 0)
   }, [isReadOnlyMode, setActiveDragCard, setCards, setDragHeight])
 
-  /**
-   * Where the card would land, not a move of it.
-   *
-   * Actually moving the card into the hovered column here is what the board
-   * used to do, and it unmounted and remounted the card in a different
-   * SortableContext every time, which is what made a cross-column drag crawl.
-   * dnd-kit calls this only when the target changes, so noting the target costs
-   * one render per target rather than one per frame, and the column draws the
-   * gap for itself. Reordering inside a column still previews through dnd-kit's
-   * own sortable transforms.
-   */
+  /** notes the target instead of moving the card; moving remounted it across SortableContexts and crawled */
   const handleDragOver = useCallback((event: DragOverEvent) => {
     if (isReadOnlyMode) return
     const { active, over } = event
@@ -220,8 +161,7 @@ export function useBoardDrag(boardState: BoardState) {
   }, [endDrag, loadCards])
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    // Before the read-only check, because the overlay and the gap have to be
-    // put away whether or not the drop is allowed to land.
+    // before the read-only check, the overlay and gap go away either way
     endDrag()
     if (isReadOnlyMode) return
     const { active, over } = event
@@ -231,7 +171,7 @@ export function useBoardDrag(boardState: BoardState) {
     const activeId = String(active.id)
     const overId = String(over.id)
 
-    // Column reorder: ids are prefixed with "col::"
+    // column ids are prefixed col::
     if (activeId.startsWith('col::')) {
       const current = columnsRef.current
       const fromIdx = current.findIndex(c => `col::${c.id}` === activeId)
@@ -241,7 +181,6 @@ export function useBoardDrag(boardState: BoardState) {
       return
     }
 
-    // Card move / reorder
     const cardId = activeId
     const draggedCard = cards.find(c => c.id === cardId)
     if (!draggedCard) return
@@ -250,22 +189,17 @@ export function useBoardDrag(boardState: BoardState) {
     const newStatus = isColumnTarget ? overId : cards.find(c => c.id === overId)?.status
     if (!newStatus) return
 
-    // The destination column in the order the user is looking at. The gap was
-    // drawn into this same list, so working the position out from any other
-    // order is how a card ends up somewhere other than where the gap was.
+    // position from the order on screen, the same list the gap was drawn into
     const order = cardsByColumn.get(newStatus) ?? EMPTY_ITEMS
     const rest = order.filter(c => c.id !== cardId)
     const index = dropIndex(order.map(c => c.id), cardId, isColumnTarget ? null : overId)
     const newPosition = positionForIndex(rest.map(c => c.position), index)
 
-    // Swimlanes group the whole board by priority, so which lane a card is
-    // dropped into is a choice of priority as much as a choice of place.
+    // in swimlanes the lane dropped into sets priority
     const neighbour = rest[index] ?? rest[index - 1]
     const newPriority = swimlanesEnabled ? (neighbour?.priority ?? draggedCard.priority) : undefined
 
-    // A null position means the cards either side of the gap already hold
-    // numbers with nothing between them. Take the lower one and renumber the
-    // column, which is the only thing that makes room.
+    // null means no room between neighbours: take the lower and renumber the column
     const needsRebalance = newPosition === null
     const patch: Partial<Item> = {
       status: newStatus,

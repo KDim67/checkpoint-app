@@ -18,17 +18,16 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
       gap: 'var(--space-4)',
       flexWrap: 'wrap'
     }}>
-      {/* Search Input */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
         <input
           type="text"
           placeholder="Search cards (title, body, tag)..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
+          className="border-offset focus-border-accent"
           style={{
             width: '100%',
             background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-surface-offset)',
             color: 'var(--color-text-base)',
             borderRadius: 'var(--radius-md)',
             padding: '5px 10px',
@@ -36,14 +35,10 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
             outline: 'none',
             transition: 'border-color var(--duration-fast)'
           }}
-          onFocus={e => (e.target.style.borderColor = 'var(--color-secondary)')}
-          onBlurCapture={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
         />
       </div>
 
-      {/* Filters Group */}
       <div className="row-lg">
-        {/* Priority filter */}
         <div className="row-6px">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Priority:</span>
           <select
@@ -67,7 +62,6 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
           </select>
         </div>
 
-        {/* Tag filter */}
         <div className="row-6px">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Tag:</span>
           <select
@@ -91,7 +85,6 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
           </select>
         </div>
 
-        {/* Reset Filters button */}
         {(searchQuery || filterPriority !== -1 || filterTagId !== 'all') && (
           <button
             onClick={() => { setSearchQuery(''); setFilterPriority(-1); setFilterTagId('all') }}

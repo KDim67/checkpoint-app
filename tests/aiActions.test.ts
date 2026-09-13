@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { extractJson, repairJson, stripThink, isAbortError, isFatalError } from '../src/main/aiActions'
 
-// Only the pure extraction/repair rungs of the ladder are exercised here. The
-// attempt* functions themselves are one `client.chat.completions.create` call
-// plus a call to extractJson, so testing them would test the OpenAI SDK.
+// only the pure extract/repair rungs; the attempt* functions would test the SDK
 
 describe('stripThink', () => {
   it('discards a reasoning model\'s think block', () => {
@@ -11,8 +9,7 @@ describe('stripThink', () => {
   })
 
   it('keeps the prose of an unterminated think block rather than losing the answer', () => {
-    // Streaming can truncate the closing tag. Dropping to end-of-string would
-    // throw away the JSON that follows on endpoints which emit it anyway.
+    // streaming can cut the closing tag, keep the JSON after it
     expect(stripThink('<think>reasoning {"a":1}')).toBe('reasoning {"a":1}')
   })
 
@@ -57,8 +54,7 @@ describe('extractJson', () => {
   })
 
   it('returns null rather than a partial object when the response is truncated', () => {
-    // A tiny model that runs out of tokens mid-array must be reported as a
-    // failed generation so the ladder can retry, not accepted as an empty board.
+    // a truncated array is a failed generation, not an empty board
     expect(extractJson('{"message":"ok","cards":[{"title":"a"')).toBeNull()
   })
 
@@ -72,11 +68,7 @@ describe('extractJson', () => {
     })
   })
 
-  // Known defect
-  // repairJson strips `//` to end of line to remove JavaScript comments, but it
-  // runs over the raw text with no notion of string boundaries. Any card body
-  // containing a URL is truncated mid-string the moment the response also needs
-  // repairing, so an otherwise recoverable generation is thrown away entirely.
+  // was a defect: repairJson cut URLs at // and threw recoverable generations away
   it('repairs a trailing comma even when a string value contains a URL', () => {
     expect(extractJson('{"body":"see https://example.com/docs",}')).toEqual({
       body: 'see https://example.com/docs'
@@ -102,8 +94,7 @@ describe('error classification', () => {
   })
 
   it('treats only auth and not-found as unfixable by another method', () => {
-    // A 429 or a 500 may well succeed on the next rung, so the ladder must keep
-    // going; a 401 or 404 will fail identically every time.
+    // 429/500 may pass on the next rung, 401/404 never will
     for (const status of [401, 403, 404]) expect(isFatalError({ status })).toBe(true)
     for (const status of [400, 422, 429, 500, 503]) expect(isFatalError({ status })).toBe(false)
     expect(isFatalError(new Error('socket hang up'))).toBe(false)

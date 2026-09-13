@@ -1,4 +1,4 @@
-/** Links between items, as the renderer reaches them. Typed off the bridge. */
+/** links between items, off the db bridge */
 
 type Db = typeof window.electronAPI.db
 

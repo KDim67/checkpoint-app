@@ -6,8 +6,6 @@ import * as trackerApi from '../data/tracker'
 
 const ALLOCATION_COLORS = ['#10b981', '#1e45fc', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#cdf12b']
 
-// SVG Icons
-
 type IconProps = React.SVGProps<SVGSVGElement> & { size?: number }
 
 function IconFocus({ size = 18, ...props }: IconProps) {
@@ -68,8 +66,6 @@ function IconRefresh({ size = 12, ...props }: IconProps) {
   )
 }
 
-// Helpers
-
 const formatDuration = (ms: number) => {
   if (ms <= 0) return '0s'
   const secs = ms / 1000
@@ -93,8 +89,7 @@ const formatDate = (timestamp: number) => {
   })
 }
 
-// Turn a raw column status id into a readable label. Handles the default columns
-// and the custom "col-<slug>-<timestamp>" ids the board generates.
+// readable labels for default columns and generated col-<slug>-<timestamp> ids
 const DEFAULT_COLUMN_LABELS: Record<string, string> = {
   open: 'Backlog',
   in_progress: 'In Progress',
@@ -108,15 +103,12 @@ const formatColumnLabel = (status: string): string => {
   return status.replace(/[_-]/g, ' ')
 }
 
-// Main Component
-
 export default function AnalyticsView() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Sub-tabs for Focus Sessions vs Activity Timeline
   const [activeTab, setActiveTab] = useState<'focus' | 'timeline'>('focus')
   const [timelineRange, setTimelineRange] = useState<'today' | 'yesterday' | 'week'>('today')
   const [timelineData, setTimelineData] = useState<{
@@ -127,7 +119,6 @@ export default function AnalyticsView() {
   } | null>(null)
   const [timelineLoading, setTimelineLoading] = useState(false)
 
-  // Hover states for tooltips
   const [hoveredHeatmapCell, setHoveredHeatmapCell] = useState<{
     dateStr: string
     count: number
@@ -152,7 +143,7 @@ export default function AnalyticsView() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      // Scope to the active workspace (null = all) so the dashboard matches its header.
+      // null means all, so the dashboard matches its header
       const res = await analyticsApi.getAnalytics(activeWorkspace === 'all' ? null : activeWorkspace)
       setData(res)
       setError(null)
@@ -209,7 +200,7 @@ export default function AnalyticsView() {
         start,
         end
       )
-      // Normalize so the render never crashes on a missing array.
+      // so a missing array can't crash the render
       setTimelineData({
         totalDurationMs: res?.totalDurationMs || 0,
         byProcess: res?.byProcess || [],
@@ -247,13 +238,11 @@ export default function AnalyticsView() {
         fontFamily: 'var(--font-sans)',
         boxSizing: 'border-box'
       }}>
-        {/* Header */}
         <div>
           <div className="skeleton" style={{ height: '24px', width: '160px', marginBottom: '8px' }} />
           <div className="skeleton" style={{ height: '14px', width: '280px', opacity: 0.6 }} />
         </div>
 
-        {/* KPI Row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           {[1, 2, 3].map(i => (
             <div key={i} className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
@@ -266,7 +255,7 @@ export default function AnalyticsView() {
           ))}
         </div>
 
-        {/* Activity Heatmap Calendar */}
+        {/* heatmap */}
         <div className="analytics-card panel">
           <div className="row-between">
             <div className="skeleton" style={{ width: '150px', height: '16px' }} />
@@ -274,7 +263,6 @@ export default function AnalyticsView() {
           </div>
 
           <div style={{ overflowX: 'auto', paddingBottom: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {/* Month Headers Mock */}
             <div style={{ display: 'flex', gap: '12px', marginLeft: '26px', height: '14px' }}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
                 <div key={m} className="skeleton" style={{ width: '22px', height: '9px', opacity: 0.5 }} />
@@ -282,7 +270,6 @@ export default function AnalyticsView() {
             </div>
 
             <div className="flex-4px">
-              {/* Day of Week Indicators */}
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '9px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
                 <span>Sun</span>
                 <span>Tue</span>
@@ -290,7 +277,6 @@ export default function AnalyticsView() {
                 <span>Sat</span>
               </div>
 
-              {/* Mock Heatmap Grid */}
               <div style={{ display: 'flex', gap: '2px', flex: 1 }}>
                 {Array.from({ length: 53 }).map((_, colIdx) => (
                   <div key={colIdx} className="col-2px">
@@ -313,9 +299,8 @@ export default function AnalyticsView() {
           </div>
         </div>
 
-        {/* Two-Column Mid Section */}
         <div className="grid-cards">
-          {/* Line Chart Card */}
+          {/* line chart */}
           <div className="analytics-card panel">
             <div className="row">
               <div className="skeleton" style={{ width: '16px', height: '16px', borderRadius: '50%' }} />
@@ -341,7 +326,7 @@ export default function AnalyticsView() {
             </div>
           </div>
 
-          {/* Bar Chart Card */}
+          {/* bar chart */}
           <div className="analytics-card panel">
             <div className="row">
               <div className="skeleton" style={{ width: '16px', height: '16px', borderRadius: '50%' }} />
@@ -358,9 +343,8 @@ export default function AnalyticsView() {
           </div>
         </div>
 
-        {/* Bottom Section */}
         <div className="grid-cards">
-          {/* Tag Distribution */}
+          {/* tag distribution */}
           <div className="analytics-card panel">
             <div className="skeleton" style={{ width: '110px', height: '16px' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-1)' }}>
@@ -376,7 +360,7 @@ export default function AnalyticsView() {
             </div>
           </div>
 
-          {/* Recent Sessions */}
+          {/* recent sessions */}
           <div className="analytics-card panel">
             <div className="skeleton" style={{ width: '150px', height: '16px' }} />
             <div className="col">
@@ -405,16 +389,16 @@ export default function AnalyticsView() {
     )
   }
 
-  // Heatmap Calendar Computations
+  // heatmap
   const today = new Date()
   const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   const daysList: Array<{ dateStr: string; date: Date; count: number; isPlaceholder?: boolean }> = []
 
-  // Go back 364 days (exact 52 weeks ago + alignment offset)
+  // 364 days back, then padded to Sunday
   const startDay = new Date(localToday.getTime() - 364 * 24 * 60 * 60 * 1000)
   const startDayOfWeek = startDay.getDay() // 0 = Sunday
 
-  // Pad the beginning so the calendar grid consistently aligns with Sunday as the top row
+  // pad so Sunday is always the top row
   for (let i = 0; i < startDayOfWeek; i++) {
     daysList.push({ dateStr: '', date: new Date(), count: 0, isPlaceholder: true })
   }
@@ -438,13 +422,11 @@ export default function AnalyticsView() {
     })
   }
 
-  // Group into columns (7 days per column)
   const columns: typeof daysList[] = []
   for (let i = 0; i < daysList.length; i += 7) {
     columns.push(daysList.slice(i, i + 7))
   }
 
-  // Get month name headers
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const monthHeaders: { text: string; colIndex: number }[] = []
   let lastMonthIndex = -1
@@ -453,7 +435,7 @@ export default function AnalyticsView() {
     if (firstValidDay) {
       const m = firstValidDay.date.getMonth()
       if (m !== lastMonthIndex) {
-        // Prevent labeling very close columns to avoid clutter
+        // skip labels on columns too close together
         if (monthHeaders.length === 0 || colIdx - monthHeaders[monthHeaders.length - 1].colIndex > 2) {
           monthHeaders.push({ text: monthNames[m], colIndex: colIdx })
           lastMonthIndex = m
@@ -462,7 +444,6 @@ export default function AnalyticsView() {
     }
   })
 
-  // Heatmap opacity colors
   const getCellStyles = (count: number) => {
     if (count === 0) return { backgroundColor: 'var(--color-surface-2)', opacity: 0.5 }
     if (count <= 1) return { backgroundColor: 'var(--color-secondary)', opacity: 0.3 }
@@ -471,7 +452,7 @@ export default function AnalyticsView() {
     return { backgroundColor: 'var(--color-secondary)', opacity: 1, boxShadow: '0 0 8px var(--color-secondary)' }
   }
 
-  // Line Graph Computations
+  // line graph
   const weeklyWidth = 460
   const weeklyHeight = 160
   const linePadding = { top: 20, right: 20, bottom: 30, left: 40 }
@@ -490,7 +471,7 @@ export default function AnalyticsView() {
     ? `${pathD} L ${linePoints[linePoints.length - 1].x} ${linePadding.top + lineChartH} L ${linePoints[0].x} ${linePadding.top + lineChartH} Z`
     : ''
 
-  // Bar Chart Computations
+  // bar chart
   const barWidth = 460
   const barHeight = 160
   const barPadding = { top: 20, right: 20, bottom: 30, left: 45 }
@@ -500,10 +481,8 @@ export default function AnalyticsView() {
   const maxBarMs = Math.max(data.columnTime.reduce((a, d) => Math.max(a, d.avgMs), 0), 1)
   const renderBarW = Math.min(36, barChartW / Math.max(1, data.columnTime.length) - 16)
 
-  // Tag Distribution
   const totalTagUses = data.mostUsedTags.reduce((acc, t) => acc + t.count, 0)
 
-  // Timeline View Renderer
   const renderTimelineView = () => {
     if (timelineLoading && !timelineData) {
       return (
@@ -519,7 +498,7 @@ export default function AnalyticsView() {
 
     return (
       <div className="col-lg">
-        {/* Date Selector Row */}
+        {/* date selector */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           <div className="flex-gap">
             {(['today', 'yesterday', 'week'] as const).map(range => (
@@ -595,9 +574,8 @@ export default function AnalyticsView() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
-            {/* Left Column: Summary & Process Share */}
+            {/* left: summary and process share */}
             <div className="col-lg">
-              {/* Total Hours Card */}
               <div className="analytics-card row-lg">
                 <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)' }}>
                   <IconHourglass size={24} />
@@ -608,7 +586,6 @@ export default function AnalyticsView() {
                 </div>
               </div>
 
-              {/* Process Share Card */}
               <div className="analytics-card col-lg">
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>Process Share</h3>
                 <div className="col-md">
@@ -631,7 +608,7 @@ export default function AnalyticsView() {
               </div>
             </div>
 
-            {/* Right Column: Active Window Titles */}
+            {/* right: window titles */}
             <div className="analytics-card col-lg">
               <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>Top Active Windows</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2.5)', overflowY: 'auto', maxHeight: '320px', paddingRight: '2px' }}>
@@ -732,7 +709,6 @@ export default function AnalyticsView() {
 
       <div className="analytics-inner" style={{ width: '100%', maxWidth: '1400px', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
-      {/* Header */}
       <div className="row-between-mb">
         <div>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
@@ -746,8 +722,8 @@ export default function AnalyticsView() {
         </div>
         <button
           onClick={fetchData}
+          className="bg-surface-2 hover-bg-offset"
           style={{
-            background: 'var(--color-surface-2)',
             border: '1px solid var(--color-surface-offset)',
             color: 'var(--color-text-base)',
             borderRadius: 'var(--radius-md)',
@@ -760,19 +736,12 @@ export default function AnalyticsView() {
             gap: '8px',
             transition: 'all 120ms ease'
           }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'var(--color-surface-offset)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'var(--color-surface-2)'
-          }}
         >
           <IconRefresh size={15} />
           <span>Refresh</span>
         </button>
       </div>
 
-      {/* Tab Switcher */}
       <div style={{
         display: 'flex',
         gap: 'var(--space-1)',
@@ -822,7 +791,6 @@ export default function AnalyticsView() {
       {activeTab === 'focus' ? (
         <>
 
-      {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         <div className="analytics-card row-lg">
           <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)' }}>
@@ -869,7 +837,7 @@ export default function AnalyticsView() {
         </div>
       </div>
 
-      {/* Heatmap Calendar Card */}
+      {/* heatmap */}
       <div className="analytics-card col-md-relative">
         <div className="row-between-full">
           <span className="text-sm-semibold">Log Activity Timeline</span>
@@ -879,7 +847,6 @@ export default function AnalyticsView() {
         <div style={{ display: 'flex', gap: 'var(--space-6)', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0, flex: '0 1 auto' }}>
         <div style={{ overflowX: 'auto', paddingBottom: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {/* Month Headers */}
           <div style={{ display: 'flex', position: 'relative', height: '14px', marginLeft: '26px' }}>
             {monthHeaders.map((header, i) => (
               <span
@@ -898,7 +865,6 @@ export default function AnalyticsView() {
           </div>
 
           <div className="flex-4px">
-            {/* Day of Week Indicators */}
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '9px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
               <span>Sun</span>
               <span>Tue</span>
@@ -906,7 +872,6 @@ export default function AnalyticsView() {
               <span>Sat</span>
             </div>
 
-            {/* Heatmap Grid */}
             <div className="flex-2px">
               {columns.map((column, colIdx) => (
                 <div key={colIdx} className="col-2px">
@@ -939,7 +904,6 @@ export default function AnalyticsView() {
           </div>
         </div>
 
-        {/* Heatmap Legend */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: '10px', color: 'var(--color-text-muted)' }}>
           <span>Less</span>
           <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: 'var(--color-surface-2)' }} />
@@ -971,7 +935,6 @@ export default function AnalyticsView() {
         </div>
         </div>
 
-        {/* Heatmap Tooltip */}
         {hoveredHeatmapCell && (
           <div style={{
             position: 'absolute',
@@ -995,9 +958,8 @@ export default function AnalyticsView() {
         )}
       </div>
 
-      {/* Two-Column Middle Section */}
       <div className="grid-cards">
-        {/* Weekly Completed Tasks Graph */}
+        {/* weekly completed tasks */}
         <div className="analytics-card col-md-relative">
           <div className="row">
             <IconChart style={{ color: 'var(--color-primary)' }} />
@@ -1018,7 +980,6 @@ export default function AnalyticsView() {
                   </linearGradient>
                 </defs>
 
-                {/* Gridlines */}
                 {[0, 0.25, 0.5, 0.75, 1].map((r, i) => {
                   const y = linePadding.top + r * lineChartH
                   const value = Math.round(maxWeeklyCount * (1 - r))
@@ -1030,13 +991,10 @@ export default function AnalyticsView() {
                   )
                 })}
 
-                {/* Gradient area */}
                 {areaD && <path d={areaD} fill="url(#weekly-grad)" />}
 
-                {/* Line path */}
                 {pathD && <path d={pathD} fill="none" stroke="var(--color-primary)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
 
-                {/* Interactive Points */}
                 {linePoints.map((p, i) => (
                   <g key={i}>
                     <circle cx={p.x} cy={p.y} r="4" fill="var(--color-surface-1)" stroke="var(--color-primary)" strokeWidth="2.5" className="hover-line-point" />
@@ -1061,7 +1019,6 @@ export default function AnalyticsView() {
                   </g>
                 ))}
 
-                {/* X axis week labels */}
                 {linePoints.map((p, i) => {
                   const currentYear = p.week.substring(0, 4)
                   const prevYear = i > 0 ? linePoints[i - 1].week.substring(0, 4) : null
@@ -1107,7 +1064,7 @@ export default function AnalyticsView() {
           )}
         </div>
 
-        {/* Kanban Cycle Time Duration Chart */}
+        {/* kanban cycle time */}
         <div className="analytics-card col-md-relative">
           <div className="row">
             <IconClock style={{ color: 'var(--color-secondary)' }} />
@@ -1121,7 +1078,6 @@ export default function AnalyticsView() {
           ) : (
             <div style={{ position: 'relative', width: '100%' }}>
               <svg width="100%" height={barHeight} viewBox={`0 0 ${barWidth} ${barHeight}`} preserveAspectRatio="xMidYMid meet">
-                {/* Horizontal guide lines */}
                 {[0, 0.25, 0.5, 0.75, 1].map((r, i) => {
                   const y = barPadding.top + r * barChartH
                   const value = formatDuration(maxBarMs * (1 - r))
@@ -1133,7 +1089,6 @@ export default function AnalyticsView() {
                   )
                 })}
 
-                {/* Bars */}
                 {data.columnTime.map((d, i) => {
                   const colCount = data.columnTime.length
                   const colSpacing = barChartW / colCount
@@ -1203,9 +1158,8 @@ export default function AnalyticsView() {
         </div>
       </div>
 
-      {/* Bottom Grid Section */}
       <div className="grid-cards">
-        {/* Context Focus Allocation (Passive Tracker) */}
+        {/* context focus allocation (passive tracker) */}
         <div className="analytics-card col-lg">
           <div className="row">
             <IconChart style={{ color: 'var(--color-secondary)' }} />
@@ -1247,7 +1201,7 @@ export default function AnalyticsView() {
           )}
         </div>
 
-        {/* Most Used Tags */}
+        {/* most used tags */}
         <div className="analytics-card col-lg">
           <div className="row">
             <IconTag style={{ color: 'var(--color-secondary)' }} />
@@ -1271,7 +1225,6 @@ export default function AnalyticsView() {
                       </span>
                       <span className="text-muted">{tag.count} uses ({percentage.toFixed(0)}%)</span>
                     </div>
-                    {/* Progress Bar Container */}
                     <div style={{ height: '6px', width: '100%', background: 'var(--color-surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${percentage}%`, background: tag.color, borderRadius: '3px', transition: 'width 300ms ease' }} />
                     </div>
@@ -1282,7 +1235,7 @@ export default function AnalyticsView() {
           )}
         </div>
 
-        {/* Focus Retrospective Logs */}
+        {/* focus retrospectives */}
         <div className="analytics-card col-lg">
           <div className="row">
             <IconFocus style={{ color: 'var(--color-primary)' }} />

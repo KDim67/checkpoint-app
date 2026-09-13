@@ -11,10 +11,7 @@ let stmtRecentFocus: Database.Statement
 let stmtActivityAllocation: Database.Statement
 let initialized = false
 
-// Every query uses the `(? IS NULL OR context = ?)` idiom so a NULL context means
-// "across all workspaces" and a concrete value scopes to that workspace. The
-// header now truthfully reflects the active context instead of always showing
-// global data.
+// (? IS NULL OR context = ?): null context means all workspaces
 function initStatements(): void {
   if (initialized) return
   const db = getDb()
@@ -79,8 +76,7 @@ function initStatements(): void {
     LIMIT 10
   `)
 
-  // Activity allocation is intentionally cross-workspace. It compares where time
-  // goes across all contexts, so it is not scoped to the selected one.
+  // cross-workspace on purpose, compares where time goes overall
   stmtActivityAllocation = db.prepare(`
     SELECT context, SUM(duration_ms) / 60000.0 as durationMins
     FROM activity_tracking_logs
@@ -92,10 +88,6 @@ function initStatements(): void {
   initialized = true
 }
 
-/**
- * Executes aggregate queries to compile statistics on tasks, logs, focus, and tags.
- * Pass a context to scope to a single workspace, or null/undefined for all.
- */
 export function getAnalyticsData(context: string | null = null): AnalyticsData {
   initStatements()
   const ctx = context && context !== 'all' ? context : null

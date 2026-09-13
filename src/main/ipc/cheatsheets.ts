@@ -1,4 +1,4 @@
-/** Reference documents the assistant can quote from. */
+/** reference docs the assistant can quote */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

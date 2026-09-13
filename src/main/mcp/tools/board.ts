@@ -4,7 +4,7 @@ import { applyConfigOps, normalizeConfigUpdate } from '../../../shared/boardOps'
 import { recordMcpActivity } from '../../mcpActivity'
 import { context, json, notifyRenderer, readBoardConfig, summarizeItem, text, writeBoardConfig, z } from '../toolKit'
 
-/** Workspaces, and each one's board: its columns and the cards in them. */
+/** workspaces and their boards: columns and cards */
 export function registerBoardTools(mcp: McpServer): void {
   mcp.registerTool(
     'list_workspaces',
@@ -48,12 +48,7 @@ export function registerBoardTools(mcp: McpServer): void {
         'set the background, priority swimlanes, or which fields appear on cards. Does not change card contents.',
       inputSchema: {
         context,
-        // Spelled out rather than left as a free-form record. The shared
-        // normalizer below is deliberately tolerant of aliases and loose types
-        // because a small local model goes through it too, but that tolerance
-        // is invisible to an MCP client, which only ever sees this schema and
-        // was previously told nothing beyond "an array of objects".
-        // .passthrough() keeps the aliases working for anything not named here.
+        // spelled out, MCP clients only see this schema; passthrough keeps the normalizer's aliases working
         operations: z
           .array(
             z
@@ -136,21 +131,17 @@ export function registerBoardTools(mcp: McpServer): void {
       }
     },
     async ({ context: ctx, operations }) => {
-      // Reuses the assistant's normalizer, so an MCP client gets the same
-      // tolerance for aliases and loose types that a local model gets.
+      // same normalizer as the assistant, same tolerance for aliases and loose types
       const normalized = normalizeConfigUpdate({ operations })
       if (!normalized) return text('No valid operations found. Check the "op" values.')
 
-      // An operation the normalizer cannot use is dropped before applyConfigOps
-      // ever sees it, so it appeared in neither "applied" nor "skipped". A
-      // client asking for three changes and getting two was told nothing.
+      // unusable ops used to vanish silently; report them so a client asking for three knows it got two
       const unusable = operations.length - normalized.operations.length
 
       const config = readBoardConfig(ctx)
       const applied = applyConfigOps(config, normalized.operations)
 
-      // Deleting a column would strand its cards under a status no column
-      // claims; they follow to the first surviving column, matching the board.
+      // cards on a deleted column follow to the first surviving one, like the board
       let movedCards = 0
       for (const move of applied.cardMoves) {
         const affected = getAllItems(ctx, 'card')
@@ -168,9 +159,7 @@ export function registerBoardTools(mcp: McpServer): void {
         applied.summary.length > 0
           ? `Board: ${applied.summary.join('; ')}`
           : 'Board configuration changed',
-        // Cards moved off a deleted column are not restored by the inverse. The
-        // column comes back, but which cards sat in it is not recoverable from
-        // the config alone, so undo is only offered when nothing moved.
+        // moved cards can't be restored from config alone, so undo only when nothing moved
         applied.inverse.length > 0 && movedCards === 0
           ? [{ kind: 'board_ops', context: ctx, operations: applied.inverse }]
           : null

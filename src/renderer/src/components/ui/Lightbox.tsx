@@ -29,7 +29,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
       const response = await fetch(src)
       const blob = await response.blob()
 
-      // Browser clipboard API requires ClipboardItem
+      // the clipboard API needs a ClipboardItem
       await navigator.clipboard.write([
         new ClipboardItem({
           [blob.type]: blob
@@ -54,7 +54,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
 
       const a = document.createElement('a')
       a.href = url
-      // extract filename or fallback
+      // filename or fallback
       const filename = src.split('/').pop() || 'image.png'
       a.download = filename
       document.body.appendChild(a)
@@ -97,16 +97,14 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
       <button
         onClick={onClose}
         aria-label="Close preview"
+        className="lightbox-close hover-border-accent hover-grow"
         style={{
           position: 'absolute',
           top: '48px',
           right: '24px',
-          background: 'var(--color-surface-3)',
-          border: '2px solid var(--color-surface-offset)',
           borderRadius: '50%',
           width: '44px',
           height: '44px',
-          color: 'var(--color-text-base)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -115,18 +113,6 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
           boxShadow: 'var(--shadow-lg)',
           zIndex: 100000
         }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = 'var(--color-secondary)'
-          e.currentTarget.style.color = 'var(--color-text-inverted)'
-          e.currentTarget.style.borderColor = 'var(--color-secondary)'
-          e.currentTarget.style.transform = 'scale(1.1)'
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'var(--color-surface-3)'
-          e.currentTarget.style.color = 'var(--color-text-base)'
-          e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-          e.currentTarget.style.transform = 'none'
-        }}
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" />
@@ -134,9 +120,8 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
         </svg>
       </button>
 
-      {/* Image Container */}
       <div
-        onClick={e => e.stopPropagation()} // Prevent closing when clicking the image itself
+        onClick={e => e.stopPropagation()} // don't close when clicking the image
         style={{
           maxWidth: '90vw',
           maxHeight: '85vh',
@@ -162,7 +147,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
           }}
         />
 
-        {/* Premium Floating Toolbar */}
+        {/* floating toolbar */}
         <div
           style={{
             display: 'flex',
@@ -178,10 +163,10 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
           <button
             onClick={handleCopy}
             title="Copy image to clipboard"
+            className="text-muted hover-text-accent"
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -193,8 +178,6 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
               transition: 'all var(--duration-fast)',
               outline: 'none'
             }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--color-secondary)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
           >
             {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
             {copied ? 'Copied!' : 'Copy'}
@@ -205,10 +188,10 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
           <button
             onClick={handleDownload}
             title="Save image to disk"
+            className="text-muted hover-text-accent"
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -220,8 +203,6 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
               transition: 'all var(--duration-fast)',
               outline: 'none'
             }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--color-secondary)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
           >
             <Download size={14} />
             Download

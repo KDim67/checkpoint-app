@@ -4,9 +4,7 @@ import { join } from 'node:path'
 import { initDb, discardDb, getDb, createItem, searchItems, getSetting, setSetting } from '../src/main/db'
 import { runBackup, runRestore, listCompletedBackups, getBackupDir, parseBackupName } from '../src/main/backupVault'
 
-// The corrupt-database dialog points people here, so restore has to actually
-// work. The electron stub fixes userData at a throwaway path, so this runs
-// against real files without touching anyone's profile.
+// the corrupt-db dialog points here; the electron stub pins userData to a throwaway path
 
 const dataPath = '/tmp/checkpoint-test/userData'
 
@@ -20,14 +18,12 @@ const addItem = (title: string): void => {
 }
 
 beforeEach(() => {
-  // initDb does not create the directory: the real app relies on Electron
-  // having made userData already.
+  // initDb doesn't create the dir, electron normally has
   mkdirSync(dataPath, { recursive: true })
 })
 
 afterEach(() => {
-  // Read while the connection is still open: getBackupDir goes through
-  // getSetting, and a finalized statement throws once the database is gone.
+  // read while open, getBackupDir goes through getSetting
   let backupDir = ''
   try { backupDir = getBackupDir() } catch { /* never opened */ }
   try { discardDb() } catch { /* already gone */ }
@@ -44,13 +40,13 @@ describe('restoring a backup', () => {
     const backupFile = await runBackup()
     expect(existsSync(backupFile)).toBe(true)
 
-    // Life goes on: something else is added after the snapshot.
+    // something added after the snapshot
     addItem('written after the backup')
     expect(search('after')).toBe(1)
 
     await runRestore(listCompletedBackups()[0].filename)
 
-    // The state the backup captured.
+    // what the backup captured
     expect(search('backup')).toBe(1)
     expect(search('after')).toBe(0)
   })
@@ -58,10 +54,7 @@ describe('restoring a backup', () => {
   it('leaves the statement cache usable, not pointing at a dead connection', async () => {
     initDb(dataPath)
     addItem('a searchable thing')
-    // Warms the cache against the pre-restore connection. Closing the raw
-    // handle instead of going through the db module used to leave every cached
-    // statement compiled against it, and better-sqlite3 then throws
-    // "The database connection is not open" on the next query.
+    // warm the cache on the old connection; closing the raw handle left dead statements
     expect(search('searchable')).toBe(1)
 
     await runBackup()
@@ -90,7 +83,7 @@ describe('restoring a backup', () => {
     const before = listCompletedBackups().length
     await runRestore(listCompletedBackups()[0].filename)
 
-    // The pre-restore snapshot joins the list.
+    // the pre-restore snapshot joins the list
     expect(listCompletedBackups().length).toBeGreaterThan(before)
   })
 
@@ -110,7 +103,7 @@ describe('reading a name in the vault', () => {
   })
 
   it('ignores anything else in the folder', () => {
-    // A stray temp file, a half-written copy, or something the user dropped in.
+    // temp files and half-written copies
     expect(parseBackupName('temp_safety_123.db')).toBeNull()
     expect(parseBackupName('notes.txt')).toBeNull()
     expect(parseBackupName('backup_notanumber.db.gz')).toBeNull()
@@ -126,8 +119,7 @@ describe('what the vault keeps', () => {
     await runRestore(listCompletedBackups().filter(b => b.kind === 'scheduled')[0].filename)
 
     const safety = listCompletedBackups().filter(b => b.kind === 'preRestore')
-    // Written but never listed was the old behaviour: a safety net on disk
-    // and nowhere the user could reach it.
+    // it used to be written but never listed
     expect(safety.length).toBe(1)
   })
 
@@ -137,8 +129,7 @@ describe('what the vault keeps', () => {
     await runBackup()
 
     const scheduled = listCompletedBackups().filter(b => b.kind === 'scheduled')[0].filename
-    // maxCount defaults well above this, so the point is only that the count
-    // tracks restores rather than growing without any bound at all.
+    // the count tracks restores instead of growing unbounded
     for (let i = 0; i < 3; i++) await runRestore(scheduled)
 
     const safety = listCompletedBackups().filter(b => b.kind === 'preRestore')
@@ -149,8 +140,7 @@ describe('what the vault keeps', () => {
 
 describe('a backup that did not finish', () => {
   it('is not mistaken for one that did', () => {
-    // compressFile writes to <name>.partial and renames only once the file is
-    // whole, so anything still wearing that suffix is incomplete.
+    // .partial means incomplete
     expect(parseBackupName('backup_1700000000000.db.gz.partial')).toBeNull()
     expect(parseBackupName('pre_restore_1700000000000.db.gz.partial')).toBeNull()
   })
@@ -163,11 +153,10 @@ describe('a backup that did not finish', () => {
     const dir = getBackupDir()
     const listedBefore = listCompletedBackups().length
 
-    // A partial left behind by a full disk or a killed process.
+    // left by a full disk or a killed process
     writeFileSync(join(dir, `backup_${Date.now() + 1000}.db.gz.partial`), 'truncated rubbish')
 
-    // It must not appear as a restorable backup, and must not push a real one
-    // out of the vault by taking up a retention slot.
+    // not restorable, and no retention slot
     expect(listCompletedBackups().length).toBe(listedBefore)
     expect(listCompletedBackups().every(b => b.filename.endsWith('.db.gz'))).toBe(true)
   })

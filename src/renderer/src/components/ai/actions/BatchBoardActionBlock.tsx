@@ -25,8 +25,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
   const batchData = parseBatchBoardJson(jsonString)
   const signature = batchData ? `batch::${activeWorkspace || 'default'}::${batchData.columns.map(c => c.name).join(',')}_${batchData.cards.map(c => c.title).join(',')}` : ''
 
-  // Rebuilt from the JSON on every render, so read through a ref rather than
-  // listed: listing it would run the effect on every render.
+  // rebuilt from JSON each render, a ref keeps it out of the deps
   const parsedRef = useRef(batchData)
   parsedRef.current = batchData
 
@@ -44,20 +43,13 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
 
         const validContext = activeWorkspace || 'default'
 
-        // 1. Create Columns (locked: prevents a concurrent column writer,
-        //    e.g. the Kanban view's own "bootstrap default columns" path, or
-        //    another action block in the same message. From reading the
-        //    same stale column list and clobbering this write or creating a
-        //    second column with the same name).
+        // locked so a concurrent column writer can't read the same stale list and dupe or clobber
         const { createdCols, colsList, reusedCols } = await withLock(boardConfigLockKey(validContext), async () => {
-          // Reads and writes the unified board document rather than the raw
-          // column key. The unlocked primitives are correct here precisely
-          // because this block already holds the lock for the whole
-          // read-decide-write sequence.
+          // unlocked primitives are right, this block holds the lock for read-decide-write
           const config = await readBoardConfigUnlocked(validContext)
           const colsList: ColumnConfig[] = [...config.columns]
 
-          // Track only columns we actually create. Reused ones aren't "added".
+          // only columns we create, reused ones aren't added
           const createdCols: ColumnConfig[] = []
           let reusedCols = 0
           for (const col of batchData.columns) {
@@ -74,19 +66,15 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
           return { createdCols, colsList, reusedCols }
         })
 
-        // 2. Create Cards (locked: prevents two concurrent creators from
-        //    both seeing "no existing card with this title" and inserting
-        //    duplicates. A classic check-then-act race).
+        // locked against check-then-act duplicate cards
         const { newCards, skippedCards } = await withLock(`kanban-cards:${validContext}`, async () => {
           const existingCards = await readItems(validContext, 'card').catch(() => [])
-          // Exclude archived cards: the archive bin is invisible to the AI, so a
-          // title that only exists in the archive must NOT block a fresh create.
+          // archived cards are invisible to the AI, don't let them block a create
           const existingCardsList = [...existingCards].filter(ci => ci.status !== 'archived')
           const newCards: BatchCard[] = []
           let skippedCards = 0
 
-          // Load tags once and reuse/extend as we create cards, so colored tags
-          // from the AI are actually applied in the batch path (previously dropped).
+          // tags loaded once so AI colours actually apply here
           const resolve = await tagResolver()
           const resolveTagIds = async (tags: unknown[]): Promise<string[]> => {
             if (!Array.isArray(tags)) return []
@@ -98,21 +86,18 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
             return found.map(tag => tag.id)
           }
 
-          // Position base: explicit ascending positions keep the batch in order
-          // AND fix a real bug. Omitting position let the IPC validator default
-          // it to 0, pinning every AI card above user cards and making them
-          // impossible to reorder (midpoint of two 0-positions is still 0).
+          // explicit ascending positions; defaulting to 0 pinned AI cards on top and broke reordering
           const posBase = Date.now()
 
           for (const card of batchData.cards) {
             const existing = existingCardsList.find(ci => ci.title.trim().toLowerCase() === card.title.trim().toLowerCase())
             if (existing) {
-              // Already on the board (or a duplicate within this batch). Don't recreate.
+              // already on the board or duped in this batch
               skippedCards++
               continue
             }
 
-            // Fuzzy status → column matching
+            // fuzzy status to column
             const rawStatus = (card.status || '').trim().toLowerCase()
             const matchedCol =
               colsList.find(c => c.id.toLowerCase() === rawStatus) ||
@@ -132,7 +117,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
             const finalStatus = matchedCol ? matchedCol.id : (colsList[0]?.id || 'open')
 
             const tagIds = await resolveTagIds(card.tags)
-            // Optional AI-provided deadline (ISO date string, validated upstream)
+            // ISO date, validated upstream
             const dueMs = card.due && !Number.isNaN(Date.parse(card.due)) ? Date.parse(card.due) : null
             const createdCard = await createItem({
               context: validContext, type: 'card',
@@ -141,12 +126,9 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
               position: posBase + newCards.length * 10,
               due_at: dueMs, metadata: '{}'
             }, tagIds)
-            // Keep the local list current so duplicate titles *within this
-            // same batch* (e.g. the AI accidentally repeats a title) are
-            // also caught, not just titles that already existed in the DB.
+            // catches duplicate titles within this batch too
             existingCardsList.push(createdCard)
-            // Store the original proposal object so the confirmation can show
-            // its tags/priority/colors (the DB item doesn't carry those).
+            // keep the proposal so the confirmation can show tags, priority and colors
             newCards.push(card)
           }
 
@@ -179,8 +161,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
     )
   }
 
-  // Before execution: show the proposal (optimistic). After execution: show what
-  // was ACTUALLY created, so the counts/rows never overstate what hit the board.
+  // the proposal before, what actually landed after
   const applied = !!completedData
   const showCols: ShownColumn[] = completedData ? completedData.columns : (batchData?.columns || [])
   const showCards: BatchCard[] = completedData ? completedData.cards : (batchData?.cards || [])

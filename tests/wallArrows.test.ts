@@ -22,10 +22,10 @@ const box = (over: Partial<WallItem> = {}): WallItem => ({
   id: 'a', kind: 'note', x: 0, y: 0, width: 100, height: 100, z: 0, ...over
 })
 
-/** Two boxes side by side, 200 apart centre to centre. */
+/** side by side, 200 apart */
 const left = box({ id: 'l', x: 0, y: 0 })
 const right = box({ id: 'r', x: 200, y: 0 })
-/** One above the other. */
+/** stacked */
 const top = box({ id: 't', x: 0, y: 0 })
 const bottom = box({ id: 'b', x: 0, y: 200 })
 
@@ -76,7 +76,7 @@ describe('a curved connector', () => {
   })
 
   it('follows the curve at the tip rather than the straight line', () => {
-    // A head aimed along the chord would visibly miss the curve it sits on.
+    // a chord-aimed head misses the curve
     expect(Math.abs(g.endAngle)).toBeGreaterThan(0.05)
   })
 
@@ -109,7 +109,7 @@ describe('an elbow connector', () => {
   it('turns two corners, both square', () => {
     const g = arrowGeometry(left, box({ id: 'd', x: 300, y: 300 }), 'elbow')
     expect(g.polyline).toHaveLength(4)
-    // Each leg runs along one axis only.
+    // each leg on one axis
     for (let i = 1; i < g.polyline.length; i++) {
       const a = g.polyline[i - 1]
       const b = g.polyline[i]
@@ -136,8 +136,7 @@ describe('taking the corners off a path', () => {
   })
 
   it('shrinks the radius rather than overshooting a short leg', () => {
-    // A 4-long leg cannot give up 10 at each end, and a corner that ate more
-    // than its own segment would double back.
+    // a 4-long leg can't lose 10 each end
     const d = roundedPath([{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }], 10)
     const numbers = defined(d.match(/-?\d+(\.\d+)?/g)).map(Number)
     expect(Math.min(...numbers)).toBeGreaterThanOrEqual(0)
@@ -153,8 +152,7 @@ describe('taking the corners off a path', () => {
 describe('hit testing a connector', () => {
   it('measures to the nearest leg, not just the first', () => {
     const g = arrowGeometry(left, box({ id: 'd', x: 300, y: 300 }), 'elbow')
-    // A point sitting on the last leg is on the line, however far it is from
-    // the first one.
+    // on the last leg is on the line
     const last = g.polyline[g.polyline.length - 1]
     expect(distanceToPolyline(last, g.polyline)).toBeLessThan(0.001)
   })
@@ -163,7 +161,7 @@ describe('hit testing a connector', () => {
     const g = arrowGeometry(left, right, 'curved')
     const middle = g.polyline[Math.floor(g.polyline.length / 2)]
     expect(distanceToPolyline(middle, g.polyline)).toBeLessThan(0.001)
-    // The straight line between the ends is no longer where the arrow is.
+    // the straight chord isn't where the arrow is
     expect(distanceToPolyline({ x: 150, y: 50 }, g.polyline)).toBeGreaterThan(5)
   })
 
@@ -262,8 +260,7 @@ describe('stopping the line behind its head', () => {
   })
 
   it('refuses to eat more of the line than there is', () => {
-    // Two items nearly touching leave a few pixels. Taking a whole head off
-    // each end of that would draw the line backwards.
+    // near items can't lose a whole head each end
     const g = arrowGeometry(left, box({ id: 'close', x: 104, y: 0 }), 'straight', { start: 500, end: 500 })
     expect(g.polyline[0].x).toBeLessThanOrEqual(g.polyline[1].x)
   })
@@ -271,8 +268,7 @@ describe('stopping the line behind its head', () => {
   it('follows the tangent on a curve, not the chord', () => {
     const g = arrowGeometry(left, right, 'curved', { end: 20 })
     const drawnEnd = g.polyline[g.polyline.length - 1]
-    // Pulled back along the curve's own direction, so it leaves the tip at an
-    // angle rather than sliding straight back along the chord.
+    // pulled back along the curve, not the chord
     expect(Math.abs(drawnEnd.y - g.end.y)).toBeGreaterThan(0.5)
   })
 
@@ -292,8 +288,7 @@ describe('stopping the line behind its head', () => {
 
 describe('the arrowhead itself', () => {
   it('has a notched back rather than being a flat triangle', () => {
-    // Four points: tip, barb, notch, barb. A flat back reads as a triangle
-    // balanced on the line rather than as a head.
+    // tip, barb, notch, barb
     expect(arrowHeadPoints({ x: 0, y: 0 }, 0, 4).split(' ')).toHaveLength(4)
   })
 
@@ -379,8 +374,7 @@ describe('an end attached to nothing', () => {
   })
 
   it('lets the item win when a stale point is left behind', () => {
-    // Reattaching writes the item id; a point that survived alongside it must
-    // not quietly override what the end is now tied to.
+    // a surviving point mustn't override a reattached item
     const item = normalizeWallItem({
       kind: 'arrow', id: 'x', from: 'a', to: 'b', toPoint: { x: 5, y: 6 },
       x: 0, y: 0, width: 10, height: 10, z: 1
@@ -400,8 +394,7 @@ describe('what a loose end does to the wall bounds', () => {
   })
 
   it(`still ignores the placeholder box when both ends are attached`, () => {
-    // The box an arrow carries is not where it is drawn, so counting it would
-    // pull "fit to content" towards a point with nothing at it.
+    // arrow boxes aren't where they're drawn
     const other = box({ id: 'o', x: 200, y: 0 })
     const arrow = box({ id: 'a', kind: 'arrow', from: 'n', to: 'o', x: 9000, y: 9000 })
     expect(boundsOf([note, other, arrow])).toEqual(boundsOf([note, other]))
@@ -434,8 +427,7 @@ describe('where a label sits on the line', () => {
   })
 
   it('does not move when a head is added or taken away', () => {
-    // Otherwise a label already placed would shift the moment the style
-    // changed, which reads as the app losing track of it.
+    // a placed label mustn't shift on restyle
     const plain = arrowGeometry(left, right, 'curved')
     const trimmed = arrowGeometry(left, right, 'curved', { start: 18, end: 18 })
     expect(trimmed.mid).toEqual(plain.mid)
@@ -448,8 +440,7 @@ describe('finding the middle of a run of segments', () => {
   })
 
   it('measures by length, so a long leg carries the middle', () => {
-    // Halfway by index would land on the corner; halfway by length is 5 along
-    // the long leg.
+    // by index lands on the corner, by length 5 along the long leg
     const mid = midpointAlong([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 2 }])
     expect(mid.x).toBeCloseTo(6)
     expect(mid.y).toBe(0)

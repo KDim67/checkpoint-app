@@ -27,9 +27,8 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
           position: 'relative'
         }}
       >
-        {/* Header Row: Preset pills, cycle dots & Cancel button */}
         <div style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-4)' }}>
-          {/* Preset mode pills. Locked while running to avoid accidentally nuking progress */}
+          {/* locked while running so progress can't be nuked */}
           <div
             style={{ display: 'flex', gap: '6px', background: 'var(--color-surface-2)', padding: '3px', borderRadius: 'var(--radius-full)', border: '1px solid var(--color-surface-offset)', opacity: isRunning ? 0.5 : 1 }}
             title={isRunning ? 'Pause the timer to switch modes' : undefined}
@@ -64,13 +63,11 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
             })}
           </div>
 
-          {/* End / Cancel session */}
           <button
             onClick={handleCancelSession}
+            className="focus-active-end"
             style={{
               background: 'transparent',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -81,24 +78,14 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
               fontWeight: 'var(--weight-medium)',
               transition: 'all 100ms ease'
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--color-error)'
-              e.currentTarget.style.borderColor = 'var(--color-error)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--color-text-muted)'
-              e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-            }}
           >
             <X size={13} />
             End Session
           </button>
         </div>
 
-        {/* Clock Dial & Progress Ring */}
         <div className={isRunning ? 'timer-ring-active' : undefined} style={{ position: 'relative', width: '250px', height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '10px 0' }}>
           <svg width="250" height="250" style={{ transform: 'rotate(-90deg)', position: 'absolute', top: 0, left: 0 }}>
-            {/* Background ring */}
             <circle
               cx="125"
               cy="125"
@@ -107,7 +94,6 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
               stroke="var(--color-surface-offset)"
               strokeWidth="10"
             />
-            {/* Active filled ring */}
             <circle
               role="progressbar"
               aria-valuenow={Math.round(progressPercent)}
@@ -127,7 +113,6 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
             />
           </svg>
 
-          {/* Readout inside Circle */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <span style={{
               fontSize: '10px',
@@ -156,17 +141,15 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
           </div>
         </div>
 
-        {/* Controls Bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
             onClick={handleResetTimer}
+            className="focus-active-control"
             style={{
               width: '44px',
               height: '44px',
               borderRadius: '50%',
               background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -174,20 +157,13 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
               transition: 'all 120ms ease'
             }}
             title="Reset Interval"
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--color-text-base)'
-              e.currentTarget.style.borderColor = 'var(--color-balance)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--color-text-muted)'
-              e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-            }}
           >
             <RotateCcw size={18} />
           </button>
 
           <button
             onClick={handleToggleTimer}
+            className="focus-active-toggle"
             style={{
               width: '56px',
               height: '56px',
@@ -200,25 +176,21 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: `0 4px 14px ${activeColor}40`,
-              transition: 'all 150ms ease',
-              transform: 'scale(1)'
+              transition: 'all 150ms ease'
             }}
             title={isRunning ? 'Pause' : 'Resume'}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           >
             {isRunning ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" style={{ marginLeft: '3px' }} />}
           </button>
 
           <button
             onClick={handleSkipTimer}
+            className="focus-active-control"
             style={{
               width: '44px',
               height: '44px',
               borderRadius: '50%',
               background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -226,21 +198,12 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
               transition: 'all 120ms ease'
             }}
             title="Skip Interval / Retrospective"
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--color-text-base)'
-              e.currentTarget.style.borderColor = 'var(--color-balance)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--color-text-muted)'
-              e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-            }}
           >
             <SkipForward size={18} />
           </button>
         </div>
 
-        {/* Distraction tally. A Pomodoro staple: acknowledge the interruption,
-            keep working, review the count in the retro. Focus intervals only. */}
+        {/* distraction tally: note it, keep going, review in the retro */}
         {preset === 'focus' && (
           <button
             onClick={focusLogDistraction}
@@ -268,7 +231,7 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
           </button>
         )}
 
-        {/* Focus Targets checklist. Hidden for breaks, since there are no tasks to work a break */}
+        {/* hidden for breaks, no tasks to work */}
         {preset === 'focus' && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>

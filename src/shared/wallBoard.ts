@@ -1,20 +1,14 @@
-/**
- * The board shown beside the Wall. The DOM-free half: what a drag carries, how
- * cards group into columns, where one lands when handed back.
- *
- * Position on the wall still means nothing. Dropping onto a named column is not
- * a position though, so that one gesture moves the card for real.
- */
+/** DOM-free half of the rail; a column drop really moves the card */
 
 import type { Item } from './types'
 import type { ColumnConfig } from './boardModel'
 
-/** Private type, so a drop from a browser or file manager cannot look like a card. */
+/** private type so browser or file drops can't pose as cards */
 export const WALL_DRAG_MIME = 'application/x-checkpoint-wall-item'
 
 interface WallDragPayload {
   kind: 'card' | 'doc'
-  /** An item id for a card, a note title for a doc. As `WallItem.ref`. */
+  /** card id, or note title for a doc */
   ref: string
 }
 
@@ -22,7 +16,7 @@ export function encodeWallDrag(payload: WallDragPayload): string {
   return JSON.stringify(payload)
 }
 
-/** A drop carries whatever the source wrote, and that source may not be us. */
+/** the source may not be us */
 export function decodeWallDrag(raw: string | null | undefined): WallDragPayload | null {
   if (!raw) return null
 
@@ -36,17 +30,12 @@ export function decodeWallDrag(raw: string | null | undefined): WallDragPayload 
   return kind && ref ? { kind, ref } : null
 }
 
-// Grouping
-
 export interface BoardGroup {
   column: ColumnConfig
   cards: Item[]
 }
 
-/**
- * Cards whose column was deleted keep its id and vanish from the board, so the
- * rail is the only place left to see them.
- */
+/** cards of deleted columns vanish from the board, the rail still shows them */
 export const ORPHAN_COLUMN_ID = '__orphaned__'
 
 const ORPHAN_COLUMN: ColumnConfig = {
@@ -55,7 +44,7 @@ const ORPHAN_COLUMN: ColumnConfig = {
   wipLimit: null
 }
 
-/** By status, in column order, sorted by position. Archived left out, as on the board. */
+/** column order, by position, archived out */
 export function groupCardsByColumn(cards: Item[], columns: ColumnConfig[]): BoardGroup[] {
   const byStatus = new Map<string, Item[]>()
   for (const card of cards) {
@@ -80,14 +69,14 @@ export function groupCardsByColumn(cards: Item[], columns: ColumnConfig[]): Boar
   return groups
 }
 
-/** Every word of the query has to appear, in the title or in a tag. */
+/** every word in the title or a tag */
 export function cardMatches(card: Item, words: string[]): boolean {
   if (words.length === 0) return true
   const hay = [card.title, ...(card.tags ?? []).map(t => t.name)].join(' ').toLowerCase()
   return words.every(w => hay.includes(w))
 }
 
-/** Empty columns are dropped while filtering. They are noise, not structure. */
+/** empty columns dropped while filtering */
 export function filterGroups(groups: BoardGroup[], query: string): BoardGroup[] {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   if (words.length === 0) return groups
@@ -96,21 +85,16 @@ export function filterGroups(groups: BoardGroup[], query: string): BoardGroup[] 
     .filter(g => g.cards.length > 0)
 }
 
-// Handing a card back to the board
-
-/** Matches the board's own gap, so positions stay comparable between the two. */
+/** the board's gap, so positions stay comparable */
 const POSITION_GAP = 1000
 
-/** At the end of the column, matching what the board does for the same drop. */
+/** end of the column, like the board */
 export function appendPosition(cardsInColumn: Item[]): number {
   if (cardsInColumn.length === 0) return POSITION_GAP
   return Math.max(...cardsInColumn.map(c => c.position)) + POSITION_GAP
 }
 
-/**
- * Which selected items are cards that would actually move, and where to. Cards
- * already in the column are skipped so the "moved N" count stays honest.
- */
+/** cards already there are skipped so the count is honest */
 export function planHandoff(
   refs: string[],
   columnId: string,
@@ -126,7 +110,7 @@ export function planHandoff(
     const card = byId.get(ref)
     if (!card || card.status === columnId) continue
     plan.push({ id: card.id, status: columnId, position: next })
-    // Spaced, so a multi-card hand-off keeps the order it was picked up in.
+    // spaced so the picked-up order holds
     next += POSITION_GAP
   }
   return plan

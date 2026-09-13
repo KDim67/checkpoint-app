@@ -1,4 +1,4 @@
-/** Pasting a stored snippet back out. */
+/** pasting a stored snippet back out */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

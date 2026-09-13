@@ -1,8 +1,4 @@
-/**
- * Wraps an IPC action in a result object rather than letting it throw over the
- * bridge. A rejected invoke arrives in the renderer as a string with the main
- * process stack in it, which is neither readable nor catchable per call site.
- */
+/** a rejected invoke reaches the renderer as a string with main's stack, so return a result instead */
 export async function handleSafe<T>(fn: () => T | Promise<T>) {
   try {
     const data = await fn()

@@ -33,7 +33,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Timers outlive the toasts they dismiss if the provider unmounts mid-flight.
+  // timers outlive their toasts if the provider unmounts mid-flight
   useEffect(() => {
     const timers = timersRef.current
     return () => {
@@ -78,7 +78,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       
-      {/* Toast Container */}
       <div
         role="status"
         aria-live="polite"
@@ -139,6 +138,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     t.action?.onClick()
                     removeToast(t.id)
                   }}
+                  className="hover-brighten"
                   style={{
                     background: 'transparent',
                     border: 'none',
@@ -149,8 +149,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     padding: 0,
                     whiteSpace: 'nowrap'
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-                  onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
                 >
                   {t.action.label}
                 </button>

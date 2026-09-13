@@ -8,8 +8,7 @@ import { resetNotificationDedupe, POLICY_SETTING_KEY } from '../src/main/notific
 import { DEFAULT_POLICY } from '../src/shared/notificationPolicy'
 import { shown } from './stubs/electron'
 
-// The sweep runs every fifteen minutes over the same rows, so the behaviour that
-// matters is what it declines to say a second time.
+// the sweep repeats every 15 minutes, what it declines to repeat matters
 
 const DAY = 86_400_000
 let dir: string
@@ -18,8 +17,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'checkpoint-due-'))
   initDb(dir)
   shown.length = 0
-  // Quiet hours default to off, but the window would otherwise depend on when
-  // the suite happens to run.
+  // otherwise the window depends on when the suite runs
   setSetting(POLICY_SETTING_KEY, { ...DEFAULT_POLICY, quietEnabled: false })
   resetNotificationDedupe()
 })
@@ -66,8 +64,7 @@ describe('checkDueItems', () => {
   })
 
   it('does not repeat itself on the next sweep', () => {
-    // The whole reason the notification layer keeps state: this runs every
-    // fifteen minutes.
+    // why the layer keeps state
     item('Renew the certificate', Date.now() - 1000)
     expect(checkDueItems()).toBe(1)
     expect(checkDueItems()).toBe(0)
@@ -84,8 +81,7 @@ describe('checkDueItems', () => {
   })
 
   it('leaves very old overdue work alone', () => {
-    // Otherwise the first run after this ships buries the user under months of
-    // stale due dates at once.
+    // or the first run buries the user in stale dates
     item('Ancient', Date.now() - 30 * DAY)
     expect(checkDueItems()).toBe(0)
   })

@@ -1,10 +1,6 @@
-/**
- * Typed const enum for ALL IPC channels used across the entire project.
- * Never use magic strings, always reference a member of this enum.
- * Defined upfront (Phase 1) so no future phase ever imports or invents new strings.
- */
+/** every IPC channel, never magic strings */
 export const enum IpcChannels {
-  // Database
+  // database
   DB_GET_ITEMS           = 'db:getItems',
   DB_CREATE_ITEM         = 'db:createItem',
   DB_UPDATE_ITEM         = 'db:updateItem',
@@ -32,7 +28,7 @@ export const enum IpcChannels {
   DB_IMPORT_CONTEXT_DATA  = 'db:importContextData',
   DB_RENAME_CONTEXT       = 'db:renameContext',
 
-  // Markdown Notes
+  // markdown notes
   NOTES_LIST             = 'notes:list',
   NOTES_READ             = 'notes:read',
   NOTES_WRITE            = 'notes:write',
@@ -40,12 +36,12 @@ export const enum IpcChannels {
   NOTES_SEARCH           = 'notes:search',
   NOTES_IMPORT_VAULT     = 'notes:importVault',
 
-  // Git Integration
+  // git
   GIT_CHECK              = 'git:check',
   GIT_STATUS             = 'git:status',
   GIT_LOG                = 'git:log',
 
-  // Clipboard History
+  // clipboard history
   CLIPBOARD_GET_HISTORY  = 'clipboard:getHistory',
   CLIPBOARD_TOGGLE_PIN   = 'clipboard:togglePin',
   CLIPBOARD_UPDATE_LABEL = 'clipboard:updateLabel',
@@ -58,7 +54,7 @@ export const enum IpcChannels {
   APP_NAVIGATE_TO_VIEW   = 'app:navigateToView',
   ANALYTICS_GET_DATA     = 'analytics:getData',
 
-  // AI Streaming
+  // AI streaming
   AI_STREAM_START        = 'ai:streamStart',
   AI_STREAM_ABORT        = 'ai:streamAbort',
   AI_TEST_CONNECTION     = 'ai:testConnection',
@@ -69,18 +65,18 @@ export const enum IpcChannels {
   AI_DONE                = 'ai:done',
   AI_ERROR               = 'ai:error',
 
-  // Widget
+  // widget
   WIDGET_TOGGLE          = 'widget:toggle',
   WIDGET_SET_POSITION    = 'widget:setPosition',
   WIDGET_SET_OPACITY     = 'widget:setOpacity',
 
-  // Theme hot-reload
+  // theme hot-reload
   THEME_UPDATE           = 'theme:update',
 
-  // Hardware profiling (AI Cookbook)
+  // hardware profiling (Cookbook)
   HARDWARE_GET_SPECS     = 'hardware:getSpecs',
 
-  // Ollama (AI Cookbook)
+  // ollama (Cookbook)
   OLLAMA_CHECK_INSTALLED = 'ollama:checkInstalled',
   OLLAMA_LIST_LOCAL      = 'ollama:listLocal',
   OLLAMA_PULL            = 'ollama:pull',
@@ -93,60 +89,60 @@ export const enum IpcChannels {
   // HUD
   HUD_TOGGLE             = 'hud:toggle',
   HUD_RESIZE             = 'hud:resize',
-  /** Main → renderer: clear whatever the HUD was holding. */
+  /** main to renderer: clear the HUD */
   HUD_RESET              = 'hud:reset',
 
-  // Webhook
+  // webhook
   WEBHOOK_TOGGLE         = 'webhook:toggle',
 
-  // MCP Server
+  // MCP server
   MCP_TOGGLE             = 'mcp:toggle',
   MCP_GET_STATUS         = 'mcp:getStatus',
   MCP_REGENERATE_TOKEN   = 'mcp:regenerateToken',
-  /** Main → renderer: something outside the UI changed the data. */
+  /** main to renderer: data changed outside the UI */
   MCP_DATA_CHANGED       = 'mcp:dataChanged',
   MCP_ACTIVITY_LIST      = 'mcp:activityList',
-  // Tray & startup
+  // tray and startup
   STARTUP_GET            = 'startup:get',
   STARTUP_SET            = 'startup:set',
   TRAY_SUMMARY           = 'tray:summary',
   TRAY_ACTION            = 'tray:action',
   TRAY_RESIZE            = 'tray:resize',
-  /** Main → renderer: startup settings changed somewhere, re-read them. */
+  /** main to renderer: re-read startup settings */
   STARTUP_CHANGED        = 'startup:changed',
 
-  // Subtasks
+  // subtasks
   SUBTASK_LIST           = 'subtask:list',
   SUBTASK_ADD            = 'subtask:add',
   SUBTASK_UPDATE         = 'subtask:update',
   SUBTASK_DELETE         = 'subtask:delete',
   SUBTASK_CONVERT        = 'subtask:convert',
 
-  // Export
+  // export
   EXPORT_ITEMS           = 'export:items',
 
-  // Notifications
+  // notifications
   NOTIFY_SEND            = 'notify:send',
   NOTIFY_GET_POLICY      = 'notify:getPolicy',
   NOTIFY_SET_POLICY      = 'notify:setPolicy',
 
-  // Recurring work
+  // recurring work
   RECURRENCE_LIST        = 'recurrence:list',
   RECURRENCE_CREATE      = 'recurrence:create',
   RECURRENCE_DELETE      = 'recurrence:delete',
   RECURRENCE_SET_ACTIVE  = 'recurrence:setActive',
   MCP_ACTIVITY_UNDO      = 'mcp:activityUndo',
 
-  // Backup
+  // backup
   BACKUP_RUN             = 'backup:run',
   BACKUP_STATUS          = 'backup:status',
 
-  // Activity Tracker
+  // activity tracker
   TRACKER_TOGGLE         = 'tracker:toggle',
   TRACKER_GET_STATE      = 'tracker:getState',
   TRACKER_GET_STATS      = 'tracker:getStats',
 
-  // App
+  // app
   APP_GET_VERSION        = 'app:getVersion',
   APP_OPEN_EXTERNAL      = 'app:openExternal',
   APP_GET_DATA_PATH      = 'app:getDataPath',
@@ -160,14 +156,14 @@ export const enum IpcChannels {
   APP_UPDATE_PROGRESS     = 'app:updateProgress',
   APP_UPDATE_STATE        = 'app:updateState',
 
-  // Phase 22 Customizer & Extensions
+  // customizer and extensions
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
   CUSTOMIZER_TOGGLE_PLUGIN       = 'customizer:togglePlugin',
   CUSTOMIZER_OPEN_PLUGINS_FOLDER = 'customizer:openPluginsFolder',
-  /** Writes one of the shipped example plugins into the user's plugins folder. */
+  /** writes a shipped example into the plugins folder */
   CUSTOMIZER_INSTALL_EXAMPLE     = 'customizer:installExample',
   CUSTOMIZER_UPDATE_THEME        = 'customizer:updateTheme',
-  /** Renderer asks for the theme CSS to apply now, rather than awaiting a push. */
+  /** pull the CSS now instead of waiting for a push */
   CUSTOMIZER_GET_CSS             = 'customizer:getCss',
   CUSTOMIZER_REGISTER_SHORTCUTS  = 'customizer:registerShortcuts',
   CUSTOMIZER_TOGGLE_ENGINE       = 'customizer:toggleEngine',
@@ -175,7 +171,7 @@ export const enum IpcChannels {
   CUSTOMIZER_GET_THEME           = 'customizer:getTheme',
   CUSTOMIZER_GET_SHORTCUTS       = 'customizer:getShortcuts',
 
-  // Cheatsheets
+  // cheatsheets
   CHEATSHEETS_LIST              = 'cheatsheets:list',
   CHEATSHEETS_ADD               = 'cheatsheets:add',
   CHEATSHEETS_REMOVE            = 'cheatsheets:remove',
@@ -185,7 +181,7 @@ export const enum IpcChannels {
   CHEATSHEETS_GET_RELEVANT      = 'cheatsheets:getRelevant',
   CHEATSHEETS_SEARCH            = 'cheatsheets:search',
 
-  // Game Dev Helpers
+  // game dev
   GAMEDEV_BATCH_RENAME          = 'gamedev:batchRename',
   GAMEDEV_SELECT_TEXTURE        = 'gamedev:selectTexture',
   GAMEDEV_LOAD_TEXTURE          = 'gamedev:loadTexture',
@@ -197,7 +193,7 @@ export const enum IpcChannels {
   GAMEDEV_SAVE_LUT              = 'gamedev:saveLut',
   GAMEDEV_SAVE_UPSCALED         = 'gamedev:saveUpscaled',
 
-  // AI Memory Engine & Workspace Indexing
+  // AI memory and workspace indexing
   AI_GET_MEMORIES               = 'ai:getMemories',
   AI_SAVE_MEMORY                = 'ai:saveMemory',
   AI_DELETE_MEMORY              = 'ai:deleteMemory',
@@ -210,13 +206,13 @@ export const enum IpcChannels {
   WORKSPACE_GET_STRUCTURE        = 'workspace:getStructure',
   WORKSPACE_READ_FILE           = 'workspace:readFile',
 
-  // Local Media
+  // local media
   MEDIA_SAVE_FROM_BUFFER        = 'media:saveFromBuffer',
   MEDIA_SAVE_FILE_PATHS         = 'media:saveFilePaths',
   MEDIA_SCAN_AND_PRUNE          = 'media:scanAndPrune',
   MEDIA_GET_STORAGE_INFO        = 'media:getStorageInfo',
 
-  // P2P Network Sync
+  // P2P sync
   SYNC_START_HOST               = 'sync:startHost',
   SYNC_STOP_HOST                = 'sync:stopHost',
   SYNC_CONNECT_AND_SYNC         = 'sync:connectAndSync',

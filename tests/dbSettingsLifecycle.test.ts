@@ -4,9 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { initDb, discardDb, getSetting, setSetting, deleteSetting } from '../src/main/db'
 
-// Settings get read at both ends of the app's life: during startup before the
-// database is open, and during shutdown after it has closed. Neither should
-// be a crash.
+// settings are read before open and after close, neither may crash
 
 let dir: string
 
@@ -21,8 +19,7 @@ describe('reading a setting with no database open', () => {
   })
 
   it('returns the default after the connection closes', () => {
-    // The statement still exists once the database is gone, just finalized,
-    // so guarding on the statement alone let this throw during shutdown.
+    // a finalized statement still exists, so guarding on it threw at shutdown
     dir = mkdtempSync(join(tmpdir(), 'checkpoint-settings-'))
     initDb(dir)
     setSetting('active_context', 'work')

@@ -1,4 +1,4 @@
-/** LAN sync between two machines, and applying what arrives. */
+/** LAN sync between machines, and applying what arrives */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -6,7 +6,7 @@ import { SyncService } from '../syncService'
 
 const syncService = new SyncService()
 
-/** Stops the LAN host, for the shutdown sweep that has to reach every service. */
+/** for the shutdown sweep */
 export function stopSyncHost(): void {
   syncService.stopHost()
 }
@@ -79,10 +79,7 @@ export function registerSyncHandlers(): void {
     }
   })
 
-// Both of these carry another machine's data into prepared statements. The
-  // renderer validates it on arrival, and it is validated again here: the rows
-  // reach SQL through this handler, and trusting the caller because the caller
-  // is usually our own renderer is how a validator ends up being skipped.
+  // validated again here, the rows reach SQL through this handler whoever the caller is
   ipcMain.handle(IpcChannels.SYNC_APPLY_BOARD_BASELINE, async (
     _event,
     context: unknown,

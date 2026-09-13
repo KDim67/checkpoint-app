@@ -1,8 +1,6 @@
 import { getDb } from './connection'
 
-// A record of what an external agent changed. Prepared lazily rather than in the
-// init block because these run rarely, only when the MCP server is switched on,
-// and there is no reason to pay for them on every launch.
+// prepared lazily, only used when the MCP server is on
 
 interface McpActivityRow {
   id: string
@@ -24,9 +22,7 @@ export function insertMcpActivity(row: McpActivityRow): void {
 }
 
 export function getMcpActivity(limit = 50): McpActivityRow[] {
-  // rowid breaks the tie. An agent can easily make several writes inside one
-  // millisecond, and on created_at alone SQLite is free to return those in any
-  // order, so the log would show a card being updated before it was created.
+  // rowid breaks ties within one ms, or an update could list before its create
   return getDb()
     .prepare(`SELECT * FROM mcp_activity ORDER BY created_at DESC, rowid DESC LIMIT ?`)
     .all(limit) as McpActivityRow[]
@@ -38,14 +34,7 @@ export function getMcpActivityById(id: string): McpActivityRow | null {
     .get(id) as McpActivityRow | undefined) ?? null
 }
 
-/**
- * Stamps an entry as reversed.
- *
- * The guard on `undone_at IS NULL` is what makes undo idempotent: two clicks on
- * the same row, or a click racing a sync, would otherwise replay the reversing
- * actions twice, and replaying a `delete_item` that already ran would go on to
- * delete whatever later took that id.
- */
+/** undone_at IS NULL makes undo idempotent; a replayed delete_item could hit a reused id */
 export function markMcpActivityUndone(id: string, at: number): boolean {
   const result = getDb()
     .prepare(`UPDATE mcp_activity SET undone_at = ? WHERE id = ? AND undone_at IS NULL`)
@@ -53,7 +42,7 @@ export function markMcpActivityUndone(id: string, at: number): boolean {
   return result.changes > 0
 }
 
-/** Drops entries older than the cutoff. The log is a convenience, not an audit. */
+/** a convenience, not an audit */
 export function pruneMcpActivity(olderThan: number): number {
   return getDb().prepare(`DELETE FROM mcp_activity WHERE created_at < ?`).run(olderThan).changes
 }

@@ -1,10 +1,4 @@
-/**
- * Marks a board that has been shared with someone, hosted or joined.
- *
- * A label and nothing else: no behaviour hangs off it. It exists because a
- * workspace holding somebody else's board was indistinguishable from one of
- * your own, which is most of the reason joining one felt alarming.
- */
+/** label only, no behaviour; a joined board used to look like your own */
 
 import { Users } from 'lucide-react'
 

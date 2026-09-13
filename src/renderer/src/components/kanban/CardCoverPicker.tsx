@@ -9,7 +9,7 @@ export default function CardCoverPicker({ cover, onChange }: { cover: CardCover 
         Cover Color & Mode
       </span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {/* Mode Selector (Header Strip vs Full Background) */}
+        {/* header strip vs full background */}
         {cover && cover.type === 'color' && (
           <div style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}>
             <button

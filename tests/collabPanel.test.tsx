@@ -41,7 +41,7 @@ const fakeSession = (overrides: Partial<Session> = {}): Session => ({
   ...overrides
 })
 
-/** The popover and the passcode field are plain state on the board; the rest is the session's to do. */
+/** popover and passcode are board state; the rest is the session's */
 function Board({ session, open }: { session: Session; open: boolean }) {
   const [popoverOpen, setPopoverOpen] = useState(open)
   const [joinCode, setJoinCode] = useState('')

@@ -22,7 +22,7 @@ describe('telling a Todoist export apart', () => {
   })
 
   it('does not mistake Checkpoint’s own export for one', () => {
-    // Checkpoint exports carry `items` too. Projects are what separate them.
+    // our exports have items too, projects tell them apart
     expect(detectImportSource({ context: 'work', items: [] })).toBeNull()
   })
 
@@ -47,8 +47,7 @@ describe('Todoist priority, which the two exports number in opposite directions'
   })
 
   it('agrees about which end is urgent despite the opposite numbering', () => {
-    // The whole point. Reading one file with the other's convention would
-    // invert every priority on the board and look like nothing was wrong.
+    // the other file's convention would invert every priority unnoticed
     expect(todoistPriorityFromApi(4)).toBe(todoistPriorityFromCsv('1'))
     expect(todoistPriorityFromApi(1)).toBe(todoistPriorityFromCsv('4'))
   })
@@ -163,8 +162,7 @@ describe('reading a CSV', () => {
   })
 
   it('keeps a newline inside a quoted field', () => {
-    // Todoist descriptions are multi-line often enough that a naive split
-    // would tear real exports in half.
+    // multi-line descriptions would tear a naive split
     expect(parseCsv('a,"line one\nline two",c')).toEqual([['a', 'line one\nline two', 'c']])
   })
 
@@ -177,8 +175,7 @@ describe('reading a CSV', () => {
   })
 
   it('strips a byte order mark off the first header', () => {
-    // Otherwise the first column is named "﻿TYPE" and matching silently
-    // stops working on any file that has been through Excel.
+    // or an Excel BOM glues onto the first column name
     expect(parseCsv('﻿TYPE,CONTENT')).toEqual([['TYPE', 'CONTENT']])
   })
 })
@@ -207,8 +204,7 @@ describe('a Todoist template CSV', () => {
 
   it('reads the CSV priority scale, not the API one', () => {
     const board = defined(parseTodoistCsv(csv, 'Renovation'))
-    // PRIORITY 1 is Todoist's p1. Read as the API scale it would arrive as
-    // the lowest instead of the highest.
+    // PRIORITY 1 is p1; the API scale would make it lowest
     expect(defined(board.cards.find(c => c.title === 'Strip the wallpaper')).priority).toBe(3)
     expect(defined(board.cards.find(c => c.title === 'Order paint, matt')).priority).toBe(1)
   })

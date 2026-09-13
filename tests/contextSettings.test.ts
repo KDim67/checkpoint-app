@@ -9,7 +9,7 @@ import {
 import { DEFAULT_WALL_ID, wallDocKey, wallIndexKey } from '../src/shared/wallModel'
 import { boardConfigKey } from '../src/shared/boardModel'
 
-/** Ids are injected so a remap is reproducible. */
+/** injected ids, reproducible remaps */
 const counter = (): (() => string) => {
   let n = 0
   return () => `new${++n}`
@@ -29,8 +29,7 @@ describe('which settings belong to a workspace', () => {
   })
 
   it('does not claim the rail preferences, which are not workspace data', () => {
-    // A prefix scan for `wall_` would sweep these up and carry one machine's
-    // panel width into every export.
+    // a wall_ prefix scan would export one machine's panel width
     const keys = contextSettingKeys('work', null)
     expect(keys).not.toContain('wallview_rail_open')
     expect(keys).not.toContain('wallview_rail_width')
@@ -46,7 +45,7 @@ describe('which settings belong to a workspace', () => {
   })
 
   it('falls back to the first wall alone when there is no index', () => {
-    // What a workspace that predates several-walls-per-workspace looks like.
+    // a pre-multi-wall workspace
     expect(wallDocKeysFor('work', null)).toEqual(['wall_work'])
   })
 
@@ -80,8 +79,7 @@ describe('importing a workspace into a new one', () => {
   })
 
   it('gives later walls new ids, so the two workspaces cannot share a document', () => {
-    // Copying the index verbatim would leave both workspaces pointing at
-    // `wall_doc_abc`: editing a wall in one would change it in the other.
+    // a verbatim index would share wall_doc_abc between workspaces
     const settings = {
       [wallIndexKey('old')]: JSON.stringify({
         version: 1,
@@ -133,7 +131,7 @@ describe('importing a workspace into a new one', () => {
   })
 
   it('writes each destination key once', () => {
-    // The first wall arrives both as a direct key and through the index.
+    // the first wall arrives twice
     const settings = {
       [wallIndexKey('old')]: JSON.stringify({ version: 1, walls: [{ id: DEFAULT_WALL_ID, name: 'Wall' }], activeId: DEFAULT_WALL_ID }),
       'wall_old': '{"items":[]}'

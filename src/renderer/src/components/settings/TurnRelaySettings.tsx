@@ -1,12 +1,4 @@
-/**
- * Somewhere to point internet sync when STUN is not enough.
- *
- * Two peers behind symmetric NATs, which is what mobile tethering and a lot of
- * corporate networks are, cannot reach each other however patient they are.
- * The fix is a TURN relay carrying the traffic between them, and there is no
- * free public one worth shipping. So the user brings their own, and until they
- * do, nothing here is used or sent anywhere.
- */
+/** symmetric NATs need a TURN relay and no free one is worth shipping; unused until set */
 
 import React, { useEffect, useState } from 'react'
 import { Route, Check } from 'lucide-react'
@@ -67,8 +59,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
     await setStringSetting(TURN_URL_KEY, url.trim())
     await setStringSetting(TURN_USERNAME_KEY, username.trim())
     await setStringSetting(TURN_CREDENTIAL_KEY, credential.trim())
-    // The transport caches this, because a peer connection is built in
-    // synchronous code and cannot wait on a setting.
+    // the transport caches it, peer connections are built synchronously
     await refreshTurnServer()
     setSaved(true)
     setTimeout(() => setSaved(false), SAVED_FEEDBACK_MS)

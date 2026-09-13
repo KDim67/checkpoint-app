@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { closeGracefully, describeChannelError } from '../src/renderer/src/lib/webrtcTransport'
 
-// What the browser hands to onerror, and the only place the reason for a dead
-// session is written down. Read wrongly it came out as "Something went wrong",
-// which is not a report anybody can act on.
+// the only record of why a session died; misread it said "Something went wrong"
 describe('describeChannelError', () => {
   const event = (error: unknown): Event => ({ type: 'error', error }) as unknown as Event
 
@@ -33,10 +31,7 @@ describe('describeChannelError', () => {
   })
 })
 
-// The goodbye message is the one send in the app that is immediately followed
-// by the connection going away, so it is the one that gets thrown away if the
-// close does not wait for it. Timing, with nothing to observe afterwards, which
-// is exactly the kind of thing that breaks quietly.
+// the goodbye is the one send followed by teardown, timing breaks quietly
 
 type Listener = () => void
 
@@ -66,7 +61,7 @@ class FakeChannel {
     this.closeCalls++
   }
 
-  /** What the transport would raise once the stream reset has gone through. */
+  /** what the transport raises once the reset lands */
   settleClosed(): void {
     this.readyState = 'closed'
     for (const fn of [...(this.listeners.get('close') ?? [])]) fn()
@@ -79,7 +74,7 @@ class FakeChannel {
 
 const asChannel = (fake: FakeChannel): RTCDataChannel => fake as unknown as RTCDataChannel
 
-/** True once the promise has settled, without awaiting it. */
+/** settled yet, without awaiting */
 function watch(promise: Promise<void>): () => boolean {
   let done = false
   void promise.then(() => { done = true })
@@ -127,8 +122,7 @@ describe('closeGracefully', () => {
     expect(settled()).toBe(true)
   })
 
-  // A peer that has already gone never reads, so the buffer never empties.
-  // Waiting on it forever would hang the disconnect the user just asked for.
+  // a gone peer never drains, don't hang the disconnect
   it('gives up on a buffer that never drains', async () => {
     const channel = new FakeChannel()
     channel.bufferedAmount = 4096

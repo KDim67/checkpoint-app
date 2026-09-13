@@ -8,13 +8,7 @@ import {
 } from '../../../../shared/startupSettings'
 import * as trayApi from '../../data/tray'
 
-/**
- * The same switches the tray panel carries, in the settings page.
- *
- * Both read and write through the same IPC and share STARTUP_OPTIONS, so there
- * is one description of what each switch does and no way for the two surfaces to
- * disagree about the current state.
- */
+/** same switches and IPC as the tray panel, one description of each */
 export default function StartupSettings(): React.JSX.Element {
   const { toast } = useToast()
   const [settings, setSettings] = useState<Settings>(DEFAULT_STARTUP_SETTINGS)
@@ -25,8 +19,7 @@ export default function StartupSettings(): React.JSX.Element {
       .then(s => { setSettings(s); setLoaded(true) })
       .catch(err => { console.error('Failed to load startup settings:', err); setLoaded(true) })
 
-    // These switches also live in the tray panel; without this the two disagree
-    // until one of them is reloaded.
+    // the tray panel has these too, keep both in step
     return trayApi.onStartupChanged(setSettings)
   }, [])
 
@@ -34,9 +27,7 @@ export default function StartupSettings(): React.JSX.Element {
     const next = { ...settings, [key]: value }
     setSettings(next)
     try {
-      // Main reconciles. Turning the tray icon off forces the dependent options
-      // off, so its answer replaces the optimistic one rather than sitting
-      // beside it.
+      // main reconciles, no tray icon forces the dependents off
       setSettings(await trayApi.setStartup(next))
     } catch (err) {
       console.error(err)

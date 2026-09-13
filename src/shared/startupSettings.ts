@@ -1,26 +1,12 @@
-/**
- * How Checkpoint behaves around the system tray and at login.
- *
- * Kept pure and shared so the settings panel, the tray itself and the window's
- * close handler all read the same shape. Three places that each have their own
- * idea of "minimise to tray" is how an app ends up quitting when you asked it to
- * hide.
- */
+/** one shape for the panel, tray and close handler so "minimise to tray" can't disagree */
 
 export interface StartupSettings {
-  /** Start with Windows. Applied through Electron's login-item API, not a file. */
+  /** via electron's login-item API */
   openAtLogin: boolean
-  /** When launched at login, start hidden in the tray rather than showing a window. */
+  /** hidden in the tray at login */
   startMinimised: boolean
-  /**
-   * Closing the window hides it instead of quitting.
-   *
-   * Defaults to OFF. Closing has always quit this app, and silently changing
-   * what the X button does would leave people thinking they had shut it down
-   * while it kept running. It is opt-in, and the tray panel says so.
-   */
+  /** off by default, closing has always quit */
   closeToTray: boolean
-  /** Whether the tray icon is shown at all. */
   showTrayIcon: boolean
 }
 
@@ -31,12 +17,12 @@ export const DEFAULT_STARTUP_SETTINGS: StartupSettings = {
   showTrayIcon: true
 }
 
-/** The switches, and what each one actually does, for every surface that shows them. */
+/** and what each does, for every surface */
 export const STARTUP_OPTIONS: {
   key: keyof StartupSettings
   label: string
   hint: string
-  /** True when the option is meaningless without a tray icon to hide to. */
+  /** meaningless without a tray icon */
   needsTray: boolean
 }[] = [
   { key: 'openAtLogin', label: 'Start with Windows', hint: 'Launch Checkpoint when you sign in.', needsTray: false },
@@ -67,35 +53,25 @@ export function normalizeStartupSettings(raw: unknown): StartupSettings {
     showTrayIcon: bool(o.showTrayIcon, DEFAULT_STARTUP_SETTINGS.showTrayIcon)
   }
 
-  // Two combinations would strand the user with no way back to the window, so
-  // they are corrected rather than stored as asked.
+  // two combos would strand the user, corrected not stored
   return reconcile(settings)
 }
 
-/**
- * Resolves settings that would otherwise hide the app with no way to reach it.
- *
- * Without a tray icon there is nothing to click, so neither starting minimised
- * nor closing to the tray can be allowed, either would leave a process running
- * with no window and no way to summon one back short of Task Manager.
- */
+/** without a tray icon neither hiding option is allowed, or only Task Manager gets it back */
 export function reconcile(settings: StartupSettings): StartupSettings {
   if (settings.showTrayIcon) return settings
   return { ...settings, startMinimised: false, closeToTray: false }
 }
 
-/** Written into the login item, read back at startup. Both ends need it. */
+/** written to the login item, read at startup */
 export const MINIMISED_FLAG = '--start-minimised'
 
-/**
- * The flag decides, not the setting: opening the app by hand should show it.
- * Without a tray icon there is nothing to click, so it refuses to hide.
- */
+/** the flag decides, so opening by hand shows the window */
 export function shouldStartHidden(argv: string[], settings: StartupSettings): boolean {
   return argv.includes(MINIMISED_FLAG) && settings.showTrayIcon
 }
 
-/** True when a change to these settings needs the tray created or destroyed. */
+/** the tray needs creating or destroying */
 export function trayVisibilityChanged(before: StartupSettings, after: StartupSettings): boolean {
   return before.showTrayIcon !== after.showTrayIcon
 }

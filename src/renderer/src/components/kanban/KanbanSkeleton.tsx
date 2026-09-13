@@ -45,16 +45,13 @@ export default function KanbanSkeleton() {
             boxSizing: 'border-box',
             flexShrink: 0
           }}>
-            {/* Column Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-1)', flexShrink: 0 }}>
               <Skeleton width="50%" height={18} />
               <Skeleton width={20} height={18} borderRadius="var(--radius-sm)" />
             </div>
 
-            {/* Column Accent Line */}
             <div style={{ height: '3px', background: 'var(--color-surface-offset)', borderRadius: '2px', flexShrink: 0 }} />
 
-            {/* Cards Container */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', overflow: 'hidden' }}>
               {[1, 2, 3].map(cardIdx => (
                 <div key={cardIdx} style={{
@@ -66,14 +63,11 @@ export default function KanbanSkeleton() {
                   flexDirection: 'column',
                   gap: 'var(--space-2)'
                 }}>
-                  {/* Title block */}
                   <Skeleton width={`${80 - cardIdx * 10}%`} height={14} />
-                  {/* Body blocks */}
                   <div className="col-6px">
                     <Skeleton width="90%" height={10} />
                     <Skeleton width="45%" height={10} />
                   </div>
-                  {/* Meta tag */}
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '4px' }}>
                     <Skeleton width={45} height={14} borderRadius="var(--radius-sm)" />
                     <Skeleton width={60} height={14} borderRadius="var(--radius-sm)" />

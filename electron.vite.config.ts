@@ -4,12 +4,7 @@ import { resolve } from 'path'
 import type { Plugin } from 'vite'
 import { SIGNALING_HOST } from './src/shared/signalingHost'
 
-/**
- * index.html cannot import the signaling host, and its content security policy
- * has to name it. The policy carries a placeholder filled in from the constant,
- * and a policy that has lost the placeholder fails the build instead of quietly
- * blocking the relay.
- */
+/** index.html can't import the signaling host; CSP placeholder filled from the constant, build fails if it's gone */
 function signalingHostPolicy(): Plugin {
   const placeholder = '%SIGNALING_HOST%'
   return {

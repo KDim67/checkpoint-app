@@ -3,38 +3,22 @@ import { useToast } from '../ui/Toast'
 import { normalizeDialogueNodes, type DialogueNode } from './types'
 import { themeTokenHex, useThemeVersion } from '../../lib/themeTokens'
 
-/** Raised by the AI panel when it has a dialogue tree to hand over. */
+/** raised by the AI panel to hand over a tree */
 export const AI_DIALOGUE_EVENT = 'ai-load-dialogue-tree'
 
-/**
- * Dialogue Quest Flow state, editing operations, and the Mermaid compilation.
- *
- * A hook rather than state inside DialoguePanel: the panel unmounts on tab
- * switch, and the ai-load-dialogue-tree listener has to stay live while the
- * user is on another tool for the AI hand-off to land at all.
- */
+/** a hook so the AI hand-off listener stays live while another tool is open */
 export function useDialogueTool(onActivate: () => void) {
   const { toast } = useToast()
-  // Re-renders when the theme changes, so the colours below are read again.
+  // re-render on theme change so colours are re-read
   useThemeVersion()
 
-  /**
-   * The one node that has to look different from the rest, in the current
-   * theme's colours.
-   *
-   * Built out here rather than inside the memo below so it can be a real
-   * dependency. A bare version counter would work at runtime and read to
-   * everyone, eslint included, as a dependency that does nothing.
-   */
-  // Hex, not the raw tokens: these go into diagram source, where Mermaid's own
-  // colour grammar cannot read the `rgba(...)` that `--color-secondary-muted`
-  // resolves to. See `themeTokenHex`.
+  /** outside the memo so it's a real dependency; a bare version counter looks like a no-op dep */
+  // hex, mermaid can't parse the rgba the token resolves to (see themeTokenHex)
   const rootClassDef =
     `  classDef root fill:${themeTokenHex('--color-secondary-muted', '#202510', '--color-surface-2')}` +
     `,stroke:${themeTokenHex('--color-secondary', '#cdf12b', '--color-surface-2')}` +
     `,color:${themeTokenHex('--color-secondary', '#cdf12b', '--color-surface-2')};\n\n`
 
-  // Tab 3: Dialogue Quest Flow State
   const [dialogueNodes, setDialogueNodes] = useState<DialogueNode[]>([
     { id: 'start', speaker: 'Hero', text: 'Hello traveler, do you have any quests?', choices: [{ text: 'Yes, help me!', nextId: 'quest_accept' }, { text: 'No, begone.', nextId: 'quit' }] },
     { id: 'quest_accept', speaker: 'Elder', text: 'Slay 5 wolves in the valley.', choices: [{ text: 'I will do it.', nextId: 'quest_active' }] },
@@ -61,13 +45,11 @@ export function useDialogueTool(onActivate: () => void) {
       toast('Loaded AI Dialogue Quest Tree into Workspace!', { type: 'success' })
     }
 
-    // A custom event name is not in WindowEventMap, so the listener is typed
-    // as the plain Event it really receives and narrowed inside.
+    // custom events aren't in WindowEventMap, narrow the plain Event
     window.addEventListener(AI_DIALOGUE_EVENT, handleAiDialogueLoad)
     return () => window.removeEventListener(AI_DIALOGUE_EVENT, handleAiDialogueLoad)
   }, [toast, onActivate])
 
-  // Tab 3: Dialogue Editor Logic
   const addDialogueNode = useCallback(() => {
     if (!nodeId) {
       toast('Node ID is required', { type: 'info' })
@@ -120,10 +102,7 @@ export function useDialogueTool(onActivate: () => void) {
 
   const compiledMermaid = useMemo(() => {
     let code = 'graph TD\n'
-    // No classDef for ordinary nodes. One used to be written here in the dark
-    // theme's own colours, which overrode whatever theme was actually selected
-    // and left every dialogue node navy on a warm board. MermaidChart hands
-    // mermaid the live theme now, so left alone they follow it.
+    // no classDef for normal nodes, it forced dark-theme colours; MermaidChart passes the live theme
     code += rootClassDef
 
     dialogueNodes.forEach(node => {

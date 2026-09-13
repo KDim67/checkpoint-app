@@ -26,7 +26,6 @@ import { getBoolSetting, setBoolSetting } from '../lib/settings'
 import * as cookbookApi from '../data/cookbook'
 import * as appApi from '../data/app'
 
-// Capability filters + display metadata for badges.
 const CAP_FILTERS: { id: string; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'chat', label: 'Chat' },
@@ -47,7 +46,7 @@ const CAP_META: Record<string, { label: string; color: string }> = {
   embedding: { label: 'Embedding', color: '#f59e0b' }
 }
 
-/** process.platform reads as developer output. Nobody runs "win32". */
+/** process.platform reads as dev output, nobody runs "win32" */
 function formatPlatform(platform: string): string {
   if (platform === 'win32') return 'Windows'
   if (platform === 'darwin') return 'macOS'
@@ -61,11 +60,6 @@ function formatContext(tokens?: number): string {
   return `${tokens} ctx`
 }
 
-/**
- * One tile in the hardware strip. There are three of them and they only ever
- * differed by their contents, which is what made the strip three copies of the
- * same forty lines.
- */
 function SpecCard({ icon, label, value, detail }: {
   icon: React.ReactNode
   label: string
@@ -100,8 +94,7 @@ function SpecCard({ icon, label, value, detail }: {
       >
         {icon}
       </div>
-      {/* minWidth 0 or the truncation below never happens: a flex child will
-          not shrink past its own content without it, and a GPU name is long. */}
+      {/* minWidth 0 or the truncation never happens, GPU names are long */}
       <div className="min-w-0">
         <div
           style={{
@@ -145,11 +138,7 @@ function SpecCard({ icon, label, value, detail }: {
   )
 }
 
-/**
- * Above this, a model is big enough to compete for video memory with whatever
- * else is open. Four billion parameters is roughly where a quantised model
- * stops fitting comfortably alongside a game engine on an ordinary card.
- */
+/** above ~4B params a quantised model fights a game engine for VRAM */
 const SAFE_MODE_MAX_PARAMS = 4
 
 export default function CookbookView() {
@@ -167,7 +156,6 @@ export default function CookbookView() {
 
   const [safeMode, setSafeMode] = useState(false)
 
-  // Active pull state tracking
   const [pullingModelTag, setPullingModelTag] = useState<string | null>(null)
   const pullingModelTagRef = useRef<string | null>(null)
   const [pullPercent, setPullPercent] = useState(0)
@@ -203,7 +191,6 @@ export default function CookbookView() {
     }
   }
 
-  // Initial load
   useEffect(() => {
     loadHardwareSpecs()
     loadOllamaStatus()
@@ -220,7 +207,6 @@ export default function CookbookView() {
     loadSafeModeSetting()
   }, [])
 
-  // Listen for IPC pull progress events
   useEffect(() => {
     const unsubscribeProgress = cookbookApi.onPullProgress((event: PullProgressEvent) => {
       updatePullingModel(event.modelId)
@@ -338,10 +324,7 @@ export default function CookbookView() {
 
   const catalogModels: CatalogModel[] = catalogData as CatalogModel[]
 
-  // Safe mode is applied separately from everything else so the count of what
-  // it took away can be shown. Folding it in with the rest left the catalog
-  // saying "no models match your search" about models that matched perfectly
-  // well and were simply too big to list.
+  // applied separately so the hidden count shows instead of "no models match"
   const matchingModels = catalogModels
     .filter((m) => {
       if (capFilter === 'tiny') {
@@ -368,14 +351,13 @@ export default function CookbookView() {
     .sort((a, b) => {
       if (sortBy === 'params_asc') return a.parameters - b.parameters
       if (sortBy === 'params_desc') return b.parameters - a.parameters
-      // 'fit' (default): best hardware fit first, then smaller models
+      // 'fit' default: best fit first, then smaller
       const fa = specs ? calculateFitResult(specs, a).score : 0
       const fb = specs ? calculateFitResult(specs, b).score : 0
       if (fb !== fa) return fb - fa
       return a.parameters - b.parameters
     })
 
-  /** How many of the matches safe mode is holding back. */
   const hiddenBySafeMode = matchingModels.length - filteredModels.length
 
   const localModels = ollamaStatus?.localModels || []
@@ -392,7 +374,6 @@ export default function CookbookView() {
         gap: 'var(--space-6)'
       }}
     >
-      {/* Title Header */}
       <div>
         <h1
           style={{
@@ -410,7 +391,6 @@ export default function CookbookView() {
         </p>
       </div>
 
-      {/* Specs Strip */}
       <div
         style={{
           display: 'grid',
@@ -465,7 +445,6 @@ export default function CookbookView() {
         )}
       </div>
 
-      {/* Control and Toggle Bar */}
       <div
         style={{
           background: 'var(--color-surface-1)',
@@ -514,8 +493,7 @@ export default function CookbookView() {
               }}
             />
           </button>
-          {/* The words are the bigger target, so they toggle it too. Hanging
-              this off the row instead would fire twice on the switch itself. */}
+          {/* the words toggle too; on the row it'd fire twice on the switch */}
           <div onClick={() => handleToggleSafeMode(!safeMode)} style={{ cursor: 'pointer', userSelect: 'none' }}>
             <div
               className="text-item-strong"
@@ -555,7 +533,6 @@ export default function CookbookView() {
         </button>
       </div>
 
-      {/* Pulling Error Banner */}
       {pullError && (
         <div
           style={{
@@ -580,7 +557,6 @@ export default function CookbookView() {
         </div>
       )}
 
-      {/* Ollama Not Installed Banner */}
       {!loadingOllama && ollamaStatus && !ollamaStatus.installed && (
         <div
           style={{
@@ -625,7 +601,6 @@ export default function CookbookView() {
         </div>
       )}
 
-      {/* Ollama Installed but not running */}
       {!loadingOllama && ollamaStatus && ollamaStatus.installed && !ollamaStatus.running && (
         <div
           style={{
@@ -670,7 +645,6 @@ export default function CookbookView() {
         </div>
       )}
 
-      {/* Installed models management */}
       {localModels.length > 0 && (
         <div>
           <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', margin: '0 0 var(--space-3)' }}>
@@ -686,9 +660,8 @@ export default function CookbookView() {
                   disabled={deletingTag === m}
                   title="Delete model"
                   aria-label={`Delete ${m}`}
-                  style={{ background: 'transparent', border: 'none', color: deletingTag === m ? 'var(--color-text-faint)' : 'var(--color-text-muted)', cursor: deletingTag === m ? 'default' : 'pointer', display: 'flex', padding: '2px' }}
-                  onMouseEnter={e => { if (deletingTag !== m) e.currentTarget.style.color = 'var(--color-error)' }}
-                  onMouseLeave={e => { if (deletingTag !== m) e.currentTarget.style.color = 'var(--color-text-muted)' }}
+                  className={`cookbook-view-delete-model ${deletingTag === m ? 'text-faint' : 'text-muted'}`}
+                  style={{ background: 'transparent', border: 'none', cursor: deletingTag === m ? 'default' : 'pointer', display: 'flex', padding: '2px' }}
                 >
                   {deletingTag === m ? <RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Trash2 size={13} />}
                 </button>
@@ -698,7 +671,6 @@ export default function CookbookView() {
         </div>
       )}
 
-      {/* Model Catalog List */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
           <h2
@@ -711,7 +683,6 @@ export default function CookbookView() {
           >
             Model Catalog
           </h2>
-          {/* Search Input */}
           <div style={{ position: 'relative', width: '240px', maxWidth: '100%' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-faint)' }} />
             <input
@@ -734,13 +705,12 @@ export default function CookbookView() {
                 onClick={() => setSearchQuery('')}
                 title="Clear search"
                 aria-label="Clear search"
+                className="text-faint hover-text-base"
                 style={{
                   position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
                   background: 'transparent', border: 'none', padding: '2px', display: 'flex',
-                  color: 'var(--color-text-faint)', cursor: 'pointer'
+                  cursor: 'pointer'
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-base)' }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-faint)' }}
               >
                 <X size={13} />
               </button>
@@ -748,7 +718,6 @@ export default function CookbookView() {
           </div>
         </div>
 
-        {/* Capability filters + sort */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {CAP_FILTERS.map(f => {
@@ -818,7 +787,6 @@ export default function CookbookView() {
             const variant = model.variants[recommendedQuant] ?? Object.values(model.variants)[0]
             if (!variant) return null
 
-            // Check if installed
             const isInstalled = localModels.some((m) => {
               const normalM = m.toLowerCase().replace(/:latest$/, '')
               const normalTarget = variant.ollamaTag.toLowerCase().replace(/:latest$/, '')
@@ -828,7 +796,6 @@ export default function CookbookView() {
             const isPullingThis = pullingModelTag === variant.ollamaTag
             const poorFit = fitResult?.status === 'not_recommended'
 
-            // Determine Fit Colors and Labels
             let fitColor = 'var(--color-text-muted)'
             let fitBg = 'var(--color-surface-offset)'
             let fitLabel = 'Unavailable'
@@ -872,7 +839,6 @@ export default function CookbookView() {
                   boxShadow: 'none'
                 }}
               >
-                {/* Header info */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                   <div>
                     <span
@@ -917,7 +883,6 @@ export default function CookbookView() {
                   )}
                 </div>
 
-                {/* Description */}
                 <p
                   style={{
                     fontSize: 'var(--text-xs)',
@@ -929,7 +894,6 @@ export default function CookbookView() {
                   {model.description}
                 </p>
 
-                {/* Capability badges */}
                 {model.capabilities && model.capabilities.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
                     {model.capabilities.map((cap) => {
@@ -951,14 +915,12 @@ export default function CookbookView() {
                   </div>
                 )}
 
-                {/* Meta line: params · context · license */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)' }}>
                   <span>{model.parameters < 1 ? `${Math.round(model.parameters * 1000)}M` : `${model.parameters}B`} params</span>
                   {model.contextLength ? <span>{formatContext(model.contextLength)}</span> : null}
                   {model.license ? <span>{model.license}</span> : null}
                 </div>
 
-                {/* Score bar */}
                 {fitResult && (
                   <div
                     style={{
@@ -982,7 +944,6 @@ export default function CookbookView() {
                         {fitResult.score} / 100
                       </span>
                     </div>
-                    {/* Progress Bar background */}
                     <div
                       style={{
                         background: 'var(--color-surface-offset)',
@@ -1013,7 +974,6 @@ export default function CookbookView() {
                   </div>
                 )}
 
-                {/* Variant resource specs */}
                 <div
                   style={{
                     display: 'grid',
@@ -1046,7 +1006,6 @@ export default function CookbookView() {
                   </div>
                 </div>
 
-                {/* Footer details & Action buttons */}
                 <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <div
                     style={{
@@ -1073,9 +1032,7 @@ export default function CookbookView() {
                     </span>
                   </div>
 
-                  {/* Actions Area */}
                   {isPullingThis ? (
-                    /* Active Pull Status */
                     <div className="col">
                       <div className="row-between">
                         <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>
@@ -1126,7 +1083,7 @@ export default function CookbookView() {
                       </div>
                     </div>
                   ) : pullingModelTag ? (
-                    /* Ollama pulls one model at a time. */
+                    /* ollama pulls one model at a time */
                     <button
                       disabled
                       style={{
@@ -1148,7 +1105,6 @@ export default function CookbookView() {
                       Another model is downloading
                     </button>
                   ) : isInstalled ? (
-                    /* Already Installed */
                     <button
                       disabled
                       style={{
@@ -1171,7 +1127,7 @@ export default function CookbookView() {
                       Installed
                     </button>
                   ) : (
-                    /* Install. A poor fit still installs, behind a confirm. */
+                    /* a poor fit still installs, behind a confirm */
                     <button
                       onClick={() => handleInstall(variant.ollamaTag, poorFit ? fitResult?.reason : undefined)}
                       disabled={ollamaStatus ? !ollamaStatus.running : true}

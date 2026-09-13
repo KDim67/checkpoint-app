@@ -23,7 +23,7 @@ import {
 import { createWorkspace, slugifyWorkspace, type WorkspaceEntry } from './lib/createWorkspace'
 
 const ONBOARDING_SEEN_KEY = 'onboarding_seen'
-/** Same palette the workspace manager assigns from, so colours stay consistent. */
+/** same palette as the workspace manager */
 const ONBOARDING_COLORS = ['#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 import {
   APP_SHORTCUTS,
@@ -40,7 +40,6 @@ import * as customizerApi from './data/customizer'
 import * as mcpApi from './data/mcp'
 import { onThemeUpdate } from './data/theme'
 
-// Lazy-loaded views (code split per view)
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
 const OnboardingTour = lazy(() => import('./components/OnboardingTour'))
 const TrayPanel      = lazy(() => import('./components/TrayPanel'))
@@ -59,15 +58,11 @@ const HudView       = lazy(() => import('./components/HudView'))
 const CheatsheetsView = lazy(() => import('./components/CheatsheetsView'))
 const GameDevView = lazy(() => import('./components/GameDevView'))
 
-// Lazy-loaded right panel
-// These only render when the right panel is open, but importing them eagerly
-// pulled ~7,000 lines (AiStreamPanel + ChatMessage alone) into the startup
-// chunk for every launch, including launches that never open the panel.
+// lazy: eager imports pulled ~7,000 lines into every startup, panel open or not
 const AiStreamPanel   = lazy(() => import('./components/AiStreamPanel'))
 const GitPanel        = lazy(() => import('./components/GitPanel'))
 const ItemDetailPanel = lazy(() => import('./components/ItemDetailPanel'))
 
-// View-level skeleton (shown while lazy chunks load)
 function ViewSkeleton() {
   return (
     <div style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -82,14 +77,12 @@ function ViewSkeleton() {
   )
 }
 
-// Theme Toggle
 function ThemeToggle() {
   const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
     return (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
   })
 
-  // Track external theme changes (startup application of the persisted
-  // setting, or the Appearance settings tab) so the icon never goes stale.
+  // follow external theme changes so the icon never goes stale
   React.useEffect(() => {
     const observer = new MutationObserver(() => {
       const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
@@ -100,12 +93,12 @@ function ThemeToggle() {
   }, [])
 
   const toggleTheme = () => {
-    // Read the live attribute (not state) so we can never double-toggle out of sync
+    // read the live attribute, not state, so a double toggle can't desync
     const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
     const nextTheme = current === 'dark' ? 'light' : 'dark'
     setTheme(nextTheme)
     document.documentElement.setAttribute('data-theme', nextTheme)
-    // Persist so the choice survives restarts (same key the Settings page uses)
+    // same key as the Settings page
     setStringSetting('app_theme', nextTheme).catch(console.error)
   }
 
@@ -113,13 +106,13 @@ function ThemeToggle() {
     <button
       onClick={toggleTheme}
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      className="bg-clear hover-bg-offset"
       style={{
         width: '28px',
         height: '22px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'transparent',
         border: 'none',
         cursor: 'pointer',
         color: 'var(--color-text-muted)',
@@ -127,8 +120,6 @@ function ThemeToggle() {
         transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)',
         WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion']
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
       {theme === 'dark' ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -144,7 +135,6 @@ function ThemeToggle() {
   )
 }
 
-// Titlebar
 function Titlebar() {
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
@@ -228,12 +218,10 @@ function TitlebarButton({
   )
 }
 
-// Right Panel
 const MIN_PANEL_WIDTH = 280
 const MAX_PANEL_WIDTH = 800
 const DEFAULT_PANEL_WIDTH = 380
-// The sidebar rail plus a usable strip of main content; below this the panel
-// would cover the view it is meant to annotate.
+// sidebar rail plus a usable strip of content; narrower and the panel covers the view
 const MIN_CONTENT_WIDTH = 360
 
 function clampPanelWidth(width: number): number {
@@ -260,7 +248,7 @@ function PanelTab({
       id={`panel-tab-${id}`}
       aria-selected={isSelected}
       aria-controls="right-panel-body"
-      // Roving tabindex: one stop for the whole tablist, arrows move within it.
+      // roving tabindex: one tab stop, arrows move within
       tabIndex={isSelected ? 0 : -1}
       onClick={onSelect}
       style={{
@@ -289,28 +277,12 @@ function RightPanel() {
 
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
 
-  // Loaded once at startup: a peer connection is built in synchronous code
-  // and cannot wait on a setting, so the transport keeps a cached copy.
+  // peer connections are built synchronously and can't await a setting, so the transport caches it
   useEffect(() => {
     void import('./lib/webrtcTransport').then(({ refreshTurnServer }) => refreshTurnServer())
   }, [])
 
-  /**
-   * Nothing dropped on the window ever navigates it.
-   *
-   * A drop that reaches the document with its default intact replaces the page
-   * with whatever was dropped, and in a packaged build the app is served from
-   * file://, so a dropped file counts as same-origin and the main process lets
-   * it through. The app is then gone, with no way back but a restart.
-   *
-   * Every real drop zone handles its own drop and this runs after them, so it
-   * only ever catches the misses: the drop that landed an inch to the left, or
-   * the one carrying something that zone had nothing to do with.
-   *
-   * The cost is that the window now accepts a drop anywhere, so the cursor no
-   * longer refuses one outside a drop zone. Nothing happens either way, and a
-   * cursor is a cheaper thing to lose than the running app.
-   */
+  /** stray drops would navigate the window away; real drop zones handle theirs first */
   useEffect(() => {
     const swallow = (e: DragEvent): void => e.preventDefault()
     window.addEventListener('dragover', swallow)
@@ -326,9 +298,7 @@ function RightPanel() {
       .then(w => setPanelWidth(clampPanelWidth(w)))
       .catch(err => console.error('Failed to read right panel width:', err))
   }, [])
-  // State, not a ref: the width transition has to be switched off during a drag,
-  // and a ref mutation does not re-render, so the animated value stayed live and
-  // the panel lerped a frame behind the cursor.
+  // state not a ref: the width transition must switch off mid-drag or the panel lags a frame
   const [isResizing, setIsResizing] = useState(false)
 
   const panelTabs: { id: PanelTabId; label: string }[] = [
@@ -363,8 +333,7 @@ function RightPanel() {
       document.body.style.cursor = ''
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
-      // Persisted on release rather than per-frame, to keep the drag off the
-      // IPC channel entirely.
+      // persisted on release, keeps the drag off IPC
       setPanelWidth(w => {
         setNumberSetting('right_panel_width', w).catch(err => {
           console.error('Failed to save right panel width:', err)
@@ -377,7 +346,7 @@ function RightPanel() {
     window.addEventListener('mouseup', handleMouseUp)
   }
 
-  // Shrinking the window must not leave the panel wider than the viewport.
+  // shrinking the window mustn't leave the panel wider than the viewport
   useEffect(() => {
     const onResize = () => setPanelWidth(w => clampPanelWidth(w))
     window.addEventListener('resize', onResize)
@@ -399,10 +368,11 @@ function RightPanel() {
       }}
       aria-hidden={!rightPanelOpen}
     >
-      {/* Resizer Handle */}
+      {/* resizer handle */}
       {rightPanelOpen && (
         <div
           onMouseDown={handleMouseDown}
+          className="right-panel-resizer"
           style={{
             position: 'absolute',
             left: 0,
@@ -413,8 +383,6 @@ function RightPanel() {
             zIndex: 10,
             transition: 'background 150ms ease'
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-secondary-muted)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           title="Drag to resize panel"
         />
       )}
@@ -479,7 +447,6 @@ function RightPanel() {
 }
 
 
-// Google Fonts Downloader
 const GOOGLE_FONTS_URLS: Record<string, string> = {
   "'Outfit', sans-serif": 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap',
   "'Roboto', sans-serif": 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap',
@@ -502,9 +469,7 @@ function applyGoogleFont(fontValue: string) {
   }
 }
 
-// Hash-route shells (widget & HUD live in their own BrowserWindows)
-// These must be top-level components so the hooks inside App() are never
-// called conditionally (Rules of Hooks).
+// top-level shells so App()'s hooks are never conditional
 function WidgetShell() {
   useSatelliteTheme()
   return (
@@ -515,17 +480,7 @@ function WidgetShell() {
     </div>
   )
 }
-/**
- * The tray popup. No transparent wrapper: the panel draws its own rounded
- * surface and shadow, and a centring flex parent would letterbox it.
- */
-/**
- * Applies the user's theme in a window that is not the main one.
- *
- * These shells are separate renderer instances that never run App's startup
- * effect, so without this they render the shipped dark palette however the app
- * is themed, which is why quick capture stayed dark under a custom theme.
- */
+/** satellite windows never run App's startup effect, so they'd ignore the user's theme */
 function useSatelliteTheme(): void {
   useEffect(() => {
     applyStoredTheme()
@@ -533,6 +488,7 @@ function useSatelliteTheme(): void {
   }, [])
 }
 
+// no transparent wrapper: the panel draws its own surface, a flex parent would letterbox it
 function TrayShell() {
   return (
     <ErrorBoundary label="The tray panel">
@@ -551,7 +507,6 @@ function HudShell() {
   )
 }
 
-// App
 export default function App() {
   const activeView = useAppStore(s => s.activeView)
   const setView = useAppStore(s => s.setView)
@@ -559,7 +514,7 @@ export default function App() {
   const setWorkspaceList = useAppStore(s => s.setWorkspaceList)
   const setWorkspace = useAppStore(s => s.setWorkspace)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
-  // The shortcut handler binds once, so it reads the flag through a ref.
+  // the shortcut handler binds once, so it reads the flag through a ref
   const appAiEnabled = useAiEnabled()
   const aiEnabledRef = useRef(appAiEnabled)
   aiEnabledRef.current = appAiEnabled
@@ -567,43 +522,26 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
-  // Shown once, then never again unless replayed from Settings. Read rather
-  // than pushed, so a slow first paint cannot race it: the panel appears when
-  // the answer arrives instead of flashing and disappearing.
+  // shown once; read, not pushed, so a slow first paint can't race it
   useEffect(() => {
     let cancelled = false
     getBoolSetting(ONBOARDING_SEEN_KEY, false)
       .then(seen => { if (!cancelled && !seen) setShowOnboarding(true) })
       .catch(() => {})
 
-    // Settings asks for a replay through the same event the rest of the app
-    // uses to talk across views.
+    // replays come through the shared cross-view event
     const replay = (): void => setShowOnboarding(true)
     window.addEventListener('replay-onboarding', replay)
     return () => { cancelled = true; window.removeEventListener('replay-onboarding', replay) }
   }, [])
 
-  /**
-   * Closes the tour, and decides whether that counts as having seen it.
-   *
-   * Done and Skip are answers, and are remembered. Escape is not: it used to be
-   * recorded the same way, so one stray press on the first screen retired the
-   * tour for good, and the only way back was a button in Settings that a
-   * first-run user has no reason to know exists. It now closes for this session
-   * and offers itself again next launch, which is the cheaper mistake of the
-   * two: seeing the tour twice costs a click, never seeing it costs the app.
-   */
+  /** Done/Skip are remembered, Escape isn't: one stray press used to retire the tour for good */
   const closeOnboarding = useCallback((remember: boolean) => {
     setShowOnboarding(false)
     if (remember) setBoolSetting(ONBOARDING_SEEN_KEY, true).catch(() => {})
   }, [])
 
-  /**
-   * Creates the workspace the first-run panel asked for and switches to it.
-   *
-   * Shares createWorkspace with the context manager in Settings, so a workspace
-   * made here is identical to one made there.
-   */
+  /** shares createWorkspace with Settings, so both make identical workspaces */
   const createOnboardingWorkspace = useCallback(async (name: string, templateId: string) => {
     const slug = slugifyWorkspace(name)
     if (!slug) throw new Error('That name has no letters or numbers in it.')
@@ -625,17 +563,12 @@ export default function App() {
     setWorkspace(slug)
   }, [setWorkspaceList, setAvailableWorkspaces, setWorkspace])
 
-  // Ctrl/Cmd+K, bound in the renderer rather than as a global shortcut: a global
-  // one would fire while Checkpoint is in the background and steal the keystroke
-  // from whatever the user is actually typing in.
+  // renderer-bound, a global shortcut would steal Ctrl+K from other apps
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        // Not while the tour is up. The tour has its own step for this combo
-        // and swallows it there, but everywhere else this binding still fired
-        // and opened the palette on top of the tour, which sits lower. One
-        // Escape then closed both, on the first screen, for good.
+        // not during the tour: it opened over the tour and one Escape closed both for good
         if (showOnboarding) return
         setPaletteOpen(open => !open)
       }
@@ -644,17 +577,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [showOnboarding])
 
-  // Opens the lightbox when an image is clicked directly. Runs in the capture
-  // phase and swallows the event, so it has to bow out whenever the image is
-  // standing in for a control (a card, button or link), otherwise clicking a
-  // card's thumbnail zooms the image instead of opening the card.
+  // capture phase and swallows the click, so skip images standing in for a card, button or link
   useEffect(() => {
     const handleImageClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (target.tagName !== 'IMG') return
 
       const img = target as HTMLImageElement
-      // Chrome and logos are decoration, not content.
+      // chrome and logos are decoration
       if (img.alt === 'Checkpoint Logo' || img.closest('#context-switcher')) return
       if (img.closest('button, a, [role="button"], [data-no-lightbox]')) return
 
@@ -673,9 +603,7 @@ export default function App() {
     return () => document.removeEventListener('click', handleImageClick, true)
   }, [])
 
-  // Bootstrap: load available contexts from DB on mount.
-  // An explicitly-set "default context" (Settings → General) wins over the
-  // last-active one. Previously that setting was saved but never read.
+  // an explicit default context wins over the last active one; it used to be saved but never read
   const loadContexts = useCallback(async () => {
     try {
       const contexts = await getContexts()
@@ -698,18 +626,17 @@ export default function App() {
         const startContext =
           defaultContext && contexts.includes(defaultContext) ? defaultContext
           : savedContext && contexts.includes(savedContext) ? savedContext
-          : contexts[0] // Fallback to first available context
+          : contexts[0] // fall back to the first context
         if (startContext) {
           setWorkspace(startContext)
         }
       }
     } catch {
-      // DB not yet initialized. Use defaults
+      // db not ready yet, keep defaults
     }
   }, [setAvailableWorkspaces, setWorkspaceList, setWorkspace])
 
-  // Land on the configured start view before the redirect guard runs, so a
-  // restored view is not immediately bounced by checkEnabledViews.
+  // apply the start view before the redirect guard, or checkEnabledViews bounces it
   const startViewAppliedRef = useRef(false)
   const shortcutBindingsRef = useRef<ShortcutBindings>(defaultBindings())
 
@@ -738,13 +665,11 @@ export default function App() {
   useEffect(() => {
     loadContexts()
 
-    // Load and apply compact mode setting
     getBoolSetting('appearance_compact', false).then((compact) => {
       if (compact) document.documentElement.setAttribute('data-compact', 'true')
     }).catch(console.error)
 
-    // Apply the persisted interface theme. Previously saved by Settings but
-    // never read on boot, so the app silently reset to dark every launch.
+    // saved by Settings but never read on boot, so every launch reset to dark
     getStringSetting('app_theme', '').then((t) => {
       if (!t) return
       if (t === 'system') {
@@ -755,18 +680,12 @@ export default function App() {
       }
     }).catch(console.error)
 
-    // Apply the persisted font scale. Previously only applied once the
-    // Appearance settings tab was opened.
+    // used to apply only once the Appearance tab opened
     getEnumSetting('appearance_font_size', ['small', 'medium', 'large'] as const, 'medium')
       .then(applyFontSize)
       .catch(console.error)
 
-    // Hot-reload user theme CSS.
-    //
-    // The push alone was not enough: the customization engine starts before this
-    // component mounts, so its startup broadcast arrived with nobody listening
-    // and a saved preset silently reverted to the defaults on every launch. The
-    // subscription handles later edits; the fetch below covers this launch.
+    // the engine's startup broadcast lands before mount; subscribe for edits, fetch below for this launch
     const applyThemeCss = (css: string): void => {
       let el = document.getElementById('user-theme') as HTMLStyleElement | null
       if (!el) {
@@ -776,7 +695,6 @@ export default function App() {
       }
       el.textContent = css
 
-      // Extract --font-sans from CSS if present
       const fontMatch = css.match(/--font-sans\s*:\s*([^;}\n]+)/)
       if (fontMatch) {
         const fontValue = fontMatch[1].trim()
@@ -788,27 +706,23 @@ export default function App() {
     }
 
     const unsubTheme = onThemeUpdate(applyThemeCss)
-    // Ask for whatever should be applied now, independent of any broadcast.
+    // fetch what applies now, independent of any broadcast
     customizerApi.getCss()
       .then(css => { if (css) applyThemeCss(css) })
       .catch(console.error)
 
-    // Navigation hotkey listener
     const unsubNavigate = appApi.onNavigateToView((view: string) => {
       setView(view as ActiveView)
     })
 
-    // An MCP client writes straight to the database from the main process,
-    // bypassing the IPC calls the views normally refresh on. Re-dispatching the
-    // DOM events the views already listen for means no view needs to know that
-    // an external agent exists.
+    // MCP writes skip the IPC views refresh on; re-dispatch the DOM events they already listen for
     const unsubMcp = mcpApi.onDataChanged(() => {
       window.dispatchEvent(new CustomEvent('kanban-refresh'))
       window.dispatchEvent(new CustomEvent('item-updated'))
       window.dispatchEvent(new CustomEvent('wall-refresh'))
     })
 
-    // Global keyboard navigation shortcuts, matched against the user's bindings.
+    // matched against the user's bindings
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return
       const combo = comboFromEvent(e)
@@ -842,7 +756,7 @@ export default function App() {
     }
   }, [loadContexts, setView, toggleRightPanel])
 
-  // Safeguard: redirect if the view we are on gets disabled in settings.
+  // leave a view that just got disabled in settings
   const checkEnabledViews = useCallback(async () => {
     if (!startViewAppliedRef.current) return
     try {
@@ -883,9 +797,7 @@ export default function App() {
     <ToastProvider>
       <ConfirmProvider>
         <FocusTimerEngine />
-        {/* Outermost net: the per-view and per-panel boundaries below handle
-            almost everything, but a throw in the shell chrome itself (Titlebar,
-            Sidebar) would otherwise still take the window to white. */}
+        {/* outermost net: a throw in the titlebar or sidebar would otherwise white out the window */}
         <ErrorBoundary label="Checkpoint">
         <Suspense fallback={null}>
           <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
@@ -922,9 +834,7 @@ export default function App() {
   )
 }
 
-// Root router. Selects between standalone shells and the full app
-// This is what main.tsx should render (or App can be renamed; kept as default
-// export for back-compat and the router wraps it).
+// picks a standalone shell or the full app
 export function AppRouter() {
   const hash = window.location.hash
   if (hash === '#widget') return <WidgetShell />

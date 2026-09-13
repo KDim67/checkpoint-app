@@ -1,4 +1,4 @@
-/** Workspaces as whole units: listing, exporting, importing and renaming them. Typed off the bridge. */
+/** whole workspaces: list, export, import, rename */
 
 type Db = typeof window.electronAPI.db
 

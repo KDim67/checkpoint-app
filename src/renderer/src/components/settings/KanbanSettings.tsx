@@ -1,22 +1,18 @@
 import { useState, useEffect } from 'react'
 import { loadBoardConfig, patchBoardConfig, type ColumnConfig } from '../../lib/boardConfig'
 
-// Kanban per-context column config
+// per-context column config
 export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: string }) {
   const [columns, setColumns] = useState<ColumnConfig[]>([])
   const [loading, setLoading] = useState(true)
-  // Track local (not-yet-saved) edits to column names separately
+  // unsaved name edits kept apart
   const [localNames, setLocalNames] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
-        // Shares the board document with the Kanban view and the AI action
-        // blocks. This tab used to keep its own ColumnConfig type and read the
-        // raw column key, so it silently dropped colour and colour-mode on
-        // every save. Any column styled on the board lost that styling as soon
-        // as its WIP limit was edited here.
+        // shares the board doc; its own type dropped colour and colour-mode on every WIP save
         const config = await loadBoardConfig(activeWorkspace)
         setColumns(config.columns)
         setLocalNames(Object.fromEntries(config.columns.map(c => [c.id, c.name])))
@@ -31,7 +27,7 @@ export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: s
     setColumns(updated)
   }
 
-  // Save name only on blur, not on every keystroke
+  // save names on blur, not per keystroke
   const handleNameBlur = (id: string) => {
     const newName = localNames[id]?.trim()
     if (!newName) return
@@ -87,7 +83,7 @@ export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: s
               value={col.wipLimit ?? 0}
               onChange={e => {
                 const n = parseInt(e.target.value) || 0
-                // Track locally but don't save yet
+                // tracked locally, not saved yet
                 setColumns(prev => prev.map(c => c.id === col.id ? { ...c, wipLimit: n === 0 ? null : n } : c))
               }}
               onBlur={e => {

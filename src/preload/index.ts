@@ -48,7 +48,7 @@ import type {
   SyncPayload
 } from '../shared/types'
 
-/** One file offered by a sync peer. */
+/** one file offered by a sync peer */
 interface SyncFileEntry {
   relPath: string
   mtime: number
@@ -56,16 +56,9 @@ interface SyncFileEntry {
   sha256: string
 }
 
-/**
- * Secure IPC bridge. Exposes a typed API surface to the renderer.
- *
- * CRITICAL PATTERN: Every ipcRenderer.on() subscription MUST return an
- * explicit cleanup/unsubscribe function. React components call this in their
- * useEffect return to prevent zombie listeners and memory leaks after unmount.
- */
+/** every ipcRenderer.on() subscription must return an unsubscribe for useEffect cleanup */
 
 const api = {
-  // App
   app: {
     platform: process.platform,
     versions: {
@@ -73,16 +66,12 @@ const api = {
       node: process.versions.node,
       chrome: process.versions.chrome
     },
-    /**
-     * The account name, used to credit card changes when nobody typed one.
-     * Read here rather than over IPC because it cannot change while the app
-     * runs, and a name needed to render a list should not need a round trip.
-     */
+    /** read here, not over IPC: it can't change while running and lists shouldn't wait on it */
     osUserName: (() => {
       try {
         return os.userInfo().username
       } catch {
-        // Docker and some locked-down accounts have no passwd entry.
+        // docker and locked-down accounts have no passwd entry
         return ''
       }
     })(),
@@ -101,10 +90,10 @@ const api = {
       ipcRenderer.invoke(IpcChannels.APP_SAVE_BINARY_FILE, defaultName, data, extension),
     showItemInFolder: (filePath: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, filePath),
-    /** Resolves with what the check found. Failures come back as a result, not a throw. */
+    /** failures come back as a result, not a throw */
     checkForUpdates: (): Promise<UpdateCheckResult> =>
       ipcRenderer.invoke(IpcChannels.APP_CHECK_FOR_UPDATES),
-    /** Where the background download had got to, or null if none is in flight. */
+    /** null when nothing's downloading */
     updateState: (): Promise<UpdateProgress | null> =>
       ipcRenderer.invoke(IpcChannels.APP_UPDATE_STATE),
     onUpdateProgress: (callback: (progress: UpdateProgress) => void): (() => void) => {
@@ -112,8 +101,7 @@ const api = {
       ipcRenderer.on(IpcChannels.APP_UPDATE_PROGRESS, handler)
       return () => ipcRenderer.removeListener(IpcChannels.APP_UPDATE_PROGRESS, handler)
     },
-    // Electron ≥32 removed File.path from renderer File objects. This is the
-    // only sanctioned way to resolve the absolute path of a dropped file.
+    // electron 32 removed File.path, this is the only way to a dropped file's path
     getPathForFile: (file: File): string => {
       try {
         return webUtils.getPathForFile(file)
@@ -128,7 +116,6 @@ const api = {
     }
   },
 
-  // Database
   db: {
     getItems: async (
       context: string,
@@ -165,10 +152,7 @@ const api = {
     deleteItem: async (id: string): Promise<void> => {
       const res = await ipcRenderer.invoke(IpcChannels.DB_DELETE_ITEM, id)
       if (!res.success) throw new Error(res.error)
-      // The context travels with the event because the item is gone by the time
-      // any listener runs. Collaboration filters outgoing mutations by
-      // workspace, and without this a delete had no workspace to be filtered
-      // by, so deletions from every workspace were broadcast to the peer.
+      // context rides along since the item's gone; collab filters by workspace or deletes broadcast everywhere
       window.dispatchEvent(
         new CustomEvent('db-mutation', { detail: { type: 'deleteItem', id, context: res.data?.context ?? null } })
       )
@@ -289,10 +273,7 @@ const api = {
       return ipcRenderer.invoke(IpcChannels.DB_EXPORT_CONTEXT, context, contextName)
     },
 
-    /**
-     * Opens a file and classifies it: `payload` for Checkpoint's own export,
-     * `foreign` for a board exported from another app. Exactly one is set.
-     */
+    /** payload for our own export, foreign for another app's board; exactly one is set */
     importContext: async (): Promise<{
       success: boolean
       payload?: ContextExport
@@ -312,10 +293,7 @@ const api = {
     }
   },
 
-  // AI Streaming
-  // streamId identifies the consumer channel ('assistant', 'standup', …) so
-  // several features can stream concurrently. Subscribers receive the id and
-  // filter to their own stream; omitting it preserves legacy global behavior.
+  // streamId lets features stream at once; omitted means legacy global behaviour
   ai: {
     startStream: (params: AiStreamParams, streamId?: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.AI_STREAM_START, params, streamId),
@@ -335,7 +313,7 @@ const api = {
     getCapabilities: (model: string, force?: boolean): Promise<ModelCapabilities> =>
       ipcRenderer.invoke(IpcChannels.AI_GET_CAPABILITIES, model, force),
 
-    // Returns an unsubscribe function. MUST be called on component unmount
+    // call the returned unsubscribe on unmount
     onChunk: (callback: (chunk: string, streamId?: string) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, chunk: string, streamId?: string) => callback(chunk, streamId)
       ipcRenderer.on(IpcChannels.AI_CHUNK, handler)
@@ -355,7 +333,6 @@ const api = {
     }
   },
 
-  // Widget
   widget: {
     toggle: (active: boolean): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.WIDGET_TOGGLE, active),
@@ -365,14 +342,13 @@ const api = {
       ipcRenderer.invoke(IpcChannels.WIDGET_SET_OPACITY, opacity)
   },
 
-  // Theme hot-reload
+  // theme hot-reload
   onThemeUpdate: (callback: (css: string) => void): (() => void) => {
     const handler = (_event: IpcRendererEvent, css: string) => callback(css)
     ipcRenderer.on(IpcChannels.THEME_UPDATE, handler)
     return () => ipcRenderer.removeListener(IpcChannels.THEME_UPDATE, handler)
   },
 
-  // HUD
   hud: {
     toggle: (active?: boolean): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.HUD_TOGGLE, active),
@@ -388,7 +364,6 @@ const api = {
     }
   },
 
-  // Webhook
   webhook: {
     toggle: (active: boolean, port: number): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.WEBHOOK_TOGGLE, active, port)
@@ -399,13 +374,13 @@ const api = {
       ipcRenderer.invoke(IpcChannels.TRAY_SUMMARY),
     action: (action: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.TRAY_ACTION, action),
-    /** Fires when the startup settings change in any window. */
+    /** fires in every window */
     onStartupChanged: (callback: (settings: StartupSettings) => void): (() => void) => {
       const listener = (_e: IpcRendererEvent, settings: StartupSettings): void => callback(settings)
       ipcRenderer.on(IpcChannels.STARTUP_CHANGED, listener)
       return () => ipcRenderer.removeListener(IpcChannels.STARTUP_CHANGED, listener)
     },
-    /** The panel measures its own content and asks to be sized to it. */
+    /** the panel measures its own content */
     resize: (height: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.TRAY_RESIZE, height),
     getStartup: (): Promise<StartupSettings> => ipcRenderer.invoke(IpcChannels.STARTUP_GET),
@@ -420,13 +395,13 @@ const api = {
     update: (id: string, patch: { title?: string; done?: boolean; position?: number }): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.SUBTASK_UPDATE, id, patch),
     remove: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke(IpcChannels.SUBTASK_DELETE, id),
-    /** Converts the markdown checkboxes in a task body into real subtasks. */
+    /** markdown checkboxes in the body become subtasks */
     convert: (itemId: string): Promise<{ ok: boolean; converted?: number; reason?: string }> =>
       ipcRenderer.invoke(IpcChannels.SUBTASK_CONVERT, itemId)
   },
 
   exporter: {
-    /** Opens a save dialog and writes the chosen format. */
+    /** save dialog, then writes the chosen format */
     items: (options: {
       context: string | null
       format: 'markdown' | 'csv' | 'json'
@@ -435,7 +410,7 @@ const api = {
   },
 
   notifications: {
-    /** Raises a notification through the shared policy. Resolves to whether it fired. */
+    /** through the shared policy; resolves to whether it fired */
     send: (input: {
       category: NotificationCategory
       title: string
@@ -469,7 +444,7 @@ const api = {
   },
 
   mcp: {
-    /** Resolves to the bound port, or null when stopping. Rejects on port clash. */
+    /** bound port, or null when stopping; rejects on port clash */
     toggle: (active: boolean, port: number): Promise<number | null> =>
       ipcRenderer.invoke(IpcChannels.MCP_TOGGLE, active, port),
 
@@ -483,7 +458,7 @@ const api = {
     regenerateToken: (): Promise<string> =>
       ipcRenderer.invoke(IpcChannels.MCP_REGENERATE_TOKEN),
 
-    /** Fires when an MCP client changed data behind the UI's back. */
+    /** an MCP client changed data behind the UI's back */
     onDataChanged: (callback: () => void): (() => void) => {
       const handler = (): void => callback()
       ipcRenderer.on(IpcChannels.MCP_DATA_CHANGED, handler)
@@ -491,7 +466,6 @@ const api = {
     }
   },
 
-  // Backup
   backup: {
     run: (action?: 'backup' | 'restore' | 'delete' | 'init', filename?: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.BACKUP_RUN, action, filename),
@@ -504,7 +478,6 @@ const api = {
     }> => ipcRenderer.invoke(IpcChannels.BACKUP_STATUS)
   },
 
-  // Activity Tracker
   tracker: {
     toggle: (active: boolean): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.TRACKER_TOGGLE, active),
@@ -516,9 +489,7 @@ const api = {
       byContext: Array<{ context: string; durationMs: number }>
       byTitle: Array<{ windowTitle: string; processName: string; durationMs: number }>
     }> => {
-      // The TRACKER_GET_STATS handler wraps its result in handleSafe's
-      // { success, data } envelope. Unwrap it here so callers get the stats
-      // object directly (matching the db.* methods and this return type).
+      // handleSafe wraps this in { success, data }, unwrap to match the db.* methods
       const res = await ipcRenderer.invoke(IpcChannels.TRACKER_GET_STATS, context, start, end)
       if (!res.success) throw new Error(res.error)
       return res.data
@@ -645,18 +616,18 @@ const api = {
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_ENGINE_STATE),
     updateTheme: (vars: Record<string, string>): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_UPDATE_THEME, vars),
-    /** The CSS to apply right now. Empty when the engine is off. */
+    /** empty when the engine is off */
     getCss: (): Promise<string> => ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_CSS),
     getTheme: (): Promise<Record<string, string>> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_THEME),
     getPlugins: (): Promise<PluginInfo[]> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_PLUGINS),
-    /** Resolves to why it failed, so a broken plugin does not silently stay off. */
+    /** resolves with the error so a broken plugin doesn't silently stay off */
     togglePlugin: (filename: string, active: boolean): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_TOGGLE_PLUGIN, filename, active),
     openPluginsFolder: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER),
-    /** Writes a shipped example into the plugins folder. It is not enabled by this. */
+    /** installs only, doesn't enable */
     installExample: (filename: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_INSTALL_EXAMPLE, filename),
     registerShortcuts: (shortcuts: ShortcutMap): Promise<void> =>
@@ -795,9 +766,5 @@ const api = {
 
 contextBridge.exposeInMainWorld('electronAPI', api)
 
-/**
- * The renderer's view of the bridge is derived from the bridge itself, so the
- * two can never disagree. Adding a method here is all it takes for the
- * renderer to see it. There is no second declaration to keep in sync.
- */
+/** derived from the bridge, so the renderer's type can't drift from it */
 export type ElectronAPI = typeof api

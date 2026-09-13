@@ -1,4 +1,4 @@
-/** Launch-at-login and how the app comes up. */
+/** launch at login, and how the app comes up */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

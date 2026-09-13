@@ -1,4 +1,4 @@
-/** The theme CSS the main process pushes when it changes. Typed off the bridge. */
+/** theme CSS pushed from main */
 
 type Api = typeof window.electronAPI
 

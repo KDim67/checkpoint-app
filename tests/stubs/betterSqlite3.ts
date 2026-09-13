@@ -1,25 +1,10 @@
-/**
- * A better-sqlite3-shaped facade over Node's built-in `node:sqlite`.
- *
- * WHY this exists: better-sqlite3 in this repo is compiled against Electron's
- * Node ABI (see the `electron-rebuild` postinstall). Plain Node, which is what
- * Vitest runs on. Cannot dlopen it, and rebuilding it for Node would leave the
- * shipped app unable to open its own database. `node:sqlite` links the same
- * SQLite engine (3.53, FTS5 included) and is already available on the Node 24
- * this project runs, so the migration code under test executes against a real
- * SQLite file rather than a mock.
- *
- * WHAT this is NOT: a general better-sqlite3 replacement. It implements only
- * the surface src/main/db actually touches. Anything it does not implement
- * throws rather than silently succeeding, so a test can never pass because a
- * call quietly did nothing.
- */
+/** better-sqlite3 is built for electron's ABI, node:sqlite runs the same SQLite; unimplemented calls throw */
 
 import { DatabaseSync, backup, type StatementSync, type SQLInputValue } from 'node:sqlite'
 
 type Row = Record<string, unknown>
 
-/** node:sqlite hands back null-prototype rows; callers expect plain objects. */
+/** null-prototype rows to plain objects */
 function plain(row: unknown): Row | undefined {
   return row == null ? undefined : { ...(row as Row) }
 }
@@ -46,12 +31,7 @@ class StatementFacade {
 
 export default class DatabaseFacade {
   readonly #db: DatabaseSync
-  /**
-   * better-sqlite3 transactions nest by promoting to SAVEPOINTs. The db module nests
-   * them (initDb's migration transaction wraps table rebuilds, IPC handlers
-   * wrap helper writes), so an inner transaction must join the outer one
-   * instead of failing on "cannot start a transaction within a transaction".
-   */
+  /** nested transactions become SAVEPOINTs, like better-sqlite3 */
   #depth = 0
 
   constructor(path: string) {
@@ -93,12 +73,7 @@ export default class DatabaseFacade {
     }
   }
 
-  /**
-   * better-sqlite3 puts backup on the instance; node:sqlite exports it as a
-   * function over the same SQLite online-backup API. Both return a promise
-   * that settles when the copy is complete, so the backup vault and its
-   * restore path can be exercised for real rather than mocked.
-   */
+  /** instance method over node:sqlite's backup function, so the vault is tested for real */
   backup(destination: string): Promise<void> {
     return backup(this.#db, destination).then(() => undefined)
   }

@@ -1,16 +1,8 @@
-/**
- * Helper to handle image copy-paste and drag-and-drop actions.
- * Copies the raw files/buffers into local media storage via IPC,
- * and inserts the resulting checkpoint-media:// tags into the input string.
- */
+/** copies pasted/dropped images into media and inserts checkpoint-media:// links */
 
 import * as mediaApi from '../data/media'
 import * as appApi from '../data/app'
 
-/**
- * Handles paste events on a textarea. Detects images in clipboard,
- * saves them locally, and inserts Markdown image links at the cursor.
- */
 export async function handleImagePaste(
   e: React.ClipboardEvent<HTMLTextAreaElement>,
   currentValue: string,
@@ -32,16 +24,14 @@ export async function handleImagePaste(
         const mimeType = file.type || 'image/png'
         const ext = mimeType.split('/')[1] || 'png'
 
-        // Save image to config/media via Electron IPC
         const filename = await mediaApi.saveFromBuffer(arrayBuffer, ext)
         markdownImgs += `\n![Pasted Image](checkpoint-media://${filename})\n`
       }
 
-      // Insert at current cursor position
       const newValue = currentValue.substring(0, start) + markdownImgs + currentValue.substring(end)
       setValue(newValue)
 
-      // Set selection/cursor position just after the inserted images
+      // cursor after the inserted images
       const newCursorPos = start + markdownImgs.length
       setTimeout(() => {
         if (target) {
@@ -57,7 +47,7 @@ export async function handleImagePaste(
     }
   }
 
-  // Fallback check for single item clipboard data (legacy browsers or platforms)
+  // single-item clipboard fallback
   const items = e.clipboardData?.items
   if (!items) return false
 
@@ -70,7 +60,7 @@ export async function handleImagePaste(
   }
 
   if (!imageItem) {
-    return false // Let standard text paste handler deal with it
+    return false // leave plain text to the normal paste
   }
 
   e.preventDefault()
@@ -87,15 +77,13 @@ export async function handleImagePaste(
     const mimeType = file.type || 'image/png'
     const ext = mimeType.split('/')[1] || 'png'
 
-    // Save image to config/media via Electron IPC
     const filename = await mediaApi.saveFromBuffer(arrayBuffer, ext)
     const markdownImg = `\n![Pasted Image](checkpoint-media://${filename})\n`
 
-    // Insert at current cursor position
     const newValue = currentValue.substring(0, start) + markdownImg + currentValue.substring(end)
     setValue(newValue)
     
-    // Set selection/cursor position just after the inserted image
+    // cursor after the inserted image
     const newCursorPos = start + markdownImg.length
     setTimeout(() => {
       if (target) {
@@ -111,10 +99,6 @@ export async function handleImagePaste(
   }
 }
 
-/**
- * Handles drop events on a textarea. Detects image files dropped,
- * saves them locally, and appends Markdown image links at the cursor.
- */
 export async function handleImageDrop(
   e: React.DragEvent<HTMLTextAreaElement>,
   currentValue: string,
@@ -124,7 +108,7 @@ export async function handleImageDrop(
   const imageFiles = files.filter(file => file.type.startsWith('image/'))
 
   if (imageFiles.length === 0) {
-    return false // Let standard file drop handler deal with it
+    return false // leave non-images to the normal drop
   }
 
   e.preventDefault()
@@ -135,14 +119,13 @@ export async function handleImageDrop(
   const end = target ? target.selectionEnd : currentValue.length
 
   try {
-    // Resolve absolute paths for the dropped files via Electron utility
+    // absolute paths via electron
     const absolutePaths = imageFiles
       .map(file => appApi.getPathForFile(file))
       .filter(Boolean)
 
     if (absolutePaths.length === 0) return false
 
-    // Copy files to local config/media via Electron IPC
     const savedMappings = await mediaApi.saveFilePaths(absolutePaths)
     if (savedMappings.length === 0) return false
 
@@ -151,7 +134,6 @@ export async function handleImageDrop(
       markdownImgs += `\n![Attached Image](checkpoint-media://${mapping.filename})\n`
     }
 
-    // Insert at current cursor position
     const newValue = currentValue.substring(0, start) + markdownImgs + currentValue.substring(end)
     setValue(newValue)
 

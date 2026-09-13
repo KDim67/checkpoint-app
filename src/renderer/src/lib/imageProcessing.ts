@@ -1,22 +1,15 @@
-/**
- * Pixel and packing routines behind the Game Dev tools. Pure functions over
- * raw pixel buffers. Extracted from GameDevView so the view holds UI rather
- * than image maths, and so they can be exercised without mounting a canvas.
- */
+/** pure over raw buffers, testable without a canvas */
 
-/**
- * One free rectangle in the atlas, and the two it becomes once something is
- * placed in it. The tree is recursive, so the node type has to be too.
- */
+/** a free rect and the two it splits into */
 interface PackerNode {
   x: number
   y: number
   w: number
   h: number
   used: boolean
-  /** The space to the right of what was placed here. */
+  /** space to the right */
   right?: PackerNode
-  /** The space below it. */
+  /** space below */
   down?: PackerNode
 }
 
@@ -35,9 +28,7 @@ export class BinaryTreePacker {
     return null
   }
 
-  // Undefined rather than a node once a branch runs out, which is why this
-  // takes one: the recursive calls below hand it `right` and `down`, and a
-  // used leaf has neither until it is split.
+  // undefined once a branch runs out; used leaves have no right/down until split
   findNode(node: PackerNode | undefined, w: number, h: number): PackerNode | null {
     if (!node) return null
     if (node.used) {
@@ -56,49 +47,31 @@ export class BinaryTreePacker {
   }
 }
 
-// Shared PBR Pixel Processing Utility
 interface PbrParams {
   normalIntensity: number
   heightDepth: number
   roughnessContrast: number
   roughnessBase: number
   aoIntensity: number
-  /** Treat dark pixels as high instead of low (crevices vs. ridges). */
+  /** dark as high: crevices vs ridges */
   invertHeight?: boolean
 }
 
-/**
- * Computes Height, Normal, Roughness and Ambient Occlusion map data from a source
- * RGBA pixel buffer using a Sobel-filter approach. Pure function. No canvas or DOM
- * dependencies, so it is safe to call from both the live-preview path and the
- * full-resolution export path without duplicating the loop.
- */
+/** Sobel over RGBA, no DOM, shared by preview and export */
 export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, params: PbrParams) {
   const { normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight } = params
 
   const clamped = (x: number, y: number): number =>
     (Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x))) * 4
 
-  // Luma-weighted grayscale with clamped border reads. Applying the height
-  // inversion here keeps height, normal direction, roughness and AO coherent.
+  // luma with clamped borders; inverting here keeps all the maps coherent
   const grayAt = (x: number, y: number): number => {
     const i = clamped(x, y)
     const g = (0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]) / 255
     return invertHeight ? 1 - g : g
   }
 
-  /**
-   * A neighbour's height, faded towards the pixel being shaded as it becomes
-   * transparent.
-   *
-   * A transparent pixel still carries colour, and what it carries is whatever
-   * the exporter left behind, which is almost always black. Reading that as
-   * height put a cliff around the silhouette of every sprite, so a cutout came
-   * back with a hard ridge embossed around its outline. Standing the centre
-   * pixel in for a transparent neighbour makes the slope across that boundary
-   * zero, which is what "there is nothing there" should mean. Fully opaque
-   * pixels take the first branch, so an opaque texture is untouched.
-   */
+  /** fade transparent neighbours to the centre, or sprites get an embossed ridge round their outline */
   const getGray = (x: number, y: number, centre: number): number => {
     const a = src[clamped(x, y) + 3] / 255
     return a >= 1 ? grayAt(x, y) : grayAt(x, y) * a + centre * (1 - a)
@@ -114,23 +87,21 @@ export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, par
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4
 
-      // Height (luminance)
+      // height (luminance)
       const h = grayAt(x, y)
       const hByte = Math.round(h * 255)
-      // The source alpha rides along, so a cutout stays a cutout and the maps
-      // can be used to mask. They used to come back fully opaque whatever went
-      // in, which turned a sprite's transparent field into solid geometry.
+      // source alpha rides along so cutouts stay cutouts
       const srcA = src[i + 3]
       hData[i] = hByte; hData[i + 1] = hByte; hData[i + 2] = hByte; hData[i + 3] = srcA
 
-      // Sobel 3×3 gradient
+      // Sobel 3x3
       const h00 = getGray(x - 1, y - 1, h); const h10 = getGray(x, y - 1, h); const h20 = getGray(x + 1, y - 1, h)
       const h01 = getGray(x - 1, y, h);                                        const h21 = getGray(x + 1, y, h)
       const h02 = getGray(x - 1, y + 1, h); const h12 = getGray(x, y + 1, h); const h22 = getGray(x + 1, y + 1, h)
       const dX = (h20 + 2 * h21 + h22) - (h00 + 2 * h01 + h02)
       const dY = (h02 + 2 * h12 + h22) - (h00 + 2 * h10 + h20)
 
-      // Normal (Sobel → unit vector → packed [0-1])
+      // normal: Sobel to unit vector, packed 0-1
       const nx = -dX * normalIntensity
       const ny = -dY * normalIntensity
       const nz = 1.0 / heightDepth
@@ -140,11 +111,11 @@ export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, par
       nData[i + 2] = Math.round(((nz / mag) * 0.5 + 0.5) * 255)
       nData[i + 3] = srcA
 
-      // Roughness (contrast + bias on luminance)
+      // roughness: contrast + bias on luma
       const rByte = Math.round(Math.max(0, Math.min(1, (h - 0.5) * roughnessContrast + 0.5 + (roughnessBase - 0.5))) * 255)
       rData[i] = rByte; rData[i + 1] = rByte; rData[i + 2] = rByte; rData[i + 3] = srcA
 
-      // Ambient Occlusion (gradient magnitude × height)
+      // AO: gradient magnitude x height
       const gradMag = Math.sqrt(dX * dX + dY * dY)
       const aoByte = Math.round(Math.max(0, Math.min(1, (1 - gradMag * aoIntensity) * (0.3 + 0.7 * h))) * 255)
       aData[i] = aoByte; aData[i + 1] = aoByte; aData[i + 2] = aoByte; aData[i + 3] = srcA
@@ -154,11 +125,9 @@ export function computePbrMaps(src: Uint8ClampedArray, W: number, H: number, par
   return { hData, nData, rData, aData }
 }
 
-// Pixel-art scaling cores (EPX / AdvMAME family)
-// Pure functions over raw RGBA buffers. Shared by the live preview and the
-// export path, and composable (Scale4x = Scale2x applied twice).
+// EPX/AdvMAME over raw RGBA, shared by preview and export
 
-/** Read a pixel as a packed 32-bit RGBA value with clamped border reads. */
+/** packed RGBA with clamped borders */
 function makePixelReaders(s: Uint8ClampedArray, w: number, h: number) {
   const idx = (x: number, y: number): number => {
     const cx = x < 0 ? 0 : x >= w ? w - 1 : x
@@ -172,7 +141,7 @@ function makePixelReaders(s: Uint8ClampedArray, w: number, h: number) {
   return { idx, pix }
 }
 
-/** Scale2x (EPX): doubles dimensions, preserving hard pixel-art edges. */
+/** doubles size, keeps hard edges */
 export function scale2xData(s: Uint8ClampedArray, w: number, h: number) {
   const { idx, pix } = makePixelReaders(s, w, h)
   const out = new Uint8ClampedArray(w * 2 * h * 2 * 4)
@@ -196,7 +165,7 @@ export function scale2xData(s: Uint8ClampedArray, w: number, h: number) {
   return out
 }
 
-/** Scale3x (AdvMAME3x): triples dimensions with the 9-subpixel rule set. */
+/** triples size, 9-subpixel rules */
 export function scale3xData(s: Uint8ClampedArray, w: number, h: number) {
   const { idx, pix } = makePixelReaders(s, w, h)
   const out = new Uint8ClampedArray(w * 3 * h * 3 * 4)
@@ -238,7 +207,6 @@ export function scale3xData(s: Uint8ClampedArray, w: number, h: number) {
   return out
 }
 
-// Shared LUT Builder Utility
 interface LutParams {
   exposure: number
   brightness: number
@@ -247,11 +215,7 @@ interface LutParams {
   temperature: number
 }
 
-/**
- * Builds a standard neutral 256×16 3D-LUT slice-strip as a flat Uint8ClampedArray.
- * A single source of truth consumed by both the live preview renderer and the export
- * path, keeping both pixel-perfect identical with no code duplication.
- */
+/** neutral 256x16 strip, shared by preview and export so both match */
 export function buildLutData(params: LutParams) {
   const { exposure, brightness, contrast, saturation, temperature } = params
   const expScale = Math.pow(2, exposure / 100)
@@ -293,18 +257,7 @@ export function buildLutData(params: LutParams) {
   return d
 }
 
-// Palette extraction
-
-/**
- * The dominant colours of an image, most common first.
- *
- * Bucketed by the top four bits per channel: counting exact RGB would return
- * sixteen identical-looking browns and call it a palette. Each bucket reports
- * the average of what landed in it, so the result is a colour from the image
- * rather than the corner of a bucket.
- *
- * Nearly transparent pixels are skipped: a cut-out's background is not a colour.
- */
+/** top four bits per channel, bucket averages; skips near-transparent pixels */
 export function extractPalette(src: Uint8ClampedArray, count = 6): string[] {
   const buckets = new Map<number, { n: number; r: number; g: number; b: number }>()
 

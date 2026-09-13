@@ -24,8 +24,7 @@ describe('a drawn stroke', () => {
   const path = [{ x: 100, y: 100 }, { x: 140, y: 130 }, { x: 120, y: 160 }]
 
   it('boxes the path and rebases the points into it', () => {
-    // Box coordinates, not wall ones, so moving and resizing a stroke are the
-    // same operations as for every other item.
+    // box coordinates, so move and resize work like any item
     const ink = defined(inkFromPath(path, []))
     expect(ink.kind).toBe('ink')
     expect(ink.x).toBeLessThan(100)
@@ -85,7 +84,7 @@ describe('reading a stroke back', () => {
   })
 
   it('drops one whose coordinates are not all numbers', () => {
-    // A half-read path would render as a stroke veering to the origin.
+    // a half-read path veers to the origin
     expect(normalizeWallItem({ ...ink, points: [0, 0, 'ten', 10] }, 0)).toBeNull()
     expect(normalizeWallItem({ ...ink, points: [0, 0, 10, 10, 20] }, 0)).toBeNull()
   })
@@ -96,7 +95,7 @@ describe('an arrow', () => {
   const right = item({ id: 'r', x: 300, y: 0, width: 100, height: 100 })
 
   it('starts and stops on the edges, not the centres', () => {
-    // A head drawn to the centre would sit inside the item it points at.
+    // a head at the centre sits inside the item
     const { start, end } = arrowEnds(left, right)
     expect(start.x).toBe(100)
     expect(end.x).toBe(300)
@@ -134,8 +133,7 @@ describe('arrows whose ends have gone', () => {
   })
 
   it('drops one whose target was deleted', () => {
-    // An arrow to nothing cannot be drawn, and would sit invisible and
-    // undeletable in the document.
+    // invisible and undeletable otherwise
     expect(pruneArrows([left, arrow]).map(i => i.id)).toEqual(['l'])
   })
 
@@ -172,8 +170,7 @@ describe('clicking a line that has no box', () => {
 })
 
 describe('an arrow has no box, and nothing should pretend it does', () => {
-  // Arrows are created with a placeholder box wherever the view happened to be,
-  // so counting it drags the camera and the marquee towards empty space.
+  // placeholder boxes would drag camera and marquee to empty space
   const note = item({ id: 'n', x: 500, y: 500, width: 100, height: 100 })
   const arrow = item({ id: 'a1', kind: 'arrow', from: 'n', to: 'n', x: 0, y: 0, width: 1, height: 1 })
 
@@ -190,7 +187,7 @@ describe('an arrow has no box, and nothing should pretend it does', () => {
   })
 
   it('is not returned by a point hit test', () => {
-    // Clicking one goes through the line test instead, since the box is a lie.
+    // clicks go through the line test, the box lies
     expect(itemAtPoint([arrow], { x: 0, y: 0 })).toBeNull()
   })
 })
@@ -211,8 +208,7 @@ describe('stroke smoothing', () => {
   })
 
   it('starts at the first sample and ends at the last, either way', () => {
-    // Smoothing must not move where the stroke begins or ends, or a line drawn
-    // to touch something would stop short of it.
+    // ends stay put
     const points = many(8)
     const smooth = inkPath(item({ kind: 'ink', points, smooth: 0.6 }))
     const last = `${points[points.length - 2].toFixed(1)},${points[points.length - 1].toFixed(1)}`
@@ -226,7 +222,7 @@ describe('stroke smoothing', () => {
   })
 
   it('is remembered per stroke, not read from a live setting', () => {
-    // Otherwise switching the toggle would redraw every line already on the wall.
+    // or toggling redraws every line
     const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: 0.6 }
     expect(normalizeWallItem(raw, 0)?.smooth).toBe(0.6)
     expect(normalizeWallItem({ ...raw, smooth: 0 }, 0)?.smooth).toBeUndefined()
@@ -246,8 +242,7 @@ describe('smoothing strength', () => {
   })
 
   it('pulls interior points further as it rises', () => {
-    // The second sample sits at y=40 between two neighbours at y=0, so both
-    // strengths pull it towards 0 and the stronger one gets closer.
+    // y=40 between two zeros, stronger pulls closer
     const light = smoothPoints(shaky, 0.3)
     const strong = smoothPoints(shaky, 0.9)
     expect(light[3]).toBeLessThan(shaky[3])
@@ -255,7 +250,7 @@ describe('smoothing strength', () => {
   })
 
   it('never moves the first or last point, at any strength', () => {
-    // A line drawn to touch something has to keep touching it.
+    // must keep touching
     for (const strength of [0.3, 0.6, 0.9, 1]) {
       const out = smoothPoints(shaky, strength)
       expect(out.slice(0, 2)).toEqual(shaky.slice(0, 2))
@@ -277,8 +272,7 @@ describe('smoothing strength', () => {
   })
 
   it('keeps a strength written by the build that had a dial', () => {
-    // The pen writes one strength now, but a stroke drawn on Light should still
-    // look like Light instead of jumping to the full amount.
+    // a Light stroke should stay Light
     const raw = { kind: 'ink', id: 'i', x: 0, y: 0, width: 9, height: 9, z: 1, points: [0, 0, 1, 1], smooth: 0.3 }
     expect(normalizeWallItem(raw, 0)?.smooth).toBe(0.3)
   })

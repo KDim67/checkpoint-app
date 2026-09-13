@@ -24,14 +24,14 @@ const chats = [
 const makeSpies = () => ({
   handleNewChat: vi.fn<Props['handleNewChat']>(),
   handleLoadChat: vi.fn<Props['handleLoadChat']>(),
-  // The panel's own handler stops the click, so deleting never loads the chat.
+  // the panel's handler stops the click, so delete never loads
   handleDeleteChat: vi.fn<Props['handleDeleteChat']>((...args) => args[1].stopPropagation()),
   handleSaveRename: vi.fn<SavedChats['handleSaveRename']>(),
   setShowSavedChatsModal: vi.fn<SavedChats['setShowSavedChatsModal']>()
 })
 type Spies = ReturnType<typeof makeSpies>
 
-/** Search and rename are typed into the chat list's state, so the harness holds them. */
+/** search and rename live in list state, the harness holds them */
 function Drawer({ savedChats, spies }: { savedChats: SavedChat[]; spies: Spies }) {
   const [chatSearchQuery, setChatSearchQuery] = useState('')
   const [editingChatId, setEditingChatId] = useState<string | null>(null)

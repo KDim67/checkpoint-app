@@ -105,6 +105,7 @@ export default function StorageSettings() {
         <button
           onClick={handlePrune}
           disabled={pruning || storageInfo?.fileCount === 0}
+          className="storage-settings-prune"
           style={{
             background: storageInfo?.fileCount === 0 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
             border: 'none',
@@ -120,8 +121,6 @@ export default function StorageSettings() {
             transition: 'filter var(--duration-fast)',
             flexShrink: 0
           }}
-          onMouseEnter={e => { if (storageInfo?.fileCount !== 0) e.currentTarget.style.filter = 'brightness(1.1)' }}
-          onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
         >
           {pruning ? 'Cleaning up...' : 'Scan & Prune Vault'}
         </button>

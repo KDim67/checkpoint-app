@@ -23,7 +23,6 @@ export default function PalettePanel({
 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 'var(--space-4)' }}>
     
-    {/* Color picker list */}
     <div className="panel">
       <h3 className="heading-sm">Color Palette Creator</h3>
       
@@ -56,7 +55,6 @@ export default function PalettePanel({
         </button>
       </div>
 
-      {/* Grid of colors */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(70px, 100%), 1fr))', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
         {tool.paletteColors.map((col) => (
           <div
@@ -108,11 +106,9 @@ export default function PalettePanel({
       </div>
     </div>
 
-    {/* Generated Code Snippets */}
     <div className="panel">
       <h3 className="heading-sm">Shader & Code Snippets</h3>
       
-      {/* Unity Code Block */}
       <div className="col-4px">
         <div className="row-between">
           <span className="text-caption-strong">Unity C# Color Array</span>
@@ -128,7 +124,6 @@ export default function PalettePanel({
         </pre>
       </div>
 
-      {/* Unreal Code Block */}
       <div className="col-4px-mt">
         <div className="row-between">
           <span className="text-caption-strong">Unreal Engine C++ FLinearColor</span>
@@ -144,7 +139,6 @@ export default function PalettePanel({
         </pre>
       </div>
 
-      {/* HLSL Code Block */}
       <div className="col-4px-mt">
         <div className="row-between">
           <span className="text-caption-strong">HLSL float4 Shader Array</span>

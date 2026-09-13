@@ -33,10 +33,7 @@ interface TaskDetailDrawerProps {
 type EditorMode = 'edit' | 'preview' | 'split'
 
 
-// Detecting the checkboxes people wrote before subtasks were real rows, so the
-// drawer can offer to convert them. The parsing itself lives in shared/ and is
-// the same code the conversion uses, so the count offered always matches what
-// conversion produces.
+// same shared parser as the conversion, so the offered count matches
 function legacyChecklistOf(markdown: string): { title: string; done: boolean }[] {
   return parseChecklist(markdown).items
 }
@@ -52,10 +49,10 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   
-  // Estimates: parsed from metadata.estimate
+  // from metadata.estimate
   const [estimate, setEstimate] = useState<number | ''>('')
 
-  // Subtasks. Rows in their own table, not checkboxes in the body.
+  // rows in their own table, not body checkboxes
   const [newSubtaskText, setNewSubtaskText] = useState('')
   const [subtasks, setSubtasks] = useState<Subtask[]>([])
 
@@ -67,10 +64,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     }
   }, [])
 
-  // Editor mode
   const [editorMode, setEditorMode] = useState<EditorMode>('split')
 
-  // Tags
   const [allTags, setAllTags] = useState<TagType[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [showTagSelector, setShowTagSelector] = useState(false)
@@ -87,7 +82,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     onCloseRef.current = onClose
   }, [onClose])
 
-  // Load details
   useEffect(() => {
     let active = true
     const loadDetails = async () => {
@@ -111,7 +105,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           setBody(found.body)
           setSelectedTagIds(found.tags?.map(t => t.id) || [])
           
-          // Parse estimate from metadata
           try {
             const meta = JSON.parse(found.metadata)
             setEstimate(meta.estimate !== undefined ? Number(meta.estimate) : '')
@@ -200,7 +193,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   }
 
   const handleToggleSubtask = async (subtask: Subtask) => {
-    // Applied locally first: a checkbox that waits for a round trip feels broken.
+    // optimistic, a checkbox waiting on a round trip feels broken
     setSubtasks(prev => prev.map(s => (s.id === subtask.id ? { ...s, done: !s.done } : s)))
     await subtasksApi.update(subtask.id, { done: !subtask.done })
     if (task) loadSubtasks(task.id)
@@ -220,13 +213,11 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     await loadSubtasks(task.id)
   }
 
-  /** Rescues the checkboxes written before subtasks were real rows. */
   const handleConvertChecklist = async () => {
     if (!task) return
     const result = await subtasksApi.convert(task.id)
     if (!result.ok) return
-    // Re-read rather than trusting a local edit: the conversion rewrote the body
-    // in main, and this is the same lookup the drawer opens with.
+    // re-read, the conversion rewrote the body in main
     const found = await searchItems({
       query: task.id,
       context: activeWorkspace,
@@ -306,7 +297,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
         aria-modal="true"
         aria-labelledby="task-modal-title"
       >
-        {/* Header */}
         <div style={{
           height: '56px',
           padding: '0 var(--space-6)',
@@ -337,7 +327,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           </div>
         </div>
 
-        {/* Scroll Body */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
@@ -346,7 +335,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           flexDirection: 'column',
           gap: 'var(--space-6)'
         }}>
-          {/* Editable Title */}
           <div>
             <DetailTitleInput
               inputRef={titleInputRef}
@@ -358,7 +346,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             />
           </div>
 
-          {/* Properties Grid */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
@@ -368,7 +355,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             borderRadius: 'var(--radius-lg)',
             border: '1px solid var(--color-surface-offset)'
           }}>
-            {/* Status (Column) */}
             <div className="col-sm">
               <span className="label-caps">
                 Status
@@ -384,7 +370,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               </select>
             </div>
 
-            {/* Priority */}
             <div className="col-sm">
               <span className="label-caps">
                 Priority
@@ -401,7 +386,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               </select>
             </div>
 
-            {/* Due Date */}
             <div className="col-sm">
               <span className="label-caps">
                 Due Date
@@ -414,7 +398,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               />
             </div>
 
-            {/* Time Estimate */}
             <div className="col-sm">
               <span className="label-caps">
                 Time Estimate (Hours)
@@ -430,7 +413,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               />
             </div>
 
-            {/* Tag Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)', position: 'relative', gridColumn: 'span 2' }}>
               <span className="label-caps">
                 Tags
@@ -504,7 +486,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </div>
           </div>
 
-          {/* Sub-tasks Checklist */}
           <div className="col">
             <span className="label-caps">
               Sub-Tasks Checklist
@@ -594,7 +575,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               </div>
             )}
 
-            {/* Add Subtask Form */}
             <form onSubmit={handleAddSubtaskSubmit} className="flex-gap">
               <input
                 type="text"
@@ -625,14 +605,12 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             </form>
           </div>
 
-          {/* Description Editor */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, minHeight: '300px' }}>
             <div className="section-head-between">
               <span className="label-caps">
                 Description (Markdown)
               </span>
 
-              {/* Layout Toggle */}
               <div style={{
                 display: 'flex',
                 background: 'var(--color-surface-2)',
@@ -662,7 +640,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               </div>
             </div>
 
-            {/* Split Pane Editor */}
             <div style={{ display: 'flex', flex: 1, gap: 'var(--space-4)', minHeight: '260px' }}>
               {(editorMode === 'edit' || editorMode === 'split') && (
                 <textarea
@@ -670,10 +647,10 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                   onChange={e => setBody(e.target.value)}
                   onBlur={handleBodyBlur}
                   placeholder="Enter details..."
+                  className="border-offset focus-border-primary"
                   style={{
                     flex: 1,
                     background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-4)',
                     color: 'var(--color-text-base)',
@@ -683,8 +660,6 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                     resize: 'none',
                     lineHeight: 1.5
                   }}
-                  onFocus={e => (e.target.style.borderColor = 'var(--color-primary)')}
-                  onBlurCapture={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
                 />
               )}
 

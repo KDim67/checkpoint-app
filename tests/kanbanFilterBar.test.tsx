@@ -13,7 +13,7 @@ const tags: Tag[] = [
   { id: 'tag-ux', name: 'ux', color: '#535e85' }
 ]
 
-/** The filters are the board's state; the harness shows what the bar left them as. */
+/** filters are board state, the harness shows the result */
 function Board() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterPriority, setFilterPriority] = useState(-1)

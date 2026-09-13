@@ -1,11 +1,4 @@
-/**
- * One query across everything Checkpoint indexes. The four searches already
- * existed and were simply never called together: run them in parallel, map to a
- * common shape, let `mergeSearchHits` order them.
- *
- * Each source may fail on its own. Cheatsheet search reads PDFs and note search
- * walks a directory, and one bad source must not blank the whole list.
- */
+/** the four searches in parallel, merged by mergeSearchHits; each source can fail alone */
 
 import { mergeSearchHits, snippet, type SearchHit } from '../../../shared/searchResults'
 import type { Item, NoteSearchResult } from '../../../shared/types'
@@ -13,7 +6,7 @@ import { searchItems } from '../data/items'
 import * as notesApi from '../data/notes'
 import * as cheatsheetsApi from '../data/cheatsheets'
 
-/** Minimum length before searching. FTS on one character matches everything. */
+/** FTS on one character matches everything */
 export const MIN_QUERY_LENGTH = 2
 
 const itemKind = (item: Item): SearchHit['kind'] =>

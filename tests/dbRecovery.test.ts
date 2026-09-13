@@ -4,8 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { quarantineDatabase, recoveryMessage, stampFor } from '../src/main/dbRecovery'
 
-// The database is the only copy of everything the user has. What happens when
-// it will not open is therefore worth being precise about.
+// the only copy of everything, so be precise
 
 let dir: string
 let dbPath: string
@@ -21,7 +20,7 @@ afterEach(() => {
 
 describe('moving an unreadable database aside', () => {
   it('keeps the file rather than deleting it', () => {
-    // It is the only copy of their work, and a later SQLite may recover it.
+    // the only copy, a later SQLite may recover it
     writeFileSync(dbPath, 'not really a database')
 
     const { movedTo } = quarantineDatabase(dbPath, '2026-01-01T00-00-00-000Z')
@@ -32,8 +31,7 @@ describe('moving an unreadable database aside', () => {
   })
 
   it('takes the write-ahead log with it', () => {
-    // A stale WAL left behind would be replayed into the fresh database and
-    // corrupt that one too.
+    // a stale WAL would corrupt the fresh db
     writeFileSync(dbPath, 'db')
     writeFileSync(`${dbPath}-wal`, 'wal')
     writeFileSync(`${dbPath}-shm`, 'shm')
@@ -62,8 +60,7 @@ describe('moving an unreadable database aside', () => {
   })
 
   it('copes with there being nothing to move', () => {
-    // An unwritable directory throws before any file exists, and that path
-    // must not throw a second time on the way out.
+    // an unwritable dir throws first; the way out mustn't throw again
     expect(() => quarantineDatabase(dbPath, 'stamp')).not.toThrow()
   })
 })
@@ -89,7 +86,7 @@ describe('what the user is told', () => {
     const message = recoveryMessage('C:/x/checkpoint.db.corrupt-1', 'C:/x/backups')
     expect(message).toContain('C:/x/checkpoint.db.corrupt-1')
     expect(message).toContain('C:/x/backups')
-    // The point of keeping the file is lost if the message implies it is gone.
+    // keeping the file is pointless if the message implies it's gone
     expect(message).toContain('kept, not deleted')
   })
 })

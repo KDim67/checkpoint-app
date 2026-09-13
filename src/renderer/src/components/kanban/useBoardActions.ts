@@ -4,7 +4,6 @@ import { bulkUpdateItems, createItem, deleteItem, updateItem } from '../../data/
 import { cardFromTemplate, isTemplateCard } from '../../../../shared/cardTemplates'
 import type { BoardState } from './useBoardState'
 
-/** What the board's menus and drawers do to columns, cards, templates and the archive. */
 export function useBoardActions(boardState: BoardState) {
   const {
     activeWorkspace, toast, confirm, cards, setCards, columns, setColumns, columnsRef,
@@ -12,7 +11,6 @@ export function useBoardActions(boardState: BoardState) {
     allTags, archivedColumns, setArchivedColumns, archivedColumnsRef, showArchiveBin,
     selectedArchived, setSelectedArchived, setShowTemplateSelector, loadCards
   } = boardState
-  // Column Management
 
   const handleCreateColumnSubmit = async (name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full', description?: string) => {
     const id = `col-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`
@@ -33,8 +31,7 @@ export function useBoardActions(boardState: BoardState) {
   }, [columnsRef, persistColumns, toast])
 
   const performDeleteColumn = useCallback(async (colId: string) => {
-    // Read the LATEST columns (via ref) so deleting two in a row can't operate on
-    // a stale list and write back a column that was just removed.
+    // latest columns via ref, so two quick deletes don't write back a removed one
     const current = columnsRef.current
     const colName = current.find(c => c.id === colId)?.name || 'Column'
     const updatedCols = current.filter(c => c.id !== colId)
@@ -65,8 +62,6 @@ export function useBoardActions(boardState: BoardState) {
     }
   }, [cards, performDeleteColumn, setPendingDeleteColId])
 
-  // Column sorting & bulk actions
-
   const handleClearColumnCards = useCallback(async (columnId: string) => {
     const colCards = cards.filter(c => c.status === columnId)
     if (colCards.length === 0) return
@@ -89,9 +84,7 @@ export function useBoardActions(boardState: BoardState) {
     if (!colToArchive) return
 
     try {
-      // Both halves in one patch: archiving moves a column between two lists,
-      // and writing them separately left a window where the column existed in
-      // neither if the second write failed.
+      // one patch: separate writes could leave the column in neither list
       const updatedArchived = [...archivedColumnsRef.current, colToArchive]
       const updatedCols = current.filter(c => c.id !== colId)
       columnsRef.current = updatedCols
@@ -105,8 +98,6 @@ export function useBoardActions(boardState: BoardState) {
       console.error(err)
     }
   }, [columnsRef, archivedColumnsRef, setColumns, setArchivedColumns, persistConfig, loadCards, toast])
-
-  // Card Management
 
   const handleUpdateCardDetails = useCallback(async (id: string, patch: Partial<Item>, tagIds?: string[]) => {
     try {
@@ -193,7 +184,6 @@ export function useBoardActions(boardState: BoardState) {
     }
   }, [cards, activeWorkspace, setCards, setActiveCardId])
 
-  // Template Instantiation
   const handleCreateCardFromTemplate = async (templateCard: Item) => {
     setShowTemplateSelector(false)
     try {
@@ -213,14 +203,12 @@ export function useBoardActions(boardState: BoardState) {
     }
   }
 
-  // Archive Bin Restores
   const handleRestoreColumn = async (colId: string) => {
     const colToRestore = archivedColumns.find(c => c.id === colId)
     if (!colToRestore) return
 
     try {
-      // One patch, for the same reason archiving is: a restore that half-failed
-      // used to leave the column in both lists at once.
+      // one patch, a half-failed restore left it in both lists
       const updatedCols = [...columns, colToRestore]
       const updatedArchived = archivedColumns.filter(c => c.id !== colId)
       columnsRef.current = updatedCols
@@ -277,7 +265,6 @@ export function useBoardActions(boardState: BoardState) {
     }
   }
 
-  // Archive Bin multi-select (bulk restore / delete)
   const handleBulkDeleteArchived = async (): Promise<void> => {
     const ids = Array.from(selectedArchived)
     if (ids.length === 0) return
@@ -341,7 +328,7 @@ export function useBoardActions(boardState: BoardState) {
     }
   }
 
-  // Clear any archive-bin selection whenever the drawer closes.
+  // clear the selection when the drawer closes
   useEffect(() => {
     if (!showArchiveBin) setSelectedArchived(new Set())
   }, [setSelectedArchived, showArchiveBin])

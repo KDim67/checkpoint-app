@@ -42,8 +42,7 @@ describe('the drag payload', () => {
   })
 
   it('refuses anything it did not write', () => {
-    // A drop carries whatever the source chose to put there, and the source is
-    // not necessarily this application.
+    // the source may not be this app
     expect(decodeWallDrag(null)).toBeNull()
     expect(decodeWallDrag('')).toBeNull()
     expect(decodeWallDrag('not json')).toBeNull()
@@ -87,8 +86,7 @@ describe('grouping cards into columns', () => {
   })
 
   it('shows cards whose column was deleted rather than dropping them', () => {
-    // These are invisible on the board itself, which makes the rail the only
-    // place they can be found.
+    // invisible on the board, the rail is the only place
     const groups = groupCardsByColumn([card({ id: 'a', status: 'gone-column' })], columns)
     const orphans = groups.find(g => g.column.id === ORPHAN_COLUMN_ID)
     expect(orphans?.cards.map(c => c.id)).toEqual(['a'])
@@ -148,8 +146,7 @@ describe('handing a card back to a column', () => {
   })
 
   it('is not confused by a column that is out of order', () => {
-    // Taking the last element would give 2000 here, and the card would land in
-    // the middle of the column rather than at the end.
+    // the last element would give 2000, landing mid-column
     expect(appendPosition([card({ position: 9000 }), card({ position: 2000 })])).toBe(10000)
   })
 

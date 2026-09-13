@@ -7,7 +7,7 @@ import Logo from './ui/Logo'
 import MenuItem, { MenuDivider } from './ui/MenuItem'
 import * as syncApi from '../data/sync'
 
-// Icons (SVG inline: no icon-lib dependency)
+// inline SVG, no icon lib
 
 function IconLog(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -156,8 +156,6 @@ function IconSync(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
-// Nav Item Data
-
 const NAV_ITEMS: Array<{
   view: ActiveView
   label: string
@@ -175,17 +173,11 @@ const NAV_ITEMS: Array<{
   { view: 'cheatsheets', label: 'Cheatsheets', Icon: IconCheatsheets }
 ]
 
-// Context Popover
-
 interface ContextPopoverProps {
   onClose: () => void
 }
 
-/**
- * A real listbox: the options are the contexts, and the "Manage" action sits
- * outside it as a footer, because an action row is not a selectable option and
- * would make the listbox semantics a lie.
- */
+/** options are the contexts; Manage sits outside as a footer, an action row isn't an option */
 function ContextPopover({ onClose }: ContextPopoverProps) {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
@@ -204,7 +196,7 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
     listRef.current?.focus()
   }, [])
 
-  // Keep the highlighted option in view when arrowing past the scroll edge.
+  // keep the highlighted option in view past the scroll edge
   useEffect(() => {
     listRef.current
       ?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
@@ -336,8 +328,6 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
   )
 }
 
-// Sidebar
-
 export function Sidebar() {
   const activeView = useAppStore(s => s.activeView)
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
@@ -349,8 +339,7 @@ export function Sidebar() {
   const [contextOpen, setContextOpen] = useState(false)
   const contextTriggerRef = useRef<HTMLButtonElement>(null)
 
-  // Focus moves into the popover on open, so it has to come back on close or
-  // the tab order restarts from the top of the document.
+  // focus moved into the popover, bring it back or tab order restarts
   const closeContextPopover = useCallback(() => {
     setContextOpen(false)
     contextTriggerRef.current?.focus()
@@ -399,15 +388,13 @@ export function Sidebar() {
     return () => window.removeEventListener('settings-update-sync', checkSyncStatus)
   }, [checkSyncStatus])
 
-  // Poll only while sync is on. The interval used to run for the whole session
-  // regardless, doing an IPC round-trip every 5s just to re-learn it was off.
+  // poll only while sync is on, it used to IPC every 5s regardless
   useEffect(() => {
     if (!syncEnabled) return
     const interval = setInterval(checkSyncStatus, 5000)
     return () => clearInterval(interval)
   }, [syncEnabled, checkSyncStatus])
 
-  // Close context popover on outside click
   useEffect(() => {
     if (!contextOpen) return
     const handler = (e: MouseEvent) => {
@@ -434,8 +421,7 @@ export function Sidebar() {
   return (
     <div
       ref={sidebarRef}
-      // Named so the first-run tour can spotlight the whole rail at once.
-      // The workspace switcher and the view icons are one idea to a newcomer.
+      // named so the tour can spotlight the whole rail
       id="app-sidebar"
       style={{
         width: '56px',
@@ -451,7 +437,7 @@ export function Sidebar() {
         position: 'relative'
       }}
     >
-      {/* Interactive Logo Context Switcher */}
+      {/* the logo doubles as the context switcher */}
       <button
         ref={contextTriggerRef}
         id="context-switcher"
@@ -460,11 +446,11 @@ export function Sidebar() {
         aria-expanded={contextOpen}
         aria-haspopup="listbox"
         onClick={() => setContextOpen(v => !v)}
+        className="sidebar-context-trigger"
         style={{
           position: 'relative',
           padding: '4px',
           borderRadius: 'var(--radius-md)',
-          background: contextOpen ? 'var(--color-secondary-muted)' : 'transparent',
           border: `1px solid ${contextOpen ? 'var(--color-secondary)' : 'transparent'}`,
           cursor: 'pointer',
           display: 'flex',
@@ -473,12 +459,6 @@ export function Sidebar() {
           marginBottom: 'var(--space-2)',
           transition: 'all var(--duration-fast) var(--ease-default)',
           flexShrink: 0
-        }}
-        onMouseEnter={e => {
-          if (!contextOpen) e.currentTarget.style.background = 'var(--color-surface-2)'
-        }}
-        onMouseLeave={e => {
-          if (!contextOpen) e.currentTarget.style.background = 'transparent'
         }}
       >
         <div style={{ filter: 'drop-shadow(0 2px 6px rgba(187, 254, 43, 0.35))', display: 'flex' }}>
@@ -512,7 +492,6 @@ export function Sidebar() {
 
       <div style={{ height: '1px', width: '32px', background: 'var(--color-surface-offset)', margin: '2px 0 4px' }} />
 
-      {/* Nav items */}
       <nav
         aria-label="Main navigation"
         style={{
@@ -555,7 +534,6 @@ export function Sidebar() {
                   transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
                 }}
               >
-                {/* Active indicator. Left border dot */}
                 {isActive && (
                   <span style={{
                     position: 'absolute',
@@ -570,8 +548,7 @@ export function Sidebar() {
                 )}
                 <Icon />
 
-                {/* Running-timer indicator. Visible from any view, so a session
-                    never silently ticks away unnoticed while you work elsewhere */}
+                {/* running-timer dot, visible from any view */}
                 {view === 'focus' && focusIsRunning && !isActive && (
                   <span
                     aria-hidden="true"
@@ -592,7 +569,6 @@ export function Sidebar() {
             )
           })}
 
-        {/* Bottom actions container */}
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', alignItems: 'center', width: '100%' }}>
           {syncEnabled && (
             <button
@@ -654,7 +630,6 @@ export function Sidebar() {
         </div>
       </nav>
 
-      {/* Tooltip */}
       {tooltip && (
         <div
           aria-hidden="true"
@@ -699,5 +674,4 @@ export function Sidebar() {
   )
 }
 
-// Chevron export
 export { IconChevronDown }

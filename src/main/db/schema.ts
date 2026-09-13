@@ -1,8 +1,4 @@
-/**
- * The FTS bridge triggers, kept separate because they are needed twice: once in
- * SCHEMA_SQL, and again after the legacy items rebuild, which drops them along
- * with the table. Two copies would drift.
- */
+/** needed twice, in SCHEMA_SQL and after the legacy rebuild drops them; two copies would drift */
 export const ITEMS_FTS_TRIGGERS_SQL = `CREATE TRIGGER IF NOT EXISTS items_fts_insert AFTER INSERT ON items BEGIN
   INSERT INTO items_fts(rowid, id, title, body) VALUES (new.rowid, new.id, new.title, new.body);
 END;

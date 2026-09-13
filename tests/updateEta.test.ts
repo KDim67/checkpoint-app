@@ -28,7 +28,7 @@ describe('etaSeconds', () => {
   })
 
   it('refuses to divide by a rate of zero', () => {
-    // The first event of every download arrives before there is a rate.
+    // no rate yet on the first event
     expect(etaSeconds(downloading({ bytesPerSecond: 0 }))).toBeNull()
   })
 
@@ -50,7 +50,7 @@ describe('etaShort', () => {
   })
 
   it('rounds seconds up to the nearest five', () => {
-    // A figure jumping 41, 38, 44 reads as broken even when the download is fine.
+    // jumping figures read as broken
     expect(etaShort(41)).toBe('45 sec')
     expect(etaShort(44)).toBe('45 sec')
     expect(etaShort(45)).toBe('45 sec')
@@ -62,7 +62,7 @@ describe('etaShort', () => {
   })
 
   it('switches to minutes at a minute', () => {
-    // 56 rounds up to 60, and "60 sec" is not what anybody says.
+    // "60 sec" isn't what anyone says
     expect(etaShort(56)).toBe('1 min')
     expect(etaShort(59)).toBe('1 min')
     expect(etaShort(60)).toBe('1 min')
@@ -111,7 +111,7 @@ describe('describeUpdateProgress', () => {
   })
 
   it('leaves out the version when the event naming it has not arrived', () => {
-    // The download starts on update-available; a restart mid-download has no name for it.
+    // a restart mid-download has no version name
     expect(describeUpdateProgress(downloading({ version: '' })))
       .toBe('Downloading, 50%. 47.7 MB of 95.4 MB. 50 sec left.')
   })

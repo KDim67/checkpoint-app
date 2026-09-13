@@ -1,22 +1,19 @@
-/** Streaming and structured generation, and what a model can do. */
+/** streaming, structured generation and model capabilities */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
 
-// One live stream per consumer channel ('assistant', 'standup', …). The legacy
-// no-id call maps to the '' channel, so old callers keep single-stream semantics.
+// one live stream per channel; the legacy no-id call maps to ''
 const aiStreamControllers = new Map<string, AbortController>()
 let structuredAbortController: AbortController | null = null
 import { sendToWindow } from '../windows'
 
 export function registerAiHandlers(): void {
-  // Each consumer passes a streamId ('assistant', 'standup', …) so multiple
-  // features can stream concurrently without cross-talk. Events carry the id
-  // back so renderer subscribers can filter to their own stream.
+  // streamId lets features stream at once without cross-talk; events echo it back for filtering
   ipcMain.handle(IpcChannels.AI_STREAM_START, async (_event, params: unknown, streamId?: unknown) => {
     const id = typeof streamId === 'string' ? streamId : ''
 
-    // Starting a new stream on the same channel replaces the old one
+    // a new stream on the same channel replaces the old one
     const existing = aiStreamControllers.get(id)
     if (existing) {
       existing.abort()
@@ -54,7 +51,7 @@ export function registerAiHandlers(): void {
   ipcMain.handle(IpcChannels.AI_STREAM_ABORT, (_event, streamId?: unknown) => {
     const id = typeof streamId === 'string' ? streamId : undefined
     if (id === undefined) {
-      // Legacy no-id abort: stop everything
+      // legacy no-id abort stops everything
       for (const controller of aiStreamControllers.values()) controller.abort()
       aiStreamControllers.clear()
     } else {
@@ -64,8 +61,7 @@ export function registerAiHandlers(): void {
     return true
   })
 
-  // Reliable structured generation (board / plan / dialogue). Request/response,
-  // not streamed. Uses tool-calling / JSON-schema when the endpoint supports it.
+  // request/response, not streamed
   ipcMain.handle(IpcChannels.AI_GENERATE_STRUCTURED, async (_event, params: unknown) => {
     if (structuredAbortController) {
       structuredAbortController.abort()

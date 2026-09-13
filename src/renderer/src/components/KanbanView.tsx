@@ -34,9 +34,7 @@ import KanbanFilterBar from './kanban/KanbanFilterBar'
 import { canAimAtSlot } from './kanban/dropSlots'
 
 
-// Re-exported rather than declared: the shape now belongs to lib/boardConfig,
-// which owns the whole board document. Kept as an export so existing importers
-// of ColumnConfig from this module keep working.
+// re-exported for existing importers, lib/boardConfig owns the shape
 export type { ColumnConfig }
 
 interface SortableColumnProps {
@@ -55,21 +53,17 @@ interface SortableColumnProps {
   onToggleCollapse?: (columnId: string) => void
   onSetSort?: (columnId: string, sort: ColumnSort) => void
   cardDisplay?: CardDisplay
-  /** Where the drop preview sits, as an index into `cards`. null for nowhere. */
+  /** index into cards, null for nowhere */
   dropSlot?: number | null
-  /** The height the dragged card had, so the gap is the footprint it will take. */
+  /** dragged card's height, so the gap matches its footprint */
   dropHeight?: number
 }
 
 function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableColumnProps) {
   if (prev.isReadOnly !== next.isReadOnly) return false
-  // The board hands these down only while a card is in the air, and only the
-  // column under the pointer gets a slot, so this is what keeps a drag to one
-  // re-rendering column instead of all of them.
+  // only the column under the pointer gets a slot, so a drag re-renders one column
   if (prev.dropSlot !== next.dropSlot || prev.dropHeight !== next.dropHeight) return false
-  // Whole-object compares. The five fields this used to name by hand left
-  // collapsed, sort, description and cardDisplay out, so those changes were
-  // dropped here and never reached a card.
+  // whole-object compare: naming five fields missed collapsed, sort, description and cardDisplay
   if (!sameColumnConfig(prev.col, next.col)) return false
   if (!sameCardDisplay(prev.cardDisplay, next.cardDisplay)) return false
   if (prev.cards.length !== next.cards.length) return false
@@ -79,7 +73,6 @@ function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableCo
   return true
 }
 
-// Sortable column wrapper so columns themselves can be reordered via drag
 const SortableColumn = React.memo(function SortableColumn({
   col,
   cards,
@@ -166,7 +159,6 @@ export default function KanbanView() {
     handleBulkRestoreArchived, handleDeleteArchivedCard
   } = kanbanBoard
 
-  // Loading skeleton view
   if (loading) {
     return (
       <KanbanSkeleton />
@@ -184,13 +176,10 @@ export default function KanbanView() {
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Header Bar */}
       <KanbanHeader kanbanBoard={kanbanBoard} />
 
-      {/* Real-Time Filter Toolbar */}
       <KanbanFilterBar kanbanBoard={kanbanBoard} />
 
-      {/* Board Area */}
       {columns.length === 0 ? (
         <div className="flex-1">
           <EmptyState
@@ -215,7 +204,7 @@ export default function KanbanView() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          {/* Column-level sortable context (for column reordering) */}
+          {/* column reordering */}
           <SortableContext items={columnSortableIds} strategy={horizontalListSortingStrategy}>
             <div style={{
               flex: 1,
@@ -225,19 +214,14 @@ export default function KanbanView() {
               overflowX: 'auto',
               overflowY: 'hidden',
               alignItems: 'stretch',
-              height: 'calc(100% - 98px)', // Adjusted for header (52px) + filter toolbar (46px)
+              height: 'calc(100% - 98px)', // header 52px + filter bar 46px
               minHeight: 0
             }}>
               {columns.map(col => {
                 const colCards = getCardsForColumn(col.id)
-                // The gap is only drawn for a card arriving from elsewhere.
-                // Reordering inside a column already parts the list through
-                // dnd-kit's sortable transforms, and both at once would be the
-                // same thing said twice.
+                // gap only for cards from elsewhere, dnd-kit already parts the list within a column
                 const foreign = activeDragCard !== null && activeDragCard.status !== col.id
-                // A column that sorts itself would move the card out of the gap
-                // the moment it landed in it, so it gets the highlight and no
-                // promise about where.
+                // a self-sorting column would move the card out of the gap, so highlight only
                 const aimable = canAimAtSlot(col, swimlanesEnabled)
                 const slot = foreign && aimable && dropTarget?.column === col.id
                   ? (dropTarget.before === null
@@ -268,19 +252,16 @@ export default function KanbanView() {
                 )
               })}
 
-              {/* Ghost "Add Column" tile at end */}
               {!isReadOnlyMode && (
                 <button
                   onClick={() => setShowAddColModal(true)}
+                  className="kanban-view-add-column"
                   style={{
                     width: '280px',
                     minWidth: '260px',
                     flexShrink: 0,
                     height: '100%',
-                    background: 'transparent',
-                    border: '2px dashed var(--color-surface-offset)',
                     borderRadius: 'var(--radius-lg)',
-                    color: 'var(--color-text-faint)',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
@@ -290,16 +271,6 @@ export default function KanbanView() {
                     fontSize: 'var(--text-sm)',
                     fontWeight: 'var(--weight-medium)',
                     transition: 'border-color 150ms ease, color 150ms ease, background 150ms ease'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'var(--color-balance)'
-                    e.currentTarget.style.color = 'var(--color-text-muted)'
-                    e.currentTarget.style.background = 'var(--color-surface-1)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-                    e.currentTarget.style.color = 'var(--color-text-faint)'
-                    e.currentTarget.style.background = 'transparent'
                   }}
                 >
                   <Plus size={20} strokeWidth={1.5} />
@@ -325,7 +296,6 @@ export default function KanbanView() {
         </DndContext>
       )}
 
-      {/* Archive Bin Drawer */}
       {showArchiveBin && (
         <ArchiveBin
           archivedColumns={archivedColumns}
@@ -343,7 +313,6 @@ export default function KanbanView() {
       )}
 
 
-      {/* Card Detail Modal */}
       {activeCardId && (
         <CardDetailModal
           cardId={activeCardId}
@@ -356,7 +325,6 @@ export default function KanbanView() {
         />
       )}
 
-      {/* Add Column Modal */}
       {showAddColModal && (
         <AddColumnModal
           onClose={() => setShowAddColModal(false)}
@@ -365,7 +333,6 @@ export default function KanbanView() {
         />
       )}
 
-      {/* Column Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={pendingDeleteColId !== null}
         title="Confirm Column Deletion"

@@ -1,33 +1,13 @@
-/**
- * Reading one frame off the ntfy signalling stream.
- *
- * Both P2P coordinators used to reach for `payload.text`, which ntfy has never
- * sent: a published body arrives under `message`. Every offer and every answer
- * was therefore dropped the moment it arrived, and the two sides sat waiting
- * for each other until someone gave up. Parsing lives here, with tests against
- * real captured frames, so the field name is asserted somewhere rather than
- * assumed in two handlers.
- *
- * The stream also carries `open` and `keepalive` frames that have no body at
- * all. Those are not errors, so they come back as null like anything else the
- * caller should skip.
- */
+/** ntfy sends the body as message, not text; open/keepalive frames come back null */
 
 interface SignalingMessage {
-  /** The publisher's Title header, or '' when it sent none. */
+  /** Title header, or '' */
   title: string
-  /** The published body: an encrypted SDP. */
+  /** encrypted SDP */
   body: string
 }
 
-/**
- * Whether a publish to the signalling lobby actually landed, in words the panel
- * can show. Null means it did.
- *
- * Both coordinators used to fire the POST and announce success without looking
- * at the response, so a rejected publish left the peer waiting on a handshake
- * that had never been sent, indistinguishable from a peer who had not joined.
- */
+/** null means it landed; unchecked publishes left peers waiting on nothing */
 export function signalingPublishError(status: number): string | null {
   if (status >= 200 && status < 300) return null
   if (status === 429) {

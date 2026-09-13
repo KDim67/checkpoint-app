@@ -11,14 +11,7 @@ import { writeWorkspaceList } from '../../lib/workspaceList'
 import { getStringSetting, setStringSetting } from '../../lib/settings'
 import * as appApi from '../../data/app'
 
-/**
- * A live share of the board: who is in it, what they may do, and what can be
- * done about it.
- *
- * Called from the board rather than from the share panel. The board has to know
- * whether it may be written to, and the session has to keep running whatever
- * the panel is doing.
- */
+/** on the board, not the panel: the board needs write permission and the session outlives the panel */
 export function useCollabSession() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const workspaceList = useAppStore(s => s.workspaceList)
@@ -29,14 +22,11 @@ export function useCollabSession() {
 
   const collabCoordinatorRef = useRef<WebRTCCollaborationCoordinator | null>(null)
 
-  /**
-   * Kept as typed and normalised on the way out, so the field is not fighting
-   * the caret. Empty is a real answer: the account name stands in for it.
-   */
+  /** kept as typed so the field doesn't fight the caret; empty means the account name */
   const [displayName, setDisplayName] = useState('')
   const osUserName = normalizeDisplayName(appApi.osUserName())
 
-  /** False until the stored name has arrived, so loading it does not write it back. */
+  /** so loading the stored name doesn't write it back */
   const nameLoaded = useRef(false)
 
   useEffect(() => {
@@ -46,28 +36,20 @@ export function useCollabSession() {
       .finally(() => { nameLoaded.current = true })
   }, [])
 
-  /**
-   * Saved as it is typed rather than on blur.
-   *
-   * The popover closes on mousedown, which unmounts the field before focus
-   * moves, so no blur is ever delivered and a name typed and then clicked away
-   * from was silently lost. This effect lives on the view, not the popover, so
-   * it survives the close and writes anyway.
-   */
+  /** saved as typed: the popover closes on mousedown before blur, which lost names */
   useEffect(() => {
     if (!nameLoaded.current) return
     const timer = setTimeout(() => {
       const name = normalizeDisplayName(displayName)
       setStringSetting(DISPLAY_NAME_KEY, name)
         .catch(err => console.error('Failed to save the display name:', err))
-      // The room is holding the name read when the session started, so without
-      // this a rename reaches nobody until the next connection.
+      // the room holds the name from session start, so push renames
       void collabCoordinatorRef.current?.rename(name)
     }, 400)
     return () => clearTimeout(timer)
   }, [displayName])
 
-  /** Tidies what is in the field once the user has finished with it. */
+  /** tidies the field once the user's done */
   const saveDisplayName = useCallback(() => {
     setDisplayName(current => normalizeDisplayName(current))
   }, [])
@@ -76,50 +58,26 @@ export function useCollabSession() {
   const [collabIsHost, setCollabIsHost] = useState(false)
   const [collabCode, setCollabCode] = useState('')
   const [collabMode, setCollabMode] = useState<'collaborative' | 'readonly'>('collaborative')
-  /**
-   * Everyone in the room, as they call themselves.
-   *
-   * The host keeps this from its own connections; a guest is told it, because
-   * guests are connected to the host and not to each other. A member with an
-   * empty name is on a build that does not introduce itself, and is still very
-   * much in the room.
-   */
+  /** the host tracks its connections, guests are told; empty names are older builds, still present */
   const [collabRoster, setCollabRoster] = useState<{ id: string; name: string }[]>([])
   const [collabProgress, setCollabProgress] = useState('Idle')
-  /**
-   * Held here rather than in the panel. The panel unmounts while the board
-   * reloads for a workspace switch, and a passcode half typed, or the popover
-   * it was typed into, should still be there afterwards.
-   */
+  /** here, not in the panel, so a half-typed passcode survives a workspace reload */
   const [showCollabPopover, setShowCollabPopover] = useState(false)
   const [joinCodeInput, setJoinCodeInput] = useState('')
 
-  /**
-   * The workspace the live session belongs to.
-   *
-   * Switching workspace leaves the session running against the one you left,
-   * which is correct (the other side agreed to share that board, not this one)
-   * but looked like a dead connection: nothing synced and the panel still said
-   * Active. Holding the slug lets the panel say so, and offer the way back.
-   */
+  /** the session stays on its workspace; holding the slug lets the panel say so and offer the way back */
   const [collabWorkspace, setCollabWorkspace] = useState('')
   const collabElsewhere = collabActive && collabWorkspace !== '' && collabWorkspace !== activeWorkspace
 
   const isReadOnlyMode = collabActive && collabMode === 'readonly' && !collabIsHost
 
-  /**
-   * Whether to take the board the other side has merged for the two of you.
-   *
-   * Put with numbers on it. "Do you want to merge" is not a question anybody
-   * can answer, and saying yes to it overwrites a board.
-   */
+  /** with numbers: "merge?" can't be answered, and yes overwrites a board */
   const considerMerge = useCallback(async ({ by, impact }: { by: string; impact: MergeImpact }) => {
     const what = describeImpact(impact)
     const them = by || 'They'
     const back = impact.cardsReturning
     const gone = impact.cardsRemoved
-    // Both of these are the merge costing this board something, and the warning
-    // is the only line that says so.
+    // both are this board losing something, only the warning says so
     const warnings: string[] = []
     if (gone > 0) {
       warnings.push(
@@ -146,14 +104,7 @@ export function useCollabSession() {
     })
   }, [confirm])
 
-  /**
-   * What the host did with the merge this side offered.
-   *
-   * A no ends the session, which the coordinator is doing as this runs: this
-   * board is now the merged one and the room is still on the host's, and a
-   * guest holding cards the room does not have loses them the moment the host
-   * takes anybody else's merge. So the panel is closed here too.
-   */
+  /** a no ends the session: this board is merged, the room isn't, so close the panel */
   const reportMergeAnswer = useCallback((accepted: boolean, by: string, reason: string) => {
     const them = by || 'They'
     if (accepted) {
@@ -166,12 +117,11 @@ export function useCollabSession() {
     setCollabProgress(why)
     setCollabActive(false)
     setCollabRoster([])
-    // Said out loud as well. The board just changed under this user and the
-    // panel it would otherwise be said in is usually shut.
+    // toast too, the panel is usually shut
     toast(why)
   }, [toast])
 
-  /** The host took somebody's merge, and this is the shared board now. */
+  /** the host took a merge, this is the shared board now */
   const reportBoardReset = useCallback((by: string) => {
     const said = by
       ? `${by} merged their board in. The shared board has been updated.`
@@ -189,9 +139,7 @@ export function useCollabSession() {
     setCollabWorkspace(activeWorkspace)
     setCollabProgress('Initializing host signal room...')
 
-    // Labelled here rather than when a peer actually arrives: publishing a
-    // passcode is the moment the board stops being private, whether or not
-    // anybody takes it up.
+    // labelled on publish, that's when the board stops being private
     const labelled = setWorkspaceShared(workspaceList, activeWorkspace, true)
     if (labelled !== workspaceList) {
       setWorkspaceList(labelled)
@@ -206,10 +154,7 @@ export function useCollabSession() {
       mode,
       onProgress: (p) => setCollabProgress(p),
       onConnect: () => setCollabProgress('Someone joined.'),
-      // Toasted as well as logged. A session that ends by itself used to do it
-      // in silence: the button went back to saying Share and the reason sat in
-      // a popover nobody had open, so the only thing anyone could report was
-      // that sharing had stopped working.
+      // toast as well; a silent end left nothing to report but "sharing stopped"
       onDisconnect: () => {
         setCollabProgress('Peer disconnected.')
         setCollabActive(false)
@@ -222,15 +167,13 @@ export function useCollabSession() {
       },
       displayName,
       onRoster: setCollabRoster,
-      // The host is the only side asked about a merge, and the only side that
-      // never offers one, so there is no answer coming back here.
+      // the host is asked, never offers, so no answer comes back
       onMergeProposed: considerMerge,
-      // One guest going does not end the session: the passcode still works and
-      // everyone else is still here.
+      // one guest leaving doesn't end the session
       onPeerLeft: (name) => {
         setCollabProgress(`${authorLabel(name)} left. The same passcode still works.`)
       },
-      // The host keeps its own board and never receives a baseline.
+      // the host keeps its board, never gets a baseline
       onResolveBaseline: async () => ({ action: 'replace' })
     })
     collabCoordinatorRef.current = coord
@@ -241,9 +184,7 @@ export function useCollabSession() {
     if (!code || code.length < 5) return
     setCollabActive(true)
     setCollabIsHost(false)
-    // Cleared, not left as it was. Hosting read-only and then joining someone
-    // else's board carried that over, and until the host's board arrived to say
-    // otherwise it locked this user out of their own.
+    // cleared: a leftover read-only mode locked users out of their own board
     setCollabMode('collaborative')
     setCollabCode(code)
     setCollabWorkspace(activeWorkspace)
@@ -253,7 +194,7 @@ export function useCollabSession() {
       pairingCode: code,
       isHost: false,
       context: activeWorkspace,
-      mode: 'collaborative', // Client infers mode from baseline message
+      mode: 'collaborative', // client infers mode from the baseline
       displayName,
       onProgress: (p) => setCollabProgress(p),
       onConnect: () => setCollabProgress('Connected to the host.'),
@@ -272,7 +213,7 @@ export function useCollabSession() {
       onMergeProposed: considerMerge,
       onMergeAnswer: reportMergeAnswer,
       onBoardReset: reportBoardReset,
-      // The host's word on what this side may do, and it can change mid-session.
+      // the host decides, and it can change mid-session
       onMode: setCollabMode,
       onRemoved: (by) => {
         const said = by ? `${by} removed you from the board` : 'You were removed from the board'
@@ -282,8 +223,7 @@ export function useCollabSession() {
         toast(said)
       },
       onResolveBaseline: async ({ context, incomingItems, mode }) => {
-        // A check that could not run is not permission to delete, so a failed
-        // read is treated as a clash and the user is asked anyway.
+        // a failed read counts as a clash, never permission to delete
         let taken: Set<string>
         try {
           taken = await occupiedWorkspaces()
@@ -291,17 +231,14 @@ export function useCollabSession() {
           console.error('Could not check for an existing workspace:', err)
           taken = new Set([context])
         }
-        // Nothing here under that name, so nothing to lose and nothing to ask.
+        // nothing here by that name, nothing to ask
         if (!taken.has(context)) {
           setCollabWorkspace(context)
           return { action: 'replace' }
         }
 
         const copySlug = availableWorkspaceSlug(context, taken)
-        // Three answers, each of which needs a sentence to be understood. A row
-        // of buttons can hold the labels but not the sentences, and picking
-        // between "Replace mine" and "Keep both" on the labels alone is how
-        // someone deletes a board they meant to keep.
+        // three answers that each need a sentence; labels alone lead to deleted boards
         const choice = await pick({
           title: `You already have "${context}"`,
           message:
@@ -309,10 +246,7 @@ export function useCollabSession() {
             `and you have a board of your own under that name.`,
           cancelText: 'Cancel',
           choices: [
-            // Not on offer when the board is shared read-only. A merge ends
-            // with the host holding the board the two of you make, and a host
-            // sharing read-only has said the guests do not change this board,
-            // so the offer would only ever be turned down.
+            // no merge when shared read-only, the host already said guests don't change it
             ...(mode === 'readonly'
               ? []
               : [
@@ -339,8 +273,7 @@ export function useCollabSession() {
             }
           ]
         })
-        // The session belongs to whichever workspace the board actually lands in,
-        // which for a copy is not the name the host used.
+        // the session follows the workspace the board lands in, a copy has a new name
         if (choice === 'merge') {
           setCollabWorkspace(context)
           return { action: 'merge' }
@@ -362,8 +295,7 @@ export function useCollabSession() {
 
   const disconnectCollab = useCallback(() => {
     if (collabCoordinatorRef.current) {
-      // Announced before hanging up, so the other side is told who left rather
-      // than watching the connection go quiet. Best effort, never blocking.
+      // announce first so the other side sees who left; best effort
       void collabCoordinatorRef.current.leave()
       collabCoordinatorRef.current = null
     }
@@ -375,13 +307,7 @@ export function useCollabSession() {
     setCollabProgress('Disconnected')
   }, [])
 
-  /**
-   * Shows one person the door, and leaves everyone else where they are.
-   *
-   * Their client will not come back on its own, but the passcode they hold
-   * still works, so this is a door rather than a lock. Changing the passcode is
-   * the lock, and it is separate because it removes everybody.
-   */
+  /** a door, not a lock: the passcode still works, rotating it is the lock */
   const removeCollabGuest = useCallback(async (member: { id: string; name: string }) => {
     const coord = collabCoordinatorRef.current
     if (!coord) return
@@ -402,17 +328,11 @@ export function useCollabSession() {
     setCollabProgress(`Removed ${who}.`)
   }, [confirm])
 
-  /**
-   * A new passcode, which is the only thing that really locks anyone out.
-   *
-   * Everybody has to rejoin, so it is deliberately its own action rather than
-   * something removing one person does on the quiet.
-   */
+  /** the only real lock-out, everyone rejoins, so its own action */
   const rotateCollabCode = useCallback(async () => {
     const coord = collabCoordinatorRef.current
     if (!coord) return
-    // Rehosting starts from the workspace on screen, so doing this from a board
-    // that is not the shared one would quietly share that one instead.
+    // rehosting shares the board on screen, which wouldn't be the shared one
     if (collabElsewhere) return
 
     const confirmed = await confirm({
@@ -432,7 +352,7 @@ export function useCollabSession() {
     setCollabProgress('The passcode has changed. Everyone needs the new one.')
   }, [collabMode, collabElsewhere, confirm, startCollabHosting])
 
-  /** Lets the guest write, or stops them, without ending the session. */
+  /** without ending the session */
   const setCollabGuestMode = useCallback(async (mode: 'collaborative' | 'readonly') => {
     setCollabMode(mode)
     try {

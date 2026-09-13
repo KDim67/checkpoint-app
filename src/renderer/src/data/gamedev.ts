@@ -1,5 +1,3 @@
-/** The bridge's `gamedev` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.gamedev
 
 export const batchRename = (...args: Parameters<Bridge['batchRename']>): ReturnType<Bridge['batchRename']> =>

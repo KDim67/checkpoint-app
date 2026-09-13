@@ -24,7 +24,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
         flexShrink: 0
       }}
     >
-      {/* Row 0: Provider Selection (manage profiles in Settings → AI) */}
+      {/* profiles are managed in Settings > AI */}
       {providers.length > 0 && (
         <div className="row-full">
           <span className="label-caps-fixed">
@@ -43,7 +43,6 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
         </div>
       )}
 
-      {/* Row 1: Model Selection */}
       <div className="row-full">
         <span className="label-caps-fixed">
           Model
@@ -71,7 +70,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
 
       <ModelCapabilityBar caps={modelCaps} onRefresh={refreshModelCaps} />
 
-      {/* Row 1b: Workspace / Context Selection. The board the AI reads & writes */}
+      {/* the board the AI reads and writes */}
       <div className="row-full">
         <span className="label-caps-fixed">
           Workspace
@@ -88,7 +87,6 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
         </select>
       </div>
 
-      {/* Row 2: Action Buttons */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -104,18 +102,16 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
           <button
             onClick={handleImportWorkspace}
             disabled={workspaceIndexing}
+            className={workspaceFolder ? 'text-accent' : 'text-muted hover-text-accent'}
             style={{
               background: workspaceFolder ? 'var(--color-secondary-muted)' : 'transparent',
               border: 'none',
-              color: workspaceFolder ? 'var(--color-secondary)' : 'var(--color-text-muted)',
               cursor: workspaceIndexing ? 'default' : 'pointer',
               padding: '4px',
               display: 'flex',
               alignItems: 'center',
               borderRadius: 'var(--radius-sm)'
             }}
-            onMouseEnter={e => { if (!workspaceFolder) e.currentTarget.style.color = 'var(--color-secondary)' }}
-            onMouseLeave={e => { if (!workspaceFolder) e.currentTarget.style.color = 'var(--color-text-muted)' }}
             title={workspaceFolder ? `Workspace imported: ${workspaceFolder} (${workspaceFiles.length} files). Click to re-import` : 'Import a project folder for codebase context'}
           >
             {workspaceIndexing ? <RefreshCw size={13} className="animate-spin" /> : <FolderOpen size={13} />}
@@ -123,9 +119,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
 
           <button
             onClick={handleOpenMemoryPanel}
-            className="icon-btn-md"
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-secondary)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
+            className="icon-btn-md hover-text-accent"
             title="View AI Memories"
           >
             <Brain size={13} />
@@ -134,18 +128,16 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
           <button
             onClick={handleExportChat}
             disabled={messages.filter(m => m.role !== 'system').length === 0}
+            className={messages.filter(m => m.role !== 'system').length === 0 ? 'text-faint' : 'text-muted hover-text-accent'}
             style={{
               background: 'transparent',
               border: 'none',
-              color: messages.filter(m => m.role !== 'system').length === 0 ? 'var(--color-text-faint)' : 'var(--color-text-muted)',
               cursor: messages.filter(m => m.role !== 'system').length === 0 ? 'default' : 'pointer',
               padding: '4px',
               display: 'flex',
               alignItems: 'center',
               borderRadius: 'var(--radius-sm)'
             }}
-            onMouseEnter={e => { if (messages.filter(m => m.role !== 'system').length > 0) e.currentTarget.style.color = 'var(--color-secondary)' }}
-            onMouseLeave={e => { if (messages.filter(m => m.role !== 'system').length > 0) e.currentTarget.style.color = 'var(--color-text-muted)' }}
             title="Export Chat as Markdown"
           >
             <FileDown size={13} />
@@ -153,18 +145,16 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
 
           <button
             onClick={() => setShowSettingsPanel(s => !s)}
+            className={showSettingsPanel ? 'text-accent' : 'text-muted hover-text-accent'}
             style={{
               background: showSettingsPanel ? 'var(--color-secondary-muted)' : 'transparent',
               border: 'none',
-              color: showSettingsPanel ? 'var(--color-secondary)' : 'var(--color-text-muted)',
               cursor: 'pointer',
               padding: '4px',
               display: 'flex',
               alignItems: 'center',
               borderRadius: 'var(--radius-sm)'
             }}
-            onMouseEnter={e => { if (!showSettingsPanel) e.currentTarget.style.color = 'var(--color-secondary)' }}
-            onMouseLeave={e => { if (!showSettingsPanel) e.currentTarget.style.color = 'var(--color-text-muted)' }}
             title="AI Settings (Temperature, System Prompt)"
           >
             <Sliders size={13} />
@@ -172,9 +162,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
 
           <button
             onClick={() => { setChatSearchQuery(''); setShowSavedChatsModal(true) }}
-            className="icon-btn-md"
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-secondary)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
+            className="icon-btn-md hover-text-accent"
             title="Saved Chats (History)"
           >
             <MessageSquare size={13} />
@@ -182,9 +170,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
 
           <button
             onClick={handleNewChat}
-            className="icon-btn-md"
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-secondary)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
+            className="icon-btn-md hover-text-accent"
             title="New Chat"
           >
             <Plus size={14} />

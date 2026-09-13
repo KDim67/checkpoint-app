@@ -1,47 +1,36 @@
-/**
- * Starting points for a new workspace: columns, their WIP limits and
- * definitions of done, and the first cards worth having.
- *
- * Nothing here touches the database. The builders return plain descriptions the
- * caller writes through the normal paths, so a templated workspace is
- * indistinguishable from a hand-built one.
- */
+/** plain descriptions written through normal paths, so templated equals hand-built */
 
 import type { ColumnConfig } from './boardModel'
 import type { ItemPriority } from './types'
 
 interface TemplateColumn {
   name: string
-  /** Null, or absent, means no limit. Same convention as ColumnConfig. */
+  /** null or absent means no limit */
   wipLimit?: number | null
-  /** Definition of done, surfaced on hover in the board header. */
+  /** definition of done, on hover */
   description?: string
 }
 
 interface TemplateCard {
   title: string
   body?: string
-  /** The column's *name*; ids are derived, so templates stay readable. */
+  /** a name; ids are derived so templates stay readable */
   column: string
   priority?: ItemPriority
-  /** Seeded unchecked. */
+  /** seeded unchecked */
   checklist?: string[]
 }
 
 export interface ProjectTemplate {
   id: string
   name: string
-  /** One line, shown under the name in the picker. */
+  /** one line under the name in the picker */
   description: string
   columns: TemplateColumn[]
   cards: TemplateCard[]
 }
 
-/**
- * Column ids are derived from the name the same way normalizeColumn derives a
- * missing one, so a template's columns and a hand-added column with the same
- * name end up with the same id.
- */
+/** same derivation as normalizeColumn, so names map to the same ids */
 export function templateColumnId(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '_')
 }
@@ -246,7 +235,7 @@ export function findProjectTemplate(id: string): ProjectTemplate | null {
   return PROJECT_TEMPLATES.find(t => t.id === id) ?? null
 }
 
-/** The template's columns as the board configuration stores them. */
+/** as the board config stores them */
 export function buildTemplateColumns(template: ProjectTemplate): ColumnConfig[] {
   return template.columns.map(col => ({
     id: templateColumnId(col.name),
@@ -259,21 +248,14 @@ export function buildTemplateColumns(template: ProjectTemplate): ColumnConfig[] 
 interface TemplateCardDraft {
   title: string
   body: string
-  /** Column id, already resolved against the template's own columns. */
+  /** already resolved */
   status: string
   priority: ItemPriority
   position: number
   metadata: string
 }
 
-/**
- * The cards to create, in board order.
- *
- * Positions are spaced the same way the board spaces them by hand (1000 apart),
- * so the first drag between two seeded cards has room to land. A card naming a
- * column the template doesn't define falls back to the first column rather than
- * being dropped. A template with a typo should still produce a usable board.
- */
+/** spaced 1000 apart like the board; unknown columns fall back to the first */
 export function buildTemplateCards(
   template: ProjectTemplate,
   idPrefix = 'tpl'
@@ -311,7 +293,7 @@ export function buildTemplateCards(
   })
 }
 
-/** "5 columns · 3 cards" for the picker. */
+/** for the picker */
 export function describeTemplate(template: ProjectTemplate): string {
   const cols = `${template.columns.length} column${template.columns.length === 1 ? '' : 's'}`
   if (template.cards.length === 0) return cols

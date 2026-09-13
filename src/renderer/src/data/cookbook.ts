@@ -1,5 +1,3 @@
-/** The bridge's `cookbook` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.cookbook
 
 export const checkOllama = (...args: Parameters<Bridge['checkOllama']>): ReturnType<Bridge['checkOllama']> =>

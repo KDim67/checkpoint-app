@@ -1,24 +1,10 @@
-/**
- * Shared AES-GCM helpers for the WebRTC coordinators.
- * Both the sync and collaboration channels derive a key from the pairing code
- * and wrap their signaling payloads with it.
- */
+/** AES-GCM keyed from the pairing code, shared by sync and collaboration signalling */
 
-/**
- * Salts are per-channel so a pairing code leaked from one channel cannot
- * decrypt the other. Changing a salt invalidates every existing pairing code
- * for that channel, which is why they carry a version suffix.
- */
+/** per-channel salts so a leaked code can't decrypt the other; versioned since changing one breaks codes */
 export const SYNC_SALT = 'checkpoint-sync-salt-v2'
 export const COLLAB_SALT = 'checkpoint-collab-salt-v2'
 
-/**
- * A 6-digit pairing code is only ~900k possibilities, so the KDF is the only
- * thing making an intercepted signaling blob expensive to crack. 1000 rounds
- * (the previous value) put the whole keyspace within seconds of a laptop;
- * 600k is the current OWASP figure for PBKDF2-SHA256 and costs a few hundred
- * milliseconds once per pairing, which nobody notices.
- */
+/** 6 digits is ~900k codes, the KDF is the only cost; 600k rounds per OWASP, a few hundred ms per pairing */
 const PBKDF2_ITERATIONS = 600_000
 
 async function importPasscode(passcode: string): Promise<CryptoKey> {
@@ -47,30 +33,19 @@ export async function deriveKey(passcode: string, salt: string): Promise<CryptoK
   )
 }
 
-/**
- * Derives the public signaling topic from the pairing code.
- *
- * ntfy.sh topics are public, and the old scheme used the pairing code as the
- * topic, publishing the very secret the encryption depended on. Ciphertext and
- * key material travelled together, and the whole 6-digit space was subscribable.
- *
- * Hashing keeps the rendezvous point without revealing the code.
- */
+/** ntfy topics are public; the old scheme published the code itself, so hash it */
 export async function deriveTopic(passcode: string, salt: string): Promise<string> {
   const digest = await window.crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(`${salt}:topic:${passcode}`)
   )
-  // 128 bits of the digest is far beyond collision risk for a rendezvous name
-  // and keeps the URL short.
+  // 128 bits is plenty for a rendezvous name and keeps the URL short
   return Array.from(new Uint8Array(digest).subarray(0, 16))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')
 }
 
-// Converted in blocks rather than one spread call: String.fromCharCode(...bytes)
-// passes every byte as a separate argument and blows the stack once a payload
-// grows past roughly 64k. SDP with a long ICE candidate list gets close.
+// in blocks, spreading every byte blows the stack past ~64k
 function bytesToBase64(bytes: Uint8Array): string {
   const BLOCK = 8192
   let binary = ''
@@ -94,9 +69,7 @@ export async function encryptData(data: string, key: CryptoKey): Promise<string>
 }
 
 export function base64ToBytes(base64: string): Uint8Array {
-  // Indexed fill rather than split('').map(): the latter allocates one string
-  // per byte, which is ruinous for the multi-megabyte payloads file transfer
-  // pushes through here.
+  // indexed fill, split('').map() allocates a string per byte
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)

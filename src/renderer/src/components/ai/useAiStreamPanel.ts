@@ -3,11 +3,7 @@ import { useAiSend } from './useAiSend'
 import { useAiPanelExtras } from './useAiPanelExtras'
 export type { SubmitOptions } from './useAiSend'
 
-/**
- * The assistant panel apart from drawing it: the conversation, the stream, the
- * board edits a reply makes, and the hooks for chats, actions, models and memory.
- * The header, the history and the input take its return as one prop.
- */
+/** everything but drawing; header, history and input take its return as one prop */
 export function useAiStreamPanel() {
   const aiChat = useAiChat()
   const aiSend = useAiSend(aiChat)

@@ -10,8 +10,7 @@ import { DEFAULT_WALL_ID, wallIndexKey } from '../src/shared/wallModel'
 import { boardConfigKey } from '../src/shared/boardModel'
 import { backlogLayoutKey } from '../src/shared/contextSettings'
 
-// Real export and import against a throwaway database. The bug guarded against
-// was not in one function. The export never read app_settings at all.
+// real export/import on a throwaway db; the export never read app_settings
 
 let dir: string
 
@@ -25,7 +24,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-/** A workspace with a configured board, a backlog layout and two walls. */
+/** configured board, backlog layout, two walls */
 function seed(context: string): void {
   createItem(getDb(), {
     type: 'card', context, title: 'A card', body: '',
@@ -56,8 +55,7 @@ describe('exporting a workspace', () => {
     seed('old')
     const settings = exportContextData(getDb(), 'old').settings ?? {}
     expect(settings['wall_old']).toBeDefined()
-    // Reachable only by reading the index: this key names the wall, not the
-    // workspace, so no amount of string-building from 'old' would find it.
+    // only via the index, the key names the wall
     expect(settings['wall_doc_abc']).toBeDefined()
   })
 
@@ -108,8 +106,7 @@ describe('importing it back into a different workspace', () => {
     expect(index?.walls.map(w => w.name)).toEqual(['Wall', 'Ideas'])
 
     const importedId = index?.walls[1].id as string
-    // The whole point: sharing `wall_doc_abc` would mean editing a wall in one
-    // workspace changed it in the other.
+    // a shared wall_doc_abc would link both workspaces' walls
     expect(importedId).not.toBe('abc')
     expect(getSetting(`wall_doc_${importedId}`, null)).not.toBeNull()
   })

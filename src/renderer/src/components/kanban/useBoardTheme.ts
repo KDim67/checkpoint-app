@@ -1,14 +1,7 @@
 import { useState, type ChangeEvent } from 'react'
 import { useToast } from '../ui/Toast'
 
-/**
- * The board background, and the one being made in the theme menu: the open tab,
- * the solid colour, the gradient and the image.
- *
- * Called from the board rather than from the menu. The board paints the
- * background, and it unmounts the menu while it reloads, which would throw away
- * a gradient the user was still mixing.
- */
+/** on the board, not the menu: the menu unmounts on reload and would drop an unfinished gradient */
 export function useBoardTheme() {
   const { toast } = useToast()
   const [boardBg, setBoardBg] = useState<string>('default')

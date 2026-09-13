@@ -1,10 +1,4 @@
-/**
- * Exports a Wall as a PNG by redrawing it onto a canvas. Rasterising the HTML
- * would mean a DOM-to-image dependency.
- *
- * So it is a rendering, not a screenshot: text wraps by a simpler rule and
- * cards are drawn as title plus status. Fine for a moodboard, not pixel-exact.
- */
+/** a canvas rendering, not a screenshot: simpler wrap, cards as title + status */
 
 import {
   arrowAnchors, arrowGeometry, arrowDash, arrowHeadPoints, arrowHeadInset,
@@ -12,15 +6,15 @@ import {
   ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallItem
 } from '../../../shared/wallModel'
 
-/** Margin around the content, in wall units. */
+/** in wall units */
 const MARGIN = 40
-/** Cap so a sprawling wall cannot ask for a canvas the GPU refuses. */
+/** caps what the GPU will allocate */
 const MAX_EDGE = 8000
 
 interface ExportContext {
-  /** Live title for a card or note, since the wall stores only a reference. */
+  /** live titles, the wall stores references */
   titleOf: (item: WallItem) => string | undefined
-  /** Resolved background and text colours, read from the live theme. */
+  /** from the live theme */
   background: string
   textColor: string
   surfaceColor: string
@@ -36,7 +30,7 @@ function loadImage(filename: string): Promise<HTMLImageElement | null> {
   })
 }
 
-/** Greedy wrap. Good enough for a note, not the browser's algorithm. */
+/** greedy wrap */
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
   for (const paragraph of text.split('\n')) {
@@ -55,7 +49,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
   return lines
 }
 
-/** Null when there is nothing to draw. */
+/** null when there's nothing to draw */
 export async function exportWallToPng(
   items: WallItem[],
   ctxInfo: ExportContext
@@ -75,10 +69,10 @@ export async function exportWallToPng(
   ctx.fillStyle = ctxInfo.background
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  // Wall coordinates, shifted to the margin. The translation the camera applies.
+  // the camera's translation, shifted to the margin
   ctx.translate(MARGIN - bounds.minX, MARGIN - bounds.minY)
 
-  // Arrows are drawn from their two ends, so the ends have to be findable.
+  // arrows need their ends findable
   const byId = new Map(items.map(i => [i.id, i]))
 
   for (const item of inPaintOrder(items)) {
@@ -90,9 +84,7 @@ export async function exportWallToPng(
     }
 
     if (item.kind === 'arrow') {
-      // Through the same geometry the canvas draws with. This used to be a
-      // second copy of it, which meant a curve exported as a straight line and
-      // an end pinned to a point exported as nothing at all.
+      // same geometry as the canvas; the old copy exported curves straight
       const ends = arrowAnchors(item, byId)
       if (ends) {
         const width = item.strokeWidth ?? 2
@@ -111,7 +103,7 @@ export async function exportWallToPng(
 
         const dash = arrowDash(item.arrowLine ?? ARROW_LINES[0], width)
         ctx.setLineDash(dash ? dash.split(' ').map(Number) : [])
-        // Path2D takes SVG path data, so the one string serves both renderers.
+        // Path2D takes SVG path data, one string for both
         ctx.stroke(new Path2D(g.d))
         ctx.setLineDash([])
 
@@ -126,7 +118,7 @@ export async function exportWallToPng(
         if (heads !== 'none') fillHead(arrowHeadPoints(g.end, g.endAngle, width))
         if (heads === 'both') fillHead(arrowHeadPoints(g.start, g.startAngle, width))
 
-        // The label, on a chip so the line does not run through it.
+        // on a chip so the line doesn't cross it
         if (item.text) {
           ctx.font = '500 12px sans-serif'
           ctx.textBaseline = 'middle'
@@ -149,8 +141,7 @@ export async function exportWallToPng(
         }
       }
     } else if (item.kind === 'ink') {
-      // Drawn through the same box scaling the SVG uses, so a resized stroke
-      // exports at the size it is shown at.
+      // same box scaling as the SVG
       const natural = inkNaturalSize(item)
       const points = item.points ?? []
       const scaleX = natural.width === 0 ? 1 : item.width / natural.width
@@ -191,7 +182,7 @@ export async function exportWallToPng(
       ctx.font = '600 13px sans-serif'
       ctx.fillText(item.text || 'Frame', item.x, item.y - 6)
     } else {
-      // Cards and notes: a tile with whatever the thing is called.
+      // tile with the name
       ctx.fillStyle = ctxInfo.surfaceColor
       ctx.fillRect(item.x, item.y, item.width, item.height)
       ctx.strokeStyle = item.color || ctxInfo.borderColor

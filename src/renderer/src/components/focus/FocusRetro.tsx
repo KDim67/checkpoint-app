@@ -30,7 +30,6 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
           </p>
         </div>
 
-        {/* At-a-glance session stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
           {[
             { label: 'Focused', value: `${Math.max(1, Math.round(elapsedTimeMs / 60000))}m`, color: 'var(--color-secondary)' },
@@ -57,7 +56,7 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
           ))}
         </div>
 
-        {/* Long-break cadence nudge. Surfaces the classic 4-interval rule */}
+        {/* the classic 4-interval long break nudge */}
         {longBreakDue && (
           <div style={{
             display: 'flex',
@@ -76,7 +75,6 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
           </div>
         )}
 
-        {/* Check completed checklist */}
         <div className="col">
           <h3 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
             Verify Completed Tasks
@@ -116,7 +114,6 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
           )}
         </div>
 
-        {/* Retrospective Text Input */}
         <div className="col">
           <label
             htmlFor="retro-notes-area"
@@ -130,10 +127,10 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
             onChange={e => setRetroNotes(e.target.value)}
             placeholder="Write down any takeaways, obstacles, or design decisions reached during this block..."
             rows={4}
+            className="border-offset focus-border-accent"
             style={{
               width: '100%',
               background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
               borderRadius: 'var(--radius-md)',
               color: 'var(--color-text-base)',
               padding: 'var(--space-3)',
@@ -143,12 +140,9 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
               outline: 'none',
               transition: 'border-color var(--duration-fast)'
             }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'var(--color-secondary)')}
-            onBlur={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
           />
         </div>
 
-        {/* Actions */}
         <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
           <div className="flex-wrap-gap">
             <button
@@ -180,22 +174,13 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
           <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
             <button
               onClick={() => setShowDiscardConfirm(true)}
+              className="bg-clear text-muted hover-bg-offset hover-text-error"
               style={{
-                background: 'transparent',
                 border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-muted)',
                 padding: '8px 16px',
                 borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
                 fontSize: 'var(--text-sm)'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'var(--color-surface-offset)'
-                e.currentTarget.style.color = 'var(--color-error)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = 'var(--color-text-muted)'
               }}
             >
               Discard

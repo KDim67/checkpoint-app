@@ -1,4 +1,4 @@
-/** Checklist rows belonging to a task. */
+/** checklist rows under a task */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -43,13 +43,7 @@ export function registerSubtasksHandlers(): void {
     return { ok: true as const }
   })
 
-  /**
-   * Turns the markdown checkboxes already in a task body into real subtasks.
-   *
-   * Offered rather than run automatically: rewriting someone's notes without
-   * asking is not a migration. The body is only replaced once every row has been
-   * inserted, so a failure partway leaves the checkboxes where they were.
-   */
+  /** offered, not automatic; body replaced only after every row inserts */
   ipcMain.handle(IpcChannels.SUBTASK_CONVERT, async (_event, itemId: string) => {
     const { getItemById, getSubtasks, insertSubtask, updateItem, getDb } = await import('../db')
     const { parseChecklist, normalizeSubtasks, nextPosition } = await import('../../shared/subtasks')

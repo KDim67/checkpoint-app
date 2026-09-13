@@ -12,8 +12,7 @@ import {
 
 describe('CreateItemSchema', () => {
   it('fills every optional column so the INSERT never sees undefined', () => {
-    // stmtInsertItem binds all twelve columns by name; a missing default would
-    // surface as a binding error at runtime rather than a validation error here.
+    // all twelve columns bind by name, a missing default fails at runtime
     expect(CreateItemSchema.parse({ type: 'card', context: 'inbox' })).toEqual({
       type: 'card',
       context: 'inbox',
@@ -36,8 +35,7 @@ describe('CreateItemSchema', () => {
   })
 
   it('rejects a stringified priority instead of coercing it', () => {
-    // The DB has CHECK(priority IN (0,1,2,3)); '2' would fail there, so it has
-    // to fail here where the error is still attributable to the caller.
+    // the CHECK would reject '2', fail here where the caller's to blame
     expect(CreateItemSchema.safeParse({ type: 'card', context: 'a', priority: '2' }).success).toBe(false)
     expect(CreateItemSchema.safeParse({ type: 'card', context: 'a', priority: 4 }).success).toBe(false)
   })
@@ -54,8 +52,7 @@ describe('CreateItemSchema', () => {
 
 describe('UpdateItemSchema', () => {
   it('leaves an empty patch empty instead of resetting the row to defaults', () => {
-    // This is the whole point of .partial(): if the defaults leaked through,
-    // every partial update would silently blank the title, body and metadata.
+    // leaked defaults would blank title, body and metadata on every partial update
     expect(UpdateItemSchema.parse({})).toEqual({})
   })
 
@@ -112,8 +109,7 @@ describe('BulkUpdateSchema', () => {
 
 describe('search and task query schemas', () => {
   it('pages search results from zero and tasks from one', () => {
-    // The two schemas disagree on the base index on purpose: searchItems
-    // computes OFFSET page * pageSize, queryTasks computes (page - 1) * pageSize.
+    // searchItems pages from 0, queryTasks from 1, on purpose
     expect(SearchQuerySchema.parse({ query: 'x' })).toMatchObject({ page: 0, pageSize: 20 })
     expect(TaskQueryParamsSchema.parse({})).toMatchObject({ page: 1, pageSize: 50 })
     expect(SearchQuerySchema.safeParse({ query: 'x', page: 0 }).success).toBe(true)

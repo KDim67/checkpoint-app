@@ -29,7 +29,6 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
 
       <div className="divider-v" />
 
-      {/* Which wall */}
       <WallSwitcher
         wallIndex={wallIndex}
         activeWall={activeWall}
@@ -63,8 +62,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       {toolButton('Fit to content', <Maximize2 size={14} />, fitToContent, { disabled: doc.items.length === 0 })}
       {toolButton('Export as PNG', <Download size={14} />, () => void exportPng(), { disabled: doc.items.length === 0 })}
 
-      {/* A number you cannot act on is a label pretending to be a control.
-          Clicking it is the fastest way back from a zoom you regret. */}
+      {/* clickable, it's the fastest way back from a bad zoom */}
       <button
         onClick={() => setCamera({ ...docRef.current.camera, zoom: 1 })}
         title="Reset zoom to 100%"
@@ -81,8 +79,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       </button>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', position: 'relative' }}>
-        {/* Says what the armed tool does rather than everything at once. The
-            old line wrapped to two rows and was ignored either way. */}
+        {/* only what the armed tool does */}
         <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
           {tool === 'pen'
             ? 'Drag to draw · Esc to stop'
@@ -101,8 +98,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
           menuButton={menuButton}
         />
 
-        {/* At this end because the panel it opens is on this side. It used
-            to sit on the far left, pointing across the whole toolbar. */}
+        {/* this end, the panel opens on this side */}
         {toolButton(
           railOpen ? 'Hide the board' : 'Show the board beside the wall',
           <PanelRight size={14} />,

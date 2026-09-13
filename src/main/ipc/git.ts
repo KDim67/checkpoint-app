@@ -1,4 +1,4 @@
-/** Reading a repository the user points at. */
+/** reads a repo the user points at */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

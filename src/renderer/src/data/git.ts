@@ -1,5 +1,3 @@
-/** The bridge's `git` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.git
 
 export const checkRepo = (...args: Parameters<Bridge['checkRepo']>): ReturnType<Bridge['checkRepo']> =>

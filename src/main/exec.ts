@@ -1,9 +1,6 @@
 import { execFile } from 'child_process'
 
-/**
- * Runs an executable and returns trimmed stdout, aborted after timeoutMs.
- * Rejects on non-zero exit, spawn failure, or timeout.
- */
+/** rejects on non-zero exit, spawn failure or timeout */
 export function execFileAsync(file: string, args: string[], timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const controller = new AbortController()
@@ -23,10 +20,7 @@ export function execFileAsync(file: string, args: string[], timeoutMs: number): 
   })
 }
 
-/**
- * Same, but resolves to '' instead of rejecting. For probing optional tooling
- * where "not installed" and "returned nothing" are the same answer.
- */
+/** resolves '' instead, for optional tools where not installed = returned nothing */
 export function execFileQuiet(file: string, args: string[], timeoutMs: number): Promise<string> {
   return execFileAsync(file, args, timeoutMs).catch(() => '')
 }

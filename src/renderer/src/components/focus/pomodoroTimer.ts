@@ -1,13 +1,9 @@
 export type TimerPreset = 'focus' | 'short-break' | 'long-break'
 
-/** What the setup screen can have selected. A preset, or a hand-typed length. */
+/** a preset, or a hand-typed length */
 export type TimerMode = TimerPreset | 'custom'
 
-/**
- * A custom length is still a focus interval; only the two break presets are
- * breaks. Cycle counting keys off this, so treating 'custom' as non-focus meant
- * hand-timed intervals never advanced the four-interval long-break cadence.
- */
+/** custom counts as focus, or hand-timed intervals never advanced the long-break cadence */
 export function isFocusInterval(mode: TimerMode): boolean {
   return mode === 'focus' || mode === 'custom'
 }
@@ -24,7 +20,7 @@ interface TimerPresetConfig {
   durationMs: number
 }
 
-/** Labels and the classic 25/5/15 lengths, used when nothing has been customised. */
+/** classic 25/5/15 when nothing's customised */
 export const TIMER_PRESETS: Record<TimerPreset, TimerPresetConfig> = {
   focus: { label: 'Focus', durationMs: 25 * 60 * 1000 },
   'short-break': { label: 'Short Break', durationMs: 5 * 60 * 1000 },
@@ -32,13 +28,13 @@ export const TIMER_PRESETS: Record<TimerPreset, TimerPresetConfig> = {
 }
 
 export interface FocusSettings {
-  /** Interval lengths in minutes, keyed by preset. */
+  /** minutes */
   durations: Record<TimerPreset, number>
-  /** Focus intervals between long breaks. 4 is the classic Pomodoro cadence. */
+  /** 4 is the classic cadence */
   longBreakInterval: number
   autoStartNext: boolean
   chimeEnabled: boolean
-  /** 0–1, applied to the chime's peak gain. */
+  /** 0 to 1, the chime's peak gain */
   chimeVolume: number
   notificationsEnabled: boolean
 }
@@ -62,7 +58,7 @@ export const FOCUS_SETTING_KEYS: Record<TimerPreset, string> = {
   'long-break': 'focus_duration_long_break'
 }
 
-/** Guards against a hand-edited settings row producing a zero-length timer. */
+/** a hand-edited row mustn't make a zero-length timer */
 export function clampMinutes(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback
   return Math.min(180, Math.max(1, Math.round(value)))
@@ -72,9 +68,7 @@ export function durationMsFor(settings: FocusSettings, preset: TimerPreset): num
   return settings.durations[preset] * 60 * 1000
 }
 
-/**
- * Formats a duration in milliseconds to MM:SS string representation.
- */
+/** MM:SS */
 export function formatTime(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000))
   const minutes = Math.floor(totalSeconds / 60)

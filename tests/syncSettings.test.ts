@@ -51,8 +51,7 @@ describe('isMachineLocalSettingKey', () => {
   })
 
   it('does not mistake a user-named context for a port or a path', () => {
-    // Contexts are named by the user and interpolated into the key, so a project
-    // called "port" produces kanban_board_port. Board config has to keep syncing.
+    // user-named contexts can make kanban_board_port, which must keep syncing
     expect(isMachineLocalSettingKey('kanban_board_port')).toBe(false)
     expect(isMachineLocalSettingKey('kanban_bg_path')).toBe(false)
     expect(isMachineLocalSettingKey('kanban_columns_position')).toBe(false)
@@ -119,11 +118,10 @@ describe('filterSyncableSettings', () => {
 })
 
 describe('secrets the app has actually created', () => {
-  // Named keys, not shapes. The sensitive rule is a denylist of substrings, so
-  // a real key is the only thing that proves a real secret stays home.
+  // real key names, the denylist matches substrings
   const SECRETS = [
-    'webhook_token',      // grants write access to the database over HTTP
-    'mcp_auth_token',     // grants full read/write over every workspace
+    'webhook_token',      // write access over HTTP
+    'mcp_auth_token',     // full read/write over every workspace
     'ai_api_key',
     'ai_provider_preset',
     'sync_pairing_code'
@@ -134,7 +132,7 @@ describe('secrets the app has actually created', () => {
   })
 
   it('drops them from a payload even when a peer sends them back', () => {
-    // The filter runs on receive too, because an older peer still ships these.
+    // receive filters too, older peers still send these
     const rows = [
       { key: 'webhook_token', value: 'secret' },
       { key: 'mcp_auth_token', value: 'secret' },
@@ -152,8 +150,7 @@ describe('secrets the app has actually created', () => {
 
 describe('a key nobody has thought about', () => {
   it('does not sync, which is the point of the allowlist', () => {
-    // The old denylist matched substrings, so anything not resembling a known
-    // credential travelled. These are the shapes that used to slip through.
+    // shapes the old substring denylist let through
     for (const key of ['github_pat', 'license_key', 'stripe_customer', 'device_fingerprint']) {
       expect(isSyncableSettingKey(key)).toBe(false)
     }
@@ -170,7 +167,7 @@ describe('a key nobody has thought about', () => {
 })
 
 describe('the settings that were syncing before the allowlist', () => {
-  // Pinned so converting the filter did not quietly stop something travelling.
+  // pinned so the conversion didn't stop anything travelling
   it.each([
     'active_context', 'app_theme', 'appearance_compact', 'appearance_font_size',
     'backup_interval', 'backup_max_count', 'cheatsheet_pins', 'contexts_list',
@@ -196,9 +193,7 @@ describe('the settings that were syncing before the allowlist', () => {
 
 describe('clipboard recording is not something to switch on remotely', () => {
   it('never travels, even though every other view toggle does', () => {
-    // That switch decides whether copies are written to the database, not
-    // whether a tab is visible. Syncing it on would start recording on a
-    // machine whose owner never asked.
+    // it controls recording, not a tab; syncing it on records unasked
     expect(isSyncableSettingKey('feature_view_clipboard')).toBe(false)
     expect(isSyncableSettingKey('feature_view_analytics')).toBe(true)
   })

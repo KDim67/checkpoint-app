@@ -30,7 +30,7 @@ describe('resolveDueRange', () => {
   })
 
   it('treats overdue as everything up to this instant', () => {
-    // Not up to midnight: something due at 5pm is not overdue at 9:30am.
+    // not midnight: due 5pm isn't overdue at 9:30am
     expect(resolveDueRange('overdue', now)).toEqual({ dueEnd: now })
   })
 
@@ -49,8 +49,7 @@ describe('resolveDueRange', () => {
   })
 
   it('asks for the absence of a date rather than an open range', () => {
-    // A task with no due date satisfies no range at all, so this cannot be
-    // expressed as dueStart/dueEnd.
+    // no due date satisfies no range
     expect(resolveDueRange('none', now)).toEqual({ noDueDate: true })
   })
 
@@ -77,7 +76,7 @@ describe('toQueryParams', () => {
   })
 
   it('drops empty arrays rather than sending them as filters', () => {
-    // An empty status array would otherwise mean "status IN ()". No rows.
+    // empty arrays would mean IN (), no rows
     const params = toQueryParams(view({ status: [], priority: [], tagIds: [] }), now)
     expect(params).toEqual({})
   })
@@ -198,7 +197,7 @@ describe('the shipped views', () => {
   })
 
   it('each actually constrain something', () => {
-    // A shipped view returning everything would be a menu entry that does nothing.
+    // a shipped view returning everything is a dead menu entry
     for (const v of BUILT_IN_VIEWS) {
       expect(Object.keys(toQueryParams(v, at(2026, 6, 15))).length, v.name).toBeGreaterThan(0)
     }

@@ -1,12 +1,4 @@
-/**
- * The system-tray icon and its panel.
- *
- * The panel is a frameless BrowserWindow at `#tray`, not a native `Menu`:
- * Windows draws those and they cannot be styled, show live counts, or hold a
- * toggle. Same pattern as the widget and the quick-capture HUD.
- *
- * The cost is that positioning and dismissal are ours, which is most of this file.
- */
+/** frameless window, not a native Menu: windows menus can't be styled, show counts or hold toggles */
 
 import { app, BrowserWindow, Tray, nativeImage, screen } from 'electron'
 import { join } from 'path'
@@ -23,18 +15,14 @@ import {
 const STARTUP_SETTING_KEY = 'startup_settings'
 
 const PANEL_WIDTH = 288
-/**
- * Starting height only. The panel measures its own content and asks to be
- * resized, because the content grows with the user's font-size setting and a
- * fixed height clipped the Quit button at anything above the default.
- */
+/** starting height only; the panel measures itself since font size grows it and a fixed height clipped Quit */
 const PANEL_HEIGHT = 380
-/** Bounds on what the panel may ask for, so a bad measurement cannot fill the screen. */
+/** so a bad measurement can't fill the screen */
 const PANEL_MIN_HEIGHT = 200
 const PANEL_MAX_HEIGHT = 720
 
 let panelHeight = PANEL_HEIGHT
-/** Gap between the tray icon and the panel, so it does not touch the taskbar. */
+/** keeps the panel off the taskbar */
 const PANEL_MARGIN = 8
 
 let tray: Tray | null = null
@@ -44,13 +32,7 @@ export function getStartupSettings(): StartupSettings {
   return normalizeStartupSettings(getSetting<unknown>(STARTUP_SETTING_KEY, null))
 }
 
-/**
- * Stores settings and applies the ones the OS owns.
- *
- * `openAtLogin` is not a value we keep. It is a Windows registry entry that
- * Electron manages, so it is written through rather than merely recorded, or the
- * checkbox would drift from what actually happens at login.
- */
+/** openAtLogin lives in the registry, so write it through or the checkbox drifts */
 export function setStartupSettings(next: unknown): StartupSettings {
   const settings = reconcile(normalizeStartupSettings(next))
   setSetting(STARTUP_SETTING_KEY, settings)
@@ -58,8 +40,7 @@ export function setStartupSettings(next: unknown): StartupSettings {
   try {
     app.setLoginItemSettings({
       openAtLogin: settings.openAtLogin,
-      // Passed so a login launch can start hidden; the app reads it back at
-      // startup rather than guessing from the absence of a window.
+      // lets a login launch start hidden, read back at startup
       args: settings.startMinimised ? [MINIMISED_FLAG] : []
     })
   } catch (err) {
@@ -69,8 +50,7 @@ export function setStartupSettings(next: unknown): StartupSettings {
   if (settings.showTrayIcon) createTray()
   else destroyTray()
 
-  // The same switches appear in the tray panel and in Settings. Without this the
-  // two drift apart the moment one of them is used.
+  // same switches in the tray and Settings, keep them in step
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(IpcChannels.STARTUP_CHANGED, settings)
   }
@@ -78,9 +58,9 @@ export function setStartupSettings(next: unknown): StartupSettings {
   return settings
 }
 
-/** True when Windows started this at login and it should stay in the tray. */
+/** started at login, stay in the tray */
 export function launchedMinimised(): boolean {
-  // A failed settings read must not cost the window.
+  // a failed settings read mustn't cost the window
   try {
     return shouldStartHidden(process.argv, getStartupSettings())
   } catch (err) {
@@ -92,15 +72,12 @@ export function launchedMinimised(): boolean {
 function panelPosition(): { x: number; y: number } {
   const bounds = tray?.getBounds()
   const cursor = screen.getCursorScreenPoint()
-  // getBounds is empty on some Windows configurations, so the cursor is the
-  // fallback. The click that opened this happened at it.
+  // getBounds is empty on some windows setups, fall back to the cursor that clicked
   const anchor = bounds && bounds.width > 0 ? bounds : { x: cursor.x, y: cursor.y, width: 0, height: 0 }
   const display = screen.getDisplayNearestPoint({ x: anchor.x, y: anchor.y })
   const area = display.workArea
 
-  // Centred on the icon, then pulled back inside the work area. The taskbar can
-  // sit on any edge, so the panel goes above or below depending on which half of
-  // the screen the icon is in rather than assuming the bottom.
+  // taskbar can be on any edge, so go above or below by which half the icon's in
   const x = Math.round(
     Math.min(Math.max(anchor.x + anchor.width / 2 - PANEL_WIDTH / 2, area.x + PANEL_MARGIN),
       area.x + area.width - PANEL_WIDTH - PANEL_MARGIN)
@@ -126,8 +103,7 @@ function createPanel(): BrowserWindow {
     movable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    // Focusable so blur can dismiss it. An unfocusable panel would have to be
-    // closed some other way, and there is nothing obvious to click.
+    // focusable so blur can dismiss it
     focusable: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -148,13 +124,7 @@ function createPanel(): BrowserWindow {
   return panel
 }
 
-/**
- * Resizes to the height the panel measured, then repositions.
- *
- * Repositioning matters as much as the size: the panel usually sits above the
- * taskbar, so growing it downward would push it off-screen rather than upward
- * away from the tray.
- */
+/** reposition too: it sits above the taskbar, growing downward would push it off-screen */
 export function setPanelHeight(height: number): void {
   const next = Math.round(Math.min(Math.max(height, PANEL_MIN_HEIGHT), PANEL_MAX_HEIGHT))
   if (next === panelHeight) return
@@ -182,7 +152,6 @@ function togglePanel(): void {
   else showPanel()
 }
 
-/** Brings the main window forward, restoring and creating it as needed. */
 export function showMainWindow(): void {
   hidePanel()
   const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.getParentWindow() && w.isResizable())
@@ -201,12 +170,11 @@ function createTray(): void {
     return
   }
 
-  // Windows wants a small icon; passing the full-size image gives a blurry one.
+  // windows wants a small icon, full size comes out blurry
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.setToolTip('Checkpoint')
 
-  // Left-click goes straight to the app, right-click opens the panel. The
-  // convention Windows users already have from everything else in the tray.
+  // left-click opens the app, right-click the panel, like the rest of the tray
   tray.on('click', () => showMainWindow())
   tray.on('double-click', () => showMainWindow())
   tray.on('right-click', () => togglePanel())

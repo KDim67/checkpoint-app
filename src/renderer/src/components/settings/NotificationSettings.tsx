@@ -24,8 +24,7 @@ export default function NotificationSettings(): React.JSX.Element {
   }, [])
 
   const save = async (next: NotificationPolicy) => {
-    // Applied locally first so the controls stay responsive; main returns the
-    // normalized copy, which is what actually governs.
+    // local first for responsiveness; main's normalized copy is what governs
     setPolicy(next)
     try {
       const stored = await notificationsApi.setPolicy(next)
@@ -173,8 +172,7 @@ export default function NotificationSettings(): React.JSX.Element {
                 title: 'Checkpoint',
                 body: 'Notifications are working.'
               })
-              // Saying why nothing appeared beats leaving the user guessing
-              // whether the feature or the OS is at fault.
+              // say why nothing appeared, feature or OS
               toast(fired ? 'Sent' : 'Suppressed: check the switches and quiet hours above')
             }}
           >

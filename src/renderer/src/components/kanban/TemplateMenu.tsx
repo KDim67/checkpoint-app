@@ -60,19 +60,17 @@ export default function TemplateMenu({ templates, open, setOpen, onPick }: Templ
             <button
               key={tc.id}
               onClick={() => onPick(tc)}
+              className="bg-clear hover-bg-offset"
               style={{
                 display: 'block',
                 width: '100%',
                 padding: '6px 12px',
-                background: 'none',
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: 'var(--text-xs)',
                 color: 'var(--color-text-base)',
                 textAlign: 'left'
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
             >
               {tc.title}
             </button>

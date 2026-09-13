@@ -1,12 +1,4 @@
-/**
- * The Kanban board configuration model. Pure: no I/O, no `window`, no database.
- *
- * In `shared/` because the renderer, the AI action blocks and the MCP server
- * all need it and main cannot import from the renderer.
- *
- * One versioned document per workspace, stored in `app_settings`, so it syncs
- * between machines with no extra plumbing.
- */
+/** pure, shared by renderer, AI blocks and MCP; one versioned doc per workspace in app_settings so it syncs */
 
 export interface ColumnConfig {
   id: string
@@ -14,25 +6,17 @@ export interface ColumnConfig {
   wipLimit: number | null
   color?: string
   colorMode?: 'header' | 'full'
-  /** Collapsed to a narrow strip showing only the name and card count. */
+  /** narrow strip with name and count */
   collapsed?: boolean
-  /** Ordering within the column. 'manual' preserves drag order. */
+  /** 'manual' keeps drag order */
   sort?: ColumnSort
-  /** Short policy note. A definition of done, surfaced on hover. */
+  /** definition of done, on hover */
   description?: string
 }
 
 export type ColumnSort = 'manual' | 'priority' | 'due'
 
-/**
- * What a card shows on its face. Every one of these hides something without
- * touching the data, so a board can be dense or detailed without the cards
- * themselves differing.
- *
- * `doneCheckbox` hides a control rather than a field. The tick doubles as the
- * done marker and the way to set it, but the kanban_toggle_done shortcut and
- * the detail modal both still work, so nothing becomes unreachable.
- */
+/** hides without touching data; doneCheckbox's shortcut and modal still work */
 export interface CardDisplay {
   priority: boolean
   tags: boolean
@@ -53,9 +37,9 @@ interface BoardFilters {
 export interface BoardConfig {
   version: 1
   columns: ColumnConfig[]
-  /** Columns removed from the board but recoverable from the archive bin. */
+  /** recoverable from the archive bin */
   archivedColumns: ColumnConfig[]
-  /** Preset id, hex colour, CSS gradient, or image url. As the picker writes it. */
+  /** as the picker writes it */
   background: string
   swimlanes: boolean
   cardDisplay: CardDisplay
@@ -75,14 +59,7 @@ export const DEFAULT_CARD_DISPLAY: CardDisplay = {
   doneCheckbox: true
 }
 
-/**
- * Both column components are memoised. Their comparators listed fields by hand
- * and missed these, so the Card Fields toggles, collapsing, sorting and column
- * descriptions all changed state that never reached the screen.
- *
- * Read off the object rather than written out, so a field added later is
- * compared without anyone having to remember.
- */
+/** memo comparators missed fields listed by hand; reading off the object catches new ones */
 export function sameCardDisplay(a?: CardDisplay, b?: CardDisplay): boolean {
   const left = a ?? DEFAULT_CARD_DISPLAY
   const right = b ?? DEFAULT_CARD_DISPLAY
@@ -93,15 +70,11 @@ export function sameCardDisplay(a?: CardDisplay, b?: CardDisplay): boolean {
 export function sameColumnConfig(a: ColumnConfig, b: ColumnConfig): boolean {
   if (a === b) return true
 
-  // Walked twice rather than through a union Set. This runs for every column on
-  // every render, and two spread arrays plus a Set per comparison is real work
-  // to avoid. Counting keys instead would be cheaper still and wrong: a field
-  // set to undefined and a field that is absent mean the same thing here, and
-  // JSON off disk gives one while a fresh object gives the other.
+  // walked twice, a Set per column per render is real work; key counts miss undefined vs absent
   for (const key of Object.keys(a) as (keyof ColumnConfig)[]) {
     if (a[key] !== b[key]) return false
   }
-  // Only the keys b has that a does not are left, and only if they say something.
+  // leftover keys only if they say something
   for (const key of Object.keys(b) as (keyof ColumnConfig)[]) {
     if (a[key] === undefined && b[key] !== undefined) return false
   }
@@ -122,34 +95,19 @@ export const DEFAULT_COLUMNS: ColumnConfig[] = [
 ]
 
 
-// Storage keys
-
 export const boardConfigKey = (context: string): string => `kanban_board_${context}`
 
-/** Pre-unification keys. Exported so main can run the same migration. */
+/** pre-unification keys, exported for main's migration */
 export const legacyColumnsKey = (context: string): string => `kanban_columns_${context}`
 export const legacyBackgroundKey = (context: string): string => `kanban_bg_${context}`
 export const legacyArchivedKey = (context: string): string => `kanban_archived_columns_${context}`
-/**
- * The fourth legacy key. It was missed when board configuration was unified:
- * migrateLegacy hardcoded `swimlanes: false`, so anyone with priority
- * swimlanes enabled had the preference silently reset on their first load
- * after that change, with the old row left orphaned in the settings table.
- */
+/** missed in the unification, which reset everyone's swimlanes */
 export const legacySwimlanesKey = (context: string): string => `kanban_swimlanes_${context}`
 
-/**
- * Every mutation serialises on the key the board bootstrap and the AI action
- * blocks already share. Config writes are read-modify-write, which is exactly
- * the sequence that produced duplicate columns when two of them interleaved.
- * Exported because the renderer's persistence layer and the MCP server must
- * take the same lock name to serialise against each other.
- */
+/** the key bootstrap and AI blocks share; renderer and MCP must use the same one */
 export const boardLockKey = (context: string): string => `kanban-cols:${context}`
 
-// Normalisation
-// Hand-written rather than schema-driven, matching the asObject/asArray/str
-// helpers in boardEnrich.ts and keeping Zod out of the renderer bundle.
+// hand-written like boardEnrich's helpers, keeps Zod out of the renderer
 
 function asObject(v: unknown): Record<string, unknown> | null {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
@@ -167,14 +125,14 @@ function bool(v: unknown, fallback: boolean): boolean {
   return fallback
 }
 
-/** null means "no limit"; anything unparseable degrades to no limit. */
+/** null means no limit, junk too */
 function wip(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null
   const n = typeof v === 'number' ? v : parseInt(String(v), 10)
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
-/** A missing or unparseable switch falls back to its default, never to false. */
+/** missing or junk falls back to the default, never to false */
 function normalizeCardDisplay(raw: Record<string, unknown>): CardDisplay {
   const display = { ...DEFAULT_CARD_DISPLAY }
   for (const key of Object.keys(DEFAULT_CARD_DISPLAY) as (keyof CardDisplay)[]) {
@@ -192,11 +150,7 @@ export function normalizeColumn(raw: unknown, index: number): ColumnConfig | nul
 
   const column: ColumnConfig = { id, name, wipLimit: wip(o.wipLimit) }
 
-  // Canonical form: a field equal to its default is omitted rather than stored.
-  // Two documents that mean the same thing then serialise identically, which is
-  // what lets an undo be checked by comparing against the original instead of
-  // field by field, and stops "collapsed: false" being written where the key
-  // simply never existed.
+  // defaults are omitted so equal docs serialise identically and undo compares whole
   if (typeof o.color === 'string' && o.color.trim()) column.color = o.color.trim()
   if (o.colorMode === 'full') column.colorMode = 'full'
   if (bool(o.collapsed, false)) column.collapsed = true
@@ -207,11 +161,7 @@ export function normalizeColumn(raw: unknown, index: number): ColumnConfig | nul
   return column
 }
 
-/**
- * Produces a valid config from anything. A partial, stale or corrupted document
- * degrades to defaults rather than throwing. This runs on every board load, and
- * a bad settings row must not be able to take the board down.
- */
+/** anything in, valid config out; runs every load, a bad row mustn't break the board */
 export function normalizeBoardConfig(raw: unknown): BoardConfig {
   const o = asObject(raw)
   if (!o) {
@@ -242,14 +192,12 @@ export function normalizeBoardConfig(raw: unknown): BoardConfig {
 
   return {
     version: CONFIG_VERSION,
-    // An empty column list would render an unusable board with no way back, so
-    // it falls back rather than persisting the emptiness.
+    // no columns would be an unusable board
     columns: columns.length > 0 ? columns : DEFAULT_COLUMNS.map(c => ({ ...c })),
     archivedColumns,
     background: str(o.background, 'default') || 'default',
     swimlanes: bool(o.swimlanes, false),
-    // Read off the defaults rather than listed by hand. Listing them is what
-    // let four toggles be added to the type and silently dropped on load.
+    // read off the defaults, a hand list dropped four toggles
     cardDisplay: normalizeCardDisplay(display),
     filters: {
       query: str(filters.query),
@@ -259,16 +207,7 @@ export function normalizeBoardConfig(raw: unknown): BoardConfig {
   }
 }
 
-// Migration
-
-/**
- * Builds a config document from the pre-unification storage keys.
- *
- * The legacy column key is double-encoded: the call site ran JSON.stringify and
- * setSetting stringified the result again, so a read yields a JSON *string*
- * rather than an array. Both shapes are accepted. A value that is already an
- * array is used directly, so this is safe to run against either.
- */
+/** the legacy column key is double-encoded; strings and arrays both accepted */
 function decodeLegacyList(raw: unknown): unknown {
   if (typeof raw !== 'string') return raw
   try {
@@ -288,8 +227,7 @@ export function migrateLegacy(
     columns: decodeLegacyList(rawColumns),
     archivedColumns: decodeLegacyList(rawArchived),
     background: typeof rawBackground === 'string' && rawBackground ? rawBackground : 'default',
-    // Stored by the old toggle as the string 'true'/'false'; `bool` in
-    // normalizeBoardConfig accepts both that and a real boolean.
+    // the old toggle stored 'true'/'false', bool() takes both
     swimlanes: rawSwimlanes ?? false,
     cardDisplay: DEFAULT_CARD_DISPLAY,
     filters: DEFAULT_FILTERS
@@ -297,7 +235,7 @@ export function migrateLegacy(
 }
 
 
-/** Resolves a column by id first, then by case-insensitive name. */
+/** id first, then case-insensitive name */
 export function findColumn(config: BoardConfig, target: string): ColumnConfig | undefined {
   const needle = target.trim().toLowerCase()
   return (

@@ -3,10 +3,9 @@ import { getDb, getSetting, queryTasks } from '../../db'
 import { BUILT_IN_VIEWS, describeView, normalizeSavedViews, toQueryParams } from '../../../shared/savedViews'
 import { context, json, summarizeItem, text, z } from '../toolKit'
 
-/** Saved task views. */
+/** saved task views */
 export function registerViewTools(mcp: McpServer): void {
-  // The point of naming a filter is that it can then be asked for by name, so an
-  // agent gets the same vocabulary the user does rather than restating a query.
+  // named filters give agents the user's vocabulary instead of restated queries
 
   mcp.registerTool(
     'list_views',

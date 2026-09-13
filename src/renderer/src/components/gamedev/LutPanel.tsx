@@ -13,7 +13,6 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
         </div>
 
         <div className="tool-layout">
-          {/* Left Columns Sliders */}
           <div className="panel-scroll">
             <div className="section-head">
               <Settings size={14} className="text-muted" />
@@ -22,7 +21,6 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               </span>
             </div>
 
-            {/* Exposure Slider */}
             <div className="col-4px">
               <div className="row-caption">
                 <span className="text-label">Exposure</span>
@@ -39,7 +37,6 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               />
             </div>
 
-            {/* Brightness Slider */}
             <div className="col-4px">
               <div className="row-caption">
                 <span className="text-label">Brightness</span>
@@ -56,7 +53,6 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               />
             </div>
 
-            {/* Contrast Slider */}
             <div className="col-4px">
               <div className="row-caption">
                 <span className="text-label">Contrast</span>
@@ -73,7 +69,6 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               />
             </div>
 
-            {/* Saturation Slider */}
             <div className="col-4px">
               <div className="row-caption">
                 <span className="text-label">Saturation</span>
@@ -90,7 +85,6 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               />
             </div>
 
-            {/* Temperature Slider */}
             <div className="col-4px">
               <div className="row-caption">
                 <span className="text-label">Temperature</span>
@@ -107,7 +101,6 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               />
             </div>
 
-            {/* Reset button */}
             <button
               onClick={() => {
                 tool.setLutExposure(0)
@@ -131,9 +124,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             </button>
           </div>
 
-          {/* Right Preview Column */}
           <div className="col-lg-min">
-            {/* Meta header */}
             <div className="panel-row">
               <div className="col-2px">
                 <span className="text-caption">Grader Viewport:</span>
@@ -143,12 +134,10 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
               </div>
             </div>
 
-            {/* Canvas viewport */}
             <div className="preview-area">
               <canvas ref={tool.lutPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '272px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
             </div>
 
-            {/* Export LUT Strip */}
             <div className="panel">
               <div className="row-between">
                 <div className="col-2px">

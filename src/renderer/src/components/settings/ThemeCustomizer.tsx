@@ -46,9 +46,7 @@ export default function ThemeCustomizer() {
 
         const stored = await customizerApi.getTheme()
         if (stored && Object.keys(stored).length > 0) {
-          // Only the canonical variables are kept in state. Earlier writes also
-          // stored the derived tints, and carrying those around meant a later
-          // save could persist a tint that no longer matched its source colour.
+          // only canonical vars in state, stored tints could drift from their source
           const next = { ...DEFAULT_THEME }
           for (const key of THEME_VAR_NAMES) {
             if (typeof stored[key] === 'string' && stored[key]) next[key] = stored[key]
@@ -73,14 +71,7 @@ export default function ThemeCustomizer() {
     }
   }
 
-  /**
-   * The single path from a variable change to the engine.
-   *
-   * The derived tints are expanded here rather than folded into state, so the
-   * colour picker, the font select and a preset all produce the same result.
-   * Previously only the picker derived them, which meant applying a saved set
-   * of variables left the old primary and secondary tints in place.
-   */
+  /** one path to the engine; tints expanded here so picker, font select and presets agree */
   const applyVars = async (next: ThemeVariables) => {
     setThemeVars(next)
     if (!engineEnabled) return
@@ -240,9 +231,9 @@ export default function ThemeCustomizer() {
         <div className="mt-2">
           <button
             onClick={handleReset}
+            className="theme-customizer-reset"
             style={{
               padding: 'var(--space-2) var(--space-4)',
-              background: 'var(--color-surface-offset)',
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
@@ -251,8 +242,6 @@ export default function ThemeCustomizer() {
               cursor: 'pointer',
               transition: 'all 100ms ease'
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'var(--color-surface-offset)'}
           >
             Reset to Defaults
           </button>

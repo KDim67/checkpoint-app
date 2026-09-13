@@ -15,9 +15,8 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
         </div>
 
         <div className="tool-layout">
-          {/* Left Column: Packing Configuration */}
+          {/* left: packing config */}
           <div className="panel-scroll">
-            {/* Title */}
             <div className="section-head">
               <Settings size={14} className="text-muted" />
               <span className="label-caps">
@@ -25,7 +24,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               </span>
             </div>
 
-            {/* Directory Selector */}
             <div className="col-6px">
               <span className="text-label-sm">
                 Source Directory
@@ -42,9 +40,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               )}
             </div>
 
-            {/* Sliders and Toggles Container */}
             <div className="col-md">
-              {/* Padding Slider */}
               <div className="col-4px">
                 <div className="row-caption">
                   <span className="text-label">Border Padding</span>
@@ -61,7 +57,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 />
               </div>
 
-              {/* Max Atlas Size Dropdown */}
               <div className="col-4px">
                 <span className="text-label-sm">
                   Max Atlas Size
@@ -87,7 +82,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 </select>
               </div>
 
-              {/* Auto-Trim Toggle */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-1)' }}>
                 <div className="col-2px">
                   <span className="text-label-sm">Auto-Trim Transparency</span>
@@ -107,7 +101,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               </div>
             </div>
 
-            {/* Reality Check Warnings */}
+            {/* reality-check warnings */}
             {tool.atlasSprites.length > 150 && (
               <div style={{
                 background: 'var(--color-warning-muted)',
@@ -129,9 +123,8 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
             )}
           </div>
 
-          {/* Right Column: 2D Packing Preview Canvas */}
+          {/* right: packing preview */}
           <div className="col-lg-min">
-            {/* Meta Header */}
             <div className="panel-row">
               <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span className="text-caption">Atlas Status:</span>
@@ -149,7 +142,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               )}
             </div>
 
-            {/* Canvas Render Area */}
             <div className="preview-area">
               {!tool.atlasFolderPath ? (
                 <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
@@ -184,7 +176,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               )}
             </div>
 
-            {/* Export Trigger Block */}
             {tool.atlasFolderPath && tool.atlasLayout && (
               <div className="panel">
                 <div className="row-between">
@@ -225,7 +216,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                   </button>
                 </div>
 
-                {/* Saved file notification info */}
                 {tool.atlasExportedPng && (
                   <div style={{
                     background: 'var(--color-success-muted)',

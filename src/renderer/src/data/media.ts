@@ -1,5 +1,3 @@
-/** The bridge's `media` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.media
 
 export const getStorageInfo = (...args: Parameters<Bridge['getStorageInfo']>): ReturnType<Bridge['getStorageInfo']> =>

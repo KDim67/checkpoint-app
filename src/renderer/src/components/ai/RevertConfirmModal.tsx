@@ -1,11 +1,4 @@
-/**
- * Confirmation before undoing what the assistant created. Destructive and not
- * recoverable, so it names every card and column it is about to remove.
- *
- * Lifted out of AiStreamPanel with its JSX unchanged, down to the indentation.
- * State stays in the panel and arrives as props: nothing here owns anything,
- * which is what makes it safe for this to unmount every time it closes.
- */
+/** destructive and final, so it names every card and column; state stays in the panel */
 
 import React from 'react'
 import { Trash2 } from 'lucide-react'
@@ -74,8 +67,8 @@ export default function RevertConfirmModal({
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
               <button
                 onClick={() => setRevertConfirmData(null)}
+                className="bg-clear hover-bg-surface-2"
                 style={{
-                  background: 'transparent',
                   border: '1px solid var(--color-surface-offset)',
                   borderRadius: 'var(--radius-md)',
                   color: 'var(--color-text-base)',
@@ -85,8 +78,6 @@ export default function RevertConfirmModal({
                   fontWeight: 'var(--weight-medium)',
                   transition: 'background-color 150ms'
                 }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-surface-2)'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 Cancel
               </button>
@@ -101,6 +92,7 @@ export default function RevertConfirmModal({
                     console.error('Failed to revert AI changes:', err)
                   }
                 }}
+                className="revert-confirm-modal-revert"
                 style={{
                   background: 'var(--color-error)',
                   border: 'none',
@@ -112,8 +104,6 @@ export default function RevertConfirmModal({
                   fontWeight: 'bold',
                   transition: 'opacity 150ms'
                 }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
               >
                 Revert Changes
               </button>

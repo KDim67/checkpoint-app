@@ -1,11 +1,4 @@
-/**
- * The saved conversations: the list kept in localStorage, which one is live,
- * and the drawer's search and rename state.
- *
- * Held by the panel rather than the drawer, which unmounts whenever it closes
- * while the list keeps syncing from the live conversation. Starting and loading
- * a chat stay in the panel, because they reset the stream as well.
- */
+/** held by the panel, the drawer unmounts while the list keeps syncing */
 
 import { useEffect, useState } from 'react'
 import type { Message, SavedChat } from './types'
@@ -27,7 +20,7 @@ export function useSavedChats(messages: Message[]) {
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
 
-  // Sync active messages into saved chats list (limit 50)
+  // limit 50
   useEffect(() => {
     if (messages.length === 0) return
     setSavedChats(prev => {

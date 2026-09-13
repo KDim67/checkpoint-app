@@ -1,15 +1,4 @@
-/**
- * The wire protocol between two collaborating Checkpoint instances.
- *
- * Whatever arrives here goes straight into prepared statements, and the pairing
- * code only proves the peer knows the code, not that it is a sane Checkpoint.
- * Usually it is just an older build.
- *
- * Reject structure, default decoration: a bad id or position means we cannot
- * apply the message, a missing title is just an empty title. And never be
- * stricter than the sender, or this breaks live sessions instead of guarding
- * them.
- */
+/** feeds prepared statements; reject bad structure, default decoration, never stricter than the sender */
 
 import type {
   BulkUpdatePayload,
@@ -24,8 +13,6 @@ import type {
 import { normalizeBoardConfig, type BoardConfig } from './boardModel'
 import { readInstallId } from './identity'
 
-// The messages
-
 export type RemoteMutation =
   | { type: 'createItem' | 'updateItem'; item: Item; tagIds?: string[] }
   | { type: 'deleteItem'; id: string }
@@ -33,23 +20,12 @@ export type RemoteMutation =
   | { type: 'deleteTag'; id: string }
   | { type: 'createRelation'; relation: Relation }
   | { type: 'deleteRelation'; id: string }
-  /**
-   * Same payload the local bulk edit takes. It was once declared as
-   * `{ updates: [...] }`, which nothing ever sent, so the receiver read
-   * undefined and threw, and bulk edits silently failed on the peer.
-   */
+  /** same payload as the local bulk edit; the old { updates } shape was never sent */
   | { type: 'bulkUpdateItems'; payload: BulkUpdatePayload }
   | { type: 'bulkDeleteItems'; ids: string[] }
   | { type: 'rebalancePositions'; context: string; status: string }
 
-/**
- * Points a mutation at a different workspace.
- *
- * Someone who joined a shared board as a copy holds it under a different slug
- * from the host's, and both sides still have to agree on which board a change
- * is about. The slug is translated at the wire so nothing else in the app has
- * to know. Mutations addressed by id carry no workspace and pass through.
- */
+/** copies hold boards under another slug, translated at the wire; id-only mutations pass through */
 export function retargetMutation(mutation: RemoteMutation, context: string): RemoteMutation {
   if (mutation.type === 'createItem' || mutation.type === 'updateItem') {
     if (mutation.item.context === context) return mutation
@@ -58,10 +34,7 @@ export function retargetMutation(mutation: RemoteMutation, context: string): Rem
   if (mutation.type === 'rebalancePositions') {
     return mutation.context === context ? mutation : { ...mutation, context }
   }
-  // The third carrier of a workspace name, and the least obvious: a bulk edit
-  // can move cards between workspaces, and its patch names the destination.
-  // Sent untranslated it would move the peer's cards into a workspace named
-  // after this side's copy.
+  // a bulk edit's patch can name a workspace too
   if (mutation.type === 'bulkUpdateItems') {
     const { context: target } = mutation.payload.patch
     if (target === undefined || target === context) return mutation
@@ -70,10 +43,7 @@ export function retargetMutation(mutation: RemoteMutation, context: string): Rem
   return mutation
 }
 
-/**
- * What a guest is allowed to do. The host decides it, and can change its mind
- * without ending the session.
- */
+/** the host decides and can change it mid-session */
 export type CollabMode = 'collaborative' | 'readonly'
 
 export interface BoardBaselineMessage {
@@ -84,53 +54,21 @@ export interface BoardBaselineMessage {
   itemTags: { item_id: string; tag_id: string }[]
   relations: Relation[]
   mode: CollabMode
-  /**
-   * The host's columns, so the cards have somewhere to land.
-   *
-   * Optional, because a build older than this one sends no board at all and a
-   * peer joining from one must still get its cards. Without it a workspace
-   * created by joining starts on the four default columns, and every card
-   * whose status is a column the host renamed or added renders nowhere.
-   */
+  /** optional for older builds; without it a joined workspace gets default columns and cards vanish */
   board?: BoardConfig
-  /**
-   * What this side has deleted, so a merge on the other end can honour it.
-   *
-   * Without them a merge knows only its own deletions, and every card the
-   * sender threw away walks back in from the receiver's copy. Optional, because
-   * a build older than this sends none and a merge without them is the merge
-   * that shipped before.
-   */
+  /** optional; without them a merge revives everything the sender deleted */
   tombstones?: SyncTombstone[]
-  /**
-   * Which installation is hosting, so the joiner can file the board it is about
-   * to hold against the person it agreed with rather than against the board's
-   * name. Two people sharing a board called "default" are not the same peer,
-   * and a common ancestor taken from the wrong one decides conflicts wrongly.
-   *
-   * Empty from a build that does not send it, which falls back to the name.
-   */
+  /** file the board against the host, not the name; empty falls back to the name */
   install?: string
 }
 
-/**
- * Who is in the room, as only the host can know.
- *
- * Guests are connected to the host and not to each other, so the list has to
- * come from the middle and be sent on every change.
- */
+/** only the host knows, sent on every change */
 interface RosterMessage {
   type: 'roster'
   members: { id: string; name: string }[]
 }
 
-/**
- * The board document: columns, background, swimlanes, the card face.
- *
- * It used to travel only with the opening baseline, so a column added during a
- * session reached nobody, and a card moved into it arrived addressed to a
- * column the other side did not have and rendered nowhere.
- */
+/** it only went with the baseline once, so new columns never arrived */
 interface BoardConfigMessage {
   type: 'board-config'
   context: string
@@ -142,58 +80,33 @@ interface DbMutationMessage {
   mutation: RemoteMutation
 }
 
-/**
- * Sent before hanging up on purpose, so the other side can say who left rather
- * than just going quiet.
- *
- * A peer that crashes or loses its network sends nothing, which is the
- * difference the receiver is being told about: a message means they chose to.
- */
+/** a crash sends nothing; this means they chose to */
 interface PeerLeavingMessage {
   type: 'peer-leaving'
-  /** May be empty. The receiver falls back to something readable. */
+  /** may be empty */
   by: string
 }
 
-/**
- * Said as soon as the channel opens, by both sides, so each can name the other.
- *
- * Without it the host knows only that somebody is in, which is no basis for
- * deciding whether to let them stay.
- */
+/** both sides on open, so each can name the other */
 interface PeerHelloMessage {
   type: 'peer-hello'
-  /** May be empty. The receiver falls back to something readable. */
+  /** may be empty */
   by: string
 }
 
-/**
- * The host dropping a guest on purpose.
- *
- * Separate from peer-leaving because the two read completely differently from
- * the other end: one is someone saying goodbye, the other is being shown the
- * door, and a connection that just goes quiet is neither.
- */
+/** being shown the door, not saying goodbye */
 interface PeerRemovedMessage {
   type: 'peer-removed'
   by: string
 }
 
-/** The host changing what the guest may do, without ending the session. */
+/** without ending the session */
 interface ModeChangeMessage {
   type: 'mode-change'
   mode: CollabMode
 }
 
-/**
- * One side offering the other the board the two of them make together.
- *
- * It carries the merged result rather than the raw copy for the other side to
- * merge for itself. Two independent merges do not have to agree: each side
- * breaks ties in its own favour and honours only its own deletions, so the
- * boards would end up nearly the same, which is the worst kind of same. One
- * merge, sent whole, and both ends hold the same board.
- */
+/** the merged result, whole: two independent merges end up nearly the same */
 export interface MergeProposalMessage {
   type: 'merge-proposal'
   by: string
@@ -205,23 +118,10 @@ export interface MergeProposalMessage {
   board: BoardConfig
 }
 
-/**
- * The shared board, replaced wholesale by the host.
- *
- * Sent to the rest of the room once the host takes a merge somebody offered.
- * They are told rather than asked: a guest is already live with the host's
- * board, so a guest who said no would keep receiving edits to cards it does not
- * have and sending edits for cards the others no longer do, and nobody would
- * know. Only the host is asked, because the board being shared is the host's.
- *
- * Safe to apply whole because everyone it reaches is holding the board it
- * replaces. The one way to be in the room holding anything else is to have
- * merged and been turned down, and that ends the session rather than leaving
- * somebody here with cards this would delete.
- */
+/** replaced wholesale, told not asked; everyone reached holds the board it replaces */
 export interface BoardResetMessage {
   type: 'board-reset'
-  /** Whose merge it was, so the notice can say where the board came from. */
+  /** so the notice says where the board came from */
   by: string
   context: string
   items: Item[]
@@ -231,16 +131,12 @@ export interface BoardResetMessage {
   board: BoardConfig
 }
 
-/** Whether the other side took the merge. A no is an answer, not a failure. */
+/** a no is an answer, not a failure */
 interface MergeAnswerMessage {
   type: 'merge-answer'
   accepted: boolean
   by: string
-  /**
-   * Why not, when the no was the app's and not the user's. "They said no" and
-   * "nobody was asked" read the same from here otherwise, and only one of them
-   * is worth trying again.
-   */
+  /** only when the app said no, so the other side knows whether to retry */
   reason?: string
 }
 
@@ -257,15 +153,13 @@ export type CollabMessage =
   | RosterMessage
   | BoardConfigMessage
 
-// Primitives
-
 function obj(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null
 }
 
-/** A non-empty string, or null. Used wherever the value is an identity. */
+/** non-empty or null, for identities */
 function id(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null
 }
@@ -281,13 +175,7 @@ function num(value: unknown): number | null {
 const ITEM_TYPES: ItemType[] = ['log', 'card', 'task']
 const RELATION_TYPES: RelationType[] = ['blocks', 'relates_to', 'duplicates']
 
-// Rows
-
-/**
- * id, type and context decide which row is replaced and where. A wrong one
- * overwrites something unrelated. Timestamps required too, or the row sorts as
- * though it were from 1970.
- */
+/** id, type and context decide what's replaced; timestamps required or it sorts as 1970 */
 export function normalizeSyncItem(raw: unknown): Item | null {
   const o = obj(raw)
   if (!o) return null
@@ -309,14 +197,14 @@ export function normalizeSyncItem(raw: unknown): Item | null {
     context,
     title: str(o.title),
     body: str(o.body),
-    // Free string by design: it holds a user-defined column id.
+    // free string, a user-defined column id
     status: str(o.status),
     priority: (priority !== null && priority >= 0 && priority <= 3 ? Math.round(priority) : 0) as ItemPriority,
     position,
     created_at: created,
     updated_at: updated,
     due_at: due,
-    // JSON text. An object here writes "[object Object]" and breaks every reader.
+    // JSON text; an object writes "[object Object]"
     metadata: typeof o.metadata === 'string' ? o.metadata : '{}'
   }
 }
@@ -348,16 +236,12 @@ function normalizeItemTag(raw: unknown): { item_id: string; tag_id: string } | n
   return itemId && tagId ? { item_id: itemId, tag_id: tagId } : null
 }
 
-/** Drops the entries that cannot be written, keeping the rest. */
+/** drops unwritable entries, keeps the rest */
 function normalizeAll<T>(raw: unknown, one: (value: unknown) => T | null): T[] {
   return Array.isArray(raw) ? raw.map(one).filter((v): v is T => v !== null) : []
 }
 
-/**
- * A deletion the sender remembers. The table matters: only these three record a
- * row id, and a merge reading a note's filename as a card id would keep that
- * card out for no reason.
- */
+/** only these three tables hold row ids */
 function normalizeTombstone(raw: unknown): SyncTombstone | null {
   const o = obj(raw)
   if (!o) return null
@@ -368,7 +252,7 @@ function normalizeTombstone(raw: unknown): SyncTombstone | null {
   return { id: rowId, table_name: table, deleted_at: num(o.deleted_at) ?? 0 }
 }
 
-/** Someone in the room. A member with no id is nobody. */
+/** no id, nobody */
 function normalizeRosterMember(raw: unknown): { id: string; name: string } | null {
   const o = obj(raw)
   if (!o) return null
@@ -376,12 +260,9 @@ function normalizeRosterMember(raw: unknown): { id: string; name: string } | nul
   return memberId ? { id: memberId, name: str(o.name) } : null
 }
 
-/** Ids only, for the mutations that carry a list of them. */
 function idList(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.map(id).filter((v): v is string => v !== null) : []
 }
-
-// Mutations
 
 export function normalizeRemoteMutation(raw: unknown): RemoteMutation | null {
   const o = obj(raw)
@@ -392,7 +273,7 @@ export function normalizeRemoteMutation(raw: unknown): RemoteMutation | null {
     case 'updateItem': {
       const item = normalizeSyncItem(o.item)
       if (!item) return null
-      // Absent leaves tags alone; empty clears them. Collapsing the two untags silently.
+      // absent leaves tags, empty clears them
       const tagIds = o.tagIds === undefined || o.tagIds === null ? undefined : idList(o.tagIds)
       return { type: o.type, item, ...(tagIds ? { tagIds } : {}) }
     }
@@ -423,14 +304,14 @@ export function normalizeRemoteMutation(raw: unknown): RemoteMutation | null {
       const rawPatch = obj(payload.patch)
       if (ids.length === 0 || !rawPatch) return null
 
-      // Only the three the local bulk edit can set; anything else is not ours to write.
+      // only what the local bulk edit can set
       const patch: BulkUpdatePayload['patch'] = {}
       if (typeof rawPatch.status === 'string') patch.status = rawPatch.status
       if (typeof rawPatch.context === 'string' && rawPatch.context.trim() !== '') patch.context = rawPatch.context
       const priority = num(rawPatch.priority)
       if (priority !== null && priority >= 0 && priority <= 3) patch.priority = Math.round(priority) as ItemPriority
 
-      // An empty patch is an empty SET clause. A syntax error, not a no-op.
+      // an empty patch is a SQL syntax error
       return Object.keys(patch).length > 0 ? { type: 'bulkUpdateItems', payload: { ids, patch } } : null
     }
 
@@ -444,13 +325,11 @@ export function normalizeRemoteMutation(raw: unknown): RemoteMutation | null {
       return context ? { type: 'rebalancePositions', context, status: str(o.status) } : null
     }
 
-    // From a build we do not know. Dropped rather than guessed at.
+    // unknown build, dropped not guessed
     default:
       return null
   }
 }
-
-// Messages
 
 export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
   const o = obj(raw)
@@ -462,22 +341,19 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
     return {
       type: 'board-baseline',
       context,
-      // Dropped one by one: a corrupt card should not cost the whole board.
+      // one by one, a bad card shouldn't cost the board
       items: normalizeAll(o.items, normalizeSyncItem),
       tags: normalizeAll(o.tags, normalizeSyncTag),
       itemTags: normalizeAll(o.itemTags, normalizeItemTag),
       relations: normalizeAll(o.relations, normalizeSyncRelation),
-      // Read-only by default, so an unclear peer does not make us broadcast back.
+      // read-only by default so an unclear peer doesn't get broadcasts
       mode: o.mode === 'collaborative' ? 'collaborative' : 'readonly',
-      // Absent from an older peer. Left undefined rather than normalised into
-      // a default board, so the joiner can tell "no board was sent" from "the
-      // host really has the default four" and keep its own in the first case.
+      // left undefined so the joiner can tell no board from the default four
       board: o.board === undefined ? undefined : normalizeBoardConfig(o.board),
       tombstones: o.tombstones === undefined
         ? undefined
         : normalizeAll(o.tombstones, normalizeTombstone),
-      // Empty covers both an older host and one whose id will not read, and
-      // both mean the same thing here: no peer to file the board under.
+      // empty covers old hosts and unreadable ids
       install: readInstallId(o.install)
     }
   }
@@ -498,8 +374,7 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
   }
 
   if (o.type === 'peer-leaving') {
-    // No name is still a valid goodbye: knowing they left on purpose is the
-    // point, and who they were is the decoration.
+    // no name is still a valid goodbye
     return { type: 'peer-leaving', by: str(o.by) }
   }
 
@@ -513,8 +388,7 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
 
   if (o.type === 'merge-proposal') {
     const context = id(o.context)
-    // Same rule as the baseline: a merge with no workspace on it has nowhere to
-    // go, and the workspace is what the receiver is about to overwrite.
+    // no workspace, nowhere to go
     if (!context) return null
     return {
       type: 'merge-proposal',
@@ -530,8 +404,7 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
 
   if (o.type === 'board-reset') {
     const context = id(o.context)
-    // Same rule as the baseline: no workspace on it is nowhere to put it, and
-    // the workspace is what this is about to overwrite.
+    // no workspace, nowhere to put it
     if (!context) return null
     return {
       type: 'board-reset',
@@ -546,9 +419,7 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
   }
 
   if (o.type === 'merge-answer') {
-    // Only an explicit yes is a yes. Anything else, including a field that will
-    // not read, leaves the other side's board exactly as it was, which is the
-    // failure nobody has to undo.
+    // only an explicit yes
     return {
       type: 'merge-answer',
       accepted: o.accepted === true,
@@ -558,10 +429,7 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
   }
 
   if (o.type === 'mode-change') {
-    // Rejected rather than defaulted, unlike every other field here. A mode
-    // nobody can read must not become the permissive one: this is the message
-    // that decides what a peer is allowed to do, and the safe way to fail is to
-    // leave what was already agreed in place.
+    // rejected, not defaulted: an unreadable mode mustn't become permissive
     if (o.mode !== 'collaborative' && o.mode !== 'readonly') return null
     return { type: 'mode-change', mode: o.mode }
   }

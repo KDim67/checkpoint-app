@@ -1,5 +1,3 @@
-/** The bridge's `sync` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.sync
 
 export const applyBoardBaseline = (...args: Parameters<Bridge['applyBoardBaseline']>): ReturnType<Bridge['applyBoardBaseline']> =>

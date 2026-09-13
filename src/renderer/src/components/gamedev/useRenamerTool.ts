@@ -5,12 +5,7 @@ import type { AssetFile } from './types'
 import * as appApi from '../../data/app'
 import * as gamedevApi from '../../data/gamedev'
 
-/**
- * Batch Asset Renamer: the file queue, the naming rules, and applying them.
- *
- * A hook rather than state inside RenamerPanel, because the panel unmounts on
- * tab switch and a queued batch would be lost on a glance at another tool.
- */
+/** a hook so a tab switch doesn't lose the queued batch */
 export function useRenamerTool() {
   const { toast } = useToast()
 
@@ -34,7 +29,7 @@ export function useRenamerTool() {
     const ext = lastDot !== -1 ? oldName.substring(lastDot) : ''
     let base = lastDot !== -1 ? oldName.substring(0, lastDot) : oldName
 
-    // 1. Presets (Unity / Unreal prefixes)
+    // unity/unreal prefixes
     if (renamerPreset === 'texture') {
       base = 'T_' + base
     } else if (renamerPreset === 'mesh') {
@@ -43,19 +38,16 @@ export function useRenamerTool() {
       base = 'A_' + base
     }
 
-    // 2. Suffix presets
     if (renamerSuffixPreset === 'diffuse') {
       base = base + '_D'
     } else if (renamerSuffixPreset === 'normal') {
       base = base + '_N'
     }
 
-    // 3. Search & Replace
     if (searchStr) {
       base = base.replaceAll(searchStr, replaceStr)
     }
 
-    // 4. Custom Prefix / Suffix
     if (customPrefix) {
       base = customPrefix + base
     }
@@ -63,7 +55,6 @@ export function useRenamerTool() {
       base = base + customSuffix
     }
 
-    // 5. Automatic Number Indexing
     if (enableIndexing) {
       const paddedNum = String(index + startIndex).padStart(indexPadding, '0')
       base = base + '_' + paddedNum
@@ -72,7 +63,6 @@ export function useRenamerTool() {
     return base + ext
   }, [renamerPreset, renamerSuffixPreset, searchStr, replaceStr, customPrefix, customSuffix, enableIndexing, startIndex, indexPadding])
 
-  // Drag & Drop Event Handlers (stable useCallback refs)
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(true)
@@ -86,7 +76,7 @@ export function useRenamerTool() {
     e.preventDefault()
     setIsDragOver(false)
     if (e.dataTransfer.files) {
-      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
+      // electron 32 dropped File.path, resolve via preload
       const dropped = Array.from(e.dataTransfer.files).map(f => ({
         name: f.name,
         path: appApi.getPathForFile(f),

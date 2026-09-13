@@ -56,9 +56,8 @@ export default function WorkspaceManager() {
   const [addTemplateId, setAddTemplateId] = useState(DEFAULT_TEMPLATE_ID)
   const [creating, setCreating] = useState(false)
 
-  // State for Import Modal
   const [importPayload, setImportPayload] = useState<ContextExport | null>(null)
-  /** Set instead of importPayload when the file came from another app. */
+  /** set instead of importPayload for another app's file */
   const [importBoard, setImportBoard] = useState<ImportedBoard | null>(null)
   const [importing, setImporting] = useState(false)
   const [importName, setImportName] = useState('')
@@ -88,8 +87,7 @@ export default function WorkspaceManager() {
         setImportName(baseName)
         setImportSlug(slugifyWorkspace(baseName))
       } else if (res.success && res.foreign) {
-        // A board from another app. Its own name is the obvious default, and
-        // the user can change it before anything is written.
+        // its own name is the default, editable before anything's written
         setImportPayload(null)
         setImportBoard(res.foreign)
         setImportName(res.foreign.name)
@@ -102,7 +100,7 @@ export default function WorkspaceManager() {
     }
   }
 
-  /** A board exported from another app, written through the ordinary paths. */
+  /** written through the ordinary paths */
   const handleForeignImportConfirm = async () => {
     if (!importBoard || !importName.trim() || importing) return
     const slug = slugifyWorkspace(importName)
@@ -119,8 +117,7 @@ export default function WorkspaceManager() {
         name: importName.trim(),
         color: PRESET_COLORS[contexts.length % PRESET_COLORS.length]
       }
-      // Registered first: if writing the cards fails part way, the workspace
-      // still exists holding whatever arrived, which beats losing all of it.
+      // registered first, so a partial failure still keeps what arrived
       await persist([...contexts, newEntry])
       const summary = await applyImportedBoard(slug, importBoard)
       setWorkspace(slug)
@@ -168,7 +165,6 @@ export default function WorkspaceManager() {
       if (stored.length > 0) {
         setContexts(stored)
       } else {
-        // Bootstrap from availableWorkspaces
         const bootstrapped: WorkspaceEntry[] = availableWorkspaces.map((slug, i) => ({
           slug,
           name: slug.charAt(0).toUpperCase() + slug.slice(1),
@@ -193,7 +189,7 @@ export default function WorkspaceManager() {
     setWorkspaceList(updated)
   }
 
-  /** Drops the shared label. Nothing else changes: it was never a mode. */
+  /** only the label, it was never a mode */
   const handleUnshare = async (slug: string) => {
     const updated = setWorkspaceShared(contexts, slug, false)
     if (updated === contexts) return
@@ -219,14 +215,13 @@ export default function WorkspaceManager() {
 
     setCreating(true)
     try {
-      // Shared with the first-run panel, so both produce the same workspace.
+      // shared with the first-run panel
       const { list, summary, templateFailed } = await createWorkspace(contexts, newEntry, addTemplateId)
       setContexts(list)
       setAvailableWorkspaces(list.map(c => c.slug))
       setWorkspaceList(list)
 
-      // The workspace itself is already saved; losing the scaffolding is worth
-      // a warning, not an unwind that would leave nothing behind.
+      // the workspace is saved; a lost template is a warning, not an unwind
       if (templateFailed) toast('Workspace created, but the template could not be applied.')
 
       setWorkspace(slug)
@@ -249,7 +244,7 @@ export default function WorkspaceManager() {
     const newSlug = slugifyWorkspace(editSlugVal) || slugifyWorkspace(trimmed)
     if (!newSlug) { toast('Invalid workspace slug'); return }
 
-    // If slug changed, ensure it's unique
+    // a new slug must be unique
     if (newSlug !== slug && contexts.some(c => c.slug === newSlug)) {
       toast(`Workspace slug "${newSlug}" already exists. Please choose a different name or slug.`);
       return
@@ -257,13 +252,11 @@ export default function WorkspaceManager() {
 
     try {
       if (newSlug !== slug) {
-        // Run DB update/migration
         const res = await renameContext(slug, newSlug)
         if (res && res.error) {
           toast(`Failed to rename workspace: ${res.error}`)
           return
         }
-        // Update active context if it was active
         if (activeWorkspace === slug) {
           setWorkspace(newSlug)
         }
@@ -318,7 +311,6 @@ export default function WorkspaceManager() {
 
   return (
     <div className="col-md">
-      {/* Context list */}
       {contexts.map((ctx, i) => (
         <div
           key={ctx.slug}
@@ -334,7 +326,6 @@ export default function WorkspaceManager() {
               : '1px solid var(--color-surface-offset)'
           }}
         >
-          {/* Color dot */}
           <div style={{
             width: '10px',
             height: '10px',
@@ -343,7 +334,6 @@ export default function WorkspaceManager() {
             flexShrink: 0
           }} />
 
-          {/* Name or edit input */}
           {editingSlug === ctx.slug ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1 }}>
               <div className="row">
@@ -470,9 +460,7 @@ export default function WorkspaceManager() {
                   }}>
                     #{ctx.slug}
                   </span>
-                  {/* Clickable, because the label is only ever right until it
-                      is not: a board you shared once and no longer do should
-                      not carry the badge forever with no way to drop it. */}
+                  {/* clickable so a board no longer shared can drop the badge */}
                   {ctx.shared && (
                     <button
                       onClick={() => handleUnshare(ctx.slug)}
@@ -501,9 +489,7 @@ export default function WorkspaceManager() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="row-4px">
-                {/* Reorder */}
                 <button
                   className="btn-icon"
                   style={{ width: '24px', height: '24px', opacity: i === 0 ? 0.3 : 1 }}
@@ -560,7 +546,6 @@ export default function WorkspaceManager() {
 
       <Divider />
 
-      {/* Add form */}
       {showAddForm ? (
         <div style={{
           display: 'flex',
@@ -744,7 +729,6 @@ export default function WorkspaceManager() {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
       {deleteWarning && (
         <ModalShell label="Delete workspace" onClose={() => setDeleteWarning(null)} width="380px" closeOnBackdrop={false}>
           <div className="row-md">
@@ -786,7 +770,6 @@ export default function WorkspaceManager() {
         </ModalShell>
       )}
 
-      {/* Import confirmation modal */}
       {(importPayload || importBoard) && (
         <ModalShell label="Import workspace" onClose={() => { setImportPayload(null); setImportBoard(null) }} closeOnBackdrop={false}>
           <div className="row-md">

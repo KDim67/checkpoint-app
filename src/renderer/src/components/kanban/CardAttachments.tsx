@@ -35,8 +35,7 @@ export default function CardAttachments({
   onSetCover,
   onRemove
 }: CardAttachmentsProps) {
-  // The whole section is the drop target, not just the button: dragging a
-  // file at a small button is a worse version of clicking it.
+  // the whole section is the drop target, aiming at a small button is worse than clicking it
   return (
     <div
       onDragOver={e => {
@@ -45,15 +44,11 @@ export default function CardAttachments({
         setDragging(true)
       }}
       onDragLeave={e => {
-        // Fires when crossing into a child, so only a leave that actually
-        // exits the section counts.
+        // fires when crossing into a child, only a real exit counts
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false)
       }}
       onDrop={e => {
-        // First, and whatever the drop turns out to be. Letting a drop
-        // run its default is how a window navigates to what was dropped
-        // on it, and a card modal replaced by a text file is not a state
-        // there is a way back from.
+        // first, whatever the drop is: a default drop navigates the window away
         e.preventDefault()
         setDragging(false)
         if (isReadOnly || e.dataTransfer.files.length === 0) return
@@ -79,7 +74,6 @@ export default function CardAttachments({
         </span>
       </span>
 
-      {/* List of Attachments */}
       {attachments.length > 0 && (
         <div className="grid-2">
           {attachments.map(att => (
@@ -149,7 +143,6 @@ export default function CardAttachments({
         </div>
       )}
 
-      {/* Add Attachment Forms */}
       <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '4px', flex: 1, minWidth: '220px' }}>
           <input

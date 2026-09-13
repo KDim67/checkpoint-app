@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readSignalingMessage, signalingPublishError } from '../src/shared/signalingPayload'
 
-// These are real frames captured off https://ntfy.sh/<topic>/sse. The body of a
-// published message arrives under `message`; there is no `text` field, which is
-// what both P2P coordinators used to read. Every offer and answer was dropped
-// on arrival, so the host sat on "Waiting for client connection..." while the
-// client sat on "Offer sent. Awaiting host pairing...".
+// real ntfy frames: the body is under message, not text, which both coordinators used to read
 
 const OPEN_FRAME = '{"id":"iCPzX7pWWtOu","time":1757372400,"event":"open","topic":"checkpoint-collab-abc"}'
 const KEEPALIVE_FRAME = '{"id":"kA9","time":1757372460,"event":"keepalive","topic":"checkpoint-collab-abc"}'
@@ -49,8 +45,7 @@ describe('readSignalingMessage', () => {
   })
 })
 
-// A publish that never landed used to look exactly like a peer who had not
-// joined yet: the panel said the offer was sent and then waited forever.
+// a failed publish used to look like a peer who hadn't joined
 describe('signalingPublishError', () => {
   it('is null for anything the server accepted', () => {
     for (const ok of [200, 201, 204]) expect(signalingPublishError(ok)).toBeNull()

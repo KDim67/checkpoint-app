@@ -1,27 +1,11 @@
-/*
-   CHECKPOINT DESIGN TOKEN SYSTEM
-   All colors, spacing, typography, and motion values live here as CSS
-   custom properties. Component code NEVER hardcodes hex values.
-   */
+/* design tokens: every colour, space, type and motion value lives here as a custom property */
 
 
 
-/* The built-in themes live in a cascade layer so a user theme always wins.
-   The customization engine injects its variables as a plain `:root { }` block
-   (customizer.ts buildCssVariablesString) and a hand-written theme.css does the
-   same. `:root` is specificity (0,1,0) while `html[data-theme="light"]` is
-   (0,1,1), so light mode silently outranked every custom colour, dark mode
-   looked fine only because its base selector is also `:root` and the injected
-   <style> came later in source order. Unlayered rules beat layered ones no
-   matter their specificity, so this fixes both the stored variables and any
-   theme.css without dictating what selector a user has to write.
-
-   The contents below are intentionally left at their original indentation: this
-   wrapper is two lines, and reindenting the block would rewrite the blame for
-   every token in the design system. */
+/* in a layer so an unlayered user theme always wins; left unindented to keep blame */
 @layer theme {
 :root {
-  /* Canvas Layers (luminance steps, not arbitrary darks) */
+  /* canvas layers, luminance steps */
   --color-background:       #0b0c10;   /* L≈4, deepest canvas, app background */
   --color-surface-1:        #131622;   /* L≈8, card/panel base */
   --color-surface-2:        #1b1f30;   /* L≈12, nested panels, input backgrounds */
@@ -29,21 +13,17 @@
   --color-surface-elevated: #2e3450;   /* L≈20, tooltips, popovers, context menus */
   --color-surface-3:        var(--color-surface-2);  /* alias: call sites pair it with a surface-offset border, i.e. they mean "nested panel" */
 
-  /* Brand Anchors */
+  /* brand anchors */
   --color-primary:          #1e45fc;   /* Electric Blue, interactive, links, focus rings */
   --color-primary-hover:    #3559ff;   /* Electric Blue +15% for hover */
   --color-primary-muted:    rgba(30, 69, 252, 0.15); /* 15% opacity, selection bg */
-  --color-on-accent:        #ffffff;   /* Text on any saturated accent fill: primary, error, the AI purple */
+  --color-on-accent:        #ffffff;   /* text on saturated accent fills */
 
-  /* The AI panels grew their own purple accent, spelled out at every call site.
-     Named here so it answers to the theme like everything else. */
+  /* named so the AI purple follows the theme */
   --color-accent-ai:        #9333ea;
   --color-accent-ai-hover:  #7c3aed;
 
-  /* Fill colours read as text on a dark surface only once they are lightened,
-     which is why the AI panels had been spelling out their own tints. These are
-     those tints, named: the -soft of a hue is the one to put on a surface, the
-     bare token is the one to fill a shape with. */
+  /* -soft tints for text on surfaces, the bare token for fills */
   --color-info:             #38bdf8;   /* sky, a tool running, a stream open */
   --color-primary-soft:     #60a5fa;
   --color-success-soft:     #4ade80;
@@ -52,7 +32,7 @@
   --color-secondary-muted:  rgba(205, 241, 43, 0.1); /* 10% opacity, highlight tint */
   --color-balance:          #535e85;   /* Steel-Slate, neutral midtone, borders */
 
-  /* Semantic Status */
+  /* semantic status */
   --color-success:          #10b981;
   --color-success-muted:    rgba(16, 185, 129, 0.12);
   --color-warning:          #f97316;
@@ -62,20 +42,20 @@
   --color-destructive:       var(--color-error);
   --color-destructive-muted: var(--color-error-muted);
 
-  /* Priority Colors */
+  /* priority colors */
   --color-priority-high:    #ef4444;
   --color-priority-med:     #eab308;
   --color-priority-low:     #3b82f6;
   --color-priority-none:    #535e85;
   
-  /* Text Scale */
-  --color-text-base:        #f1f5f9;   /* Near-white, primary readable text */
+  /* text scale */
+  --color-text-base:        #f1f5f9;   /* near-white, primary text */
   --color-text-muted:       #94a3b8;   /* Slate-400, secondary labels, metadata */
   --color-text-faint:       #475569;   /* Slate-600, placeholder, disabled */
-  --color-text-inverted:    #0b0c10;   /* Used on Volt Lime buttons */
+  --color-text-inverted:    #0b0c10;   /* on Volt Lime buttons */
   --color-text:             var(--color-text-base);  /* alias */
   
-  /* Typography */
+  /* typography */
   --font-sans: 'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
 
@@ -105,7 +85,7 @@
   --tracking-wider:    0.075em;
   --tracking-widest:   0.1em;
 
-  /* Spacing */
+  /* spacing */
   --space-0-5:  0.125rem;
   --space-1:    0.25rem;
   --space-1-5:  0.375rem;
@@ -123,26 +103,24 @@
   --space-10:   2.5rem;
   --space-12:   3rem;
 
-  /* How wide the game dev launcher is allowed to get. Past this the cards
-     stretch into billboards and the eye has to travel the whole monitor to
-     read a row of them. */
+  /* past this the cards stretch into billboards */
   --gamedev-launcher-max: 1180px;
 
-  /* Border Radius */
+  /* border radius */
   --radius-sm:   4px;
   --radius-md:   8px;
   --radius-lg:   12px;
   --radius-xl:   16px;
   --radius-full: 9999px;
 
-  /* Elevation & Shadow */
+  /* elevation and shadow */
   --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.3);
   --shadow-lg:   0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-xl:   0 12px 40px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.45);
   --shadow-2xl:  0 24px 64px rgba(0, 0, 0, 0.7), 0 8px 20px rgba(0, 0, 0, 0.5);
 
-  /* Motion */
+  /* motion */
   --duration-fast:    100ms;
   --duration-normal:  200ms;
   --duration-slow:    300ms;
@@ -174,32 +152,23 @@ html[data-compact="true"] {
 }
 
 html[data-theme="light"] {
-  /* Canvas Layers (elevation rises toward white) */
-  /* Deliberately the inverse of the dark ladder. In a light UI a surface reads
-     as nearer the viewer the lighter it is, so cards and popovers are white and
-     the canvas sits beneath them. Previously --color-surface-elevated was
-     #cbd5e1, the darkest token in the whole theme, so every tooltip and
-     context menu rendered as a grey slab floating on white. */
+  /* canvas layers, elevation rises toward white */
+  /* inverse of the dark ladder, lighter is nearer; surface-elevated used to be the darkest token */
   --color-background:       #f2f4f8;   /* L≈90, soft canvas; full white glares */
   --color-surface-1:        #ffffff;   /* L=100, card/panel base */
   --color-surface-2:        #eef1f6;   /* L≈88, nested panels, input backgrounds */
   --color-surface-offset:   #e0e4ec;   /* L≈77, hover states, dividers */
   --color-surface-elevated: #ffffff;   /* L=100, popovers; depth comes from --shadow-* */
 
-  /* Brand Anchors */
-  /* Electric Blue and Volt Lime are both pitched to sit on near-black, so each
-     is darkened until it clears 4.5:1 on the lightest surface it can land on.
-     The muted tints are the subtle part: an alpha of the DARKENED lime composites
-     to #eceee0, a khaki that made every selected chip look stained. Tinting from
-     the original bright lime instead lands on #e9f6d5 and stays a fresh green,
-     so the fill and the text on it are drawn from different points of the ramp. */
+  /* brand anchors */
+  /* darkened to clear 4.5:1; muted tints come from the bright lime, the dark one composites to khaki */
   --color-primary:          #2b4ad8;   /* 6.0:1, links, focus rings */
   --color-primary-hover:    #1e3ab8;
   --color-primary-muted:    rgba(43, 74, 216, 0.10);
   --color-on-accent:        #ffffff;   /* 6.6:1 on the blue above */
   --color-accent-ai:        #7e22ce;   /* darkened so white on it still reads */
   --color-accent-ai-hover:  #6b21a8;
-  /* Darkened rather than lightened here: the surface underneath is the pale one. */
+  /* darkened here, the surface underneath is pale */
   --color-info:             #0369a1;
   --color-primary-soft:     #1d4ed8;
   --color-success-soft:     #15803d;
@@ -208,10 +177,8 @@ html[data-theme="light"] {
   --color-secondary-muted:  rgba(132, 204, 22, 0.18);  /* tinted from the BRIGHT lime, not the dark one */
   --color-balance:          #6f7a8c;   /* 3.8:1, borders and neutral marks */
 
-  /* Semantic Status */
-  /* These had no light-mode values at all and fell through to the dark ones,
-     which are tuned against #0b0c10: success measured 2.4:1 on white and
-     warning 2.6:1, so status text was the least readable thing on screen. */
+  /* semantic status */
+  /* fell through to dark values tuned for #0b0c10 and failed contrast on white */
   --color-success:          #157d3c;   /* 4.6:1, green; #047857 read as dark teal */
   --color-success-muted:    rgba(21, 125, 60, 0.12);
   --color-warning:          #b05109;   /* 4.6:1, amber; #a34d07 read as brown */
@@ -219,19 +186,19 @@ html[data-theme="light"] {
   --color-error:            #c53030;   /* 4.8:1 */
   --color-error-muted:      rgba(197, 48, 48, 0.12);
 
-  /* Priority Colors */
+  /* priority colors */
   --color-priority-high:    #c53030;
   --color-priority-med:     #b05109;   /* was #eab308 at 1.8:1, effectively invisible */
   --color-priority-low:     #2563eb;
   --color-priority-none:    #6f7a8c;
 
-  /* Text Scale */
+  /* text scale */
   --color-text-base:        #161d2b;   /* 14.9:1, softened off pure black, same undertone */
   --color-text-muted:       #525b6c;   /* 6.0:1 */
   --color-text-faint:       #646c7e;   /* 4.7:1, was #94a3b8 at 2.4:1 */
   --color-text-inverted:    #ffffff;   /* on the darkened Volt Lime */
 
-  /* Elevation & Shadow */
+  /* elevation and shadow */
   --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.05);
   --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
   --shadow-lg:   0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -240,9 +207,7 @@ html[data-theme="light"] {
 }
 }
 
-/*
-   BASE RESET
-   */
+/* base reset */
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -270,12 +235,12 @@ body {
   user-select: none;
 }
 
-/* Allow text selection in content areas */
+/* allow text selection in content */
 p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   user-select: text;
 }
 
-/* Scrollbar styling */
+/* scrollbars */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-surface-offset) transparent;
@@ -298,7 +263,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   background: var(--color-text-faint);
 }
 
-/* Focus ring */
+/* focus ring */
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
@@ -307,7 +272,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   outline: none;
 }
 
-/* Reduced motion guard */
+/* reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
@@ -315,7 +280,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   }
 }
 
-/* App shell layout */
+/* app shell */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -337,7 +302,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   view-transition-name: main-content;
 }
 
-/* View transitions */
+/* view transitions */
 ::view-transition-old(main-content) {
   animation: vt-fade-out 150ms var(--ease-exit) forwards;
 }
@@ -361,7 +326,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Skeleton shimmer */
+/* skeleton shimmer */
 .skeleton {
   background: linear-gradient(
     90deg,
@@ -379,11 +344,9 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   to   { background-position: -200% center; }
 }
 
-/* Common component tokens */
+/* common component tokens */
 
-/* Layout primitives. These four shapes accounted for 130 byte-identical inline
-   style objects across the views; the gap steps track the spacing tokens, so
-   compact mode still tightens them. */
+/* layout primitives replacing 130 identical inline styles; gaps track spacing tokens for compact mode */
 .row {
   display: flex;
   align-items: center;
@@ -402,7 +365,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   justify-content: space-between;
 }
 
-/* Small uppercase section label, the metadata voice used above field groups. */
+/* small caps section label */
 .label-caps {
   font-size: 11px;
   font-weight: var(--weight-bold);
@@ -410,12 +373,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   text-transform: uppercase;
 }
 
-/*
- * Shared building blocks: the style objects written out by hand most often
- * across the renderer, named once. Pixel sizes stay pixels. They were written
- * that way, and turning them into spacing tokens would let the compact density
- * setting start resizing them.
- */
+/* the most repeated inline styles, named; pixel sizes stay pixels so compact mode doesn't resize them */
 .text-accent {
   color: var(--color-secondary);
 }
@@ -1384,7 +1342,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   color: var(--color-text-base);
 }
 
-/* Input base */
+/* input base */
 .input-base {
   background-color: var(--color-surface-2);
   border: 1px solid var(--color-surface-offset);
@@ -1407,7 +1365,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   border-color: var(--color-primary);
 }
 
-/* Tag badge */
+/* tag badge */
 .tag-badge {
   display: inline-flex;
   align-items: center;
@@ -1421,7 +1379,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   white-space: nowrap;
 }
 
-/* Titlebar region */
+/* titlebar */
 .titlebar {
   height: 32px;
   display: flex;
@@ -1440,7 +1398,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   -webkit-app-region: no-drag;
 }
 
-/* Update indicator, at the right of the titlebar and only while downloading */
+/* update indicator, right of the titlebar while downloading */
 .update-indicator {
   position: relative;
   display: flex;
@@ -1479,7 +1437,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   transition: width var(--duration-normal) linear;
 }
 
-/* Above the fill: an absolutely positioned sibling paints over static ones. */
+/* above the fill, a positioned sibling paints over static ones */
 .update-indicator-body {
   position: relative;
   display: flex;
@@ -1487,7 +1445,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   gap: var(--space-1);
 }
 
-/* Toast animations */
+/* toast animations */
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(12px) scale(0.95); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -1501,10 +1459,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   to { transform: rotate(360deg); }
 }
 
-/* The only two Tailwind utilities the app ever actually used, spinners in
-   CheatsheetsView and the Game Dev panels. Declared here so removing Tailwind
-   did not stop them animating. The spin keyframes above are byte-identical to
-   the ones Tailwind emitted, so nothing about the motion changed. */
+/* the only two Tailwind utilities ever used, kept byte-identical after removing it */
 .animate-spin {
   animation: spin 1s linear infinite;
 }
@@ -1554,7 +1509,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   to   { opacity: 1; transform: scale(1); }
 }
 
-/* Fade and scale together, distinct from modal-fade-in, which is opacity only. */
+/* fade and scale, unlike modal-fade-in */
 @keyframes modal-pop-in {
   from { opacity: 0; transform: scale(0.97); }
   to   { opacity: 1; transform: scale(1); }
@@ -1570,9 +1525,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* The gap a dragged card would land in. It is a different element every time
-   the target changes, so it arrives rather than slides, and a short fade is
-   what stops that reading as a flicker. */
+/* a new element per target, so fade in rather than slide */
 @keyframes card-drop-slot-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -1597,7 +1550,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   50%      { opacity: 1; }
 }
 
-/* AI Markdown Response Styling */
+/* AI markdown */
 .markdown-body {
   font-size: var(--text-xs);
   line-height: 1.6;
@@ -1665,7 +1618,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
-/* AI Assistant Animations */
+/* AI animations */
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%       { opacity: 0.3; transform: scale(0.8); }
@@ -1685,7 +1638,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   vertical-align: text-bottom;
   animation: blink-cursor 0.85s step-end infinite;
 }
-/* AI chat: hover-reveal metadata (pure CSS, no re-renders) */
+/* hover-reveal metadata, CSS so no re-renders */
 .chat-msg-row .msg-hover-reveal {
   opacity: 0;
   transition: opacity 150ms ease;
@@ -1703,10 +1656,7 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   border-top-color: rgba(255, 255, 255, 0.06);
 }
 
-/* Wall: connection handles
-   Drag one to run a connector to another item without leaving the select
-   tool. Hidden until the item is hovered, and done in CSS rather than React
-   state so moving the pointer across a busy wall does not re-render it. */
+/* wall connect handles, hover-only in CSS so a busy wall doesn't re-render */
 .wall-connect {
   opacity: 0;
   pointer-events: none;
@@ -1729,54 +1679,35 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   transform: scale(1.35);
 }
 
-/* Wall: what a selected item looks like
-   An attribute rather than a prop, for the same reason as the handles above.
-   Selection used to be passed into each item, so a marquee across fifty of them
-   re-rendered fifty subtrees on the frame it was released. WallView writes this
-   attribute onto the elements that changed instead, which is a handful. */
+/* selection as an attribute, a prop re-rendered every item a marquee crossed */
 [data-wall-item][data-wall-selected] {
   outline: 2px solid var(--color-secondary);
   outline-offset: 2px;
 }
 
-/* Paper resting on the board casts a shadow; paper picked up does not. */
+/* selected paper is picked up, no shadow */
 [data-wall-item][data-wall-selected] .wall-paper {
   box-shadow: none;
 }
 
-/* Only worth marking on an item you have actually got hold of. */
+/* only on an item you've got hold of */
 .wall-lock-selected { display: none; }
 [data-wall-item][data-wall-selected] .wall-lock-selected { display: block; }
 
-/* Kanban header: what gives way as the bar narrows
-   Container queries rather than media queries, because the bar's width is not
-   the window's: the sidebar and the AI panel both take from it, so the same
-   window can be wide with plenty of room or wide with none.
-
-   A container query measures the CONTENT box, so with 24px of padding a side
-   these fire 48px before the bar looks that wide. The numbers below are
-   content-box widths and were measured, not guessed: the buttons need 710px
-   with their labels and 302px without, and the title, chip and count together
-   need 406px.
-
-   The order things go in is deliberate. Labels have icons and tooltips behind
-   them. The count is a nicety. The title is how you know where you are, so it
-   goes last, and the workspace chip never goes at all: it truncates instead. */
+/* container queries since the bar isn't the window; content-box widths measured; labels go first, the chip never */
 .kanban-header {
   container-type: inline-size;
   container-name: kanban-header;
 }
 
-/* 710 + 406 = 1116, so labels go the moment they no longer fit alongside
-   everything on the left. */
+/* 710 + 406 = 1116, labels go once they don't fit */
 @container kanban-header (max-width: 1120px) {
   .kanban-btn-label {
     display: none;
   }
 }
 
-/* Icons only leaves 302 for the buttons; below this the left side would have
-   to start truncating to fit. */
+/* icons only leaves 302, below this the left side would truncate */
 @container kanban-header (max-width: 700px) {
   .kanban-card-count {
     display: none;
@@ -1789,7 +1720,440 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   }
 }
 
-/* Shared workspace label, in the picker and the workspace manager */
+/* hover looks moved from JS handlers that stuck on re-render; inline beats :hover, so resting values are classes */
+.bg-clear {
+  background: transparent;
+}
+
+.border-offset {
+  border: 1px solid var(--color-surface-offset);
+}
+
+.bg-surface-2 {
+  background: var(--color-surface-2);
+}
+
+.hover-bg-offset:hover {
+  background: var(--color-surface-offset);
+}
+
+.hover-bg-surface-2:hover {
+  background: var(--color-surface-2);
+}
+
+.hover-bg-error-muted:hover {
+  background: var(--color-error-muted);
+}
+
+.hover-text-base:hover {
+  color: var(--color-text-base);
+}
+
+.hover-text-accent:hover {
+  color: var(--color-secondary);
+}
+
+.hover-text-error:hover {
+  color: var(--color-error);
+}
+
+.hover-border-accent:hover {
+  border-color: var(--color-secondary);
+}
+
+.hover-brighten:hover {
+  filter: brightness(1.15);
+}
+
+.hover-brighten-sm:hover {
+  filter: brightness(1.1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-1px);
+}
+
+.hover-grow:hover {
+  transform: scale(1.1);
+}
+
+.focus-border-primary:focus {
+  border-color: var(--color-primary);
+}
+
+.focus-border-accent:focus {
+  border-color: var(--color-secondary);
+}
+
+.ai-chat-history-chip {
+  border: 1px solid var(--color-surface-offset);
+  color: var(--color-text-base);
+}
+
+.ai-chat-history-chip:hover {
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+}
+
+.chat-message-rewrite {
+  color: var(--color-text-muted);
+}
+
+.chat-message-rewrite:hover {
+  color: #fff;
+}
+
+.chat-message-resend:hover {
+  opacity: 0.8;
+}
+
+/* :not(:hover) avoids a specificity tie with .hover-bg-surface-2 */
+.chat-input-mention[data-attached]:not(:hover) {
+  background: var(--color-surface-offset);
+}
+
+.chat-input-plus:hover:not(:disabled) {
+  color: var(--color-text-base);
+}
+
+.chat-input-menu-toggle[data-active] {
+  background: var(--color-surface-2);
+}
+
+.memory-vault-modal-pin {
+  color: var(--color-text-faint);
+}
+
+.memory-vault-modal-pin[data-pinned] {
+  color: #a855f7;
+}
+
+.memory-vault-modal-pin:hover {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.memory-vault-modal-edit:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.memory-vault-modal-delete:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.revert-confirm-modal-revert:hover {
+  opacity: 0.9;
+}
+
+.view-on-kanban-button:hover {
+  opacity: 0.9;
+}
+
+.create-dialogue-tree-action-block-icon-btn {
+  background: rgba(255,255,255,0.05);
+}
+
+.create-dialogue-tree-action-block-icon-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.create-dialogue-tree-action-block-load {
+  background: var(--color-accent-ai);
+}
+
+.create-dialogue-tree-action-block-load[data-loaded] {
+  background: var(--color-surface-offset);
+}
+
+.create-dialogue-tree-action-block-load:not([data-loaded]):hover {
+  background: var(--color-accent-ai-hover);
+}
+
+.create-plan-action-block-export {
+  background: rgba(255,255,255,0.06);
+}
+
+.create-plan-action-block-export:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.create-plan-action-block-commit {
+  background: #0284c7;
+}
+
+.create-plan-action-block-commit:disabled {
+  background: rgba(255,255,255,0.05);
+}
+
+.create-plan-action-block-commit:hover:not(:disabled) {
+  background: #0369a1;
+}
+
+.create-plan-action-block-step[data-selected] {
+  background: var(--color-surface-offset);
+}
+
+.create-plan-action-block-modal-export:hover {
+  opacity: 0.85;
+}
+
+.create-plan-action-block-modal-commit:hover {
+  opacity: 0.9;
+}
+
+/* the chosen option keeps the hover look, marked by attribute since the choice is React state */
+.backlog-row-option {
+  background: transparent;
+}
+
+.backlog-row-option:hover,
+.backlog-row-option[data-active] {
+  background: var(--color-surface-offset);
+}
+
+.log-input-box:focus-within {
+  border-color: var(--color-primary);
+}
+
+.log-input-send:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.board-theme-menu-upload {
+  border: 1px dashed var(--color-surface-offset);
+}
+
+.card-texture-tools-pbr {
+  background: var(--color-primary);
+}
+
+.card-texture-tools-pbr:hover {
+  background: var(--color-primary-hover);
+}
+
+.card-texture-tools-seamless {
+  background: var(--color-surface-offset);
+  border: 1px solid var(--color-balance);
+}
+
+.collab-panel-host-collab {
+  background: var(--color-secondary-muted);
+  color: var(--color-secondary);
+}
+
+.collab-panel-host-collab:hover {
+  background: var(--color-secondary);
+  color: #fff;
+}
+
+.collab-panel-remove:hover {
+  color: var(--color-warning);
+}
+
+.collab-panel-rotate:hover {
+  background: var(--color-warning-muted);
+}
+
+.collab-panel-disconnect {
+  background: var(--color-destructive-muted);
+  color: var(--color-destructive);
+}
+
+.collab-panel-disconnect:hover {
+  background: var(--color-destructive);
+  color: #fff;
+}
+
+.kanban-card-check {
+  color: var(--color-text-faint);
+}
+
+.kanban-card-check[data-done] {
+  color: #22c55e;
+}
+
+.kanban-card-check:not([data-done]):hover {
+  color: var(--color-text-muted);
+}
+
+.kanban-view-add-column {
+  background: transparent;
+  border: 2px dashed var(--color-surface-offset);
+  color: var(--color-text-faint);
+}
+
+.kanban-view-add-column:hover {
+  background: var(--color-surface-1);
+  border-color: var(--color-balance);
+  color: var(--color-text-muted);
+}
+
+.focus-active-end {
+  border: 1px solid var(--color-surface-offset);
+  color: var(--color-text-muted);
+}
+
+.focus-active-end:hover {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.focus-active-control {
+  border: 1px solid var(--color-surface-offset);
+  color: var(--color-text-muted);
+}
+
+.focus-active-control:hover {
+  border-color: var(--color-balance);
+  color: var(--color-text-base);
+}
+
+.focus-active-toggle {
+  transform: scale(1);
+}
+
+.focus-active-toggle:hover {
+  transform: scale(1.06);
+}
+
+.texture-drop-zone {
+  background: var(--color-surface-1);
+  border: 2px dashed var(--color-surface-offset);
+}
+
+.texture-drop-zone:hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-primary);
+}
+
+.ai-assist-button:hover {
+  filter: brightness(1.2);
+}
+
+.detail-title-input {
+  border: none;
+  border-bottom: 1px solid transparent;
+}
+
+.detail-title-input:focus {
+  border-bottom-color: var(--color-surface-offset);
+}
+
+.lightbox-close {
+  background: var(--color-surface-3);
+  border: 2px solid var(--color-surface-offset);
+  color: var(--color-text-base);
+}
+
+.lightbox-close:hover {
+  background: var(--color-secondary);
+  color: var(--color-text-inverted);
+}
+
+.wall-context-menu-entry:hover:not(:disabled) {
+  background: var(--color-surface-offset);
+}
+
+.wall-color-picker-swatch:focus {
+  transform: scale(1.1);
+}
+
+.wall-cycle-button:hover {
+  background: var(--color-secondary-muted);
+}
+
+.theme-customizer-reset {
+  background: var(--color-surface-offset);
+}
+
+.theme-customizer-reset:hover {
+  background: var(--color-surface-elevated);
+}
+
+.storage-settings-prune:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.hotkey-binder-shortcut-trigger:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.hotkey-binder-action-primary {
+  background: var(--color-primary);
+}
+
+.hotkey-binder-action-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.hotkey-binder-action-secondary {
+  background: var(--color-surface-offset);
+}
+
+.hotkey-binder-action-secondary:hover:not(:disabled) {
+  background: var(--color-surface-elevated);
+}
+
+.extensions-tab-open-folder:hover {
+  border-color: var(--color-primary);
+}
+
+.settings-view-tab {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.settings-view-tab[aria-current="page"] {
+  background: var(--color-secondary-muted);
+  color: var(--color-secondary);
+}
+
+.settings-view-tab:not([aria-current="page"]):hover {
+  background: var(--color-surface-offset);
+  color: var(--color-text-base);
+}
+
+.item-detail-panel-title {
+  border: 1px solid transparent;
+}
+
+.item-detail-panel-title:focus {
+  border-color: var(--color-surface-offset);
+}
+
+.cookbook-view-delete-model:hover:not(:disabled) {
+  color: var(--color-error);
+}
+
+.clipboard-view-card:hover {
+  border-color: rgba(30, 69, 252, 0.35);
+  box-shadow: 0 2px 10px -6px rgba(0,0,0,0.4);
+}
+
+.sidebar-context-trigger {
+  background: transparent;
+}
+
+.sidebar-context-trigger[aria-expanded="true"] {
+  background: var(--color-secondary-muted);
+}
+
+.sidebar-context-trigger:not([aria-expanded="true"]):hover {
+  background: var(--color-surface-2);
+}
+
+.git-panel-commit:hover {
+  border-color: rgba(205, 241, 43, 0.25);
+}
+
+.right-panel-resizer:hover {
+  background: var(--color-secondary-muted);
+}
+
+/* shared workspace label, picker and manager */
 .shared-badge {
   display: inline-flex;
   align-items: center;

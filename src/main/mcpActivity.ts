@@ -1,12 +1,4 @@
-/**
- * Recording and reversing of MCP writes.
- *
- * Deliberately a separate module from mcpServer.ts. That file is imported
- * dynamically so the MCP SDK, which drags in express and hono, stays out of
- * the startup chunk, and undo has to keep working when the server is switched
- * off: yesterday's agent writes are exactly the ones you want to reverse today.
- * Nothing here imports the SDK.
- */
+/** apart from mcpServer, which loads lazily with the SDK: undo has to work with the server off */
 
 import { v4 as uuidv4 } from 'uuid'
 import { normalizeWallDoc } from '../shared/wallModel'
@@ -37,16 +29,10 @@ import {
 } from '../shared/mcpActivity'
 import type { Item } from '../shared/types'
 
-/** How long entries are kept. The log exists to answer "what just happened?". */
+/** the log answers "what just happened?" */
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
-/**
- * Writes one entry.
- *
- * Never throws: a failure to record must not fail the tool call that triggered
- * it. An agent losing a card because the log was unwritable would be a far worse
- * outcome than a missing row.
- */
+/** never throws, a logging failure mustn't fail the tool call */
 export function recordMcpActivity(
   tool: string,
   context: string | null,
@@ -109,16 +95,13 @@ function runUndoAction(action: McpUndoAction): void {
       applyBoardUndo(action)
       break
     case 'remove_wall_item': {
-      // Read back rather than remembered: the wall may have been edited since,
-      // and reversing a placement should not also reverse that.
+      // read back, the wall may have changed since and only the placement should reverse
       const doc = normalizeWallDoc(getSetting<unknown>(action.key, null))
       setSetting(action.key, { ...doc, items: doc.items.filter(i => i.id !== action.itemId) })
       break
     }
     case 'delete_note':
-      // Notes are filesystem-backed and therefore async, unlike everything else
-      // here. Fired and logged rather than awaited so one slow write cannot hold
-      // the rest of the reversal open; the failure surfaces in the console.
+      // notes are async fs; fire and log so one slow write can't hold the reversal open
       deleteNote(action.title).catch(err =>
         console.error('[mcp-activity] Could not delete note during undo:', err)
       )
@@ -141,13 +124,7 @@ function applyBoardUndo(action: Extract<McpUndoAction, { kind: 'board_ops' }>): 
   setSetting(boardConfigKey(action.context), applied.next)
 }
 
-/**
- * Reverses one entry.
- *
- * The row is claimed before any action runs. Marking it undone first means a
- * second click finds it already claimed and does nothing, rather than replaying
- * a delete against an id something else may since have taken.
- */
+/** claim the row first, so a second click can't replay a delete onto a reused id */
 export function undoMcpActivity(id: string): { ok: true } | { ok: false; reason: string } {
   const row = getMcpActivityById(id)
   if (!row) return { ok: false, reason: 'That entry is no longer in the log.' }
@@ -165,8 +142,7 @@ export function undoMcpActivity(id: string): { ok: true } | { ok: false; reason:
     return { ok: true }
   } catch (err) {
     console.error('[mcp-activity] Undo failed partway:', err)
-    // The claim is left in place. Re-running a half-applied reversal is more
-    // dangerous than leaving it: the steps that did land would run a second time.
+    // claim stays: re-running a half-applied reversal repeats the steps that landed
     return { ok: false, reason: 'Undo failed partway. Check the log for details.' }
   }
 }

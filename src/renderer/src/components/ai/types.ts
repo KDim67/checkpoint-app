@@ -1,27 +1,21 @@
-/**
- * Shapes shared by the assistant panel and the pieces split out of it.
- *
- * These lived inside AiStreamPanel.tsx, which meant every hook or modal
- * extracted from it had to either re-declare them or import from a 3,600-line
- * component. They are here so the split has somewhere neutral to point at.
- */
+/** neutral home for shapes the split-out hooks and modals share */
 
 export interface Message {
   role: 'system' | 'user' | 'assistant'
   content: string
-  /** Chain-of-thought extracted from <think>…</think> tags (reasoning models). */
+  /** from <think> tags */
   thinking?: string
-  /** Optional concise label shown in the bubble instead of the full prompt (quick actions). */
+  /** short label shown instead of the full prompt */
   displayContent?: string
-  /** Explicit intent from a quick-action button, so it can't be mis-classified by keywords. */
+  /** from a quick-action button, so keywords can't misclassify it */
   intentHint?: 'create' | 'analyze'
   mode?: string
   cheatsheets?: string[]
-  /** Attached note titles (from the Notes feature). */
+  /** from Notes */
   notes?: string[]
-  /** Attached workspace file relative paths. */
+  /** relative paths */
   files?: string[]
-  /** Attached images as data URLs (vision models). */
+  /** data URLs for vision models */
   images?: string[]
   timestamp?: number
   boardSnapshot?: {
@@ -39,8 +33,7 @@ export interface SavedChat {
   messages: Message[]
 }
 
-// Defined in shared/types so the preload, the main process and the panel all
-// describe an indexed file the same way.
+// in shared/types so preload, main and the panel agree
 export type { WorkspaceFileInfo } from '../../../../shared/types'
 
 export interface CustomAction {
@@ -50,7 +43,7 @@ export interface CustomAction {
   intent: 'create' | 'analyze'
 }
 
-/** What the model should do with a message, decided before it is sent. */
+/** decided before sending */
 export type IntentType =
   | 'create_items'
   | 'create_plan'

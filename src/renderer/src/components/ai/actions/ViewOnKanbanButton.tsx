@@ -5,6 +5,7 @@ export default function ViewOnKanbanButton({ onClick }: { onClick: MouseEventHan
   return (
     <button
       onClick={onClick}
+      className="view-on-kanban-button"
       style={{
         background: 'var(--color-secondary)',
         border: 'none',
@@ -20,8 +21,6 @@ export default function ViewOnKanbanButton({ onClick }: { onClick: MouseEventHan
         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
         transition: 'opacity 150ms ease'
       }}
-      onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
     >
       <Layout size={12} />
       <span>View on Kanban</span>

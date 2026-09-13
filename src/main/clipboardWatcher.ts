@@ -5,22 +5,17 @@ let lastText = ''
 let intervalId: NodeJS.Timeout | null = null
 let recordCopy: ((text: string) => void) | null = null
 
-/**
- * Registers the sink for captured copies. Kept separate from start/stop so the
- * enabled flag can be flipped from setSetting without the db module having to reach
- * back into main/index.ts for the callback.
- */
+/** separate from start/stop so setSetting can flip it without db reaching into index.ts */
 export function configureClipboardWatcher(recordCopyFn: (text: string) => void): void {
   recordCopy = recordCopyFn
 }
 
 function startClipboardWatcher(recordCopyFn?: (text: string) => void): void {
   if (recordCopyFn) recordCopy = recordCopyFn
-  // Starting twice would orphan the first interval and double-record every copy.
+  // a second start would orphan the interval and double-record
   if (intervalId) return
 
-  // Seed from the current clipboard so whatever was already copied before the
-  // watcher started is not recorded as a fresh capture.
+  // seed so whatever was copied before start isn't recorded
   try {
     lastText = clipboard.readText()
   } catch (err) {
@@ -31,11 +26,9 @@ function startClipboardWatcher(recordCopyFn?: (text: string) => void): void {
     try {
       const currentText = clipboard.readText()
       if (currentText && currentText.trim().length > 0 && currentText !== lastText) {
-        // Noted as seen either way, or a skipped secret would be re-examined
-        // every second until something else is copied.
+        // mark seen either way or a skipped secret gets rechecked every second
         lastText = currentText
-        // Windows will not tell us which copies were meant to be secret, so
-        // this guesses. See shared/clipboardPrivacy for what that costs.
+        // windows doesn't flag secret copies, so this guesses (see shared/clipboardPrivacy)
         if (!looksLikeSecret(currentText)) recordCopy?.(currentText)
       }
     } catch (err) {
@@ -51,11 +44,7 @@ export function stopClipboardWatcher(): void {
   }
 }
 
-/**
- * Mirrors the Clipboard feature toggle. Without this the watcher ran for the
- * whole session regardless of the setting, so turning the feature off hid the
- * view but kept writing every copy to the history table.
- */
+/** without this, turning the feature off still recorded every copy */
 export function setClipboardCaptureEnabled(enabled: boolean): void {
   if (enabled) {
     startClipboardWatcher()

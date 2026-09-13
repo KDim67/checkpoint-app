@@ -1,5 +1,3 @@
-/** The bridge's `app` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.app
 
 export const checkForUpdates = (...args: Parameters<Bridge['checkForUpdates']>): ReturnType<Bridge['checkForUpdates']> =>

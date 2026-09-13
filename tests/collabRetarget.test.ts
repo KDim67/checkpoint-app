@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { normalizeCollabMessage, retargetMutation } from '../src/shared/collabProtocol'
 import type { Item, Tag } from '../src/shared/types'
 
-// Joining a shared board as a copy holds it under a different slug from the
-// host's. Both sides still have to agree which board a change is about, so the
-// slug is translated at the wire and nowhere else.
+// copies hold the board under another slug, translated at the wire only
 
 const item = (context: string): Item => ({
   id: 'i1', type: 'card', context, title: 'A card', body: '', status: 'open',
@@ -35,14 +33,14 @@ describe('retargetMutation', () => {
   })
 
   it('leaves the original alone', () => {
-    // The caller still holds it; a mutated argument would rewrite local state.
+    // the caller still holds it
     const original = item('domimorfi')
     retargetMutation({ type: 'createItem', item: original }, 'copy')
     expect(original.context).toBe('domimorfi')
   })
 
   it('hands back the very same object when it is already addressed right', () => {
-    // Identity, so the host path costs nothing: it never retargets anything.
+    // identity, the host path never retargets
     const mutation = { type: 'createItem' as const, item: item('domimorfi') }
     expect(retargetMutation(mutation, 'domimorfi')).toBe(mutation)
   })
@@ -56,9 +54,7 @@ describe('retargetMutation', () => {
   })
 
   it('retargets a bulk edit that moves cards between workspaces', () => {
-    // The least obvious carrier of a workspace name, and the one that was
-    // missed: sent untranslated it moves the peer's cards into a workspace
-    // named after this side's copy.
+    // the missed carrier: untranslated it moves peer cards into this side's copy name
     const out = retargetMutation(
       { type: 'bulkUpdateItems', payload: { ids: ['i1', 'i2'], patch: { context: 'domimorfi-shared' } } },
       'domimorfi'
@@ -86,15 +82,13 @@ describe('retargetMutation', () => {
     { type: 'bulkDeleteItems' as const, ids: ['i1', 'i2'] }
   ]) {
     it(`passes ${mutation.type} through untouched`, () => {
-      // Addressed by id. Ids are shared across the baseline, so they resolve
-      // in either workspace without a slug.
+      // ids are shared, they resolve in either workspace
       expect(retargetMutation(mutation, 'somewhere-else')).toBe(mutation)
     })
   }
 })
 
-// A card's status is a column id. Without the host's columns, every card in a
-// column the host renamed or added renders in no column at all.
+// statuses are column ids; without the host's columns cards render nowhere
 describe('board-baseline board config', () => {
   const baseline = (over: Record<string, unknown> = {}): unknown => ({
     type: 'board-baseline',
@@ -117,9 +111,7 @@ describe('board-baseline board config', () => {
   })
 
   it('leaves the board undefined when an older peer sent none', () => {
-    // Undefined, not a default board: the joiner has to be able to tell "no
-    // columns were sent" from "the host really does have the default four",
-    // and keep its own in the first case.
+    // undefined, so "none sent" differs from "the default four"
     const msg = normalizeCollabMessage(baseline())
     if (msg?.type !== 'board-baseline') throw new Error('expected a baseline')
     expect(msg.board).toBeUndefined()
@@ -132,8 +124,7 @@ describe('board-baseline board config', () => {
   })
 })
 
-// A peer that crashes sends nothing. A message means they chose to leave, and
-// the receiver can say who rather than just going quiet.
+// crashes send nothing, this means they chose to leave
 describe('peer-leaving', () => {
   it('carries the name through', () => {
     const msg = normalizeCollabMessage({ type: 'peer-leaving', by: 'Dimitris' })
@@ -141,7 +132,7 @@ describe('peer-leaving', () => {
   })
 
   it('is still a valid goodbye with no name on it', () => {
-    // Knowing they left on purpose is the point; who they were is decoration.
+    // the leaving matters, the name is decoration
     expect(normalizeCollabMessage({ type: 'peer-leaving' })).toEqual({ type: 'peer-leaving', by: '' })
     expect(normalizeCollabMessage({ type: 'peer-leaving', by: 42 })).toEqual({ type: 'peer-leaving', by: '' })
   })
@@ -151,7 +142,7 @@ describe('peer-leaving', () => {
   })
 })
 
-// The host cannot decide anything about a guest it cannot name.
+// the host can't decide about a guest it can't name
 describe('peer-hello', () => {
   it('carries the name through', () => {
     expect(normalizeCollabMessage({ type: 'peer-hello', by: 'Dim67' }))
@@ -159,16 +150,14 @@ describe('peer-hello', () => {
   })
 
   it('is still an introduction with no name on it', () => {
-    // A peer on an older build says nothing at all, and the host still has to
-    // be able to see it is there.
+    // older builds say nothing, the host still has to see them
     expect(normalizeCollabMessage({ type: 'peer-hello' })).toEqual({ type: 'peer-hello', by: '' })
     expect(normalizeCollabMessage({ type: 'peer-hello', by: { name: 'x' } }))
       .toEqual({ type: 'peer-hello', by: '' })
   })
 })
 
-// Being shown the door reads nothing like someone leaving, so it is its own
-// message rather than a flag on the goodbye.
+// being removed reads nothing like leaving
 describe('peer-removed', () => {
   it('carries who did it', () => {
     expect(normalizeCollabMessage({ type: 'peer-removed', by: 'Dimitris' }))
@@ -180,8 +169,7 @@ describe('peer-removed', () => {
   })
 })
 
-// A merge is offered rather than taken, so it needs a way to be offered and a
-// way to be answered.
+// offered, so it needs an answer path
 describe('merge-proposal', () => {
   const proposal = {
     type: 'merge-proposal',
@@ -202,8 +190,7 @@ describe('merge-proposal', () => {
     expect(msg.board.columns.map(c => c.id)).toEqual(['open'])
   })
 
-  // Same rule as the baseline, and for the same reason: the workspace named
-  // here is the one about to be written over.
+  // the named workspace is the one being overwritten
   it('refuses a proposal with no workspace on it', () => {
     expect(normalizeCollabMessage({ ...proposal, context: '' })).toBeNull()
     expect(normalizeCollabMessage({ ...proposal, context: null })).toBeNull()
@@ -216,8 +203,7 @@ describe('merge-proposal', () => {
   })
 })
 
-// What the rest of the room is sent once the host takes a merge. Told, not
-// asked: they are live with the host's board and cannot be left holding another.
+// told, not asked: they're live on the host's board
 describe('board-reset', () => {
   const reset = {
     type: 'board-reset',
@@ -258,7 +244,7 @@ describe('merge-answer', () => {
       .toEqual({ type: 'merge-answer', accepted: false, by: '', reason: '' })
   })
 
-  // The difference between the host saying no and nobody having been asked.
+  // host said no vs nobody asked
   it('carries a reason when the app answered rather than a person', () => {
     expect(normalizeCollabMessage({
       type: 'merge-answer',
@@ -268,8 +254,7 @@ describe('merge-answer', () => {
     })).toMatchObject({ reason: 'another merge was being decided' })
   })
 
-  // Only an explicit yes is a yes. Anything else leaves the other side's board
-  // as it was, which is the failure nobody has to undo.
+  // only an explicit yes
   it('reads anything but a real yes as a no', () => {
     for (const bad of [undefined, null, 'true', 1, {}]) {
       expect(normalizeCollabMessage({ type: 'merge-answer', accepted: bad }))
@@ -278,8 +263,7 @@ describe('merge-answer', () => {
   })
 })
 
-// Guests are connected to the host and not to each other, so the list of who
-// is here has to come from the middle.
+// guests only know each other through the host
 describe('roster', () => {
   it('carries the members through', () => {
     expect(normalizeCollabMessage({ type: 'roster', members: [{ id: 'p1', name: 'Dim67' }] }))
@@ -298,9 +282,7 @@ describe('roster', () => {
   })
 })
 
-// The board document used to reach a peer exactly once, with the baseline, so a
-// column added mid-session left their cards addressed to a column they did not
-// have, rendering nowhere while still being counted.
+// board config used to arrive once, so new columns stranded cards
 describe('board-config', () => {
   it('carries the board through', () => {
     const msg = normalizeCollabMessage({
@@ -335,8 +317,7 @@ describe('baseline tombstones', () => {
     expect(msg.tombstones).toEqual([{ id: 'c1', table_name: 'items', deleted_at: 5 }])
   })
 
-  // A deleted note records its filename where a row id goes, and a note named
-  // after a card id would otherwise keep that card out of the merge.
+  // note tombstones hold filenames, which could shadow a card id
   it('keeps only the tables whose tombstone id is a row id', () => {
     const msg = normalizeCollabMessage({
       ...baseline,
@@ -356,8 +337,7 @@ describe('baseline tombstones', () => {
   })
 })
 
-// Which installation is hosting, so a later merge reads the ancestor this pair
-// has rather than one left by whoever last shared a board of the same name.
+// so a merge reads this pair's ancestor, not a same-named board's
 describe('baseline install id', () => {
   const baseline = { type: 'board-baseline', context: 'work' }
 
@@ -367,8 +347,7 @@ describe('baseline install id', () => {
     expect(msg.install).toBe('abc123de-9f8g7h6i5j')
   })
 
-  // Both mean the same thing here: no peer to file the board under, so the
-  // ancestor is kept under the workspace name alone.
+  // both mean no peer, the ancestor keys on the name
   it('is empty from an older host and from one that will not read', () => {
     for (const raw of [baseline, { ...baseline, install: 'UPPER' }, { ...baseline, install: 42 }]) {
       const msg = normalizeCollabMessage(raw)
@@ -386,10 +365,7 @@ describe('mode-change', () => {
       .toEqual({ type: 'mode-change', mode: 'collaborative' })
   })
 
-  // The only field in this protocol that is refused rather than defaulted. A
-  // mode nobody can read must not become the permissive one: defaulting here
-  // would be a garbled message handing out write access, and the safe failure
-  // is to leave whatever was already agreed in place.
+  // the one field refused, not defaulted: a garbled mode mustn't grant write access
   it('refuses a mode it cannot read rather than guessing at one', () => {
     for (const bad of [undefined, null, '', 'admin', 'Collaborative', 1, true, {}]) {
       expect(normalizeCollabMessage({ type: 'mode-change', mode: bad })).toBeNull()

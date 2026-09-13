@@ -8,7 +8,6 @@ import { wallMenuEntries } from './wallMenuEntries'
 import type { WallDocument } from './useWallDocument'
 import type { WallPointer } from './useWallPointer'
 
-/** The keyboard, pasted images, the context menu, and what the toolbar and canvas derive from the document. */
 export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer) {
   const {
     toast, doc, cards, notes, selectedIds, setSelectedIds, editingId, setEditingId, picker,
@@ -21,22 +20,19 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
   const {
     fitToContent
   } = wallPointer
-  // Keyboard
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
       if (e.code !== 'Space' || e.repeat) return
-      // Space belongs to whatever has focus: it types, and it presses a button
-      // that has been tabbed to. Only a press with nothing focused is a pan.
+      // space belongs to focus; only a press with nothing focused pans
       const el = document.activeElement
       if (el instanceof HTMLElement && el !== document.body &&
         el.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]')) return
-      // Otherwise the page scrolls under the wall.
+      // otherwise the page scrolls
       e.preventDefault()
       setSpaceHeld(true)
     }
     const up = (e: KeyboardEvent): void => { if (e.code === 'Space') setSpaceHeld(false) }
-    // A key held while the window loses focus is never seen to come up, and the
-    // wall would be stuck panning when you came back to it.
+    // a key held through blur never comes up, clear it
     const clear = (): void => setSpaceHeld(false)
 
     window.addEventListener('keydown', down)
@@ -52,8 +48,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const el = document.activeElement
-      // contenteditable included now that bare letters arm a tool: typing "a"
-      // into text must not switch to the arrow.
+      // bare letters arm tools, typing "a" mustn't switch to arrow
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
       if (el instanceof HTMLElement && el.isContentEditable) return
 
@@ -63,8 +58,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         applyHistory(e.shiftKey ? redo(historyRef.current) : undo(historyRef.current))
         return
       }
-      // The tools and duplicate come from the bindings, so Settings can move
-      // them. V, P and A are only the defaults now, not the definition.
+      // from the bindings; V, P, A are only defaults
       const command = matchKey(e)
       if (command === 'wall_tool_select') { setTool('select'); setArrowFrom(null); return }
       if (command === 'wall_tool_draw') { setTool('pen'); setArrowFrom(null); return }
@@ -78,8 +72,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         return
       }
       if (e.key === 'Escape') {
-        // Every open panel, not just the canvas state. A popover you can open
-        // with the keyboard and only close with the mouse is a trap.
+        // every panel: keyboard-open, mouse-close is a trap
         setWallMenuOpen(false)
         setRenaming(null)
         setBgOpen(false)
@@ -104,7 +97,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       const delta = deltas[e.key]
       if (delta) {
         e.preventDefault()
-        // Nudging matches dragging: a frame takes its contents either way.
+        // nudging matches dragging, frames take their contents
         setItems(moveItems(
           docRef.current.items,
           withFrameContents(docRef.current.items, selectedRef.current),
@@ -131,25 +124,21 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     return () => window.removeEventListener('paste', onPaste)
   }, [placeImageFiles])
 
-  // Context menus
   const menuEntries = (): MenuEntry[] => wallMenuEntries({
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
     duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast
   })
 
-  // Not doc.camera directly: while a pan is in flight the live one is in the
-  // ref, and a render triggered by something else entirely still has to agree
-  // with what has already been painted.
+  // live camera from the ref mid-pan, so a stray render agrees with what's painted
   const camera = panCameraRef.current ?? doc.camera
-  // 'default' follows the theme, until someone picks a colour.
+  // 'default' follows the theme
   const custom = doc.background && doc.background !== 'default' ? doc.background : null
   const canvasBackground = custom ?? 'var(--color-background)'
-  // Derived from the background: a fixed dot colour vanishes on half the palette.
+  // derived, a fixed dot colour vanishes on half the palette
   const dotColor = custom
     ? (getTextColorForBackground(custom) === '#ffffff' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)')
     : 'var(--color-surface-offset)'
-  // Anything already on the wall is left out: placing a second copy of the same
-  // card is possible but never what the picker is for.
+  // skip what's already placed
   const placed = new Set(
     doc.items
       .filter(i => (i.kind === 'card' || i.kind === 'doc') && i.ref)
@@ -161,7 +150,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       ? notes.filter(n => !placed.has(n.title)).map(n => ({ ref: n.title, label: n.title }))
       : []
 
-  /** What an item is called, wherever its name actually lives. */
+  /** wherever the name actually lives */
   const labelOf = (i: WallItem): string | undefined => {
     if (i.kind === 'card') return cardsById.get(i.ref ?? '')?.title
     if (i.kind === 'doc') return i.ref
@@ -171,25 +160,14 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
   labelRef.current = labelOf
   const matches = query.trim() ? searchItems(doc.items, query, labelOf) : []
 
-  // Read after historyTick so the buttons reflect the ref-held stack.
+  // read after historyTick so buttons see the ref stack
   void historyTick
   const undoable = canUndo(historyRef.current)
   const redoable = canRedo(historyRef.current)
 
-  /**
-   * Where the selection's toolbar goes, in screen space.
-   *
-   * Above the selection normally, below it when there is no room. The canvas
-   * clips its overflow, so an unclamped toolbar simply vanished whenever the
-   * selected item was near the top edge. Horizontal is clamped too, since the
-   * toolbar is centre-anchored and would otherwise hang off either side.
-   */
+  /** above the selection, below if no room; clamped both ways since the canvas clips */
   const selectionBounds = boundsOf(selectedItems)
-  /**
-   * The selection toolbar's own width, so the clamp below knows what it is
-   * keeping on screen. It changes with the selection: an arrow adds four more
-   * buttons than a sticky note does.
-   */
+  /** its width changes with the selection */
   const floatingRef = useRef<HTMLDivElement>(null)
   const [floatingWidth, setFloatingWidth] = useState(220)
   const floatingPos = ((): { left: number; top: number } | null => {
@@ -200,9 +178,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     const below = selectionBounds.maxY * camera.zoom + camera.y + 12
 
     const rect = viewportRef.current?.getBoundingClientRect()
-    // Measured rather than assumed. This was a flat 110, which was already
-    // wrong for the arrow toolbar and stayed wrong: the clamp let a toolbar
-    // wider than 220 hang off the edge it was there to keep it away from.
+    // measured, a flat 110 let wide toolbars hang off the edge
     const halfWidth = floatingWidth / 2
     return {
       left: rect ? Math.min(Math.max(centreX, halfWidth), rect.width - halfWidth) : centreX,
@@ -210,20 +186,13 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
   })()
 
-  /**
-   * The toolbar's width, read back after it has been laid out.
-   *
-   * Measured rather than counted from the buttons: the arrow controls, the
-   * label button and the colour swatch come and go with what is selected, and
-   * a number kept in step by hand would drift the first time one of them
-   * changed.
-   */
+  /** measured after layout, counting buttons would drift */
   useLayoutEffect(() => {
     const width = floatingRef.current?.offsetWidth
     if (width && width !== floatingWidth) setFloatingWidth(width)
   }, [floatingWidth, selectedIds, arrowsSelected, single?.locked, single?.text])
 
-  /** A popover belongs to the selection that opened it. */
+  /** belongs to the selection that opened it */
   useEffect(() => { setSwatchOpen(false) }, [selectedIds, setSwatchOpen])
 
   return {

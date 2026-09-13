@@ -1,4 +1,4 @@
-/** Exporting, importing and renaming a whole workspace. */
+/** export, import and rename a whole workspace */
 
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import fs from 'fs'
@@ -8,12 +8,8 @@ import { IpcChannels } from '../../shared/ipcChannels'
 import type { ContextExport } from '../../shared/types'
 import { errorMessage } from '../../shared/errors'
 
-/**
- * Takes the database handle rather than reaching for it, because these run
- * against the connection the caller opened and nothing else.
- */
+/** takes the handle, these run against the caller's connection only */
 export function registerContextHandlers(db: Database.Database): void {
-    // Context Export
     ipcMain.handle(IpcChannels.DB_EXPORT_CONTEXT, async (_event, context: string, contextName: string) => {
       try {
         const window = BrowserWindow.getFocusedWindow()
@@ -38,7 +34,6 @@ export function registerContextHandlers(db: Database.Database): void {
       }
     })
 
-    // Context Import File Selector
     ipcMain.handle(IpcChannels.DB_IMPORT_CONTEXT, async () => {
       try {
         const window = BrowserWindow.getFocusedWindow()
@@ -58,11 +53,9 @@ export function registerContextHandlers(db: Database.Database): void {
           parseForeignBoard, parseTodoistCsv, isTodoistCsv
         } = await import('../../shared/foreignImport')
 
-        // Todoist's own "export as template" writes a CSV, which is the only
-        // route out of Todoist that does not need an API token.
+        // todoist's template export is a CSV, the only way out without an API token
         if (isTodoistCsv(raw)) {
-          // A template export carries no project name, so the file's own name
-          // stands in. It is what Todoist names the download.
+          // template exports carry no project name, the filename stands in
           const fromCsv = parseTodoistCsv(raw, basename(filePath, extname(filePath)))
           if (fromCsv) return { success: true, foreign: fromCsv }
           return { success: false, error: 'That Todoist export has no tasks in it.' }
@@ -70,14 +63,12 @@ export function registerContextHandlers(db: Database.Database): void {
 
         const parsed = JSON.parse(raw)
 
-        // Checkpoint's own export.
+        // checkpoint's own export
         if (parsed && parsed.context && Array.isArray(parsed.items)) {
           return { success: true, payload: parsed }
         }
 
-        // Otherwise it may be an export from somewhere else. Recognised here
-        // rather than in the renderer so the file is classified where it is read,
-        // and the renderer only ever sees a shape it already understands.
+        // classified where it's read, so the renderer only sees shapes it knows
         const foreign = parseForeignBoard(parsed)
         if (foreign) return { success: true, foreign }
 
@@ -91,7 +82,6 @@ export function registerContextHandlers(db: Database.Database): void {
       }
     })
 
-    // Context Import Data Insertion
     ipcMain.handle(IpcChannels.DB_IMPORT_CONTEXT_DATA, async (_event, newContextSlug: string, data: ContextExport) => {
       try {
         const { importContextData } = await import('../db')
@@ -103,7 +93,6 @@ export function registerContextHandlers(db: Database.Database): void {
       }
     })
 
-    // Context Rename
     ipcMain.handle(IpcChannels.DB_RENAME_CONTEXT, async (_event, oldSlug: string, newSlug: string) => {
       try {
         db.transaction(() => {

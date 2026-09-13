@@ -1,22 +1,15 @@
-/**
- * The "create label" half of a tag picker: a name, a colour, and a button.
- *
- * Written out in all three pickers, each reading its input back through
- * `document.getElementById('new-tag-name')`. Three components sharing one DOM
- * id meant that with two pickers mounted, whichever rendered first answered for
- * both. Holding the name in state removes the id and the collision with it.
- */
+/** name in state; three pickers sharing one DOM id answered for each other */
 
 import React, { useState } from 'react'
 import type { Tag } from '../../../../shared/types'
 import ColorPicker from './ColorPicker'
 import { createTag, listTags } from '../../data/tags'
 
-/** Enough colours to tell labels apart at a glance, few enough to pick from. */
+/** enough to tell apart, few enough to pick from */
 const SWATCHES = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#cdf12b', '#ff45b5']
 
 interface TagCreatorProps {
-  /** The new tag, plus the refreshed list. The caller owns both. */
+  /** the caller owns both */
   onCreated: (tag: Tag, tags: Tag[]) => void
 }
 

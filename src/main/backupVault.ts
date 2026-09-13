@@ -10,15 +10,7 @@ let backupTimer: NodeJS.Timeout | null = null
 let initialCheckTimer: NodeJS.Timeout | null = null
 let isBackingUp = false
 
-/**
- * Compresses to a scratch name and moves it into place only once it is whole.
- *
- * Writing straight to the final name meant a failure part way through, a full
- * disk or a killed process, left a truncated file wearing a real backup's name.
- * It listed as a backup, it counted against the retention cap, and so it could
- * push a good backup out of the vault. A rename within one directory is atomic,
- * so a file under the final name is now always a complete one.
- */
+/** scratch name then rename, so a killed write never looks like a real backup */
 async function compressFile(sourcePath: string, destinationPath: string): Promise<void> {
   const partial = `${destinationPath}.partial`
   try {
@@ -69,13 +61,7 @@ export function getBackupDir(): string {
   return defaultDir
 }
 
-/**
- * What a file in the vault is.
- *
- * `scheduled` is the rolling automatic snapshot. `preRestore` is the copy taken
- * of the live database immediately before a restore overwrites it, so a restore
- * chosen by mistake can be undone.
- */
+/** preRestore: live db copied before a restore, so a mistaken restore can be undone */
 type BackupKind = 'scheduled' | 'preRestore'
 
 const PREFIXES: Record<BackupKind, string> = {
@@ -83,7 +69,7 @@ const PREFIXES: Record<BackupKind, string> = {
   preRestore: 'pre_restore_'
 }
 
-/** Reads a vault filename, or null when it is not one of ours. */
+/** null when not one of ours */
 export function parseBackupName(filename: string): { kind: BackupKind; timestamp: number } | null {
   if (!filename.endsWith('.db.gz')) return null
   for (const [kind, prefix] of Object.entries(PREFIXES) as [BackupKind, string][]) {
@@ -95,13 +81,7 @@ export function parseBackupName(filename: string): { kind: BackupKind; timestamp
   return null
 }
 
-/**
- * Trims each kind to `maxCount` separately.
- *
- * Pre-restore copies used to match neither the listing nor this, so every
- * restore left a full compressed database behind that nothing would ever show
- * or remove. A few restores and the vault quietly outgrew the data it guards.
- */
+/** trims each kind separately; pre-restore copies used to pile up forever */
 async function pruneBackups(backupDir: string, maxCount: number): Promise<void> {
   try {
     const byKind = new Map<BackupKind, { filename: string; timestamp: number }[]>()
@@ -114,7 +94,7 @@ async function pruneBackups(backupDir: string, maxCount: number): Promise<void> 
     }
 
     for (const files of byKind.values()) {
-      files.sort((a, b) => a.timestamp - b.timestamp) // Oldest first
+      files.sort((a, b) => a.timestamp - b.timestamp) // oldest first
       if (files.length <= maxCount) continue
       for (const f of files.slice(0, files.length - maxCount)) {
         fs.unlinkSync(join(backupDir, f.filename))
@@ -137,15 +117,12 @@ export async function runBackup(): Promise<string> {
   try {
     const db = getDb()
 
-    // Asynchronous non-blocking SQLite backup snapshot
     await db.backup(tempFile)
 
-    // Compress using asynchronous zlib stream pipeline
     await compressFile(tempFile, compressedFile)
 
     setSetting('last_backup_time', String(timestamp))
 
-    // Prune old backups exceeding rolling retention count
     const maxCountStr = getSetting<string>('backup_max_count', '10')
     const maxCount = parseInt(maxCountStr, 10) || 10
     await pruneBackups(backupDir, maxCount)
@@ -174,10 +151,9 @@ export async function runRestore(filename: string): Promise<void> {
   const tempRestoreFile = join(backupDir, `temp_restore_${timestamp}.db`)
 
   try {
-    // 1. Decompress backup file
     await decompressFile(sourcePath, tempRestoreFile)
 
-    // 2. Validate SQLite database integrity before swapping
+    // check integrity before swapping anything
     let tempDb: Database.Database | null = null
     try {
       tempDb = new Database(tempRestoreFile)
@@ -203,7 +179,7 @@ export async function runRestore(filename: string): Promise<void> {
     const primaryWalFile = join(dataPath, 'checkpoint.db-wal')
     const primaryShmFile = join(dataPath, 'checkpoint.db-shm')
 
-    // 3. Create pre-restore safety copy of the current active DB
+    // safety copy of the live db first
     const safetyCopyPath = join(backupDir, `pre_restore_${timestamp}.db.gz`)
     const tempSafetyPath = join(backupDir, `temp_safety_${timestamp}.db`)
     try {
@@ -218,24 +194,15 @@ export async function runRestore(filename: string): Promise<void> {
       }
     }
 
-    // 4. Close the connection through the db module, not by reaching for the handle.
-    //
-    // The db module caches prepared statements keyed by SQL, compiled against whichever
-    // connection was open at the time. Closing the raw handle left every one of
-    // them pointing at a dead connection while `dbInstance` still looked live,
-    // so after a restore the search, task, analytics and update paths all threw
-    // "The database connection is not open" until the app was restarted.
-    // discardDb drops the cache along with the connection.
+    // close via the db module, cached statements would point at the dead connection
     discardDb()
 
-    // 5. Delete WAL/SHM journaling state files to prevent locks
+    // leftover WAL/SHM would lock the swap
     if (fs.existsSync(primaryWalFile)) fs.unlinkSync(primaryWalFile)
     if (fs.existsSync(primaryShmFile)) fs.unlinkSync(primaryShmFile)
 
-    // 6. Overwrite primary database file
     fs.copyFileSync(tempRestoreFile, primaryDbFile)
 
-    // 7. Re-initialize database connection
     initDb(dataPath)
   } finally {
     try {
@@ -258,8 +225,7 @@ export function listCompletedBackups(): {
   try {
     if (!fs.existsSync(backupDir)) return []
 
-    // Pre-restore copies are listed too. Taking one and then hiding it meant
-    // the safety net existed on disk and nowhere the user could reach it.
+    // list pre-restore copies too, a hidden safety net is useless
     return fs.readdirSync(backupDir)
       .map(filename => {
         const parsed = parseBackupName(filename)
@@ -273,7 +239,7 @@ export function listCompletedBackups(): {
         }
       })
       .filter((b): b is { filename: string; timestamp: number; size: number; kind: BackupKind } => b !== null)
-      .sort((a, b) => b.timestamp - a.timestamp) // Newest first
+      .sort((a, b) => b.timestamp - a.timestamp) // newest first
   } catch (err) {
     console.error('Failed to list backups:', err)
     return []
@@ -289,7 +255,6 @@ export function deleteBackup(filename: string): void {
 }
 
 export function initializeBackupScheduler(): void {
-  // Clear existing timers
   shutdownBackupScheduler()
 
   const isEnabled = getSetting<string>('feature_backup', 'true') !== 'false'
@@ -298,18 +263,16 @@ export function initializeBackupScheduler(): void {
   const interval = getSetting<string>('backup_interval', 'daily')
 
   if (interval === 'launch-exit') {
-    // Run backup immediately on boot
     runBackup().catch(err => console.error('Failed to run boot backup:', err))
     return
   }
 
-  // Setup hourly check timer
   const checkInterval = 60 * 60 * 1000 // 1 hour
   backupTimer = setInterval(() => {
     checkAndRunTimedBackup()
   }, checkInterval)
 
-  // Run initial check after a brief delay. Stored so it can be cancelled on early quit
+  // stored so an early quit can cancel it
   initialCheckTimer = setTimeout(() => {
     initialCheckTimer = null
     checkAndRunTimedBackup()
@@ -357,7 +320,6 @@ export function shutdownBackupScheduler(): void {
     backupTimer = null
   }
 
-  // Synchronously run backup on exit if requested
   try {
     const isEnabled = getSetting<string>('feature_backup', 'true') !== 'false'
     const interval = getSetting<string>('backup_interval', 'daily')
@@ -375,13 +337,12 @@ export function shutdownBackupScheduler(): void {
       if (fs.existsSync(primaryDbFile)) {
         fs.copyFileSync(primaryDbFile, tempFile)
 
-        // Compress synchronously on exit to prevent thread termination
+        // sync on exit, async work dies with the process
         const gzip = zlib.gzipSync(fs.readFileSync(tempFile))
         fs.writeFileSync(compressedFile, gzip)
 
         fs.unlinkSync(tempFile)
 
-        // Prune synchronously
         const maxCountStr = getSetting<string>('backup_max_count', '10')
         const maxCount = parseInt(maxCountStr, 10) || 10
         const files = fs.readdirSync(backupDir)

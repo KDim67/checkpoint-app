@@ -7,7 +7,7 @@ interface TextureDropZoneProps {
   onClick: () => void
   processing: boolean
   label: string
-  /** What the tool gives back, said under the prompt. */
+  /** what you get back, under the prompt */
   outcome?: string
 }
 
@@ -17,13 +17,11 @@ export default function TextureDropZone({ onDragOver, onDrop, onClick, processin
       onDragOver={onDragOver}
       onDrop={onDrop}
       onClick={onClick}
+      className="texture-drop-zone"
       style={{
-        // Not flex: 1. The drop target grew to whatever height was
-        // going, which on a tall window left a nine hundred pixel dashed
-        // box with a small label adrift in the middle of it.
+        // not flex: 1, it grew into a 900px dashed box on tall windows
         minHeight: '260px',
         maxHeight: '420px',
-        border: '2px dashed var(--color-surface-offset)',
         borderRadius: 'var(--radius-lg)',
         display: 'flex',
         flexDirection: 'column',
@@ -31,16 +29,7 @@ export default function TextureDropZone({ onDragOver, onDrop, onClick, processin
         justifyContent: 'center',
         gap: 'var(--space-4)',
         cursor: 'pointer',
-        background: 'var(--color-surface-1)',
         transition: 'border-color var(--duration-fast), background var(--duration-fast)',
-      }}
-      onMouseOver={e => {
-        e.currentTarget.style.borderColor = 'var(--color-primary)'
-        e.currentTarget.style.background = 'var(--color-surface-2)'
-      }}
-      onMouseOut={e => {
-        e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-        e.currentTarget.style.background = 'var(--color-surface-1)'
       }}
     >
       {processing ? (
@@ -69,8 +58,7 @@ export default function TextureDropZone({ onDragOver, onDrop, onClick, processin
             <span className="text-hint">
               or click to browse local files (.png, .jpg, .jpeg, .tga, .bmp)
             </span>
-            {/* What comes back. An empty drop target says what to put in
-                and never said what you get out. */}
+            {/* say what comes out, not just what goes in */}
             {outcome && (
               <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', marginTop: 'var(--space-2)' }}>
                 {outcome}

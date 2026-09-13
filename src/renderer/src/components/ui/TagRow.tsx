@@ -1,16 +1,4 @@
-/**
- * One label in a tag picker: press it to attach or detach, recolour it, or
- * delete it everywhere.
- *
- * Three screens carry the same picker, and the row was written out three times.
- * Adding the delete button meant making the identical edit in each of them,
- * which is the argument for this file.
- *
- * The data calls live here rather than in the callers, so a screen that shows
- * tags does not also have to know how tags are stored. What it does have to
- * supply is what happens after: the list it renders and the selection it holds
- * are its own state, so it is told to refresh them.
- */
+/** one row for the three pickers; data calls here, callers refresh their own list and selection */
 
 import React from 'react'
 import { Check, Trash2 } from 'lucide-react'
@@ -23,9 +11,9 @@ interface TagRowProps {
   tag: Tag
   isSelected: boolean
   onToggle: (tagId: string) => void
-  /** The tag list changed. Hand back the new one. */
+  /** hands back the new list */
   onTagsChanged: (tags: Tag[]) => void
-  /** A tag was deleted, so it cannot still be selected. */
+  /** so it can't stay selected */
   onDeleted: (tagId: string) => void
 }
 
@@ -58,6 +46,7 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
 
   return (
     <div
+      className="hover-bg-offset"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -67,8 +56,6 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
         fontSize: 'var(--text-xs)',
         gap: '6px'
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
       <button
         onClick={() => onToggle(tag.id)}
@@ -100,17 +87,15 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
         <button
           onClick={remove}
           title="Delete label"
+          className="text-faint hover-text-error"
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--color-text-faint)',
             cursor: 'pointer',
             padding: 0,
             display: 'flex',
             alignItems: 'center'
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-error)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-faint)')}
         >
           <Trash2 size={12} />
         </button>

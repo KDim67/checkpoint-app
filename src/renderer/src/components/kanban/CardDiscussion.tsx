@@ -19,13 +19,11 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 'var(--space-5)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
       
-      {/* Comments Thread */}
       <div className="col-md">
         <span className="label-caps">
           Discussion
         </span>
 
-        {/* Post comment input */}
         <div className="col-4px">
           <textarea
             placeholder="Write a comment..."
@@ -72,7 +70,6 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
           </button>
         </div>
 
-        {/* Comments Feed */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '200px', overflowY: 'auto' }}>
           {comments.map(c => (
             <div
@@ -109,7 +106,7 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
         </div>
       </div>
 
-      {/* Audit Activities Trail */}
+      {/* activity trail */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderLeft: '1px solid var(--color-surface-offset)', paddingLeft: 'var(--space-4)' }}>
         <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Clock size={11} className="text-faint" />

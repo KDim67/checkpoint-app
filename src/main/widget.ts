@@ -1,13 +1,4 @@
-/**
- * A transparent, frameless, always-on-top summary overlay. Windows only,
- * returns null elsewhere.
- *
- * The three widget_* settings are read here, not just in the panel that writes
- * them. Nothing in main used to consult them, so the window came back
- * bottom-right at full opacity every launch, and since nothing restored it at
- * startup the toggle inverted: the panel painted the switch ON from the stored
- * flag with no window present, so the next click ran a blind flip that made one.
- */
+/** windows only; main reads the widget_* settings, or it reset position every launch and the toggle inverted */
 
 import { BrowserWindow, screen } from 'electron'
 import { join } from 'path'
@@ -21,8 +12,7 @@ const WIDGET_WIDTH  = 280
 const WIDGET_HEIGHT = 160
 const WIDGET_MARGIN = 16
 
-// Must match the defaults the settings panel falls back to, or the widget
-// appears somewhere the UI is not showing.
+// must match the settings panel defaults
 const DEFAULT_POSITION: WidgetPosition = 'bottom-right'
 const DEFAULT_OPACITY = 0.9
 
@@ -47,8 +37,7 @@ function clampOpacity(value: number): number {
 
 function storedPosition(): WidgetPosition {
   const raw = getSetting<string>('widget_position', DEFAULT_POSITION)
-  // Validated rather than cast: this value reaches an index into the corner
-  // table, and a stale or hand-edited row should not place the window offscreen.
+  // validated not cast, it indexes the corner table and a bad row could land offscreen
   return POSITIONS.includes(raw as WidgetPosition) ? (raw as WidgetPosition) : DEFAULT_POSITION
 }
 
@@ -57,7 +46,6 @@ function storedOpacity(): number {
   return Number.isFinite(raw) ? clampOpacity(raw) : DEFAULT_OPACITY
 }
 
-/** Creates the widget window. Returns null on non-Windows platforms. */
 function createWidget(): BrowserWindow | null {
   if (process.platform !== 'win32') return null
 
@@ -74,9 +62,9 @@ function createWidget(): BrowserWindow | null {
     transparent: true,
     skipTaskbar: true,
     resizable:   false,
-    focusable:   false,          // will NOT steal focus from IDE/editor
+    focusable:   false,          // won't steal focus from the IDE
     alwaysOnTop: true,
-    type:        'toolbar',      // keeps it off the taskbar on Windows
+    type:        'toolbar',      // off the windows taskbar
     show:        false,
     webPreferences: {
       preload:          preloadPath,
@@ -86,7 +74,6 @@ function createWidget(): BrowserWindow | null {
     }
   })
 
-  // Null reference on close to allow GC
   widgetWindow.on('closed', () => {
     widgetWindow = null
   })
@@ -95,7 +82,6 @@ function createWidget(): BrowserWindow | null {
     widgetWindow?.showInactive() // showInactive never steals focus
   })
 
-  // Load the main renderer with the #widget hash route
   if (process.env['ELECTRON_RENDERER_URL']) {
     widgetWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#widget`)
   } else {
@@ -105,12 +91,7 @@ function createWidget(): BrowserWindow | null {
   return widgetWindow
 }
 
-/**
- * Applies an explicit desired state. Idempotent, unlike the blind flip this
- * replaced. The caller knows whether the user asked for the widget, and the
- * window can be absent for reasons the caller cannot see (a previous launch,
- * a non-Windows platform), so a flip and the switch drift apart.
- */
+/** explicit state, not a blind flip: the window can be missing for reasons the caller can't see */
 export function setWidgetEnabled(active: boolean): void {
   if (active) {
     if (!widgetWindow) createWidget()
@@ -120,19 +101,18 @@ export function setWidgetEnabled(active: boolean): void {
   }
 }
 
-/** Recreates the widget at launch if it was left on. Safe to call always. */
+/** safe to call always */
 export function restoreWidget(): void {
   if (getSetting<string>('widget_enabled', 'false') === 'true') setWidgetEnabled(true)
 }
 
-/** Sets widget position (called from Settings). */
 export function setWidgetPosition(position: WidgetPosition): void {
   if (!widgetWindow) return
   const { x, y } = cornerFor(position)
   widgetWindow.setPosition(x, y)
 }
 
-/** Sets widget opacity (0.3–1.0 from the settings slider). */
+/** 0.3 to 1.0 from the slider */
 export function setWidgetOpacity(opacity: number): void {
   if (!widgetWindow) return
   widgetWindow.setOpacity(clampOpacity(opacity))

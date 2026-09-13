@@ -35,8 +35,7 @@ export default function WallPenSettings({
         position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)',
         zIndex: 20, display: 'flex', flexDirection: 'column', gap: '6px',
         padding: 'var(--space-2)',
-        // A single column is tall, so it gets a ceiling rather than
-        // running off the bottom of a short window.
+        // a ceiling so the column doesn't run off a short window
         maxHeight: 'calc(100% - var(--space-6))', overflowY: 'auto', overflowX: 'hidden',
         background: 'var(--color-surface-elevated)',
         border: '1px solid var(--color-surface-offset)',
@@ -61,7 +60,7 @@ export default function WallPenSettings({
           aria-label={`Stroke width ${width}`}
           aria-pressed={penWidth === width}
           style={{
-            // 26 to match the swatches above it, so the strip has one edge.
+            // 26 to match the swatches, one edge
             width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: penWidth === width ? 'var(--color-secondary-muted)' : 'none',
             border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer',

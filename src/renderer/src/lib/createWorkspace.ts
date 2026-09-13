@@ -1,14 +1,4 @@
-/**
- * Creating a workspace from a project template.
- *
- * Two places do this. The workspace manager in Settings and the first-run
- * panel, and they must produce the same thing, so the scaffolding lives here
- * rather than in either of them.
- *
- * Everything goes through the ordinary board-config and item paths, so a
- * templated workspace is an ordinary one the moment it exists: there is no
- * template state left behind to reason about later.
- */
+/** shared by Settings and first run so both make the same workspace, through ordinary paths */
 
 import { normalizeBoardConfig, saveBoardConfig } from './boardConfig'
 import {
@@ -24,17 +14,12 @@ import { getContexts } from '../data/workspaces'
 import { createTag } from '../data/tags'
 import { setSetting } from '../data/settings'
 
-/** The same slug rule the workspace manager has always used. */
+/** same slug rule as the manager */
 export function slugifyWorkspace(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-/**
- * Writes the template's board and seeds its cards for an existing workspace
- * slug. Returns a one-line summary for a toast, or '' when the template id is
- * unknown. An unrecognised template should leave a usable empty workspace
- * rather than fail the whole creation.
- */
+/** an unknown template leaves a usable empty workspace and returns '' */
 async function applyProjectTemplate(slug: string, templateId: string): Promise<string> {
   const template = findProjectTemplate(templateId)
   if (!template) return ''
@@ -61,17 +46,7 @@ async function applyProjectTemplate(slug: string, templateId: string): Promise<s
   return `Created "${template.name}" workspace, ${describeTemplate(template)}.`
 }
 
-/**
- * Writes an imported board into a workspace that already exists.
- *
- * Tags are created once up front and reused, rather than per card: the same
- * label appears on many cards, and creating it each time would leave duplicate
- * tags with the same name.
- *
- * Cards are created one at a time on purpose. A board of a few hundred is the
- * realistic case, the writes are local, and doing them individually means a
- * single malformed card cannot take the whole import down with it.
- */
+/** tags created once and reused; cards one at a time so one bad card can't sink the import */
 export async function applyImportedBoard(slug: string, board: ImportedBoard): Promise<string> {
   await saveBoardConfig(slug, normalizeBoardConfig({
     version: 1,
@@ -84,7 +59,7 @@ export async function applyImportedBoard(slug: string, board: ImportedBoard): Pr
       const tag = await createTag(label.name, label.color)
       tagIdByName.set(label.name, tag.id)
     } catch (err) {
-      // A tag that cannot be made is not worth losing the card it was on.
+      // a tag failure isn't worth losing the card
       console.warn(`Could not create tag "${label.name}":`, err)
     }
   }
@@ -129,32 +104,22 @@ export interface WorkspaceEntry {
   name: string
   color: string
   gitPath?: string
-  /**
-   * Has been part of a P2P session, hosted or joined.
-   *
-   * A label rather than a mode: nothing behaves differently because of it. It
-   * exists so a workspace holding someone else's board is not indistinguishable
-   * from one of your own, which is the whole of the complaint.
-   */
+  /** a label, not a mode: someone else's board shouldn't look like your own */
   shared?: boolean
 }
 
-/** Shared by onboarding, the settings manager and joining a shared board. */
+/** shared by onboarding, settings and joining */
 export const WORKSPACE_COLORS = [
   '#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'
 ]
 
-/**
- * The picker reads this list, so a workspace missing from it is unreachable
- * once you leave. An existing entry comes back untouched: rejoining a shared
- * board is not a rename.
- */
+/** the picker reads this list; existing entries come back untouched */
 export function ensureWorkspaceListed(
   list: WorkspaceEntry[],
   slug: string,
   name?: string
 ): WorkspaceEntry[] {
-  // Same array, not a copy: the caller skips the write on identity.
+  // same array, the caller skips the write on identity
   if (list.some(w => w.slug === slug)) return list
 
   return [...list, {
@@ -164,17 +129,7 @@ export function ensureWorkspaceListed(
   }]
 }
 
-/**
- * Every workspace slug that is spoken for.
- *
- * Both halves matter. A slug can hold items without ever reaching the picker,
- * and a workspace can be listed while still empty. Treating either as free is
- * how joining a shared board overwrites something.
- *
- * The item read is allowed to throw: a caller deciding whether it is safe to
- * delete a board must not be handed an empty set when the question could not
- * be answered. The list read is a second opinion and only logs.
- */
+/** items and the list both count; the item read may throw so deletes never get an empty answer */
 export async function occupiedWorkspaces(): Promise<Set<string>> {
   const taken = new Set<string>(await getContexts())
 
@@ -183,13 +138,7 @@ export async function occupiedWorkspaces(): Promise<Set<string>> {
   return taken
 }
 
-/**
- * A slug near `desired` that nothing is using yet.
- *
- * Joining a shared board used to overwrite whatever was already under that
- * name. Keeping both copies needs somewhere to put the second one, and the
- * name has to be predictable enough to show in the prompt before it is made.
- */
+/** keeps both copies, with a name predictable enough to show first */
 export function availableWorkspaceSlug(desired: string, taken: Iterable<string>): string {
   const used = new Set(taken)
   if (!used.has(desired)) return desired
@@ -197,18 +146,16 @@ export function availableWorkspaceSlug(desired: string, taken: Iterable<string>)
   const shared = `${desired}-shared`
   if (!used.has(shared)) return shared
 
-  // Counts rather than searching, so joining the same board a third time does
-  // not land back on the second copy.
+  // counts, so a third join doesn't land on the second copy
   for (let n = 2; n < 1000; n++) {
     const candidate = `${shared}-${n}`
     if (!used.has(candidate)) return candidate
   }
-  // A thousand copies of one board is not a real situation, but silently
-  // returning a taken slug would be a wipe, so this ends somewhere unique.
+  // never return a taken slug, that'd be a wipe
   return `${shared}-${Date.now()}`
 }
 
-/** Turns the shared label on or off. Returns the same list when it already says that. */
+/** same list when unchanged */
 export function setWorkspaceShared(
   list: WorkspaceEntry[],
   slug: string,
@@ -216,8 +163,7 @@ export function setWorkspaceShared(
 ): WorkspaceEntry[] {
   const entry = list.find(w => w.slug === slug)
   if (!entry || Boolean(entry.shared) === shared) return list
-  // Absent rather than false, so an unshared workspace serialises the way it
-  // did before the flag existed.
+  // absent not false, so unshared workspaces serialise as before
   return list.map(w => {
     if (w.slug !== slug) return w
     if (shared) return { ...w, shared: true }
@@ -227,13 +173,7 @@ export function setWorkspaceShared(
   })
 }
 
-/**
- * Lists a workspace if it is new and labels it shared either way.
- *
- * Separate from ensureWorkspaceListed because rejoining a board you already
- * hold is exactly the case that needs the label, and exactly the case that
- * function deliberately leaves untouched.
- */
+/** separate since rejoining is exactly when the label is needed */
 export function markWorkspaceShared(
   list: WorkspaceEntry[],
   slug: string,
@@ -242,18 +182,14 @@ export function markWorkspaceShared(
   return setWorkspaceShared(ensureWorkspaceListed(list, slug, name), slug, true)
 }
 
-/**
- * The list only: the baseline brings the board and its columns, so scaffolding
- * here would lay a template over data that has just arrived. Never throws, as
- * this runs mid-join and a failed write should cost a picker entry, not the board.
- */
+/** list only, the baseline brings the board; never throws mid-join */
 export async function registerSharedWorkspace(
   slug: string,
   name?: string
 ): Promise<WorkspaceEntry[]> {
   const existing = await readWorkspaceList()
   const next = markWorkspaceShared(existing, slug, name)
-  // Identity: already listed and already labelled, so nothing to write.
+  // already listed and labelled
   if (next === existing) return next
 
   try {
@@ -264,13 +200,7 @@ export async function registerSharedWorkspace(
   return next
 }
 
-/**
- * Registers a workspace in the contexts list and scaffolds it.
- *
- * The list write happens first: if the scaffolding fails the workspace still
- * exists and is usable, which is a better outcome than unwinding and leaving
- * the user with nothing.
- */
+/** list first, a failed scaffold still leaves a usable workspace */
 export async function createWorkspace(
   existing: WorkspaceEntry[],
   entry: WorkspaceEntry,

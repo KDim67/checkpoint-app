@@ -1,14 +1,9 @@
 import { z } from 'zod'
 import type { AiStructuredKind } from '../shared/types'
 
-// Runtime validation for structured AI output. The generator used to accept
-// anything that parsed, so `{}` counted as success and the renderer silently
-// produced nothing.
-//
-// Lenient about extra keys and about types a small model fumbles: a priority
-// arriving as "2" is a formatting slip, not a failed generation.
+// lenient on extra keys and fumbled types; used to accept {} as success
 
-/** Small models frequently emit numbers as strings. */
+/** small models often send numbers as strings */
 const looseInt = z.union([z.number(), z.string()]).transform(v => {
   const n = typeof v === 'number' ? v : parseInt(v, 10)
   return Number.isFinite(n) ? n : 0
@@ -21,7 +16,7 @@ const tag = z.object({
   color: z.string().optional()
 })
 
-/** Tags are often emitted as bare strings; normalise both shapes. */
+/** tags come as bare strings or objects */
 const tagList = z
   .array(z.union([tag, z.string().min(1).transform(name => ({ name }))]))
   .optional()
@@ -106,14 +101,7 @@ const UpdateResult = z.object({
     .min(1, 'no operations produced')
 })
 
-/**
- * Board *configuration* changes, as distinct from card edits.
- *
- * Deliberately loose about which fields accompany which op. The renderer's
- * normalizer decides what a given op can actually use, and rejecting a whole
- * generation because the model attached a stray key to one operation would
- * throw away the other nine.
- */
+/** loose on which fields go with which op; one stray key shouldn't sink the other nine */
 const ConfigResult = z.object({
   message: z.string().optional(),
   operations: z
@@ -159,7 +147,7 @@ const VALIDATORS: Record<AiStructuredKind, z.ZodTypeAny> = {
 interface ValidationOutcome {
   ok: boolean
   data?: unknown
-  /** Human-readable problem list, fed back to the model on the repair attempt. */
+  /** fed back to the model on the repair attempt */
   error?: string
 }
 
@@ -167,8 +155,7 @@ export function validateStructured(kind: AiStructuredKind, data: unknown): Valid
   const result = VALIDATORS[kind].safeParse(data)
   if (result.success) return { ok: true, data: result.data }
 
-  // Only the first few issues: a corrective prompt carrying thirty complaints
-  // is worse for a small model than one carrying three.
+  // first few only, thirty complaints confuse a small model more than three
   const issues = result.error.issues.slice(0, 4).map(i => {
     const path = i.path.length ? i.path.join('.') : '(root)'
     return `${path}: ${i.message}`

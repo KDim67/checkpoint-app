@@ -27,7 +27,6 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
         )}
       </div>
 
-      {/* Checklist Progress Bar */}
       {items.length > 0 && (
         <div className="col-6px">
           <div style={{ height: '6px', background: 'var(--color-surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -36,7 +35,6 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
         </div>
       )}
 
-      {/* Checklist Items */}
       <div className="col-4px">
         {items.map(item => (
           <div
@@ -70,9 +68,8 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
             </label>
             <button
               onClick={() => onDelete(item.id)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', padding: '2px' }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--color-error)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-faint)'}
+              className="text-faint hover-text-error"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px' }}
             >
               <Trash2 size={12} />
             </button>
@@ -80,7 +77,6 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
         ))}
       </div>
 
-      {/* Add Checklist Item Form */}
       <div className="flex-gap">
         <input
           type="text"

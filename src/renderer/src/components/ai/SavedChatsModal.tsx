@@ -1,14 +1,4 @@
-/**
- * The saved-conversation drawer: search, rename, load and delete.
- *
- * `currentChatId` is what marks the live conversation in the list; the drawer
- * never reads the messages themselves.
- *
- * Lifted out of AiStreamPanel with its JSX unchanged. State lives in
- * useSavedChats and arrives as one `chats` prop, beside the panel handlers that
- * also reset the stream: this unmounts every time it closes, so it must not own
- * anything worth keeping.
- */
+/** currentChatId marks the live chat, messages are never read; state lives in useSavedChats */
 
 import React from 'react'
 import { Edit2, MessageSquare, Plus, Search, Trash2 } from 'lucide-react'
@@ -63,7 +53,6 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
       }
       onClose={() => setShowSavedChatsModal(false)}
     >
-      {/* Search */}
       {savedChats.length > 3 && (
         <div style={{ padding: 'var(--space-2) var(--space-3) 0', position: 'relative', flexShrink: 0 }}>
           <Search size={12} style={{ position: 'absolute', left: 'calc(var(--space-3) + 8px)', top: 'calc(50% + 4px)', transform: 'translateY(-50%)', color: 'var(--color-text-faint)', pointerEvents: 'none' }} />
@@ -88,7 +77,6 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
         </div>
       )}
 
-      {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {(() => {
           const q = chatSearchQuery.trim().toLowerCase()

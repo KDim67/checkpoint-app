@@ -9,9 +9,9 @@ interface GraphNode {
   vy: number
   fx: number | null
   fy: number | null
-  /** Linked to by a note, but no note of that name exists. */
+  /** linked to, but no such note */
   missing: boolean
-  /** How many links touch this node. Drives its size. */
+  /** link count, drives size */
   degree: number
 }
 
@@ -28,28 +28,28 @@ interface GraphViewProps {
   onSelectNote: (title: string) => void
 }
 
-// Physics constants (shared by every simulation step)
+// physics constants
 const REPULSION = 180
 const SPRING = 0.05
 const REST_LENGTH = 65
 const GRAVITY = 0.012
 const FRICTION = 0.82
 const CONVERGENCE_KE = 0.01
-const DRAG_THRESHOLD = 3 // px of movement before a press counts as a drag (not a click)
+const DRAG_THRESHOLD = 3 // px before a press counts as a drag
 
 const MIN_ZOOM = 0.4
 const MAX_ZOOM = 4
-/** Past this, there is room for every label without them piling up. */
+/** past this, labels have room */
 const LABEL_ZOOM = 1.3
-/** Below this many nodes, labels fit at any zoom. */
+/** below this many nodes labels always fit */
 const LABEL_NODE_LIMIT = 12
 
-/** Advances the simulation by one step (mutates nodes) and returns total kinetic energy. */
+/** one step, mutates nodes, returns kinetic energy */
 function stepSimulation(nodes: GraphNode[], links: GraphLink[], width: number, height: number): number {
   const centerX = width / 2
   const centerY = height / 2
 
-  // Node repulsion (Coulomb)
+  // repulsion (Coulomb)
   for (let i = 0; i < nodes.length; i++) {
     const a = nodes[i]
     for (let j = i + 1; j < nodes.length; j++) {
@@ -66,7 +66,7 @@ function stepSimulation(nodes: GraphNode[], links: GraphLink[], width: number, h
     }
   }
 
-  // Spring attraction along links (Hooke)
+  // springs along links (Hooke)
   for (const link of links) {
     if (!link.sourceNode || !link.targetNode) continue
     const a = link.sourceNode
@@ -81,13 +81,13 @@ function stepSimulation(nodes: GraphNode[], links: GraphLink[], width: number, h
     b.vx -= fx; b.vy -= fy
   }
 
-  // Center gravity
+  // centre gravity
   for (const n of nodes) {
     n.vx += (centerX - n.x) * GRAVITY
     n.vy += (centerY - n.y) * GRAVITY
   }
 
-  // Integrate + bound, and accumulate kinetic energy of free nodes
+  // integrate, bound, sum KE of free nodes
   let totalKE = 0
   for (const n of nodes) {
     if (n.fx !== null && n.fy !== null) {
@@ -103,7 +103,7 @@ function stepSimulation(nodes: GraphNode[], links: GraphLink[], width: number, h
   return totalKE
 }
 
-/** Node radius from how well connected it is, so hubs read as hubs. */
+/** hubs read as hubs */
 function radiusFor(node: GraphNode, isActive: boolean): number {
   if (isActive) return 8
   return Math.min(7.5, 4 + Math.sqrt(node.degree) * 1.1)
@@ -117,14 +117,13 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
   const [nodes, setNodes] = useState<GraphNode[]>([])
   const [links, setLinks] = useState<GraphLink[]>([])
 
-  /** Pan and zoom. Purely a view transform: the physics never sees it. */
+  /** view transform only, the physics never sees it */
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 })
   const cameraRef = useRef(camera)
   cameraRef.current = camera
 
   const [hoverId, setHoverId] = useState<string | null>(null)
-  /** In state, not a ref. A ref read during render never re-renders, which is
-   *  why the grab cursor used to never appear. */
+  /** state not a ref, or the grab cursor never appears */
   const [draggingId, setDraggingId] = useState<string | null>(null)
 
   const nodesRef = useRef<GraphNode[]>([])
@@ -138,7 +137,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
   const rafRef = useRef<number | null>(null)
   const dragNodeIdRef = useRef<string | null>(null)
 
-  /** Everything one hop from the hovered node, itself included. */
+  /** one hop from the hovered node, itself included */
   const focus = useMemo(() => {
     if (!hoverId) return null
     const near = new Set<string>([hoverId])
@@ -149,14 +148,14 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     return near
   }, [hoverId, links])
 
-  // Single reusable animation loop; restart via ensureRunning().
+  // one reusable loop, restart via ensureRunning()
   const ensureRunning = useCallback(() => {
     if (rafRef.current !== null) return
     const tick = (): void => {
       const { width, height } = dimsRef.current
       const totalKE = stepSimulation(nodesRef.current, linksRef.current, width, height)
 
-      // Paint positions imperatively for performance
+      // imperative paint for speed
       for (const n of nodesRef.current) {
         const el = nodeElementsRef.current[n.id]
         if (el) el.setAttribute('transform', `translate(${n.x}, ${n.y})`)
@@ -171,7 +170,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
         }
       })
 
-      // Keep looping while dragging or until the graph settles
+      // loop while dragging or until settled
       if (totalKE < CONVERGENCE_KE && dragNodeIdRef.current === null) {
         rafRef.current = null
         return
@@ -181,7 +180,6 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     rafRef.current = requestAnimationFrame(tick)
   }, [])
 
-  // 1. Monitor container size
   useEffect(() => {
     if (!containerRef.current) return
     const resizeObserver = new ResizeObserver(entries => {
@@ -196,8 +194,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     return () => resizeObserver.disconnect()
   }, [])
 
-  // 2. Rebuild nodes/links when notes change, preserving existing positions,
-  //    then reheat the simulation so new nodes settle into place.
+  // keep positions, reheat so new nodes settle
   useEffect(() => {
     const existing = new Map<string, GraphNode>()
     nodesRef.current.forEach(n => existing.set(n.id, n))
@@ -206,13 +203,11 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     const centerX = width / 2
     const centerY = height / 2
 
-    // Case-insensitive edge resolution against real note titles
+    // case-insensitive against real titles
     const canonical = new Map<string, string>()
     notes.forEach(n => canonical.set(n.title.toLowerCase(), n.title))
 
-    // A link whose target does not exist still says something: it is usually a
-    // typo, or a note somebody meant to write. Dropping it silently was the
-    // graph disagreeing with the editor, which shows the same link as broken.
+    // keep missing targets, the editor shows them as broken too
     const missing = new Map<string, string>()
     notes.forEach(note => {
       note.links.forEach(target => {
@@ -225,7 +220,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     const spawn = (id: string, i: number, total: number, isMissing: boolean): GraphNode => {
       const prev = existing.get(id)
       if (prev) return { ...prev, missing: isMissing, degree: 0 }
-      // Spawn brand-new nodes on a ring around the center (deterministic: no RNG)
+      // new nodes on a ring, no RNG
       const angle = (i / Math.max(1, total)) * Math.PI * 2
       const radius = 25 + (i % 4) * 12
       return {
@@ -244,7 +239,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
       ...[...missing.values()].map((title, i) => spawn(title, notes.length + i, total, true))
     ]
 
-    // Missing targets resolve to themselves so their edges still connect.
+    // missing targets resolve to themselves so edges connect
     const resolve = new Map(canonical)
     missing.forEach((title, key) => resolve.set(key, title))
 
@@ -255,9 +250,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
         const realTarget = resolve.get(target.trim().toLowerCase())
         if (!realTarget || realTarget === note.title) return
         const [first, second] = [note.title, realTarget].sort()
-        // NUL separates the pair so a title containing the separator cannot forge
-        // a collision with a different pair. Written as an escape, not a raw
-        // byte: a literal NUL makes this file binary to every text tool.
+        // NUL separator can't be forged by a title; escaped so the file stays text
         const key = `${first}\u0000${second}`
         if (seen.has(key)) return
         seen.add(key)
@@ -273,8 +266,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
       if (link.targetNode) link.targetNode.degree++
     })
 
-    // Keys for nodes and links that no longer exist would otherwise pile up for
-    // the life of the session.
+    // prune keys for gone nodes and links
     const liveIds = new Set(newNodes.map(n => n.id))
     for (const id of Object.keys(nodeElementsRef.current)) {
       if (!liveIds.has(id)) delete nodeElementsRef.current[id]
@@ -288,14 +280,14 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     setNodes(newNodes)
     setLinks(newLinks)
 
-    // Give free nodes a small kick so the layout reflows after add/remove
+    // small kick so the layout reflows
     newNodes.forEach(n => {
       if (n.fx === null) { n.vx += (Math.cos(n.x) * 0.5); n.vy += (Math.sin(n.y) * 0.5) }
     })
     ensureRunning()
   }, [notes, ensureRunning])
 
-  // 3. Reheat on resize and on mount; always stop the loop on unmount.
+  // reheat on resize and mount, stop on unmount
   useEffect(() => {
     ensureRunning()
     return () => {
@@ -306,7 +298,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     }
   }, [dimensions, ensureRunning])
 
-  /** Screen pixels to graph coordinates, undoing the current pan and zoom. */
+  /** undoes pan and zoom */
   const toGraph = useCallback((clientX: number, clientY: number): { x: number; y: number } => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
@@ -317,7 +309,6 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     }
   }, [])
 
-  // 4. Drag a node, or pan the background
   const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string): void => {
     e.preventDefault()
     e.stopPropagation()
@@ -339,8 +330,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
       }
       const target = nodesRef.current.find(n => n.id === dragNodeIdRef.current)
       if (target) {
-        // Recomputed from the live rect every move, so a resize or a scroll
-        // mid-drag cannot leave the node offset from the cursor.
+        // live rect each move, so a resize or scroll mid-drag can't offset it
         const p = toGraph(moveEvent.clientX, moveEvent.clientY)
         target.fx = p.x
         target.fy = p.y
@@ -357,11 +347,10 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
       setDraggingId(null)
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
-      // A press with no meaningful movement is a click → open the note
+      // no real movement means a click, open the note
       if (!moved && id) {
         const node = nodesRef.current.find(n => n.id === id)
-        // A missing note has nothing to open. Selecting it would create one,
-        // which is not what clicking a graph should do behind your back.
+        // opening a missing note would create it
         if (node && !node.missing) onSelectNote(id)
       }
       ensureRunning()
@@ -391,7 +380,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     window.addEventListener('mouseup', handleMouseUp)
   }
 
-  // Zoom toward the pointer, so the thing under the cursor stays under it.
+  // zoom toward the pointer
   const handleWheel = (e: React.WheelEvent): void => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return
@@ -446,7 +435,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
             <g transform={`translate(${camera.x}, ${camera.y}) scale(${camera.zoom})`}>
               <g>
                 {links.map((link, idx) => {
-                  // With something hovered, only its own edges stay solid.
+                  // the hovered node's own edges stay solid
                   const lit = !focus || (focus.has(link.source) && focus.has(link.target))
                   return (
                     <line
@@ -470,7 +459,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
                       key={node.id}
                       ref={el => {
                         nodeElementsRef.current[node.id] = el
-                        // Seed the initial transform once so new nodes don't flash at origin
+                        // seed the transform so new nodes don't flash at origin
                         if (el && !el.getAttribute('transform')) {
                           el.setAttribute('transform', `translate(${node.x}, ${node.y})`)
                         }
@@ -484,11 +473,11 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
                         transition: 'opacity 0.15s'
                       }}
                     >
-                      {/* An invisible disc so small nodes are still easy to hit. */}
+                      {/* invisible hit disc for small nodes */}
                       <circle r={Math.max(r + 6, 11)} fill="transparent" />
                       <circle
                         r={r}
-                        // Hollow means linked to but never written.
+                        // hollow: linked but never written
                         fill={node.missing ? 'transparent' : isActive ? 'var(--color-secondary)' : 'var(--color-primary)'}
                         stroke={node.missing ? 'var(--color-text-faint)' : 'var(--color-surface-offset)'}
                         strokeWidth="1.5"
@@ -504,8 +493,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
                           textAnchor="middle"
                           fill={isActive ? 'var(--color-text-base)' : node.missing ? 'var(--color-text-faint)' : 'var(--color-text-muted)'}
                           style={{
-                            // Held at a constant on-screen size, or zooming in
-                            // turns the labels into billboards.
+                            // constant on-screen size, or labels balloon on zoom
                             fontSize: `${10 / camera.zoom}px`,
                             fontFamily: 'var(--font-sans)',
                             fontWeight: isActive ? 'var(--weight-semibold)' : 'var(--weight-regular)',
@@ -524,7 +512,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
             </g>
           </svg>
 
-          {/* Counts and a way back. Both only when they say something. */}
+          {/* only when they say something */}
           <div style={{
             position: 'absolute', left: 'var(--space-2)', bottom: 'var(--space-2)',
             display: 'flex', alignItems: 'center', gap: 'var(--space-2)',

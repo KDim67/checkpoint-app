@@ -41,7 +41,7 @@ describe('cardEdit', () => {
   })
 
   it('refuses to blank a title', () => {
-    // Emptying the field and saving should leave the card named, not untitled.
+    // an emptied field keeps the name
     const result = cardEdit(snap(), snap({ title: '   ' }))
     expect(result.patch).toEqual({})
     expect(result.dirty).toBe(false)
@@ -59,7 +59,7 @@ describe('cardEdit', () => {
   })
 
   it('reads a reordered tag list as no change', () => {
-    // Passing tags rewrites the join table, so a false positive is a pointless write.
+    // passing tags rewrites the join table, so false positives cost a write
     const result = cardEdit(snap(), snap({ tagIds: ['t2', 't1'] }))
     expect(result.dirty).toBe(false)
     expect(result.tagIds).toBeUndefined()

@@ -1,15 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { APP_SHORTCUTS, defaultBindings } from '../src/renderer/src/lib/shortcuts'
 
-// The scheme is "digits run down the sidebar". It drifted once already, when a
-// view took the next free digit instead of its place in the order, so it is
-// worth a test rather than a comment alone.
+// digits run down the sidebar; it drifted once, so it's tested
 
 const views = APP_SHORTCUTS.filter(s => s.action.kind === 'view')
 
 describe('the default shortcut scheme', () => {
   it('gives every shortcut a binding', () => {
-    // Two views shipped unbound for a while, reachable only by clicking.
+    // two views once shipped unbound
     for (const shortcut of APP_SHORTCUTS) {
       expect(shortcut.defaultCombo, `${shortcut.label} has no default`).not.toBe('')
     }
@@ -21,16 +19,14 @@ describe('the default shortcut scheme', () => {
   })
 
   it('numbers the views down the sidebar, 1 to 9 then 0', () => {
-    // The rule that was broken before: Wall sat sixth in the list holding
-    // Ctrl+9, so the digits no longer matched what was on screen.
+    // Wall once sat sixth holding Ctrl+9
     const expected = ['Ctrl+1', 'Ctrl+2', 'Ctrl+3', 'Ctrl+4', 'Ctrl+5',
                       'Ctrl+6', 'Ctrl+7', 'Ctrl+8', 'Ctrl+9', 'Ctrl+0']
     expect(views.slice(0, 10).map(v => v.defaultCombo)).toEqual(expected)
   })
 
   it('does not run out of digits silently', () => {
-    // There are more views than digits. Any past the tenth needs a letter,
-    // and this fails if one is ever given an eleventh digit that cannot exist.
+    // past the tenth view needs a letter
     for (const view of views.slice(10)) {
       expect(view.defaultCombo).not.toMatch(/^Ctrl\+\d$/)
       expect(view.defaultCombo).not.toBe('')

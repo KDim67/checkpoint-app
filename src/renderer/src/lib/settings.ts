@@ -1,11 +1,4 @@
-/**
- * Typed access to the settings table.
- *
- * Values are written through IPC as JSON, and historically some booleans were
- * stored as the strings 'true'/'false' via String(active) while others were
- * stored as real booleans. The readers here accept both so old databases keep
- * working; writers use the string form the settings UI already produces.
- */
+/** readers accept 'true'/'false' strings and real booleans from older dbs; writers use strings */
 
 import { getSetting, setSetting } from '../data/settings'
 
@@ -35,7 +28,7 @@ export async function getStringSetting(key: string, defaultValue: string): Promi
   }
 }
 
-/** Reads a setting constrained to a known set, falling back when it drifts. */
+/** falls back when the value drifts out of the set */
 export async function getEnumSetting<T extends string>(
   key: string,
   allowed: readonly T[],
@@ -63,13 +56,7 @@ export async function setNumberSetting(key: string, value: number): Promise<void
   await setSetting(key, String(value))
 }
 
-/**
- * A setting the app stores as a JSON blob.
- *
- * Falls back for a row that is missing, empty, or no longer parses. These rows
- * are written by the app and read back as text, so a half-written or
- * hand-edited row is a real possibility and must not take a screen down with it.
- */
+/** falls back for missing, empty or unparseable rows; hand edits happen */
 export async function getJsonSetting<T>(key: string, fallback: T): Promise<T> {
   try {
     const raw = await getSetting(key)

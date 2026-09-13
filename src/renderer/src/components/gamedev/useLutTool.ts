@@ -4,18 +4,10 @@ import { buildLutData } from '../../lib/imageProcessing'
 import { errorMessage } from '../../../../shared/errors'
 import * as gamedevApi from '../../data/gamedev'
 
-/**
- * LUT Color Grader.
- *
- * sourcePath is whichever asset a sibling tool has loaded: the graded strip is
- * written next to it, so this tool has no source of its own. Passed in rather
- * than reached for through a shared store, because the coupling is one-way and
- * worth keeping visible at the call site.
- */
+/** writes next to the sibling tool's asset; passed in to keep the one-way coupling visible */
 export function useLutTool(isActive: boolean, sourcePath: string | null) {
   const { toast } = useToast()
 
-  // Tab 9: LUT Color Grader State
   const [lutBrightness, setLutBrightness] = useState(0)
   const [lutContrast, setLutContrast] = useState(0)
   const [lutSaturation, setLutSaturation] = useState(0)
@@ -26,7 +18,6 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
   const lutPreviewCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
 
-  // Tab 9: LUT Color Grader Callbacks
   const runLutUpdate = useCallback(() => {
     const canvas = lutPreviewCanvasRef.current
     if (!canvas) return
@@ -36,7 +27,6 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // 1. Build the colour grading LUT using the shared pure utility
     const d = buildLutData({
       exposure:    lutExposure,
       brightness:  lutBrightness,
@@ -45,7 +35,6 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
       temperature: lutTemperature
     })
 
-    // Helper: Map an RGB triple through the pre-built LUT data buffer
     const applyLut = (r: number, g: number, b: number) => {
       const bBlock = Math.max(0, Math.min(15, Math.floor((b / 255) * 15)))
       const x     = Math.max(0, Math.min(15, Math.floor((r / 255) * 15)))
@@ -54,7 +43,7 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
       return { r: d[idx], g: d[idx + 1], b: d[idx + 2] }
     }
 
-    // 2. Draw Color Spectrum (Left half: 256×256)
+    // spectrum, left half 256x256
     const specData = ctx.createImageData(256, 256)
     const sd = specData.data
     for (let y = 0; y < 256; y++) {
@@ -66,7 +55,7 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
     }
     ctx.putImageData(specData, 0, 0)
 
-    // 3. Draw simple demo scene (Right half: 256×256)
+    // demo scene, right half
     const demoCanvas = document.createElement('canvas')
     demoCanvas.width = 256
     demoCanvas.height = 256
@@ -106,7 +95,7 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
       ctx.putImageData(demoImgData, 256, 0)
     }
 
-    // 4. Draw the LUT strip at the bottom centre
+    // LUT strip, bottom centre
     const lutCanvas = document.createElement('canvas')
     lutCanvas.width = 256
     lutCanvas.height = 16
@@ -123,7 +112,7 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
   const handleLutExport = useCallback(async () => {
     setIsLutSaving(true)
     try {
-      // Re-use the shared utility. Output is pixel-perfect identical to the preview
+      // same utility, identical to the preview
       const d = buildLutData({
         exposure:    lutExposure,
         brightness:  lutBrightness,
@@ -140,9 +129,7 @@ export function useLutTool(isActive: boolean, sourcePath: string | null) {
       exportCtx.putImageData(new ImageData(d, 256, 16), 0, 0)
 
       const base64Data = exportCanvas.toDataURL('image/png')
-      // Anchor the export next to whichever asset is loaded in a sibling tool.
-      // No silent fallback directory. Exporting somewhere the user never
-      // chose is worse than asking them to load an asset first.
+      // no silent fallback dir, exporting where the user never chose is worse
       const basePath = sourcePath
       if (!basePath) {
         toast('Load an image in any texture tool first: the LUT is saved next to that asset.', { type: 'warning' })

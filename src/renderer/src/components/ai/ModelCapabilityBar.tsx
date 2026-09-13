@@ -43,12 +43,7 @@ function Badge({ children, color }: { children: React.ReactNode; color?: string 
   )
 }
 
-/**
- * Shows what the assistant believes the selected model can do, and where that
- * belief came from. Previously all of this was guessed silently from the model
- * name, so a wrong guess was invisible. "Name" or "default" as the source is
- * the cue to hit refresh or correct the endpoint.
- */
+/** shows where the belief came from; "name" or "default" means refresh or fix the endpoint */
 export default function ModelCapabilityBar({
   caps,
   onRefresh

@@ -25,8 +25,7 @@ export default function CreateColumnActionBlock({ jsonString }: { jsonString: st
   const cachedCol = signature ? createdColsCacheMap.get(signature) : null
   const colData = createdCol || cachedCol || (normalized ? { name: normalized.name, color: normalized.color, wipLimit: normalized.wipLimit } : null)
 
-  // Rebuilt from the JSON on every render, so read through a ref rather than
-  // listed: listing them would run the effect on every render.
+  // rebuilt from JSON each render, a ref keeps it out of the deps
   const parsedRef = useRef({ normalized, name, cachedCol })
   parsedRef.current = { normalized, name, cachedCol }
 
@@ -56,7 +55,6 @@ export default function CreateColumnActionBlock({ jsonString }: { jsonString: st
           const config = await readBoardConfigUnlocked(context)
           const colsList: ColumnConfig[] = [...config.columns]
 
-          // Prevent duplicate column names
           const existing = colsList.find(c => c.name.toLowerCase() === name.toLowerCase())
           if (existing) {
             createdColsCacheMap.set(signature, existing)
@@ -72,7 +70,7 @@ export default function CreateColumnActionBlock({ jsonString }: { jsonString: st
           return created
         })
 
-        // Dispatch live update event to reload Kanban board instantly
+        // kanban listens for this to reload
         window.dispatchEvent(new CustomEvent('kanban-refresh'))
 
         if (isMounted) setCreatedCol(newCol)

@@ -7,13 +7,7 @@ import {
 } from '../../../shared/modelCapabilities'
 import * as aiApi from '../data/ai'
 
-/**
- * Capabilities for the selected model, discovered in the main process.
- *
- * Starts from the name-derived defaults so the first render has real numbers
- * rather than nothing, then swaps in whatever the endpoint reports. Discovery
- * is cached in settings, so this is usually a single fast IPC round-trip.
- */
+/** name-derived defaults first, then the endpoint's answer; usually one cached IPC trip */
 export function useModelCapabilities(model: string): {
   caps: ModelCapabilities
   budget: TierBudget
@@ -26,8 +20,7 @@ export function useModelCapabilities(model: string): {
 
   useEffect(() => {
     let cancelled = false
-    // Reset to the name-derived guess immediately so a stale model's window
-    // size is never used to budget the new model's prompt.
+    // reset to the name guess so the old model's window never budgets the new prompt
     setCaps(defaultCapabilities(model))
     if (!model) return
 

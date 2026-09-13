@@ -1,14 +1,4 @@
-/**
- * Rewind: what you were doing last time you worked on this card. The join is in
- * `shared/rewind.ts`; this only presents it.
- *
- * Observations sit above the evidence, because the useful part is the sentence
- * handing back a fact you had forgotten, not the list of commits. The evidence
- * is grouped and collapsed with counts, since dumping forty window titles is
- * the same as showing nothing.
- *
- * The heading says "around then": this is inferred, not certain.
- */
+/** observations above evidence; evidence grouped with counts; "around then" since it's inferred */
 
 import React, { useEffect, useState } from 'react'
 import { History, ChevronRight, GitCommit as GitCommitIcon, Clipboard, MonitorSmartphone, StickyNote, AlertCircle } from 'lucide-react'
@@ -16,7 +6,7 @@ import { formatDuration, type Rewind, type Signal } from '../../../../shared/rew
 import { loadRewind } from '../../lib/rewind'
 import type { Item } from '../../../../shared/types'
 
-/** Locale-aware, and short enough to sit on one line. */
+/** locale-aware, one line */
 function formatWhen(start: number, end: number): string {
   const d = new Date(start)
   const day = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })
@@ -38,7 +28,7 @@ interface GroupProps {
   children: React.ReactNode
 }
 
-/** A collapsed evidence group. States its size before it is opened. */
+/** states its size before it opens */
 function Group({ icon, label, count, children }: GroupProps) {
   const [open, setOpen] = useState(false)
   if (count === 0) return null
@@ -113,8 +103,7 @@ function Signals({ signals }: { signals: Signal[] }) {
             borderRadius: 'var(--radius-sm)'
           }}
         >
-          {/* An icon as well as the colour, so the emphasis is not carried by
-              hue alone. */}
+          {/* icon as well as colour */}
           <AlertCircle size={13} style={{ color: 'var(--color-secondary)', flexShrink: 0, marginTop: '1px' }} />
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', lineHeight: 1.5 }}>
             {s.text}
@@ -137,10 +126,7 @@ export default function RewindPanel({ item }: { item: Item }) {
       .catch(err => { if (!cancelled) { console.warn('[rewind] failed:', err); setState(null) } })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-    // Keyed on the id alone, deliberately. `item` is a new object on every
-    // edit, and Rewind describes the past. Refetching five streams because the
-    // user typed a character in the title would be work for an answer that
-    // cannot have changed.
+    // id only: item changes on every edit and the past can't have
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.id])
 
@@ -159,8 +145,7 @@ export default function RewindPanel({ item }: { item: Item }) {
     </div>
   )
 
-  // Space is reserved at a fixed minimum so the card body does not jump when
-  // the answer arrives.
+  // fixed min height so the body doesn't jump
   const shell = (children: React.ReactNode) => (
     <div style={{ minHeight: '78px' }}>
       {header}
@@ -192,7 +177,6 @@ export default function RewindPanel({ item }: { item: Item }) {
   return shell(
     <div className="col-md">
 
-      {/* When, and for how long */}
       <div>
         <div className="text-item">
           {formatWhen(sitting.start, sitting.end)}
@@ -206,7 +190,7 @@ export default function RewindPanel({ item }: { item: Item }) {
 
       <Signals signals={signals} />
 
-      {/* What was written down at the time beats anything inferred. */}
+      {/* notes written at the time beat inference */}
       {sitting.notes.length > 0 && (
         <div className="col-4px">
           {sitting.notes.map((note, i) => (
@@ -265,7 +249,7 @@ export default function RewindPanel({ item }: { item: Item }) {
         </Group>
       </div>
 
-      {/* Said plainly rather than left as a mysteriously thin panel. */}
+      {/* say it plainly, not a mysteriously thin panel */}
       {state && state.unavailable.length > 0 && (
         <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>
           Not included: {state.unavailable.join(', ')}. Turn these on in Settings for a fuller picture.

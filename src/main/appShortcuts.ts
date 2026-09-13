@@ -1,9 +1,4 @@
-/**
- * The global hotkeys, rebound whenever the customizer changes them.
- *
- * The clipboard key is held so the old binding can be released before a new one
- * is taken; registering over a live binding leaves the first one holding the key.
- */
+/** clipboard key is held so the old binding is released first; registering over a live one keeps the old */
 
 import { globalShortcut } from 'electron'
 import { IpcChannels } from '../shared/ipcChannels'

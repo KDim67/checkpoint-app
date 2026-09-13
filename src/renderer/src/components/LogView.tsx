@@ -43,20 +43,17 @@ export default function LogView() {
 
   const { toast } = useToast()
 
-  // Load page 1 of logs for the active context
   const loadInitialFeed = useCallback(async () => {
     setLoading(true)
     try {
       const res = await itemPage(activeWorkspace, 'log', 1, 50)
       
-      // SQLite returns sorted by position ASC, created_at DESC (which is newest first).
-      // For a Slack-like chronological feed (oldest at the top, newest at the bottom),
-      // we reverse the array of items before putting it in state.
+      // SQLite returns newest first, reverse for an oldest-at-top feed
       const reversed = [...res.items].reverse()
       setItems(reversed)
       setPage(1)
       
-      // If we got a full page (50 items), there may be more historical entries to load
+      // a full page (50) means there may be more
       setHasMore(res.items.length === 50)
     } catch (err) {
       console.error('Failed to load initial log feed:', err)
@@ -77,7 +74,7 @@ export default function LogView() {
     return () => window.removeEventListener('item-updated', handleItemUpdated)
   }, [loadInitialFeed])
 
-  // Load more historical entries (scroll up pagination)
+  // scroll-up pagination
   const handleLoadMore = useCallback(async () => {
     const nextPage = page + 1
     try {
@@ -88,14 +85,12 @@ export default function LogView() {
         setPage(nextPage)
       }
       
-      // Check if there are still more items in the DB
       setHasMore(res.items.length === 50 && items.length + res.items.length < res.total)
     } catch (err) {
       console.error('Failed to load more logs:', err)
     }
   }, [activeWorkspace, page, items.length])
 
-  // Create Log Entry
   const handleSubmitLog = async (body: string, tagIds: string[]) => {
     try {
       const title = body.split('\n')[0].replace(/^[#\s*>-]+/, '').trim().substring(0, 80) || 'Untitled Log'
@@ -111,14 +106,14 @@ export default function LogView() {
         metadata: '{}'
       }, tagIds)
 
-      // Append new items at the bottom (newest)
+      // newest at the bottom
       setItems(prev => [...prev, newItem])
     } catch (err) {
       console.error('Failed to create log entry:', err)
     }
   }
 
-  // Toggle Pinned status (Priority = 3 represents pinned, 0 represents normal)
+  // priority 3 means pinned
   const handleTogglePin = async (id: string, currentPriority: number) => {
     const newPriority = currentPriority === 3 ? 0 : 3
     try {
@@ -130,19 +125,16 @@ export default function LogView() {
     }
   }
 
-  // Soft Delete Log Entry (archives it)
+  // soft delete, archives it
   const handleDeleteLog = async (id: string) => {
     try {
       const targetItem = items.find(item => item.id === id)
       if (!targetItem) return
 
-      // Archive in DB
       await updateItem(id, { status: 'archived' })
       
-      // Update UI state
       setItems(prev => prev.filter(item => item.id !== id))
 
-      // Trigger Toast notification with Undo Action
       toast('Log entry deleted.', {
         action: {
           label: 'Undo',
@@ -165,7 +157,6 @@ export default function LogView() {
     }
   }
 
-  // Convert Log Entry into Kanban Card
   const handleConvertToCard = async (id: string, title: string, tagIds: string[]) => {
     try {
       await updateItem(id, {
@@ -174,7 +165,6 @@ export default function LogView() {
         title
       }, tagIds)
 
-      // Remove from Log feed
       setItems(prev => prev.filter(item => item.id !== id))
       toast(`Promoted to Kanban Card: "${title}"`)
     } catch (err) {
@@ -182,7 +172,7 @@ export default function LogView() {
     }
   }
 
-  // Filter by search (title/body/tags) then float pinned items (priority 3) to top.
+  // pinned (priority 3) float to the top
   const displayedItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     const filtered = q
@@ -195,7 +185,6 @@ export default function LogView() {
     return [...filtered].sort((a, b) => b.priority - a.priority)
   }, [items, searchQuery])
 
-  // Loading skeleton view
   if (loading) {
     return (
       <div style={{
@@ -229,16 +218,13 @@ export default function LogView() {
               flexDirection: 'column',
               gap: 'var(--space-2)'
             }}>
-              {/* Header block (timestamp) */}
               <div className="flex-gap">
                 <Skeleton width={80} height={12} />
               </div>
-              {/* Body block (varying lines) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: '4px' }}>
                 <Skeleton width={i === 1 ? '90%' : i === 2 ? '75%' : i === 3 ? '60%' : '80%'} height={14} />
                 <Skeleton width={i === 1 ? '45%' : i === 2 ? '30%' : i === 3 ? '40%' : '50%'} height={14} />
               </div>
-              {/* Tags block */}
               <div className="flex-gap-mt">
                 <Skeleton width={50} height={16} borderRadius="var(--radius-sm)" />
                 {i % 2 === 0 && <Skeleton width={65} height={16} borderRadius="var(--radius-sm)" />}
@@ -259,7 +245,6 @@ export default function LogView() {
       background: 'var(--color-background)',
       overflow: 'hidden'
     }}>
-      {/* Header Bar */}
       <header style={{
         height: '48px',
         display: 'flex',
@@ -282,10 +267,10 @@ export default function LogView() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(v => !v)}
+              className="bg-surface-2 hover-bg-offset"
               style={{
                 fontSize: 'var(--text-xs)',
                 color: 'var(--color-secondary)',
-                background: 'var(--color-surface-2)',
                 padding: '2px 8px',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--color-surface-offset)',
@@ -295,12 +280,6 @@ export default function LogView() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'var(--color-surface-offset)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'var(--color-surface-2)'
               }}
             >
               #{activeWorkspace}
@@ -346,7 +325,6 @@ export default function LogView() {
         </div>
 
         <div className="row-md">
-          {/* Search */}
           <div className="row-relative">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '9px', color: 'var(--color-text-faint)', pointerEvents: 'none' }}>
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -386,6 +364,7 @@ export default function LogView() {
 
           {aiEnabled && <button
             onClick={() => setShowStandupModal(true)}
+            className="hover-brighten"
             style={{
               background: 'var(--color-secondary-muted)',
               border: '1px solid var(--color-secondary)',
@@ -401,8 +380,6 @@ export default function LogView() {
               whiteSpace: 'nowrap',
               transition: 'filter var(--duration-fast)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-            onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
@@ -412,7 +389,6 @@ export default function LogView() {
         </div>
       </header>
 
-      {/* Main feed container */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {items.length === 0 ? (
           <EmptyState
@@ -439,7 +415,6 @@ export default function LogView() {
         )}
       </div>
 
-      {/* Pinned compose bar */}
       <LogInput
         context={activeWorkspace}
         onSubmit={handleSubmitLog}

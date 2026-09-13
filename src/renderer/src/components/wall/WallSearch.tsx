@@ -22,8 +22,7 @@ export default function WallSearch({ query, setQuery, matches, jumpTo, labelOf }
         onChange={e => setQuery(e.target.value)}
         onKeyDown={e => {
           if (e.key === 'Escape') { setQuery(''); (e.target as HTMLInputElement).blur() }
-          // Enter jumps to the best match, so finding something never
-          // needs the mouse.
+          // Enter jumps to the best match, no mouse needed
           if (e.key === 'Enter' && matches.length > 0) { jumpTo(matches[0]); setQuery('') }
         }}
         placeholder="Find on this wall"
@@ -65,14 +64,13 @@ export default function WallSearch({ query, setQuery, matches, jumpTo, labelOf }
             <button
               key={m.id}
               onClick={() => { jumpTo(m); setQuery('') }}
+              className="bg-clear hover-bg-offset"
               style={{
-                display: 'block', width: '100%', textAlign: 'left', background: 'none',
+                display: 'block', width: '100%', textAlign: 'left',
                 border: 'none', cursor: 'pointer', padding: 'var(--space-2)',
                 borderRadius: 'var(--radius-sm)', color: 'var(--color-text-base)',
                 fontSize: 'var(--text-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
             >
               {labelOf(m) || '(untitled)'}
             </button>

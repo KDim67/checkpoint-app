@@ -1,4 +1,4 @@
-/** The tray panel: its contents, its size and its actions. */
+/** tray panel contents, size and actions */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -6,7 +6,6 @@ import { beginQuit } from '../windows'
 import { app } from 'electron'
 
 export function registerTrayHandlers(): void {
-  /** Live counts for the tray panel, so it says something worth reading. */
   ipcMain.handle(IpcChannels.TRAY_SUMMARY, async () => {
     const { getDb, getSetting } = await import('../db')
     try {
@@ -51,9 +50,7 @@ export function registerTrayHandlers(): void {
         break
       case 'capture': {
         hidePanel()
-        // showHud, not enableHud: the latter only registers the global hotkey
-        // and pre-creates the window hidden, so the button appeared to do
-        // nothing. showHud creates the window if needed and displays it.
+        // showHud not enableHud, the latter only registers the hotkey so the button did nothing
         const { showHud } = await import('../hud')
         showHud()
         break

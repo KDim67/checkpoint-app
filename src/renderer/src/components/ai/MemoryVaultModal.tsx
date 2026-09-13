@@ -1,12 +1,4 @@
-/**
- * The memory vault modal. Lifted out of AiStreamPanel unchanged, down to the
- * JSX indentation, which is why it still opens with the same constant tables
- * rather than a tidier arrangement.
- *
- * State lives in useMemoryVault and arrives as one `vault` prop. It must not
- * move in here: this modal unmounts when closed, and the chat stream writes to
- * the vault while it is shut.
- */
+/** state stays in useMemoryVault: this unmounts when closed and the stream writes while it's shut */
 
 import React from 'react'
 import type { MemoryCategory } from '../../../../shared/memoryActions'
@@ -15,7 +7,7 @@ import type { MemoryVault } from './useMemoryVault'
 
 interface Props {
   vault: MemoryVault
-  /** Shown in the header, so the user knows whose memories these are. */
+  /** whose memories these are */
   activeWorkspace: string
 }
 
@@ -84,7 +76,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
               display: 'flex', flexDirection: 'column',
               boxShadow: '0 20px 50px rgba(0,0,0,0.5)', overflow: 'hidden'
             }}>
-              {/* Header */}
               <div style={{
                 padding: '12px 16px 10px',
                 borderBottom: '1px solid var(--color-surface-offset)',
@@ -94,7 +85,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 gap: '8px',
                 flexShrink: 0
               }}>
-                {/* Row 1: Title and Close button */}
                 <div className="row-between-full">
                   <div className="row-8px">
                     <Brain size={15} style={{ color: '#a855f7' }} />
@@ -114,9 +104,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                   </button>
                 </div>
 
-                {/* Row 2: Badges and Action buttons */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  {/* Badges */}
                   <div className="row-6px">
                     <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
                       Context: {activeWorkspace}
@@ -126,7 +114,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                     </span>
                   </div>
 
-                  {/* Actions */}
                   <div className="row-6px">
                     <button
                       onClick={() => setShowAddMemoryForm(v => !v)}
@@ -162,7 +149,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 </div>
               </div>
 
-              {/* Search Bar */}
               <div style={{
                 padding: '10px 16px',
                 borderBottom: '1px solid var(--color-surface-offset)',
@@ -220,7 +206,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 )}
               </div>
 
-              {/* Add Memory Form */}
               {showAddMemoryForm && (
                 <div style={{
                   padding: '12px 16px',
@@ -284,8 +269,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                       style={{
                         background: newMemoryKey.trim() && newMemoryContent.trim() ? 'var(--color-accent-ai)' : 'var(--color-surface-offset)',
                         border: 'none',
-                        // Disabled, the fill is a plain surface rather than the
-                        // purple, and white on it did not survive light mode.
+                        // disabled fill is a plain surface, white on it vanished in light mode
                         color: newMemoryKey.trim() && newMemoryContent.trim() ? 'var(--color-on-accent)' : 'var(--color-text-faint)',
                         borderRadius: 'var(--radius-sm)',
                         padding: '3px 10px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer'
@@ -295,7 +279,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 </div>
               )}
 
-              {/* Memory List */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {memoryLoading ? (
                   <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -324,7 +307,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                       transition: 'all 200ms ease',
                       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)'
                     }}>
-                      {/* Memory Header Row */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden', minWidth: 0 }}>
                           <span style={{
@@ -352,15 +334,14 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                             {mem.memory_key}
                           </span>
                         </div>
-                        {/* Action Buttons */}
                         <div className="row-6px-fixed">
                           <button
                             onClick={() => handleTogglePinMemory(mem.id)}
                             title={mem.is_pinned ? 'Unpin memory' : 'Pin memory (always recalled first)'}
+                            className="bg-clear memory-vault-modal-pin"
+                            data-pinned={mem.is_pinned || undefined}
                             style={{
-                              background: 'transparent',
                               border: 'none',
-                              color: mem.is_pinned ? '#a855f7' : 'var(--color-text-faint)',
                               cursor: 'pointer',
                               padding: '4px',
                               borderRadius: '4px',
@@ -368,14 +349,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                               alignItems: 'center',
                               justifyContent: 'center',
                               transition: 'color 150ms, background-color 150ms'
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.15)'
-                              e.currentTarget.style.color = '#a855f7'
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.backgroundColor = 'transparent'
-                              if (!mem.is_pinned) e.currentTarget.style.color = 'var(--color-text-faint)'
                             }}
                           >
                             <Pin size={11} fill={mem.is_pinned ? 'currentColor' : 'none'} style={{ transform: mem.is_pinned ? 'none' : 'rotate(45deg)' }} />
@@ -383,10 +356,9 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                           <button
                             onClick={() => editingMemoryId === mem.id ? setEditingMemoryId(null) : handleStartEditMemory(mem)}
                             title="Edit memory content"
+                            className="bg-clear text-faint memory-vault-modal-edit"
                             style={{
-                              background: 'transparent',
                               border: 'none',
-                              color: 'var(--color-text-faint)',
                               cursor: 'pointer',
                               padding: '4px',
                               borderRadius: '4px',
@@ -394,14 +366,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                               alignItems: 'center',
                               justifyContent: 'center',
                               transition: 'color 150ms, background-color 150ms'
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'
-                              e.currentTarget.style.color = '#3b82f6'
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.backgroundColor = 'transparent'
-                              e.currentTarget.style.color = 'var(--color-text-faint)'
                             }}
                           >
                             <Edit2 size={11} />
@@ -409,10 +373,9 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                           <button
                             onClick={() => handleDeleteMemory(mem.id)}
                             title="Delete memory"
+                            className="bg-clear text-faint memory-vault-modal-delete"
                             style={{
-                              background: 'transparent',
                               border: 'none',
-                              color: 'var(--color-text-faint)',
                               cursor: 'pointer',
                               padding: '4px',
                               borderRadius: '4px',
@@ -421,21 +384,12 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                               justifyContent: 'center',
                               transition: 'color 150ms, background-color 150ms'
                             }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'
-                              e.currentTarget.style.color = '#ef4444'
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.backgroundColor = 'transparent'
-                              e.currentTarget.style.color = 'var(--color-text-faint)'
-                            }}
                           >
                             <Trash2 size={11} />
                           </button>
                         </div>
                       </div>
 
-                      {/* Content. Editable or read-only */}
                       {editingMemoryId === mem.id ? (
                         <div className="col-4px">
                           <textarea
@@ -469,7 +423,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                         </div>
                       )}
 
-                      {/* Footer meta */}
                       <div style={{ fontSize: '9px', color: 'var(--color-text-faint)', display: 'flex', gap: '8px', paddingLeft: '2px' }}>
                         <span>Recalled {mem.access_count}×</span>
                         <span>·</span>
@@ -481,7 +434,6 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 )}
               </div>
 
-              {/* Footer legend */}
               <div style={{
                 padding: '6px 14px',
                 borderTop: '1px solid var(--color-surface-offset)',

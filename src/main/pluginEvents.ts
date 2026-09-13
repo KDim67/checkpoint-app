@@ -1,22 +1,13 @@
-/**
- * The events plugins can react to. They used to get `app`, `BrowserWindow`, an
- * IPC channel and a logger: everything needed to run code at startup, nothing
- * to run it in response to anything.
- *
- * A small set naming user-meaningful moments rather than internal calls, so it
- * stays stable while the code underneath changes.
- */
+/** user-meaningful moments, not internal calls, so it stays stable as the code moves */
 
 import type { Item } from '../shared/types'
 
 interface PluginEventMap {
-  /** A card, task or log entry was created, by anyone. UI, agent or webhook. */
+  /** by anyone: UI, agent or webhook */
   'item:created': { item: Item }
-  /** An item moved into a finished state. */
+  /** moved into a finished state */
   'item:completed': { item: Item }
-  /** A focus session finished and was recorded. */
   'focus:completed': { context: string; durationMs: number }
-  /** A due-date reminder was raised. */
   'due:reminded': { itemId: string; title: string }
 }
 
@@ -37,14 +28,7 @@ export function onPluginEvent<K extends PluginEventName>(
   }
 }
 
-/**
- * Delivers an event to every subscriber.
- *
- * Each handler is isolated: a plugin that throws must not take down the write
- * that emitted the event, nor stop the other plugins from hearing it. This is
- * called from inside database writes, so a throw here would surface as a failed
- * card creation with no obvious cause.
- */
+/** handlers isolated: called inside db writes, a throw would look like a failed card creation */
 export function emitPluginEvent<K extends PluginEventName>(name: K, payload: PluginEventMap[K]): void {
   const set = listeners.get(name)
   if (!set || set.size === 0) return
@@ -57,7 +41,7 @@ export function emitPluginEvent<K extends PluginEventName>(name: K, payload: Plu
   }
 }
 
-/** Used by tests and by a full teardown of the plugin system. */
+/** for tests and full teardown */
 export function clearPluginEvents(): void {
   listeners.clear()
 }

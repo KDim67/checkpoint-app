@@ -1,132 +1,88 @@
-# Application Identity
 appId: com.checkpoint.app
 productName: Checkpoint
-# Windows reads this straight into the exe and installer file properties, so
-# it has to name the same holder and year as LICENSE. Kept in step by a test.
+# baked into the exe and installer; must match LICENSE's holder and year, a test checks
 copyright: "Copyright © 2026 Dimitrios Koutsompinas"
 
-# Updates
-# Straight at this repository's releases. No token is needed or wanted: the
-# repository is public, and electron-updater against a private one would want
-# a GH_TOKEN compiled into the shipped app.
-#
-# Publishing a release needs GH_TOKEN in the *build* environment only, and the
-# version in package.json must be bumped or the updater sees nothing new.
+# public repo, so no token ships; publishing needs GH_TOKEN at build time and a version bump
 publish:
   provider: github
   owner: KDim67
   repo: checkpoint-app
   releaseType: release
 
-# Output & Resources
 directories:
   output: dist
   buildResources: resources
 
-# File Inclusion (exclude dev artifacts & sources)
 files:
   - out/**/*
   - resources/**/*
-  - "!**/*.map"               # strip source maps
-  - "!**/*.d.ts"              # strip type declaration files
-  - "!**/test{s,}/**"        # strip any test directories
+  - "!**/*.map"
+  - "!**/*.d.ts"
+  - "!**/test{s,}/**"
   - "!**/__tests__/**"
   - "!**/*.{spec,test}.{js,ts}"
   - "!**/node_modules/.cache"
 
-# ASAR Archive
-# Pack all JS into a single ASAR for performance and to obscure source code.
-# Unpack native .node binaries so they can still be loaded by the OS.
+# native .node binaries stay unpacked so the OS can load them
 asar: true
 asarUnpack:
   - "**/*.node"
 
-# Languages
-# Electron ships a .pak per locale, 55 of them and 41 MB, and Checkpoint has no
-# translations to go with any of them. Chromium falls back to en-US for the few
-# strings it owns, such as the context menu on a text field.
+# 55 locale .paks (41 MB) and no translations; chromium falls back to en-US
 electronLanguages:
   - en-US
 
-# Compression
-# LZMA (level 9) gives the smallest possible installer. Slower to build
-# but dramatically smaller download size for end users.
+# smallest installer, slower build
 compression: maximum
 
-# Artifact naming
-# No spaces. The default is "${productName} Setup ${version}.${ext}", which
-# produces a local file with spaces while latest.yml records the name GitHub
-# will give the uploaded asset. The two agreeing is what makes an update
-# download work, and the surest way for them to agree is to leave nothing to
-# sanitise.
+# no spaces: latest.yml has to match the name GitHub gives the asset or updates fail
 artifactName: ${name}-${version}-${os}-${arch}.${ext}
 
-# Windows Installer
 win:
   target:
     - target: nsis
       arch:
         - x64
   icon: resources/icon.ico
-  # Unsigned builds trip SmartScreen on every install. When you have a
-  # certificate you do NOT need to edit this file: electron-builder reads
-  # CSC_LINK (path or base64 of the .p12) and CSC_KEY_PASSWORD from the
-  # environment. Prefer that over the keys below so the certificate never
-  # ends up committed.
+  # unsigned trips SmartScreen; sign via CSC_LINK / CSC_KEY_PASSWORD env, not keys here
   # certificateFile: certs/cert.p12
   # certificatePassword: ${env.WIN_CERT_PASSWORD}
-  requestedExecutionLevel: asInvoker  # do NOT request admin unless truly needed
+  requestedExecutionLevel: asInvoker  # never ask for admin
 
 nsis:
-  # Install UX
-  # One click. Double-click the download, watch a short progress window, and
-  # the app opens. No wizard, no Next, no folder to choose. It is what Discord,
-  # Obsidian and Figma do, and it is what people now expect a small desktop app
-  # to do.
-  #
-  # There is a real trade here: nobody can pick an install directory any more.
-  # Per-user is what makes that acceptable, since the app lands somewhere the
-  # user already owns rather than in Program Files.
+  # one click, no wizard; per-user is what makes losing the directory choice acceptable
   oneClick: true
 
-  # Installs to %LOCALAPPDATA%\Programs, which the user can write to, so there
-  # is no UAC prompt at any point. A machine-wide install would need one on
-  # every install, update and uninstall.
+  # %LOCALAPPDATA%\Programs, so never a UAC prompt
   perMachine: false
 
-  # Opens as soon as it is done. With no wizard there is no final page to put a
-  # "launch now" tick on, so this is the only way it ever opens itself.
+  # no final wizard page for a launch tick, so this is the only auto-open
   runAfterFinish: true
 
-  # Shortcuts
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: "Checkpoint"             # label shown on desktop & start menu
+  shortcutName: "Checkpoint"
 
-  # Branding
-  # In one-click mode the header icon is the whole of the installer's face:
-  # there is no sidebar image and no header band to fill.
+  # in one-click mode the header icon is the installer's whole face
   installerIcon: resources/icon.ico
   uninstallerIcon: resources/icon.ico
   installerHeaderIcon: resources/icon.ico
 
-  # Uninstall
-  deleteAppDataOnUninstall: false         # preserve user data by default
+  deleteAppDataOnUninstall: false         # keep user data
 
-  # Multi-language
   installerLanguages:
     - en_US
 
-# macOS DMG
 mac:
   target:
     - target: dmg
       arch:
         - x64
-        - arm64              # Apple Silicon support
+        - arm64
   icon: resources/icon.png
   category: public.app-category.developer-tools
-  # Uncomment to enable code signing & notarisation:
+  # uncomment to sign and notarise:
   # identity: "Developer ID Application: Your Name (TEAM_ID)"
   # hardenedRuntime: true
   # gatekeeperAssess: false
@@ -146,7 +102,6 @@ dmg:
       type: link
       path: /Applications
 
-# Linux AppImage
 linux:
   target:
     - target: AppImage

@@ -5,9 +5,7 @@ import { join } from 'node:path'
 import { initDb, closeDb, getDb } from '../src/main/db'
 import { collectDbTexts } from '../src/main/mediaService'
 
-// The prune deletes files off disk, so what it counts as a reference is the
-// only thing standing between a wall full of photos and an empty one. These
-// run the real schema against a throwaway database.
+// what counts as a reference is all that stands between a wall of photos and nothing
 
 let dir: string
 
@@ -32,8 +30,7 @@ const references = (filename: string): boolean =>
 
 describe('what the media prune counts as a reference', () => {
   it('sees an image on a wall', () => {
-    // Regression: walls live in app_settings, which the scan did not read, so
-    // every wall image looked orphaned and the prune deleted the lot.
+    // regression: walls in app_settings weren't scanned and got pruned
     setSetting('wall_work', JSON.stringify({
       items: [{ id: 'a', kind: 'image', ref: 'ab12.png', x: 0, y: 0, width: 10, height: 10, z: 0 }],
       camera: { x: 0, y: 0, zoom: 1 }
@@ -67,8 +64,7 @@ describe('what the media prune counts as a reference', () => {
   })
 
   it('reads a table added after this was written', () => {
-    // The scan walks the schema rather than a hand-written list, so a new table
-    // cannot quietly reintroduce the bug above.
+    // schema walk, so a new table can't bring that back
     getDb().exec('CREATE TABLE later_feature (id TEXT PRIMARY KEY, note TEXT)')
     getDb().prepare('INSERT INTO later_feature (id, note) VALUES (?, ?)').run('x', 'kl12.png')
     expect(references('kl12.png')).toBe(true)
@@ -81,8 +77,7 @@ describe('what the media prune counts as a reference', () => {
                 VALUES (?, 'log', 'work', ?, '', '{}', ?, ?)`)
       .run('i2', 'mn34.png', now, now)
 
-    // items_fts holds a copy of the same text; the point is that walking the
-    // schema does not throw on a virtual table or its blob shadows.
+    // virtual tables and blob shadows mustn't throw
     expect(() => collectDbTexts(getDb())).not.toThrow()
     expect(references('mn34.png')).toBe(true)
   })

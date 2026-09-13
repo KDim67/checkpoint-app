@@ -6,12 +6,9 @@ import useEscapeKey from '../ui/useEscapeKey'
 
 interface ArchiveBinProps {
   archivedColumns: ColumnConfig[]
-  /** Every card on the board. The drawer shows the archived ones. */
+  /** the drawer shows the archived ones */
   cards: Item[]
-  /**
-   * Owned by the board, not the drawer. The drawer unmounts while the board
-   * reloads, and a selection being built up should still be there afterwards.
-   */
+  /** owned by the board: the drawer unmounts on reload and the selection should survive */
   selectedIds: Set<string>
   setSelected: Dispatch<SetStateAction<Set<string>>>
   onClose: () => void
@@ -36,7 +33,7 @@ export default function ArchiveBin({
   onBulkRestore,
   onBulkDelete
 }: ArchiveBinProps) {
-  // Mounted only while open, so both are simply on for as long as it exists.
+  // mounted only while open, so both are just on
   const archiveBinRef = useFocusTrap(true)
   useEscapeKey(onClose, true)
 
@@ -83,7 +80,6 @@ export default function ArchiveBin({
           animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
         }}
       >
-        {/* Header */}
         <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="text-item-strong">
             Archive Bin
@@ -96,10 +92,8 @@ export default function ArchiveBin({
           </button>
         </div>
 
-        {/* Content list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           
-          {/* Archived Columns List */}
           <div className="col">
             <span className="label-caps-sm">
               Archived Columns ({archivedColumns.length})
@@ -141,7 +135,6 @@ export default function ArchiveBin({
             )}
           </div>
 
-          {/* Archived Cards List */}
           {(() => {
             const archivedCards = cards.filter(c => c.status === 'archived')
             const allSelected = archivedCards.length > 0 && archivedCards.every(c => selectedIds.has(c.id))
@@ -162,7 +155,7 @@ export default function ArchiveBin({
                   )}
                 </div>
 
-                {/* Bulk action bar. Appears when items are selected */}
+                {/* shows when something's selected */}
                 {selCount > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--color-primary-muted)', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }}>
                     <span className="text-label-xs-semibold">

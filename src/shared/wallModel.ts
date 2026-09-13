@@ -1,83 +1,46 @@
-/**
- * The Wall: a freeform canvas per workspace. Nothing snaps, sorts or has a
- * status, so the model stays dumb. Coordinates, sizes, colours, paint order.
- *
- * A card here is a reference, never a copy. It stores an id, so the card always
- * renders live instead of going stale.
- *
- * Hand-normalised like `boardModel.ts`: this is user data that outlives builds.
- */
+/** a card is a reference, never a copy; hand-normalised since user data outlives builds */
 
-/**
- * `note` is a sticky note, `doc` a real note from the Notes view. Yes,
- * `sticky`/`note` would read better, but walls already store stickies as
- * `note` and no migration could tell the two apart after a rename.
- */
+/** note is a sticky, doc a real note; stored names can't be migrated apart */
 export type WallItemKind = 'card' | 'note' | 'doc' | 'image' | 'text' | 'frame' | 'ink' | 'arrow'
 
 export interface WallItem {
-  /** Wall-local id. Two placements of the same card are two items. */
+  /** wall-local, two placements of one card are two items */
   id: string
   kind: WallItemKind
   x: number
   y: number
   width: number
   height: number
-  /**
-   * What this points at: an item id for 'card', a note title for 'doc', a media
-   * filename for 'image'. Unused by 'note', 'text' and 'frame'.
-   */
+  /** item id for card, note title for doc, media filename for image */
   ref?: string
-  /** Body for 'note' and 'text'; the label for 'frame' and for an arrow. */
+  /** body for note/text, label for frame and arrow */
   text?: string
-  /** Hex, or absent to use the kind's default. */
+  /** hex, or absent for the kind's default */
   color?: string
-  /**
-   * An ink stroke, as flat [x0,y0,x1,y1,…] in the item's own box. Kept in box
-   * coordinates rather than wall ones so moving and resizing are the same
-   * operations they are for everything else: the SVG scales with the box.
-   */
+  /** flat [x0,y0,...] in the item's box, so move and resize work like everything else */
   points?: number[]
   strokeWidth?: number
-  /**
-   * How hard this stroke was smoothed, 0 to 1. Absent or zero draws the raw
-   * samples. Stored per stroke rather than read from the live setting, so
-   * turning smoothing off later does not redraw the lines already on the wall.
-   */
+  /** 0-1 per stroke, so toggling smoothing later doesn't redraw old lines */
   smooth?: number
-  /**
-   * An arrow's ends, as item ids. An arrow is not positioned: it is redrawn
-   * from whatever the two items are doing, so it follows them for free and
-   * cannot drift out of step with what it is pointing at.
-   */
+  /** item ids; arrows are redrawn from their items so they never drift */
   from?: string
   to?: string
-  /**
-   * Where an end sits when it is attached to nothing, in wall coordinates.
-   * An end has one or the other: an item it follows, or a point it stays at.
-   */
+  /** a free end's wall point; an end has an item or a point */
   fromPoint?: { x: number; y: number }
   toPoint?: { x: number; y: number }
-  /**
-   * How an arrow is drawn. All three are absent at their default, so an arrow
-   * saved before styles existed still reads as the plain one it was.
-   */
+  /** absent at defaults, so pre-style arrows read as plain */
   arrowShape?: ArrowShape
   arrowLine?: ArrowLine
   arrowHeads?: ArrowHeads
-  /** Degrees. Freedom includes the freedom to put something on a slant. */
+  /** degrees */
   rotation?: number
-  /** Paint order. Explicit because it has to survive a reload. */
+  /** explicit so it survives a reload */
   z: number
-  /**
-   * Pinned in place: not draggable, not resizable, not selectable by marquee.
-   * What a background reference image needs so that reaching past it to pan
-   * does not drag it instead.
-   */
+  /** no drag, resize or marquee, so panning past a background image doesn't grab it */
   locked?: boolean
 }
 
-/** A wall's identity. The contents live under `wallDocKey`, not in here. */
+/** contents live under wallDocKey */
 export interface WallRef {
   id: string
   name: string
@@ -98,18 +61,16 @@ export interface WallCamera {
 export interface WallDoc {
   version: 1
   items: WallItem[]
-  /** Persisted so reopening a wall lands where you left it, not at the origin. */
+  /** reopening lands where you left it */
   camera: WallCamera
-  /** Hex, or a preset name the view understands. */
+  /** hex or a preset name */
   background: string
 }
-
-// Defaults
 
 export const MIN_ZOOM = 0.2
 export const MAX_ZOOM = 3
 
-/** Sizes chosen so a freshly dropped item is legible without being resized. */
+/** legible when dropped, no resize needed */
 export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number }> = {
   card: { width: 260, height: 120 },
   note: { width: 200, height: 200 },
@@ -117,12 +78,12 @@ export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number
   image: { width: 280, height: 200 },
   text: { width: 240, height: 48 },
   frame: { width: 480, height: 360 },
-  // Both are sized from their contents, never from a default.
+  // sized from their contents
   ink: { width: 120, height: 120 },
   arrow: { width: 1, height: 1 }
 }
 
-/** Sticky-note colours. Muted on purpose: a wall of saturated squares is noise. */
+/** muted, a wall of saturated squares is noise */
 export const WALL_COLORS = [
   '#f6c453', '#f28b82', '#a7c7e7', '#b5e6b5',
   '#d7b3e8', '#f5b78c', '#9fdfd5', '#cfd3da'
@@ -130,21 +91,15 @@ export const WALL_COLORS = [
 
 const DEFAULT_CAMERA: WallCamera = { x: 0, y: 0, zoom: 1 }
 
-/**
- * The first wall keeps the original single-wall key so old walls are still
- * found. Later ones are keyed by id alone. Workspace names are free text, so
- * `wall_${context}_${id}` could collide with another workspace's wall.
- */
+/** the first wall keeps the old single-wall key; later ones by id since names are free text */
 export const DEFAULT_WALL_ID = 'main'
 const DEFAULT_WALL_NAME = 'Wall'
 
 export const wallDocKey = (context: string, wallId: string = DEFAULT_WALL_ID): string =>
   wallId === DEFAULT_WALL_ID ? `wall_${context}` : `wall_doc_${wallId}`
 
-/** Which walls a workspace has, and which one it was left on. */
+/** which walls exist and which was open */
 export const wallIndexKey = (context: string): string => `wall_index_${context}`
-
-// Normalisation
 
 function num(v: unknown, fallback: number): number {
   const n = typeof v === 'number' ? v : parseFloat(String(v))
@@ -157,26 +112,24 @@ function str(v: unknown): string {
 
 const KINDS: WallItemKind[] = ['card', 'note', 'doc', 'image', 'text', 'frame', 'ink', 'arrow']
 
-/** Pen widths, in wall units. Three is enough to be useful and to choose from. */
+/** wall units, three is enough */
 export const STROKE_WIDTHS = [2, 4, 8]
 
-/** The route a connector takes between its two items. */
+/** the route between two items */
 export type ArrowShape = 'straight' | 'curved' | 'elbow'
-/** What the line itself looks like. */
 export type ArrowLine = 'solid' | 'dashed' | 'dotted'
-/** Which ends get a head. `none` makes it a plain connector. */
+/** none makes a plain connector */
 export type ArrowHeads = 'end' | 'both' | 'none'
 
-// Order matters: the palette steps through each in turn, and the first is the
-// default that is never written to the document.
+// order matters: the palette steps through, the first is the unwritten default
 export const ARROW_SHAPES: readonly ArrowShape[] = ['straight', 'curved', 'elbow']
 export const ARROW_LINES: readonly ArrowLine[] = ['solid', 'dashed', 'dotted']
 export const ARROW_HEAD_MODES: readonly ArrowHeads[] = ['end', 'both', 'none']
 
-/** How hard a smoothed stroke gets smoothed. The pen offers this or nothing. */
+/** smoothing is this strength or nothing */
 export const SMOOTHING_STRENGTH = 0.9
 
-/** A point off a stored document, or null if either coordinate is unusable. */
+/** null if a coordinate is unusable */
 function readPoint(raw: unknown): { x: number; y: number } | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const o = raw as Record<string, unknown>
@@ -185,10 +138,7 @@ function readPoint(raw: unknown): { x: number; y: number } | null {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
 }
 
-/**
- * A path is only a path with two points, and an odd-length array means the
- * coordinates have been truncated somewhere, so the pairs cannot be trusted.
- */
+/** two points minimum; odd length means truncated */
 function normalizePoints(raw: unknown): number[] | null {
   if (!Array.isArray(raw) || raw.length < 4 || raw.length % 2 !== 0) return null
   const points = raw.map(v => (typeof v === 'number' && Number.isFinite(v) ? v : null))
@@ -202,14 +152,11 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const kind = KINDS.includes(o.kind as WallItemKind) ? (o.kind as WallItemKind) : null
   if (!kind) return null
 
-  // A card, doc or image with nothing to point at cannot render, and an empty
-  // box the user cannot identify is worse than a missing one.
+  // nothing to point at can't render
   const ref = str(o.ref).trim()
   if ((kind === 'card' || kind === 'doc' || kind === 'image') && !ref) return null
 
-  // Same rule for the two drawn kinds: a stroke with no path and an arrow with
-  // no ends are both invisible, and an invisible item cannot be selected to be
-  // deleted.
+  // no path or no ends is invisible, and invisible can't be selected to delete
   const points = normalizePoints(o.points)
   if (kind === 'ink' && !points) return null
 
@@ -217,19 +164,15 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const to = str(o.to).trim()
   const fromPoint = readPoint(o.fromPoint)
   const toPoint = readPoint(o.toPoint)
-  // Each end needs one anchor or the other. An end with neither cannot be
-  // drawn, and an arrow that cannot be drawn cannot be selected to be deleted.
+  // each end needs an item or a point
   if (kind === 'arrow' && ((!from && !fromPoint) || (!to && !toPoint))) return null
 
-  // `true` is what the first version wrote, and the build after it wrote a
-  // strength off a dial. Any strength still renders, so nothing already drawn
-  // changes shape under the user.
+  // true from v1, a strength from the dial build; both still render
   const smooth = o.smooth === true
     ? SMOOTHING_STRENGTH
     : Math.min(1, Math.max(0, num(o.smooth, 0)))
 
-  // Anything unrecognised falls back to the default rather than being kept,
-  // so a document edited by hand cannot ask for a style that cannot be drawn.
+  // unknown styles fall back so hand edits can't ask for the undrawable
   const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | null => {
     const v = str(value) as T
     return allowed.includes(v) ? v : null
@@ -244,8 +187,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     kind,
     x: num(o.x, 0),
     y: num(o.y, 0),
-    // Floors rather than defaults: a zero-size item is unclickable and so
-    // unrecoverable without editing the database by hand.
+    // floors: zero-size items are unclickable
     width: Math.max(40, num(o.width, size.width)),
     height: Math.max(32, num(o.height, size.height)),
     ...(ref ? { ref } : {}),
@@ -256,12 +198,10 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(smooth > 0 ? { smooth } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
-    // The item wins when both are somehow present, so a stale point left over
-    // from a detached end cannot override the thing it was reattached to.
+    // the item wins over a stale point
     ...(!from && fromPoint ? { fromPoint } : {}),
     ...(!to && toPoint ? { toPoint } : {}),
-    // The default is left out, so only an arrow that was actually restyled
-    // carries the field.
+    // defaults left out, only restyled arrows carry it
     ...(arrowShape && arrowShape !== ARROW_SHAPES[0] ? { arrowShape } : {}),
     ...(arrowLine && arrowLine !== ARROW_LINES[0] ? { arrowLine } : {}),
     ...(arrowHeads && arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {}),
@@ -281,10 +221,7 @@ export function normalizeCamera(raw: unknown): WallCamera {
   }
 }
 
-/**
- * Accepts anything. A parsed document, a JSON string, undefined, an older
- * shape, and returns a wall that will render.
- */
+/** anything in, a renderable wall out */
 export function normalizeWallDoc(raw: unknown): WallDoc {
   let source = raw
   if (typeof raw === 'string') {
@@ -307,14 +244,12 @@ export function normalizeWallDoc(raw: unknown): WallDoc {
   }
 }
 
-// Operations
-
-/** The next paint order above everything present. */
+/** above everything present */
 export function topZ(items: WallItem[]): number {
   return items.reduce((max, i) => Math.max(max, i.z), 0) + 1
 }
 
-/** Moves one item to the front without disturbing the order of the rest. */
+/** without disturbing the rest */
 export function bringToFront(items: WallItem[], id: string): WallItem[] {
   const top = topZ(items)
   return items.map(i => (i.id === id ? { ...i, z: top } : i))
@@ -325,7 +260,7 @@ export function sendToBack(items: WallItem[], id: string): WallItem[] {
   return items.map(i => (i.id === id ? { ...i, z: min } : i))
 }
 
-/** Painting order: lowest z first, so the highest ends up on top. */
+/** lowest z first */
 export function inPaintOrder(items: WallItem[]): WallItem[] {
   return [...items].sort((a, b) => a.z - b.z)
 }
@@ -333,10 +268,7 @@ export function inPaintOrder(items: WallItem[]): WallItem[] {
 export interface Bounds { minX: number; minY: number; maxX: number; maxY: number }
 
 export function boundsOf(items: WallItem[]): Bounds | null {
-  // An arrow's own box is a placeholder that is not where it is drawn, so
-  // counting it would pull "fit to content" towards a point with nothing at
-  // it. An end pinned to the wall is different: that really is somewhere the
-  // wall extends to, and leaving it out crops it off an export.
+  // arrow boxes are placeholders; a pinned end is real extent
   const boxed = items.filter(i => i.kind !== 'arrow')
   const loose = items
     .filter(i => i.kind === 'arrow')
@@ -366,10 +298,7 @@ export function boundsOf(items: WallItem[]): Bounds | null {
   )
 }
 
-/**
- * Frames everything, with breathing room. This is "fit to content". The way
- * back from panning into empty space, which has no scrollbars to rescue you.
- */
+/** fit to content, the way back from empty space */
 export function fitCamera(
   items: WallItem[],
   viewport: { width: number; height: number },
@@ -391,8 +320,7 @@ export function fitCamera(
     )
   )
 
-  // Centre the content: the camera offset is in screen space, so the content
-  // centre is scaled before being subtracted.
+  // the camera offset is in screen space, so scale the centre first
   return {
     zoom,
     x: viewport.width / 2 - ((b.minX + b.maxX) / 2) * zoom,
@@ -400,7 +328,7 @@ export function fitCamera(
   }
 }
 
-/** Screen point to wall point, for dropping something where the cursor is. */
+/** for dropping at the cursor */
 export function toWallPoint(
   screen: { x: number; y: number },
   camera: WallCamera
@@ -411,15 +339,14 @@ export function toWallPoint(
   }
 }
 
-/** Zooms about a point, so the thing under the cursor stays under the cursor. */
+/** the thing under the cursor stays there */
 export function zoomAt(
   camera: WallCamera,
   screen: { x: number; y: number },
   factor: number
 ): WallCamera {
   const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, camera.zoom * factor))
-  // Nothing to do if the clamp swallowed the change; recomputing would drift
-  // the camera sideways for no visible zoom.
+  // the clamp swallowed it; recomputing would drift sideways
   if (zoom === camera.zoom) return camera
 
   const before = toWallPoint(screen, camera)
@@ -430,7 +357,7 @@ export function zoomAt(
   }
 }
 
-/** Creates an item at a wall position, sized and coloured for its kind. */
+/** sized and coloured for its kind */
 export function createWallItem(
   kind: WallItemKind,
   at: { x: number; y: number },
@@ -441,8 +368,7 @@ export function createWallItem(
   return {
     id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     kind,
-    // Placed centred on the cursor rather than starting there, which is what
-    // dropping something somewhere feels like it should do.
+    // centred on the cursor, like a drop should feel
     x: at.x - size.width / 2,
     y: at.y - size.height / 2,
     width: size.width,
@@ -452,11 +378,9 @@ export function createWallItem(
   }
 }
 
-// Selection and bulk edits
-
 export interface Rect { x: number; y: number; width: number; height: number }
 
-/** Normalises a drag between two points into a rectangle with positive size. */
+/** positive size from any two points */
 export function rectFromPoints(a: { x: number; y: number }, b: { x: number; y: number }): Rect {
   return {
     x: Math.min(a.x, b.x),
@@ -466,10 +390,7 @@ export function rectFromPoints(a: { x: number; y: number }, b: { x: number; y: n
   }
 }
 
-/**
- * Intersection, not containment. Needing to enclose a big frame means zooming
- * out first, which feels broken. Locked items skipped; that is what locked is.
- */
+/** intersection, not containment; locked items skipped */
 export function itemsInRect(items: WallItem[], rect: Rect): string[] {
   const right = rect.x + rect.width
   const bottom = rect.y + rect.height
@@ -479,14 +400,14 @@ export function itemsInRect(items: WallItem[], rect: Rect): string[] {
     .map(i => i.id)
 }
 
-/** Moves a set of items together, leaving locked ones where they are. */
+/** locked ones stay put */
 export function moveItems(items: WallItem[], ids: Set<string>, dx: number, dy: number): WallItem[] {
   return items.map(i =>
     ids.has(i.id) && !i.locked ? { ...i, x: i.x + dx, y: i.y + dy } : i
   )
 }
 
-/** Applies the same patch to a set of items. Locked items are left alone. */
+/** locked left alone */
 export function patchItems(
   items: WallItem[],
   ids: Set<string>,
@@ -495,10 +416,7 @@ export function patchItems(
   return items.map(i => (ids.has(i.id) && !i.locked ? { ...i, ...patch } : i))
 }
 
-/**
- * Offset so duplicates are not exactly on top of the originals. Returns only
- * the new items. The caller appends and selects them.
- */
+/** offset from the originals; the caller appends and selects */
 export function duplicateItems(
   items: WallItem[],
   ids: Set<string>,
@@ -515,14 +433,13 @@ export function duplicateItems(
         y: i.y + offset,
         z: z++
       }
-      // A duplicate arrives unlocked whatever the original was: otherwise the
-      // copy of a locked background cannot be moved into place.
+      // copies arrive unlocked so a locked background's copy can be moved
       delete copy.locked
       return copy
     })
 }
 
-/** Rounds to a grid. Used only when the user asks for snapping. */
+/** only when snapping is on */
 export function snap(value: number, grid: number): number {
   if (grid <= 0) return value
   return Math.round(value / grid) * grid
@@ -530,17 +447,10 @@ export function snap(value: number, grid: number): number {
 
 export const SNAP_GRID = 24
 
-/** Dots closer together than this stop reading as dots. */
+/** closer stops reading as dots */
 export const MIN_GRID_PX = 12
 
-/**
- * The spacing to draw the background dots at, in screen pixels.
- *
- * The step doubles instead of the spacing shrinking without limit. Zoomed all
- * the way out the plain grid lands under five pixels apart, which Chromium
- * paints as a flat tint rather than as dots, and in patches that disagree with
- * each other along its tile boundaries.
- */
+/** doubles the step instead of shrinking; under ~5px chromium paints a flat, patchy tint */
 export function gridSpacing(zoom: number): number {
   if (!(zoom > 0)) return SNAP_GRID
   let step = SNAP_GRID
@@ -548,18 +458,11 @@ export function gridSpacing(zoom: number): number {
   return step * zoom
 }
 
-/**
- * Topmost item under a wall point. Needed because pointer capture retargets the
- * following click/dblclick to the viewport, so `event.target` lies.
- *
- * Uses the unrotated box, so rotated items are a little generous at the corners.
- */
+/** pointer capture retargets clicks, so hit-test by point; unrotated box */
 export function itemAtPoint(items: WallItem[], point: { x: number; y: number }): WallItem | null {
   let hit: WallItem | null = null
   for (const i of items) {
-    // Neither of these is really the shape of its box. An arrow's box is a
-    // placeholder, and a stroke's is a rectangle around a line that is mostly
-    // not in it, so treating either as solid blocks whatever is underneath.
+    // arrow and ink boxes aren't their shape, don't let them block
     if (i.kind === 'arrow' || i.kind === 'ink') continue
     const inside =
       point.x >= i.x && point.x <= i.x + i.width &&
@@ -569,7 +472,7 @@ export function itemAtPoint(items: WallItem[], point: { x: number; y: number }):
   return hit
 }
 
-/** A camera that centres one item in the viewport, keeping the current zoom. */
+/** keeps zoom */
 export function cameraCentredOn(
   item: WallItem,
   viewport: { width: number; height: number },
@@ -582,15 +485,12 @@ export function cameraCentredOn(
   }
 }
 
-/**
- * Titles live on the referenced record, not the wall item, so the caller
- * resolves them and passes them in.
- */
+/** titles live on the referenced record, the caller resolves them */
 function searchableText(item: WallItem, resolvedTitle?: string): string {
   return [item.text ?? '', resolvedTitle ?? ''].join(' ').trim().toLowerCase()
 }
 
-/** Items whose text contains every word of the query, in paint order. */
+/** every word, in paint order */
 export function searchItems(
   items: WallItem[],
   query: string,
@@ -605,8 +505,6 @@ export function searchItems(
     })
     .reverse()
 }
-
-// Several walls per workspace
 
 function newWallId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
@@ -628,17 +526,14 @@ export function normalizeWallIndex(raw: unknown): WallIndex {
       if (!entry || typeof entry !== 'object') return null
       const e = entry as Record<string, unknown>
       const id = str(e.id).trim()
-      // A duplicate id would mean two tabs writing the same document, which
-      // reads as one wall losing edits to another.
+      // duplicate ids would have two tabs writing one doc
       if (!id || seen.has(id)) return null
       seen.add(id)
       return { id, name: str(e.name).trim() || DEFAULT_WALL_NAME }
     })
     .filter((w): w is WallRef => w !== null)
 
-  // Only when nothing was stored: a workspace that has never had an index still
-  // has a wall at the original key, and this is what makes it reachable. A
-  // stored list is trusted as it stands, so a deleted wall stays deleted.
+  // only when nothing's stored, so a deleted wall stays deleted
   if (walls.length === 0) walls.push({ id: DEFAULT_WALL_ID, name: DEFAULT_WALL_NAME })
 
   const stored = str(o.activeId)
@@ -649,7 +544,7 @@ export function normalizeWallIndex(raw: unknown): WallIndex {
   }
 }
 
-/** Adds a wall and switches to it, since creating one is a request to use it. */
+/** creating one is a request to use it */
 export function createWall(index: WallIndex, name?: string): { index: WallIndex; wall: WallRef } {
   const wall: WallRef = {
     id: newWallId(),
@@ -667,10 +562,7 @@ export function renameWall(index: WallIndex, id: string, name: string): WallInde
   return { ...index, walls: index.walls.map(w => (w.id === id ? { ...w, name: trimmed } : w)) }
 }
 
-/**
- * Refuses to remove the last wall: a workspace with no wall has nowhere to put
- * the next thing, and the view would have nothing to show.
- */
+/** never the last wall */
 export function removeWall(index: WallIndex, id: string): WallIndex {
   if (index.walls.length <= 1) return index
   const walls = index.walls.filter(w => w.id !== id)
@@ -686,15 +578,7 @@ export function setActiveWall(index: WallIndex, id: string): WallIndex {
   return index.walls.some(w => w.id === id) ? { ...index, activeId: id } : index
 }
 
-// Frames as containers
-
-/**
- * What a frame holds. Items whose centre is inside it. Centre, not full
- * enclosure, or a frame quietly drops things at its border.
- *
- * Locked items excluded (a locked background image is the usual case), and
- * rotation ignored: the unrotated rect is what gets tested.
- */
+/** centre inside, not full enclosure; locked and rotation ignored */
 export function itemsInFrame(items: WallItem[], frame: WallItem): string[] {
   if (frame.kind !== 'frame') return []
   const right = frame.x + frame.width
@@ -710,10 +594,7 @@ export function itemsInFrame(items: WallItem[], frame: WallItem): string[] {
     .map(item => item.id)
 }
 
-/**
- * What actually moves: a frame brings its contents. Loops until nothing new is
- * added so nested frames follow. Terminates because the set only grows.
- */
+/** frames bring contents, loops for nesting; terminates since the set only grows */
 export function withFrameContents(items: WallItem[], ids: Set<string>): Set<string> {
   const out = new Set(ids)
   let growing = true
@@ -733,37 +614,13 @@ export function withFrameContents(items: WallItem[], ids: Set<string>): Set<stri
   return out
 }
 
-// Drawing and arrows
-
-/** Margin around a stroke so the cap is not clipped by its own box. */
+/** so the cap isn't clipped */
 const INK_PAD = 8
 
-/**
- * Turns a drawn path in wall coordinates into an ink item.
- *
- * The box is the path's bounds plus a pad, and the points are rebased into it,
- * so the stroke moves and resizes like any other item with no special cases.
- * Null when the path is a single point, which is a click and not a stroke.
- */
-/**
- * How far a sample may sit from the line between its neighbours before it is
- * worth keeping. In wall units, and well under a stroke's own width, so the
- * line that is drawn does not change shape.
- */
+/** well under a stroke width, so the drawn line doesn't change shape */
 export const SIMPLIFY_TOLERANCE = 0.7
 
-/**
- * Ramer-Douglas-Peucker: drops the samples a stroke does not need.
- *
- * A pointer emits a sample every few milliseconds, so a single confident
- * gesture arrives as hundreds of points sitting almost exactly on top of one
- * another. They cost nothing to draw but everything is stored: the wall
- * document is JSON in a settings row, it is synced between machines, and it is
- * exported. A drawing session used to add tens of thousands of numbers to it.
- *
- * The first and last points are always kept, so a line drawn to touch
- * something still touches it.
- */
+/** RDP: pointers emit hundreds of near-identical samples and all are stored and synced; ends kept */
 export function simplifyPath(points: Point[], tolerance = SIMPLIFY_TOLERANCE): Point[] {
   if (points.length < 3) return points
 
@@ -771,8 +628,7 @@ export function simplifyPath(points: Point[], tolerance = SIMPLIFY_TOLERANCE): P
   keep[0] = true
   keep[points.length - 1] = true
 
-  // Iterative rather than recursive: a long stroke is thousands of points and
-  // the recursion depth follows the data.
+  // iterative, long strokes would recurse thousands deep
   const stack: Array<[number, number]> = [[0, points.length - 1]]
 
   for (let span = stack.pop(); span; span = stack.pop()) {
@@ -790,7 +646,7 @@ export function simplifyPath(points: Point[], tolerance = SIMPLIFY_TOLERANCE): P
       }
     }
 
-    // Nothing strays far enough, so everything between the ends goes.
+    // nothing strays far enough, drop everything between
     if (furthest === -1) continue
 
     keep[furthest] = true
@@ -807,8 +663,7 @@ export function inkFromPath(
 ): WallItem | null {
   if (path.length < 2) return null
 
-  // Thinned before the box is measured, so a sample dropped at the very edge
-  // cannot leave the box larger than the stroke inside it.
+  // thinned before measuring so a dropped edge sample can't bloat the box
   const simplified = simplifyPath(path)
 
   const xs = simplified.map(p => p.x)
@@ -823,8 +678,7 @@ export function inkFromPath(
     kind: 'ink',
     x: minX,
     y: minY,
-    // Not floored to the usual minimum: a straight horizontal line is a
-    // legitimate stroke and its box is genuinely only as tall as the pad.
+    // not floored, a horizontal line's box is only the pad tall
     width,
     height,
     points: simplified.flatMap(p => [p.x - minX, p.y - minY]),
@@ -833,20 +687,7 @@ export function inkFromPath(
   }
 }
 
-/**
- * The `d` of an ink stroke, in the box coordinates the SVG scales.
- *
- * Smoothed strokes curve through the midpoint of each pair of samples, using
- * the sample itself as the control point. Pointer samples are noisy and evenly
- * spaced, so this is enough to take the hand-shake out without the line
- * drifting away from where it was drawn.
- */
-/**
- * Pulls each interior sample towards the average of its neighbours.
- *
- * The ends are left exactly where they were: a line drawn to touch something
- * has to keep touching it, however hard the rest is smoothed.
- */
+/** ends stay put so a line drawn to touch something still does */
 export function smoothPoints(points: number[], strength: number): number[] {
   if (strength <= 0 || points.length < 6) return points
 
@@ -878,7 +719,7 @@ export function inkPath(item: WallItem): string {
     const midY = (p[i + 1] + p[i + 3]) / 2
     d += `Q${p[i].toFixed(1)},${p[i + 1].toFixed(1)} ${midX.toFixed(1)},${midY.toFixed(1)}`
   }
-  // The last sample is joined straight, since it has no successor to average.
+  // the last sample joins straight
   return `${d}L${p[p.length - 2].toFixed(1)},${p[p.length - 1].toFixed(1)}`
 }
 
@@ -889,25 +730,20 @@ const centreOf = (item: WallItem): Point => ({
   y: item.y + item.height / 2
 })
 
-/**
- * Where an arrow between two items should start and stop: on the edge of each
- * box rather than at its centre, so the head lands against the item instead of
- * inside it.
- */
+/** on each box's edge so the head lands against the item */
 export function arrowEnds(from: WallItem, to: WallItem): { start: Point; end: Point } {
   const a = centreOf(from)
   const b = centreOf(to)
   return { start: edgePoint(from, a, b), end: edgePoint(to, b, a) }
 }
 
-/** Walks from a box's centre towards a target and stops at the box edge. */
+/** centre towards the target, stops at the edge */
 function edgePoint(box: WallItem, centre: Point, towards: Point): Point {
   const dx = towards.x - centre.x
   const dy = towards.y - centre.y
   if (dx === 0 && dy === 0) return centre
 
-  // The scale at which the ray first crosses each pair of sides. The smaller
-  // one is the side it actually leaves through.
+  // the smaller scale is the side it leaves through
   const scaleX = dx === 0 ? Infinity : (box.width / 2) / Math.abs(dx)
   const scaleY = dy === 0 ? Infinity : (box.height / 2) / Math.abs(dy)
   const scale = Math.min(scaleX, scaleY)
@@ -915,21 +751,20 @@ function edgePoint(box: WallItem, centre: Point, towards: Point): Point {
   return { x: centre.x + dx * scale, y: centre.y + dy * scale }
 }
 
-/** Distance from a point to a segment. Used to click a line that has no box. */
+/** for clicking a line with no box */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const lengthSq = dx * dx + dy * dy
   if (lengthSq === 0) return Math.hypot(p.x - a.x, p.y - a.y)
 
-  // Clamped, so a point beyond either end measures to that end and not to the
-  // infinite line through them.
+  // clamped to the segment, not the infinite line
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq))
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
 }
 
 
-/** Distance to the nearest of a run of segments. */
+/** nearest of the segments */
 export function distanceToPolyline(p: Point, points: Point[]): number {
   if (points.length === 0) return Infinity
   if (points.length === 1) return Math.hypot(p.x - points[0].x, p.y - points[0].y)
@@ -941,7 +776,7 @@ export function distanceToPolyline(p: Point, points: Point[]): number {
   return best
 }
 
-/** The point where a ray leaving `box` horizontally or vertically crosses it. */
+/** where a horizontal or vertical ray crosses the box */
 function sidePoint(box: WallItem, horizontal: boolean, positive: boolean): Point {
   const c = centreOf(box)
   return horizontal
@@ -949,13 +784,7 @@ function sidePoint(box: WallItem, horizontal: boolean, positive: boolean): Point
     : { x: c.x, y: c.y + (positive ? 1 : -1) * box.height / 2 }
 }
 
-/**
- * A path through a run of points with the corners taken off.
- *
- * The radius shrinks to fit whichever segment is shortest, so two items almost
- * on top of each other get a tight corner rather than a curve that overshoots
- * the line it belongs to.
- */
+/** radius shrinks to the shortest segment so near items don't overshoot */
 export function roundedPath(points: Point[], radius: number): string {
   if (points.length < 2) return ''
   if (points.length === 2) {
@@ -988,19 +817,12 @@ export function roundedPath(points: Point[], radius: number): string {
   return `${d}L${last.x},${last.y}`
 }
 
-/**
- * A point wearing an item's clothes, so a loose end goes through exactly the
- * same geometry as an attached one. A box with no size has its edge at its
- * centre, which is what a point is.
- */
+/** a point dressed as an item so loose ends share the geometry */
 function pointAnchor(p: Point): WallItem {
   return { id: '', kind: 'note', x: p.x, y: p.y, width: 0, height: 0, z: 0 }
 }
 
-/**
- * What an arrow's two ends currently resolve to, or null when one of them
- * names an item that is no longer there.
- */
+/** null when an end names a missing item */
 export function arrowAnchors(
   arrow: WallItem,
   byId: Map<string, WallItem>
@@ -1010,34 +832,29 @@ export function arrowAnchors(
   return from && to ? { from, to } : null
 }
 
-/** How much shorter to draw the line at each end than it really is. */
+/** shorter at each end than the true line */
 interface ArrowTrim {
   start?: number
   end?: number
 }
 
 interface ArrowGeometry {
-  /** Where the connector really begins and ends. The heads go here. */
+  /** the true ends, heads go here */
   start: Point
   end: Point
-  /** The line, as SVG path data, stopped short by whatever trim was asked for. */
+  /** SVG path, trimmed */
   d: string
-  /** Which way a head at the far end points, in radians. */
+  /** far head direction, radians */
   endAngle: number
-  /** Which way a head at the near end points. Back out of the item it left. */
+  /** the near head points back out of its item */
   startAngle: number
-  /** Straight segments following the line, for hit testing. */
+  /** straight segments for hit testing */
   polyline: Point[]
-  /**
-   * Halfway along, where a label sits.
-   *
-   * Measured on the untrimmed line, so adding or removing an arrowhead does
-   * not shift the label that is already there.
-   */
+  /** on the untrimmed line so heads don't move the label */
   mid: Point
 }
 
-/** The point half way along a run of segments, by length rather than by index. */
+/** by length, not index */
 export function midpointAlong(points: Point[]): Point {
   if (points.length === 0) return { x: 0, y: 0 }
   if (points.length === 1) return points[0]
@@ -1049,7 +866,7 @@ export function midpointAlong(points: Point[]): Point {
     legs.push(length)
     total += length
   }
-  // Every point in the same place, so anywhere is the middle.
+  // all points coincide, anywhere is the middle
   if (total === 0) return points[0]
 
   let walked = 0
@@ -1066,12 +883,7 @@ export function midpointAlong(points: Point[]): Point {
   return points[points.length - 1]
 }
 
-/**
- * The trim actually applied, never more than a share of the run.
- *
- * Two items almost touching leave a few pixels between them; taking a whole
- * arrowhead off each end of that would draw the line backwards.
- */
+/** never more than a share of the run, or near items draw backwards */
 function clampTrim(trim: ArrowTrim, start: Point, end: Point): [number, number] {
   const cap = Math.hypot(end.x - start.x, end.y - start.y) * 0.4
   return [
@@ -1080,32 +892,18 @@ function clampTrim(trim: ArrowTrim, start: Point, end: Point): [number, number] 
   ]
 }
 
-/** How far a curved connector bows out, as a fraction of its own length. */
+/** bow as a fraction of length */
 const BOW = 0.22
-/** Past this it stops bowing further, or a wall-length arrow becomes a circle. */
+/** cap, or a long arrow becomes a circle */
 const MAX_BOW = 140
 const ELBOW_RADIUS = 12
 
-/**
- * Everything needed to draw one connector: where it starts and ends, the path
- * between them, and which way each head points.
- *
- * The renderer gets no say in any of it, so the line that is drawn and the
- * line that is clicked are the same line by construction.
- */
-/** Slides a point back along a heading. Used to stop a line behind its head. */
+/** stops a line behind its head */
 function pullBack(p: Point, angle: number, by: number): Point {
   return { x: p.x - by * Math.cos(angle), y: p.y - by * Math.sin(angle) }
 }
 
-/**
- * Everything needed to draw one connector.
- *
- * `trim` shortens the drawn line without moving where the connector actually
- * starts and ends, so a head sits at the true endpoint while the stroke stops
- * behind it. Neither trim may eat more than a fraction of the run, or two
- * items almost touching would produce a line drawn backwards.
- */
+/** one geometry for drawing and clicking; trim shortens the stroke, heads stay at the true ends */
 export function arrowGeometry(
   from: WallItem,
   to: WallItem,
@@ -1115,8 +913,7 @@ export function arrowGeometry(
   if (shape === 'elbow') {
     const a = centreOf(from)
     const b = centreOf(to)
-    // Whichever way the two are further apart is the way the connector leaves,
-    // which is what keeps an elbow from doubling back on itself.
+    // leave along the wider separation so elbows don't double back
     const horizontal = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
     const positive = horizontal ? b.x >= a.x : b.y >= a.y
 
@@ -1155,25 +952,22 @@ export function arrowGeometry(
     const length = Math.hypot(dx, dy) || 1
     const bow = Math.min(length * BOW, MAX_BOW)
 
-    // Perpendicular to the line, so it always bows the same way round.
+    // perpendicular so it always bows the same way
     const control = {
       x: (start.x + end.x) / 2 - (dy / length) * bow,
       y: (start.y + end.y) / 2 + (dx / length) * bow
     }
 
-    // The tangent at either end of a quadratic points away from the control.
+    // a quadratic's end tangents point away from the control
     const endAngle = Math.atan2(end.y - control.y, end.x - control.x)
     const startAngle = Math.atan2(start.y - control.y, start.x - control.x)
 
     const [ts, te] = clampTrim(trim, start, end)
-    // Pulled back along the tangent, keeping the same control point. The curve
-    // stops a little early rather than being re-solved, which at the few pixels
-    // a head needs is not a difference anyone can see.
+    // pulled back along the tangent, not re-solved; invisible at head size
     const drawnStart = pullBack(start, startAngle, ts)
     const drawnEnd = pullBack(end, endAngle, te)
 
-    // Sampled rather than solved: a handful of points is close enough to click
-    // and avoids a quadratic root-finder living in a hit test.
+    // sampled, avoids a root-finder in a hit test
     const polyline: Point[] = []
     const steps = 12
     for (let i = 0; i <= steps; i++) {
@@ -1192,7 +986,7 @@ export function arrowGeometry(
       endAngle,
       startAngle,
       polyline,
-      // The quadratic at t = 0.5, which is exact rather than sampled.
+      // exact at t = 0.5
       mid: {
         x: 0.25 * start.x + 0.5 * control.x + 0.25 * end.x,
         y: 0.25 * start.y + 0.5 * control.y + 0.25 * end.y
@@ -1216,46 +1010,29 @@ export function arrowGeometry(
   }
 }
 
-/**
- * The dash pattern for a line style, scaled to the stroke so a thick dashed
- * line does not read as solid.
- *
- * Undefined for a solid line rather than a pattern meaning "no gaps", since
- * that is what SVG wants and it keeps the attribute off the element.
- */
+/** scaled to the stroke; undefined for solid so the attribute stays off */
 export function arrowDash(line: ArrowLine, strokeWidth: number): string | undefined {
   const w = Math.max(1, strokeWidth)
   if (line === 'dashed') return `${w * 3} ${w * 2}`
-  // Round caps turn a very short dash into a dot.
+  // round caps turn a short dash into a dot
   if (line === 'dotted') return `1 ${w * 2}`
   return undefined
 }
 
-/** How long a head is, tip to barb. */
+/** tip to barb */
 function headSize(strokeWidth: number): number {
   return 9 + Math.max(1, strokeWidth) * 2.4
 }
 
-/**
- * How far back the line should stop.
- *
- * The notch, not the barbs: the line runs into the head far enough that a
- * thick round-capped stroke leaves no gap, without filling the notch in and
- * turning the head back into a plain triangle.
- */
+/** to the notch, so thick round caps leave no gap without filling the notch */
 export function arrowHeadInset(strokeWidth: number): number {
   return headSize(strokeWidth) * NOTCH
 }
 
-/** How far the back of the head dips towards the tip, as a fraction of it. */
+/** back dip towards the tip */
 const NOTCH = 0.72
 
-/**
- * An arrowhead pointing along `angle`: a tip, two barbs and a notched back.
- *
- * The notch is what stops it reading as a triangle balanced on the end of a
- * line, which is what it looked like at the thicker stroke widths.
- */
+/** notched so it doesn't read as a triangle on a stick */
 export function arrowHeadPoints(tip: Point, angle: number, strokeWidth: number): string {
   const size = headSize(strokeWidth)
   const spread = 0.46
@@ -1268,14 +1045,10 @@ export function arrowHeadPoints(tip: Point, angle: number, strokeWidth: number):
   ].join(' ')
 }
 
-/**
- * Arrows whose ends both still exist. Deleting an item leaves its arrows
- * pointing at nothing, and an arrow to nowhere cannot be drawn or explained.
- */
+/** deleting an item leaves arrows to nowhere */
 export function pruneArrows(items: WallItem[]): WallItem[] {
   const present = new Set(items.filter(i => i.kind !== 'arrow').map(i => i.id))
-  // An end pinned to a point survives on its own. Only an end that named an
-  // item which has since gone takes its arrow with it.
+  // point-pinned ends survive, only a vanished item takes its arrow
   const anchored = (id: string | undefined, point: unknown): boolean =>
     id ? present.has(id) : !!point
 
@@ -1284,10 +1057,7 @@ export function pruneArrows(items: WallItem[]): WallItem[] {
   )
 }
 
-/**
- * The size the stroke was drawn at. The SVG keeps this as its viewBox, so
- * resizing the box scales the drawing instead of cropping it.
- */
+/** the drawn size, kept as viewBox so resizing scales */
 export function inkNaturalSize(item: WallItem): { width: number; height: number } {
   const points = item.points ?? []
   let maxX = 0

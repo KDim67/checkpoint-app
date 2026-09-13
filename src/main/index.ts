@@ -10,22 +10,11 @@ import { beginQuit, getMainWindow, isQuitting, sendToWindow, setMainWindow } fro
 import { registerAppShortcuts } from './appShortcuts'
 import { getStartupSettings, launchedMinimised } from './tray'
 
-// Pure constants with no dependencies of their own, so importing them
-// statically does not defeat the dynamic `import('./mcpServer')` calls below.
-// Those exist to keep the MCP SDK, which drags in express and hono, out of the
-// startup chunk on the majority of launches where the server is switched off.
+// pure constants, so this static import doesn't drag the MCP SDK (express, hono) into startup
 import { MCP_DEFAULT_PORT, WEBHOOK_DEFAULT_PORT } from '../shared/ports'
 
 
-/**
- * Set once the app is genuinely on its way out.
- *
- * Close-to-tray works by cancelling the window's close, so without a way to say
- * "this time we mean it" Quit would be cancelled too and the app could never
- * exit.
- */
-
-// Register protocols as privileged before app.whenReady()
+// must happen before app.whenReady()
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'cheatsheet',
@@ -49,36 +38,21 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
-// Windows notification identity, BEFORE app.whenReady()
-// Windows takes the name and icon shown on a toast from the AppUserModelID, not
-// from the app. Without this, every notification is headed "electron.app.Electron".
-// The value must match electron-builder's appId, because the installer registers
-// the Start Menu shortcut under it and that shortcut is what Windows reads the
-// display name and icon from.
+// windows heads toasts from the AppUserModelID; must match electron-builder's appId, set before whenReady
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.checkpoint.app')
 }
 
-// Disable background throttling BEFORE app.whenReady()
-// Critical: allows the app to function fully alongside Unity/VS/JetBrains.
+// before whenReady; keeps timers running alongside Unity/VS/JetBrains
 app.commandLine.appendSwitch('disable-background-timer-throttling')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('wm-window-animations-disabled')
 app.commandLine.appendSwitch('log-level', '3')
 
-// Suppress default Electron menu bar entirely
 Menu.setApplicationMenu(null)
 
 
-// Single Instance Lock
-/**
- * Last resort, armed before anything else runs.
- *
- * Electron's default for an uncaught exception is to tear the process down,
- * which for a local-first app means whatever was in flight is gone with no
- * message at all. Logged and survived instead: one broken feature beats a
- * window that vanishes.
- */
+/** last resort: electron's default kills the process and loses in-flight work, so log and survive */
 process.on('uncaughtException', err => {
   console.error('[main] uncaught exception:', err)
 })
@@ -99,12 +73,7 @@ if (!gotTheLock) {
   })
 }
 
-/**
- * shell.openExternal hands the URL to the OS, which will happily run a
- * file:// path or a registered protocol handler. Links reach us from note
- * markdown, cheatsheets and AI responses, so the scheme is checked before
- * anything leaves the app.
- */
+/** openExternal will run file:// or protocol handlers; links come from notes, cheatsheets and AI */
 const EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 
 function openExternalSafely(url: string): void {
@@ -134,11 +103,7 @@ interface WindowBounds {
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1280, height: 800 }
 
-/**
- * Restores the saved bounds, but only if the window would still land on a
- * connected display. Otherwise unplugging a second monitor strands the app
- * off-screen with no way to drag it back (the titlebar is custom).
- */
+/** only if it lands on a connected display, an unplugged monitor would strand it (custom titlebar) */
 function loadWindowBounds(): WindowBounds {
   try {
     const raw = getSetting<string | null>('window_bounds', null)
@@ -182,8 +147,7 @@ function saveWindowBoundsNow(): void {
   if (!win || win.isDestroyed()) return
   try {
     const maximized = win.isMaximized()
-    // getBounds() reports the maximized frame; persist the restore size so
-    // un-maximizing returns to the size the user actually chose.
+    // persist the restore size, getBounds() reports the maximized frame
     const { width, height, x, y } = maximized ? win.getNormalBounds() : win.getBounds()
     setSetting('window_bounds', JSON.stringify({ width, height, x, y, maximized }))
   } catch (err) {
@@ -191,7 +155,7 @@ function saveWindowBoundsNow(): void {
   }
 }
 
-/** Debounced: resize and move fire continuously while dragging. */
+/** resize and move fire continuously while dragging */
 function scheduleSaveWindowBounds(): void {
   if (saveBoundsTimer) clearTimeout(saveBoundsTimer)
   saveBoundsTimer = setTimeout(saveWindowBoundsNow, 400)
@@ -212,7 +176,7 @@ function createWindow(): void {
     y: bounds.y,
     minWidth: 800,
     minHeight: 600,
-    show: false,                    // show: false prevents white flash on startup
+    show: false,                    // hidden until ready, avoids a white flash
     frame: false,                   // custom titlebar
     titleBarStyle: 'hidden',
     titleBarOverlay: {
@@ -225,26 +189,22 @@ function createWindow(): void {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      // sandbox: false is required because better-sqlite3 runs in the main process
-      // via IPC, not the renderer. The renderer itself is sandboxed via contextIsolation.
+      // required for better-sqlite3 over IPC; renderer still isolated via contextIsolation
       sandbox: false
     }
   })
   setMainWindow(win)
 
-  // Reveal the window once it can paint. Eliminates the white flash. This is
-  // guarded and backed by `did-finish-load` plus a safety timeout so a slow or
-  // racy dev server (where `ready-to-show` may never fire after a failed initial
-  // load) can never leave us with only a detached DevTools window and no app.
+  // did-finish-load and a timeout back up ready-to-show, which a racy dev server may never fire
   let hasShown = false
   const revealWindow = (): void => {
     if (hasShown || win.isDestroyed()) return
     hasShown = true
     clearTimeout(revealTimeout)    // cancel safety fallback if an event fires first
 
-    // Loaded but never shown. The tray is the way in.
+    // loaded but hidden, the tray is the way in
     if (launchedMinimised()) {
-      // Maximising a hidden window shows it, so wait for the tray to.
+      // maximising a hidden window shows it, so wait for the tray
       if (bounds.maximized) win.once('show', () => win.maximize())
       return
     }
@@ -253,7 +213,7 @@ function createWindow(): void {
     win.show()
     win.focus()
   }
-  // Absolute fallback: if neither event fires (hard load-failure loop), show anyway.
+  // neither event fired (load-failure loop), show anyway
   const revealTimeout = setTimeout(revealWindow, 8000)
   win.on('ready-to-show', revealWindow)
   win.webContents.on('did-finish-load', revealWindow)
@@ -262,19 +222,15 @@ function createWindow(): void {
   win.on('move', scheduleSaveWindowBounds)
   win.on('maximize', scheduleSaveWindowBounds)
   win.on('unmaximize', scheduleSaveWindowBounds)
-  // Flush before teardown, or a resize inside the debounce window is lost.
+  // flush, or a resize inside the debounce is lost
   win.on('close', saveWindowBoundsNow)
 
-  // Close-to-tray. Off by default: closing has always quit this app, and the
-  // setting exists so nobody discovers the change by accident.
+  // off by default, closing has always quit
   win.on('close', event => {
     if (isQuitting() || process.platform === 'darwin') return
     let closeToTray = false
     try {
-      // Read at the moment of closing rather than cached, so toggling the
-      // setting takes effect without a restart. Statically imported because the
-      // main bundle is ESM. A require() here would throw, and this catch would
-      // swallow it, leaving close-to-tray silently dead.
+      // read live so the toggle needs no restart; static import since require() throws in ESM and gets swallowed
       const settings = getStartupSettings()
       closeToTray = settings.closeToTray && settings.showTrayIcon
     } catch (err) {
@@ -286,24 +242,17 @@ function createWindow(): void {
     }
   })
 
-  // Null reference on close. Allows V8 garbage collection of the window
   win.on('closed', () => {
     setMainWindow(null)
-    // Quit the app when the main window is closed on non-macOS platforms
     if (process.platform !== 'darwin') {
       app.quit()
     }
   })
 
-  // Open external links in the system browser, not a new Electron window
-  /**
-   * The window shows the app and nothing else. Without this, anything that
-   * managed to set `location` in the renderer could replace the whole app with
-   * a remote page that still sits behind the same preload bridge.
-   */
+  /** app only, or a set location could swap in a remote page behind the same preload bridge */
   win.webContents.on('will-navigate', (event, url) => {
     const here = win.webContents.getURL()
-    // The dev server reloads through this path, so same-origin stays allowed.
+    // dev server reloads through here, same-origin stays allowed
     if (here && new URL(url).origin === new URL(here).origin) return
     event.preventDefault()
     openExternalSafely(url)
@@ -314,20 +263,18 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Load the renderer
   if (process.env['ELECTRON_RENDERER_URL']) {
     const devUrl = process.env['ELECTRON_RENDERER_URL']
     win.loadURL(devUrl)
 
-    // Open DevTools only AFTER the app has actually loaded, so a failed initial
-    // load can never leave a lone DevTools window floating over a hidden app.
+    // only after load, so a failed load never leaves a lone DevTools window
     win.webContents.once('did-finish-load', () => {
       if (!win.isDestroyed() && !win.webContents.isDevToolsOpened()) {
         win.webContents.openDevTools()
       }
     })
 
-    // Retry loading if the dev server is not warm yet. Stored handle cancels on success.
+    // dev server may not be warm yet; handle cancels on success
     let failRetryTimeout: NodeJS.Timeout | null = null
     win.webContents.on('did-finish-load', () => {
       if (failRetryTimeout) { clearTimeout(failRetryTimeout); failRetryTimeout = null }
@@ -347,8 +294,6 @@ function createWindow(): void {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
-
-// IPC Handlers
 
 
 import { registerAppHandlers } from './ipc/app'
@@ -376,13 +321,7 @@ import { registerContextHandlers } from './ipc/context'
 import { registerGamedevHandlers } from './ipc/gamedev'
 import { registerMediaHandlers } from './ipc/media'
 
-/**
- * Every IPC handler the app answers, registered by domain.
- *
- * One call per module rather than one function holding all of them: this was
- * a single 1,086-line function, which meant every feature touching main landed
- * in the same scope and every branch conflicted there.
- */
+/** one call per module; this was a single 1,086-line function every branch conflicted in */
 function registerIpcHandlers(): void {
   registerAppHandlers()
   registerAiHandlers()
@@ -409,22 +348,13 @@ function registerIpcHandlers(): void {
   registerMediaHandlers()
 }
 
-// App Lifecycle
-
 app.whenReady().then(async () => {
-  // The database opens before the window because createWindow restores the
-  // saved bounds through getSetting. initDb is synchronous, and the window is
-  // created hidden regardless. It is not revealed until ready-to-show, which
-  // waits on the renderer bundle and dwarfs the cost of opening SQLite.
+  // db before window: createWindow reads saved bounds via getSetting; opening SQLite is cheap next to the bundle
   const { initDb } = await import('./db')
   const { registerDbHandlers } = await import('./ipc/db')
   const { registerClipboardVaultHandlers } = await import('./ipc/clipboardVault')
 
-  /**
-   * A database that will not open used to take the window with it: the throw
-   * landed before createWindow, so the app started and drew nothing at all.
-   * Now the unreadable file is moved aside, kept, and said out loud.
-   */
+  /** a bad db used to take the window down; now it's moved aside, kept and reported */
   let db: Awaited<ReturnType<typeof initDb>>
   const userData = app.getPath('userData')
   try {
@@ -435,16 +365,13 @@ app.whenReady().then(async () => {
     const { getBackupDir } = await import('./backupVault')
     const { discardDb } = await import('./db')
 
-    // SQLite opens a file lazily, so the handle is live even though the first
-    // read threw. Windows will not rename a file this process still holds, and
-    // without the rename there is nowhere for a fresh database to go.
+    // handle is live after the failed read, and windows won't rename a file still held
     discardDb()
 
     try {
       const { movedTo } = quarantineDatabase(join(userData, 'checkpoint.db'), stampFor(Date.now()))
       db = initDb(userData)
-      // After the window, so the dialog has something to sit in front of and
-      // the app is usable the moment the message is dismissed.
+      // after the window, so the dialog has something to sit in front of
       createWindow()
       dialog.showMessageBox({
         type: 'warning',
@@ -457,11 +384,11 @@ app.whenReady().then(async () => {
       registerDbHandlers(db)
   registerClipboardVaultHandlers()
 
-  // Last, and only when packaged. Nothing else waits on it.
+  // last, packaged only; nothing waits on it
   void import('./updater').then(({ initializeUpdater }) => initializeUpdater())
       return
     } catch (fatal) {
-      // The second failure is not the file, so a third attempt would fail too.
+      // second failure isn't the file, a third try would fail too
       console.error('[main] Could not start even with a fresh database:', fatal)
       dialog.showErrorBox(
         'Checkpoint cannot start',
@@ -475,14 +402,13 @@ app.whenReady().then(async () => {
   createWindow()
   registerIpcHandlers()
 
-  // Register cheatsheet protocol handler and ensure its directory exists
   try {
     await initCheatsheets()
     protocol.handle('cheatsheet', async (request) => {
       try {
         const url = new URL(request.url)
         let rawPath = url.host ? (url.host + url.pathname) : url.pathname
-        // Strip the dummy 'show/' host/prefix if present
+        // strip the dummy show/ host
         if (rawPath.toLowerCase().startsWith('show/')) {
           rawPath = rawPath.substring(5)
         }
@@ -490,7 +416,7 @@ app.whenReady().then(async () => {
         const dir = getCheatsheetsDir()
         const filePath = join(dir, filename)
 
-        // Prevent directory traversal
+        // no directory traversal
         const relativePath = relative(dir, filePath)
         if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
           return new Response('Access Denied', { status: 403 })
@@ -510,7 +436,6 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize cheatsheets folder/protocol:', err)
   }
 
-  // Register checkpoint-media protocol handler and ensure its directory exists
   try {
     const { ensureMediaDir } = await import('./mediaService')
     const { ensurePreview, previewWidthFor } = await import('./mediaPreview')
@@ -524,7 +449,7 @@ app.whenReady().then(async () => {
         const dir = getMediaDir()
         const filePath = join(dir, filename)
 
-        // Prevent directory traversal
+        // no directory traversal
         const relativePath = relative(dir, filePath)
         if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
           return new Response('Access Denied', { status: 403 })
@@ -534,8 +459,7 @@ app.whenReady().then(async () => {
           return new Response('File Not Found', { status: 404 })
         }
 
-        // `?w=` asks for a display-sized copy. Callers that leave it off, such
-        // as an export or a note, still get the original bytes.
+        // ?w= wants a display-sized copy; without it callers get the original bytes
         const wanted = Number(url.searchParams.get('w'))
         if (Number.isFinite(wanted) && wanted > 0) {
           const preview = ensurePreview(filePath, previewWidthFor(wanted))
@@ -554,13 +478,11 @@ app.whenReady().then(async () => {
 
   registerDbHandlers(db)
 
-  // Last, and only when packaged. Nothing else waits on it, and the updater
-  // starts at most once however many times this is reached.
+  // last, packaged only; updater starts at most once however often this runs
   void import('./updater').then(({ initializeUpdater }) => initializeUpdater())
 
   registerContextHandlers(db)
 
-  // Initialize AI Memory & Workspace IPC Services
   try {
     const { initMemoryIpc } = await import('./memoryService')
     const { initWorkspaceIpc } = await import('./workspaceService')
@@ -570,7 +492,6 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize AI Memory or Workspace IPC:', err)
   }
 
-  // Synchronize native titlebar overlay colors
   try {
     initTitleBarSync(() => getSetting<string>('app_theme', 'dark'))
     const appTheme = getSetting<string>('app_theme', 'dark')
@@ -579,7 +500,6 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize titlebar synchronization:', err)
   }
 
-  // Start Backup Vaulting
   try {
     const { initializeBackupScheduler } = await import('./backupVault')
     initializeBackupScheduler()
@@ -587,24 +507,16 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize Backup Vaulting:', err)
   }
 
-  // Clipboard Watcher. Record the capture, then push a change event so the
-  // renderer refreshes instantly instead of waiting on a slow poll. Only starts
-  // when the Clipboard feature is on; setSetting flips it live after that.
+  // push a change event so the renderer refreshes now, not on the slow poll
   const { configureClipboardWatcher, setClipboardCaptureEnabled } = await import('./clipboardWatcher')
   const { recordClipboardCopy } = await import('./db')
   configureClipboardWatcher((text) => {
     recordClipboardCopy(text)
     sendToWindow(IpcChannels.CLIPBOARD_HISTORY_CHANGED)
   })
-  // Off until switched on. Recording every copy is not something to start
-  // doing to someone who has not asked for it.
-  //
-  // Anyone who turned it on keeps it: their row says 'true'. Anyone who never
-  // touched the switch stops recording, which is the point, since they never
-  // chose to start. Nothing already captured is deleted either way.
+  // off unless chosen; an existing 'true' row keeps it, nothing captured is deleted
   setClipboardCaptureEnabled(getSetting<string>('feature_view_clipboard', 'false') === 'true')
 
-  // Load customization engine if enabled
   try {
     const { getSetting } = await import('./db')
     const customizerEnabled = getSetting<string>('customizer_enabled', 'false') === 'true'
@@ -616,11 +528,9 @@ app.whenReady().then(async () => {
     console.error('Failed to initialize Customizer Engine:', err)
   }
 
-  // Register application hotkeys (HUD & Clipboard)
   registerAppShortcuts()
 
-  // Tray icon. Created before the window is shown so a login launch that starts
-  // minimised still has somewhere to go.
+  // before the window shows, so a minimised login launch has somewhere to go
   try {
     const { initializeTray } = await import('./tray')
     initializeTray()
@@ -628,9 +538,7 @@ app.whenReady().then(async () => {
     console.error('Failed to create the tray icon:', err)
   }
 
-  // Due-date reminders. In main because the renderer's Notification API only
-  // fires while a window exists, and a reminder that needs the app focused is
-  // not a reminder.
+  // in main: the renderer's Notification only fires while a window exists
   try {
     const { initializeDueReminders } = await import('./dueReminders')
     initializeDueReminders()
@@ -638,8 +546,7 @@ app.whenReady().then(async () => {
     console.error('Failed to start due-date reminders:', err)
   }
 
-  // Recurring work: sweep at startup, then hourly. Completing an instance also
-  // advances its rule immediately, wired through the db handler below.
+  // startup sweep then hourly; completing an instance advances its rule right away
   try {
     const { initializeRecurrenceScheduler, setRecurrenceSpawnHandler, onInstanceClosed } =
       await import('./recurrenceService')
@@ -653,9 +560,7 @@ app.whenReady().then(async () => {
     console.error('Failed to start the recurrence scheduler:', err)
   }
 
-  // The widget is a BrowserWindow, so it cannot outlive the process. Without
-  // this the stored widget_enabled flag described a window that no longer
-  // existed, and the settings switch inverted on the next click.
+  // widget can't outlive the process; a stale widget_enabled flag inverted the switch
   try {
     const { restoreWidget } = await import('./widget')
     restoreWidget()
@@ -663,7 +568,6 @@ app.whenReady().then(async () => {
     console.error('Failed to restore desktop widget:', err)
   }
 
-  // Phase 17. Start Webhook Gateway if enabled
   try {
     const { getSetting } = await import('./db')
     const featureWebhook = getSetting<string>('feature_webhook', 'true')
@@ -677,15 +581,13 @@ app.whenReady().then(async () => {
     console.error('Failed to auto-start Webhook Gateway:', err)
   }
 
-  // MCP server. Off unless explicitly enabled, since it exposes read/write
-  // access to every workspace.
+  // off unless enabled, it exposes read/write to every workspace
   try {
     const { getSetting } = await import('./db')
     if (getSetting<string>('feature_mcp', 'false') === 'true') {
       const port = parseInt(getSetting<string>('mcp_port', String(MCP_DEFAULT_PORT)), 10) || MCP_DEFAULT_PORT
       const { toggleMcpServer, setMcpDataChangedHandler } = await import('./mcpServer')
-      // Writes arriving over MCP bypass renderer IPC entirely, so the open
-      // window would otherwise show a stale board until the user navigated.
+      // MCP writes bypass renderer IPC, so nudge the window or it shows a stale board
       setMcpDataChangedHandler(() => {
         sendToWindow(IpcChannels.MCP_DATA_CHANGED)
       })
@@ -695,7 +597,6 @@ app.whenReady().then(async () => {
     console.error('Failed to auto-start MCP server:', err)
   }
 
-  // Phase 21. Start Passive Activity Tracker if enabled
   try {
     const { initializeActivityTracker } = await import('./tracker')
     initializeActivityTracker()
@@ -704,7 +605,7 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    // macOS: re-create window on dock click if no main window exists
+    // macOS dock click re-creates a missing window
     const win = getMainWindow()
     if (!win || win.isDestroyed()) {
       createWindow()
@@ -717,19 +618,17 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  // Quit on non-macOS platforms
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
 app.on('will-quit', (e) => {
-  // Prevent immediate termination so we can perform async cleanup
+  // hold the quit for async cleanup
   e.preventDefault()
 
   globalShortcut.unregisterAll()
 
-  // Clean up all background services in parallel
   Promise.all([
     import('./clipboardWatcher').then(({ stopClipboardWatcher }) => stopClipboardWatcher()).catch(() => {}),
     import('./customizer').then(({ disableCustomizer }) => disableCustomizer()).catch(() => {}),
@@ -744,7 +643,7 @@ app.on('will-quit', (e) => {
     app.exit(0)
   })
 
-  // Safety timeout: force exit if cleanup takes longer than 800ms
+  // force exit if cleanup passes 800ms
   setTimeout(() => {
     app.exit(0)
   }, 800)

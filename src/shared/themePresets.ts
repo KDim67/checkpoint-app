@@ -1,10 +1,4 @@
-/**
- * Named theme presets. The engine stored one set of overrides, so trying a new
- * look meant destroying the one you had.
- *
- * A preset is that same variable map with a name, which is why there is no
- * persistence here: the renderer stores them like any other setting.
- */
+/** a named variable map, stored like any setting */
 
 import { lighten, readableForegroundOn } from './color'
 
@@ -26,7 +20,7 @@ export const THEME_VAR_NAMES = [
 type ThemeVarName = (typeof THEME_VAR_NAMES)[number]
 export type ThemeVariables = Record<ThemeVarName, string>
 
-/** The shipped brand values. Also what "Reset to Defaults" returns you to. */
+/** what Reset to Defaults returns to */
 export const DEFAULT_THEME: ThemeVariables = {
   '--color-background': '#0b0c10',
   '--color-surface-1': '#131622',
@@ -46,30 +40,18 @@ export interface ThemePreset {
   id: string
   name: string
   vars: ThemeVariables
-  /** Built-ins ship with the app: they can be applied but not renamed or deleted. */
+  /** applyable, not renamable or deletable */
   builtIn?: boolean
 }
 
-/**
- * Opacity suffixes for the tints the picker derives rather than asking for.
- * 0x26/255 is about 15% and 0x1a/255 about 10%. The values the colour handler
- * already used inline. Named here so the preset path and the picker cannot
- * drift apart.
- */
+/** 0x26 ~15%, 0x1a ~10%; named so picker and presets agree */
 const PRIMARY_TINT_ALPHA = '26'
 const SECONDARY_TINT_ALPHA = '1a'
 
-/** How far a hover state sits above its base, matched to the shipped pair. */
+/** matched to the shipped pair */
 const HOVER_LIGHTEN = 0.1
 
-/**
- * Expands a variable map with everything derived from primary and secondary.
- * Call it before handing variables to the engine: a preset storing its own
- * derivatives would keep stale values after the rule changed.
- *
- * Hover and inverted-text are here because neither was ever overridden, so a
- * custom primary kept the stock blue hover.
- */
+/** call before the engine; stored derivatives go stale */
 export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
   const primary = vars['--color-primary']
   const secondary = vars['--color-secondary']
@@ -78,23 +60,14 @@ export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
     '--color-primary-muted': primary + PRIMARY_TINT_ALPHA,
     '--color-primary-hover': lighten(primary, HOVER_LIGHTEN),
     '--color-secondary-muted': secondary + SECONDARY_TINT_ALPHA,
-    // Buttons filled with the secondary colour put their label on top of it.
+    // secondary buttons put their label on it
     '--color-text-inverted': readableForegroundOn(secondary),
-    // Legacy alias still referenced by a few call sites.
+    // legacy alias some call sites still use
     '--color-gold': secondary
   }
 }
 
-/**
- * The presets that ship. No copy of DEFAULT_THEME here, since "Reset to
- * Defaults" already covers going back.
- *
- * Eight light and eight dark, chosen to span lighting conditions rather than to
- * collect hues. Ink is for OLED, where true black costs no backlight.
- *
- * All held to the shipped palette's readability bar (body above 7:1, accents
- * above 4.5:1) and tests/themePresets.ts enforces it.
- */
+/** eight light, eight dark; Ink for OLED; tests hold 7:1 body, 4.5:1 accents */
 export const BUILT_IN_PRESETS: ThemePreset[] = [
   {
     id: 'builtin-midnight',
@@ -404,13 +377,7 @@ export const BUILT_IN_PRESETS: ThemePreset[] = [
 
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
 
-/**
- * Coerces one stored entry into a preset, or null if it cannot be trusted.
- *
- * Every field is checked rather than cast: these rows are read straight back out
- * of the settings table, where a hand-edited value or a half-written array would
- * otherwise reach the engine and paint the app with `undefined`.
- */
+/** every field checked, a bad row would paint undefined */
 export function normalizePreset(raw: unknown): ThemePreset | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -422,8 +389,7 @@ export function normalizePreset(raw: unknown): ThemePreset | null {
   const vars = { ...DEFAULT_THEME }
   for (const key of THEME_VAR_NAMES) {
     const v = rawVars[key]
-    // A font is free text; every other variable must be a hex colour, because
-    // the derived tints are built from these by string concatenation.
+    // fonts are free text, the rest must be hex for tint concatenation
     if (key === '--font-sans') {
       if (typeof v === 'string' && v.trim()) vars[key] = v.trim()
     } else if (isHex(v)) {
@@ -433,11 +399,10 @@ export function normalizePreset(raw: unknown): ThemePreset | null {
   return { id, name, vars, ...(o.builtIn === true ? { builtIn: true as const } : {}) }
 }
 
-/** Parses the stored list, dropping anything malformed rather than throwing. */
+/** drops malformed entries */
 export function normalizePresets(raw: unknown): ThemePreset[] {
   let parsed: unknown = raw
-  // A JSON string is accepted alongside a real array, the same tolerance the
-  // board config applies, because older writes stringified the value themselves.
+  // JSON strings accepted, older writes stringified
   if (typeof raw === 'string') {
     try {
       parsed = JSON.parse(raw)
@@ -451,8 +416,7 @@ export function normalizePresets(raw: unknown): ThemePreset[] {
   const out: ThemePreset[] = []
   for (const entry of parsed) {
     const preset = normalizePreset(entry)
-    // Ids address a preset for delete and rename, so a duplicate would make the
-    // second copy unreachable and the first undeletable.
+    // duplicate ids make one copy unreachable
     if (preset && !seen.has(preset.id)) {
       seen.add(preset.id)
       out.push(preset)
@@ -461,24 +425,17 @@ export function normalizePresets(raw: unknown): ThemePreset[] {
   return out
 }
 
-/** True when every variable in the preset equals the live value. */
+/** equals the live values */
 export function presetMatches(preset: ThemePreset, vars: ThemeVariables): boolean {
   return THEME_VAR_NAMES.every(k => {
     const a = preset.vars[k]
     const b = vars[k]
-    // Colours compare case-insensitively: the picker emits uppercase hex while
-    // the shipped defaults are lowercase.
+    // picker hex is uppercase, defaults lowercase
     return k === '--font-sans' ? a === b : a?.toLowerCase() === b?.toLowerCase()
   })
 }
 
-/**
- * Builds a preset from the current variables.
- *
- * `existing` is used both to reject a duplicate name and to settle the id, so
- * two presets saved in the same millisecond cannot collide. The timestamp alone
- * could, and the id is what delete and rename address.
- */
+/** existing settles name clashes and ids for same-ms saves */
 export function createPreset(
   name: string,
   vars: ThemeVariables,

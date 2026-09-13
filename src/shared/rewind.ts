@@ -1,47 +1,34 @@
-/**
- * Reconstructs what you were doing last time you worked on something. The app
- * already records focus sessions, windows, clipboard, commits and board moves
- * separately. This is the join.
- *
- * It is inference, not fact: window activity is per workspace, never per card.
- * So everything is scoped to a sitting. A span anchored by focus sessions that
- * named the card, and never claims more than that.
- *
- * Pure: no IPC, no dates beyond arithmetic on what the caller passes in.
- */
+/** joins focus, windows, clipboard, commits and board moves; inference scoped to a sitting, never per card */
 
 import type { ClipboardItem, FocusSession, GitCommit, Item } from './types'
 
-/** A task or card as a focus session recorded it. */
+/** as a focus session recorded it */
 interface FocusTaskRef {
   id: string
   title: string
   completed?: boolean
 }
 
-/**
- * One continuous stretch of work: focus sessions close enough together to be
- * the same sitting rather than separate visits.
- */
+/** sessions close enough to be one sitting */
 interface Sitting {
   start: number
   end: number
-  /** Time actually focused, not wall-clock across the gaps. */
+  /** focused time, not wall-clock across gaps */
   durationMs: number
   sessionCount: number
-  /** Retrospective notes the user wrote at the end of each session. */
+  /** retro notes from each session */
   notes: string[]
-  /** True when the card was ticked off in the last session of the sitting. */
+  /** ticked off in the sitting's last session */
   completed: boolean
 }
 
-/** Sessions further apart than this are separate sittings, not one long one. */
+/** further apart is a separate sitting */
 export const SITTING_GAP_MS = 90 * 60 * 1000 // 90 minutes
 
 export interface RewindInput {
   item: Pick<Item, 'id' | 'title' | 'status' | 'updated_at' | 'metadata'>
   sessions: FocusSession[]
-  /** Already narrowed to the sitting by the caller. The tracker query is ranged. */
+  /** already narrowed by the caller */
   windows: { windowTitle: string; processName: string; durationMs: number }[]
   clipboard: ClipboardItem[]
   commits: GitCommit[]
@@ -57,25 +44,23 @@ type SignalKind =
 
 export interface Signal {
   kind: SignalKind
-  /** One sentence, phrased as an observation rather than a verdict. */
+  /** an observation, not a verdict */
   text: string
 }
 
 export interface Rewind {
   sitting: Sitting | null
-  /** Days between the end of that sitting and now. */
+  /** since that sitting ended */
   daysSince: number
   windows: { windowTitle: string; processName: string; durationMs: number }[]
   clipboard: ClipboardItem[]
   commits: GitCommit[]
-  /** Card activity entries that fall inside the sitting. */
+  /** card activity inside the sitting */
   boardMoves: { text: string; createdAt: number }[]
   signals: Signal[]
 }
 
-// Parsing
-
-/** Reads a focus session's task list, which is stored as JSON text. */
+/** stored as JSON text */
 export function parseFocusTasks(tasksJson: string | null | undefined): FocusTaskRef[] {
   if (!tasksJson) return []
   try {
@@ -93,7 +78,7 @@ export function parseFocusTasks(tasksJson: string | null | undefined): FocusTask
   }
 }
 
-/** Card activity entries, which live as JSON in the item's metadata column. */
+/** from the metadata JSON */
 export function parseBoardMoves(metadata: string | null | undefined): { text: string; createdAt: number }[] {
   if (!metadata) return []
   try {
@@ -110,20 +95,14 @@ export function parseBoardMoves(metadata: string | null | undefined): { text: st
   }
 }
 
-// The join
-
-/** Focus sessions in which this item was one of the selected tasks. */
+/** sessions that selected this item */
 export function sessionsForItem(sessions: FocusSession[], itemId: string): FocusSession[] {
   return sessions
     .filter(s => parseFocusTasks(s.tasks_json).some(t => t.id === itemId))
     .sort((a, b) => a.completed_at - b.completed_at)
 }
 
-/**
- * `completed_at` is when a session ended, so its span runs backwards by its own
- * duration. Otherwise a 50-minute session looks instant and the window
- * activity during it falls outside.
- */
+/** completed_at is the end, so spans run backwards by duration */
 export function clusterSittings(sessions: FocusSession[], gapMs = SITTING_GAP_MS): Sitting[] {
   const ordered = [...sessions].sort((a, b) => a.completed_at - b.completed_at)
   const sittings: Sitting[] = []
@@ -152,7 +131,7 @@ export function clusterSittings(sessions: FocusSession[], gapMs = SITTING_GAP_MS
   return sittings
 }
 
-/** The most recent sitting that covered this item, or null if there is none. */
+/** null if none */
 export function lastSittingFor(
   sessions: FocusSession[],
   itemId: string,
@@ -165,14 +144,13 @@ export function lastSittingFor(
   const last = sittings[sittings.length - 1] ?? null
   if (!last) return null
 
-  // Whether the item was ticked off is a property of the final session, not of
-  // the sitting as a whole: it can be unticked and reselected across sessions.
+  // ticked-off belongs to the final session, it can be unticked in between
   const lastSession = relevant[relevant.length - 1]
   last.completed = parseFocusTasks(lastSession.tasks_json).some(t => t.id === itemId && t.completed)
   return last
 }
 
-/** Rows whose timestamp falls inside the sitting. */
+/** timestamp inside the sitting */
 export function within<T>(rows: T[], at: (row: T) => number, sitting: Sitting): T[] {
   return rows.filter(row => {
     const t = at(row)
@@ -180,13 +158,7 @@ export function within<T>(rows: T[], at: (row: T) => number, sitting: Sitting): 
   })
 }
 
-// Reading the evidence
-
-/**
- * Wording that suggests the copied text is a failure rather than a snippet.
- * Deliberately conservative: a false "you stopped mid-problem" is worse than
- * staying quiet, because it invents a story about the user's own work.
- */
+/** conservative: a false "stopped mid-problem" invents a story */
 const ERROR_HINTS = [
   /\bexception\b/i,
   /\berror\s*:/i,
@@ -207,19 +179,19 @@ export function looksLikeAnError(text: string): boolean {
   return ERROR_HINTS.some(re => re.test(text))
 }
 
-/** Commit messages that describe a pause rather than a finished piece of work. */
+/** commits that describe a pause */
 const WIP_HINTS = [/\bwip\b/i, /\btemp\b/i, /\bcheckpoint\b/i, /\bsquash\b/i, /\bfixup\b/i, /\bdo not merge\b/i]
 
 export function looksUnfinished(message: string): boolean {
   return WIP_HINTS.some(re => re.test(message ?? ''))
 }
 
-/** Days between two moments, floored, "9 days ago" rather than 9.4. */
+/** floored, "9 days ago" not 9.4 */
 export function daysBetween(from: number, to: number): number {
   return Math.max(0, Math.floor((to - from) / 86_400_000))
 }
 
-/** Phrased as what happened, not as a diagnosis. The user draws the conclusion. */
+/** what happened, not a diagnosis */
 export function detectSignals(
   input: RewindInput,
   sitting: Sitting,
@@ -283,7 +255,7 @@ function safeMetadata(metadata: string | null | undefined): Record<string, unkno
   }
 }
 
-/** Everything the panel needs, from the raw streams. */
+/** everything the panel needs */
 export function buildRewind(input: RewindInput, gapMs = SITTING_GAP_MS): Rewind {
   const sitting = lastSittingFor(input.sessions, input.item.id, gapMs)
 
@@ -306,7 +278,7 @@ export function buildRewind(input: RewindInput, gapMs = SITTING_GAP_MS): Rewind 
   const boardMoves = within(parseBoardMoves(input.item.metadata), m => m.createdAt, sitting)
     .sort((a, b) => b.createdAt - a.createdAt)
 
-  // Longest first: what you spent the most time in is what you were doing.
+  // longest first, most time is what you were doing
   const windows = [...input.windows].sort((a, b) => b.durationMs - a.durationMs)
 
   return {
@@ -320,7 +292,7 @@ export function buildRewind(input: RewindInput, gapMs = SITTING_GAP_MS): Rewind 
   }
 }
 
-/** "1h 45m", "22m", "40s". The shortest form that is still accurate. */
+/** shortest accurate form */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return '0s'
   const totalMinutes = Math.floor(ms / 60000)

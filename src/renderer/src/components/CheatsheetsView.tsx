@@ -43,17 +43,14 @@ export default function CheatsheetsView() {
   const [loading, setLoading] = useState(true)
   const [dragOver, setDragOver] = useState(false)
 
-  // Pins & sorting
   const [pinned, setPinned] = useState<string[]>([])
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     try { return (localStorage.getItem('checkpoint_cheatsheet_sort') as SortMode) || 'recent' } catch { return 'recent' }
   })
 
-  // Cross-document content search
   const [contentResults, setContentResults] = useState<ContentSearchResult[] | null>(null)
   const [searching, setSearching] = useState(false)
 
-  // Viewer: PDF or extracted-text mode
   const [viewMode, setViewMode] = useState<ViewMode>('pdf')
   const [textContent, setTextContent] = useState<string>('')
   const [textLoading, setTextLoading] = useState(false)
@@ -62,14 +59,12 @@ export default function CheatsheetsView() {
   const [copied, setCopied] = useState(false)
   const textContainerRef = useRef<HTMLDivElement>(null)
 
-  // Modals / Actions state
   const [renamePdf, setRenamePdf] = useState<CheatsheetFile | null>(null)
   const [renameName, setRenameName] = useState('')
   const [deletePdf, setDeletePdf] = useState<CheatsheetFile | null>(null)
 
   const dragCounter = useRef(0)
 
-  // Fetch Cheatsheets + Pins
   const loadCheatsheets = useCallback(async () => {
     setLoading(true)
     try {
@@ -104,7 +99,6 @@ export default function CheatsheetsView() {
     try { localStorage.setItem('checkpoint_cheatsheet_sort', mode) } catch {}
   }
 
-  // Cross-document content search (debounced)
   useEffect(() => {
     const q = searchQuery.trim()
     if (q.length < 3) {
@@ -127,7 +121,6 @@ export default function CheatsheetsView() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Text mode: load extracted text for the selected sheet
   useEffect(() => {
     if (viewMode !== 'text' || !selectedPdf) return
     let cancelled = false
@@ -139,14 +132,12 @@ export default function CheatsheetsView() {
     return () => { cancelled = true }
   }, [viewMode, selectedPdf])
 
-  // Reset viewer state when switching sheets
   useEffect(() => {
     setTextQuery('')
     setActiveMatch(0)
     setCopied(false)
   }, [selectedPdf])
 
-  // In-text search: highlighted segments + match count
   const { highlightedParts, matchCount } = useMemo(() => {
     if (!textContent) return { highlightedParts: null as React.ReactNode[] | null, matchCount: 0 }
     const q = textQuery.trim()
@@ -176,7 +167,6 @@ export default function CheatsheetsView() {
     return { highlightedParts: parts, matchCount: m }
   }, [textContent, textQuery])
 
-  // Scroll the active match into view and emphasize it
   useEffect(() => {
     const container = textContainerRef.current
     if (!container || matchCount === 0) return
@@ -202,18 +192,16 @@ export default function CheatsheetsView() {
     } catch { /* clipboard unavailable */ }
   }
 
-  // Ask AI: attach the sheet to the assistant and open the panel
   const handleAskAi = (sheetName: string) => {
     setRightPanelContent('ai-chat')
-    // Give the panel a tick to mount before dispatching the attach event
+    // let the panel mount before the attach event
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('checkpoint-ai-attach-cheatsheet', { detail: { name: sheetName } }))
     }, 150)
     toast(`Attached "${sheetName.replace(/\.pdf$/i, '')}": ask away!`, { type: 'success' })
   }
 
-  // Open a content-search hit: select the sheet in TEXT mode with the query
-  // pre-filled, so the matches are highlighted and ready to step through.
+  // opens in text mode with the query filled, so matches are highlighted
   const handleOpenContentHit = (name: string) => {
     const sheet = cheatsheets.find(c => c.name === name)
     if (!sheet) return
@@ -225,11 +213,10 @@ export default function CheatsheetsView() {
     }, 0)
   }
 
-  // Add File Actions
   const handleAddFile = async () => {
     try {
       const srcPath = await cheatsheetsApi.selectFile()
-      if (!srcPath) return // Canceled
+      if (!srcPath) return // cancelled
 
       setLoading(true)
       const newName = await cheatsheetsApi.add(srcPath)
@@ -243,7 +230,6 @@ export default function CheatsheetsView() {
     }
   }
 
-  // Drag & Drop Handlers
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
     dragCounter.current++
@@ -283,7 +269,7 @@ export default function CheatsheetsView() {
 
     for (const pdf of pdfs) {
       try {
-        // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
+        // electron 32 dropped File.path, resolve via preload
         const filePath = appApi.getPathForFile(pdf)
         if (filePath) {
           await cheatsheetsApi.add(filePath)
@@ -303,7 +289,6 @@ export default function CheatsheetsView() {
     await loadCheatsheets()
   }
 
-  // Rename Action
   const handleRenameClick = (pdf: CheatsheetFile, e: React.MouseEvent) => {
     e.stopPropagation()
     setRenamePdf(pdf)
@@ -325,7 +310,7 @@ export default function CheatsheetsView() {
 
       const newFileName = cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`
 
-      // Keep pin pointing at the renamed file
+      // keep the pin on the renamed file
       if (pinned.includes(renamePdf.name)) {
         setPinned(prev => {
           const next = prev.map(p => p === renamePdf.name ? newFileName : p)
@@ -346,7 +331,6 @@ export default function CheatsheetsView() {
     }
   }
 
-  // Delete Action
   const handleDeleteClick = (pdf: CheatsheetFile, e: React.MouseEvent) => {
     e.stopPropagation()
     setDeletePdf(pdf)
@@ -377,14 +361,12 @@ export default function CheatsheetsView() {
     }
   }
 
-  // Open in External Window
   const handleOpenExternal = () => {
     if (!selectedPdf) return
     const url = `cheatsheet://show/${encodeURIComponent(selectedPdf.name)}`
     appApi.openExternal(url)
   }
 
-  // List derivation: name filter + pins + sort
   const { pinnedList, unpinnedList } = useMemo(() => {
     const q = searchQuery.toLowerCase()
     const filtered = cheatsheets.filter(c => c.name.toLowerCase().includes(q))
@@ -398,7 +380,7 @@ export default function CheatsheetsView() {
     }
   }, [cheatsheets, searchQuery, pinned, sortMode])
 
-  // Content hits for sheets that did NOT already match by name (avoid dupes)
+  // only sheets not already matched by name
   const contentOnlyHits = useMemo(() => {
     if (!contentResults) return []
     const q = searchQuery.toLowerCase()
@@ -745,7 +727,6 @@ export default function CheatsheetsView() {
         }
       `}</style>
 
-      {/* Drag & Drop Overlay */}
       {dragOver && (
         <div className="drag-overlay">
           <UploadCloud size={48} className="animate-bounce" />
@@ -758,7 +739,6 @@ export default function CheatsheetsView() {
         </div>
       )}
 
-      {/* Left Sidebar List */}
       <div className="cheatsheets-sidebar">
         <div className="search-container">
           <div className="row">
@@ -783,7 +763,6 @@ export default function CheatsheetsView() {
             </button>
           </div>
 
-          {/* Sort row */}
           <div className="row-between">
             <span className="text-micro-faint">
               {cheatsheets.length} sheet{cheatsheets.length !== 1 ? 's' : ''}
@@ -849,7 +828,7 @@ export default function CheatsheetsView() {
                 </>
               )}
 
-              {/* Content-search hits inside sheets whose NAME didn't match */}
+              {/* content hits in sheets whose name didn't match */}
               {contentOnlyHits.length > 0 && (
                 <>
                   <div className="list-section-label" style={{ marginTop: 'var(--space-2)', color: 'var(--color-secondary)' }}>
@@ -883,11 +862,9 @@ export default function CheatsheetsView() {
         </div>
       </div>
 
-      {/* Right Main Viewer */}
       <div className="cheatsheets-main">
         {selectedPdf ? (
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
-            {/* Header control bar */}
             <div
               style={{
                 minHeight: '44px',
@@ -912,7 +889,6 @@ export default function CheatsheetsView() {
               </div>
 
               <div className="row-wrap">
-                {/* PDF / Text mode toggle */}
                 <div style={{ display: 'flex', gap: '2px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: '2px' }}>
                   <button
                     className={`viewer-toolbar-btn ${viewMode === 'pdf' ? 'mode-active' : ''}`}
@@ -943,7 +919,6 @@ export default function CheatsheetsView() {
               </div>
             </div>
 
-            {/* Text-mode search bar */}
             {viewMode === 'text' && (
               <div
                 style={{
@@ -995,7 +970,6 @@ export default function CheatsheetsView() {
               </div>
             )}
 
-            {/* Viewport */}
             {viewMode === 'pdf' ? (
               <iframe
                 title={selectedPdf.name}
@@ -1069,7 +1043,6 @@ export default function CheatsheetsView() {
         )}
       </div>
 
-      {/* Rename Modal */}
       {renamePdf && (
         <div className="modal-overlay" onClick={() => setRenamePdf(null)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
@@ -1120,7 +1093,6 @@ export default function CheatsheetsView() {
         </div>
       )}
 
-      {/* Delete Confirmation */}
       <ConfirmDialog
         isOpen={!!deletePdf}
         title="Delete Cheatsheet"

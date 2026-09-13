@@ -23,7 +23,6 @@ export default function DialoguePanel({
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         
-        {/* Editor Console */}
         <div className="panel">
           <h3 className="heading-sm">Add Dialogue Node</h3>
           
@@ -127,7 +126,6 @@ export default function DialoguePanel({
                   &ldquo;{node.text}&rdquo;
                 </div>
                 
-                {/* Active Choices list */}
                 {node.choices.map((c, choiceIdx) => (
                   <div key={choiceIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', background: 'var(--color-surface-1)', padding: '2px 6px', borderRadius: '4px', marginTop: '2px' }}>
                     <span>choice: <strong>{c.text}</strong> ➔ {c.nextId}</span>
@@ -140,7 +138,6 @@ export default function DialoguePanel({
                   </div>
                 ))}
 
-                {/* Add Choice Form */}
                 <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
                   <input
                     type="text"
@@ -216,7 +213,7 @@ export default function DialoguePanel({
           </div>
         </div>
 
-        {/* Compiled Mermaid Output */}
+        {/* compiled mermaid output */}
         <div className="panel">
           <div className="row-between-gap">
             <h3 className="heading-sm">Dialogue Graph</h3>

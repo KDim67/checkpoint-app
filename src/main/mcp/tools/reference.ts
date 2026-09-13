@@ -3,15 +3,7 @@ import { getCheatsheetText, listCheatsheets, searchCheatsheets } from '../../che
 import { getMemories, searchMemories } from '../../memoryService'
 import { json, text, z } from '../toolKit'
 
-/**
- * Guards the memory tools.
- *
- * memoryService prepares its statements in initMemoryIpc() at app boot and
- * getMemories() dereferences them without checking, so calling it before that
- * has run throws on an undefined statement. That should never happen in the
- * packaged app (boot order puts memory init first), but a failed init would
- * otherwise surface to an agent as an opaque crash rather than a usable answer.
- */
+/** getMemories derefs statements from initMemoryIpc; a failed init would reach the agent as an opaque crash */
 function withMemoryStore(fn: () => { content: { type: 'text'; text: string }[] }): {
   content: { type: 'text'; text: string }[]
 } {
@@ -23,12 +15,9 @@ function withMemoryStore(fn: () => { content: { type: 'text'; text: string }[] }
   }
 }
 
-/** What the user keeps to hand: imported cheatsheets, and what the assistant remembers. */
+/** imported cheatsheets and assistant memory */
 export function registerReferenceTools(mcp: McpServer): void {
-  // Reference material
-  // Cheatsheets are the user's own imported documentation. Exposing them lets an
-  // agent ground an answer in what this person actually keeps to hand rather
-  // than in whatever it happens to recall.
+  // lets an agent ground answers in the user's own docs
 
   mcp.registerTool(
     'list_cheatsheets',
@@ -58,9 +47,7 @@ export function registerReferenceTools(mcp: McpServer): void {
     async ({ name, maxChars }) => {
       const body = await getCheatsheetText(name)
       if (!body) {
-        // getCheatsheetText returns '' for a missing file as readily as for an
-        // empty one. Left as-is, an agent cannot tell "this document has no
-        // text" from "you invented that filename", and would keep retrying.
+        // '' means missing or empty, so name the real files or the agent keeps retrying
         const available = (await listCheatsheets()).map(c => c.name)
         return text(
           available.includes(name)
@@ -69,13 +56,10 @@ export function registerReferenceTools(mcp: McpServer): void {
         )
       }
       const cap = maxChars ?? 20000
-      // Truncated by default: a full PDF can be hundreds of thousands of
-      // characters, which would swamp a client's context in one call.
+      // truncated by default, a full PDF would swamp the client's context
       return text(body.length > cap ? `${body.slice(0, cap)}\n\n…[truncated at ${cap} characters]` : body)
     }
   )
-
-  // Assistant memory
 
   mcp.registerTool(
     'search_memories',

@@ -11,14 +11,7 @@ import {
   type ShortcutScope
 } from '../src/renderer/src/lib/shortcuts'
 
-// View commands are the ones that only mean anything while you are looking at
-// a particular view: V for the wall's select tool, R to reset the focus timer.
-// They were hard-coded in each component, so nobody could change them and the
-// same letter quietly meant two different things in two different places.
-//
-// Scope is what makes that safe rather than a collision: two views are never
-// on screen at once, so D can log a distraction in Focus and tick a due date
-// on a kanban card without either shadowing the other.
+// view commands only mean something on their view; scope makes shared letters safe
 
 const scopes = (): ShortcutScope[] => [...new Set(VIEW_SHORTCUTS.map(s => s.scope))]
 
@@ -58,14 +51,13 @@ describe('the view shortcut list', () => {
   })
 
   it('does let two scopes reuse a key, which is the point of scoping', () => {
-    // If this ever stops being true the scoping has quietly become pointless,
-    // and the flat clash check it replaced would have done just as well.
+    // if defaults never overlap across views, scoping is pointless
     const combos = VIEW_SHORTCUTS.map(s => s.defaultCombo)
     expect(new Set(combos).size).toBeLessThan(combos.length)
   })
 
   it('never takes a key the global shortcuts already own', () => {
-    // A global fires whatever is on screen, so it would win or double-fire.
+    // globals fire everywhere, they'd win or double-fire
     const global = new Set(APP_SHORTCUTS.map(s => s.defaultCombo))
     for (const shortcut of VIEW_SHORTCUTS) {
       expect(global.has(shortcut.defaultCombo), `${shortcut.label} takes a global key`).toBe(false)
@@ -73,19 +65,14 @@ describe('the view shortcut list', () => {
   })
 
   it('defaults to nothing the binder would refuse to accept back', () => {
-    // A default that cannot be re-entered is a one-way door: change it once
-    // and you can never get it back without wiping every binding.
+    // an unre-enterable default is a one-way door
     for (const shortcut of VIEW_SHORTCUTS) {
       expect(isReservedCombo(shortcut.defaultCombo), `${shortcut.label} defaults to a reserved combo`).toBe(false)
     }
   })
 
   it('claims none of the keys the views handle unconditionally', () => {
-    // Delete, Backspace, Escape and Enter are dealt with directly, whatever
-    // the bindings say: Escape closes, Enter activates what has focus, and
-    // Delete removes a selection on the wall. Binding a command to one of them
-    // would fire twice, once through the binding and once through the handler
-    // that never consults it.
+    // these keys are handled directly, a binding would double-fire
     const handledDirectly = ['Delete', 'Backspace', 'Escape', 'Enter', 'Tab']
     for (const shortcut of VIEW_SHORTCUTS) {
       expect(handledDirectly, `${shortcut.label} takes a key the view handles on its own`)
@@ -94,7 +81,7 @@ describe('the view shortcut list', () => {
   })
 
   it('does not put duplicate and delete on the same keys', () => {
-    // They act on the same selection and one of them is destructive.
+    // same selection, one is destructive
     const wall = Object.fromEntries(
       VIEW_SHORTCUTS.filter(s => s.scope === 'wall').map(s => [s.id, s.defaultCombo])
     )
@@ -147,7 +134,7 @@ describe('commandForEvent', () => {
   })
 
   it('does not answer a bare letter for a modified press', () => {
-    // Ctrl+V is paste. It must not arm the wall's select tool on the way past.
+    // Ctrl+V is paste, not the select tool
     expect(commandForEvent(keyEvent({ key: 'v', ctrlKey: true }), 'wall', bindings)).toBeNull()
   })
 
@@ -176,7 +163,7 @@ describe('shortcutClash', () => {
   })
 
   it('lets a scope take a key another scope uses', () => {
-    // R resets the focus timer. The wall may still have it for something else.
+    // R in focus doesn't block the wall
     expect(shortcutClash('R', { id: 'wall_tool_select', scope: 'wall' }, app, view)).toBeNull()
   })
 

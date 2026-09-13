@@ -1,23 +1,14 @@
 import type { HardwareSpecs, CatalogModel, FitResult, QuantizationLevel, FitStatus } from './cookbookTypes'
 
-/**
- * Evaluates hardware specs against a catalog model to calculate fit status,
- * score (0-100), and recommended quantization level.
- *
- * CRITICAL: This is a pure logic file. Do not import any Node.js core libraries (fs, os, etc.)
- * so that Vite can load it directly in the React frontend.
- */
-/**
- * How much of the installed RAM a model is allowed to claim. The rest belongs
- * to the operating system and to whatever else the machine is running.
- */
+/** pure, no Node imports, so Vite can load it in the renderer */
+/** the rest belongs to the OS and other apps */
 export const USABLE_RAM_FRACTION = 0.75
 
 export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): FitResult {
   const quantizations: QuantizationLevel[] = ['q4', 'q8', 'f16']
   let bestVariantName: QuantizationLevel | undefined = undefined
 
-  // 1. Determine best candidate variant fitting in RAM (needs 25% headroom for OS)
+  // best variant that fits usable RAM
   const maxAvailableRam = specs.ramGb * USABLE_RAM_FRACTION
   for (const q of quantizations) {
     const variant = model.variants[q]
@@ -26,7 +17,7 @@ export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): F
     }
   }
 
-  // 6. If no variant can fit in system RAM, return not_recommended immediately
+  // nothing fits, not recommended
   if (!bestVariantName) {
     return {
       status: 'not_recommended',
@@ -46,7 +37,6 @@ export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): F
     }
   }
 
-  // 2. Determine GPU viability
   let gpuViable = false
   let canOffload = false
 
@@ -60,15 +50,14 @@ export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): F
     canOffload = false
   }
 
-  // 3. Calculate base score (0 - 100)
   let score = 100
 
-  // Subtract for lowest quantization downgrade
+  // q4 downgrade penalty
   if (bestVariantName === 'q4') {
     score -= 20
   }
 
-  // Subtract for CPU offloading or pure CPU inference
+  // CPU offload penalty
   if (!gpuViable) {
     if (canOffload) {
       score -= 30
@@ -77,37 +66,26 @@ export function calculateFitResult(specs: HardwareSpecs, model: CatalogModel): F
     }
   }
 
-  // RAM headroom bonus (if user has double the required RAM, add 10)
+  // bonus for double the needed RAM
   if (specs.ramGb >= bestVariant.ramRequiredGb * 2) {
     score += 10
   }
 
-  // Clamp final score to [0, 100]
   score = Math.max(0, Math.min(100, score))
 
-  // 4. Determine FitStatus
-  //
-  // Capped by the execution mode decided in step 2. Deriving it from the score
-  // alone let the +10 RAM headroom bonus outweigh the GPU penalty, so a machine
-  // with plenty of RAM and no usable VRAM landed in a bracket whose text claims
-  // GPU execution, and users choose a model on the strength of that sentence.
+  // capped by execution mode; the RAM bonus used to outweigh no GPU and claim GPU execution
   let status: FitStatus = 'not_recommended'
   if (score >= 80) status = 'optimal'
   else if (score >= 55) status = 'tight'
   else if (score >= 25) status = 'cpu_offload'
   else status = 'not_recommended'
 
-  // Both 'optimal' and 'tight' assert the model runs on the GPU, so neither can
-  // survive a verdict of not-GPU-viable however high the score climbed.
+  // optimal and tight both claim GPU
   if (!gpuViable && (status === 'optimal' || status === 'tight')) {
     status = score >= 25 ? 'cpu_offload' : 'not_recommended'
   }
 
-  // 5. Build reason string.
-  //
-  // Keyed off the execution mode rather than the status bracket, so the text can
-  // never describe hardware the machine does not have. Partial offload and pure
-  // CPU share the 'cpu_offload' status but are not the same claim.
+  // keyed off execution mode so it never describes absent hardware
   let reason = ''
   if (status === 'not_recommended') {
     reason = `System RAM or VRAM insufficient for any supported quantization of this model.`

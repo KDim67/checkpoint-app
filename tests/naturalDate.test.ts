@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { parseNaturalDate, describeDue } from '../src/shared/naturalDate'
 import { defined } from './helpers/defined'
 
-// A Wednesday, so weekday arithmetic has somewhere to go in both directions.
+// a Wednesday, room both ways
 const WED_10AM = new Date(2026, 5, 17, 10, 0, 0, 0).getTime()
 const at = (ms: number | null) => (ms === null ? null : new Date(ms))
 
@@ -21,14 +21,14 @@ describe('no date present', () => {
   })
 
   it('does not fire on a word that merely contains a keyword', () => {
-    // "montage" starts with "mon"; word boundaries are what stop this.
+    // word boundaries stop "montage" matching mon
     for (const text of ['build the montage', 'satisfy the linter', 'a wednesdayish plan']) {
       expect(parse(text).dueAt, text).toBeNull()
     }
   })
 
   it('does not read a bare number as a time', () => {
-    // Far more often part of the task than a clock time.
+    // usually part of the task
     expect(parse('upgrade to 18').dueAt).toBeNull()
     expect(parse('refactor 3 modules').dueAt).toBeNull()
   })
@@ -59,17 +59,17 @@ describe('days', () => {
 
 describe('weekdays', () => {
   it('finds the coming occurrence', () => {
-    // Wednesday the 17th; Friday is the 19th.
+    // Wed 17th, Friday is the 19th
     expect(defined(at(parse('standup friday').dueAt)).getDate()).toBe(19)
   })
 
   it('treats the current weekday as today', () => {
-    // "standup wednesday" said on Wednesday means this one, not next.
+    // said on Wednesday means today
     expect(defined(at(parse('standup wednesday').dueAt)).getDate()).toBe(17)
   })
 
   it('wraps into the following week for a day already passed', () => {
-    // Monday was the 15th; the next one is the 22nd.
+    // Monday was the 15th, next is the 22nd
     expect(defined(at(parse('review monday').dueAt)).getDate()).toBe(22)
   })
 
@@ -98,7 +98,7 @@ describe('relative offsets', () => {
   })
 
   it('keeps the clock time for hours and minutes', () => {
-    // "in 4 hours" already names a moment, so the 9am default must not apply.
+    // names a moment, no 9am default
     const out = defined(at(parse('check in 4 hours').dueAt))
     expect(out.getHours()).toBe(14)
     expect(defined(at(parse('ping in 30 minutes').dueAt)).getMinutes()).toBe(30)
@@ -134,7 +134,7 @@ describe('times', () => {
   })
 
   it('rolls a bare time that has already passed to tomorrow', () => {
-    // Nobody sets a reminder for the past.
+    // nobody sets a reminder for the past
     const out = defined(at(parse('review at 8am').dueAt))
     expect(out.getDate()).toBe(18)
   })
@@ -154,7 +154,7 @@ describe('cleaned text', () => {
   })
 
   it('leaves the other capture syntax untouched', () => {
-    // The HUD parses these separately; the date parser must not eat them.
+    // the HUD parses these, the date parser mustn't eat them
     const out = parse('- fix login #auth @web !high tomorrow')
     expect(out.cleanedText).toBe('- fix login #auth @web !high')
     expect(out.dueAt).not.toBeNull()

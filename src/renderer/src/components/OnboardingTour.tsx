@@ -1,24 +1,13 @@
-/**
- * The first-run tour. The app opens onto fourteen views with nothing to orient
- * anyone, and its two best features (the palette and quick capture) are
- * invisible unless you already know the keys.
- *
- * Steps that can point at something do: a spotlight cuts a hole in a dimming
- * layer over the real element, so the tour explains the interface rather than a
- * picture of it. The rest render centred.
- *
- * Targeting has to survive a nav item hidden by `enabledViews` (falls back to
- * centred) and a window resize mid-tour (re-measures).
- */
+/** spotlights the real element where it can, centred otherwise; survives hidden nav items and resizes */
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Command, Compass, Zap, ClipboardList, Check, ArrowRight, ArrowLeft } from 'lucide-react'
 import useFocusTrap from './ui/useFocusTrap'
 import { PROJECT_TEMPLATES, DEFAULT_TEMPLATE_ID, describeTemplate } from '../../../shared/projectTemplates'
 
-/** Breathing room between the spotlight edge and the element it reveals. */
+/** padding around the revealed element */
 const SPOT_PAD = 8
-/** Gap between the spotlight and the card that explains it. */
+/** gap between spotlight and card */
 const CARD_GAP = 16
 const CARD_WIDTH = 380
 
@@ -26,25 +15,19 @@ interface Step {
   id: string
   title: string
   body: string
-  /** CSS selector for the element to reveal. Absent means a centred card. */
+  /** absent means a centred card */
   target?: string
 }
 
 const STEPS: Step[] = [
   {
-    // A question, not an opening slide.
-    //
-    // The tour used to start on its own, with a small grey Skip beside a large
-    // Get started. That is a choice on paper and an announcement in practice:
-    // the first person to use Checkpoint went through the whole thing without
-    // registering that he had been asked. Both answers now look like answers.
+    // a question, not a slide: people clicked through without noticing they'd been asked
     id: 'welcome',
     title: 'Welcome to Checkpoint',
     body: 'A board, a backlog, notes, a focus timer, clipboard history and an AI assistant. In one place, organised by workspace. Everything stays on this machine: no account, no cloud, no sign-in.'
   },
   {
-    // Second, not last. This is the most useful thing in the tour, and anything
-    // at the end is read by whoever did not skip, which is the wrong half.
+    // second, not last: whoever reaches the end already didn't skip
     id: 'palette',
     title: 'Try the command palette',
     body: 'It reaches any view, workspace or action by name, and it is the fastest way around the app. Press it now and the tour moves on.'
@@ -72,17 +55,14 @@ const KEYS: { combo: string; name: string; why: string; icon: React.ReactNode }[
   { combo: 'Ctrl + Shift + V', name: 'Clipboard history', why: 'Everything you have copied, searchable.', icon: <ClipboardList size={15} /> }
 ]
 
-/** What the palette step listens for. Matches the binding in App.tsx. */
+/** matches the binding in App.tsx */
 const PALETTE_COMBO = 'Ctrl + K'
 
 interface Rect { top: number; left: number; width: number; height: number }
 
 interface Props {
   onCreateWorkspace: (name: string, templateId: string) => Promise<void>
-  /**
-   * `remember` says whether this was an answer. Done and Skip are; Escape is
-   * not, and asking again next launch is the cheaper of the two mistakes.
-   */
+  /** Done and Skip are answers; Escape asks again next launch */
   onClose: (remember: boolean) => void
 }
 
@@ -94,37 +74,17 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   const [creating, setCreating] = useState(false)
   const [palettePressed, setPalettePressed] = useState(false)
   const [error, setError] = useState('')
-  /**
-   * The workspace this tour made, once it has made one.
-   *
-   * Without it the step had no memory of having worked: stepping Back landed
-   * on the same form, still holding the name that had just been used, with an
-   * enabled button that could only fail. The way out was to invent a second
-   * name and end up with a workspace nobody wanted.
-   */
+  /** remembers the created workspace so Back doesn't show a form that can only fail */
   const [created, setCreated] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
 
-  // The card declares aria-modal, so focus has to actually be held inside it.
-  // Without the trap, Tab walked out into the app behind, which is dimmed and
-  // click-blocked, so focus landed on controls the user could neither see the
-  // state of nor operate.
-  //
-  // Focus starts on the primary action rather than the first focusable in DOM
-  // order, which is Skip: landing there means Enter abandons the tour.
+  // aria-modal needs a real focus trap; start on the primary action, Skip comes first in the DOM
   const cardRef = useFocusTrap(true, primaryRef)
 
   const step = STEPS[index]
 
-  /**
-   * Escape leaves the tour, but not out of a field someone is typing in.
-   *
-   * It used to be a plain window listener, so Escape pressed while naming a
-   * workspace, which is the ordinary way to clear a text field, tore down the
-   * whole tour. Here it empties the field instead, and only a second press,
-   * with the field already empty, leaves.
-   */
+  /** Escape clears a field first, only a second press leaves */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
@@ -140,17 +100,13 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [name, onClose])
 
-  /**
-   * Measured in a layout effect so the spotlight is never painted at a stale
-   * position for a frame, which reads as a flicker rather than a glide.
-   */
+  /** layout effect so the spotlight never paints a stale frame */
   const measure = useCallback(() => {
     if (!step.target) { setRect(null); return }
     const el = document.querySelector(step.target)
     if (!el) { setRect(null); return }
     const r = el.getBoundingClientRect()
-    // A zero-size box means the element is present but not laid out; treat it
-    // as absent rather than spotlighting a point.
+    // zero-size means present but not laid out, treat as absent
     if (r.width === 0 || r.height === 0) { setRect(null); return }
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
   }, [step.target])
@@ -167,15 +123,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
     else primaryRef.current?.focus()
   }, [step.id])
 
-  /**
-   * The palette step is passed by doing, not by reading.
-   *
-   * Captured on the window rather than the card, so it fires wherever focus
-   * happens to be, and swallowed so the palette does not open on top of the
-   * tour: what the step is teaching is the gesture, and a second modal over the
-   * first would only be something else to dismiss. App.tsx binds the same combo
-   * on the bubble phase, which stopPropagation here prevents from running.
-   */
+  /** passed by doing it; captured and swallowed so the palette doesn't open over the tour */
   useEffect(() => {
     if (step.id !== 'palette' || palettePressed) return
     const onKeyDown = (e: KeyboardEvent) => {
@@ -189,9 +137,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [step.id, palettePressed])
 
-  // Long enough to register as a confirmation, short enough not to feel like a
-  // wait. Advancing by index rather than through `next` keeps this free of a
-  // stale closure over the render that scheduled it.
+  // long enough to read as confirmation; by index to dodge a stale closure
   useEffect(() => {
     if (!palettePressed) return
     const timer = setTimeout(() => {
@@ -220,10 +166,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
     }
   }
 
-  // Card placement
-  // To the right of the spotlight when there is room, which there always is for
-  // the sidebar rail; flipped to the left otherwise. Clamped to the viewport so
-  // a target near an edge cannot push the card off screen.
+  // right of the spotlight if there's room, else left; clamped to the viewport
   const cardStyle: React.CSSProperties = (() => {
     if (!rect) {
       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: `${CARD_WIDTH}px` }
@@ -241,7 +184,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   })()
 
   const isLast = index === STEPS.length - 1
-  /** The workspace step reads as a confirmation once it has been through. */
+  /** reads as a confirmation once done */
   const settled = step.id === 'workspace' && created !== null
   const heading = settled ? 'Workspace created' : step.title
   const blurb = settled
@@ -251,18 +194,10 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9997 }}>
 
-      {/* Swallows clicks on the app underneath. The dimming layer below cannot
-          do this itself: its scrim is a box-shadow, which paints but never
-          receives pointer events, so without this the whole interface stayed
-          clickable while looking disabled. Escape and Skip are the ways out. */}
+      {/* blocks clicks on the app, the box-shadow scrim paints but gets no pointer events */}
       <div aria-hidden="true" style={{ position: 'fixed', inset: 0 }} />
 
-      {/* The dimming layer
-          With no target this is a plain scrim. With one, the scrim is the
-          9999px shadow spread around a transparent box, which is what cuts the
-          hole. Only this element's own box changes between steps. It is out of
-          flow with no children, so animating its geometry cannot reflow the
-          document beneath it. */}
+      {/* the hole is a 9999px shadow around a transparent box; out of flow, so animating it can't reflow */}
       <div
         aria-hidden="true"
         style={{
@@ -285,13 +220,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
         }}
       />
 
-      {/* The card
-          Two elements on purpose. The outer one owns the position, including
-          the translate that centres it; the inner one owns the pop-in, whose
-          keyframes animate `transform`. In one element the animation wins the
-          cascade for those 250ms and the centring translate is dropped, so the
-          card opens with its corner at the middle of the screen and jumps into
-          place when the animation ends. */}
+      {/* two elements: outer positions and centres, inner animates, or the keyframes drop the centring translate */}
       <div
         style={{
           position: 'fixed',
@@ -322,9 +251,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           animation: 'modal-pop-in var(--duration-enter) var(--ease-enter)'
         }}
       >
-        {/* Progress, once there is progress to show. The first card is the
-            question of whether to start at all, and a progress bar on it says
-            the answer has already been assumed. */}
+        {/* no progress on the first card, it's still asking whether to start */}
         {index > 0 && (
         <div role="group" aria-label={`Step ${index + 1} of ${STEPS.length}`} className="flex-4px">
           {STEPS.map((s, i) => (
@@ -357,7 +284,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           </p>
         </div>
 
-        {/* The question. Asked out loud rather than implied by the buttons. */}
+        {/* asked out loud, not implied by the buttons */}
         {index === 0 && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
@@ -378,7 +305,6 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           </div>
         )}
 
-        {/* Press the combo */}
         {step.id === 'palette' && (
           <div
             aria-live="polite"
@@ -425,9 +351,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           </div>
         )}
 
-        {/* Already done, so the form is a confirmation rather than an offer.
-            Coming back to a live form here could only end in the name being
-            refused or a second workspace nobody asked for. */}
+        {/* already created, so a confirmation; a live form could only refuse the name or dupe it */}
         {step.id === 'workspace' && created && (
           <div
             style={{
@@ -450,7 +374,6 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           </div>
         )}
 
-        {/* Workspace form */}
         {step.id === 'workspace' && !created && (
           <>
             <div className="col-1-5">
@@ -522,7 +445,6 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           </>
         )}
 
-        {/* The keys */}
         {step.id === 'keys' && (
           <div className="col">
             {KEYS.map(k => (
@@ -563,11 +485,8 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           </div>
         )}
 
-        {/* Controls */}
         <div className="row-between-gap">
-          {/* Nothing on the left of the question: both of its answers belong
-              together on the right, at the same weight, or the quiet one reads
-              as a corner to ignore rather than a choice. */}
+          {/* both answers sit together on the right at equal weight */}
           {index === 0 ? <span /> : (
             <button
               className="btn-ghost"
@@ -580,9 +499,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           )}
 
           <div className="row">
-            {/* On the form, the secondary action moves past it rather than
-                ending the tour, not wanting a workspace right now is not the
-                same as not wanting the rest. */}
+            {/* on the form, secondary skips the step, not the whole tour */}
             {index === 0 ? (
               <button
                 className="btn-secondary"
@@ -610,9 +527,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               </button>
             ) : null}
 
-            {/* No primary Next on the palette step: an easier way past would be
-                the one most people take, and the keystroke is the whole point.
-                The way out is deliberately the quieter control. */}
+            {/* no primary Next here: the keystroke is the point, the way out stays quiet */}
             {step.id === 'palette' ? (
               <button
                 ref={primaryRef}

@@ -35,8 +35,7 @@ export default function ExtensionsTab() {
     try {
       const result = await customizerApi.togglePlugin(filename, checked)
       if (!result.ok) {
-        // The switch stays off and the reason is shown. Previously a plugin that
-        // threw on load was recorded as enabled and failed silently every launch.
+        // the switch stays off with the reason; failed loads used to look enabled
         setLoadError({ filename, message: result.error ?? 'The plugin failed to load.' })
         toast(`${filename} could not be enabled`)
         return
@@ -59,8 +58,7 @@ export default function ExtensionsTab() {
         toast(result.error ?? 'Could not install that example')
         return
       }
-      // Re-scanned rather than assumed: the list is what the folder actually
-      // holds, and the new file should appear with its metadata read from disk.
+      // rescan so the file shows with metadata from disk
       await loadPluginsList()
       toast(`Installed ${filename}. Read it, then enable it below.`)
     } catch (err) {
@@ -84,9 +82,7 @@ export default function ExtensionsTab() {
 
   return (
     <div className="col-xl">
-      {/* Plugins are required into the main process, so they run with the app's
-          full privileges. Saying so plainly is the honest thing: the engine's
-          own description used to call them "sandboxed", which they are not. */}
+      {/* plugins run in main with full privileges; the old copy wrongly said sandboxed */}
       <div style={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -195,12 +191,12 @@ export default function ExtensionsTab() {
 
         <button
           onClick={handleOpenFolder}
+          className="extensions-tab-open-folder border-offset"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 'var(--space-2)',
             background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-surface-offset)',
             color: 'var(--color-text-base)',
             borderRadius: 'var(--radius-md)',
             padding: 'var(--space-2) var(--space-3)',
@@ -209,8 +205,6 @@ export default function ExtensionsTab() {
             cursor: 'pointer',
             transition: 'all 100ms ease'
           }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-surface-offset)'}
         >
           <FolderOpen size={12} />
           Open Plugins Folder

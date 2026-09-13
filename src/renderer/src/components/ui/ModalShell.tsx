@@ -3,20 +3,16 @@ import useFocusTrap from './useFocusTrap'
 import useEscapeKey from './useEscapeKey'
 
 interface ModalShellProps {
-  /** Accessible name for the dialog. The visible heading stays in children. */
+  /** accessible name; the visible heading stays in children */
   label: string
   onClose: () => void
   width?: string
-  /** Off for destructive prompts, where a stray backdrop click should not dismiss. */
+  /** off for destructive prompts */
   closeOnBackdrop?: boolean
   children: React.ReactNode
 }
 
-/**
- * Backdrop and panel for the one-off dialogs scattered across the settings and
- * board views. Carries the dialog role, focus trap and Escape handling that
- * each hand-rolled copy was missing.
- */
+/** dialog role, focus trap and Escape that the hand-rolled copies lacked */
 export default function ModalShell({
   label,
   onClose,

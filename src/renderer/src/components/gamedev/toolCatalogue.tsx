@@ -7,7 +7,7 @@ import type { GameDevTab } from './types'
 interface GameDevToolMeta {
   id: GameDevTab
   label: string
-  /** One line, shown on the launcher card. What it does, not how. */
+  /** what it does, not how */
   blurb: string
   icon: React.ReactNode
 }
@@ -17,13 +17,7 @@ interface GameDevToolGroup {
   tools: GameDevToolMeta[]
 }
 
-/**
- * Every tool in the workspace, in one place.
- *
- * The launcher, the switcher and the header all read from this. They used to
- * each carry their own copy of the labels and icons, which is how a tool could
- * be renamed in one and not the other.
- */
+/** one source for launcher, switcher and header; separate copies let names drift */
 export const GAMEDEV_TOOLS: GameDevToolGroup[] = [
   {
     group: 'Textures',
@@ -51,7 +45,7 @@ export const GAMEDEV_TOOLS: GameDevToolGroup[] = [
   }
 ]
 
-/** The one tool, wherever it sits. Undefined only for an id that no longer exists. */
+/** undefined only for ids that no longer exist */
 export function findTool(id: GameDevTab): GameDevToolMeta | undefined {
   for (const section of GAMEDEV_TOOLS) {
     const hit = section.tools.find(t => t.id === id)
@@ -60,7 +54,7 @@ export function findTool(id: GameDevTab): GameDevToolMeta | undefined {
   return undefined
 }
 
-/** Which group a tool belongs to, for the header's sense of place. */
+/** for the header's sense of place */
 export function groupOf(id: GameDevTab): string | undefined {
   return GAMEDEV_TOOLS.find(s => s.tools.some(t => t.id === id))?.group
 }

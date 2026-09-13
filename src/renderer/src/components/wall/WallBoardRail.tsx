@@ -1,11 +1,4 @@
-/**
- * The board as a rail beside the Wall. Not a second board, but a source and
- * a destination showing only what those two jobs need.
- *
- * Cards already on the wall are dimmed, not hidden: a board with cards missing
- * is a board that lies. Columns are drop targets and cards are not, because
- * ordering belongs to the board.
- */
+/** source and destination only; placed cards dim, not hide; columns are targets, cards aren't */
 
 import React from 'react'
 import { Search, X, PanelRightClose } from 'lucide-react'
@@ -23,11 +16,11 @@ interface Props {
   onTabChange: (tab: RailTab) => void
   groups: BoardGroup[]
   notes: NoteMetadata[]
-  /** Refs already placed on the open wall, so they can be marked as such. */
+  /** so they can be marked */
   placed: Set<string>
   query: string
   onQueryChange: (query: string) => void
-  /** The column a wall drag is currently over, highlighted as a target. */
+  /** highlighted as a target */
   dropColumnId: string | null
   onClose: () => void
 }
@@ -126,7 +119,7 @@ export default function WallBoardRail({
         )}
 
         {tab === 'board' && groups.map(group => {
-          // Orphans have no column to hand back to, so they show but stay inert.
+          // orphans have no column to go back to
           const droppable = group.column.id !== ORPHAN_COLUMN_ID
           const isTarget = droppable && dropColumnId === group.column.id
 
@@ -254,7 +247,7 @@ export default function WallBoardRail({
         })}
       </div>
 
-      {/* Said once here rather than in a tooltip nobody hovers for. */}
+      {/* said once, not in a tooltip nobody hovers */}
       <p style={{
         padding: 'var(--space-2) var(--space-3)', margin: 0,
         borderTop: '1px solid var(--color-surface-offset)',

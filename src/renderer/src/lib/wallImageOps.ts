@@ -1,14 +1,9 @@
-/**
- * Runs the app's texture tooling on an image sitting on the Wall.
- *
- * `imageProcessing.ts` already has the algorithms; this is just the plumbing
- * between them and a wall image.
- */
+/** plumbing from imageProcessing to wall images */
 
 import { computePbrMaps, extractPalette, scale2xData, scale3xData } from './imageProcessing'
 import * as mediaApi from '../data/media'
 
-/** Sensible middle settings, so the menu entry does not need a dialogue first. */
+/** middle settings, so no dialogue first */
 const PBR_DEFAULTS = {
   normalIntensity: 1,
   heightDepth: 1,
@@ -23,11 +18,7 @@ interface Pixels {
   height: number
 }
 
-/**
- * Reads a wall image back into pixels via an offscreen canvas. The DOM node
- * does not expose them. `checkpoint-media://` is same-origin enough not to
- * taint the canvas.
- */
+/** offscreen canvas; checkpoint-media:// doesn't taint it */
 function loadPixels(filename: string): Promise<Pixels> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -50,14 +41,14 @@ function loadPixels(filename: string): Promise<Pixels> {
   })
 }
 
-/** Writes pixels back out as a PNG and stores it, returning the new filename. */
+/** returns the new filename */
 async function savePixels(pixels: Pixels): Promise<string> {
   const canvas = document.createElement('canvas')
   canvas.width = pixels.width
   canvas.height = pixels.height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not write the image.')
-  // Via the context, not `new ImageData(...)`. That wants a narrower buffer type.
+  // via the context, new ImageData wants a narrower buffer type
   const image = ctx.createImageData(pixels.width, pixels.height)
   image.data.set(pixels.data)
   ctx.putImageData(image, 0, 0)
@@ -70,16 +61,13 @@ async function savePixels(pixels: Pixels): Promise<string> {
 
 interface DerivedImage {
   filename: string
-  /** Appended to the original's caption, so the wall says what each one is. */
+  /** appended to the caption */
   label: string
   width: number
   height: number
 }
 
-/**
- * Height, normal, roughness and AO. All four, because one pass produces them
- * all and a material is the set.
- */
+/** one pass makes all four, and a material is the set */
 export async function derivePbrMaps(filename: string): Promise<DerivedImage[]> {
   const { data, width, height } = await loadPixels(filename)
   const { hData, nData, rData, aData } = computePbrMaps(data, width, height, PBR_DEFAULTS)
@@ -103,7 +91,7 @@ export async function derivePbrMaps(filename: string): Promise<DerivedImage[]> {
   return out
 }
 
-/** Pixel-art upscale, 2× or 3×, using the EPX family already in the app. */
+/** 2x or 3x EPX */
 export async function deriveUpscale(filename: string, factor: 2 | 3): Promise<DerivedImage> {
   const { data, width, height } = await loadPixels(filename)
   const scaled = factor === 2 ? scale2xData(data, width, height) : scale3xData(data, width, height)
@@ -117,7 +105,7 @@ export async function deriveUpscale(filename: string, factor: 2 | 3): Promise<De
   }
 }
 
-/** The image's dominant colours, as hex. */
+/** as hex */
 export async function derivePalette(filename: string, count = 6): Promise<string[]> {
   const { data } = await loadPixels(filename)
   return extractPalette(data, count)

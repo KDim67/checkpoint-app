@@ -3,13 +3,8 @@ import {
   ARROW_HEAD_MODES, ARROW_SHAPES, type WallCamera, type WallItem
 } from '../../../../shared/wallModel'
 
-/*
- * Painting the wall by hand, between renders. A pan or a drag moves things many
- * times a frame, and putting each of those through React re-rendered every item
- * on the wall. These write onto the elements the last render left instead.
- */
+/* painted onto the last render's elements; through React every move re-rendered the wall */
 
-/** Moves the view by hand, without going through React. */
 export function paintWallCamera(viewport: HTMLElement, cam: WallCamera): void {
   const transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.zoom})`
   viewport.querySelectorAll<HTMLElement>('[data-wall-camera-layer]').forEach(layer => {
@@ -19,9 +14,7 @@ export function paintWallCamera(viewport: HTMLElement, cam: WallCamera): void {
   const dots = gridSpacing(cam.zoom)
   viewport.style.backgroundSize = `${dots}px ${dots}px`
 
-  // The minimap's window onto the wall, kept in step so it does not sit still
-  // through the pan and then jump at the end. Its scale and offsets cannot
-  // change while a pan runs, so they ride along on the element itself.
+  // keep the minimap window moving with the pan
   const view = viewport.querySelector<HTMLElement>('[data-wall-minimap-view]')
   const geom = view?.dataset.geom?.split(',').map(Number)
   if (view && geom && geom.length === 5 && geom.every(Number.isFinite)) {
@@ -33,16 +26,7 @@ export function paintWallCamera(viewport: HTMLElement, cam: WallCamera): void {
   }
 }
 
-/**
- * Marks what is selected on the elements themselves, and returns what is now
- * marked, for the next call to diff against.
- *
- * Selection is not passed down to the items. It used to be, and releasing a
- * marquee over fifty of them re-rendered fifty subtrees on that one frame.
- * Here only the elements whose state actually changed are touched, and
- * index.css draws the rest. With nothing painted yet, or with `all`, every
- * item is written.
- */
+/** only elements whose state changed are touched, index.css draws the rest */
 export function paintWallSelection(
   viewport: HTMLElement,
   painted: Set<string> | null,
@@ -63,7 +47,6 @@ export function paintWallSelection(
   return new Set(next)
 }
 
-/** Moves items, and the arrows on them, by hand without going through React. */
 export function paintWallItems(viewport: HTMLElement, items: WallItem[], ids: Set<string>): void {
   const byId = new Map(items.map(i => [i.id, i]))
 
@@ -74,8 +57,7 @@ export function paintWallItems(viewport: HTMLElement, items: WallItem[], ids: Se
     el.style.transform = `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`
   })
 
-  // An arrow has no position of its own. One on a moving item is redrawn
-  // from wherever both its ends now are, the same way the render draws it.
+  // arrows on moving items redraw from both ends
   items.forEach(arrow => {
     if (arrow.kind !== 'arrow') return
     if (![arrow.from, arrow.to].some(end => end !== undefined && ids.has(end))) return
@@ -91,7 +73,7 @@ export function paintWallItems(viewport: HTMLElement, items: WallItem[], ids: Se
       start: heads === 'both' ? inset : 0
     })
     g.querySelector('path')?.setAttribute('d', geo.d)
-    // In the order the render puts them: the end head first, then the start.
+    // end head first, then start, as rendered
     const [endHead, startHead] = Array.from(g.querySelectorAll('polygon'))
     endHead?.setAttribute('points', arrowHeadPoints(geo.end, geo.endAngle, width))
     startHead?.setAttribute('points', arrowHeadPoints(geo.start, geo.startAngle, width))

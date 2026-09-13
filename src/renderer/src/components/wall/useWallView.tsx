@@ -3,12 +3,7 @@ import { useWallPointer } from './useWallPointer'
 import { useWallKeys } from './useWallKeys'
 export type { Menu } from './useWallDocument'
 
-/**
- * The wall apart from drawing it: the document and its history, the camera,
- * every pointer gesture and key, and the actions the toolbar, the canvas and
- * the menu call. Drags paint the DOM directly between renders, which is why so
- * much of this is refs.
- */
+/** drags paint the DOM between renders, hence the refs */
 export function useWallView() {
   const wallDocument = useWallDocument()
   const wallPointer = useWallPointer(wallDocument)

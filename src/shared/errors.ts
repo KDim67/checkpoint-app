@@ -1,25 +1,17 @@
-/**
- * Turns a caught value into something worth showing a user.
- *
- * Replaces the `catch (err: any)` + `err.message || String(err)` idiom, which
- * printed "[object Object]" whenever something other than an Error was thrown.
- */
+/** replaces err.message || String(err), which printed "[object Object]" */
 
 export function errorMessage(err: unknown, fallback = 'Something went wrong.'): string {
   if (err instanceof Error && err.message) return err.message
 
-  // Rejected promises and older APIs sometimes carry a bare string.
+  // bare strings from rejections and older APIs
   if (typeof err === 'string' && err.trim()) return err
 
-  // IPC and fetch failures often arrive as a plain object with a message.
+  // IPC and fetch failures, plain objects
   if (err && typeof err === 'object') {
     const maybe = (err as { message?: unknown }).message
     if (typeof maybe === 'string' && maybe.trim()) return maybe
 
-    // An RTCErrorEvent is an Event, not an Error, and keeps its text one level
-    // down on `.error`. Without this every WebRTC failure read as the fallback,
-    // which is how a session that died reported nothing about why. Read by hand
-    // rather than by recursing, so a value pointing at itself cannot spin.
+    // RTCErrorEvent keeps its text on .error; read by hand so a self-reference can't spin
     const inner = (err as { error?: unknown }).error
     if (inner instanceof Error && inner.message) return inner.message
     if (inner && typeof inner === 'object') {
@@ -28,13 +20,13 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong.'): 
     }
   }
 
-  // Numbers and symbols stringify usefully; objects and null do not.
+  // numbers and booleans stringify usefully
   if (typeof err === 'number' || typeof err === 'boolean') return String(err)
 
   return fallback
 }
 
-/** True when the failure is a user-initiated abort rather than a fault. */
+/** user aborts, not faults */
 export function isAbortError(err: unknown): boolean {
   if (err instanceof Error && err.name === 'AbortError') return true
   return errorMessage(err, '').toLowerCase().includes('abort')

@@ -63,7 +63,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
 
 const ALL_TABS: TabInfo[] = TAB_GROUPS.flatMap(g => g.tabs)
 
-// Old tab ids (pre-merge) still navigable from anywhere in the app
+// pre-merge tab ids still navigable from anywhere
 const LEGACY_TAB_ALIASES: Record<string, SettingsTab> = {
   kanban: 'workspaces',
   themeCustomizer: 'appearance',
@@ -71,7 +71,6 @@ const LEGACY_TAB_ALIASES: Record<string, SettingsTab> = {
   widget: 'general'
 }
 
-// Main SettingsView
 export default function SettingsView() {
   const rawTab = useAppStore(s => s.settingsTab)
   const setActiveTab = useAppStore(s => s.setSettingsTab)
@@ -79,10 +78,8 @@ export default function SettingsView() {
   const isWindows = appApi.platform() === 'win32'
   const aiEnabled = useAiEnabled()
 
-  // Resolve any pre-merge tab id that might still arrive from old navigation paths
   const activeTab: SettingsTab = (LEGACY_TAB_ALIASES[rawTab as string] ?? rawTab) as SettingsTab
 
-  // Each tab renders one or more titled section cards
   const renderTabContent = () => {
     switch (activeTab) {
       case 'general':
@@ -193,8 +190,7 @@ export default function SettingsView() {
     }
   }
 
-  // Switching AI off while its tab is open would otherwise leave the panel
-  // showing settings for something that no longer exists.
+  // AI switched off while its tab is open would leave a dead panel
   useEffect(() => {
     if (!aiEnabled && activeTab === 'ai') setActiveTab('general')
   }, [aiEnabled, activeTab, setActiveTab])
@@ -208,7 +204,6 @@ export default function SettingsView() {
       background: 'var(--color-background)',
       overflow: 'hidden'
     }}>
-      {/* Sidebar nav (grouped) */}
       <nav aria-label="Settings sections" style={{
         width: '210px',
         flexShrink: 0,
@@ -247,10 +242,9 @@ export default function SettingsView() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                // Which section is open was signalled by colour alone, so it
-                // was invisible to screen readers and to anyone who cannot
-                // distinguish the accent from the muted foreground.
+                // the active section used to be colour only, invisible to screen readers
                 aria-current={activeTab === tab.id ? 'page' : undefined}
+                className="settings-view-tab"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -258,26 +252,12 @@ export default function SettingsView() {
                   padding: 'var(--space-2) var(--space-3)',
                   borderRadius: 'var(--radius-md)',
                   border: 'none',
-                  background: activeTab === tab.id ? 'var(--color-secondary-muted)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                   cursor: 'pointer',
                   fontSize: 'var(--text-sm)',
                   fontWeight: activeTab === tab.id ? 'var(--weight-semibold)' : 'var(--weight-regular)',
                   textAlign: 'left',
                   width: '100%',
                   transition: 'background 100ms ease, color 100ms ease'
-                }}
-                onMouseEnter={e => {
-                  if (activeTab !== tab.id) {
-                    e.currentTarget.style.background = 'var(--color-surface-offset)'
-                    e.currentTarget.style.color = 'var(--color-text-base)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (activeTab !== tab.id) {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = 'var(--color-text-muted)'
-                  }
                 }}
               >
                 <span style={{ flexShrink: 0, opacity: 0.8 }}>{tab.icon}</span>
@@ -288,7 +268,6 @@ export default function SettingsView() {
         ))}
       </nav>
 
-      {/* Content area */}
       <div style={{
         flex: 1,
         minHeight: 0,
@@ -296,9 +275,7 @@ export default function SettingsView() {
         padding: 'var(--space-6)',
         paddingBottom: 'var(--space-10)'
       }}>
-        {/* Centred column, capped so the content never sprawls across a very
-            wide monitor. It used to be a fixed 860px pinned hard to the left,
-            which left most of a maximised window empty. */}
+        {/* centred and capped; the old fixed 860px left most of a wide window empty */}
         <div style={{
           maxWidth: '1400px',
           margin: '0 auto',
@@ -306,7 +283,6 @@ export default function SettingsView() {
           flexDirection: 'column',
           gap: 'var(--space-5)'
         }}>
-          {/* Page title + description */}
           <div>
             <h1 style={{
               margin: 0,
@@ -326,11 +302,7 @@ export default function SettingsView() {
             </p>
           </div>
 
-          {/* Tab content. One or more section cards.
-              The grid holds ONLY the cards: a full-width title inside it would
-              span every track, and `auto-fit` collapses a track only when it is
-              genuinely empty, so a single-card tab was left sitting in the
-              first of two live columns instead of filling the width. */}
+          {/* grid holds only cards: a full-width title spans every track and single-card tabs got stuck in one column */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 520px), 1fr))',

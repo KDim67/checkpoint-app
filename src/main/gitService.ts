@@ -5,9 +5,6 @@ import type { GitCommit, GitStatusResult } from '../shared/types'
 
 const execPromise = util.promisify(exec)
 
-/**
- * Checks if Git is installed on the user's machine and in their PATH.
- */
 async function isGitInstalled(): Promise<boolean> {
   try {
     await execPromise('git --version')
@@ -17,9 +14,6 @@ async function isGitInstalled(): Promise<boolean> {
   }
 }
 
-/**
- * Checks if the provided directory path exists and is a valid Git repository.
- */
 export async function checkRepo(repoPath: string): Promise<boolean> {
   if (!repoPath || !fs.existsSync(repoPath)) {
     return false
@@ -32,9 +26,6 @@ export async function checkRepo(repoPath: string): Promise<boolean> {
   }
 }
 
-/**
- * Retrieves the current branch and uncommitted changes count.
- */
 export async function getGitStatus(repoPath: string): Promise<GitStatusResult> {
   const installed = await isGitInstalled()
   if (!installed) {
@@ -46,11 +37,9 @@ export async function getGitStatus(repoPath: string): Promise<GitStatusResult> {
   }
 
   try {
-    // Run branch name query
     const branchRes = await execPromise('git branch --show-current', { cwd: repoPath })
     const branch = branchRes.stdout.trim() || 'DETACHED'
 
-    // Run porcelain status to count changes
     const statusRes = await execPromise('git status --porcelain', { cwd: repoPath })
     const changesCount = statusRes.stdout
       .split('\n')
@@ -64,9 +53,6 @@ export async function getGitStatus(repoPath: string): Promise<GitStatusResult> {
   }
 }
 
-/**
- * Retrieves the last 10 commits.
- */
 export async function getGitLog(repoPath: string): Promise<GitCommit[]> {
   const installed = await isGitInstalled()
   if (!installed || !repoPath || !fs.existsSync(repoPath)) {
@@ -74,7 +60,7 @@ export async function getGitLog(repoPath: string): Promise<GitCommit[]> {
   }
 
   try {
-    // Query last 10 commits. Format: hash<tab>subject<tab>author_name<tab>author_date_iso
+    // hash<tab>subject<tab>author<tab>iso date
     const { stdout } = await execPromise(
       'git log -n 10 --pretty=format:"%h%x09%s%x09%an%x09%aI"',
       { cwd: repoPath }
