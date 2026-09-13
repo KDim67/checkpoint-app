@@ -48,7 +48,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
   }, [setShowBgSelector])
 
   return (
-    <div style={{ position: 'relative' }} ref={bgSelectorRef}>
+    <div className="relative" ref={bgSelectorRef}>
       <HeaderBtn
         onClick={() => setShowBgSelector(v => !v)}
         title="Change board background theme"
@@ -296,7 +296,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
 
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Start Color</span>
+                        <span className="text-micro">Start Color</span>
                         <ColorPicker
                           value={customGradStart}
                           onLiveDomUpdate={col => {
@@ -317,7 +317,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                         />
                       </div>
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>End Color</span>
+                        <span className="text-micro">End Color</span>
                         <ColorPicker
                           value={customGradEnd}
                           onLiveDomUpdate={col => {
@@ -340,7 +340,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Gradient Style</span>
+                      <span className="text-micro">Gradient Style</span>
                       <div style={{ display: 'flex', gap: '4px', background: 'var(--color-surface-2)', padding: '2px', borderRadius: 'var(--radius-sm)' }}>
                         <button
                           onClick={() => setCustomGradType('linear')}
@@ -374,7 +374,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                     </div>
 
                     {customGradType === 'linear' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div className="col-4px">
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-text-muted)' }}>
                           <span>Angle / Direction</span>
                           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-secondary)', fontWeight: 'bold' }}>{customGradAngle}°</span>
@@ -472,7 +472,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-secondary)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-surface-offset)'}
               >
-                <Upload size={18} style={{ color: 'var(--color-secondary)' }} />
+                <Upload size={18} className="text-accent" />
                 <span>Upload Image from Computer</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>PNG, JPG, WEBP, GIF (Max 8MB)</span>
               </button>

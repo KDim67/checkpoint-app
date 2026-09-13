@@ -20,13 +20,13 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 'var(--space-5)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
       
       {/* Comments Thread */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div className="col-md">
         <span className="label-caps">
           Discussion
         </span>
 
         {/* Post comment input */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="col-4px">
           <textarea
             placeholder="Write a comment..."
             value={draft}
@@ -89,7 +89,7 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
             >
               <div className="row-between">
                 <strong style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>{authorLabel(c.user)}</strong>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="row-6px">
                   <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
                     {new Date(c.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                   </span>
@@ -112,7 +112,7 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
       {/* Audit Activities Trail */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderLeft: '1px solid var(--color-surface-offset)', paddingLeft: 'var(--space-4)' }}>
         <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Clock size={11} style={{ color: 'var(--color-text-faint)' }} />
+          <Clock size={11} className="text-faint" />
           Activity History
         </span>
 

@@ -119,7 +119,7 @@ export default function MermaidChart({ code, style }: MermaidChartProps): React.
   // next working picture is the wrong thing to show someone mid-edit.
   if (error && svg) {
     return (
-      <div style={{ position: 'relative' }}>
+      <div className="relative">
         <div
           dangerouslySetInnerHTML={{ __html: svg }}
           style={{

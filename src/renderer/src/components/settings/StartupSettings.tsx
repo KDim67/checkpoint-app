@@ -45,24 +45,20 @@ export default function StartupSettings(): React.JSX.Element {
   }
 
   if (!loaded) {
-    return <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>Loading…</div>
+    return <div className="text-hint-faint">Loading…</div>
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+    <div className="col-lg">
       {STARTUP_OPTIONS.map(option => {
         const disabled = option.needsTray && !settings.showTrayIcon
         return (
           <RowBetween key={option.key}>
             <div style={{ opacity: disabled ? 0.5 : 1 }}>
-              <div style={{
-                fontSize: 'var(--text-sm)',
-                fontWeight: 'var(--weight-medium)',
-                color: 'var(--color-text-base)'
-              }}>
+              <div className="text-item">
                 {option.label}
               </div>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+              <div className="text-sub">
                 {option.hint}
               </div>
             </div>

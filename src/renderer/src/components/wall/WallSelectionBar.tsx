@@ -44,7 +44,7 @@ export default function WallSelectionBar({
           had just selected. The palette itself has not shrunk back to
           the six colours it used to offer: it is all still here, one
           click in, which is what the pen palette already does. */}
-      <div data-wall-swatch style={{ position: 'relative' }}>
+      <div data-wall-swatch className="relative">
         <button
           onClick={() => setSwatchOpen(v => !v)}
           title="Colour"

@@ -245,7 +245,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
               }}>
                 {isApproved && <Check size={10} color="#38bdf8" />}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="fill">
                 <div style={{
                   fontSize: '11px', fontWeight: 'bold',
                   color: isApproved ? '#e2e8f0' : '#64748b',
@@ -385,7 +385,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Sparkles size={16} style={{ color: 'var(--color-secondary)' }} />
+                <Sparkles size={16} className="text-accent" />
                 <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', letterSpacing: '-0.01em' }}>
                   Plan Review: {planTitle}
                 </span>
@@ -471,7 +471,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                 {steps[activeStepIndex] ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div className="col-4px">
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'bold', letterSpacing: '0.1em' }}>
                           STEP DETAILS • 0{activeStepIndex + 1} OF {steps.length}
                         </span>

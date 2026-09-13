@@ -20,7 +20,7 @@ export default function WallSwitcher({
   wallIndex, activeWall, wallMenuOpen, setWallMenuOpen, renaming, setRenaming, commitIndex, addWall, setPendingDelete
 }: WallSwitcherProps) {
   return (
-    <div data-wall-popover="wall" style={{ position: 'relative' }}>
+    <div data-wall-popover="wall" className="relative">
       <button
         onClick={() => { setWallMenuOpen(v => !v); setRenaming(null) }}
         title="Switch wall"
@@ -37,7 +37,7 @@ export default function WallSwitcher({
           fontWeight: 500, cursor: wallIndex ? 'pointer' : 'default'
         }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="truncate">
           {activeWall?.name ?? '…'}
         </span>
         {/* Just a hint that there is a choice. */}

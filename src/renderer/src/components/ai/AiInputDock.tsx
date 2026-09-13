@@ -49,7 +49,7 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
           }}
         >
-          <ArrowDown size={12} style={{ color: 'var(--color-secondary)' }} />
+          <ArrowDown size={12} className="text-accent" />
           <span>{isStreaming ? 'Following live…' : 'Latest'}</span>
         </button>
       )}

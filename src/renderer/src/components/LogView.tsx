@@ -279,7 +279,7 @@ export default function LogView() {
           }}>
             Workspace Feed
           </h1>
-          <div style={{ position: 'relative' }} ref={dropdownRef}>
+          <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(v => !v)}
               style={{

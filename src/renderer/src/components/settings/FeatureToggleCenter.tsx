@@ -314,11 +314,7 @@ function FeatureRow({ cfg, on, busy, onChange }: {
           {cfg.icon}
         </span>
         <div>
-          <div style={{
-            fontSize: 'var(--text-sm)',
-            fontWeight: 'var(--weight-medium)',
-            color: 'var(--color-text-base)'
-          }}>
+          <div className="text-item">
             {cfg.title}
           </div>
           <div style={{
@@ -389,7 +385,7 @@ export default function FeatureToggleCenter() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+    <div className="col-lg">
       <div>
         <div style={{
           fontSize: '11px',

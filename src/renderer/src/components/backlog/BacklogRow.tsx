@@ -125,7 +125,7 @@ export default function BacklogRow({
                     onMouseLeave={e => (e.currentTarget.style.background = item.status === col.id ? 'var(--color-surface-offset)' : 'transparent')}
                   >
                     <span>{col.name}</span>
-                    {item.status === col.id && <Check size={10} style={{ color: 'var(--color-secondary)' }} />}
+                    {item.status === col.id && <Check size={10} className="text-accent" />}
                   </button>
                 ))}
               </div>
@@ -309,7 +309,7 @@ export default function BacklogRow({
                 {t.name}
               </span>
             ))}
-            {(!item.tags || item.tags.length === 0) && <span style={{ color: 'var(--color-text-faint)' }}>-</span>}
+            {(!item.tags || item.tags.length === 0) && <span className="text-faint">-</span>}
           </div>
         )
 
@@ -378,7 +378,7 @@ export default function BacklogRow({
                 <Link2 size={10} /> {relationsCount}
               </span>
             ) : (
-              <span style={{ color: 'var(--color-text-faint)' }}>-</span>
+              <span className="text-faint">-</span>
             )}
           </div>
         )

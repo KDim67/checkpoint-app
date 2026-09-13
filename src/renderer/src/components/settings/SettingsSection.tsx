@@ -60,7 +60,7 @@ export default function SettingsSection({
         <span aria-hidden="true" style={{ color: 'var(--color-secondary)', display: 'flex', flexShrink: 0 }}>
           {icon}
         </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="fill">
           {/* A real heading: these were <div>s, so the Settings page presented
               screen readers with no document outline to navigate by. */}
           <h2 style={{
@@ -74,11 +74,7 @@ export default function SettingsSection({
             {title}
           </h2>
           {description && (
-            <div style={{
-              fontSize: 'var(--text-xs)',
-              color: 'var(--color-text-faint)',
-              marginTop: '2px'
-            }}>
+            <div className="text-sub">
               {description}
             </div>
           )}

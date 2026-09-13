@@ -20,8 +20,8 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
           <SettingsColumn title="Slicing Settings">
 
             {/* File input button */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+            <div className="col-6px">
+              <span className="text-label-sm">
                 Sprite Sheet Image
               </span>
               <FilePickerButton
@@ -32,8 +32,8 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
             </div>
 
             {/* Slicing mode selector */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+            <div className="col-6px">
+              <span className="text-label-sm">
                 Slicing Mode
               </span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', background: 'var(--color-background)', padding: '2px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-surface-offset)' }}>
@@ -72,9 +72,9 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
 
             {/* Grid Slicing inputs */}
             {tool.sliceMode === 'grid' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Cell Width (px)</span>
+              <div className="col-md">
+                <div className="col-4px">
+                  <span className="text-caption">Cell Width (px)</span>
                   <input
                     type="number"
                     value={tool.sliceCellW}
@@ -90,8 +90,8 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                     }}
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Cell Height (px)</span>
+                <div className="col-4px">
+                  <span className="text-caption">Cell Height (px)</span>
                   <input
                     type="number"
                     value={tool.sliceCellH}
@@ -123,9 +123,9 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Slicer Status:</span>
-                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+              <div className="col-2px">
+                <span className="text-caption">Slicer Status:</span>
+                <span className="text-label-xs">
                   {tool.slicerPath ? `${tool.slicedFrames.length} Slices Identified` : 'Idle - Please load image'}
                 </span>
                 {tool.slicerPath && tool.sliceMode === 'grid' && tool.slicerDims && (tool.slicerDims.w % tool.sliceCellW > 0 || tool.slicerDims.h % tool.sliceCellH > 0) && (
@@ -157,8 +157,8 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                 />
               ) : tool.isSlicerProcessing ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
-                  <Loader size={32} className="animate-spin" style={{ color: 'var(--color-secondary)' }} />
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Slicing texture regions...</span>
+                  <Loader size={32} className="animate-spin text-accent" />
+                  <span className="text-hint">Slicing texture regions...</span>
                 </div>
               ) : (
                 <canvas ref={tool.slicerPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
@@ -167,19 +167,11 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
 
             {/* Sliced Export Trigger */}
             {tool.slicerPath && tool.slicedFrames.length > 0 && (
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-3)'
-              }}>
+              <div className="panel">
                 <div className="row-between">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export Slices</span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  <div className="col-2px">
+                    <span className="text-item-bold">Export Slices</span>
+                    <span className="text-caption">
                       Saves individual sliced PNG files directly to the directory of the original sheet.
                     </span>
                   </div>

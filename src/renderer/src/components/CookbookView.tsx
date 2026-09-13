@@ -518,15 +518,11 @@ export default function CookbookView() {
               this off the row instead would fire twice on the switch itself. */}
           <div onClick={() => handleToggleSafeMode(!safeMode)} style={{ cursor: 'pointer', userSelect: 'none' }}>
             <div
-              style={{
-                fontSize: 'var(--text-sm)',
-                fontWeight: 'var(--weight-semibold)',
-                color: 'var(--color-text-base)'
-              }}
+              className="text-item-strong"
             >
               Safe Mode
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            <div className="text-hint">
               Hides models over {SAFE_MODE_MAX_PARAMS}B parameters, so a large one cannot take the
               video memory your engine or editor is already using.
             </div>
@@ -599,7 +595,7 @@ export default function CookbookView() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <AlertTriangle size={20} style={{ color: 'var(--color-error)' }} />
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+            <div className="text-item-strong">
               Ollama Not Detected
             </div>
           </div>
@@ -644,7 +640,7 @@ export default function CookbookView() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+            <div className="text-item-strong">
               Ollama Service Stopped
             </div>
           </div>
@@ -981,7 +977,7 @@ export default function CookbookView() {
                         fontSize: 'var(--text-2xs)'
                       }}
                     >
-                      <span style={{ color: 'var(--color-text-muted)' }}>Compatibility Score</span>
+                      <span className="text-muted">Compatibility Score</span>
                       <span style={{ fontWeight: 'var(--weight-bold)', color: fitColor }}>
                         {fitResult.score} / 100
                       </span>
@@ -1031,19 +1027,19 @@ export default function CookbookView() {
                   }}
                 >
                   <div>
-                    <div style={{ color: 'var(--color-text-muted)' }}>RAM</div>
+                    <div className="text-muted">RAM</div>
                     <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
                       {variant.ramRequiredGb} GB
                     </div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--color-text-muted)' }}>VRAM</div>
+                    <div className="text-muted">VRAM</div>
                     <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
                       {variant.vramRequiredGb > 0 ? `${variant.vramRequiredGb} GB` : 'None'}
                     </div>
                   </div>
                   <div>
-                    <div style={{ color: 'var(--color-text-muted)' }}>Disk</div>
+                    <div className="text-muted">Disk</div>
                     <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
                       {variant.fileSizeGb} GB
                     </div>

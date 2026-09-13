@@ -117,7 +117,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 {/* Row 2: Badges and Action buttons */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="row-6px">
                     <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
                       Context: {activeWorkspace}
                     </span>
@@ -127,7 +127,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="row-6px">
                     <button
                       onClick={() => setShowAddMemoryForm(v => !v)}
                       style={{
@@ -437,7 +437,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
 
                       {/* Content. Editable or read-only */}
                       {editingMemoryId === mem.id ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div className="col-4px">
                           <textarea
                             value={editingMemoryContent}
                             onChange={e => setEditingMemoryContent(e.target.value)}

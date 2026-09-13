@@ -538,7 +538,7 @@ export default function ChatInput({
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="row-6px">
                 <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)' }}>
                   {cmd.name}
                 </span>
@@ -646,7 +646,7 @@ export default function ChatInput({
             >
               <FileCode size={13} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                <span className="truncate">{f.name}</span>
                 <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
               </div>
               {attachedFiles.includes(f.relativePath) && (
@@ -748,7 +748,7 @@ export default function ChatInput({
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                 onMouseLeave={e => (e.currentTarget.style.background = isEmailDraftMode ? 'var(--color-surface-2)' : 'transparent')}
               >
-                <Mail size={13} style={{ color: 'var(--color-secondary)' }} />
+                <Mail size={13} className="text-accent" />
                 <span>Draft Email Mode</span>
               </button>
 
@@ -884,7 +884,7 @@ export default function ChatInput({
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       <Sparkles size={13} style={{ color: a.intent === 'create' ? 'var(--color-secondary)' : 'var(--color-text-muted)' }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.label}</span>
+                      <span className="truncate">{a.label}</span>
                     </button>
                   ))}
                 </>

@@ -61,7 +61,7 @@ export default function McpActivityLog(): React.JSX.Element {
   }
 
   if (loading) {
-    return <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>Loading…</div>
+    return <div className="text-hint-faint">Loading…</div>
   }
 
   if (entries.length === 0) {
@@ -101,7 +101,7 @@ export default function McpActivityLog(): React.JSX.Element {
               opacity: undone ? 0.55 : 1
             }}
           >
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="fill">
               <div style={{
                 fontSize: 'var(--text-xs)',
                 color: 'var(--color-text-base)',

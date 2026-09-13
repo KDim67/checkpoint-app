@@ -19,7 +19,7 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
       marginTop: 'var(--space-2)'
     }}>
       <div className="row">
-        <Sparkles size={14} style={{ color: 'var(--color-secondary)' }} />
+        <Sparkles size={14} className="text-accent" />
         <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Game Dev: Texture Tooling Detected
         </span>
@@ -106,7 +106,7 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
                     e.currentTarget.style.borderColor = 'var(--color-balance)'
                   }}
                 >
-                  <Layers size={12} style={{ color: 'var(--color-secondary)' }} />
+                  <Layers size={12} className="text-accent" />
                   <span>Make Seamless</span>
                 </button>
               </div>

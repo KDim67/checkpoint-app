@@ -135,14 +135,14 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
 
               {/* Sliders Title */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
-                <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
+                <Settings size={14} className="text-muted" />
                 <span className="label-caps">
                   Map Generation Tweak Settings
                 </span>
               </div>
 
               {/* Sliders Container */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div className="col-md">
 
                 {/* Invert height. Dark pixels read as crevices vs. ridges */}
                 <label style={{
@@ -158,7 +158,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                   userSelect: 'none'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Invert Height</span>
+                    <span className="text-label-sm">Invert Height</span>
                     <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>Treat dark pixels as raised instead of recessed</span>
                   </div>
                   <input
@@ -170,10 +170,10 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                 </label>
 
                 {/* Normal Intensity */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="col-4px">
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                    <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Normal Intensity</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{tool.normalIntensity.toFixed(1)}</span>
+                    <span className="text-label">Normal Intensity</span>
+                    <span className="text-accent">{tool.normalIntensity.toFixed(1)}</span>
                   </div>
                   <input
                     type="range"
@@ -182,15 +182,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     step="0.1"
                     value={tool.normalIntensity}
                     onChange={e => tool.setNormalIntensity(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                    className="range-full"
                   />
                 </div>
 
                 {/* Height Depth */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="col-4px">
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                    <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Height/Bump Depth</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{tool.heightDepth.toFixed(2)}</span>
+                    <span className="text-label">Height/Bump Depth</span>
+                    <span className="text-accent">{tool.heightDepth.toFixed(2)}</span>
                   </div>
                   <input
                     type="range"
@@ -199,15 +199,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     step="0.05"
                     value={tool.heightDepth}
                     onChange={e => tool.setHeightDepth(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                    className="range-full"
                   />
                 </div>
 
                 {/* Roughness Contrast */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="col-4px">
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                    <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Roughness Contrast</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{tool.roughnessContrast.toFixed(1)}</span>
+                    <span className="text-label">Roughness Contrast</span>
+                    <span className="text-accent">{tool.roughnessContrast.toFixed(1)}</span>
                   </div>
                   <input
                     type="range"
@@ -216,15 +216,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     step="0.1"
                     value={tool.roughnessContrast}
                     onChange={e => tool.setRoughnessContrast(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                    className="range-full"
                   />
                 </div>
 
                 {/* Roughness Base */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="col-4px">
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                    <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Roughness Base (Shininess)</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{tool.roughnessBase.toFixed(2)}</span>
+                    <span className="text-label">Roughness Base (Shininess)</span>
+                    <span className="text-accent">{tool.roughnessBase.toFixed(2)}</span>
                   </div>
                   <input
                     type="range"
@@ -233,15 +233,15 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     step="0.05"
                     value={tool.roughnessBase}
                     onChange={e => tool.setRoughnessBase(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                    className="range-full"
                   />
                 </div>
 
                 {/* AO Intensity */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="col-4px">
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                    <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>AO Crevice Darkness</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{tool.aoIntensity.toFixed(1)}</span>
+                    <span className="text-label">AO Crevice Darkness</span>
+                    <span className="text-accent">{tool.aoIntensity.toFixed(1)}</span>
                   </div>
                   <input
                     type="range"
@@ -250,7 +250,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     step="0.1"
                     value={tool.aoIntensity}
                     onChange={e => tool.setAoIntensity(parseFloat(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                    className="range-full"
                   />
                 </div>
               </div>
@@ -306,19 +306,11 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
               </div>
 
               {/* Export Trigger Block */}
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-3)'
-              }}>
+              <div className="panel">
                 <div className="row-between">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export PBR Textures</span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  <div className="col-2px">
+                    <span className="text-item-bold">Export PBR Textures</span>
+                    <span className="text-caption">
                       Saves maps next to original file as lossless PNGs.
                     </span>
                   </div>
@@ -366,8 +358,8 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                     marginTop: 'var(--space-2)',
                   }}>
                     <div className="row">
-                      <CheckCircle size={14} style={{ color: 'var(--color-secondary)' }} />
-                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+                      <CheckCircle size={14} className="text-accent" />
+                      <span className="text-label-xs">
                         Maps Saved next to original texture!
                       </span>
                     </div>

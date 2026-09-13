@@ -38,7 +38,7 @@ export default function CustomModelPromptModal({ models }: Props) {
             <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>
               Enter Model Name
             </div>
-            <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+            <div className="text-micro">
               Specify any custom cloud model (e.g. <code>gemini-2.5-flash</code>, <code>gpt-4o</code>, <code>deepseek-chat</code>).
             </div>
             <input

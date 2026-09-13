@@ -317,7 +317,7 @@ export default function WorkspaceManager() {
   if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading workspaces…</div>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+    <div className="col-md">
       {/* Context list */}
       {contexts.map((ctx, i) => (
         <div
@@ -452,12 +452,8 @@ export default function WorkspaceManager() {
             </div>
           ) : (
             <>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 'var(--weight-medium)',
-                  color: 'var(--color-text-base)'
-                }}>
+              <div className="fill">
+                <div className="text-item">
                   {ctx.name}
                 </div>
                 <div style={{
@@ -638,8 +634,8 @@ export default function WorkspaceManager() {
               />
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+          <div className="col">
+            <span className="text-hint">
               Start from
             </span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '210px', overflowY: 'auto' }}>
@@ -666,14 +662,10 @@ export default function WorkspaceManager() {
                       width: '100%'
                     }}
                   >
-                    <span style={{
-                      fontSize: 'var(--text-sm)',
-                      fontWeight: 'var(--weight-medium)',
-                      color: 'var(--color-text-base)'
-                    }}>
+                    <span className="text-item">
                       {t.name}
                     </span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                    <span className="text-caption">
                       {t.description}
                     </span>
                     <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>
@@ -804,7 +796,7 @@ export default function WorkspaceManager() {
             </span>
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <div className="col-md">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               <label htmlFor="import-context-name" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
                 Workspace Name
@@ -849,7 +841,7 @@ export default function WorkspaceManager() {
                   {importBoard.notes.length > 0 && (
                     <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       {importBoard.notes.map(note => (
-                        <span key={note} style={{ color: 'var(--color-text-faint)' }}>· {note}</span>
+                        <span key={note} className="text-faint">· {note}</span>
                       ))}
                     </div>
                   )}

@@ -43,8 +43,8 @@ export default function CustomActionsModal({ actions }: Props) {
               background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0
             }}>
               <div className="row">
-                <Sparkles size={14} style={{ color: 'var(--color-secondary)' }} />
-                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+                <Sparkles size={14} className="text-accent" />
+                <span className="text-label-xs">
                   My Quick Actions ({customActions.length})
                 </span>
               </div>
@@ -68,8 +68,8 @@ export default function CustomActionsModal({ actions }: Props) {
                     display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 10px',
                     background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)'
                   }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="fill">
+                      <div className="row-6px">
                         <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{a.label}</span>
                         <span style={{
                           fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', padding: '1px 6px', borderRadius: '6px',

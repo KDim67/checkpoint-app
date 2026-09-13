@@ -44,7 +44,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
       {/* Filters Group */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
         {/* Priority filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="row-6px">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Priority:</span>
           <select
             value={filterPriority}
@@ -68,7 +68,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
         </div>
 
         {/* Tag filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="row-6px">
           <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Tag:</span>
           <select
             value={filterTagId}

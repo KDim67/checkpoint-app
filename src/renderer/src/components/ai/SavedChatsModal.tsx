@@ -38,7 +38,7 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
   } = chats
   return (
     <ChatPanelModal
-      icon={<MessageSquare size={14} style={{ color: 'var(--color-secondary)' }} />}
+      icon={<MessageSquare size={14} className="text-accent" />}
       title={<>Saved Chats ({savedChats.length}/50)</>}
       actions={
         <button

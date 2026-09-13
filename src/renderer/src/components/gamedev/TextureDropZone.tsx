@@ -45,7 +45,7 @@ export default function TextureDropZone({ onDragOver, onDrop, onClick, processin
     >
       {processing ? (
         <>
-          <Loader size={32} className="animate-spin" style={{ color: 'var(--color-secondary)' }} />
+          <Loader size={32} className="animate-spin text-accent" />
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Processing texture...</span>
         </>
       ) : (
@@ -63,10 +63,10 @@ export default function TextureDropZone({ onDragOver, onDrop, onClick, processin
             <Download size={24} style={{ color: 'var(--color-text-muted)', transform: 'rotate(180deg)' }} />
           </div>
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+            <span className="text-item-strong">
               {label}
             </span>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            <span className="text-hint">
               or click to browse local files (.png, .jpg, .jpeg, .tga, .bmp)
             </span>
             {/* What comes back. An empty drop target says what to put in

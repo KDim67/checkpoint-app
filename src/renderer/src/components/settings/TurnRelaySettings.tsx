@@ -83,8 +83,8 @@ export default function TurnRelaySettings(): React.JSX.Element {
       borderRadius: 'var(--radius-md)'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '4px' }}>
-        <Route size={14} style={{ color: 'var(--color-secondary)' }} />
-        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+        <Route size={14} className="text-accent" />
+        <span className="text-item-bold">
           Relay server (optional)
         </span>
         {active && (
@@ -106,7 +106,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
         coturn or a hosted one. LAN sync never needs it.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <div className="col">
         <div>
           <label style={label} htmlFor="turn-url">Server URL</label>
           <input

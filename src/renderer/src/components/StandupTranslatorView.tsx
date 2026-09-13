@@ -482,7 +482,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               <SparklesIcon />
               AI Standup Translator
             </h2>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            <span className="text-hint">
               Translate raw notes into structured agile logs for context <strong>#{activeWorkspace}</strong>
             </span>
           </div>
@@ -742,7 +742,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                             </svg>
                           )}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="fill">
                           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-3)', marginBottom: '3px' }}>
                             <span style={{ fontSize: '11px', lineHeight: '16px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {log.title}

@@ -198,7 +198,7 @@ export default function ItemDetailPanel() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
             {item.type === 'task' ? (
-              <CheckSquare size={12} style={{ color: 'var(--color-secondary)' }} />
+              <CheckSquare size={12} className="text-accent" />
             ) : (
               <Layout size={12} style={{ color: 'var(--color-primary)' }} />
             )}
@@ -355,7 +355,7 @@ export default function ItemDetailPanel() {
             ))}
             
             {/* Tag Selector dropdown */}
-            <div style={{ position: 'relative' }} ref={tagSelectorRef}>
+            <div className="relative" ref={tagSelectorRef}>
               <button
                 type="button"
                 onClick={() => setShowTagSelector(!showTagSelector)}

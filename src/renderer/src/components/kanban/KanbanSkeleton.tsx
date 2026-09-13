@@ -69,7 +69,7 @@ export default function KanbanSkeleton() {
                   {/* Title block */}
                   <Skeleton width={`${80 - cardIdx * 10}%`} height={14} />
                   {/* Body blocks */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div className="col-6px">
                     <Skeleton width="90%" height={10} />
                     <Skeleton width="45%" height={10} />
                   </div>

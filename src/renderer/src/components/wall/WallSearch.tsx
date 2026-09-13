@@ -12,7 +12,7 @@ interface WallSearchProps {
 
 export default function WallSearch({ query, setQuery, matches, jumpTo, labelOf }: WallSearchProps) {
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="relative">
       <Search
         size={12}
         style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-faint)', pointerEvents: 'none' }}

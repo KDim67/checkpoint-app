@@ -136,7 +136,7 @@ export default function LogVirtualList({
           }}>
             <Calendar size={18} />
           </div>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+          <span className="text-item-strong">
             Beginning of Workspace History
           </span>
           <span style={{ fontSize: 'var(--text-xs)', maxWidth: '320px' }}>

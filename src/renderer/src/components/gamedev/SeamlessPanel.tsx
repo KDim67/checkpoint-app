@@ -41,18 +41,18 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
             }}>
               {/* Settings Title */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
-                <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
+                <Settings size={14} className="text-muted" />
                 <span className="label-caps">
                   Stitching Configuration
                 </span>
               </div>
 
               {/* Sliders Container */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div className="col-md">
                 
                 {/* Algorithm Toggle */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+                <div className="col-6px">
+                  <span className="text-label-sm">
                     Blending Algorithm
                   </span>
                   <div style={{ display: 'flex', gap: '4px', background: 'var(--color-background)', padding: '2px', borderRadius: 'var(--radius-sm)' }}>
@@ -95,8 +95,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 {tool.seamlessAlgorithm === 'feather' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                      <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Blend/Overlap Width</span>
-                      <span style={{ color: 'var(--color-secondary)' }}>{Math.round(tool.seamlessBlendWidth * 100)}%</span>
+                      <span className="text-label">Blend/Overlap Width</span>
+                      <span className="text-accent">{Math.round(tool.seamlessBlendWidth * 100)}%</span>
                     </div>
                     <input
                       type="range"
@@ -105,7 +105,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       step="0.01"
                       value={tool.seamlessBlendWidth}
                       onChange={e => { tool.setSeamlessBlendWidth(parseFloat(e.target.value)); tool.updateSeamlessPreviewDebounced() }}
-                      style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                      className="range-full"
                     />
                   </div>
                 )}
@@ -113,8 +113,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 {/* Luminance Equalizer */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                    <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Luminance Equalizer</span>
-                    <span style={{ color: 'var(--color-secondary)' }}>{Math.round(tool.seamlessEqualizer * 100)}%</span>
+                    <span className="text-label">Luminance Equalizer</span>
+                    <span className="text-accent">{Math.round(tool.seamlessEqualizer * 100)}%</span>
                   </div>
                   <input
                     type="range"
@@ -123,7 +123,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     step="0.05"
                     value={tool.seamlessEqualizer}
                     onChange={e => { tool.setSeamlessEqualizer(parseFloat(e.target.value)); tool.updateSeamlessPreviewDebounced() }}
-                    style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                    className="range-full"
                   />
                 </div>
 
@@ -131,8 +131,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 {tool.seamlessAlgorithm === 'feather' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                      <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>Wavy Seams (Mask Warping)</span>
-                      <span style={{ color: 'var(--color-secondary)' }}>{Math.round(tool.seamlessWavySeams * 100)}%</span>
+                      <span className="text-label">Wavy Seams (Mask Warping)</span>
+                      <span className="text-accent">{Math.round(tool.seamlessWavySeams * 100)}%</span>
                     </div>
                     <input
                       type="range"
@@ -141,14 +141,14 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       step="0.05"
                       value={tool.seamlessWavySeams}
                       onChange={e => { tool.setSeamlessWavySeams(parseFloat(e.target.value)); tool.updateSeamlessPreviewDebounced() }}
-                      style={{ width: '100%', accentColor: 'var(--color-primary)' }}
+                      className="range-full"
                     />
                   </div>
                 )}
 
                 {/* Tiling Grid Scale */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'var(--space-2)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+                  <span className="text-label-sm">
                     Preview Repetition Scale
                   </span>
                   <div style={{ display: 'flex', gap: '4px', background: 'var(--color-background)', padding: '2px', borderRadius: 'var(--radius-sm)' }}>
@@ -176,7 +176,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
 
                 {/* Show Grid Helper Toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-2)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)' }}>
+                  <span className="text-label-sm">
                     Show Tiling Grid Lines
                   </span>
                   <input
@@ -261,19 +261,11 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
               </div>
 
               {/* Export Trigger Block */}
-              <div style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-3)'
-              }}>
+              <div className="panel">
                 <div className="row-between">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>Export Seamless Texture</span>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  <div className="col-2px">
+                    <span className="text-item-bold">Export Seamless Texture</span>
+                    <span className="text-caption">
                       Saves file next to original image with a _seamless suffix.
                     </span>
                   </div>
@@ -321,8 +313,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     marginTop: 'var(--space-2)',
                   }}>
                     <div className="row">
-                      <CheckCircle size={14} style={{ color: 'var(--color-secondary)' }} />
-                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+                      <CheckCircle size={14} className="text-accent" />
+                      <span className="text-label-xs">
                         Seamless texture saved next to original!
                       </span>
                     </div>

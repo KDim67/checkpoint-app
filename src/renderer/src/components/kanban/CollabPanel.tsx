@@ -25,7 +25,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
   }, [setPopoverOpen])
 
   return (
-    <div style={{ position: 'relative' }} ref={collabPopoverRef}>
+    <div className="relative" ref={collabPopoverRef}>
       <HeaderBtn
         onClick={() => session.setPopoverOpen(v => !v)}
         title="Share this board with someone else"
@@ -128,7 +128,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
           )}
 
           {!session.active ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div className="col-md">
               {/* Who you are, once, for both hosting and joining. Card
                   history credits this name, so it is worth setting before
                   a board is shared rather than after. */}
@@ -298,11 +298,11 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
               </p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div className="col-md">
               {/* Active session state */}
               <div style={{ background: 'var(--color-surface-offset)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 <div className="row-between">
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Role:</span>
+                  <span className="text-caption">Role:</span>
                   <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
                     {session.isHost ? `Host (${session.mode === 'readonly' ? 'Read-Only' : 'Collaborative'})` : 'Client'}
                   </span>
@@ -310,7 +310,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 
                 {session.code && (
                   <div className="row-between">
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Passcode:</span>
+                    <span className="text-caption">Passcode:</span>
                     <span
                       onClick={() => {
                         navigator.clipboard.writeText(session.code)
@@ -328,8 +328,8 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 {/* Who is in the room. The session used to report only
                     that somebody was, which is no basis for deciding
                     whether they should stay. */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                <div className="col-4px">
+                  <span className="text-caption">
                     {session.isHost
                       ? `In this board (${session.roster.length})`
                       : `Also here (${session.roster.length})`}
@@ -380,7 +380,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
                 <div style={{ height: '1px', background: 'var(--color-surface-1)', margin: '4px 0' }} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div className="col-2px">
                   <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>Status Logs:</span>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {session.progress}
@@ -391,7 +391,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
               {/* What the host can do about the person in the room. Only
                   the host, and only while someone is in it. */}
               {session.isHost && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="col">
                   <button
                     onClick={() => session.setGuestMode(session.mode === 'readonly' ? 'collaborative' : 'readonly')}
                     title={session.mode === 'readonly'

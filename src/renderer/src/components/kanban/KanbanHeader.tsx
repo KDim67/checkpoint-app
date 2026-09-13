@@ -57,7 +57,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
         }}>
           Kanban Board
         </h1>
-        <div style={{ position: 'relative' }} ref={dropdownRef}>
+        <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen(v => !v)}
             style={{
@@ -86,7 +86,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
               e.currentTarget.style.background = 'var(--color-surface-2)'
             }}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span className="truncate">
               #{workspaceList.find(c => c.slug === activeWorkspace)?.name || activeWorkspace}
             </span>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}>
@@ -181,7 +181,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
         </HeaderBtn>
 
         {/* Card face toggles. What each card shows */}
-        <div style={{ position: 'relative' }} ref={cardDisplayRef}>
+        <div className="relative" ref={cardDisplayRef}>
           <HeaderBtn
             active={showCardDisplayMenu}
             onClick={() => setShowCardDisplayMenu(v => !v)}

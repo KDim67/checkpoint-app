@@ -107,7 +107,7 @@ export default function WallColorPicker({
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div className="col-6px">
       {defaultLabel && onDefault && (
         <button
           onClick={onDefault}
@@ -131,7 +131,7 @@ export default function WallColorPicker({
         {colors.map(color => swatch(color, value === color, color, () => onChange(color)))}
 
         {allowCustom && (
-          <div ref={customRef} style={{ position: 'relative' }}>
+          <div ref={customRef} className="relative">
             <button
               onClick={e => {
                 if (customOpen) { setCustomAt(null); return }

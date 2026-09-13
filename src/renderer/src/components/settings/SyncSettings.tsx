@@ -320,7 +320,7 @@ export default function SyncSettings() {
           border: '1px solid var(--color-surface-offset)'
         }}>
           <div>
-            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+            <div className="text-label-xs">
               Last Sync Succeeded
             </div>
             <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-muted)', marginTop: '2px' }}>
@@ -350,10 +350,10 @@ export default function SyncSettings() {
 
       {syncEnabled ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="col-lg">
             <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-                <Wifi size={18} style={{ color: 'var(--color-secondary)' }} />
+                <Wifi size={18} className="text-accent" />
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
                   Local LAN Sync (Wi-Fi)
                 </h3>
@@ -377,7 +377,7 @@ export default function SyncSettings() {
                   {discoveredPeers.map((peer, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2) var(--space-3)' }}>
                       <div>
-                        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>{peer.name}</div>
+                        <div className="text-label-xs">{peer.name}</div>
                         <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)' }}>{peer.ip}:{peer.port}</div>
                       </div>
                       <button
@@ -462,10 +462,10 @@ export default function SyncSettings() {
             </form>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="col-lg">
             <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
-                <Globe size={18} style={{ color: 'var(--color-secondary)' }} />
+                <Globe size={18} className="text-accent" />
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
                   Internet Sync (WebRTC)
                 </h3>
@@ -560,7 +560,7 @@ export default function SyncSettings() {
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '140px', overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-text-muted)' }}>
                 {logs.length === 0 ? (
-                  <div style={{ color: 'var(--color-text-faint)' }}>Console is empty. Enable sync and trigger a connection.</div>
+                  <div className="text-faint">Console is empty. Enable sync and trigger a connection.</div>
                 ) : (
                   logs.map((log, idx) => <div key={idx}>{log}</div>)
                 )}

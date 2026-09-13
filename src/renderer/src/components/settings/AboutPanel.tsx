@@ -90,7 +90,7 @@ export default function AboutPanel() {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       {/* Brand header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
         <Logo size={48} />
@@ -98,7 +98,7 @@ export default function AboutPanel() {
           <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
             Checkpoint
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
+          <div className="text-hint-faint">
             A local-first desktop workspace for keeping track of what you’re doing
           </div>
         </div>
@@ -111,7 +111,7 @@ export default function AboutPanel() {
           app is, which is the same question the panel answers. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Getting started
           </div>
           <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
@@ -144,7 +144,7 @@ export default function AboutPanel() {
               borderRadius: 'var(--radius-sm)'
             }}
           >
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{v.label}</span>
+            <span className="text-hint">{v.label}</span>
             <code style={{
               fontSize: 'var(--text-xs)',
               fontFamily: 'var(--font-mono)',

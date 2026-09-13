@@ -267,7 +267,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* Activity Heatmap Calendar */}
-        <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
+        <div className="analytics-card panel">
           <div className="row-between">
             <div className="skeleton" style={{ width: '150px', height: '16px' }} />
             <div className="skeleton" style={{ width: '80px', height: '14px', opacity: 0.6 }} />
@@ -293,7 +293,7 @@ export default function AnalyticsView() {
               {/* Mock Heatmap Grid */}
               <div style={{ display: 'flex', gap: '2px', flex: 1 }}>
                 {Array.from({ length: 53 }).map((_, colIdx) => (
-                  <div key={colIdx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div key={colIdx} className="col-2px">
                     {Array.from({ length: 7 }).map((_, rowIdx) => (
                       <div
                         key={rowIdx}
@@ -316,7 +316,7 @@ export default function AnalyticsView() {
         {/* Two-Column Mid Section */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           {/* Line Chart Card */}
-          <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
+          <div className="analytics-card panel">
             <div className="row">
               <div className="skeleton" style={{ width: '16px', height: '16px', borderRadius: '50%' }} />
               <div className="skeleton" style={{ width: '130px', height: '16px' }} />
@@ -342,7 +342,7 @@ export default function AnalyticsView() {
           </div>
 
           {/* Bar Chart Card */}
-          <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
+          <div className="analytics-card panel">
             <div className="row">
               <div className="skeleton" style={{ width: '16px', height: '16px', borderRadius: '50%' }} />
               <div className="skeleton" style={{ width: '150px', height: '16px' }} />
@@ -361,11 +361,11 @@ export default function AnalyticsView() {
         {/* Bottom Section */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           {/* Tag Distribution */}
-          <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
+          <div className="analytics-card panel">
             <div className="skeleton" style={{ width: '110px', height: '16px' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-1)' }}>
               {[1, 2, 3].map(i => (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div key={i} className="col-6px">
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div className="skeleton" style={{ width: '60px', height: '14px' }} />
                     <div className="skeleton" style={{ width: '30px', height: '14px' }} />
@@ -377,12 +377,12 @@ export default function AnalyticsView() {
           </div>
 
           {/* Recent Sessions */}
-          <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
+          <div className="analytics-card panel">
             <div className="skeleton" style={{ width: '150px', height: '16px' }} />
             <div className="col">
               {[1, 2, 3].map(i => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-surface-offset)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div className="col-4px">
                     <div className="skeleton" style={{ width: '100px', height: '14px' }} />
                     <div className="skeleton" style={{ width: '130px', height: '10px' }} />
                   </div>
@@ -400,7 +400,7 @@ export default function AnalyticsView() {
     return (
       <div style={{ padding: 'var(--space-6)', color: 'var(--color-error)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <h3>Failed to load analytics data</h3>
-        <p style={{ color: 'var(--color-text-muted)' }}>{error || 'No database connections available'}</p>
+        <p className="text-muted">{error || 'No database connections available'}</p>
       </div>
     )
   }
@@ -518,7 +518,7 @@ export default function AnalyticsView() {
     const totalHoursStr = timelineData ? formatMsToHoursAndMins(timelineData.totalDurationMs) : '0m'
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="col-lg">
         {/* Date Selector Row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -596,7 +596,7 @@ export default function AnalyticsView() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
             {/* Left Column: Summary & Process Share */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div className="col-lg">
               {/* Total Hours Card */}
               <div className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
                 <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)' }}>
@@ -609,17 +609,17 @@ export default function AnalyticsView() {
               </div>
 
               {/* Process Share Card */}
-              <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="analytics-card col-lg">
                 <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>Process Share</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <div className="col-md">
                   {timelineData.byProcess.map((proc, idx) => {
                     const percentage = timelineData.totalDurationMs > 0 ? (proc.durationMs / timelineData.totalDurationMs) * 100 : 0
                     const barColor = ALLOCATION_COLORS[idx % ALLOCATION_COLORS.length]
                     return (
-                      <div key={proc.processName} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div key={proc.processName} className="col-4px">
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
                           <span style={{ fontWeight: 'var(--weight-medium)', textTransform: 'capitalize' }}>{proc.processName}</span>
-                          <span style={{ color: 'var(--color-text-muted)' }}>{formatMsToHoursAndMins(proc.durationMs)} ({percentage.toFixed(0)}%)</span>
+                          <span className="text-muted">{formatMsToHoursAndMins(proc.durationMs)} ({percentage.toFixed(0)}%)</span>
                         </div>
                         <div style={{ height: '6px', background: 'var(--color-surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${percentage}%`, background: barColor, borderRadius: '3px', transition: 'width 300ms ease' }} />
@@ -632,7 +632,7 @@ export default function AnalyticsView() {
             </div>
 
             {/* Right Column: Active Window Titles */}
-            <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div className="analytics-card col-lg">
               <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>Top Active Windows</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2.5)', overflowY: 'auto', maxHeight: '320px', paddingRight: '2px' }}>
                 {timelineData.byTitle.map((title, idx) => {
@@ -740,8 +740,8 @@ export default function AnalyticsView() {
           </h2>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
             {activeWorkspace === 'all'
-              ? <>Insights across <strong style={{ color: 'var(--color-secondary)' }}>all workspaces</strong></>
-              : <>Insights for workspace <strong style={{ color: 'var(--color-secondary)' }}>{activeWorkspace}</strong></>}
+              ? <>Insights across <strong className="text-accent">all workspaces</strong></>
+              : <>Insights for workspace <strong className="text-accent">{activeWorkspace}</strong></>}
           </p>
         </div>
         <button
@@ -873,7 +873,7 @@ export default function AnalyticsView() {
       <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Log Activity Timeline</span>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Past 365 Days</span>
+          <span className="text-hint">Past 365 Days</span>
         </div>
 
         <div style={{ display: 'flex', gap: 'var(--space-6)', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -909,7 +909,7 @@ export default function AnalyticsView() {
             {/* Heatmap Grid */}
             <div style={{ display: 'flex', gap: '2px' }}>
               {columns.map((column, colIdx) => (
-                <div key={colIdx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div key={colIdx} className="col-2px">
                   {column.map((day, rowIdx) => {
                     if (day.isPlaceholder) {
                       return <div key={rowIdx} style={{ width: '10px', height: '10px' }} />
@@ -1206,7 +1206,7 @@ export default function AnalyticsView() {
       {/* Bottom Grid Section */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         {/* Context Focus Allocation (Passive Tracker) */}
-        <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <div className="analytics-card col-lg">
           <div className="row">
             <IconChart style={{ color: 'var(--color-secondary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Context Focus Allocation (Past 7 Days)</span>
@@ -1217,7 +1217,7 @@ export default function AnalyticsView() {
               No activity logs recorded yet. Enable the tracker in settings.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div className="col-md">
               {(() => {
                 const totalActivityMins = data.activityAllocation.reduce((acc, a) => acc + a.durationMins, 0)
                 return data.activityAllocation.map((act, i) => {
@@ -1228,13 +1228,13 @@ export default function AnalyticsView() {
                   const durationStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`
 
                   return (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div key={i} className="col-4px">
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'var(--weight-medium)' }}>
                           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: barColor }} />
                           {act.context.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>{durationStr} ({percentage.toFixed(0)}%)</span>
+                        <span className="text-muted">{durationStr} ({percentage.toFixed(0)}%)</span>
                       </div>
                       <div style={{ height: '6px', width: '100%', background: 'var(--color-surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${percentage}%`, background: barColor, borderRadius: '3px', transition: 'width 300ms ease' }} />
@@ -1248,7 +1248,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* Most Used Tags */}
-        <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <div className="analytics-card col-lg">
           <div className="row">
             <IconTag style={{ color: 'var(--color-secondary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Tag Usage Share</span>
@@ -1259,17 +1259,17 @@ export default function AnalyticsView() {
               No tag references found. Add tags to items.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div className="col-md">
               {data.mostUsedTags.map((tag, i) => {
                 const percentage = totalTagUses > 0 ? (tag.count / totalTagUses) * 100 : 0
                 return (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div key={i} className="col-4px">
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'var(--weight-medium)' }}>
                         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color }} />
                         {tag.name}
                       </span>
-                      <span style={{ color: 'var(--color-text-muted)' }}>{tag.count} uses ({percentage.toFixed(0)}%)</span>
+                      <span className="text-muted">{tag.count} uses ({percentage.toFixed(0)}%)</span>
                     </div>
                     {/* Progress Bar Container */}
                     <div style={{ height: '6px', width: '100%', background: 'var(--color-surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -1283,7 +1283,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* Focus Retrospective Logs */}
-        <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <div className="analytics-card col-lg">
           <div className="row">
             <IconFocus style={{ color: 'var(--color-primary)' }} />
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Focus Retrospective Log</span>

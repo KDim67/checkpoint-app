@@ -14,7 +14,7 @@ export default function SettingsColumn({ title, children }: { title: string; chi
       overflowY: 'auto'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
-        <Settings size={14} style={{ color: 'var(--color-text-muted)' }} />
+        <Settings size={14} className="text-muted" />
         <span className="label-caps">
           {title}
         </span>

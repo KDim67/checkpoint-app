@@ -87,7 +87,7 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
         }}
       >
         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color, flexShrink: 0 }} />
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag.name}</span>
+        <span className="truncate">{tag.name}</span>
       </button>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
         <ColorPicker
@@ -114,7 +114,7 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
         >
           <Trash2 size={12} />
         </button>
-        {isSelected && <Check size={12} style={{ color: 'var(--color-secondary)' }} />}
+        {isSelected && <Check size={12} className="text-accent" />}
       </div>
     </div>
   )

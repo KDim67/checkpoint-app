@@ -41,12 +41,12 @@ export default function ExportPanel(): React.JSX.Element {
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+    <div className="col-md">
       <div>
-        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+        <div className="text-item">
           Export your data
         </div>
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+        <div className="text-sub">
           Cards, tasks and log entries with their tags. Notes are already plain
           markdown files on disk.
         </div>

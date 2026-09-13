@@ -17,7 +17,7 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
       <div className="row-between">
         <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <CheckSquare size={13} style={{ color: 'var(--color-secondary)' }} />
+          <CheckSquare size={13} className="text-accent" />
           Sub-Task Checklist
         </span>
         {items.length > 0 && (
@@ -29,7 +29,7 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
 
       {/* Checklist Progress Bar */}
       {items.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="col-6px">
           <div style={{ height: '6px', background: 'var(--color-surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
             <div style={{ width: `${items.length > 0 ? Math.round((items.filter(i => i.done).length / items.length) * 100) : 0}%`, height: '100%', background: 'var(--color-secondary)', borderRadius: '3px', transition: 'width 200ms ease' }} />
           </div>
@@ -37,7 +37,7 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
       )}
 
       {/* Checklist Items */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div className="col-4px">
         {items.map(item => (
           <div
             key={item.id}

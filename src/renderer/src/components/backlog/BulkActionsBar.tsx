@@ -52,7 +52,7 @@ export default function BulkActionsBar({
     >
       {/* Selection count & clear */}
       <div className="row">
-        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+        <span className="text-label-xs">
           {selectedItems.length} selected
         </span>
         <button
@@ -79,7 +79,7 @@ export default function BulkActionsBar({
       {/* Action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', position: 'relative' }}>
         {/* Bulk Status Update */}
-        <div style={{ position: 'relative' }}>
+        <div className="relative">
           <button
             onClick={() => {
               setShowStatusMenu(!showStatusMenu)
@@ -150,7 +150,7 @@ export default function BulkActionsBar({
         </div>
 
         {/* Bulk Priority Update */}
-        <div style={{ position: 'relative' }}>
+        <div className="relative">
           <button
             onClick={() => {
               setShowPriorityMenu(!showPriorityMenu)
@@ -220,7 +220,7 @@ export default function BulkActionsBar({
                     {p === 3 && <ChevronUp size={12} style={{ color: 'var(--color-priority-high)' }} />}
                     {p === 2 && <ChevronUp size={12} style={{ color: 'var(--color-priority-med)' }} />}
                     {p === 1 && <ChevronDown size={12} style={{ color: 'var(--color-priority-low)' }} />}
-                    {p === 0 && <Minus size={12} style={{ color: 'var(--color-text-faint)' }} />}
+                    {p === 0 && <Minus size={12} className="text-faint" />}
                   </span>
                   <span>{PRIORITY_LABELS[p]}</span>
                 </button>
@@ -230,7 +230,7 @@ export default function BulkActionsBar({
         </div>
 
         {/* Bulk Add Tag */}
-        <div style={{ position: 'relative' }}>
+        <div className="relative">
           <button
             onClick={() => {
               setShowTagMenu(!showTagMenu)

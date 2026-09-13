@@ -82,7 +82,7 @@ export default function MemoryVaultManager() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
         {memories.map(mem => (
           <div key={mem.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: '11px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div className="col-2px">
               <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{mem.memory_key} <span style={{ fontSize: '9px', opacity: 0.6, color: 'var(--color-text-muted)' }}>({mem.category})</span></div>
               <div style={{ color: 'var(--color-text-base)' }}>{mem.content}</div>
             </div>

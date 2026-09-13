@@ -83,7 +83,7 @@ export default function ExtensionsTab() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+    <div className="col-xl">
       {/* Plugins are required into the main process, so they run with the app's
           full privileges. Saying so plainly is the honest thing: the engine's
           own description used to call them "sandboxed", which they are not. */}
@@ -115,7 +115,7 @@ export default function ExtensionsTab() {
           borderRadius: 'var(--radius-lg)'
         }}>
           <AlertTriangle size={16} style={{ color: 'var(--color-error)', flexShrink: 0, marginTop: '1px' }} />
-          <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="fill">
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)', fontWeight: 'var(--weight-semibold)' }}>
               {loadError.filename} could not be enabled
             </div>
@@ -217,12 +217,12 @@ export default function ExtensionsTab() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <div className="col">
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+          <div className="text-item">
             Example plugins
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+          <div className="text-sub">
             Written into your plugins folder so you can read them before enabling anything.
             Installing does not switch a plugin on.
           </div>
@@ -243,7 +243,7 @@ export default function ExtensionsTab() {
                 borderRadius: 'var(--radius-md)'
               }}
             >
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="fill">
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{example.name}</div>
                 <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '1px' }}>
                   {example.description}
@@ -284,8 +284,8 @@ export default function ExtensionsTab() {
             alignItems: 'center',
             gap: 'var(--space-3)'
           }}>
-            <Sparkles size={24} style={{ color: 'var(--color-text-faint)' }} />
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)' }}>
+            <Sparkles size={24} className="text-faint" />
+            <div className="text-item">
               No plugins found in the plugins directory
             </div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', maxWidth: '440px', lineHeight: 'var(--leading-relaxed)' }}>
@@ -344,7 +344,7 @@ export default function ExtensionsTab() {
               >
                 <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
                   <div className="row">
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+                    <span className="text-item-strong">
                       {p.name}
                     </span>
                     <span style={{

@@ -352,7 +352,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
             </div>
           </div>
         ) : (
-          <div style={{ position: 'relative' }}>
+          <div className="relative">
             {message.thinking && (
               <div style={{
                 background: 'rgba(255, 255, 255, 0.02)',
@@ -371,7 +371,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     fontSize: '10px', fontWeight: 'bold'
                   }}
                 >
-                  <Brain size={12} style={{ color: 'var(--color-secondary)' }} />
+                  <Brain size={12} className="text-accent" />
                   <span>{showThinking ? 'Hide Thinking Process' : 'Show Thinking Process'}</span>
                   <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
                     ({Math.ceil(message.thinking.length / 4)} tokens)
