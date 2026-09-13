@@ -6,7 +6,7 @@ import FilePickerButton from './FilePickerButton'
 
 export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
+      <div className="col-lg-full">
         <div className="gamedev-info-banner">
           <Grid size={15} className="gamedev-info-banner-icon" />
           <div>
@@ -14,20 +14,11 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--space-4)', minHeight: 0, flex: 1 }}>
+        <div className="tool-layout">
           {/* Left Column: Packing Configuration */}
-          <div style={{
-            background: 'var(--color-surface-1)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-4)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-            overflowY: 'auto'
-          }}>
+          <div className="panel-scroll">
             {/* Title */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
+            <div className="section-head">
               <Settings size={14} className="text-muted" />
               <span className="label-caps">
                 Packer Settings
@@ -55,7 +46,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
             <div className="col-md">
               {/* Padding Slider */}
               <div className="col-4px">
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                <div className="row-caption">
                   <span className="text-label">Border Padding</span>
                   <span className="text-accent">{tool.atlasPadding}px</span>
                 </div>
@@ -100,7 +91,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-1)' }}>
                 <div className="col-2px">
                   <span className="text-label-sm">Auto-Trim Transparency</span>
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Cuts out bounding alpha borders</span>
+                  <span className="text-nano">Cuts out bounding alpha borders</span>
                 </div>
                 <input
                   type="checkbox"
@@ -139,17 +130,9 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
           </div>
 
           {/* Right Column: 2D Packing Preview Canvas */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
+          <div className="col-lg-min">
             {/* Meta Header */}
-            <div style={{
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-3) var(--space-4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
+            <div className="panel-row">
               <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span className="text-caption">Atlas Status:</span>
                 <span className="text-label-xs">
@@ -167,20 +150,10 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
             </div>
 
             {/* Canvas Render Area */}
-            <div style={{
-              flex: 1,
-              background: 'var(--color-background)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-surface-offset)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 'var(--space-4)',
-              overflow: 'hidden'
-            }}>
+            <div className="preview-area">
               {!tool.atlasFolderPath ? (
                 <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
-                  <Box size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />
+                  <Box size={40} className="icon-dim" />
                   <div className="col-2px">
                     <span className="text-item-bold">No Folder Selected</span>
                     <span className="text-hint">Select a folder of loose sprites to begin forging the atlas.</span>
@@ -269,8 +242,8 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                       <CheckCircle size={13} />
                       <strong>Atlas generated successfully!</strong>
                     </div>
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>PNG Path: {tool.atlasExportedPng}</span>
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>JSON Path: {tool.atlasExportedJson}</span>
+                    <span className="text-nano">PNG Path: {tool.atlasExportedPng}</span>
+                    <span className="text-nano">JSON Path: {tool.atlasExportedJson}</span>
                   </div>
                 )}
               </div>

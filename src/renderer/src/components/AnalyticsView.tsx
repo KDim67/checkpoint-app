@@ -281,7 +281,7 @@ export default function AnalyticsView() {
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div className="flex-4px">
               {/* Day of Week Indicators */}
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '9px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
                 <span>Sun</span>
@@ -314,7 +314,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* Two-Column Mid Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
+        <div className="grid-cards">
           {/* Line Chart Card */}
           <div className="analytics-card panel">
             <div className="row">
@@ -359,7 +359,7 @@ export default function AnalyticsView() {
         </div>
 
         {/* Bottom Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
+        <div className="grid-cards">
           {/* Tag Distribution */}
           <div className="analytics-card panel">
             <div className="skeleton" style={{ width: '110px', height: '16px' }} />
@@ -521,7 +521,7 @@ export default function AnalyticsView() {
       <div className="col-lg">
         {/* Date Selector Row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div className="flex-gap">
             {(['today', 'yesterday', 'week'] as const).map(range => (
               <button
                 key={range}
@@ -569,7 +569,7 @@ export default function AnalyticsView() {
 
         {timelineLoading ? (
           <div style={{ padding: 'var(--space-8)', display: 'flex', justifyContent: 'center' }}>
-            <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>
+            <div className="text-sm-faint">
               Querying active timeline logs...
             </div>
           </div>
@@ -598,13 +598,13 @@ export default function AnalyticsView() {
             {/* Left Column: Summary & Process Share */}
             <div className="col-lg">
               {/* Total Hours Card */}
-              <div className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+              <div className="analytics-card row-lg">
                 <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)' }}>
                   <IconHourglass size={24} />
                 </div>
                 <div>
                   <div className="kpi-value">{totalHoursStr}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '2px' }}>Total Tracked Development Time</div>
+                  <div className="text-hint-sub">Total Tracked Development Time</div>
                 </div>
               </div>
 
@@ -617,7 +617,7 @@ export default function AnalyticsView() {
                     const barColor = ALLOCATION_COLORS[idx % ALLOCATION_COLORS.length]
                     return (
                       <div key={proc.processName} className="col-4px">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
+                        <div className="row-caption-xs">
                           <span style={{ fontWeight: 'var(--weight-medium)', textTransform: 'capitalize' }}>{proc.processName}</span>
                           <span className="text-muted">{formatMsToHoursAndMins(proc.durationMs)} ({percentage.toFixed(0)}%)</span>
                         </div>
@@ -660,7 +660,7 @@ export default function AnalyticsView() {
                         <div style={{ color: 'var(--color-secondary)', fontWeight: 'var(--weight-semibold)' }}>
                           {formatMsToHoursAndMins(title.durationMs)}
                         </div>
-                        <div style={{ color: 'var(--color-text-faint)', fontSize: '9px' }}>
+                        <div className="text-nano-faint">
                           {percentage.toFixed(1)}%
                         </div>
                       </div>
@@ -733,12 +733,12 @@ export default function AnalyticsView() {
       <div className="analytics-inner" style={{ width: '100%', maxWidth: '1400px', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+      <div className="row-between-mb">
         <div>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', margin: '0 0 var(--space-1)' }}>
             Analytics
           </h2>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+          <p className="text-hint-flush">
             {activeWorkspace === 'all'
               ? <>Insights across <strong className="text-accent">all workspaces</strong></>
               : <>Insights for workspace <strong className="text-accent">{activeWorkspace}</strong></>}
@@ -824,17 +824,17 @@ export default function AnalyticsView() {
 
       {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 'var(--space-4)' }}>
-        <div className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+        <div className="analytics-card row-lg">
           <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)' }}>
             <IconFocus />
           </div>
           <div>
             <div className="kpi-value">{data.focusStats.totalSessions}</div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '2px' }}>Total Focus Sessions</div>
+            <div className="text-hint-sub">Total Focus Sessions</div>
           </div>
         </div>
 
-        <div className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+        <div className="analytics-card row-lg">
           <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', background: 'rgba(30, 69, 252, 0.15)', color: 'var(--color-primary)' }}>
             <IconClock />
           </div>
@@ -845,34 +845,34 @@ export default function AnalyticsView() {
                   {Math.floor(data.focusStats.totalDurationMins / 60)}{' '}
                   <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginRight: '4px' }}>h</span>
                   {data.focusStats.totalDurationMins % 60}{' '}
-                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>m</span>
+                  <span className="text-sm-muted">m</span>
                 </>
               ) : (
                 <>
                   {data.focusStats.totalDurationMins}{' '}
-                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>m</span>
+                  <span className="text-sm-muted">m</span>
                 </>
               )}
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '2px' }}>Total Focus Time</div>
+            <div className="text-hint-sub">Total Focus Time</div>
           </div>
         </div>
 
-        <div className="analytics-card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+        <div className="analytics-card row-lg">
           <div style={{ padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)' }}>
             <IconHourglass />
           </div>
           <div>
-            <div className="kpi-value">{data.focusStats.avgSessionMins} <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>mins</span></div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '2px' }}>Avg Focus Session</div>
+            <div className="kpi-value">{data.focusStats.avgSessionMins} <span className="text-sm-muted">mins</span></div>
+            <div className="text-hint-sub">Avg Focus Session</div>
           </div>
         </div>
       </div>
 
       {/* Heatmap Calendar Card */}
-      <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Log Activity Timeline</span>
+      <div className="analytics-card col-md-relative">
+        <div className="row-between-full">
+          <span className="text-sm-semibold">Log Activity Timeline</span>
           <span className="text-hint">Past 365 Days</span>
         </div>
 
@@ -897,7 +897,7 @@ export default function AnalyticsView() {
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="flex-4px">
             {/* Day of Week Indicators */}
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '9px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
               <span>Sun</span>
@@ -907,7 +907,7 @@ export default function AnalyticsView() {
             </div>
 
             {/* Heatmap Grid */}
-            <div style={{ display: 'flex', gap: '2px' }}>
+            <div className="flex-2px">
               {columns.map((column, colIdx) => (
                 <div key={colIdx} className="col-2px">
                   {column.map((day, rowIdx) => {
@@ -996,12 +996,12 @@ export default function AnalyticsView() {
       </div>
 
       {/* Two-Column Middle Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
+      <div className="grid-cards">
         {/* Weekly Completed Tasks Graph */}
-        <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
+        <div className="analytics-card col-md-relative">
           <div className="row">
             <IconChart style={{ color: 'var(--color-primary)' }} />
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Weekly Finished Items</span>
+            <span className="text-sm-semibold">Weekly Finished Items</span>
           </div>
 
           {data.tasksCompletedWeekly.length === 0 ? (
@@ -1025,7 +1025,7 @@ export default function AnalyticsView() {
                   return (
                     <g key={i}>
                       <line x1={linePadding.left} y1={y} x2={weeklyWidth - linePadding.right} y2={y} stroke="var(--color-surface-offset)" strokeWidth="1" />
-                      <text x={linePadding.left - 8} y={y + 4} textAnchor="end" fill="var(--color-text-faint)" style={{ fontSize: '9px' }}>{value}</text>
+                      <text x={linePadding.left - 8} y={y + 4} textAnchor="end" fill="var(--color-text-faint)" className="text-9px">{value}</text>
                     </g>
                   )
                 })}
@@ -1045,7 +1045,7 @@ export default function AnalyticsView() {
                       cy={p.y}
                       r="16"
                       fill="transparent"
-                      style={{ cursor: 'pointer' }}
+                      className="clickable"
                       onMouseEnter={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect()
                         const parentRect = e.currentTarget.closest('.analytics-card')?.getBoundingClientRect()
@@ -1074,7 +1074,7 @@ export default function AnalyticsView() {
                       y={weeklyHeight - 8}
                       textAnchor="middle"
                       fill="var(--color-text-muted)"
-                      style={{ fontSize: '9px' }}
+                      className="text-9px"
                     >
                       {label}
                     </text>
@@ -1108,10 +1108,10 @@ export default function AnalyticsView() {
         </div>
 
         {/* Kanban Cycle Time Duration Chart */}
-        <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', position: 'relative' }}>
+        <div className="analytics-card col-md-relative">
           <div className="row">
             <IconClock style={{ color: 'var(--color-secondary)' }} />
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Average Column Duration (Cycle Time)</span>
+            <span className="text-sm-semibold">Average Column Duration (Cycle Time)</span>
           </div>
 
           {data.columnTime.length === 0 ? (
@@ -1128,7 +1128,7 @@ export default function AnalyticsView() {
                   return (
                     <g key={i}>
                       <line x1={barPadding.left} y1={y} x2={barWidth - barPadding.right} y2={y} stroke="var(--color-surface-offset)" strokeWidth="1" />
-                      <text x={barPadding.left - 8} y={y + 4} textAnchor="end" fill="var(--color-text-faint)" style={{ fontSize: '9px' }}>{value}</text>
+                      <text x={barPadding.left - 8} y={y + 4} textAnchor="end" fill="var(--color-text-faint)" className="text-9px">{value}</text>
                     </g>
                   )
                 })}
@@ -1204,16 +1204,16 @@ export default function AnalyticsView() {
       </div>
 
       {/* Bottom Grid Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', gap: 'var(--space-4)' }}>
+      <div className="grid-cards">
         {/* Context Focus Allocation (Passive Tracker) */}
         <div className="analytics-card col-lg">
           <div className="row">
             <IconChart style={{ color: 'var(--color-secondary)' }} />
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Context Focus Allocation (Past 7 Days)</span>
+            <span className="text-sm-semibold">Context Focus Allocation (Past 7 Days)</span>
           </div>
 
           {data.activityAllocation.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)', minHeight: '140px' }}>
+            <div className="empty-panel">
               No activity logs recorded yet. Enable the tracker in settings.
             </div>
           ) : (
@@ -1229,7 +1229,7 @@ export default function AnalyticsView() {
 
                   return (
                     <div key={i} className="col-4px">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
+                      <div className="row-caption-xs">
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'var(--weight-medium)' }}>
                           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: barColor }} />
                           {act.context.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -1251,11 +1251,11 @@ export default function AnalyticsView() {
         <div className="analytics-card col-lg">
           <div className="row">
             <IconTag style={{ color: 'var(--color-secondary)' }} />
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Tag Usage Share</span>
+            <span className="text-sm-semibold">Tag Usage Share</span>
           </div>
 
           {data.mostUsedTags.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)', minHeight: '140px' }}>
+            <div className="empty-panel">
               No tag references found. Add tags to items.
             </div>
           ) : (
@@ -1264,7 +1264,7 @@ export default function AnalyticsView() {
                 const percentage = totalTagUses > 0 ? (tag.count / totalTagUses) * 100 : 0
                 return (
                   <div key={i} className="col-4px">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
+                    <div className="row-caption-xs">
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'var(--weight-medium)' }}>
                         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color }} />
                         {tag.name}
@@ -1286,11 +1286,11 @@ export default function AnalyticsView() {
         <div className="analytics-card col-lg">
           <div className="row">
             <IconFocus style={{ color: 'var(--color-primary)' }} />
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>Focus Retrospective Log</span>
+            <span className="text-sm-semibold">Focus Retrospective Log</span>
           </div>
 
           {data.recentFocusSessions.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)', minHeight: '140px' }}>
+            <div className="empty-panel">
               No focus session records found.
             </div>
           ) : (
@@ -1309,7 +1309,7 @@ export default function AnalyticsView() {
                     <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-semibold)' }}>
                       {session.durationMinutes} min session
                     </span>
-                    <span style={{ color: 'var(--color-text-faint)', fontSize: '10px' }}>
+                    <span className="text-micro-faint">
                       {formatDate(session.completedAt)}
                     </span>
                   </div>

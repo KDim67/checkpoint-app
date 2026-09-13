@@ -89,7 +89,7 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: tag.color, flexShrink: 0 }} />
         <span className="truncate">{tag.name}</span>
       </button>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+      <div className="row-6px-fixed">
         <ColorPicker
           value={tag.color}
           showHexInput={false}

@@ -157,7 +157,7 @@ export default function WallBoardRail({
                 }}>
                   {group.column.name}
                 </span>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>
+                <span className="text-mono-micro">
                   {group.cards.length}
                 </span>
               </div>

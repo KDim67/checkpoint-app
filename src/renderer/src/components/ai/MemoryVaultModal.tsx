@@ -95,15 +95,15 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 flexShrink: 0
               }}>
                 {/* Row 1: Title and Close button */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="row-between-full">
+                  <div className="row-8px">
                     <Brain size={15} style={{ color: '#a855f7' }} />
                     <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', letterSpacing: '0.01em' }}>
                       Memory Vault
                     </span>
                     {memoryConsolidating && (
                       <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <RefreshCw size={9} style={{ animation: 'spin 1s linear infinite' }} />
+                        <RefreshCw size={9} className="animate-spin" />
                         Consolidating…
                       </span>
                     )}
@@ -231,7 +231,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                   margin: '8px 16px 0 16px',
                   display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0
                 }}>
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div className="flex-6px">
                     <input
                       type="text"
                       placeholder="Memory key (e.g. player_movement_system)"
@@ -299,7 +299,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {memoryLoading ? (
                   <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                    <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                    <RefreshCw size={12} className="animate-spin" />
                     Loading memories…
                   </div>
                 ) : orderedMems.length === 0 ? (
@@ -353,7 +353,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                           </span>
                         </div>
                         {/* Action Buttons */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        <div className="row-6px-fixed">
                           <button
                             onClick={() => handleTogglePinMemory(mem.id)}
                             title={mem.is_pinned ? 'Unpin memory' : 'Pin memory (always recalled first)'}
@@ -489,12 +489,12 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0
               }}>
                 {Object.entries(CATEGORY_LABELS).map(([cat, label]) => (
-                  <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div key={cat} className="row-4px">
                     <span style={{
                       width: '6px', height: '6px', borderRadius: '50%',
                       background: CATEGORY_COLORS[cat], display: 'inline-block', flexShrink: 0
                     }} />
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>{label}</span>
+                    <span className="text-nano">{label}</span>
                   </div>
                 ))}
                 <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>

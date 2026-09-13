@@ -4,7 +4,7 @@ import type { LutTool } from './useLutTool'
 
 export default function LutPanel({ tool }: { tool: LutTool }) {
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
+      <div className="col-lg-full">
         <div className="gamedev-info-banner">
           <Sliders size={15} className="gamedev-info-banner-icon" />
           <div>
@@ -12,19 +12,10 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--space-4)', minHeight: 0, flex: 1 }}>
+        <div className="tool-layout">
           {/* Left Columns Sliders */}
-          <div style={{
-            background: 'var(--color-surface-1)',
-            border: '1px solid var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-4)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)',
-            overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-2)' }}>
+          <div className="panel-scroll">
+            <div className="section-head">
               <Settings size={14} className="text-muted" />
               <span className="label-caps">
                 Color Adjustments
@@ -33,7 +24,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
 
             {/* Exposure Slider */}
             <div className="col-4px">
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <div className="row-caption">
                 <span className="text-label">Exposure</span>
                 <span className="text-accent">{tool.lutExposure > 0 ? `+${tool.lutExposure}` : tool.lutExposure}%</span>
               </div>
@@ -50,7 +41,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
 
             {/* Brightness Slider */}
             <div className="col-4px">
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <div className="row-caption">
                 <span className="text-label">Brightness</span>
                 <span className="text-accent">{tool.lutBrightness > 0 ? `+${tool.lutBrightness}` : tool.lutBrightness}%</span>
               </div>
@@ -67,7 +58,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
 
             {/* Contrast Slider */}
             <div className="col-4px">
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <div className="row-caption">
                 <span className="text-label">Contrast</span>
                 <span className="text-accent">{tool.lutContrast > 0 ? `+${tool.lutContrast}` : tool.lutContrast}%</span>
               </div>
@@ -84,7 +75,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
 
             {/* Saturation Slider */}
             <div className="col-4px">
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <div className="row-caption">
                 <span className="text-label">Saturation</span>
                 <span className="text-accent">{tool.lutSaturation > 0 ? `+${tool.lutSaturation}` : tool.lutSaturation}%</span>
               </div>
@@ -101,7 +92,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
 
             {/* Temperature Slider */}
             <div className="col-4px">
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+              <div className="row-caption">
                 <span className="text-label">Temperature</span>
                 <span className="text-accent">{tool.lutTemperature > 0 ? `Warm (+${tool.lutTemperature})` : tool.lutTemperature < 0 ? `Cool (${tool.lutTemperature})` : 'Neutral'}</span>
               </div>
@@ -141,17 +132,9 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
           </div>
 
           {/* Right Preview Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
+          <div className="col-lg-min">
             {/* Meta header */}
-            <div style={{
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-3) var(--space-4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
+            <div className="panel-row">
               <div className="col-2px">
                 <span className="text-caption">Grader Viewport:</span>
                 <span className="text-label-xs">
@@ -161,17 +144,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
             </div>
 
             {/* Canvas viewport */}
-            <div style={{
-              flex: 1,
-              background: 'var(--color-background)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-surface-offset)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 'var(--space-4)',
-              overflow: 'hidden'
-            }}>
+            <div className="preview-area">
               <canvas ref={tool.lutPreviewCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '272px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
             </div>
 
@@ -231,7 +204,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                     <CheckCircle size={13} />
                     <strong>LUT generated successfully!</strong>
                   </div>
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Saved Path: {tool.lutExportedPath}</span>
+                  <span className="text-nano">Saved Path: {tool.lutExportedPath}</span>
                 </div>
               )}
             </div>

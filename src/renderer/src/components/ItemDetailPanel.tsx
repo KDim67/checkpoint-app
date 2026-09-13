@@ -200,7 +200,7 @@ export default function ItemDetailPanel() {
             {item.type === 'task' ? (
               <CheckSquare size={12} className="text-accent" />
             ) : (
-              <Layout size={12} style={{ color: 'var(--color-primary)' }} />
+              <Layout size={12} className="text-primary" />
             )}
             <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)' }}>
               {item.type}
@@ -239,8 +239,8 @@ export default function ItemDetailPanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--color-surface-1)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', border: '1px solid var(--color-surface-offset)' }}>
           
           {/* Status field */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="row-between-gap">
+            <span className="row-hint">
               <Clock size={12} /> Status
             </span>
             <select
@@ -267,8 +267,8 @@ export default function ItemDetailPanel() {
           </div>
 
           {/* Priority field */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="row-between-gap">
+            <span className="row-hint">
               <AlertCircle size={12} /> Priority
             </span>
             <select
@@ -298,8 +298,8 @@ export default function ItemDetailPanel() {
           </div>
 
           {/* Due date field */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="row-between-gap">
+            <span className="row-hint">
               <Calendar size={12} /> Due Date
             </span>
             <input
@@ -334,7 +334,7 @@ export default function ItemDetailPanel() {
           <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', display: 'block', marginBottom: 'var(--space-2)' }}>
             Tags
           </span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'center' }}>
+          <div className="row-wrap">
             {item.tags?.map(t => (
               <span
                 key={t.id}
@@ -421,7 +421,7 @@ export default function ItemDetailPanel() {
 
         {/* Description Section */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+          <div className="row-between-mb">
             <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)' }}>
               Description
             </span>

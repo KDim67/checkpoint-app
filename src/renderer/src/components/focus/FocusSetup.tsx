@@ -31,7 +31,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 'var(--space-6)', flex: 1, minHeight: 0 }}>
       {/* Left panel: Task Picker */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
+      <div className="col-lg-min">
         <div>
           <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <div className="row">
@@ -72,7 +72,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
         </div>
 
         {/* Quick-add: jot a task straight into today's focus list without leaving the view */}
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <div className="flex-gap">
           <input
             className="quick-add-input"
             type="text"
@@ -131,7 +131,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                     {isSelected && <Check size={12} strokeWidth={3} />}
                   </div>
 
-                  <div style={{ flex: 1 }}>
+                  <div className="flex-1">
                     <div className="text-label">{item.title}</div>
                     <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
                       <span style={{
@@ -186,7 +186,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
           <div className="row-between">
             <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', margin: 0 }}>Timer Config</h3>
             {/* Fills one dot per completed focus interval, resetting each time a long break comes due */}
-            <div style={{ display: 'flex', gap: '4px' }} title={`${cyclesCompleted} focus intervals completed this session`}>
+            <div className="flex-4px" title={`${cyclesCompleted} focus intervals completed this session`}>
               {Array.from({ length: focusSettings.longBreakInterval }, (_, i) => i).map(i => (
                 <span key={i} className={`cycle-dot ${i < cycleDots || (cycleDots === 0 && cyclesCompleted > 0 && i < focusSettings.longBreakInterval) ? 'filled' : ''}`} />
               ))}
@@ -215,7 +215,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                   transition: 'all var(--duration-fast) var(--ease-default)'
                 }}
               >
-                <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="row-between-full">
                   <span>{TIMER_PRESETS[key].label}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>
                     {focusSettings.durations[key]}m
@@ -264,7 +264,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                 transition: 'all var(--duration-fast) var(--ease-default)'
               }}
             >
-              <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="row-between-full">
                 <span>Custom Timer</span>
                 {preset === 'custom' && (
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>
@@ -410,7 +410,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
                       gap: '4px'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)' }}>
+                    <div className="row-caption-xs">
                       <span className="text-label">
                         {minutes}m Session
                       </span>

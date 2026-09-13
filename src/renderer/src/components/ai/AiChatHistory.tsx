@@ -25,7 +25,7 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
     >
       {/* Context pre-seeded pill if active */}
       {contextItem && (
-        <div style={{ flexShrink: 0 }}>
+        <div className="no-shrink">
           <ContextPill item={contextItem} onClear={() => { selectItem(null); setContextItem(null) }} />
         </div>
       )}
@@ -85,7 +85,7 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
             ))}
           </div>
 
-          <span style={{ fontSize: '9px', color: 'var(--color-text-faint)' }}>
+          <span className="text-nano-faint">
             / commands · @ mentions · paste screenshots (👁 models) · Esc stops generation
           </span>
         </div>

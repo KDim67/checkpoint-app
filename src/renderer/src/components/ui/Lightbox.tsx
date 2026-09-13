@@ -196,7 +196,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
             onMouseEnter={e => e.currentTarget.style.color = 'var(--color-secondary)'}
             onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
           >
-            {copied ? <Check size={14} style={{ color: 'var(--color-success)' }} /> : <Copy size={14} />}
+            {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
             {copied ? 'Copied!' : 'Copy'}
           </button>
 

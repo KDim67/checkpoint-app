@@ -92,7 +92,7 @@ export default function AboutPanel() {
   return (
     <div className="col-xl">
       {/* Brand header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+      <div className="row-lg">
         <Logo size={48} />
         <div>
           <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
@@ -114,7 +114,7 @@ export default function AboutPanel() {
           <div className="text-item">
             Getting started
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+          <div className="text-caption-sub">
             The welcome panel, with the keyboard shortcuts worth knowing.
           </div>
         </div>

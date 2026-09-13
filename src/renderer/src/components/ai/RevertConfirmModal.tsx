@@ -55,7 +55,7 @@ export default function RevertConfirmModal({
             }
           `}</style>
           <div className="revert-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div className="row-md">
               <Trash2 style={{ color: 'var(--color-error)' }} size={22} />
               <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>
                 Revert Board State

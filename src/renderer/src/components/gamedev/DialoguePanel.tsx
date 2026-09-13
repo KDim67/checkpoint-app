@@ -25,9 +25,9 @@ export default function DialoguePanel({
         
         {/* Editor Console */}
         <div className="panel">
-          <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Add Dialogue Node</h3>
+          <h3 className="heading-sm">Add Dialogue Node</h3>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+          <div className="grid-2">
             <div className="col-2px">
               <label className="text-micro">Unique Node ID</label>
               <input
@@ -35,14 +35,7 @@ export default function DialoguePanel({
                 value={tool.nodeId}
                 onChange={e => tool.setNodeId(e.target.value)}
                 placeholder="e.g. quest_decline"
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: 'var(--space-2)',
-                  fontSize: 'var(--text-xs)'
-                }}
+                className="input-sm"
               />
             </div>
             <div className="col-2px">
@@ -52,14 +45,7 @@ export default function DialoguePanel({
                 value={tool.nodeSpeaker}
                 onChange={e => tool.setNodeSpeaker(e.target.value)}
                 placeholder="e.g. Hero"
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: 'var(--space-2)',
-                  fontSize: 'var(--text-xs)'
-                }}
+                className="input-sm"
               />
             </div>
           </div>
@@ -232,8 +218,8 @@ export default function DialoguePanel({
 
         {/* Compiled Mermaid Output */}
         <div className="panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Dialogue Graph</h3>
+          <div className="row-between-gap">
+            <h3 className="heading-sm">Dialogue Graph</h3>
             <div className="row">
               <div style={{ display: 'flex', gap: '2px', background: 'var(--color-surface-2)', padding: '2px', borderRadius: '6px', border: '1px solid var(--color-surface-offset)' }}>
                 <button

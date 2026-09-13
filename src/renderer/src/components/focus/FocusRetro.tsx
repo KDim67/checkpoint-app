@@ -25,7 +25,7 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
             <Award />
             Interval Retrospective
           </h2>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', marginTop: '2px' }}>
+          <p className="text-hint-sub">
             Verify completed tasks and record any notes about this session.
           </p>
         </div>
@@ -82,7 +82,7 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
             Verify Completed Tasks
           </h3>
           {retroTasks.length === 0 ? (
-            <div style={{ fontStyle: 'italic', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)' }}>
+            <div className="text-empty">
               No tasks selected for this session.
             </div>
           ) : (
@@ -150,7 +150,7 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+          <div className="flex-wrap-gap">
             <button
               className="btn-ghost"
               onClick={() => handleStartBreak('short-break')}

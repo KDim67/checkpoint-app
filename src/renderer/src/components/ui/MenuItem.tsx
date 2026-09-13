@@ -53,7 +53,7 @@ export default function MenuItem({ onClick, children, icon, active }: MenuItemPr
 
 /** The hairline these menus put above their last entry. */
 export function MenuDivider() {
-  return <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+  return <div className="rule" />
 }
 
 /**

@@ -56,7 +56,7 @@ export default function WallShortcutsMenu({
                   justifyContent: 'space-between', gap: 'var(--space-3)',
                   padding: '2px 0'
                 }}>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>
+                  <span className="text-xs-base">
                     {what}
                   </span>
                   <kbd style={{

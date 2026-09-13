@@ -179,7 +179,7 @@ export default function LogVirtualList({
           gap: 'var(--space-2)',
           padding: 'var(--space-10)'
         }}>
-          <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+          <p className="heading-sm-strong">
             No logs in this workspace yet
           </p>
           <p style={{ margin: 0, fontSize: 'var(--text-xs)', textAlign: 'center', maxWidth: '300px' }}>

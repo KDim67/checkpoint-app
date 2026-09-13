@@ -7,7 +7,7 @@ import NoImageLoaded from './NoImageLoaded'
 
 export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
   return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
+      <div className="col-lg-full">
         <div className="gamedev-info-banner">
           <Scissors size={15} className="gamedev-info-banner-icon" />
           <div>
@@ -15,7 +15,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--space-4)', minHeight: 0, flex: 1 }}>
+        <div className="tool-layout">
           {/* Left Configuration Column */}
           <SettingsColumn title="Slicing Settings">
 
@@ -112,17 +112,9 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
           </SettingsColumn>
 
           {/* Right Canvas Column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
+          <div className="col-lg-min">
             {/* Meta header */}
-            <div style={{
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-3) var(--space-4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
+            <div className="panel-row">
               <div className="col-2px">
                 <span className="text-caption">Slicer Status:</span>
                 <span className="text-label-xs">
@@ -138,20 +130,10 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
             </div>
 
             {/* Preview Canvas Area */}
-            <div style={{
-              flex: 1,
-              background: 'var(--color-background)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-surface-offset)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 'var(--space-4)',
-              overflow: 'hidden'
-            }}>
+            <div className="preview-area">
               {!tool.slicerUrl ? (
                 <NoImageLoaded
-                  icon={<Scissors size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.5 }} />}
+                  icon={<Scissors size={40} className="icon-dim" />}
                   hint="Choose a composite texture or grid sheet to partition."
                   onChoose={tool.handleSelectSlicerFile}
                 />

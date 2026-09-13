@@ -40,7 +40,7 @@ export default function ThemeModeSettings() {
 
   return (
     <FieldRow label="Interface Theme" hint="Applied instantly and restored on the next launch. The titlebar toggle uses the same setting.">
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+      <div className="flex-gap">
         {THEME_OPTIONS.map(opt => (
           <button
             key={opt.value}
@@ -66,7 +66,7 @@ export default function ThemeModeSettings() {
               <opt.Icon size={14} />
               {opt.label}
             </span>
-            <span style={{ fontSize: '10px', opacity: 0.6 }}>{opt.desc}</span>
+            <span className="text-micro-dim">{opt.desc}</span>
           </button>
         ))}
       </div>

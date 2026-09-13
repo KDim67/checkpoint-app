@@ -230,7 +230,7 @@ export default function LogView() {
               gap: 'var(--space-2)'
             }}>
               {/* Header block (timestamp) */}
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <div className="flex-gap">
                 <Skeleton width={80} height={12} />
               </div>
               {/* Body block (varying lines) */}
@@ -239,7 +239,7 @@ export default function LogView() {
                 <Skeleton width={i === 1 ? '45%' : i === 2 ? '30%' : i === 3 ? '40%' : '50%'} height={14} />
               </div>
               {/* Tags block */}
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+              <div className="flex-gap-mt">
                 <Skeleton width={50} height={16} borderRadius="var(--radius-sm)" />
                 {i % 2 === 0 && <Skeleton width={65} height={16} borderRadius="var(--radius-sm)" />}
               </div>
@@ -345,9 +345,9 @@ export default function LogView() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div className="row-md">
           {/* Search */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <div className="row-relative">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '9px', color: 'var(--color-text-faint)', pointerEvents: 'none' }}>
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
             </svg>

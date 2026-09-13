@@ -126,7 +126,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
           {errorMessage(error)}
         </code>
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+        <div className="flex-gap-mt">
           <button className="btn-primary" onClick={this.handleRetry}>
             Try again
           </button>

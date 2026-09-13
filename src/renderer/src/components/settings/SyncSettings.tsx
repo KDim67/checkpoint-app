@@ -276,7 +276,7 @@ export default function SyncSettings() {
             type="checkbox"
             checked={syncEnabled}
             onChange={e => handleToggleSync(e.target.checked)}
-            style={{ display: 'none' }}
+            className="is-hidden"
           />
           <span
             style={{
@@ -329,7 +329,7 @@ export default function SyncSettings() {
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-5)' }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)' }}>
+              <div className="text-accent-xs-bold">
                 {lastSyncStats.dbUpdates}
               </div>
               <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-muted)' }}>
@@ -337,7 +337,7 @@ export default function SyncSettings() {
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)' }}>
+              <div className="text-accent-xs-bold">
                 {lastSyncStats.filesSynced}
               </div>
               <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-muted)' }}>
@@ -354,13 +354,13 @@ export default function SyncSettings() {
             <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                 <Wifi size={18} className="text-accent" />
-                <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
+                <h3 className="heading-sm-bold">
                   Local LAN Sync (Wi-Fi)
                 </h3>
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }}>
-                <span>Host Port: <code style={{ color: 'var(--color-text-base)' }}>{hostStatus.port}</code></span>
+                <span>Host Port: <code className="text-base">{hostStatus.port}</code></span>
                 <span>LAN Passcode: <strong style={{ color: 'var(--color-secondary)', fontSize: 'var(--text-sm)' }}>{hostStatus.pairingCode}</strong></span>
               </div>
 
@@ -415,14 +415,14 @@ export default function SyncSettings() {
                   placeholder="e.g. 192.168.1.5 or Tailscale IP"
                   value={manualIp}
                   onChange={e => setManualIp(e.target.value)}
-                  style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)', fontSize: 'var(--text-xs)', padding: '6px var(--space-2)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
+                  className="input-xs"
                 />
                 <input
                   type="text"
                   placeholder="Port"
                   value={manualPort}
                   onChange={e => setManualPort(e.target.value)}
-                  style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)', fontSize: 'var(--text-xs)', padding: '6px var(--space-2)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
+                  className="input-xs"
                 />
               </div>
 
@@ -432,7 +432,7 @@ export default function SyncSettings() {
                 value={manualCode}
                 onChange={e => setManualCode(e.target.value)}
                 maxLength={6}
-                style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)', fontSize: 'var(--text-xs)', padding: '6px var(--space-2)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
+                className="input-xs"
               />
 
               <button
@@ -466,7 +466,7 @@ export default function SyncSettings() {
             <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
                 <Globe size={18} className="text-accent" />
-                <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
+                <h3 className="heading-sm-bold">
                   Internet Sync (WebRTC)
                 </h3>
               </div>
@@ -477,7 +477,7 @@ export default function SyncSettings() {
               {isWebrtcActive ? (
                 <div style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   <div className="row-between">
-                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)' }}>
+                    <span className="text-accent-xs-bold">
                       Active WebRTC Room: {webrtcCode}
                     </span>
                     <button
@@ -515,9 +515,9 @@ export default function SyncSettings() {
                   </button>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)' }}>
-                    <div style={{ height: '1px', flex: 1, background: 'var(--color-surface-offset)' }} />
+                    <div className="rule-fill" />
                     OR CONNECT TO PEER
-                    <div style={{ height: '1px', flex: 1, background: 'var(--color-surface-offset)' }} />
+                    <div className="rule-fill" />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-2)' }}>
@@ -527,7 +527,7 @@ export default function SyncSettings() {
                       value={webrtcInputCode}
                       onChange={e => setWebrtcInputCode(e.target.value)}
                       maxLength={6}
-                      style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)', fontSize: 'var(--text-xs)', padding: '6px var(--space-2)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
+                      className="input-xs"
                     />
                     <button
                       onClick={handleStartWebRTCClient}
@@ -552,7 +552,7 @@ export default function SyncSettings() {
 
             <div style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: '4px', marginBottom: '4px' }}>
-                <Terminal size={14} style={{ color: 'var(--color-success)' }} />
+                <Terminal size={14} className="text-success" />
                 <span style={{ fontSize: 'var(--text-xxs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-success)', textTransform: 'uppercase' }}>
                   Sync Console Log
                 </span>
@@ -571,7 +571,7 @@ export default function SyncSettings() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-12) 0', border: '1px dashed var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-2)' }}>
           <Wifi size={48} style={{ color: 'var(--color-text-faint)', marginBottom: 'var(--space-3)' }} />
-          <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
+          <h3 className="heading-sm-bold">
             Sync Engine is Disabled
           </h3>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '4px', maxWidth: '320px', textAlign: 'center' }}>
@@ -584,10 +584,10 @@ export default function SyncSettings() {
 
       {peerToPair && (
         <ModalShell label="Enter pairing passcode" onClose={() => setPeerToPair(null)} width="320px">
-          <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
+          <h3 className="heading-sm-bold">
             Enter Pairing Passcode
           </h3>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+          <p className="text-hint-flush">
             Please type the 6-digit passcode displayed on <strong>{peerToPair.name}</strong> to authorize connection.
           </p>
           <input
@@ -615,7 +615,7 @@ export default function SyncSettings() {
               }
             }}
           />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '2px' }}>
+          <div className="flex-gap-mt2">
             <button
               onClick={() => setPeerToPair(null)}
               style={{

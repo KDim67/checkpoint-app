@@ -132,7 +132,7 @@ export default function GitPanel() {
           <div className="skeleton" style={{ height: '70px', flex: 1, borderRadius: 'var(--radius-md)' }} />
           <div className="skeleton" style={{ height: '70px', flex: 1, borderRadius: 'var(--radius-md)' }} />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+        <div className="col-mt">
           <div className="skeleton" style={{ height: '20px', width: '40%', marginBottom: 'var(--space-2)' }} />
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="skeleton" style={{ height: '56px', borderRadius: 'var(--radius-md)' }} />
@@ -271,7 +271,7 @@ export default function GitPanel() {
             {gitPath}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+        <div className="flex-gap-mt">
           <button
             className="btn-ghost"
             onClick={handleReload}
@@ -315,7 +315,7 @@ export default function GitPanel() {
         
         {/* Header summary info */}
         <div className="row-between">
-          <div style={{ minWidth: 0 }}>
+          <div className="min-w-0">
             <h3 style={{
               fontSize: 'var(--text-sm)',
               fontWeight: 'var(--weight-semibold)',
@@ -357,7 +357,7 @@ export default function GitPanel() {
         </div>
 
         {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+        <div className="grid-2">
           
           {/* Branch badge */}
           <div style={{

@@ -326,7 +326,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             question of whether to start at all, and a progress bar on it says
             the answer has already been assumed. */}
         {index > 0 && (
-        <div role="group" aria-label={`Step ${index + 1} of ${STEPS.length}`} style={{ display: 'flex', gap: '4px' }}>
+        <div role="group" aria-label={`Step ${index + 1} of ${STEPS.length}`} className="flex-4px">
           {STEPS.map((s, i) => (
             <span
               key={s.id}
@@ -366,12 +366,12 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)'
           }}>
-            <Compass size={18} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
-            <div style={{ minWidth: 0 }}>
+            <Compass size={18} className="icon-accent" />
+            <div className="min-w-0">
               <div className="text-item">
                 Would you like a quick tour?
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+              <div className="text-caption-sub">
                 About a minute. You can leave it at any point, and replay it later from Settings.
               </div>
             </div>
@@ -417,7 +417,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                 }}>
                   {PALETTE_COMBO}
                 </kbd>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+                <span className="text-caption-faint">
                   Waiting for the keystroke…
                 </span>
               </>
@@ -438,12 +438,12 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               borderRadius: 'var(--radius-md)'
             }}
           >
-            <Check size={20} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />
-            <div style={{ minWidth: 0 }}>
+            <Check size={20} className="icon-accent" />
+            <div className="min-w-0">
               <div className="text-item">
                 {created} is ready
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
+              <div className="text-caption-sub">
                 You are in it now. More workspaces come from the badge at the top of the sidebar.
               </div>
             </div>
@@ -453,10 +453,10 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
         {/* Workspace form */}
         {step.id === 'workspace' && !created && (
           <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
+            <div className="col-1-5">
               <label
                 htmlFor="onboarding-workspace-name"
-                style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}
+                className="text-hint-strong"
               >
                 Workspace name
               </label>
@@ -483,7 +483,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             </div>
 
             <div className="col">
-              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+              <span className="text-hint-strong">
                 Start from
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '150px', overflowY: 'auto' }}>
@@ -539,8 +539,8 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                 }}
               >
                 <span style={{ color: 'var(--color-secondary)', flexShrink: 0, marginTop: '2px' }}>{k.icon}</span>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <div className="min-w-0">
+                  <div className="row-wrap">
                     <span className="text-item">
                       {k.name}
                     </span>
@@ -564,7 +564,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
         )}
 
         {/* Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+        <div className="row-between-gap">
           {/* Nothing on the left of the question: both of its answers belong
               together on the right, at the same weight, or the quiet one reads
               as a corner to ignore rather than a choice. */}
@@ -579,7 +579,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
             </button>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row">
             {/* On the form, the secondary action moves past it rather than
                 ending the tour, not wanting a workspace right now is not the
                 same as not wanting the rest. */}

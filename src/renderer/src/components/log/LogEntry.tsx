@@ -57,7 +57,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
       }}
     >
       {/* Header Info */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+      <div className="row-between-mb">
         <div className="row">
           {isPinned && (
             <span style={{
@@ -113,7 +113,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
           >
-            {copied ? <Check size={12} style={{ color: 'var(--color-success)' }} /> : <Copy size={12} />}
+            {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
           
@@ -291,12 +291,12 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
               </h2>
             </div>
             
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+            <p className="text-hint-flush">
               Convert this scratchpad log into a fully trackable Kanban card. It will be moved to the Kanban view.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
-              <label htmlFor="card-title-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+            <div className="col-1-5">
+              <label htmlFor="card-title-input" className="text-hint-strong">
                 Card Title
               </label>
               <input

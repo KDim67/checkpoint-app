@@ -158,7 +158,7 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
                       {chat.title}
                     </span>
                   )}
-                  <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>
+                  <span className="text-nano">
                     {chat.messages.length} messages • {new Date(chat.createdAt).toLocaleDateString()}
                   </span>
                 </div>
@@ -170,14 +170,14 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
                       setEditingChatId(chat.id)
                       setEditingTitle(chat.title)
                     }}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px' }}
+                    className="icon-btn"
                     title="Rename Chat"
                   >
                     <Edit2 size={11} />
                   </button>
                   <button
                     onClick={e => handleDeleteChat(chat.id, e)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '2px' }}
+                    className="icon-btn"
                     title="Delete Chat"
                   >
                     <Trash2 size={11} />

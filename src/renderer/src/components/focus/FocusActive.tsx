@@ -288,7 +288,7 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
             </div>
 
             {selectedTasks.length === 0 ? (
-              <div style={{ fontStyle: 'italic', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)' }}>
+              <div className="text-empty">
                 No tasks selected for this session.
               </div>
             ) : (

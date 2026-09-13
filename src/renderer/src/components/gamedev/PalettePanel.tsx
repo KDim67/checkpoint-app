@@ -25,9 +25,9 @@ export default function PalettePanel({
     
     {/* Color picker list */}
     <div className="panel">
-      <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Color Palette Creator</h3>
+      <h3 className="heading-sm">Color Palette Creator</h3>
       
-      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+      <div className="row">
         <ColorPicker
           value={tool.newColor}
           onCommit={tool.setNewColor}
@@ -110,52 +110,52 @@ export default function PalettePanel({
 
     {/* Generated Code Snippets */}
     <div className="panel">
-      <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', margin: 0 }}>Shader & Code Snippets</h3>
+      <h3 className="heading-sm">Shader & Code Snippets</h3>
       
       {/* Unity Code Block */}
       <div className="col-4px">
         <div className="row-between">
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>Unity C# Color Array</span>
+          <span className="text-caption-strong">Unity C# Color Array</span>
           <button
             onClick={() => copyToClipboard(`public Color[] palette = new Color[] {\n  ${tool.generatedUnityColor}\n};`, 'Unity C#')}
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px' }}
+            className="link-btn"
           >
             <Copy size={10} /> Copy
           </button>
         </div>
-        <pre style={{ margin: 0, padding: 'var(--space-2)', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', fontSize: '10px', color: 'var(--color-text-muted)', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
+        <pre className="code-snippet">
           {`public Color[] palette = new Color[] {\n  ${tool.generatedUnityColor.substring(0, 80)}...\n};`}
         </pre>
       </div>
 
       {/* Unreal Code Block */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
+      <div className="col-4px-mt">
         <div className="row-between">
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>Unreal Engine C++ FLinearColor</span>
+          <span className="text-caption-strong">Unreal Engine C++ FLinearColor</span>
           <button
             onClick={() => copyToClipboard(`TArray<FLinearColor> Palette = {\n  ${tool.generatedUnrealColor}\n};`, 'Unreal C++')}
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px' }}
+            className="link-btn"
           >
             <Copy size={10} /> Copy
           </button>
         </div>
-        <pre style={{ margin: 0, padding: 'var(--space-2)', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', fontSize: '10px', color: 'var(--color-text-muted)', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
+        <pre className="code-snippet">
           {`TArray<FLinearColor> Palette = {\n  ${tool.generatedUnrealColor.substring(0, 80)}...\n};`}
         </pre>
       </div>
 
       {/* HLSL Code Block */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'var(--space-2)' }}>
+      <div className="col-4px-mt">
         <div className="row-between">
-          <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-semibold)' }}>HLSL float4 Shader Array</span>
+          <span className="text-caption-strong">HLSL float4 Shader Array</span>
           <button
             onClick={() => copyToClipboard(tool.generatedHlslColor, 'HLSL float4')}
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px' }}
+            className="link-btn"
           >
             <Copy size={10} /> Copy
           </button>
         </div>
-        <pre style={{ margin: 0, padding: 'var(--space-2)', background: 'var(--color-background)', borderRadius: 'var(--radius-sm)', fontSize: '10px', color: 'var(--color-text-muted)', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
+        <pre className="code-snippet">
           {tool.generatedHlslColor.substring(0, 100) + '...'}
         </pre>
       </div>

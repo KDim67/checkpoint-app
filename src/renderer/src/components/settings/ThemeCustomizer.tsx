@@ -126,7 +126,7 @@ export default function ThemeCustomizer() {
       }}>
         <div className="row-between">
           <div>
-            <h3 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+            <h3 className="heading-sm-strong">
               Enable Customizer Engine
             </h3>
             <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
@@ -151,7 +151,7 @@ export default function ThemeCustomizer() {
 
         <Divider />
 
-        <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+        <h4 className="heading-caps">
           Color Scheme Overrides
         </h4>
 
@@ -160,18 +160,10 @@ export default function ThemeCustomizer() {
           return (
             <div
               key={name}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: 'var(--space-2) var(--space-3)',
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)'
-              }}
+              className="panel-row-sm"
             >
-              <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+              <div className="flex-1-mr">
+                <span className="field-label">
                   {info.label}
                 </span>
                 <span className="text-caption">
@@ -205,23 +197,15 @@ export default function ThemeCustomizer() {
         <Divider />
 
         <div className="col-md">
-          <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+          <h4 className="heading-caps">
             Typography Customization
           </h4>
 
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: 'var(--space-2) var(--space-3)',
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)'
-            }}
+            className="panel-row-sm"
           >
-            <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+            <div className="flex-1-mr">
+              <span className="field-label">
                 Primary Font Family
               </span>
               <span className="text-caption">
@@ -253,7 +237,7 @@ export default function ThemeCustomizer() {
           </div>
         </div>
 
-        <div style={{ marginTop: 'var(--space-2)' }}>
+        <div className="mt-2">
           <button
             onClick={handleReset}
             style={{

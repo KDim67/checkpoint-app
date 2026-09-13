@@ -42,7 +42,7 @@ export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: s
   const updateColWip = (id: string, wipLimit: number | null) =>
     save(columns.map(c => c.id === id ? { ...c, wipLimit } : c))
 
-  if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading…</div>
+  if (loading) return <div className="text-sm-faint">Loading…</div>
 
   return (
     <div className="col-md">

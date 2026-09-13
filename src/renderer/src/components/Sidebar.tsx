@@ -313,7 +313,7 @@ function ContextPopover({ onClose }: ContextPopoverProps) {
                 background: isCurrent ? 'var(--color-secondary)' : color,
                 flexShrink: 0
               }} />
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span className="truncate-fill">
                 {name}
               </span>
               {entry?.shared && <SharedBadge />}

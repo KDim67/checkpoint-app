@@ -110,9 +110,9 @@ export default function WallContextMenu({ x, y, entries, onClose }: Props) {
               <span style={{ display: 'flex', width: '14px', flexShrink: 0, color: 'var(--color-text-faint)' }}>
                 {entry.icon}
               </span>
-              <span style={{ flex: 1 }}>{entry.label}</span>
+              <span className="flex-1">{entry.label}</span>
               {entry.hint && (
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>
+                <span className="text-mono-micro">
                   {entry.hint}
                 </span>
               )}

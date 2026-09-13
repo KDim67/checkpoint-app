@@ -68,7 +68,7 @@ export default function AppearanceSettings() {
     <div className="col-xl">
       {/* Font size */}
       <FieldRow label="Font Size" hint="Scales all text proportionally across the entire app.">
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <div className="flex-gap">
           {FONT_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -90,10 +90,10 @@ export default function AppearanceSettings() {
                 transition: 'all 100ms ease'
               }}
             >
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' }}>
+              <span className="text-sm-semibold">
                 {opt.label}
               </span>
-              <span style={{ fontSize: '10px', opacity: 0.6 }}>{opt.desc}</span>
+              <span className="text-micro-dim">{opt.desc}</span>
             </button>
           ))}
         </div>

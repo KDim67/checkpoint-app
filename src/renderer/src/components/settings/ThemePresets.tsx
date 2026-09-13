@@ -79,14 +79,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
   return (
     <div className="col-md">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h4 style={{
-          margin: 0,
-          fontSize: 'var(--text-xs)',
-          fontWeight: 'var(--weight-bold)',
-          color: 'var(--color-text-faint)',
-          textTransform: 'uppercase',
-          letterSpacing: 'var(--tracking-wider)'
-        }}>
+        <h4 className="heading-caps">
           Presets
         </h4>
 
@@ -113,7 +106,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
       </div>
 
       {naming && (
-        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+        <div className="row">
           <input
             autoFocus
             value={draftName}
@@ -219,7 +212,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
                   ))}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                  {active && <Check size={12} style={{ color: 'var(--color-secondary)', flexShrink: 0 }} />}
+                  {active && <Check size={12} className="icon-accent" />}
                   <span style={{
                     fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-medium)',

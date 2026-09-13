@@ -77,14 +77,14 @@ export default function McpActivityLog(): React.JSX.Element {
         fontSize: 'var(--text-xs)',
         color: 'var(--color-text-muted)'
       }}>
-        <History size={14} style={{ flexShrink: 0 }} />
+        <History size={14} className="no-shrink" />
         Nothing yet. Changes made by an external agent through MCP show up here.
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+    <div className="col-xs">
       {entries.map(entry => {
         const undone = entry.undoneAt !== null
         return (
@@ -112,8 +112,8 @@ export default function McpActivityLog(): React.JSX.Element {
               }}>
                 {entry.summary}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '2px' }}>
-                <code style={{ fontFamily: 'var(--font-mono)' }}>{entry.tool}</code>
+              <div className="text-caption-sub">
+                <code className="mono">{entry.tool}</code>
                 {entry.context ? ` · ${entry.context}` : ''}
                 {` · ${relativeTime(entry.createdAt, now)}`}
                 {undone ? ' · undone' : ''}

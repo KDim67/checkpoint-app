@@ -433,7 +433,7 @@ export default function BacklogRow({
           checked={isSelected}
           onClick={e => e.stopPropagation()} // Prevent double click trigger
           onChange={e => onSelectToggle(item.id, e as unknown as React.MouseEvent)}
-          style={{ cursor: 'pointer' }}
+          className="clickable"
         />
       </div>
 

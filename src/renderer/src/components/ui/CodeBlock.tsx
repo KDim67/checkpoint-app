@@ -52,7 +52,7 @@ export default function CodeBlock({ language, value }: { language?: string; valu
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
         >
-          {copied ? <Check size={12} style={{ color: 'var(--color-success)' }} /> : <Copy size={12} />}
+          {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
           <span>{copied ? 'Copied!' : 'Copy'}</span>
         </button>
       </div>

@@ -151,12 +151,7 @@ export default function ConfirmDialog({
           )}
 
           {choices && choices.length > 0 && onPick && (
-            <div style={{
-              marginTop: 'var(--space-4)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-2)'
-            }}>
+            <div className="col-mt">
               {choices.map(choice => (
                 <PickRow key={choice.key} choice={choice} onClick={() => onPick(choice.key)} />
               ))}

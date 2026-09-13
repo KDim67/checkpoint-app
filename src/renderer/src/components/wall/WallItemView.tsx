@@ -172,7 +172,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
       }}>
         <div className="row-6px">
-          <FileText size={12} style={{ color: 'var(--color-text-faint)', flexShrink: 0 }} />
+          <FileText size={12} className="icon-faint" />
           <span style={{
             fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',
             color: 'var(--color-text-base)',

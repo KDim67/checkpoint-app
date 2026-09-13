@@ -152,7 +152,7 @@ export default function BackupSettings() {
     return `${mb.toFixed(1)} MB`
   }
 
-  if (loading) return <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>Loading backup vault…</div>
+  if (loading) return <div className="text-sm-faint">Loading backup vault…</div>
 
   return (
     <div className="col-xl">
@@ -197,17 +197,7 @@ export default function BackupSettings() {
             <select
               value={interval}
               onChange={e => handleIntervalChange(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-base)',
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-2) var(--space-3)',
-                fontSize: 'var(--text-sm)',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
+              className="select-md"
             >
               <option value="daily">Daily Check</option>
               <option value="weekly">Weekly Check</option>
@@ -306,7 +296,7 @@ export default function BackupSettings() {
                             style={{
                               marginLeft: 'var(--space-2)',
                               padding: '1px 6px',
-                              borderRadius: 'var(--radius-full, 999px)',
+                              borderRadius: 'var(--radius-full)',
                               background: 'var(--color-surface-2)',
                               color: 'var(--color-text-muted)',
                               fontFamily: 'var(--font-sans)',

@@ -40,7 +40,7 @@ export default function WallPlacePicker({
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
         >
-          <Plus size={12} style={{ flexShrink: 0, color: 'var(--color-text-faint)' }} />
+          <Plus size={12} className="icon-faint" />
           <span className="truncate">{row.label}</span>
         </button>
       ))}

@@ -376,15 +376,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               <select
                 value={task.status}
                 onChange={handleStatusChange}
-                style={{
-                  background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-sm)',
-                  outline: 'none'
-                }}
+                className="input-md"
               >
                 {columns.map(col => (
                   <option key={col.id} value={col.id}>{col.name}</option>
@@ -400,15 +392,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               <select
                 value={task.priority}
                 onChange={handlePriorityChange}
-                style={{
-                  background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-sm)',
-                  outline: 'none'
-                }}
+                className="input-md"
               >
                 <option value={0}>None</option>
                 <option value={1}>Low</option>
@@ -426,15 +410,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                 type="date"
                 value={task.due_at ? new Date(task.due_at).toISOString().substring(0, 10) : ''}
                 onChange={handleDueDateChange}
-                style={{
-                  background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-sm)',
-                  outline: 'none'
-                }}
+                className="input-md"
               />
             </div>
 
@@ -450,15 +426,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                 onBlur={handleEstimateBlur}
                 placeholder="No estimate"
                 min={0}
-                style={{
-                  background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-sm)',
-                  outline: 'none'
-                }}
+                className="input-md"
               />
             </div>
 
@@ -627,22 +595,13 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
             )}
 
             {/* Add Subtask Form */}
-            <form onSubmit={handleAddSubtaskSubmit} style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <form onSubmit={handleAddSubtaskSubmit} className="flex-gap">
               <input
                 type="text"
                 value={newSubtaskText}
                 onChange={e => setNewSubtaskText(e.target.value)}
                 placeholder="Add sub-task item..."
-                style={{
-                  flex: 1,
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-xs)',
-                  outline: 'none'
-                }}
+                className="input-fill"
               />
               <button
                 type="submit"
@@ -668,13 +627,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
           {/* Description Editor */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, minHeight: '300px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottom: '1px solid var(--color-surface-offset)',
-              paddingBottom: 'var(--space-2)'
-            }}>
+            <div className="section-head-between">
               <span className="label-caps">
                 Description (Markdown)
               </span>

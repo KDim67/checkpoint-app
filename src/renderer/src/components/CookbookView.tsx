@@ -102,7 +102,7 @@ function SpecCard({ icon, label, value, detail }: {
       </div>
       {/* minWidth 0 or the truncation below never happens: a flex child will
           not shrink past its own content without it, and a GPU name is long. */}
-      <div style={{ minWidth: 0 }}>
+      <div className="min-w-0">
         <div
           style={{
             fontSize: 'var(--text-2xs)',
@@ -405,7 +405,7 @@ export default function CookbookView() {
         >
           AI Cookbook
         </h1>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+        <p className="text-sm-muted">
           Find a local model that will actually run on this machine, and install it without leaving the app.
         </p>
       </div>
@@ -593,7 +593,7 @@ export default function CookbookView() {
             gap: 'var(--space-3)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div className="row-md">
             <AlertTriangle size={20} style={{ color: 'var(--color-error)' }} />
             <div className="text-item-strong">
               Ollama Not Detected
@@ -638,7 +638,7 @@ export default function CookbookView() {
             gap: 'var(--space-3)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div className="row-md">
             <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />
             <div className="text-item-strong">
               Ollama Service Stopped
@@ -676,7 +676,7 @@ export default function CookbookView() {
           <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', margin: '0 0 var(--space-3)' }}>
             Installed Models ({localModels.length})
           </h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+          <div className="flex-wrap-gap">
             {localModels.map(m => (
               <div key={m} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: '6px 10px' }}>
                 <CheckCircle size={13} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
@@ -770,7 +770,7 @@ export default function CookbookView() {
               )
             })}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="row-8px">
             <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
               {filteredModels.length} model{filteredModels.length === 1 ? '' : 's'}
               {hiddenBySafeMode > 0 && `, ${hiddenBySafeMode} hidden by Safe Mode`}
@@ -1028,19 +1028,19 @@ export default function CookbookView() {
                 >
                   <div>
                     <div className="text-muted">RAM</div>
-                    <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
+                    <div className="text-strong-sub">
                       {variant.ramRequiredGb} GB
                     </div>
                   </div>
                   <div>
                     <div className="text-muted">VRAM</div>
-                    <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
+                    <div className="text-strong-sub">
                       {variant.vramRequiredGb > 0 ? `${variant.vramRequiredGb} GB` : 'None'}
                     </div>
                   </div>
                   <div>
                     <div className="text-muted">Disk</div>
-                    <div style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', marginTop: '2px' }}>
+                    <div className="text-strong-sub">
                       {variant.fileSizeGb} GB
                     </div>
                   </div>
@@ -1085,7 +1085,7 @@ export default function CookbookView() {
                           {pullPercent}%
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                      <div className="row">
                         <div
                           style={{
                             flex: 1,

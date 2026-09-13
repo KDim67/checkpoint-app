@@ -21,7 +21,7 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
           Sub-Task Checklist
         </span>
         {items.length > 0 && (
-          <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
+          <span className="text-micro-faint">
             {items.filter(c => c.done).length} of {items.length} tasks completed
           </span>
         )}
@@ -81,7 +81,7 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
       </div>
 
       {/* Add Checklist Item Form */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+      <div className="flex-gap">
         <input
           type="text"
           placeholder="Add sub-task..."
@@ -94,16 +94,7 @@ export default function CardChecklist({ items, draft, setDraft, onAdd, onToggle,
               setDraft('')
             }
           }}
-          style={{
-            flex: 1,
-            background: 'var(--color-surface-2)',
-            border: '1px solid var(--color-surface-offset)',
-            color: 'var(--color-text-base)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-2) var(--space-3)',
-            fontSize: 'var(--text-xs)',
-            outline: 'none'
-          }}
+          className="input-fill"
         />
         <button
           onClick={() => {

@@ -81,7 +81,7 @@ export default function CardAttachments({
 
       {/* List of Attachments */}
       {attachments.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+        <div className="grid-2">
           {attachments.map(att => (
             <div
               key={att.id}
@@ -96,7 +96,7 @@ export default function CardAttachments({
                 gap: 'var(--space-2)'
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+              <div className="col-fill">
                 <span
                   title={att.path}
                   style={{
@@ -120,7 +120,7 @@ export default function CardAttachments({
                 </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div className="row-4px">
                 {att.isImage && (
                   <button
                     onClick={() => onSetCover(att.path)}
@@ -229,7 +229,7 @@ export default function CardAttachments({
           <input
             type="file"
             id="card-file-uploader"
-            style={{ display: 'none' }}
+            className="is-hidden"
             onChange={onFileChosen}
           />
         </div>

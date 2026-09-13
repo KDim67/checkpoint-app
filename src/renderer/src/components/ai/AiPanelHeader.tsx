@@ -26,19 +26,15 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
     >
       {/* Row 0: Provider Selection (manage profiles in Settings → AI) */}
       {providers.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
+        <div className="row-full">
+          <span className="label-caps-fixed">
             Provider
           </span>
           <select
             value={activeProviderId}
             onChange={e => handleSwitchProvider(e.target.value)}
             title="Switch AI provider. Add/edit profiles in Settings → AI"
-            style={{
-              background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '3px 8px',
-              fontSize: '11px', outline: 'none', cursor: 'pointer', flex: 1, minWidth: 0
-            }}
+            className="select-sm"
           >
             {providers.map(p => (
               <option key={p.id} value={p.id}>{p.name}{isLocalUrl(p.baseURL) ? ' (local)' : ' (cloud)'}</option>
@@ -48,8 +44,8 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
       )}
 
       {/* Row 1: Model Selection */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
-        <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
+      <div className="row-full">
+        <span className="label-caps-fixed">
           Model
         </span>
         {(() => {
@@ -61,18 +57,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
             <select
               value={selectedModel}
               onChange={e => handleModelChange(e.target.value)}
-              style={{
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-base)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '3px 8px',
-                fontSize: '11px',
-                outline: 'none',
-                cursor: 'pointer',
-                flex: 1,
-                minWidth: 0
-              }}
+              className="select-sm"
             >
               {dropdownModels.map(m => (
                 <option key={m} value={m}>{m}{supportsVision(m) ? ' 👁' : ''}</option>
@@ -87,19 +72,15 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
       <ModelCapabilityBar caps={modelCaps} onRefresh={refreshModelCaps} />
 
       {/* Row 1b: Workspace / Context Selection. The board the AI reads & writes */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
-        <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>
+      <div className="row-full">
+        <span className="label-caps-fixed">
           Workspace
         </span>
         <select
           value={activeWorkspace}
           onChange={e => setWorkspace(e.target.value)}
           title="Which workspace the assistant reads from and creates items in"
-          style={{
-            background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
-            color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '3px 8px',
-            fontSize: '11px', outline: 'none', cursor: 'pointer', flex: 1, minWidth: 0
-          }}
+          className="select-sm"
         >
           {(availableWorkspaces.length > 0 ? availableWorkspaces : ['default']).map(ctx => (
             <option key={ctx} value={ctx}>{ctx}</option>
@@ -116,7 +97,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
         borderTop: '1px dashed var(--color-surface-offset)',
         paddingTop: 'var(--space-1.5)'
       }}>
-        <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+        <span className="label-caps-sm">
           Actions
         </span>
         <div className="row-6px">
@@ -137,21 +118,12 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
             onMouseLeave={e => { if (!workspaceFolder) e.currentTarget.style.color = 'var(--color-text-muted)' }}
             title={workspaceFolder ? `Workspace imported: ${workspaceFolder} (${workspaceFiles.length} files). Click to re-import` : 'Import a project folder for codebase context'}
           >
-            {workspaceIndexing ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <FolderOpen size={13} />}
+            {workspaceIndexing ? <RefreshCw size={13} className="animate-spin" /> : <FolderOpen size={13} />}
           </button>
 
           <button
             onClick={handleOpenMemoryPanel}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-text-muted)',
-              cursor: 'pointer',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: 'var(--radius-sm)'
-            }}
+            className="icon-btn-md"
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-secondary)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
             title="View AI Memories"
@@ -200,16 +172,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
 
           <button
             onClick={() => { setChatSearchQuery(''); setShowSavedChatsModal(true) }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-text-muted)',
-              cursor: 'pointer',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: 'var(--radius-sm)'
-            }}
+            className="icon-btn-md"
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-secondary)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
             title="Saved Chats (History)"
@@ -219,16 +182,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
 
           <button
             onClick={handleNewChat}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-text-muted)',
-              cursor: 'pointer',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: 'var(--radius-sm)'
-            }}
+            className="icon-btn-md"
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-secondary)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
             title="New Chat"

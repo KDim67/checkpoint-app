@@ -308,7 +308,7 @@ export default function ClipboardView() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + 3px)' }}>
           {/* Header row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div className="row-between-gap">
             {/* Left: label (snippet) or type badge + timestamp (history) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
               {isSnippet && isEditing ? (
@@ -464,7 +464,7 @@ export default function ClipboardView() {
           </pre>
 
           {/* Footer meta */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+          <div className="row-between-gap">
             <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
               {item.content.length.toLocaleString()} chars{lineCount > 1 ? ` · ${lineCount} lines` : ''}
             </span>
@@ -567,8 +567,8 @@ export default function ClipboardView() {
           </div>
 
           {/* Search bar */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--color-text-faint)' }} />
+          <div className="row-relative">
+            <Search size={14} className="input-icon" />
             <input
               type="text"
               placeholder="Search history…"
@@ -738,8 +738,8 @@ export default function ClipboardView() {
           )}
 
           {/* Snippets search bar */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--color-text-faint)' }} />
+          <div className="row-relative">
+            <Search size={14} className="input-icon" />
             <input
               type="text"
               placeholder="Search snippets…"
@@ -801,7 +801,7 @@ export default function ClipboardView() {
           color: 'var(--color-text-faint)',
           background: 'var(--color-surface-2)'
         }}>
-          <Info size={12} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+          <Info size={12} color="var(--color-primary)" className="no-shrink" />
           <span>Click any entry's text to copy it. Double-click a snippet title to rename.</span>
         </div>
 

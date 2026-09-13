@@ -378,7 +378,7 @@ export default function FeatureToggleCenter() {
 
   if (loading) {
     return (
-      <div style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>
+      <div className="text-sm-faint">
         Loading feature states…
       </div>
     )
@@ -387,14 +387,7 @@ export default function FeatureToggleCenter() {
   return (
     <div className="col-lg">
       <div>
-        <div style={{
-          fontSize: '11px',
-          fontWeight: 'var(--weight-bold)',
-          color: 'var(--color-secondary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          marginBottom: 'var(--space-3)'
-        }}>
+        <div className="section-kicker">
           Assistant
         </div>
         <FeatureRow
@@ -409,17 +402,10 @@ export default function FeatureToggleCenter() {
 
       {/* Background Subsystems Section */}
       <div>
-        <div style={{
-          fontSize: '11px',
-          fontWeight: 'var(--weight-bold)',
-          color: 'var(--color-secondary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          marginBottom: 'var(--space-3)'
-        }}>
+        <div className="section-kicker">
           Background Subsystems
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+        <div className="col-xs">
           {BACKGROUND_CONFIGS.map((cfg, i) => (
             <React.Fragment key={cfg.key}>
               {i > 0 && <Divider />}
@@ -439,17 +425,10 @@ export default function FeatureToggleCenter() {
 
       {/* Workspace Sidebar Views Section */}
       <div>
-        <div style={{
-          fontSize: '11px',
-          fontWeight: 'var(--weight-bold)',
-          color: 'var(--color-secondary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          marginBottom: 'var(--space-3)'
-        }}>
+        <div className="section-kicker">
           Workspace Views & Sidebar Customization
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+        <div className="col-xs">
           {SIDEBAR_VIEW_CONFIGS.map((cfg, i) => (
             <React.Fragment key={cfg.key}>
               {i > 0 && <Divider />}

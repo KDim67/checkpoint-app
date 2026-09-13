@@ -133,7 +133,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
         }} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+      <div className="row">
         <span style={{
           width: '24px', height: '24px', flexShrink: 0, borderRadius: 'var(--radius-sm)',
           background: hex, border: '1px solid var(--color-surface-offset)'

@@ -155,7 +155,7 @@ export default function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { j
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 'var(--space-3)', marginBottom: outcome.summary.length ? 'var(--space-2)' : 0
       }}>
-        <strong style={{ color: 'var(--color-text-base)' }}>
+        <strong className="text-base">
           {outcome.undone ? 'Board settings reverted' : 'Board settings updated'}
         </strong>
         {!outcome.undone && outcome.inverse.length > 0 && (

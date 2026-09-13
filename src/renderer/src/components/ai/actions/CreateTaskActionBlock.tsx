@@ -191,7 +191,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
     return (
       <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', margin: '8px 0' }}>
         <div style={{ padding: '4px 0', color: 'var(--color-text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
+          <RefreshCw size={12} className="animate-spin" />
           <span>Generating card block...</span>
         </div>
       </div>

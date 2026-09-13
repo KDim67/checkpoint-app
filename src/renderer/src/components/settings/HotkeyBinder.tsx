@@ -79,8 +79,8 @@ function ChoiceRow<T extends string>({
       border: '1px solid var(--color-surface-offset)',
       borderRadius: 'var(--radius-md)'
     }}>
-      <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
-        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+      <div className="flex-1-mr">
+        <span className="field-label">
           {label}
         </span>
         <span className="text-hint">{desc}</span>
@@ -110,7 +110,7 @@ function ChoiceRow<T extends string>({
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h4 style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)' }}>
+    <h4 className="heading-caps">
       {children}
     </h4>
   )
@@ -144,8 +144,8 @@ function ShortcutRow({
         transition: 'border-color 100ms ease'
       }}
     >
-      <div style={{ marginRight: 'var(--space-4)', flex: 1 }}>
-        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: 'var(--color-text-base)', display: 'block' }}>
+      <div className="flex-1-mr">
+        <span className="field-label">
           {label}
         </span>
         {desc && (
@@ -407,7 +407,7 @@ export default function HotkeyBinder() {
           alignItems: 'center',
           gap: 'var(--space-3)'
         }}>
-          <AlertTriangle size={18} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+          <AlertTriangle size={18} className="icon-warning" />
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
             Customization Engine is disabled. Enable it in the <strong>Theme Builder</strong> settings tab first to register customized global shortcut triggers. In-app shortcuts below work regardless.
           </div>
@@ -453,7 +453,7 @@ export default function HotkeyBinder() {
           />
         ))}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+        <div className="flex-gap-mt">
           <ActionButton onClick={handleSave} disabled={recording !== null} variant="primary">
             Apply Bindings
           </ActionButton>
@@ -465,7 +465,7 @@ export default function HotkeyBinder() {
 
       <div className="col-lg">
         <SectionHeading>In-App Shortcuts</SectionHeading>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+        <span className="text-hint-pull">
           Fire only while the Checkpoint window has focus, and are ignored while typing. Changes apply immediately.
         </span>
 
@@ -480,7 +480,7 @@ export default function HotkeyBinder() {
           />
         ))}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+        <div className="flex-gap-mt">
           <ActionButton onClick={handleResetAppDefaults} disabled={recording !== null} variant="secondary">
             Restore Default Shortcuts
           </ActionButton>
@@ -489,17 +489,14 @@ export default function HotkeyBinder() {
 
       <div className="col-lg">
         <SectionHeading>View Shortcuts</SectionHeading>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+        <span className="text-hint-pull">
           Work only while that view is open, so two of them can share a key without clashing.
           A kanban card also needs to be focused, which Tab does.
         </span>
 
         {VIEW_SCOPES.map(scope => (
           <div key={scope} className="col">
-            <span style={{
-              fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
-              color: 'var(--color-text-muted)'
-            }}>
+            <span className="text-hint-strong">
               {SCOPE_LABELS[scope]}
             </span>
             {VIEW_SHORTCUTS.filter(s => s.scope === scope).map(shortcut => (
@@ -515,7 +512,7 @@ export default function HotkeyBinder() {
           </div>
         ))}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+        <div className="flex-gap-mt">
           <ActionButton onClick={handleResetViewDefaults} disabled={recording !== null} variant="secondary">
             Restore Default View Shortcuts
           </ActionButton>
@@ -524,7 +521,7 @@ export default function HotkeyBinder() {
 
       <div className="col-lg">
         <SectionHeading>Mouse</SectionHeading>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
+        <span className="text-hint-pull">
           On the Wall, where the right button both pans and opens the menu. Holding
           space and dragging with the left button always pans, whatever these say.
         </span>

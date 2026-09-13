@@ -403,7 +403,7 @@ export default function BacklogTable({
             type="checkbox"
             checked={allSelected}
             onChange={handleSelectAllToggle}
-            style={{ cursor: 'pointer' }}
+            className="clickable"
           />
         </div>
 
@@ -620,7 +620,7 @@ export default function BacklogTable({
                         type="checkbox"
                         checked={!!visibleColumns[colKey]}
                         onChange={() => onColumnVisibilityToggle(colKey)}
-                        style={{ cursor: 'pointer' }}
+                        className="clickable"
                       />
                       <span>{label}</span>
                     </label>

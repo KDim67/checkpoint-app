@@ -203,7 +203,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
         gap: '8px'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+      <div className="row-between-8px">
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-accent-ai-soft)', fontSize: '12px', fontWeight: 'bold', minWidth: 0 }}>
           <CheckCircle2 size={15} style={{ flexShrink: 0, opacity: applied ? 1 : 0.45 }} />
           <span className="truncate">

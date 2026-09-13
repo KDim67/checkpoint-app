@@ -27,7 +27,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
     }}>
       <WallBackgroundMenu bgOpen={bgOpen} setBgOpen={setBgOpen} custom={custom} setBackground={setBackground} />
 
-      <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
+      <div className="divider-v" />
 
       {/* Which wall */}
       <WallSwitcher
@@ -42,7 +42,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
         setPendingDelete={setPendingDelete}
       />
 
-      <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
+      <div className="divider-v" />
 
       {toolButton('Select', <MousePointer2 size={14} />, () => setTool('select'), { active: tool === 'select', shortcut: keys.wall_tool_select })}
       {toolButton('Draw', <PenLine size={14} />, () => setTool(t => (t === 'pen' ? 'select' : 'pen')), { active: tool === 'pen', shortcut: keys.wall_tool_draw })}
@@ -55,7 +55,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       {toolButton('Place a note', <FileText size={14} />, () => setPicker(p => (p === 'doc' ? null : 'doc')))}
       {toolButton('Image', <ImageIcon size={14} />, () => fileInputRef.current?.click())}
 
-      <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)' }} />
+      <div className="divider-v" />
 
       {toolButton('Undo', <Undo2 size={14} />, () => applyHistory(undo(historyRef.current)), { disabled: !undoable })}
       {toolButton('Redo', <Redo2 size={14} />, () => applyHistory(redo(historyRef.current)), { disabled: !redoable })}
@@ -116,7 +116,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       )}
 
       <input
-        ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+        ref={fileInputRef} type="file" accept="image/*" multiple className="is-hidden"
         onChange={e => { void placeImageFiles(Array.from(e.target.files ?? [])); e.target.value = '' }}
       />
     </div>

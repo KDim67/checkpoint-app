@@ -95,7 +95,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           </h2>
         </div>
 
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
+        <p className="text-hint-flush">
           Add a new column stage to this context's Kanban workflow.
         </p>
 
@@ -115,7 +115,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
 
         {/* Column Name Input */}
         <div className="col-sm">
-          <label htmlFor="col-name-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+          <label htmlFor="col-name-input" className="text-hint-strong">
             Column Title
           </label>
           <input
@@ -141,7 +141,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
 
         {/* WIP Limit Input */}
         <div className="col-sm">
-          <label htmlFor="col-wip-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+          <label htmlFor="col-wip-input" className="text-hint-strong">
             WIP Limit (Optional)
           </label>
           <input
@@ -166,7 +166,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
         {/* Definition of done. Shown on the column name's tooltip, and the
             field the assistant fills in when it designs a workflow. */}
         <div className="col-sm">
-          <label htmlFor="col-desc-input" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+          <label htmlFor="col-desc-input" className="text-hint-strong">
             Definition of Done (Optional)
           </label>
           <input
@@ -189,7 +189,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
 
         {/* Column Theme & Mode */}
         <div className="col">
-          <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+          <label className="text-hint-strong">
             Column Theme & Display Mode
           </label>
           

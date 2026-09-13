@@ -471,7 +471,7 @@ function KanbanColumn({
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '4px' }}>
+                <div className="flex-4px">
                   <button
                     type="button"
                     onClick={() => {
@@ -682,12 +682,12 @@ function KanbanColumn({
                     label={`${sort === 'due' ? '✓ ' : ''}Order: Due Date`}
                     onClick={() => { onSetSort?.(id, 'due'); setShowMenu(false) }}
                   />
-                  <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+                  <div className="rule" />
                   <MenuItem
                     label="Collapse Column"
                     onClick={() => { onToggleCollapse?.(id); setShowMenu(false) }}
                   />
-                  <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+                  <div className="rule" />
                   <MenuItem
                     label="Archive All Cards"
                     onClick={async () => {
@@ -708,7 +708,7 @@ function KanbanColumn({
                   />
                   {!isDefaultCol && (
                     <>
-                      <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: '4px 0' }} />
+                      <div className="rule" />
                       <MenuItem
                         label="Delete Column"
                         onClick={() => { onDelete(id); setShowMenu(false) }}
