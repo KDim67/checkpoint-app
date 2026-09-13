@@ -1,11 +1,4 @@
-/**
- * The assistant's vocabulary for board configuration. Everything the config UI
- * can do, the AI can do too.
- *
- * Each op computes its own inverse before it is applied, so undo is one click.
- * And `applyConfigOps` is pure: side effects like rehoming a deleted column's
- * cards come back as instructions, which keeps it testable without a database.
- */
+/** everything the config UI can do; each op computes its inverse; pure, card moves come back as instructions */
 
 import {
   normalizeBoardConfig,
@@ -28,14 +21,9 @@ type ConfigOp =
 
 export interface ConfigOperation {
   op: ConfigOp
-  /** Column id or name, for the column operations. */
+  /** column id or name */
   target?: string
-  /**
-   * Exact id to restore. Only set on an inverse: undoing a delete has to bring
-   * the column back under its original id, because the cards that were moved
-   * out still carry that id as their status and would otherwise be restored
-   * into a column that no longer exists.
-   */
+  /** original id for an inverse, moved cards still carry it */
   id?: string
   name?: string
   wipLimit?: number | null
@@ -44,30 +32,26 @@ export interface ConfigOperation {
   collapsed?: boolean
   sort?: ColumnSort
   description?: string
-  /** Insertion index for add_column; also used by the inverse of a delete. */
+  /** insertion index, also for a delete's inverse */
   position?: number
-  /** Column ids or names, in the desired order. */
+  /** ids or names, in order */
   order?: string[]
   background?: string
   swimlanes?: boolean
   cardDisplay?: Partial<CardDisplay>
-  /** Restores a column's contents when undoing a delete. Set by the caller. */
+  /** set by the caller when undoing a delete */
   restoreCards?: { id: string; status: string }[]
 }
 
 interface ApplyResult {
   next: BoardConfig
-  /** Applied in order, returns the board to its previous configuration. */
+  /** returns the board to before */
   inverse: ConfigOperation[]
-  /** One human-readable line per operation actually applied. */
+  /** one line per applied op */
   summary: string[]
-  /** Operations the model asked for that could not be carried out. */
+  /** what couldn't be done */
   skipped: string[]
-  /**
-   * Card reassignments the caller must perform. Deleting a column would
-   * otherwise strand its cards under a status no column claims, so they move
-   * to the first surviving column. The same rule the board's own delete uses.
-   */
+  /** cards follow to the first surviving column, like the board's own delete */
   cardMoves: { fromColumn: string; toColumn: string }[]
 }
 
@@ -78,10 +62,7 @@ const VALID_OPS: ConfigOp[] = [
 
 const COLUMN_SORTS: ColumnSort[] = ['manual', 'priority', 'due']
 
-// Normalisation of model output
-// Mirrors normalizeUpdate in boardEnrich.ts: small models are inconsistent
-// about key names, and a rejected operation is a worse outcome than accepting a
-// synonym. Anything genuinely unrecognisable is dropped rather than guessed at.
+// small models vary key names; accept synonyms, drop the unrecognisable
 
 function asObject(v: unknown): Record<string, unknown> | null {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
@@ -105,7 +86,7 @@ function wipOrUndef(v: unknown): number | null | undefined {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
-/** Accepts `#rrggbb`, bare `rrggbb`, and the CSS colour names models reach for. */
+/** #rrggbb, bare rrggbb, or CSS colour names */
 const NAMED_COLORS: Record<string, string> = {
   red: '#ef4444', orange: '#f97316', amber: '#f59e0b', yellow: '#eab308',
   green: '#22c55e', emerald: '#10b981', teal: '#14b8a6', cyan: '#06b6d4',
@@ -146,8 +127,7 @@ export function normalizeConfigUpdate(
     } else if (op === 'update_column' || op === 'delete_column') {
       if (!target) continue
       next.target = target
-      // A rename is `name` on an update; for add_column `name` is the identity,
-      // so the two are read from different places on purpose.
+      // name renames on update but identifies on add
       if (op === 'update_column' && e.name !== undefined && str(e.name).trim() && str(e.name).trim() !== target) {
         next.name = str(e.name).trim()
       }
@@ -175,7 +155,7 @@ export function normalizeConfigUpdate(
       next.cardDisplay = partial
     }
 
-    // Shared column attributes, meaningful on add_column and update_column.
+    // add_column and update_column only
     if (op === 'add_column' || op === 'update_column') {
       const wip = wipOrUndef(e.wipLimit ?? e.wip_limit ?? e.wip ?? e.limit)
       if (wip !== undefined) next.wipLimit = wip
@@ -203,20 +183,11 @@ export function normalizeConfigUpdate(
   return { message: str(obj.message).trim(), operations }
 }
 
-// Application
-
 function columnId(name: string): string {
   return `col-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
 }
 
-/**
- * The full prior state of a column, captured for the inverse.
- *
- * Every field is stated explicitly, including the ones that were absent:
- * `color: ''` rather than `color: undefined`. An undefined field means "leave
- * alone" to the applier, so an inverse built from undefineds could never undo
- * the *addition* of a colour to a column that had none.
- */
+/** every field explicit: undefined means leave alone, so an inverse couldn't remove an added colour */
 function captureColumn(col: ColumnConfig): ConfigOperation {
   return {
     op: 'update_column',
@@ -231,10 +202,7 @@ function captureColumn(col: ColumnConfig): ConfigOperation {
   }
 }
 
-/**
- * Applies a sequence of operations, returning the new configuration alongside
- * the inverse that undoes it. Never mutates the input.
- */
+/** never mutates the input */
 export function applyConfigOps(config: BoardConfig, operations: ConfigOperation[]): ApplyResult {
   let next = normalizeBoardConfig(config)
   const inverse: ConfigOperation[] = []
@@ -266,8 +234,7 @@ export function applyConfigOps(config: BoardConfig, operations: ConfigOperation[
           : columns.length
         columns.splice(at, 0, col)
         next = { ...next, columns }
-        // Unshift throughout: inverses must run newest-first, or an earlier
-        // undo can reference a column a later one has not restored yet.
+        // unshift, inverses run newest-first
         inverse.unshift({ op: 'delete_column', target: col.id })
         summary.push(`Added column "${name}"`)
         break
@@ -286,9 +253,7 @@ export function applyConfigOps(config: BoardConfig, operations: ConfigOperation[
           updated.wipLimit = operation.wipLimit
           changes.push(operation.wipLimit === null ? 'WIP limit removed' : `WIP limit ${operation.wipLimit}`)
         }
-        // Empty string is the explicit "clear it" signal; undefined means
-        // "leave it alone". The distinction is what makes undo able to remove
-        // a colour it previously added.
+        // '' clears, undefined leaves alone, so undo can remove a colour
         if (operation.color !== undefined) {
           updated.color = operation.color || undefined
           changes.push(operation.color ? `colour ${operation.color}` : 'colour cleared')
@@ -325,8 +290,7 @@ export function applyConfigOps(config: BoardConfig, operations: ConfigOperation[
         }
         const at = next.columns.findIndex(c => c.id === col.id)
         const remaining = next.columns.filter(c => c.id !== col.id)
-        // Same rule as the board's own delete: cards follow to the first
-        // surviving column rather than being stranded under a dead status.
+        // cards follow to the first surviving column
         cardMoves.push({ fromColumn: col.id, toColumn: remaining[0].id })
         next = { ...next, columns: remaining }
         inverse.unshift({
@@ -355,8 +319,7 @@ export function applyConfigOps(config: BoardConfig, operations: ConfigOperation[
           skipped.push('None of the columns in the requested order were recognised')
           break
         }
-        // Columns the model left out keep their relative order at the end,
-        // so a partial list reorders rather than silently dropping the rest.
+        // unlisted columns keep their order at the end
         const rest = next.columns.filter(c => !resolved.some(r => r.id === c.id))
         inverse.unshift({ op: 'reorder_columns', order: next.columns.map(c => c.id) })
         next = { ...next, columns: [...resolved, ...rest] }

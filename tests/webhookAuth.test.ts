@@ -6,9 +6,7 @@ import { initDb, closeDb, getSetting, setSetting } from '../src/main/db'
 import { ensureWebhookToken, offeredToken, tokenMatches, WEBHOOK_TOKEN_KEY } from '../src/main/webhookAuth'
 import { isSecretSetting, secretSettingKeys } from '../src/main/secureSettings'
 
-// The gateway is an HTTP server on the loopback interface, and the loopback
-// interface is reachable from any browser page. The token is the only thing
-// between a website and the user's database, so it gets pinned down here.
+// loopback is reachable from any page, the token is the only guard
 
 let dir: string
 
@@ -27,8 +25,7 @@ describe('the webhook token', () => {
     try {
       const first = ensureWebhookToken()
       expect(first).toMatch(/^[0-9a-f]{48}$/)
-      // A token that changed on every call would break every script that
-      // stored it the moment the app restarted.
+      // a changing token breaks stored scripts on restart
       expect(ensureWebhookToken()).toBe(first)
       expect(getSetting(WEBHOOK_TOKEN_KEY, '')).toBe(first)
     } finally {
@@ -39,8 +36,7 @@ describe('the webhook token', () => {
   it('is long enough not to be guessed', () => {
     setup()
     try {
-      // 24 random bytes. Anything short enough to brute force over HTTP would
-      // be no better than the nothing that was there before.
+      // 24 random bytes, not brute-forceable over HTTP
       expect(Buffer.from(ensureWebhookToken(), 'hex')).toHaveLength(24)
     } finally {
       teardown()
@@ -62,8 +58,7 @@ describe('the webhook token', () => {
   it('replaces a stored value too short to be one of ours', () => {
     setup()
     try {
-      // A truncated or hand-edited setting must not become a weak token that
-      // the gateway then accepts forever.
+      // a truncated setting mustn't become a weak token forever
       setSetting(WEBHOOK_TOKEN_KEY, 'short')
       const fixed = ensureWebhookToken()
       expect(fixed).not.toBe('short')
@@ -114,8 +109,7 @@ describe('checking an offered token', () => {
   })
 
   it('rejects a prefix of the real one without throwing', () => {
-    // timingSafeEqual throws on a length mismatch, and a throw in the request
-    // handler would let anyone stop the gateway by sending a short string.
+    // a length mismatch throw would let anyone stop the gateway
     expect(() => tokenMatches(real.slice(0, 10), real)).not.toThrow()
     expect(tokenMatches(real.slice(0, 10), real)).toBe(false)
   })
@@ -127,8 +121,7 @@ describe('checking an offered token', () => {
 
 describe('how the token is stored', () => {
   it('is treated as a secret, so it is encrypted at rest', () => {
-    // It sits in the same file and the same rolling backups as the provider
-    // keys, and it grants writes over HTTP to whoever reads it.
+    // same file and backups as the provider keys, and it grants writes
     expect(isSecretSetting(WEBHOOK_TOKEN_KEY)).toBe(true)
   })
 
@@ -137,8 +130,7 @@ describe('how the token is stored', () => {
   })
 
   it('sits alongside the other credential of its kind', () => {
-    // mcp_auth_token was encrypted for exactly this reason; the two should not
-    // drift apart.
+    // encrypted for the same reason as mcp_auth_token
     expect(isSecretSetting('mcp_auth_token')).toBe(true)
     expect(isSecretSetting('ai_api_key')).toBe(true)
   })

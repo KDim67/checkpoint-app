@@ -29,11 +29,10 @@ export default function LogVirtualList({
   const [prevScrollHeight, setPrevScrollHeight] = useState<number | null>(null)
   const [prevScrollTop, setPrevScrollTop] = useState<number | null>(null)
 
-  // Auto scroll to bottom on initial mount (when page 1 loaded)
+  // scroll to bottom once page 1 loads
   const [hasInitialScrolled, setHasInitialScrolled] = useState(false)
 
   useEffect(() => {
-    // Reset initial scroll flag when context changes
     setHasInitialScrolled(false)
   }, [activeWorkspace])
 
@@ -44,8 +43,7 @@ export default function LogVirtualList({
     }
   }, [items, hasInitialScrolled])
 
-  // Scroll restoration: when items length increases (indicating older logs prepended),
-  // adjust the scrollTop to prevent layout jump
+  // keep the scroll position when older logs prepend
   useLayoutEffect(() => {
     if (prevScrollHeight !== null && prevScrollTop !== null && containerRef.current) {
       const container = containerRef.current
@@ -54,13 +52,12 @@ export default function LogVirtualList({
       
       container.scrollTop = prevScrollTop + heightDifference
       
-      // Reset measurements
       setPrevScrollHeight(null)
       setPrevScrollTop(null)
     }
   }, [items, prevScrollHeight, prevScrollTop])
 
-  // IntersectionObserver for scroll-up loading
+  // scroll-up loading
   useEffect(() => {
     const sentinel = sentinelRef.current
     if (!sentinel || !hasMore || loadingMore) return
@@ -69,7 +66,6 @@ export default function LogVirtualList({
       async (entries) => {
         const entry = entries[0]
         if (entry.isIntersecting && containerRef.current) {
-          // Record current scroll state for restoration
           setPrevScrollHeight(containerRef.current.scrollHeight)
           setPrevScrollTop(containerRef.current.scrollTop)
           
@@ -86,7 +82,7 @@ export default function LogVirtualList({
       {
         root: containerRef.current,
         threshold: 0.1,
-        rootMargin: '100px 0px 0px 0px' // Trigger slightly before hitting the top
+        rootMargin: '100px 0px 0px 0px' // fire a little before the top
       }
     )
 
@@ -107,10 +103,8 @@ export default function LogVirtualList({
         background: 'var(--color-background)'
       }}
     >
-      {/* Sentinel / Top Spacer */}
       <div ref={sentinelRef} style={{ height: '1px' }} />
 
-      {/* Beginning of History Indicator */}
       {!hasMore && items.length > 0 && (
         <div style={{
           display: 'flex',

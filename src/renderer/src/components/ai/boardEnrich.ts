@@ -1,11 +1,4 @@
-// Deterministic enrichment for AI-generated board/plan/dialogue output.
-//
-// The model's structured JSON (from ai.generateStructured) is guaranteed to be
-// valid, but a small model may still omit tags, colors, or good priorities.
-// These helpers guarantee a visually rich, consistent result regardless of the
-// model's capability. Every column gets a color, every card gets 1-3 colored
-// tags, and package the result into the exact fenced-block format the existing
-// ChatMessage executor understands.
+// small models omit tags, colors, priorities; fill them in and package the block the executor reads
 
 import type { AiDialogueBlock, AiPlanBlock } from './aiActionTypes'
 import { asArray, asObject, str } from './aiActionTypes'
@@ -13,7 +6,6 @@ import type { ItemPriority } from '@shared/types'
 
 type StructuredKind = 'board' | 'plan' | 'dialogue' | 'update' | 'config'
 
-// Palette
 const NAMED_COLORS: Record<string, string> = {
   red: '#ef4444', orange: '#f97316', amber: '#f59e0b', yellow: '#eab308',
   lime: '#84cc16', green: '#22c55e', emerald: '#10b981', teal: '#14b8a6',
@@ -22,13 +14,13 @@ const NAMED_COLORS: Record<string, string> = {
   rose: '#f43f5e', gray: '#6b7280', slate: '#64748b'
 }
 
-// Rotatable palette for stable hashing (readable on the dark board)
+// rotation palette for stable hashing, readable on the dark board
 const PALETTE = [
   '#3b82f6', '#a855f7', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4',
   '#8b5cf6', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#f43f5e'
 ]
 
-/** Palette summary injected into prompts so the model reaches for real colors. */
+/** injected into prompts so the model reaches for real colors */
 export const PALETTE_HINT =
   'Use hex colors from this palette: #3b82f6 (blue), #a855f7 (purple), #22c55e (green), ' +
   '#f59e0b (amber), #ec4899 (pink), #06b6d4 (cyan), #14b8a6 (teal), #f97316 (orange), ' +
@@ -49,7 +41,7 @@ function stableColor(seed: string): string {
   return PALETTE[hash % PALETTE.length]
 }
 
-// Semantic column colors (by name keyword)
+// column colours by name keyword
 const COLUMN_COLOR_RULES: Array<{ test: RegExp; color: string }> = [
   { test: /backlog|todo|to do|inbox|idea|new/i, color: '#64748b' },
   { test: /progress|doing|active|wip|develop|build/i, color: '#3b82f6' },
@@ -65,7 +57,7 @@ function colorForColumn(name: string, index: number): string {
   return PALETTE[index % PALETTE.length]
 }
 
-// Tag inference (keyword → topical tag)
+// keyword to topical tag
 const TAG_RULES: Array<{ test: RegExp; tag: string }> = [
   { test: /\b(bug|fix|crash|error|regression|broken)\b/i, tag: 'bug' },
   { test: /\b(ui|hud|menu|button|screen|layout|widget)\b/i, tag: 'ui' },
@@ -112,7 +104,6 @@ function inferTags(title: string, body: string): string[] {
   return found
 }
 
-// Types for the normalized output
 interface Tag { name: string; color: string }
 interface EnrichedCard { title: string; body: string; status: string; priority: number; tags: Tag[]; due?: string }
 interface EnrichedColumn { name: string; wipLimit: number | null; color: string; colorMode: string }
@@ -135,7 +126,7 @@ function normalizeTags(raw: unknown, title: string, body: string): Tag[] {
     }
   }
 
-  // Guarantee at least one tag. Infer from content, else a sensible default.
+  // at least one tag, inferred or a default
   if (out.length === 0) {
     const inferred = inferTags(title, body)
     if (inferred.length > 0) inferred.forEach(t => add(t))
@@ -144,7 +135,6 @@ function normalizeTags(raw: unknown, title: string, body: string): Tag[] {
   return out.slice(0, 3)
 }
 
-// Public: normalize + enrich a board plan
 interface EnrichedBoard {
   message: string
   columns: EnrichedColumn[]
@@ -155,7 +145,7 @@ function enrichBoard(raw: unknown): EnrichedBoard | null {
   const obj = asObject(raw)
   if (!obj) return null
 
-  // Cards can appear under several keys
+  // cards can come under several keys
   const rawCards = asArray(obj.cards ?? obj.tasks ?? obj.items)
   const rawCols = asArray(obj.columns ?? obj.stages ?? obj.lists)
 
@@ -204,7 +194,6 @@ function enrichBoard(raw: unknown): EnrichedBoard | null {
   return { message, columns, cards }
 }
 
-// Public: normalize a plan
 function normalizePlan(raw: unknown): { message: string; block: AiPlanBlock } | null {
   const obj = asObject(raw)
   if (!obj) return null
@@ -223,7 +212,6 @@ function normalizePlan(raw: unknown): { message: string; block: AiPlanBlock } | 
   return { message, block: { title, overview, steps } }
 }
 
-// Public: normalize a dialogue tree (and repair dangling targets)
 function normalizeDialogue(raw: unknown): { message: string; block: AiDialogueBlock } | null {
   const obj = asObject(raw)
   if (!obj) return null
@@ -242,7 +230,7 @@ function normalizeDialogue(raw: unknown): { message: string; block: AiDialogueBl
   if (nodes.length === 0) return null
 
   const ids = new Set(nodes.map(n => n.id))
-  // Repair any choice pointing at a non-existent node → terminate that branch.
+  // a choice pointing nowhere ends that branch
   for (const n of nodes) {
     for (const ch of n.choices) {
       if (ch.target !== 'end' && !ids.has(ch.target)) ch.target = 'end'
@@ -253,22 +241,16 @@ function normalizeDialogue(raw: unknown): { message: string; block: AiDialogueBl
   return { message, block: { startNode, nodes } }
 }
 
-// Public: normalize board-edit operations
 type BoardOp = 'move' | 'set_priority' | 'retitle' | 'update_body' | 'archive' | 'set_due_date'
 
-/**
- * A validated board edit. Modelled as a discriminated union so each variant
- * carries exactly the field it needs. The executor then reads `op.toColumn`
- * or `op.priority` without re-checking for undefined, which is what the
- * optional-field version forced it to paper over with casts.
- */
+/** discriminated union so the executor reads op.toColumn without casts */
 export type UpdateOperation =
   | { op: 'move'; target: string; toColumn: string }
   | { op: 'set_priority'; target: string; priority: ItemPriority }
   | { op: 'retitle'; target: string; newTitle: string }
   | { op: 'update_body'; target: string; newBody: string }
   | { op: 'archive'; target: string }
-  /** `due` is an ISO date string; empty string clears the due date. */
+  /** ISO date, '' clears it */
   | { op: 'set_due_date'; target: string; due: string }
 
 const VALID_OPS: BoardOp[] = ['move', 'set_priority', 'retitle', 'update_body', 'archive', 'set_due_date']
@@ -292,9 +274,7 @@ export function normalizeUpdate(raw: unknown): { message: string; operations: Up
       if (!to) continue
       operations.push({ op, target, toColumn: to })
     } else if (op === 'set_priority') {
-      // Math.round only ever yields an integer, NaN or ±Infinity, so testing
-      // the three accepted values IS the old finite/1..3 range check, and it
-      // narrows to the literal type the DB column expects.
+      // Math.round yields an integer, NaN or Infinity, so checking the three values is the range check
       const p = Math.round(Number(e.priority ?? e.value))
       if (p !== 1 && p !== 2 && p !== 3) continue
       operations.push({ op, target, priority: p })
@@ -308,7 +288,7 @@ export function normalizeUpdate(raw: unknown): { message: string; operations: Up
       operations.push({ op, target, newBody: nb })
     } else if (op === 'set_due_date') {
       const due = str(e.due ?? e.dueDate ?? e.due_date ?? e.date ?? e.value).trim()
-      // Empty clears the due date; anything else must be a parseable date.
+      // '' clears, anything else must parse
       if (due && Number.isNaN(Date.parse(due))) continue
       operations.push({ op, target, due })
     } else {
@@ -320,7 +300,6 @@ export function normalizeUpdate(raw: unknown): { message: string; operations: Up
   return { message, operations }
 }
 
-// Public: build the assistant message content the executor renders
 export function buildAssistantMessage(kind: StructuredKind, raw: unknown): string | null {
   if (kind === 'board') {
     const b = enrichBoard(raw)

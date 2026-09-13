@@ -1,4 +1,4 @@
-/** Images stored alongside the database. */
+/** images stored beside the db */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

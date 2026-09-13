@@ -9,7 +9,7 @@ import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 interface NoteEditorProps {
   content: string
   onChange: (value: string) => void
-  /** All existing note titles, used for [[wiki-link]] autocomplete. */
+  /** for [[ autocomplete */
   noteTitles: string[]
 }
 
@@ -42,7 +42,7 @@ const TOOLBAR_GROUPS: ToolbarButton[][] = [
   ]
 ]
 
-// Caret pixel-coordinate helper (mirror-div technique)
+// caret pixel position via a mirror div
 const MIRROR_PROPS: string[] = [
   'box-sizing', 'width', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
@@ -79,10 +79,9 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const pendingSelection = useRef<{ start: number; end: number } | null>(null)
 
-  // Wiki-link autocomplete state
   const [autocomplete, setAutocomplete] = useState<{
     query: string
-    start: number // index just after `[[`
+    start: number // index just after [[
     top: number
     left: number
     index: number
@@ -91,7 +90,7 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
   const wordCount = useMemo(() => countWords(content), [content])
   const readTime = useMemo(() => readingTime(content), [content])
 
-  // Restore selection after a programmatic value change (formatting actions).
+  // restore selection after programmatic edits
   useLayoutEffect(() => {
     if (pendingSelection.current && textareaRef.current) {
       const { start, end } = pendingSelection.current
@@ -109,7 +108,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
     onChange(result.value)
   }, [onChange])
 
-  // Autocomplete detection
   const suggestions = useMemo(() => {
     if (!autocomplete) return []
     const q = autocomplete.query.toLowerCase()
@@ -131,7 +129,7 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
       return
     }
     const between = before.slice(open + 2)
-    // Cancel if the bracket was already closed or spans lines / contains a pipe target close
+    // cancel once closed, multi-line, or a new [[
     if (between.includes(']]') || between.includes('\n') || between.includes('[[')) {
       setAutocomplete(null)
       return
@@ -152,7 +150,7 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
     const caret = el.selectionStart
     const before = el.value.slice(0, autocomplete.start)
     const after = el.value.slice(caret)
-    // Insert the title and the closing ]] (add closing only if not already there)
+    // add ]] only if missing
     const closing = after.startsWith(']]') ? '' : ']]'
     const newValue = before + title + closing + after
     const newCaret = before.length + title.length + closing.length
@@ -161,7 +159,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
     onChange(newValue)
   }, [autocomplete, onChange])
 
-  // Re-detect autocomplete whenever content changes while typing.
   useEffect(() => {
     if (textareaRef.current && document.activeElement === textareaRef.current) {
       detectAutocomplete(textareaRef.current)
@@ -170,7 +167,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
   }, [content])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Autocomplete navigation
     if (autocomplete && suggestions.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -194,7 +190,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
       }
     }
 
-    // Formatting shortcuts
     if (e.ctrlKey || e.metaKey) {
       const k = e.key.toLowerCase()
       if (k === 'b') { e.preventDefault(); runFormat('bold'); return }
@@ -202,7 +197,7 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
       if (k === 'k') { e.preventDefault(); runFormat('link'); return }
     }
 
-    // Tab / Shift+Tab → indent / outdent (2 spaces)
+    // Tab/Shift+Tab indents by 2 spaces
     if (e.key === 'Tab') {
       e.preventDefault()
       const el = e.currentTarget
@@ -212,7 +207,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
         pendingSelection.current = { start: selectionStart + 2, end: selectionStart + 2 }
         onChange(newValue)
       } else {
-        // Indent/outdent selected lines
         const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
         const block = value.slice(lineStart, selectionEnd)
         const updated = e.shiftKey
@@ -227,7 +221,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
-      {/* Formatting toolbar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -259,7 +252,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
         ))}
       </div>
 
-      {/* Textarea */}
       <textarea
         ref={textareaRef}
         className="notes-textarea"
@@ -280,7 +272,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
         spellCheck={false}
       />
 
-      {/* Wiki-link autocomplete */}
       {autocomplete && suggestions.length > 0 && (
         <div
           style={{
@@ -326,7 +317,6 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
         </div>
       )}
 
-      {/* Stats footer */}
       <div style={{
         padding: '6px var(--space-4)',
         background: 'var(--color-surface-1)',

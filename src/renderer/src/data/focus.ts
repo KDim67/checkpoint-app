@@ -1,4 +1,4 @@
-/** Focus sessions, as the renderer reaches them. Typed off the bridge. */
+/** focus sessions, off the db bridge */
 
 type Db = typeof window.electronAPI.db
 

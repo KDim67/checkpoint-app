@@ -37,8 +37,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
 
   const data = currentItem || previewData
 
-  // Rebuilt from the JSON on every render, so read through a ref rather than
-  // listed: listing them would run the effect on every render.
+  // rebuilt from JSON each render, a ref keeps it out of the deps
   const parsedRef = useRef({ normalized, title, cached })
   parsedRef.current = { normalized, title, cached }
 
@@ -76,9 +75,9 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
           const body = normalized.body || ''
           const priority = normalized.priority ?? 2
 
-          // Resolve status to match existing board column IDs
+          // match an existing column id
           let finalStatus = 'open'
-          // Unified board document; read unlocked inside the existing lock.
+          // read unlocked, already inside the lock
           const { columns: cols } = await readBoardConfigUnlocked(validContext)
 
           const rawStatus = (normalized.status || '').trim().toLowerCase()
@@ -99,9 +98,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
           }
           finalStatus = matchedCol ? matchedCol.id : (cols[0]?.id || 'open')
 
-          // Handle Tags if provided
-          // Nameless tags are skipped rather than thrown on: reading `.name` off
-          // whatever the model sent used to fail the whole card.
+          // nameless tags skipped; reading .name off junk used to fail the card
           const createdTagsList: Tag[] = Array.isArray(normalized.tags)
             ? await (await tagResolver())(
                 normalized.tags
@@ -118,20 +115,18 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
             body,
             status: finalStatus,
             priority,
-            // Explicit position. Omitting it defaults to 0 in the IPC validator,
-            // pinning the card above everything and breaking drag-reordering.
+            // explicit position, 0 pins it on top and breaks reordering
             position: Date.now(),
             due_at: null,
             metadata: '{}'
           }, tagIds)
 
-          // Cache the result permanently in memory
           createdItemsCacheMap.set(signature, { item: newItem, tags: createdTagsList })
 
           return { item: newItem, tags: createdTagsList, isNew: true }
         })
 
-        // Dispatch live update event to reload Kanban board instantly
+        // kanban listens for this to reload
         window.dispatchEvent(new CustomEvent('kanban-refresh'))
         window.dispatchEvent(new CustomEvent('item-updated'))
 
@@ -147,10 +142,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
     return () => { isMounted = false }
   }, [jsonString, activeWorkspace, signature])
 
-  // Look up the human-readable column name for whatever status ID this card has.
-  // Must stay above the early returns below: this block renders a "generating"
-  // placeholder while `data` is still streaming in, so hooks placed after those
-  // returns would change in count once the card resolves, and React would throw.
+  // above the early returns, or the hook count changes once the card resolves
   const [colDisplayName, setColDisplayName] = React.useState<string>('')
   const dataStatus = data?.status
   React.useEffect(() => {
@@ -164,7 +156,6 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
         )
         if (match) setColDisplayName(match.name)
         else {
-          // Friendly label for default column IDs
           const labels: Record<string, string> = {
             open: 'To Do', in_progress: 'In Progress', in_review: 'In Review', done: 'Done'
           }
@@ -218,7 +209,6 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
         overflow: 'hidden'
       }}
     >
-      {/* Top Header Badge */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary-soft)', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.02em', flexShrink: 0 }}>
           <CheckCircle2 size={14} style={{ color: '#3b82f6', flexShrink: 0 }} />
@@ -258,7 +248,6 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
         </div>
       </div>
 
-      {/* Card Details */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
         <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-base)', lineHeight: 1.4, wordBreak: 'break-word' }}>
           {data.title}
@@ -270,7 +259,6 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
         )}
       </div>
 
-      {/* Tags Chips */}
       {((currentTags && currentTags.length > 0) || (data.tags && data.tags.length > 0)) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
           {(currentTags.length > 0 ? currentTags : asArray(data.tags)).map((t, idx) => {
@@ -296,7 +284,6 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
         </div>
       )}
 
-      {/* View Action Button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
         <ViewOnKanbanButton
           onClick={() => {

@@ -9,13 +9,11 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
         Linked Relations
       </span>
 
-      {/* Relations list */}
       {links.relations.length > 0 && (
         <div className="col">
           {links.relations.map(rel => {
             const isFromCurrent = rel.from_id === links.itemId
             const peerId = isFromCurrent ? rel.to_id : rel.from_id
-            // Display relation type
             const label = rel.type === 'blocks'
               ? (isFromCurrent ? 'blocks' : 'is blocked by')
               : rel.type === 'duplicates'
@@ -60,7 +58,6 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
         </div>
       )}
 
-      {/* Link tool */}
       <div style={{ display: 'flex', gap: 'var(--space-2)', position: 'relative' }}>
         <select
           value={links.type}
@@ -89,7 +86,6 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
           className="input-fill"
         />
 
-        {/* Autocomplete Search Results */}
         {links.results.length > 0 && (
           <div style={{
             position: 'absolute',
@@ -112,8 +108,8 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
               <button
                 key={res.id}
                 onClick={() => links.add(res.id)}
+                className="bg-clear hover-bg-offset"
                 style={{
-                  background: 'transparent',
                   border: 'none',
                   color: 'var(--color-text-base)',
                   padding: 'var(--space-2)',
@@ -124,8 +120,6 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
                   flexDirection: 'column',
                   gap: '2px'
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <strong style={{ fontSize: '11px' }}>{res.title}</strong>
                 <span className="text-nano">#{res.id.substring(0, 8)} | context: {res.context}</span>

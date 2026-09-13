@@ -1,4 +1,4 @@
-/** Rows in the settings table, as the renderer reaches them. The typed readers built on these are in lib/settings. */
+/** raw rows; the typed readers live in lib/settings */
 
 type Db = typeof window.electronAPI.db
 

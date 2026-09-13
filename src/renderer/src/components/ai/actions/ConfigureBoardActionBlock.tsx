@@ -11,24 +11,18 @@ import { faultTolerantParseJSON } from '../aiActionParse'
 import { bulkUpdateItems, readItems, updateItem } from '../../../data/items'
 import { executedActionSignaturesSet } from './shared'
 
-/** Persisted outcome of one configure_board block, so remounts replay the truth. */
+/** persisted so remounts replay the truth */
 interface ConfigOutcome {
   summary: string[]
   skipped: string[]
   inverse: ConfigOperation[]
-  /** Cards relocated by a delete, with the status they held before. */
+  /** with their prior status */
   movedCards: { id: string; status: string }[]
   undone?: boolean
 }
 const executedConfigOutcomesMap = new Map<string, ConfigOutcome>()
 
-/**
- * Applies the assistant's board-configuration changes.
- *
- * Auto-applies like the card blocks do, but every change carries its inverse,
- * so a wrong call is one click from being reverted rather than something the
- * user has to unpick by hand.
- */
+/** auto-applies, each change carries its inverse for one-click revert */
 export default function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { jsonString: string; dedupeKey?: string }) {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [outcome, setOutcome] = useState<ConfigOutcome | null>(null)
@@ -43,9 +37,7 @@ export default function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { j
     ? `config::${context}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target ?? o.name ?? ''}`).join('|')}`
     : ''
 
-  // Rebuilt from the JSON on every render, so read through a ref rather than
-  // listed: listing it would run the effect on every render, and cancel the
-  // edit already in flight.
+  // ref: listing it would rerun every render and cancel the in-flight edit
   const parsedRef = useRef(operations)
   parsedRef.current = operations
 
@@ -61,17 +53,12 @@ export default function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { j
     let alive = true
     const apply = async (): Promise<void> => {
       try {
-        // The whole read-decide-write runs under the shared board lock, so a
-        // concurrent column write from the board or another block cannot land
-        // between the read and the write and lose one side's changes.
+        // under the board lock so a concurrent write can't land mid read-write
         const result = await withLock(boardConfigLockKey(context), async () => {
           const current = await readBoardConfigUnlocked(context)
           const applied = applyConfigOps(current, operations)
 
-          // Deleting a column strands its cards under a status no column
-          // claims. They follow to the first surviving column, exactly as the
-          // board's own delete does, and their prior status is recorded so
-          // undo can put them back.
+          // cards follow to the first surviving column, prior status kept for undo
           const movedCards: { id: string; status: string }[] = []
           if (applied.cardMoves.length > 0) {
             const page = await readItems(context, 'card')
@@ -108,11 +95,11 @@ export default function ConfigureBoardActionBlock({ jsonString, dedupeKey }: { j
     try {
       await withLock(boardConfigLockKey(context), async () => {
         const current = await readBoardConfigUnlocked(context)
-        // The inverse is already ordered newest-first by applyConfigOps.
+        // the inverse is already newest-first
         const reverted = applyConfigOps(current, outcome.inverse)
         await writeBoardConfigUnlocked(context, reverted.next)
       })
-      // Cards go back to the column they came from, now that it exists again.
+      // cards go back now their column exists again
       for (const card of outcome.movedCards) {
         await updateItem(card.id, { status: card.status }).catch(() => {})
       }

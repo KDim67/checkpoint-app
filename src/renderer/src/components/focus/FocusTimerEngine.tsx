@@ -7,21 +7,12 @@ import { reconcileSelectedTasks } from './reconcileTasks'
 import { readItems } from '../../data/items'
 import * as notificationsApi from '../../data/notifications'
 
-/**
- * Mounted once at the app root (outside FocusView) so a running focus/break
- * timer keeps counting down, and still fires its completion chime,
- * notification, and screen transition, even while the user is on a
- * different view (Kanban, Log, etc). Previously all of this lived inside
- * FocusView's local component state, so navigating away silently paused
- * and then reset the session.
- */
+/** mounted at the root so a running timer keeps going on other views; inside FocusView it reset on navigation */
 export default function FocusTimerEngine(): null {
   const { toast } = useToast()
 
   const audioCtxRef = useRef<AudioContext | null>(null)
-  // Remember the app's real title so we can restore it once a session ends,
-  // and track whether we're currently overriding it (only touch document.title
-  // when it actually changes, to avoid thrashing it every 250ms tick).
+  // restore the real title after; only touch it on change, not every 250ms tick
   const baseTitleRef = useRef<string>('')
   const titleShownRef = useRef<string | null>(null)
 
@@ -48,16 +39,7 @@ export default function FocusTimerEngine(): null {
     }
   }, [])
 
-  // Keep the session's task selection in step with the board.
-  //
-  // The selection is a snapshot of whole Item objects living in the store, so
-  // it survives navigating away, which also meant it survived the cards being
-  // deleted. A card removed from Kanban stayed in the session list forever, and
-  // ticking it called updateItem on a dead id, which throws "Item not found":
-  // a task that could be neither completed nor dismissed.
-  //
-  // This lives here rather than in FocusView because FocusView is unmounted
-  // while the user is on the Kanban board doing the deleting.
+  // drop deleted cards from the session, ticking a dead id threw; lives here since FocusView is unmounted then
   useEffect(() => {
     const reconcile = async (): Promise<void> => {
       const { focusSelectedTasks, activeWorkspace, focusSetSelectedTasks } = useAppStore.getState()
@@ -69,12 +51,10 @@ export default function FocusTimerEngine(): null {
         ])
         const live = [...cards, ...tasks]
         const next = reconcileSelectedTasks(focusSelectedTasks, live)
-        // Referentially identical when nothing changed, so this is a no-op
-        // render-wise on the vast majority of board mutations.
+        // same reference when nothing changed, so usually no render
         if (next !== focusSelectedTasks) focusSetSelectedTasks(next)
       } catch (err) {
-        // A failed reconcile must not disturb a running timer; the stale entry
-        // simply persists until the next board change.
+        // a failed reconcile mustn't disturb a running timer
         console.error('[focus] Could not reconcile selected tasks:', err)
       }
     }
@@ -118,10 +98,7 @@ export default function FocusTimerEngine(): null {
   }
 
   const notifyCompletion = (isFocus: boolean) => {
-    // Routed through main rather than the web Notification API so it obeys the
-    // same policy as everything else, and so it still fires when this window is
-    // not the focused one, which is the whole point of a timer alert.
-    // No dedupe key: two intervals ending really are two things to say.
+    // via main for the shared policy and to fire unfocused; no dedupe, two intervals are two things
     notificationsApi.send({
         category: 'focus',
         title: isFocus ? 'Focus interval complete 🧠' : 'Break complete ☕',
@@ -129,13 +106,11 @@ export default function FocusTimerEngine(): null {
           ? 'Nice work. Time to log a quick retrospective.'
           : 'Ready to start another focus interval when you are.'
       })
-      // Notifications are not essential, never let this break the timer.
+      // never let notifications break the timer
       .catch(err => console.error('Desktop notification failed:', err))
   }
 
-  // Only ticks while a session is on screen. Subscribing to focusStep rather
-  // than reading it inside the tick keeps the interval off the event loop
-  // entirely for the rest of the app's lifetime.
+  // subscribed so the interval only exists while a session is on screen
   const focusStep = useAppStore(s => s.focusStep)
 
   useEffect(() => {
@@ -144,10 +119,7 @@ export default function FocusTimerEngine(): null {
     const interval = setInterval(() => {
       const state = useAppStore.getState()
 
-      // Glanceable window/taskbar title
-      // Mirror the live countdown into document.title so a backgrounded
-      // session is still visible at a glance (e.g. "24:31 · Focus"). The
-      // effect cleanup restores it when the session leaves the active step.
+      // live countdown in document.title, restored on cleanup
       const remainMs = state.focusIsRunning && state.focusEndAt !== null
         ? Math.max(0, state.focusEndAt - Date.now())
         : state.focusRemainingMs
@@ -165,8 +137,7 @@ export default function FocusTimerEngine(): null {
         return
       }
 
-      // Timer hit zero. focusFinish() nulls focusEndAt, so the guard above
-      // short-circuits every later tick. No re-entry flag needed.
+      // focusFinish() nulls focusEndAt, so later ticks short-circuit
       const settings = state.focusSettings
       const isFocus = isFocusInterval(state.focusPreset)
       state.focusFinish()
@@ -174,18 +145,15 @@ export default function FocusTimerEngine(): null {
       if (settings.notificationsEnabled) notifyCompletion(isFocus)
 
       if (isFocus) {
-        // Focus intervals route to the retrospective so progress gets logged
+        // focus goes to the retro so progress gets logged
         state.focusSetStep('retro')
         toast('Focus interval complete! Time for a quick retrospective.', { type: 'success' })
       } else {
-        // Breaks just end. No retrospective needed, hand control back to setup
-        // with the mode reset to Focus so the next round is one click away.
+        // breaks just end, back to setup with Focus preselected
         state.focusSetStep('setup')
         state.focusSetPreset('focus')
         state.focusConfigureDuration(durationMsFor(settings, 'focus'))
-        // Auto-start applies only to the break→focus edge. Doing it after a
-        // focus interval would skip straight past the retrospective, which is
-        // the point of routing there.
+        // only on break to focus, or it'd skip the retro
         if (settings.autoStartNext) {
           state.focusStart(durationMsFor(settings, 'focus'))
           toast('Break complete: next focus interval started.', { type: 'info' })

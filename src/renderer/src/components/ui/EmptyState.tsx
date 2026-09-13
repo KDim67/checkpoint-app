@@ -65,6 +65,7 @@ export default function EmptyState({
       {actionLabel && onActionClick && (
         <button
           onClick={onActionClick}
+          className="hover-brighten-sm"
           style={{
             background: 'var(--color-secondary)',
             border: 'none',
@@ -76,8 +77,6 @@ export default function EmptyState({
             cursor: 'pointer',
             transition: 'filter var(--duration-fast) var(--ease-default)'
           }}
-          onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.1)')}
-          onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
         >
           {actionLabel}
         </button>

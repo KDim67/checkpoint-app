@@ -13,11 +13,6 @@ import { readItems } from '../../data/items'
 import { useCollabSession } from './useCollabSession'
 import { useBoardTheme } from './useBoardTheme'
 
-/**
- * The board and how it loads: columns, cards, tags, the archive, the card face
- * and filter settings, and the writes every other part of the board goes
- * through.
- */
 export function useBoardState() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
@@ -51,26 +46,15 @@ export function useBoardState() {
   const cardDisplayRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
 
-  // Always-latest columns snapshot. Column mutations read/write through this so
-  // two quick edits (e.g. deleting two columns in a row) can never operate on a
-  // stale closure and resurrect a just-removed column.
+  // latest columns, so two quick edits can't resurrect a removed column
   const columnsRef = useRef<ColumnConfig[]>([])
   useEffect(() => { columnsRef.current = columns }, [columns])
 
-  // Single source of truth for writing the column list: updates the ref
-  // synchronously, the state, and the persisted setting the AI also reads.
-  /**
-   * Whether this side may write the board document.
-   *
-   * A ref because the persistence layer is defined above the collaboration
-   * state it depends on, and written during render rather than in an effect so
-   * it is never a frame behind the permission it stands for.
-   */
+  /** a ref, written during render so it's never a frame behind the permission */
   const readOnlyRef = useRef(false)
 
   const persistColumns = useCallback(async (next: ColumnConfig[]): Promise<void> => {
-    // The board document travels between peers now, so a guest with no right to
-    // change the board has no right to change this either.
+    // the board doc travels between peers, a read-only guest can't change it
     if (readOnlyRef.current) return
     columnsRef.current = next
     setColumns(next)
@@ -81,7 +65,7 @@ export function useBoardState() {
     }
   }, [activeWorkspace])
 
-  /** Writes any other slice of the board document; state is set by the caller. */
+  /** state is set by the caller */
   const persistConfig = useCallback(async (patch: Partial<BoardConfig>): Promise<void> => {
     if (readOnlyRef.current) return
     try {
@@ -91,7 +75,6 @@ export function useBoardState() {
     }
   }, [activeWorkspace])
 
-  /** Applies a change to one column and persists the whole list. */
   const updateColumn = useCallback((colId: string, patch: Partial<ColumnConfig>): void => {
     const next = columnsRef.current.map(c => (c.id === colId ? { ...c, ...patch } : c))
     persistColumns(next)
@@ -111,7 +94,7 @@ export function useBoardState() {
 
   const rightPanelOpen = useAppStore(s => s.rightPanelOpen)
 
-  // Mutual exclusivity between Card details drawer and AI assistant panel
+  // card drawer and AI panel are mutually exclusive
   useEffect(() => {
     if (activeCardId) {
       const store = useAppStore.getState()
@@ -126,21 +109,11 @@ export function useBoardState() {
   }, [rightPanelOpen])
 
   const [activeDragCard, setActiveDragCard] = useState<Item | null>(null)
-  /**
-   * Where the card in the air would land.
-   *
-   * State on the board rather than each column reading the drag context for
-   * itself. The context's value changes on every pointer move, so every column
-   * on the board re-rendered on every frame of every drag just to work out that
-   * nothing about it had changed. This changes when the target changes, which
-   * during a whole drag is a handful of times.
-   */
+  /** state on the board: the drag context changes every move and re-rendered every column */
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
-  /** The height the dragged card had before it was picked up. */
   const [dragHeight, setDragHeight] = useState(0)
   const [pendingDeleteColId, setPendingDeleteColId] = useState<string | null>(null)
 
-  // Advanced Kanban States
   const theme = useBoardTheme()
   const { boardBg, setBoardBg } = theme
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -149,11 +122,7 @@ export function useBoardState() {
   const [allTags, setAllTags] = useState<Tag[]>([])
 
   const [archivedColumns, setArchivedColumns] = useState<ColumnConfig[]>([])
-  /**
-   * The archive list as it stands. The columns keep whichever archive handler
-   * they last rendered with, so a handler reading state would see the list as
-   * it was when the board loaded and write that back over the real one.
-   */
+  /** columns keep stale archive handlers, so read the live list via ref */
   const archivedColumnsRef = useRef<ColumnConfig[]>([])
   useEffect(() => { archivedColumnsRef.current = archivedColumns }, [archivedColumns])
   const [showArchiveBin, setShowArchiveBin] = useState(false)
@@ -165,13 +134,12 @@ export function useBoardState() {
   const isReadOnlyMode = collab.isReadOnly
   readOnlyRef.current = isReadOnlyMode
 
-  // Sensors: use a distance threshold to distinguish click vs drag
+  // distance threshold tells click from drag
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  // Click Outside Closures
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (cardDisplayRef.current && !cardDisplayRef.current.contains(e.target as Node)) {
@@ -182,15 +150,9 @@ export function useBoardState() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Data Loading
-
   const loadColumns = useCallback(async () => {
     try {
-      // One document now covers columns, background, swimlanes and the archive
-      // bin, so this is a single read where it used to be four. loadBoardConfig
-      // holds the same `kanban-cols:` lock the AI action blocks take, which is
-      // what stops the board bootstrap and a concurrent AI write from both
-      // seeing "empty" and each installing its own default column set.
+      // one doc covers columns, background, swimlanes and archive; the shared lock stops two default column sets
       const config = await loadBoardConfig(activeWorkspace)
       setColumns(config.columns)
       setSwimlanesEnabled(config.swimlanes)

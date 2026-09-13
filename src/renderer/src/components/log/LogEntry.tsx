@@ -56,7 +56,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
         transition: 'background var(--duration-fast) var(--ease-default)'
       }}
     >
-      {/* Header Info */}
       <div className="row-between-mb">
         <div className="row">
           {isPinned && (
@@ -86,7 +85,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
           </span>
         </div>
 
-        {/* Action Row */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -98,10 +96,10 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
           <button
             onClick={handleCopyRaw}
             title="Copy Raw Markdown"
+            className="text-muted hover-text-base"
             style={{
               background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-muted)',
               borderRadius: 'var(--radius-sm)',
               padding: 'var(--space-1) var(--space-2)',
               cursor: 'pointer',
@@ -110,8 +108,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
               gap: '4px',
               fontSize: 'var(--text-xs)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
           >
             {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -120,10 +116,10 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
           <button
             onClick={() => onTogglePin(item.id, item.priority)}
             title={isPinned ? 'Unpin' : 'Pin to Top'}
+            className={`${isPinned ? 'text-accent' : 'text-muted'} hover-text-base`}
             style={{
               background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
-              color: isPinned ? 'var(--color-secondary)' : 'var(--color-text-muted)',
               borderRadius: 'var(--radius-sm)',
               padding: 'var(--space-1) var(--space-2)',
               cursor: 'pointer',
@@ -132,8 +128,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
               gap: '4px',
               fontSize: 'var(--text-xs)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-            onMouseLeave={e => (e.currentTarget.style.color = isPinned ? 'var(--color-secondary)' : 'var(--color-text-muted)')}
           >
             <Pin size={12} fill={isPinned ? 'currentColor' : 'none'} />
             <span>{isPinned ? 'Unpin' : 'Pin'}</span>
@@ -142,10 +136,10 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
           <button
             onClick={() => setShowConvertModal(true)}
             title="Convert to Kanban Card"
+            className="text-muted hover-text-base"
             style={{
               background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-muted)',
               borderRadius: 'var(--radius-sm)',
               padding: 'var(--space-1) var(--space-2)',
               cursor: 'pointer',
@@ -154,8 +148,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
               gap: '4px',
               fontSize: 'var(--text-xs)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
           >
             <ArrowRightLeft size={12} />
             <span>Convert</span>
@@ -164,8 +156,8 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
           <button
             onClick={() => onDelete(item.id)}
             title="Delete Entry"
+            className="bg-surface-2 hover-bg-error-muted"
             style={{
-              background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-error)',
               borderRadius: 'var(--radius-sm)',
@@ -176,8 +168,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
               gap: '4px',
               fontSize: 'var(--text-xs)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-error-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
           >
             <Trash2 size={12} />
             <span>Delete</span>
@@ -185,7 +175,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
         </div>
       </div>
 
-      {/* Render Markdown Content */}
       <div style={{
         color: 'var(--color-text-base)',
         fontSize: 'var(--text-sm)',
@@ -229,7 +218,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
         </Markdown>
       </div>
 
-      {/* Render Tags Row */}
       {item.tags && item.tags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)', marginTop: 'var(--space-2)' }}>
           {item.tags.map(tag => (
@@ -255,7 +243,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
         </div>
       )}
 
-      {/* Convert to Card Modal */}
       {showConvertModal && (
         <div style={{
           position: 'fixed',
@@ -307,9 +294,9 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
                 placeholder="Enter card title..."
                 autoFocus
                 required
+                className="border-offset focus-border-primary"
                 style={{
                   background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-md)',
                   padding: 'var(--space-2.5) var(--space-3.5)',
@@ -317,8 +304,6 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
                   outline: 'none',
                   transition: 'border-color var(--duration-fast) var(--ease-default)'
                 }}
-                onFocus={e => (e.target.style.borderColor = 'var(--color-primary)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--color-surface-offset)')}
               />
             </div>
 

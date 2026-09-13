@@ -1,5 +1,3 @@
-/** The bridge's `hud` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.hud
 
 export const onReset = (...args: Parameters<Bridge['onReset']>): ReturnType<Bridge['onReset']> =>

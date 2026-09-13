@@ -6,10 +6,9 @@ import { computeProgress, nextPosition, normalizeSubtasks } from '../../../share
 import { shorten } from '../../../shared/mcpActivity'
 import { json, notifyRenderer, text, z } from '../toolKit'
 
-/** Subtasks of a card or task. */
+/** subtasks of a card or task */
 export function registerSubtaskTools(mcp: McpServer): void {
-  // The reason subtasks became rows: as checkboxes buried in a body they could
-  // not be listed, counted, or ticked off by anything but a human reading prose.
+  // rows, not body checkboxes, so they can be listed, counted and ticked
 
   mcp.registerTool(
     'list_subtasks',

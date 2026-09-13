@@ -1,4 +1,4 @@
-/** The board background: the named presets, and how a stored value becomes CSS. */
+/** named presets, and stored value to CSS */
 
 export const BG_STYLES: Record<string, string> = {
   default: 'var(--color-background)',

@@ -1,5 +1,3 @@
-/** The bridge's `customizer` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.customizer
 
 export const getCss = (...args: Parameters<Bridge['getCss']>): ReturnType<Bridge['getCss']> =>

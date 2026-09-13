@@ -37,13 +37,7 @@ export default function WallSelectionBar({
       boxShadow: 'var(--shadow-lg)',
       zIndex: 15
     }}>
-      {/* One swatch, not the whole palette laid out flat.
-
-          Nine circles and five buttons in a row made this toolbar wider
-          than most of what it floats over, so it covered the thing you
-          had just selected. The palette itself has not shrunk back to
-          the six colours it used to offer: it is all still here, one
-          click in, which is what the pen palette already does. */}
+      {/* one swatch, the full palette is one click in; laid out flat it covered the selection */}
       <div data-wall-swatch className="relative">
         <button
           onClick={() => setSwatchOpen(v => !v)}
@@ -62,9 +56,7 @@ export default function WallSelectionBar({
             style={{
               width: '16px', height: '16px', borderRadius: '50%',
               background: single?.color ?? 'transparent',
-              // Nothing selected has a colour of its own yet, or the
-              // selection is mixed: an empty ring says so without
-              // claiming one of the eight.
+              // empty ring for none or mixed
               border: single?.color
                 ? '1px solid rgba(0, 0, 0, 0.25)'
                 : '1px dashed var(--color-text-faint)'

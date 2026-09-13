@@ -1,9 +1,4 @@
-/**
- * shell.openExternal hands the URL to the OS, which will happily run a
- * file:// path or a registered protocol handler. Links reach us from note
- * markdown, cheatsheets and AI responses, so the scheme is checked before
- * anything leaves the app.
- */
+/** openExternal runs file:// and protocol handlers; links come from notes, cheatsheets and AI */
 
 import { shell } from 'electron'
 

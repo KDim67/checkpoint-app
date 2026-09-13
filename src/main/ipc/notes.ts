@@ -1,4 +1,4 @@
-/** Markdown notes on disk, and importing a vault. */
+/** markdown notes on disk, and vault import */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -31,8 +31,7 @@ export function registerNotesHandlers(): void {
     return searchNotes(query)
   })
 
-  // A vault is a folder, not a file, so this picks a directory rather than
-  // going through the workspace import.
+  // a vault is a folder, so pick a directory
   ipcMain.handle(IpcChannels.NOTES_IMPORT_VAULT, async () => {
     try {
       const window = BrowserWindow.getFocusedWindow()

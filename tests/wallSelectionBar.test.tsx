@@ -13,7 +13,7 @@ type Given = Omit<Props, 'swatchOpen' | 'setSwatchOpen'>
 const item = (id: string, over: Partial<WallItem> = {}): WallItem => ({ id, kind: 'note', z: 0, ...over } as WallItem)
 const notes = [item('a', { z: 1 }), item('b', { z: 2 }), item('c', { z: 3 })]
 
-/** The swatch opens and closes on the Wall's state, so the harness holds it. */
+/** the swatch toggles on Wall state */
 function Bar(props: Given) {
   const [swatchOpen, setSwatchOpen] = useState(false)
   return <WallSelectionBar {...props} swatchOpen={swatchOpen} setSwatchOpen={setSwatchOpen} />

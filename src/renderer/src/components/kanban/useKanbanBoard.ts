@@ -2,11 +2,7 @@ import { useBoardState } from './useBoardState'
 import { useBoardDrag } from './useBoardDrag'
 import { useBoardActions } from './useBoardActions'
 
-/**
- * The board and everything done to it: loading, drag and drop, columns, cards
- * and the archive. KanbanView draws the columns from it, and its header and
- * filter bar take it as one prop.
- */
+/** KanbanView draws columns from it; header and filter bar take it as one prop */
 export function useKanbanBoard() {
   const boardState = useBoardState()
   const boardDrag = useBoardDrag(boardState)

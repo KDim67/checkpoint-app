@@ -73,7 +73,6 @@ export default function BacklogFilters({
       gap: 'var(--space-4)',
       marginBottom: 'var(--space-4)'
     }}>
-      {/* Title / Action Header */}
       <div className="row-between">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-text-base)' }}>
           <Filter size={14} />
@@ -84,10 +83,10 @@ export default function BacklogFilters({
         
         <button
           onClick={onReset}
+          className="text-muted hover-text-base"
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--color-text-muted)',
             cursor: 'pointer',
             fontSize: 'var(--text-2xs)',
             display: 'flex',
@@ -95,20 +94,16 @@ export default function BacklogFilters({
             gap: '4px',
             padding: 0
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
         >
           <RefreshCw size={10} /> Reset Filters
         </button>
       </div>
 
-      {/* Filter Options Grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))',
         gap: 'var(--space-4)'
       }}>
-        {/* Status Multi-Select */}
         <div className="col">
           <span className="label-caps-sm">
             Workflow Stages
@@ -138,7 +133,6 @@ export default function BacklogFilters({
           </div>
         </div>
 
-        {/* Priority Multi-Select */}
         <div className="col">
           <span className="label-caps-sm">
             Priority
@@ -166,7 +160,6 @@ export default function BacklogFilters({
           </div>
         </div>
 
-        {/* Tags Multi-Select */}
         <div className="col">
           <span className="label-caps-sm">
             Tags
@@ -204,7 +197,6 @@ export default function BacklogFilters({
           </div>
         </div>
 
-        {/* Due Date Range */}
         <div className="col">
           <span className="label-caps-sm">
             Due Date Range
@@ -254,7 +246,6 @@ export default function BacklogFilters({
           </div>
         </div>
 
-        {/* Links / Relations Filter */}
         <div className="col">
           <span className="label-caps-sm">
             Link Relations

@@ -27,17 +27,14 @@ export default function FocusView() {
     >
       <FocusStyles />
 
-      {/* STEP 1: SETUP SCREEN */}
       {step === 'setup' && (
         <FocusSetup focusView={focusView} />
       )}
 
-      {/* STEP 2: ACTIVE SESSION SCREEN */}
       {step === 'active' && (
         <FocusActive focusView={focusView} />
       )}
 
-      {/* STEP 3: RETROSPECTIVE SCREEN */}
       {step === 'retro' && (
         <FocusRetro focusView={focusView} />
       )}

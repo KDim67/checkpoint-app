@@ -1,34 +1,22 @@
-/**
- * Merges results from the four things Checkpoint can search.
- *
- * Each source has its own index and its own idea of relevance, and FTS5 ranks a
- * card against other cards, not against a note. Rather than invent a
- * cross-source score, results interleave round-robin: twenty matching cards
- * must not bury the one note being looked for.
- */
+/** round-robin across sources, FTS only ranks within a source */
 
 type SearchHitKind = 'card' | 'task' | 'log' | 'note' | 'cheatsheet'
 
 export interface SearchHit {
-  /** Stable within a result set; used as the React key and for dedupe. */
+  /** stable per result set, React key and dedupe */
   id: string
   kind: SearchHitKind
   title: string
-  /** A snippet or the workspace name. Whatever helps tell two hits apart. */
+  /** whatever tells two hits apart */
   subtitle?: string
-  /** Carried through for the click handler; shape depends on the kind. */
+  /** shape depends on the kind */
   target?: string
 }
 
-/** How many hits any single source may contribute, before interleaving. */
+/** per source, before interleaving */
 export const PER_SOURCE_LIMIT = 5
 
-/**
- * Round-robin merge, preserving each source's internal order.
- *
- * Empty groups are skipped rather than leaving gaps, so a search matching only
- * notes still fills the list with notes instead of showing five and stopping.
- */
+/** empty groups skipped so notes-only searches still fill the list */
 export function interleave<T>(groups: T[][], limit: number): T[] {
   const queues = groups.filter(g => g.length > 0).map(g => [...g])
   const out: T[] = []
@@ -44,13 +32,7 @@ export function interleave<T>(groups: T[][], limit: number): T[] {
   return out
 }
 
-/**
- * Caps each source, drops duplicate ids, then interleaves.
- *
- * Dedupe runs before interleaving so a hit appearing in two sources does not
- * consume two slots, and the first source to claim an id wins, which keeps the
- * caller's group order meaningful.
- */
+/** dedupe before interleave so one hit doesn't take two slots; first source wins */
 export function mergeSearchHits(groups: SearchHit[][], limit = 12): SearchHit[] {
   const seen = new Set<string>()
   const capped = groups.map(group => {
@@ -66,7 +48,7 @@ export function mergeSearchHits(groups: SearchHit[][], limit = 12): SearchHit[] 
   return interleave(capped, limit)
 }
 
-/** Short label shown beside a hit so its source is obvious at a glance. */
+/** so the source is obvious */
 export function kindLabel(kind: SearchHitKind): string {
   switch (kind) {
     case 'card': return 'Card'
@@ -77,12 +59,7 @@ export function kindLabel(kind: SearchHitKind): string {
   }
 }
 
-/**
- * Collapses a match into one line.
- *
- * Snippets arrive with newlines and runs of whitespace from the source
- * document; left alone they break the single-line row layout.
- */
+/** one line, source newlines break the row */
 export function snippet(text: string, max = 90): string {
   const clean = text.replace(/\s+/g, ' ').trim()
   return clean.length > max ? clean.slice(0, max - 1) + '…' : clean

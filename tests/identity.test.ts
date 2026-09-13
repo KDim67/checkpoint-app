@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { newInstallId, readInstallId } from '../src/shared/identity'
 
-// A removal is remembered against the install id, so a value that fails to read
-// means the peer holding it cannot be barred from coming back.
+// removals key on install id, an unreadable one can't be barred
 describe('readInstallId', () => {
   it('accepts one it minted', () => {
     const id = newInstallId()
@@ -32,8 +31,7 @@ describe('newInstallId', () => {
   })
 
   it('still reads back when the random half comes out empty', () => {
-    // Math.random() of 0 stringifies to '0', which slices to nothing, so the
-    // id is the timestamp and a trailing dash. It has to survive its own reader.
+    // random 0 gives a timestamp and a dash, it must survive its reader
     expect(readInstallId(newInstallId(() => 0))).not.toBe('')
   })
 })

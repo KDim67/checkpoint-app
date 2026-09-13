@@ -7,7 +7,6 @@ import { getContextSlugs, getSetting, insertActivityLog } from './db'
 let trackerProcess: ChildProcess | null = null
 let trackerTimer: NodeJS.Timeout | null = null
 
-// Buffering state
 let currentWindowProcess = ''
 let currentWindowTitle = ''
 let currentWindowContext = ''
@@ -29,11 +28,11 @@ function flushBuffer(): void {
 }
 
 function handleTrackerTick(line: string): void {
-  // Check system idle time first (300 seconds = 5 minutes)
+  // idle after 300s
   try {
     const idleTime = powerMonitor.getSystemIdleTime()
     if (idleTime > 300) {
-      // System is idle; flush current buffer and skip this tick
+      // idle: flush and skip this tick
       flushBuffer()
       return
     }
@@ -45,12 +44,11 @@ function handleTrackerTick(line: string): void {
   const processName = (parts[0] || '').trim()
   const windowTitle = (parts[1] || '').trim()
 
-  // Skip if we have no active window details
   if (!processName && !windowTitle) {
     return
   }
 
-  // Map process/window names to contexts
+  // map process/window names to contexts
   let tickContext = ''
   try {
     const contexts = getContextSlugs()
@@ -60,7 +58,7 @@ function handleTrackerTick(line: string): void {
     if (matched) {
       tickContext = matched
     } else {
-      // Default to the current active context selected in settings/UI
+      // fall back to the active context
       tickContext = getSetting<string>('active_context', 'default')
     }
   } catch (err) {
@@ -83,7 +81,7 @@ function handleTrackerTick(line: string): void {
     currentWindowDuration += 5000
     if (currentWindowDuration >= 30000) {
       flushBuffer()
-      // Keep active window info but reset duration for the next chunk
+      // keep the window info, reset duration for the next chunk
       currentWindowProcess = processName
       currentWindowTitle = windowTitle
       currentWindowContext = tickContext
@@ -92,13 +90,12 @@ function handleTrackerTick(line: string): void {
 }
 
 export function initializeActivityTracker(): void {
-  // Check if tracker feature is enabled
   const isEnabled = getSetting<string>('feature_tracker', 'false') === 'true'
   if (!isEnabled) {
     return
   }
 
-  // Prevent duplicate tracker starts
+  // no duplicate starts
   if (trackerProcess || trackerTimer) {
     return
   }
@@ -157,7 +154,7 @@ while ($true) {
       let stdoutBuffer = ''
       trackerProcess.stdout?.on('data', (chunk: string) => {
         stdoutBuffer += chunk
-        // Safety cap: if buffer grows past 64KB without a newline, discard it
+        // drop the buffer past 64KB with no newline
         if (stdoutBuffer.length > 65536) {
           console.warn('[Tracker] stdout buffer overflow, discarding')
           stdoutBuffer = ''
@@ -183,7 +180,7 @@ while ($true) {
       console.error('[Tracker] Failed to launch PowerShell window tracker:', err)
     }
   } else {
-    // macOS/Linux Fallback stub
+    // macOS/Linux stub
     console.log('[Tracker] Spawning macOS/Linux activity tracking stub interval')
     trackerTimer = setInterval(() => {
       handleTrackerTick('mock-app|||Mock Active Window')
@@ -194,7 +191,6 @@ while ($true) {
 export function shutdownActivityTracker(): void {
   console.log('[Tracker] Shutting down Passive Activity Tracker (Hard Stop)...')
   
-  // Flush any remaining buffered logs
   flushBuffer()
 
   if (trackerProcess) {
@@ -211,7 +207,6 @@ export function shutdownActivityTracker(): void {
     trackerTimer = null
   }
 
-  // Clear buffers
   currentWindowProcess = ''
   currentWindowTitle = ''
   currentWindowContext = ''

@@ -1,7 +1,4 @@
-// Specialized AI "skill" role profiles. Selecting a skill injects an
-// additional, focused system-prompt fragment that biases the assistant's
-// tone, priorities, and output format toward that workflow. Without
-// losing any of the base Checkpoint action-block capabilities.
+// a skill adds a focused system-prompt fragment on top of the base action blocks
 
 interface AiSkill {
   id: string
@@ -34,7 +31,7 @@ export const AI_SKILLS: AiSkill[] = [
     systemPrompt: `ACTIVE SKILL: Game Dev Narrative Specialist.
 You are now focused on narrative design: lore, characters, branching dialogue, stories, and quest structure.
 
-██ NARRATIVE CORE RULES ██
+NARRATIVE CORE RULES:
 1. NEVER output Kanban board cards, task lists, or BATCH JSON format. The user is building branching story nodes, not project boards.
 2. For ANY request to "generate a story", "write dialogue", "create a quest", or "design a narrative path", you MUST output the story structure using the \`\`\`json:create_dialogue_tree format. Immediately, with no preamble.
 3. Every dialogue tree MUST satisfy ALL of these structural rules:
@@ -80,7 +77,7 @@ You are now focused on project/workflow structure: columns, WIP limits, task bre
     systemPrompt: `ACTIVE SKILL: Implementation Planner.
 You are now focused on producing structured implementation plans for features, systems, or refactors.
 
-██ PLAN RULES ██
+PLAN RULES:
 1. For any non-trivial request, respond with a \`\`\`json:create_plan block containing:
    - "title": A clear, specific plan name (not generic like "Implementation Plan").
    - "overview": 2–4 sentences covering scope, goals, and any open risks or unknowns.

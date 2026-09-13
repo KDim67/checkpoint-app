@@ -16,19 +16,10 @@ import {
 
 const PROBE_TIMEOUT_MS = 4000
 
-/**
- * Discovered capabilities are cached per endpoint+model. Without this the
- * ladder in aiActions re-probes on every restart, which costs a small local
- * model three failed round-trips before it does any work.
- */
+/** cached per endpoint+model, or the ladder re-probes each restart at three failed round-trips */
 const CACHE_SETTING_KEY = 'ai_model_capabilities'
 
-/**
- * Fallbacks from a failed probe are held here for the session only. Persisting
- * them would let one blip (Ollama not up yet at launch) freeze a guessed
- * profile forever, while re-probing on every message would pay the timeout
- * repeatedly against an endpoint that is genuinely down.
- */
+/** session only: persisting one blip would freeze a guessed profile, re-probing each message pays the timeout */
 const sessionFallbacks = new Map<string, ModelCapabilities>()
 
 type CapabilityCache = Record<string, ModelCapabilities>
@@ -51,7 +42,7 @@ function writeCache(cache: CapabilityCache): void {
   setSetting(CACHE_SETTING_KEY, JSON.stringify(cache))
 }
 
-/** Ollama's REST API sits next to the OpenAI-compatible /v1 path, not under it. */
+/** ollama's REST API sits beside /v1, not under it */
 function ollamaRoot(baseURL: string): string {
   return baseURL.replace(/\/+$/, '').replace(/\/v1$/, '')
 }
@@ -62,19 +53,13 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
   return res.json()
 }
 
-// Ollama
-
 interface OllamaTagEntry {
   name?: string
   model?: string
   details?: { parameter_size?: string; quantization_level?: string; family?: string }
 }
 
-/**
- * Lists installed models with the metadata attached. The previous listing threw
- * away everything but the name, which is why model size had to be guessed from
- * that name in the first place.
- */
+/** keeps the metadata; a name-only listing is why sizes got guessed from names */
 async function listOllamaModels(
   baseURL: string
 ): Promise<Array<{ name: string; paramsB: number | null; quantization: string | null }>> {
@@ -87,9 +72,9 @@ async function listOllamaModels(
 }
 
 interface OllamaShowResponse {
-  // Keyed by architecture, e.g. "llama.context_length" / "qwen2.context_length".
+  // keyed by architecture, e.g. llama.context_length
   model_info?: Record<string, unknown>
-  // Present on newer Ollama: ["completion", "tools", "vision", "thinking"].
+  // newer ollama only: completion, tools, vision, thinking
   capabilities?: string[]
   details?: { parameter_size?: string; quantization_level?: string }
 }
@@ -119,8 +104,7 @@ async function probeOllama(baseURL: string, model: string): Promise<Partial<Mode
       paramsB,
       quantization,
       ...(contextTokens ? { contextTokens } : {}),
-      // Only trust the capabilities array when the server actually sends one;
-      // older Ollama omits it entirely and absence is not a denial.
+      // older ollama omits the array, absence isn't a denial
       ...(caps
         ? {
             supportsTools: caps.includes('tools'),
@@ -135,12 +119,10 @@ async function probeOllama(baseURL: string, model: string): Promise<Partial<Mode
   }
 }
 
-// OpenAI-compatible cloud
-
 interface CloudModelEntry {
   id?: string
   context_length?: number
-  // OpenRouter shape.
+  // OpenRouter shape
   top_provider?: { context_length?: number; max_completion_tokens?: number }
   architecture?: { input_modalities?: string[]; modality?: string }
   supported_parameters?: string[]
@@ -183,13 +165,7 @@ async function probeCloud(
   }
 }
 
-// Public API
-
-/**
- * Resolves what a model can do, preferring the endpoint's own answer over the
- * curated table over the model name. Results are cached; pass force to re-probe
- * after pulling a new model or changing endpoints.
- */
+/** endpoint's answer > curated table > model name; force re-probes after a pull or endpoint change */
 export async function getModelCapabilities(
   model: string,
   force = false
@@ -212,8 +188,7 @@ export async function getModelCapabilities(
 
   const merged: ModelCapabilities = { ...base, ...(probed || {}) }
 
-  // Re-derive the tier from whatever size we ended up with, then let heavy
-  // quantization pull it back a band.
+  // re-derive the tier from the final size, heavy quantization drops it a band
   const paramsB =
     merged.paramsB ??
     parseParamsFromName(model) ??
@@ -221,8 +196,7 @@ export async function getModelCapabilities(
   merged.paramsB = paramsB
   merged.tier = applyQuantizationPenalty(tierForParams(paramsB), merged.quantization)
 
-  // These three are properties of the model family, not of the endpoint, so a
-  // silent endpoint must not downgrade what the name already tells us.
+  // family traits: a silent endpoint mustn't downgrade what the name tells us
   merged.supportsVision = merged.supportsVision || detectVisionFromName(model)
   if (merged.reasoningStyle === 'none') merged.reasoningStyle = detectReasoningStyle(model)
   if (isOpenAiReasoningModel(model)) {

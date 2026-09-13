@@ -6,16 +6,10 @@ import type { GameDevTab } from './types'
 interface Props {
   activeTab: GameDevTab
   onPick: (id: GameDevTab) => void
-  /** Back to the launcher. */
   onHome: () => void
 }
 
-/**
- * The header inside an open tool: where you are, and how to get anywhere else.
- *
- * A menu rather than a second sidebar. The window already has one down the left
- * and a second rail beside it read as two competing navigations.
- */
+/** a menu, not a second sidebar competing with the app's rail */
 export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
   const [open, setOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -37,7 +31,7 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
     }
   }, [open])
 
-  // A tool picked from the menu leaves the menu open behind it otherwise.
+  // otherwise the menu stays open behind the tool
   const pick = (id: GameDevTab): void => {
     setOpen(false)
     onPick(id)

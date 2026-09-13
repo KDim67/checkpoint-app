@@ -44,7 +44,6 @@ export default function BacklogRow({
   const dueDateStr = item.due_at ? new Date(item.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '-'
   const createdDateStr = new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
-  // Read relations count from item metadata or pre-populated field
   const relationsCount = (item as Item & { relations_count?: number }).relations_count ?? 0
 
   const renderCell = (colKey: string) => {
@@ -109,8 +108,9 @@ export default function BacklogRow({
                   <button
                     key={col.id}
                     onClick={() => handleStatusSelect(col.id)}
+                    data-active={item.status === col.id || undefined}
+                    className="backlog-row-option"
                     style={{
-                      background: item.status === col.id ? 'var(--color-surface-offset)' : 'transparent',
                       border: 'none',
                       color: 'var(--color-text-base)',
                       padding: 'var(--space-1.5) var(--space-3)',
@@ -121,8 +121,6 @@ export default function BacklogRow({
                       alignItems: 'center',
                       justifyContent: 'space-between'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = item.status === col.id ? 'var(--color-surface-offset)' : 'transparent')}
                   >
                     <span>{col.name}</span>
                     {item.status === col.id && <Check size={10} className="text-accent" />}
@@ -152,8 +150,8 @@ export default function BacklogRow({
               aria-haspopup="menu"
               onClick={() => setShowPriorityMenu(!showPriorityMenu)}
               title={`Priority: ${PRIORITY_LABELS[item.priority]}`}
+              className="bg-clear hover-bg-offset"
               style={{
-                background: 'transparent',
                 border: '1px solid var(--color-surface-offset)',
                 borderRadius: '4px',
                 width: '24px',
@@ -164,8 +162,6 @@ export default function BacklogRow({
                 cursor: 'pointer',
                 padding: 0
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               {PRIORITY_ICONS[item.priority]}
             </button>
@@ -191,8 +187,9 @@ export default function BacklogRow({
                   <button
                     key={p}
                     onClick={() => handlePrioritySelect(p)}
+                    data-active={item.priority === p || undefined}
+                    className="backlog-row-option"
                     style={{
-                      background: item.priority === p ? 'var(--color-surface-offset)' : 'transparent',
                       border: 'none',
                       color: 'var(--color-text-base)',
                       padding: 'var(--space-1.5) var(--space-3)',
@@ -203,8 +200,6 @@ export default function BacklogRow({
                       alignItems: 'center',
                       gap: 'var(--space-2)'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = item.priority === p ? 'var(--color-surface-offset)' : 'transparent')}
                   >
                     {PRIORITY_ICONS[p]}
                     <span>{PRIORITY_LABELS[p]}</span>
@@ -252,9 +247,8 @@ export default function BacklogRow({
                 useAppStore.getState().setPreselectedTaskId(item.id)
                 useAppStore.getState().setView('focus')
               }}
-              className="backlog-play-btn"
+              className="backlog-play-btn bg-clear hover-bg-offset"
               style={{
-                background: 'transparent',
                 border: 'none',
                 color: 'var(--color-secondary)',
                 cursor: 'pointer',
@@ -266,8 +260,6 @@ export default function BacklogRow({
                 transition: 'background var(--duration-fast)',
                 flexShrink: 0
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"/>
@@ -418,7 +410,6 @@ export default function BacklogRow({
       }}
       className="backlog-row-container"
     >
-      {/* Checkbox Cell */}
       <div
         style={{
           width: '40px',
@@ -431,19 +422,17 @@ export default function BacklogRow({
         <input
           type="checkbox"
           checked={isSelected}
-          onClick={e => e.stopPropagation()} // Prevent double click trigger
+          onClick={e => e.stopPropagation()} // don't trigger the row's double click
           onChange={e => onSelectToggle(item.id, e as unknown as React.MouseEvent)}
           className="clickable"
         />
       </div>
 
-      {/* Render columns based on order and visibility */}
       {columnOrder.map(colKey => {
         if (!visibleColumns[colKey]) return null
         return renderCell(colKey)
       })}
       
-      {/* Hover and focus row style */}
       <style>{`
         .backlog-row-container:hover {
           background-color: var(--color-surface-2) !important;

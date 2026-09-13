@@ -9,7 +9,7 @@ afterEach(cleanup)
 
 type PersistConfig = Parameters<typeof BoardThemeMenu>[0]['persistConfig']
 
-/** The board owns the theme and paints it; this stands in for the board. */
+/** stands in for the board, which owns and paints the theme */
 function Board({ persistConfig }: { persistConfig: PersistConfig }) {
   const theme = useBoardTheme()
   return (

@@ -89,10 +89,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
             )}
           </div>
 
-          {/* The session belongs to the workspace it was started in and
-              stays there when you move, so nothing you do here is shared
-              and nothing they do shows up. It said Active throughout,
-              which read exactly like a dead connection. */}
+          {/* the session stays in its workspace; showing Active here read like a dead connection */}
           {session.elsewhere && (
             <div style={{
               fontSize: '11px',
@@ -129,9 +126,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
           {!session.active ? (
             <div className="col-md">
-              {/* Who you are, once, for both hosting and joining. Card
-                  history credits this name, so it is worth setting before
-                  a board is shared rather than after. */}
+              {/* one name for hosting and joining, card history credits it */}
               <div className="col">
                 <span className="text-label-xs-medium">Your Name</span>
                 <p className="text-caption-flush">
@@ -143,8 +138,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                   maxLength={DISPLAY_NAME_MAX}
                   onChange={e => session.setDisplayName(e.target.value)}
                   onBlur={session.saveDisplayName}
-                  // The fallback rather than an invented example, so the
-                  // empty field shows what it will actually do.
+                  // the real fallback, not an invented example
                   placeholder={session.osUserName || 'e.g. Dimitris'}
                   style={{
                     marginTop: '2px',
@@ -159,7 +153,6 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 />
               </div>
 
-              {/* Host section */}
               <div className="col">
                 <span className="text-label-xs-medium">Invite Someone</span>
                 <p className="text-caption-flush">Give another person this board to read or edit, live, while you both have it open.</p>
@@ -169,25 +162,16 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                     onClick={() => {
                       session.host('collaborative')
                     }}
+                    className="collab-panel-host-collab"
                     style={{
                       flex: 1,
                       fontSize: 'var(--text-xs)',
                       fontWeight: 'var(--weight-semibold)',
-                      background: 'var(--color-secondary-muted)',
-                      color: 'var(--color-secondary)',
                       border: '1px solid var(--color-secondary)',
                       padding: '6px 0',
                       borderRadius: 'var(--radius-md)',
                       cursor: 'pointer',
                       transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'var(--color-secondary)'
-                      e.currentTarget.style.color = '#fff'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'var(--color-secondary-muted)'
-                      e.currentTarget.style.color = 'var(--color-secondary)'
                     }}
                   >
                     Collaborative
@@ -208,12 +192,6 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                       cursor: 'pointer',
                       transition: 'all 0.2s'
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'var(--color-surface-offset)'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'transparent'
-                    }}
                   >
                     Read-Only
                   </button>
@@ -222,7 +200,6 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
               <div style={{ height: '1px', background: 'var(--color-surface-offset)' }} />
 
-              {/* Join section */}
               <div className="col">
                 <span className="text-label-xs-medium">Join Someone's Board</span>
                 <div className="flex-4px">
@@ -264,9 +241,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 </div>
               </div>
 
-              {/* The two features are one word apart and were being
-                  mistaken for each other. Each now says what it is not
-                  and where the other one lives. */}
+              {/* the two features are one word apart, each says what it isn't */}
               <p style={{
                 fontSize: '11px',
                 color: 'var(--color-text-faint)',
@@ -299,7 +274,6 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
             </div>
           ) : (
             <div className="col-md">
-              {/* Active session state */}
               <div style={{ background: 'var(--color-surface-offset)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 <div className="row-between">
                   <span className="text-caption">Role:</span>
@@ -325,9 +299,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                   </div>
                 )}
 
-                {/* Who is in the room. The session used to report only
-                    that somebody was, which is no basis for deciding
-                    whether they should stay. */}
+                {/* who's in the room, not just that someone is */}
                 <div className="col-4px">
                   <span className="text-caption">
                     {session.isHost
@@ -351,24 +323,21 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                         }}>
                           {authorLabel(member.name)}
                         </span>
-                        {/* Removing is the host's, and not from a board
-                            it is not looking at. */}
+                        {/* host only, and not from a board it isn't looking at */}
                         {session.isHost && !session.elsewhere && (
                           <button
                             onClick={() => session.removeGuest(member)}
                             title={`Remove ${authorLabel(member.name)}`}
+                            className="collab-panel-remove text-faint"
                             style={{
                               background: 'transparent',
                               border: 'none',
                               padding: '0 2px',
                               fontSize: '10px',
                               fontWeight: 'var(--weight-semibold)',
-                              color: 'var(--color-text-faint)',
                               cursor: 'pointer',
                               flexShrink: 0
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-warning)')}
-                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-faint)')}
                           >
                             Remove
                           </button>
@@ -388,8 +357,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 </div>
               </div>
 
-              {/* What the host can do about the person in the room. Only
-                  the host, and only while someone is in it. */}
+              {/* host only, while someone's in */}
               {session.isHost && (
                 <div className="col">
                   <button
@@ -397,20 +365,18 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                     title={session.mode === 'readonly'
                       ? 'Let them make changes to the board'
                       : 'Let them look, but not change anything'}
+                    className="border-offset hover-border-accent"
                     style={{
                       width: '100%',
                       fontSize: 'var(--text-xs)',
                       fontWeight: 'var(--weight-semibold)',
                       background: 'transparent',
                       color: 'var(--color-text-base)',
-                      border: '1px solid var(--color-surface-offset)',
                       padding: '6px 0',
                       borderRadius: 'var(--radius-md)',
                       cursor: 'pointer',
                       transition: 'border-color var(--duration-fast) var(--ease-default)'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-secondary)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
                   >
                     {session.mode === 'readonly' ? 'Let them edit' : 'Make it read-only'}
                   </button>
@@ -419,11 +385,11 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                     <button
                       onClick={session.rotateCode}
                       title="Disconnect everyone and issue a new passcode"
+                      className="collab-panel-rotate bg-clear"
                       style={{
                         width: '100%',
                         fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-semibold)',
-                        background: 'transparent',
                         color: 'var(--color-warning)',
                         border: '1px solid var(--color-warning)',
                         padding: '6px 0',
@@ -431,8 +397,6 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                         cursor: 'pointer',
                         transition: 'background var(--duration-fast) var(--ease-default)'
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-warning-muted)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       Change passcode
                     </button>
@@ -442,25 +406,16 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
               <button
                 onClick={session.disconnect}
+                className="collab-panel-disconnect"
                 style={{
                   width: '100%',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-semibold)',
-                  background: 'var(--color-destructive-muted)',
-                  color: 'var(--color-destructive)',
                   border: '1px solid var(--color-destructive)',
                   padding: '6px 0',
                   borderRadius: 'var(--radius-md)',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'var(--color-destructive)'
-                  e.currentTarget.style.color = '#fff'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'var(--color-destructive-muted)'
-                  e.currentTarget.style.color = 'var(--color-destructive)'
                 }}
               >
                 Disconnect Share

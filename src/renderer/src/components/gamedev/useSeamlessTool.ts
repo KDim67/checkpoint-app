@@ -5,37 +5,31 @@ import { errorMessage } from '../../../../shared/errors'
 import * as gamedevApi from '../../data/gamedev'
 import * as appApi from '../../data/app'
 
-/**
- * Seamless Texture Generator: stitching, the tiling preview, and export.
- *
- * Reads the Kanban hand-off path straight from the store and asks the parent
- * to switch tabs, so the hand-off still lands while another tool is on screen.
- */
+/** hand-off path from the store, switching tabs so it lands from any tool */
 export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
   const { toast } = useToast()
 
-  // Tab 6: Seamless Texture Generator State
   const preloadSeamlessPath = useAppStore(state => state.gamedevPreloadSeamlessPath)
   const preloadSeamlessCardId = useAppStore(state => state.gamedevSourceSeamlessCardId)
 
   const [seamlessPath, setSeamlessPath] = useState<string | null>(null)
   const [seamlessUrl, setSeamlessUrl] = useState<string | null>(null)
-  const [seamlessBlendWidth, setSeamlessBlendWidth] = useState(0.15) // Overlap fraction: 15%
+  const [seamlessBlendWidth, setSeamlessBlendWidth] = useState(0.15) // 15% overlap
   const [seamlessAlgorithm, setSeamlessAlgorithm] = useState<'mirror' | 'feather'>('feather')
-  const [seamlessTilingScale, setSeamlessTilingScale] = useState(3) // 3x3 repetition default
-  const [seamlessEqualizer, setSeamlessEqualizer] = useState(0.5) // Brightness Equalizer (High-Pass)
-  const [seamlessWavySeams, setSeamlessWavySeams] = useState(0.5) // Seam warping amount
+  const [seamlessTilingScale, setSeamlessTilingScale] = useState(3) // 3x3 by default
+  const [seamlessEqualizer, setSeamlessEqualizer] = useState(0.5) // high-pass brightness equalizer
+  const [seamlessWavySeams, setSeamlessWavySeams] = useState(0.5) // seam warp amount
   const [isSeamlessProcessing, setIsSeamlessProcessing] = useState(false)
   const [isSeamlessSaving, setIsSeamlessSaving] = useState(false)
-  const [seamlessShowGrid, setSeamlessShowGrid] = useState(false) // Toggle to show tiling boundaries
+  const [seamlessShowGrid, setSeamlessShowGrid] = useState(false) // show tile boundaries
   const [seamlessExportedFile, setSeamlessExportedFile] = useState<string | null>(null)
-  // Before/after compare: 'result' = show seamless output, 'original' = tile the raw source
+  // 'result' shows output, 'original' tiles the raw source
   const [seamlessShowOriginal, setSeamlessShowOriginal] = useState(false)
 
   const seamlessOriginalImageRef = useRef<HTMLImageElement | null>(null)
   const seamlessTilingCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const seamlessGeneratedCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  // Debounce timer for preview re-render triggered by slider changes
+  // debounce slider-driven previews
   const seamlessDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 
@@ -56,7 +50,6 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     }
   }, [toast])
 
-  // Watch preload seamless path from appStore
   useEffect(() => {
     if (preloadSeamlessPath) {
       onActivate()
@@ -64,17 +57,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     }
   }, [preloadSeamlessPath, loadSeamlessPath, onActivate])
 
-  // Seamless processing math
-  //
-  // Best practices applied:
-  //   1. All parameters are explicit. No closure captures. Empty dep array = stable ref.
-  //   2. Center offset uses Math.round() to prevent half-pixel drift on odd dimensions.
-  //   3. Toroidal luminance equalisation pad avoids edge-bleed from CSS blur().
-  //   4. Four-offset separable blend: every seam of every wrap-offset copy gets
-  //      exactly zero weight, so the result is fully seamless by construction
-  //      (see the detailed derivation at the blend loop below).
-  //   5. Wave modulation is multiplicative on the border distance, so tile-edge
-  //      continuity is preserved for any wave amplitude.
+  // explicit params, rounded centre, toroidal equalisation, 4-offset blend: seamless by construction
   const runSeamlessStitch = useCallback((
     img: HTMLImageElement,
     blendWidth: number,
@@ -91,7 +74,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     if (!ctx) return
 
     if (algorithm === 'mirror') {
-      // 4-quadrant mirror: fast path, no pixel-level work required
+      // 4-quadrant mirror, no pixel work
       const w2 = Math.round(targetW / 2)
       const h2 = Math.round(targetH / 2)
 
@@ -115,7 +98,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
       ctx.drawImage(img, 0, 0, w2, h2)
       ctx.restore()
     } else {
-      // 1. Draw source to temp canvas with optional Brightness Equalisation (toroidal High-Pass)
+      // optional toroidal high-pass brightness equalisation
       const srcCanvas = document.createElement('canvas')
       srcCanvas.width = targetW
       srcCanvas.height = targetH
@@ -128,7 +111,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
       let equalizedData: Uint8ClampedArray | null = null
       if (equalizer > 0) {
-        // Toroidal padded canvas to completely avoid edge-fading blur artefacts
+        // toroidal padding so the blur never fades at the edges
         const padW = Math.max(32, Math.round(targetW / 8))
         const padH = Math.max(32, Math.round(targetH / 8))
 
@@ -138,14 +121,14 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
         const padCtx = padCanvas.getContext('2d')
 
         if (padCtx) {
-          // Centre original
+          // centre
           padCtx.drawImage(srcCanvas, padW, padH)
-          // Edge tiles (toroidal wrap)
-          padCtx.drawImage(srcCanvas, targetW - padW, 0,           padW,    targetH, 0,            padH,           padW,    targetH) // Left
-          padCtx.drawImage(srcCanvas, 0,           0,           padW,    targetH, targetW + padW, padH,           padW,    targetH) // Right
-          padCtx.drawImage(srcCanvas, 0,           targetH - padH, targetW, padH,    padW,          0,              targetW, padH)    // Top
-          padCtx.drawImage(srcCanvas, 0,           0,           targetW, padH,    padW,          targetH + padH, targetW, padH)    // Bottom
-          // Corner tiles
+          // edge tiles, toroidal wrap
+          padCtx.drawImage(srcCanvas, targetW - padW, 0,           padW,    targetH, 0,            padH,           padW,    targetH) // left
+          padCtx.drawImage(srcCanvas, 0,           0,           padW,    targetH, targetW + padW, padH,           padW,    targetH) // right
+          padCtx.drawImage(srcCanvas, 0,           targetH - padH, targetW, padH,    padW,          0,              targetW, padH)    // top
+          padCtx.drawImage(srcCanvas, 0,           0,           targetW, padH,    padW,          targetH + padH, targetW, padH)    // bottom
+          // corners
           padCtx.drawImage(srcCanvas, targetW - padW, targetH - padH, padW, padH, 0,            0,            padW, padH) // TL
           padCtx.drawImage(srcCanvas, 0,           targetH - padH, padW, padH, targetW + padW, 0,            padW, padH) // TR
           padCtx.drawImage(srcCanvas, targetW - padW, 0,           padW, padH, 0,            targetH + padH, padW, padH) // BL
@@ -162,7 +145,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
             const blurData = blurCtx.getImageData(0, 0, targetW, targetH).data
 
-            // Sample average colour of source (every 8th pixel for speed)
+            // every 8th pixel for speed
             let sumR = 0, sumG = 0, sumB = 0, sampleCount = 0
             for (let i = 0; i < src.length; i += 4 * 8) {
               sumR += src[i]; sumG += src[i + 1]; sumB += src[i + 2]; sampleCount++
@@ -188,42 +171,25 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
       const activeSrc = equalizedData || src
 
-      // 2. Four-offset separable border blend.
-      //
-      // A two-sample "half-shift + blend the centre cross" can never be fully
-      // seamless: wherever a cross arm meets the tile border, either the
-      // original's border mismatch or the shifted copy's centre seam is
-      // exposed. Visible as short "whisker" artefacts at tile-boundary
-      // midpoints. Blending FOUR wrap-offset copies with separable weights
-      // gives every seam of every copy exactly zero weight:
-      //   S00 unshifted. Seams at the borders          (w = ax·ay)
-      //   S10 x-shifted by cx. Seams at x=cx and y-borders   (w = bx·ay)
-      //   S01 y-shifted by cy. Seams at y=cy and x-borders   (w = ax·by)
-      //   S11 xy-shifted. Seams at x=cx and y=cy        (w = bx·by)
-      // ax rises 0→1 over the blend band measured inward from the x-borders:
-      // it is 0 at the borders (hiding S00/S01 there) and 1 in the interior
-      // (where bx = 1−ax = 0 hides S10/S11's centre seams). ay likewise.
-      // The border ring is therefore toroidally continuous by construction
-      // and the interior remains the untouched original.
+      // four wrap-offset copies with separable weights give every seam zero weight; two-sample blends leave whiskers
       const outImgData = ctx.createImageData(targetW, targetH)
       const dst = outImgData.data
 
-      // Integer center prevents sub-pixel drift on odd-dimension textures
+      // integer centre, no sub-pixel drift on odd sizes
       const cx = Math.round(targetW / 2)
       const cy = Math.round(targetH / 2)
-      // Blend band width, clamped so it can never reach the shifted copies'
-      // centre seams (which must stay strictly inside the bx=0 region).
+      // clamped so the band never reaches the shifted copies' centre seams
       const B_w = Math.min(cx - 2, Math.max(4, Math.round(targetW * blendWidth)))
       const B_h = Math.min(cy - 2, Math.max(4, Math.round(targetH * blendWidth)))
 
-      // Toroidal coordinate wrap that handles negative values correctly
+      // handles negatives
       const wrapVal = (v: number, limit: number) =>
         ((Math.round(v) % limit) + limit) % limit
 
       const sampleAt = (px: number, py: number): number =>
         (wrapVal(py, targetH) * targetW + wrapVal(px, targetW)) * 4
 
-      // Low-cost deterministic 2D hash for dithering the blend transitions
+      // cheap deterministic hash to dither transitions
       const hash2d = (x: number, y: number) => {
         const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123
         return h - Math.floor(h)
@@ -232,8 +198,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
       const smooth01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v))
 
       for (let y = 0; y < targetH; y++) {
-        // Wave along the x-transition, driven by y (toroidally periodic:
-        // whole numbers of cycles, so it matches across tile copies)
+        // whole cycles, so the wave matches across tiles
         const angleX = (2 * Math.PI * 3 * y) / targetH
         const waveX = Math.sin(angleX) * 0.08 + Math.cos(angleX * 2) * 0.03
 
@@ -247,13 +212,11 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
           const dxB = Math.min(x, targetW - 1 - x)
 
-          // Normalised distance inward from the nearest border. The wave
-          // modulates multiplicatively so the value stays exactly 0 at the
-          // border. Continuity across tile copies is never broken.
+          // multiplicative wave keeps 0 at the border
           let ax = smooth01((dxB / B_w) * (1 + waveX * wavySeams))
           let ay = smooth01((dyB / B_h) * (1 + waveY * wavySeams))
 
-          // Dither the transition zones to mask any residual banding
+          // dither to hide banding
           if (wavySeams > 0) {
             if (ax > 0.02 && ax < 0.98) {
               ax = Math.max(0, Math.min(1, ax + (hash2d(x, y) - 0.5) * 0.12 * wavySeams))
@@ -265,8 +228,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
           const i00 = sampleAt(x, y)
 
-          // Fast path: the interior (the vast majority of pixels) is the
-          // untouched original. Skip the other three samples entirely.
+          // the interior is the untouched original, skip the other samples
           if (ax === 1 && ay === 1) {
             dst[idx]     = activeSrc[i00]
             dst[idx + 1] = activeSrc[i00 + 1]
@@ -295,18 +257,9 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
 
       ctx.putImageData(outImgData, 0, 0)
     }
-  }, []) // No deps: all inputs arrive as explicit parameters. Stable reference
+  }, []) // no deps, every input is a parameter
 
-  // Helper that tiles a canvas (either the seamless result or the raw original)
-  // onto the visible tiling preview canvas, optionally overlaying grid lines.
-  // Tiles are drawn at the source's true aspect ratio. A 2:1 texture renders
-  // as 2:1 tiles instead of being squashed into squares.
-  //
-  // The tile is downscaled ONCE into an integer-sized stamp, then blitted as
-  // byte-identical unscaled copies. Scaling each tile individually (and at
-  // fractional positions) filters every tile's edges independently, which
-  // shows up as faint hairlines along the tile boundaries. Artifacts of the
-  // preview, not the texture.
+  // true-aspect tiles; downscale once to an integer stamp, per-tile scaling drew hairlines
   const drawTilingCanvas = useCallback((
     sourceCanvas: HTMLCanvasElement | HTMLImageElement,
     reps: number,
@@ -365,20 +318,18 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     const aspect = srcW > 0 && srcH > 0 ? srcW / srcH : 1
 
     if (seamlessShowOriginal) {
-      // Before/after compare: tile the unmodified source image directly
+      // compare mode tiles the raw source
       drawTilingCanvas(img, seamlessTilingScale, seamlessShowGrid, aspect)
       return
     }
 
-    // Ensure we have a persistent off-screen canvas for the single generated tile
     let singleTileCanvas = seamlessGeneratedCanvasRef.current
     if (!singleTileCanvas) {
       singleTileCanvas = document.createElement('canvas')
       seamlessGeneratedCanvasRef.current = singleTileCanvas
     }
 
-    // Preview at aspect-correct proxy resolution (longest side 512) so the
-    // stitch math sees the same proportions the full-resolution export will.
+    // aspect-correct 512 proxy so the math matches the full-res export
     const previewW = aspect >= 1 ? 512 : Math.max(64, Math.round(512 * aspect))
     const previewH = aspect >= 1 ? Math.max(64, Math.round(512 / aspect)) : 512
 
@@ -400,7 +351,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     runSeamlessStitch, drawTilingCanvas
   ])
 
-  // Debounced wrapper so rapid slider drags don't block the UI thread
+  // debounced so slider drags don't block
   const updateSeamlessPreviewDebounced = useCallback(() => {
     if (seamlessDebounceRef.current) clearTimeout(seamlessDebounceRef.current)
     seamlessDebounceRef.current = setTimeout(() => updateSeamlessPreview(), 80)
@@ -411,7 +362,7 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     const img = new Image()
     img.onload = () => {
       seamlessOriginalImageRef.current = img
-      // Warn the user if the texture is extremely large (processing is synchronous)
+      // processing is synchronous, warn on huge textures
       if (img.naturalWidth * img.naturalHeight > 4096 * 4096) {
         toast(
           `Large texture warning: ${img.naturalWidth}×${img.naturalHeight}px. ` +
@@ -491,9 +442,9 @@ export function useSeamlessTool(isActive: boolean, onActivate: () => void) {
     }
 
     setIsSeamlessProcessing(true)
-    setSeamlessShowOriginal(false) // reset compare to 'result' on new file
+    setSeamlessShowOriginal(false) // compare back to 'result' for a new file
     try {
-      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
+      // electron 32 dropped File.path, resolve via preload
       const path = appApi.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {

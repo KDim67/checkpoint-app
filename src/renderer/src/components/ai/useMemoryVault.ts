@@ -1,27 +1,17 @@
-/**
- * The memory vault's state, loader and CRUD. Same pattern as GameDevView: a
- * hook called unconditionally, paired with a panel taking its return as a prop.
- *
- * The state cannot live in the modal, which unmounts whenever it is closed
- * while the chat stream keeps writing to it. That is also why the setters are
- * returned: consolidation runs after each AI turn and reaches back in here.
- *
- * Names are unchanged from when this was inline, so the move is verifiable.
- */
+/** state can't live in the modal, it unmounts while the stream writes; setters returned for consolidation */
 
 import { useEffect, useState } from 'react'
 import type { useToast } from '../ui/Toast'
 import type { AiMemory, MemoryCategory } from '../../../../shared/types'
 import * as memoryApi from '../../data/memory'
 
-// Re-exported so the modal and the panel can keep importing them from here,
-// where the vault they belong to lives.
+// re-exported so imports stay beside the vault
 export type { MemoryCategory, AiMemory as MemoryRow } from '../../../../shared/types'
 
 interface Options {
   activeWorkspace: string
   selectedModel: string
-  /** Typed off useToast so the two cannot drift apart. */
+  /** typed off useToast so they can't drift */
   toast: ReturnType<typeof useToast>['toast']
 }
 
@@ -38,10 +28,7 @@ export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Option
   const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>('semantic')
   const [memoryConsolidating, setMemoryConsolidating] = useState(false)
 
-  // Reloaded whenever the vault opens (from the header chip, /mem, or the "N
-  // recalled" pill) and whenever the workspace changes while it is open. This is
-  // what keeps it in sync with the Settings memory vault rather than showing a
-  // stale or empty count.
+  // reload on open and on workspace change so counts don't go stale
   useEffect(() => {
     if (!showMemoryPanel) return
     let cancelled = false

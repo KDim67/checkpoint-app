@@ -6,17 +6,10 @@ import { errorMessage } from '../../../../shared/errors'
 import * as gamedevApi from '../../data/gamedev'
 import * as appApi from '../../data/app'
 
-/**
- * Pixel Art Upscaler: source selection, nearest/EPX scaling, and export.
- *
- * isActive gates the re-render effect so the canvas work only runs while the
- * tool is on screen. It is a hook rather than panel state because the panel
- * unmounts on tab switch, which would drop the loaded image.
- */
+/** isActive gates re-rendering; a hook so a tab switch doesn't drop the image */
 export function useUpscalerTool(isActive: boolean) {
   const { toast } = useToast()
 
-  // Tab 10: Pixel Art Upscaler State
   const [upscalePath, setUpscalePath] = useState<string | null>(null)
   const [upscaleUrl, setUpscaleUrl] = useState<string | null>(null)
   const [upscaleAlgorithm, setUpscaleAlgorithm] = useState<UpscaleAlgorithm>('scale2x')
@@ -26,7 +19,6 @@ export function useUpscalerTool(isActive: boolean) {
   const [upscaleShowOriginal, setUpscaleShowOriginal] = useState(false)
   const upscalePreviewCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  // Tab 10: Pixel Art Upscaler Callbacks
   const handleSelectUpscaleFile = useCallback(async () => {
     try {
       const res = await gamedevApi.selectTexture()
@@ -41,7 +33,6 @@ export function useUpscalerTool(isActive: boolean) {
     }
   }, [toast])
 
-  // Drag & drop a source image straight onto the upscaler viewport
   const handleUpscaleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
@@ -50,7 +41,7 @@ export function useUpscalerTool(isActive: boolean) {
       toast('Invalid File: Please drop an image file.', { type: 'error' })
       return
     }
-    // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
+    // electron 32 dropped File.path, resolve via preload
     const path = appApi.getPathForFile(file)
     const reader = new FileReader()
     reader.onload = (event) => {
@@ -62,9 +53,7 @@ export function useUpscalerTool(isActive: boolean) {
     reader.readAsDataURL(file)
   }, [toast])
 
-  // Persistent off-screen canvas holding the true upscale result. The export
-  // path reads from here, so the before/after compare toggle can never
-  // accidentally export the nearest-scaled original.
+  // export reads here, so compare mode can't export the nearest-scaled original
   const upscaleResultCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const runUpscale = useCallback(async () => {
@@ -81,7 +70,6 @@ export function useUpscalerTool(isActive: boolean) {
       const w = img.width
       const h = img.height
 
-      // 1. Compute the upscaled result into the persistent off-screen canvas
       let result = upscaleResultCanvasRef.current
       if (!result) {
         result = document.createElement('canvas')
@@ -98,15 +86,14 @@ export function useUpscalerTool(isActive: boolean) {
         rctx.clearRect(0, 0, result.width, result.height)
         rctx.drawImage(img, 0, 0, result.width, result.height)
       } else {
-        // EPX family. Operate on the raw RGBA buffer via the shared pure cores
+        // EPX family on the raw RGBA via the shared cores
         const tmp = document.createElement('canvas')
         tmp.width = w
         tmp.height = h
         const tctx = tmp.getContext('2d')
         if (!tctx) return
         tctx.drawImage(img, 0, 0)
-        // Copy once so the buffer is plain-ArrayBuffer-backed (matches what
-        // the scaling cores return and what the ImageData constructor wants)
+        // copy once so it's plain-ArrayBuffer-backed, like ImageData wants
         let data = new Uint8ClampedArray(tctx.getImageData(0, 0, w, h).data)
         let ow = w
         let oh = h
@@ -115,7 +102,7 @@ export function useUpscalerTool(isActive: boolean) {
         } else if (upscaleAlgorithm === 'scale3x') {
           data = scale3xData(data, ow, oh); ow *= 3; oh *= 3
         } else {
-          // Scale4x (AdvMAME4x) = Scale2x applied twice
+          // Scale4x is Scale2x twice
           data = scale2xData(data, ow, oh); ow *= 2; oh *= 2
           data = scale2xData(data, ow, oh); ow *= 2; oh *= 2
         }
@@ -126,8 +113,7 @@ export function useUpscalerTool(isActive: boolean) {
 
       setUpscaleDims({ w, h, ow: result.width, oh: result.height })
 
-      // 2. Blit either the result or the nearest-scaled original (compare
-      //    mode) onto the visible canvas at the same output size.
+      // the result or the compare original, at the same output size
       const canvas = upscalePreviewCanvasRef.current
       if (!canvas) return
       const ctx = canvas.getContext('2d')
@@ -150,7 +136,7 @@ export function useUpscalerTool(isActive: boolean) {
   const handleUpscaleExport = useCallback(async () => {
     if (!upscalePath) return
 
-    // Always export the computed result, never the compare-mode view
+    // always the computed result, never the compare view
     const canvas = upscaleResultCanvasRef.current
     if (!canvas) return
 

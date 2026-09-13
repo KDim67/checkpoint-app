@@ -1,4 +1,4 @@
-/** Reading and writing cards, tasks, tags and relations. */
+/** cards, tasks, tags and relations */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -160,8 +160,7 @@ export function registerDbHandlers(db: Database.Database): void {
       const parsedPayload = BulkUpdateSchema.parse(payload)
       const now = Date.now()
 
-      // Build the SET clause once from whichever fields were actually provided,
-      // so bulk status/priority/context updates all persist (not just status).
+      // SET from the fields provided, so bulk context/priority updates persist too
       const setFields: string[] = []
       const baseParams: Record<string, unknown> = { updated_at: now }
       if (parsedPayload.patch.status !== undefined) {

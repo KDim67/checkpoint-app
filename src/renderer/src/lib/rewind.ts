@@ -1,12 +1,4 @@
-/**
- * Gathers the five streams Rewind joins.
- *
- * Focus sessions come first: they define the span everything else is filtered
- * to, and the tracker query is time-ranged so it narrows in SQL.
- *
- * Every stream is optional. The tracker, git and clipboard capture can each be
- * off, and a missing one means a thinner reconstruction, never a failure.
- */
+/** focus sessions define the span; every stream is optional, a missing one thins it, never fails it */
 
 import {
   buildRewind,
@@ -23,11 +15,10 @@ import { getSetting } from '../data/settings'
 
 interface RewindResult {
   rewind: Rewind
-  /** Streams that could not contribute, so the panel can say why it is thin. */
+  /** so the panel can say why it's thin */
   unavailable: string[]
 }
 
-/** The git path recorded for a workspace, if it has one. */
 async function gitPathFor(context: string): Promise<string | null> {
   try {
     const raw = await getSetting('contexts_list')
@@ -44,8 +35,7 @@ export async function loadRewind(item: Item): Promise<RewindResult> {
 
   const sessions = await getFocusSessions(item.context).catch(() => [])
 
-  // No sitting means nothing to filter the other streams to, so they are never
-  // queried. The panel shows its empty state instead.
+  // no sitting, nothing to filter by, so skip the queries
   const sitting = lastSittingFor(sessions, item.id)
   if (!sitting) {
     return {

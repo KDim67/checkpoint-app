@@ -5,7 +5,7 @@ import type { HardwareSpecs, GpuVendor } from '../shared/cookbookTypes'
 
 
 export async function getHardwareSpecs(): Promise<HardwareSpecs> {
-  // Safe default values
+  // defaults if detection fails
   let ramGb = Math.round((os.totalmem() / 1073741824) * 10) / 10
   let cpuCores = 4
   let cpuThreads = os.cpus().length || 4
@@ -13,7 +13,6 @@ export async function getHardwareSpecs(): Promise<HardwareSpecs> {
   let gpuName = 'Generic GPU'
   let vramGb = 0
 
-  // 1. Get exact CPU specs via systeminformation
   try {
     const cpuInfo = await si.cpu()
     if (cpuInfo) {
@@ -24,10 +23,9 @@ export async function getHardwareSpecs(): Promise<HardwareSpecs> {
     console.warn('Profiler: Failed to fetch CPU physical cores from systeminformation:', err)
   }
 
-  // 2. Multi-tier GPU Vendor & VRAM Detection
   let gpuDetected = false
 
-  // --- Tier 1: nvidia-smi (Windows & Linux, NVIDIA only) ---
+  // tier 1: nvidia-smi, NVIDIA only
   try {
     const stdout = await execFileAsync(
       'nvidia-smi',
@@ -47,10 +45,10 @@ export async function getHardwareSpecs(): Promise<HardwareSpecs> {
       }
     }
   } catch {
-    // nvidia-smi fails if not NVIDIA or command not found in PATH; fallback to Tier 2
+    // not NVIDIA or not on PATH, try tier 2
   }
 
-  // --- Tier 2: PowerShell WMI (Windows AMD/Intel fallback) ---
+  // tier 2: WMI for AMD/Intel on windows
   if (!gpuDetected && process.platform === 'win32') {
     try {
       const psCommand =
@@ -65,8 +63,7 @@ export async function getHardwareSpecs(): Promise<HardwareSpecs> {
         const name = data.Name || ''
         const rawRam = data.AdapterRAM
 
-        // WMI AdapterRAM is 32-bit signed/unsigned int and often wraps/caps at 4GB (4294967295 bytes)
-        // for larger modern GPUs. Tier 1 must succeed for correct VRAM numbers above 4GB.
+        // WMI AdapterRAM caps/wraps at 4GB, only nvidia-smi gets bigger cards right
         const bytes = Math.abs(Number(rawRam || 0))
         const detectedVram = Math.round((bytes / 1073741824) * 10) / 10
 
@@ -85,11 +82,11 @@ export async function getHardwareSpecs(): Promise<HardwareSpecs> {
         }
       }
     } catch {
-      // WMI/PowerShell failed; fallback to Tier 3
+      // WMI failed, try tier 3
     }
   }
 
-  // --- Tier 3: systeminformation graphics fallback (cross-platform) ---
+  // tier 3: systeminformation, cross-platform
   if (!gpuDetected) {
     try {
       const graphics = await si.graphics()

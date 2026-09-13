@@ -26,25 +26,19 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      // Suppressed entirely: the menu is opened from the pointer release,
-      // which is the only place a click can be told apart from a pan.
+      // the menu opens on release, the only place a click differs from a pan
       onContextMenu={e => e.preventDefault()}
-      // Hit-tested by coordinate, not by event.target: the pointer capture
-      // taken during a drag retargets the following dblclick to this element,
-      // so the target reports the viewport whatever was actually clicked.
+      // by coordinate: pointer capture retargets dblclick to the viewport
       onDoubleClick={e => {
-        // Double-clicking a word inside a note being edited selects the word.
+        // double-clicking a word in an edited note selects it
         if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return
 
-        // The floating panels are children of the canvas, and this handler
-        // works from coordinates rather than the target, so without the
-        // guard a double-click on the ink palette made a note behind it.
+        // panels are canvas children; without this a palette dblclick made a note
         if ((e.target as HTMLElement).closest('[data-wall-ui]')) return
         const at = toWallPoint(screenPoint(e), docRef.current.camera)
         const hit = itemAtPoint(docRef.current.items, at)
         if (!hit) {
-          // A connector has no box to hit, so it is asked for by hand
-          // before the empty canvas gets to make a note.
+          // connectors have no box, ask first
           const arrow = arrowAt(at)
           if (arrow) { setSelectedIds(new Set([arrow.id])); setEditingId(arrow.id); return }
           addItem('note', {}, at)
@@ -53,7 +47,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         if (hit.locked) return
         if (hit.kind === 'card') openCard(hit)
         else if (hit.kind === 'doc') {
-          // Hands the title to the Notes view, which opens it on arrival.
+          // Notes opens the title on arrival
           if (hit.ref) {
             setPendingNoteTitle(hit.ref)
             setView('notes')
@@ -63,14 +57,14 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       }}
       onDragOver={e => {
         e.preventDefault()
-      // Copy, not move. The card stays on the board.
+      // copy, the card stays on the board
         if (e.dataTransfer.types.includes(WALL_DRAG_MIME)) e.dataTransfer.dropEffect = 'copy'
       }}
       onDrop={e => {
         e.preventDefault()
         const at = toWallPoint(screenPoint(e), docRef.current.camera)
         const dragged = decodeWallDrag(e.dataTransfer.getData(WALL_DRAG_MIME))
-      // Where the cursor was. The whole point of dragging rather than picking.
+      // at the cursor, the point of dragging
         if (dragged) { addItem(dragged.kind, { ref: dragged.ref }, at); return }
         void placeImageFiles(Array.from(e.dataTransfer.files ?? []), at)
       }}
@@ -110,15 +104,10 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         position: 'absolute', top: 0, left: 0,
         transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
         transformOrigin: '0 0',
-        // Promoted up front. A plain 2D transform is not given its own
-        // compositor layer, so the first frame of a pan repainted the whole
-        // board on the main thread; only then did Chromium notice the
-        // transform was moving and promote it, which is why a pan used to
-        // stall once at the start and run smoothly ever after.
+        // promoted up front, or the first pan frame repaints the whole board
         willChange: 'transform',
       }}>
-        {/* One layer for every arrow. They have no box of their own: each
-            is redrawn from wherever its two items currently are. */}
+        {/* one layer for all arrows, redrawn from their items */}
         <svg
           style={{
             position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
@@ -133,8 +122,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             const stroke = arrow.color || 'var(--color-text-muted)'
             const selected = selectedIds.has(arrow.id)
             const heads = arrow.arrowHeads ?? ARROW_HEAD_MODES[0]
-            // Stopped behind whichever ends carry a head, so a thick stroke
-            // does not fill in the notch it is supposed to meet.
+            // stop behind heads so thick strokes don't fill the notch
             const inset = arrowHeadInset(width)
             const g = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0], {
               end: heads !== 'none' ? inset : 0,
@@ -162,14 +150,12 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             )
           })}
 
-          {/* The connector being dragged out. Drawn in the style it will
-              have, so what is on screen is what gets made. */}
+          {/* drawn in its final style */}
           {arrowDrag && (() => {
             const from = itemsById.get(arrowDrag.fromId)
             if (!from) return null
 
-            // Snaps to the item under the pointer when there is one, and
-            // otherwise follows the pointer itself as a point with no size.
+            // snap to the item under the pointer, else follow it
             const target = arrowDrag.overId ? itemsById.get(arrowDrag.overId) : undefined
             const landing: WallItem = target ?? {
               id: '', kind: 'note', z: 0,
@@ -203,8 +189,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           })()}
         </svg>
 
-        {/* The stroke in progress. Drawn separately because it is not an
-            item yet: it becomes one when the pointer comes up. */}
+        {/* not an item until the pointer comes up */}
         {drawing && drawing.length > 1 && (
           <svg style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', overflow: 'visible', pointerEvents: 'none', zIndex: 2 }}>
             <polyline
@@ -238,8 +223,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         })}
       </div>
 
-      {/* Labels, above the lines and the items so they stay readable.
-          An arrow's label lives in `text`, the same field a frame's does. */}
+      {/* labels above lines and items; arrow labels live in text like frames */}
       <div data-wall-camera-layer style={{
         position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
         transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
@@ -281,8 +265,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
                   onBlur={e => {
                     setEditingId(null)
                     const text = e.target.value.trim()
-                    // An emptied label is removed rather than kept as a
-                    // blank chip sitting on the line.
+                    // an emptied label is removed, not a blank chip
                     setItems(patchItems(docRef.current.items, new Set([arrow.id]), {
                       text: text || undefined
                     }))
@@ -303,9 +286,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         })}
       </div>
 
-      {/* Both ends of the selected connector, as something to grab. Drawn
-          in the canvas layer so they sit exactly on the line, but sized
-          against the zoom so they stay the same size to grab. */}
+      {/* both ends grabbable, sized against zoom */}
       {single?.kind === 'arrow' && (() => {
         const ends = arrowAnchors(single, itemsById)
         if (!ends) return null
@@ -334,8 +315,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
                   borderRadius: '50%',
                   background: 'var(--color-surface-elevated)',
                   border: `${ring}px solid var(--color-secondary)`,
-                  // Square at the tail, round at the head, so which end is
-                  // which is readable without hovering either of them.
+                  // square tail, round head
                   ...(which === 'start' && heads !== 'both' ? { borderRadius: '20%' } : {}),
                   cursor: 'grab'
                 }}
@@ -345,10 +325,9 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         )
       })()}
 
-      {/* Marquee, drawn in screen space so it does not scale with the camera. */}
+      {/* screen space, doesn't scale with the camera */}
       {marquee && (() => {
-        // The box drawn by hand is ahead of the one in state, and a render
-        // mid-sweep must not shrink it back to where the press was.
+        // the hand-drawn box is ahead of state, don't shrink it mid-sweep
         const box = marqueeRectRef.current ?? marquee
         return (
           <div data-wall-marquee style={{
@@ -362,7 +341,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         )
       })()}
 
-      {/* Controls for the current selection, floated above it. */}
+      {/* floated above the selection */}
       {floatingPos && selectedItems.length > 0 && (
         <WallSelectionBar
           floatingPos={floatingPos}
@@ -385,8 +364,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         <div onPointerDown={() => setPicker(null)} style={{ position: 'absolute', inset: 0, zIndex: 10 }} />
       )}
 
-      {/* A minimap only earns its space once there is something to lose track
-          of, so it appears with the fourth item rather than sitting empty. */}
+      {/* minimap from the fourth item on */}
       {doc.items.length > 3 && (
         <WallMinimap
           items={doc.items}

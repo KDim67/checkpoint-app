@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { looksLikeSecret } from '../src/shared/clipboardPrivacy'
 
-// A heuristic, and it is judged as one: what it must catch, what it must not
-// eat, and where it is honestly expected to fail.
+// judged as a heuristic: what it must catch, must not eat, and expected misses
 
-// Assembled at run time rather than written whole. A fixture that matches a
-// credential shape closely enough to exercise the heuristic also matches the
-// scanners that watch the repository, and an alert raised on a string that was
-// never a secret teaches everyone to wave alerts through.
+// built at runtime so repo secret scanners don't cry wolf
 const shaped = (prefix: string, body: string): string => prefix + body
 
 describe('credentials with a shape of their own', () => {
@@ -67,15 +63,14 @@ describe('things people copy on purpose, which must survive', () => {
   })
 
   it('still records a long single-token blob that is past credential length', () => {
-    // Beyond 200 characters it is data, not something typed into a login box.
+    // past 200 chars it's data
     expect(looksLikeSecret('aB3$'.repeat(80))).toBe(false)
   })
 })
 
 describe('what it is honest about missing', () => {
   it('records a password made of one lower-case word and a digit', () => {
-    // Two character classes. Indistinguishable from a username or a slug, and
-    // dropping everything of this shape would gut the feature.
+    // two classes looks like a username; dropping those guts the feature
     expect(looksLikeSecret('hunter2')).toBe(false)
   })
 

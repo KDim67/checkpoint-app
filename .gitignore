@@ -1,4 +1,4 @@
-# Logs
+# logs
 logs
 *.log
 npm-debug.log*
@@ -7,18 +7,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dependency directories
+# dependencies
 node_modules/
 jspm_packages/
 
-# Optional npm cache directory
+# npm cache
 .npm
 
-# Temp files
+# temp files
 .temp/
 .tmp/
 
-# OS-specific files
+# OS files
 .DS_Store
 .DS_Store?
 ._*
@@ -27,7 +27,7 @@ jspm_packages/
 ehthumbs.db
 Thumbs.db
 
-# IDEs and editors
+# editors
 .idea/
 .vscode/
 *.suo
@@ -36,18 +36,18 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Output build artifacts
+# build output
 out/
 dist/
 
-# Vite / bundler caches
+# bundler caches
 .vite
 .eslintcache
 
-# TypeScript incremental build state, regenerated on every typecheck/build
+# tsc incremental state, regenerated every build
 *.tsbuildinfo
 
-# `tsc --build` on these composite projects emits beside the sources
+# tsc --build emits beside the sources
 src/**/*.js
 src/**/*.jsx
 src/**/*.d.ts
@@ -55,7 +55,6 @@ src/**/*.d.ts
 !src/renderer/src/vite-env.d.ts
 !src/shared/**/*.d.ts
 
-# Stale self-snapshots and binary twins of documents. These live outside the
-# repo, in ../checkpoint-archive. The patterns stay so they cannot creep back in.
+# snapshots and doc twins live in ../checkpoint-archive; kept so they can't creep back
 checkpoint-app*.zip
 *.docx

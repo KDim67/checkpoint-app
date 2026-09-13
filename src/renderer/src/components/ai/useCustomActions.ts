@@ -1,10 +1,4 @@
-/**
- * The user's quick-action prompts, loaded from settings, and the form that adds
- * one.
- *
- * Held by the panel rather than the manager modal, which unmounts whenever it
- * closes, while the chat input lists the actions all the time.
- */
+/** held by the panel, not the modal: the modal unmounts, the input always lists actions */
 
 import { useEffect, useState } from 'react'
 import { getJsonSetting, setJsonSetting } from '../../lib/settings'

@@ -4,11 +4,9 @@ import { checkRepo, getGitLog, getGitStatus } from '../../gitService'
 import { getAnalyticsData } from '../../analyticsService'
 import { context, json, text, z } from '../toolKit'
 
-/** What has been happening: repository state, activity, focus time and the clipboard. */
+/** repo state, activity, focus time, clipboard */
 export function registerTrackingTools(mcp: McpServer): void {
-  // Repository state
-  // A workspace can be bound to a git repo, which is what makes "what have I
-  // actually changed since I filed this card" answerable.
+  // a workspace bound to a repo can answer "what changed since this card"
 
   mcp.registerTool(
     'get_git_status',
@@ -33,8 +31,6 @@ export function registerTrackingTools(mcp: McpServer): void {
       return json({ commits: await getGitLog(repoPath) })
     }
   )
-
-  // Time and activity
 
   mcp.registerTool(
     'get_analytics',
@@ -68,7 +64,7 @@ export function registerTrackingTools(mcp: McpServer): void {
     },
     async ({ limit, pinnedOnly }) => {
       const all = getClipboardHistory()
-      // Stored as SQLite's 0/1 rather than a boolean.
+      // SQLite 0/1, not a boolean
       const filtered = pinnedOnly ? all.filter(c => c.is_pinned === 1) : all
       return json({ items: filtered.slice(0, limit ?? 50) })
     }

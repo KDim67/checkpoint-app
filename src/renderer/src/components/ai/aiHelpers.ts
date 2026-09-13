@@ -1,22 +1,10 @@
-/**
- * The assistant panel's pure logic: token estimation, history pruning, intent
- * classification, skill detection, response parsing.
- *
- * Split out of a 3,600-line component so the regex-heavy parts (classifyIntent
- * especially) can be tested. Nothing here touches React, the DOM or IPC.
- * Moved verbatim, so behaviour is unchanged by construction.
- */
+/** pure logic split out of a 3,600-line component so the regex parts are testable */
 
 import { detectVisionFromName } from '../../../../shared/modelCapabilities'
 import type { IntentType, Message } from './types'
 
 
-/**
- * Name-only fallback, for the model dropdown where a per-entry IPC probe would
- * be wasteful. The live model uses discovered capabilities via
- * useModelCapabilities; this is only a hint for models the user has not
- * selected yet.
- */
+/** name-only hint for the dropdown; the live model uses discovered capabilities */
 export function supportsVision(modelName: string): boolean {
   return detectVisionFromName(modelName)
 }
@@ -57,12 +45,7 @@ export function parseThinkingAndContent(text: string) {
   return { thinking, content }
 }
 
-// Rough, fast token estimate. No tokenizer dependency.
-//
-// A flat 4 chars/token holds for Latin prose but understates CJK badly: those
-// codepoints cost roughly a token each, so a Chinese conversation was reported
-// at a quarter of its real size and blew the context window without warning.
-// Counted separately, then combined.
+// no tokenizer; 4 chars/token undercounts CJK badly, so count those apart
 const CJK_RE = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/g
 
 export function estimateTokens(text: string): number {
@@ -72,21 +55,16 @@ export function estimateTokens(text: string): number {
   return Math.ceil(cjkCount + rest / 4)
 }
 
-/**
- * Prunes the conversation history to fit within a maximum token limit,
- * keeping the newest messages at the end. Always preserves the latest user query.
- */
+/** newest kept, latest user message always */
 export function pruneHistory(history: Message[], maxHistoryTokens: number): Message[] {
   if (history.length === 0) return []
   const pruned: Message[] = []
   let estimatedTokens = 0
 
-  // Always include the latest turn (the most recent user message)
   const lastMsg = history[history.length - 1]
   pruned.push(lastMsg)
   estimatedTokens += estimateTokens(lastMsg.content)
 
-  // Iterate backwards starting from the second to last message
   for (let i = history.length - 2; i >= 0; i--) {
     const msg = history[i]
     const tokens = estimateTokens(msg.content)
@@ -100,16 +78,11 @@ export function pruneHistory(history: Message[], maxHistoryTokens: number): Mess
   return pruned
 }
 
-// Semantic intent classifier. Replaces the fragile keyword-heuristic approach.
-// Returns what action type the model should take, factoring in the active skill.
-// Defaults to 'converse' to prevent hallucination when intent is ambiguous.
+// defaults to converse when ambiguous, the active skill biases it
 export function classifyIntent(text: string, activeSkillId: string | null): IntentType {
   const lower = text.toLowerCase().trim()
 
-  // Board CONFIGURATION signals (columns, background, swimlanes, card fields).
-  // Checked before card editing because the two share verbs. "Set", "change",
-  // "rename", and only the noun distinguishes "rename the card" from "rename
-  // the column". The column/board nouns are therefore required here.
+  // config before editing: they share verbs, only the column/board noun tells them apart
   if (
     /\b(wip|work in progress)\b[\s\S]{0,20}\blimit\b/.test(lower) ||
     /\blimit\b[\s\S]{0,30}\b(column|list|lane)\b/.test(lower) ||
@@ -121,8 +94,7 @@ export function classifyIntent(text: string, activeSkillId: string | null): Inte
     /\bcards?\b[\s\S]{0,20}\b(fields?|face)\b/.test(lower)
   ) return 'configure_board'
 
-  // Board EDITING signals (existing cards). Checked before creation so
-  // "move X to done" never reads as a create request. High-precision patterns.
+  // editing before creation so "move X to done" isn't a create
   if (
     /\b(move|put|shift|transfer)\b[\s\S]{0,60}\b(to|into|in)\b[\s\S]{0,40}\b(column|done|progress|review|backlog|lane|stage)\b/.test(lower) ||
     /\barchive\b[\s\S]{0,60}\b(card|task|item|column|everything|all|done)\b/.test(lower) ||
@@ -134,7 +106,7 @@ export function classifyIntent(text: string, activeSkillId: string | null): Inte
     /\b(due|deadline)\b[\s\S]{0,30}\b(to|for|on|by)\b[\s\S]{0,30}\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|next week|\d)/.test(lower)
   ) return 'update_items'
 
-  // Skill-specific intent elevation: active skill biases strongly toward its native format
+  // the active skill biases toward its native format
   if (activeSkillId === 'narrative_specialist') {
     const dialogueTriggers = ['dialogue', 'dialog', 'quest', 'story', 'narrative', 'write', 'create', 'generate', 'design', 'character', 'npc', 'scene', 'conversation', 'lore', 'plot']
     if (dialogueTriggers.some(t => lower.includes(t))) return 'create_dialogue'
@@ -144,28 +116,26 @@ export function classifyIntent(text: string, activeSkillId: string | null): Inte
     if (planTriggers.some(t => lower.includes(t))) return 'create_plan'
   }
 
-  // High-confidence dialogue signals (explicit multi-word patterns)
+  // explicit multi-word patterns only
   if (/dialogue tree|quest flow|branching dialogue|npc dialogue|create.*dialogue|dialogue.*for|conversation.*tree/.test(lower)) return 'create_dialogue'
 
-  // High-confidence plan signals
   if (/implementation plan|create.*plan|make.*plan|step.by.step plan|detailed plan|plan for/.test(lower)) return 'create_plan'
 
-  // Item creation: requires BOTH an imperative verb AND an item noun (high-precision pairing)
+  // needs both a verb and an item noun
   const CREATE_VERBS = ['create', 'add', 'make', 'generate', 'build', 'populate', 'set up', 'scaffold', 'give me', 'suggest', 'produce']
   const ITEM_NOUNS  = ['card', 'task', 'column', 'board', 'ticket', 'item', 'stage', 'more task', 'another task', 'some task', 'few task']
   const hasCreateVerb = CREATE_VERBS.some(v => lower.includes(v))
   const hasItemNoun   = ITEM_NOUNS.some(n => lower.includes(n))
   if (hasCreateVerb && hasItemNoun) return 'create_items'
 
-  // "more" / "another" as standalone follow-up → create more of whatever the current topic is
+  // bare "more"/"another" means more of the current topic
   if (/^(more|add more|another|give me more|a few more|some more)/.test(lower)) return 'create_items'
 
-  // Default to conversational, only output JSON when explicitly requested
+  // JSON only when explicitly asked
   return 'converse'
 }
 
-// Automatic skill recall. Infers which specialized skill best fits the message
-// so the user never has to manually pick one (they still can, to pin it).
+// so the user never has to pick a skill, though they can pin one
 export function detectSkill(text: string): string | null {
   const t = (text || '').toLowerCase()
   if (!t.trim()) return null
@@ -196,20 +166,15 @@ export function detectSkill(text: string): string | null {
   return bestScore >= 2 ? best : null
 }
 
-/** True when the user is asking for board structure (columns/stages/lanes), not just cards. */
+/** board structure, not just cards */
 export function wantsColumns(text: string): boolean {
   return /\b(column|columns|lane|lanes|stage|stages|swimlane|set ?up (a|the|my)? ?board|board structure|workflow|pipeline|restructure)\b/i.test(text || '')
 }
 
-/**
- * Helper to parse assistant response content and extract the exact card titles
- * and column names that the AI attempted to create.
- */
 export function getAIEntitiesFromMessage(content: string): { cardTitles: string[]; columnNames: string[] } {
   const cardTitles: string[] = []
   const columnNames: string[] = []
 
-  // Regex to extract text inside ```json ... ``` blocks
   const regex = /```json(?::\w+)?\s*([\s\S]*?)\s*```/g
   let match
   while ((match = regex.exec(content)) !== null) {
@@ -218,9 +183,8 @@ export function getAIEntitiesFromMessage(content: string): { cardTitles: string[
       const parsed = JSON.parse(jsonText)
       
       if (parsed && typeof parsed === 'object') {
-        // 1. Batch format
         if (Array.isArray(parsed.cards)) {
-          // Model output, so every field is checked rather than assumed.
+          // model output, check every field
           parsed.cards.forEach((c: unknown) => {
             const title = (c as { title?: unknown })?.title
             if (typeof title === 'string' && title.trim()) cardTitles.push(title.trim())
@@ -233,18 +197,16 @@ export function getAIEntitiesFromMessage(content: string): { cardTitles: string[
           })
         }
 
-        // 2. Single card format
         if (parsed.title && !parsed.cards) {
           cardTitles.push(parsed.title.trim())
         }
 
-        // 3. Single column format
         if (parsed.name && !parsed.columns) {
           columnNames.push(parsed.name.trim())
         }
       }
     } catch {
-      // Skip invalid JSON
+      // skip invalid JSON
     }
   }
 

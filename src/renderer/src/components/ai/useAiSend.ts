@@ -25,10 +25,6 @@ export interface SubmitOptions {
   intentHint?: 'create' | 'analyze'
 }
 
-/**
- * Sending a message and receiving the reply: the stream listeners, the prompt
- * built for each turn, and rewriting, resending, reverting and aborting.
- */
 export function useAiSend(aiChat: AiChat) {
   const {
     activeWorkspace, messages, setMessages, inputValue, setInputValue, isStreaming, setIsStreaming,
@@ -38,16 +34,15 @@ export function useAiSend(aiChat: AiChat) {
     setRecalledMemCount, setWaitingLabel, consolidateRef, setShowMemoryPanel, systemPromptOverride,
     activeSkillId, setActiveSkillId, workspaceFolder, workspaceFiles
   } = aiChat
-  // 4. Mount IPC Streaming Listeners with cleanups to prevent leaks
+  // listeners clean up on unmount
   useEffect(() => {
     const stream = streamRef.current
     const unsubscribeChunk = aiApi.onChunk((chunk, streamId) => {
       if (streamId && streamId !== ASSISTANT_STREAM_ID) return
       if (isAbortedRef.current) return
-      // Ignore chunks if current chat is no longer the streaming chat
+      // ignore chunks once the user switched chats
       if (streamingChatIdRef.current !== currentChatIdRef.current) return
 
-      // Clear "waiting for first chunk" indicator on first chunk received
       if (!hasReceivedFirstChunkRef.current) {
         hasReceivedFirstChunkRef.current = true
         setIsWaitingForFirstChunk(false)
@@ -58,8 +53,7 @@ export function useAiSend(aiChat: AiChat) {
 
     const unsubscribeDone = aiApi.onDone((streamId, usage) => {
       if (streamId && streamId !== ASSISTANT_STREAM_ID) return
-      // Endpoints honouring stream_options report what the prompt actually
-      // cost; that replaces the estimate until the next turn changes it.
+      // real prompt cost replaces the estimate until the next turn
       if (usage?.promptTokens) setReportedPromptTokens(usage.promptTokens)
       if (isAbortedRef.current) {
         isAbortedRef.current = false
@@ -67,7 +61,7 @@ export function useAiSend(aiChat: AiChat) {
       }
       const finalAssistantResponse = streamRef.current.flush()
 
-      // Only append to UI if user is still on the same chat
+      // only if still on the same chat
       if (streamingChatIdRef.current === currentChatIdRef.current) {
         const { thinking, content: finalContent } = parseThinkingAndContent(finalAssistantResponse)
         setMessages(prev => {
@@ -77,7 +71,6 @@ export function useAiSend(aiChat: AiChat) {
             thinking: thinking || undefined,
             timestamp: Date.now()
           }]
-          // Kick off background memory consolidation after message is committed
           setTimeout(() => consolidateRef.current(updated), 100)
           return updated
         })
@@ -134,11 +127,9 @@ export function useAiSend(aiChat: AiChat) {
     })
   }
 
-  // Snapshots & Board Reversion
   const revertAICreatedEntities = async (cardTitles: string[], columnNames: string[]) => {
     const validContext = activeWorkspace || 'default'
 
-    // 1. Delete cards/tasks with matching titles in this context
     if (cardTitles.length > 0) {
       const [tasksRes, cardsRes] = await Promise.all([
         readItems(validContext, 'task').catch(() => []),
@@ -154,11 +145,8 @@ export function useAiSend(aiChat: AiChat) {
       }
     }
 
-    // 2. Delete columns with matching names in this context
     if (columnNames.length > 0) {
-      // The unified board document, not the legacy column key. That key stopped
-      // being written when board configuration was unified, so reverting against
-      // it both read and wrote a snapshot the board no longer looks at.
+      // unified board doc; the legacy key is a snapshot the board no longer reads
       const { columns } = await loadBoardConfig(validContext)
 
       if (columns.length > 0) {
@@ -167,7 +155,6 @@ export function useAiSend(aiChat: AiChat) {
       }
     }
 
-    // 3. Trigger UI reload
     window.dispatchEvent(new CustomEvent('kanban-refresh'))
     window.dispatchEvent(new CustomEvent('item-updated'))
   }
@@ -180,7 +167,6 @@ export function useAiSend(aiChat: AiChat) {
     setRevertConfirmData({ cardTitles, columnNames, index: messageIndex })
   }
 
-  // Rewrite & Resend handlers
   const handleRewrite = async (newContent: string, messageIndex: number) => {
     if (isStreaming) return
 
@@ -207,22 +193,19 @@ export function useAiSend(aiChat: AiChat) {
     await runChatStream(historyToKeep)
   }
 
-  // 5. Submit Query
   const handleSubmitWithText = async (textToSubmit?: string, options?: SubmitOptions) => {
     const text = (textToSubmit ?? inputValue).trim()
     const hasAttachment = !!(options?.cheatsheets?.length || options?.notes?.length || options?.files?.length || options?.images?.length)
     if (!text && !hasAttachment) return
     if (isStreaming) return
 
-    // Slash Commands Parser
     if (text.startsWith('/')) {
       const parts = text.split(/\s+/)
       const cmd = parts[0].toLowerCase()
       const remainingText = parts.slice(1).join(' ').trim()
 
       if (cmd === '/clear') {
-        // Full reset (same as New Chat). Also clears the action caches so
-        // previously created card titles can be recreated in the fresh thread.
+        // same as New Chat, and clears action caches so titles can be recreated
         handleNewChat()
         setInputValue('')
         return
@@ -257,19 +240,17 @@ export function useAiSend(aiChat: AiChat) {
         return
       }
 
-      // Skill switching commands
       let matchedSkillId: string | null = null
       if (cmd === '/narrative') matchedSkillId = 'narrative_specialist'
       else if (cmd === '/kanban') matchedSkillId = 'kanban_architect'
       else if (cmd === '/plan' || cmd === '/planner') matchedSkillId = 'implementation_planner'
 
       if (matchedSkillId) {
-        // Switch the skill
         setActiveSkillId(matchedSkillId)
         try { localStorage.setItem(STORAGE_KEY_ACTIVE_SKILL, matchedSkillId) } catch {}
 
         if (remainingText) {
-          // Submit the rest of the text under this new skill
+          // send the rest under the new skill
           const userMessage: Message = {
             role: 'user',
             content: remainingText,
@@ -282,7 +263,6 @@ export function useAiSend(aiChat: AiChat) {
           setInputValue('')
           await runChatStream(nextMessages)
         } else {
-          // Just print a system confirmation message
           const systemMsg: Message = {
             role: 'assistant',
             content: `✨ Switched active skill to **${getSkillById(matchedSkillId)?.label}**.`,
@@ -328,20 +308,17 @@ export function useAiSend(aiChat: AiChat) {
         const lastUserMsg = [...nextMessages].reverse().find(m => m.role === 'user')
         const text = lastUserMsg?.content || ''
 
-        // Discovered from the endpoint rather than guessed from the model
-        // name. The old check read '72b'.includes('2b') as true and drove a
-        // 72B model with a 2B model's budgets.
+        // discovered, not guessed: '72b'.includes('2b') ran a 72B model on 2B budgets
         const caps = modelCapsRef.current
         const budget = TIER_BUDGETS[caps.tier]
         const isSmallModel = budget.tersePrompt
         const memoryRecallLimit = budget.memoryRecallLimit
         const workspaceFileCap = budget.workspaceFileCap
-        // Reserve the model's real output ceiling instead of a flat guess.
+        // reserve the model's real output ceiling
         const contextWindowTokens = Math.max(2048, caps.contextTokens - caps.maxOutputTokens)
 
         const baseSystemPromptContent = buildBasePrompt(isSmallModel)
 
-        // Seed context as a system instruction if preset
         const systemPrompt: Message[] = [
           {
             role: 'system',
@@ -349,22 +326,16 @@ export function useAiSend(aiChat: AiChat) {
           }
         ]
 
-        // Ground all date/deadline reasoning. Models have no clock of their
-        // own, so "Friday", "next week" and "overdue" are meaningless without this.
+        // models have no clock, pin dates to now
         systemPrompt.push({
           role: 'system',
           content: buildDateBlock(new Date())
         })
 
-        // Scrape live board state (columns, cards) and then retrieve semantic memories.
-        // Board state comes FIRST so memories have board context when recalled.
+        // board state first so recalled memories have context
         try {
           const validContext = activeWorkspace || 'default'
-          // This list becomes the "VALID COLUMN IDs" the model is told to use,
-          // so reading the stale legacy key meant describing a board that no
-          // longer existed: columns the user had deleted were still offered,
-          // and ones they had added were invisible. loadBoardConfig always
-          // returns a non-empty column set, so no defaults fallback is needed.
+          // these become the valid column ids; the stale key offered deleted columns
           const { columns: colsList } = await loadBoardConfig(validContext)
 
           const [tasksRes, cardsRes] = await Promise.all([
@@ -381,7 +352,7 @@ export function useAiSend(aiChat: AiChat) {
             content: liveBoardStateText
           })
 
-          // 2. Semantic Memory Vector Retrieval (runs AFTER board state so memories interpret board context)
+          // memories after board state
           try {
             const memories = await memoryApi.searchMemories(text, validContext, memoryRecallLimit).catch(() => [])
             setRecalledMemCount(memories?.length || 0)
@@ -398,7 +369,7 @@ export function useAiSend(aiChat: AiChat) {
           console.warn('Failed to scrape workspace items for AI context:', err)
         }
 
-        // Specialized Skill Workflow injection (auto-elevated if not manually overridden)
+        // auto-elevated unless manually pinned
         const lastUserContentForSkill = nextMessages[nextMessages.length - 1]?.content || text
         const predictedIntent = classifyIntent(lastUserContentForSkill, activeSkillId)
         const resolvedSkillId = resolveSkillId(activeSkillId, lastUserContentForSkill, predictedIntent)
@@ -411,8 +382,7 @@ export function useAiSend(aiChat: AiChat) {
           })
         }
 
-        // Workspace codebase index injection. Grouped by top-level folder and file-type buckets
-        // so the model understands project structure, not just a flat list of filenames.
+        // grouped by folder and file type so the model sees structure
         if (workspaceFolder && workspaceFiles.length > 0) {
           systemPrompt.push({
             role: 'system',
@@ -427,7 +397,6 @@ export function useAiSend(aiChat: AiChat) {
         })
       }
 
-      // Inject user's session-level system prompt override if set
       if (systemPromptOverride.trim()) {
         systemPrompt.push({
           role: 'system',
@@ -435,12 +404,10 @@ export function useAiSend(aiChat: AiChat) {
         })
       }
 
-      // Inject saved Email Writing Style Context & Multi-Draft Samples, ONLY when no specialized
-      // skill is active. Injecting this while a skill runs pollutes the skill's system prompt.
+      // email style samples only without a skill, they pollute a skill's prompt
       if (!activeSkillId) {
         try {
-          // Read through the database rather than localStorage: a restored or
-          // synced database used to carry samples the panel could not see.
+          // via the db, not localStorage: restored or synced dbs carried samples the panel couldn't see
           const samplesText = await loadSamplesPromptBlock()
           if (samplesText.trim()) {
             systemPrompt.push({
@@ -453,18 +420,15 @@ export function useAiSend(aiChat: AiChat) {
         }
       }
 
-      // Prepare final API messages payload
       const apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> }> = [
         ...systemPrompt,
         ...(await gatherAttachmentMessages({ messages: nextMessages, text, isSmallModel, contextWindowTokens, workspaceFolder }))
       ]
 
-      // Calculate token budget for conversation history:
       const historyBudget = historyBudgetFor(contextWindowTokens, resolvedSkillId, workspaceFolder, workspaceFiles, workspaceFileCap)
       const prunedHistory = pruneHistory(nextMessages, Math.max(4000, historyBudget))
 
-      // Add conversation history. User messages with image attachments become
-      // multimodal content parts (vision-capable models read them directly).
+      // image attachments become multimodal parts
       for (const msg of prunedHistory) {
         if (msg.role === 'user' && msg.images && msg.images.length > 0) {
           apiMessages.push({
@@ -479,25 +443,14 @@ export function useAiSend(aiChat: AiChat) {
         }
       }
 
-      // Classify the user's intent and inject a skill-aware enforcement message at the
-      // very bottom of the prompt stack (highest weight position for the model).
-      // NOTE: only a MANUALLY-pinned skill (activeSkillId) forces its structured
-      // output. An auto-recalled skill only sets tone/expertise, so a casual
-      // mention ("what tasks…", "the character…") won't surprise the user with a
-      // plan or dialogue block; clear create-requests still trigger via the base classifier.
+      // enforcement goes last (heaviest); only a pinned skill forces structured output, a recalled one sets tone
       const lastUserContent = prunedHistory[prunedHistory.length - 1]?.content || ''
       let intent = classifyIntent(lastUserContent, activeSkillId)
-      // An explicit quick-action intent is authoritative. A "Do NOT output JSON"
-      // analyze prompt must never be mis-read as a create request, and vice versa.
+      // an explicit quick-action intent is authoritative
       if (lastUserMsg?.intentHint === 'analyze') intent = 'converse'
       else if (lastUserMsg?.intentHint === 'create') intent = 'create_items'
 
-      // Reliable structured action path
-      // For creation intents, generate the action through the structured generator
-      // (tool-calling / JSON-schema / JSON-mode), which forces valid, schema-shaped
-      // output even on tiny local models, then deterministically enriches it with
-      // tags + colors. Falls back to the streaming path below on any failure, so
-      // this can only improve reliability, never regress it.
+      // creation goes through the structured generator plus enrichment; any failure falls back to streaming
       const structuredKind = structuredKindFor(intent)
 
       if (structuredKind) {
@@ -513,7 +466,7 @@ export function useAiSend(aiChat: AiChat) {
             temperature
           })
 
-          // Respect an in-flight user abort. Don't post or fall back.
+          // respect a user abort, no post or fallback
           if (isAbortedRef.current) {
             isAbortedRef.current = false
             setStreamingText('')
@@ -550,7 +503,6 @@ export function useAiSend(aiChat: AiChat) {
         }
       }
 
-      // Inject model-tuned reasoning instructions
       const reasoningInstruction = buildReasoningInstruction(modelLower, isSmallModel)
 
       apiMessages.push({ role: 'system', content: reasoningInstruction })
@@ -590,9 +542,7 @@ export function useAiSend(aiChat: AiChat) {
       hasReceivedFirstChunkRef.current = false
       setIsWaitingForFirstChunk(false)
       setIsStreaming(false)
-      // CRITICAL FIX: Reset abort flag so subsequent streams work correctly.
-      // The backend silently swallows AbortErrors and never fires onDone/onError,
-      // so isAbortedRef would otherwise stay true forever, dropping all future chunks.
+      // the backend swallows AbortErrors without onDone/onError, so reset or later chunks drop
       isAbortedRef.current = false
     } catch (err) {
       console.error('Failed to abort stream:', err)
@@ -602,10 +552,7 @@ export function useAiSend(aiChat: AiChat) {
     }
   }
 
-  // Esc anywhere stops an in-flight generation. The input is disabled while
-  // streaming, so a keyboard-only user otherwise has no way to abort. The abort
-  // is reached through a ref so the listener is not removed and added again on
-  // every render of a streaming reply.
+  // Esc stops generation since the input is disabled while streaming; ref so the listener isn't rebound
   const abortRef = useRef(handleAbort)
   abortRef.current = handleAbort
   useEffect(() => {

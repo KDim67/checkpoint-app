@@ -4,6 +4,7 @@ export default function AiAssistButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
+      className="hover-lift ai-assist-button"
       style={{
         background: 'var(--color-secondary-muted)',
         border: '1.5px solid var(--color-secondary)',
@@ -17,14 +18,6 @@ export default function AiAssistButton({ onClick }: { onClick: () => void }) {
         alignItems: 'center',
         gap: '8px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.filter = 'brightness(1.2)'
-        e.currentTarget.style.transform = 'translateY(-1px)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.filter = 'none'
-        e.currentTarget.style.transform = 'none'
       }}
     >
       <Sparkles size={16} fill="currentColor" />

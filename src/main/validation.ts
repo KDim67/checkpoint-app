@@ -1,7 +1,5 @@
 import { z } from 'zod'
 
-// Item Validation Schemas
-
 export const CreateItemSchema = z.object({
   type: z.enum(['log', 'card', 'task']),
   context: z.string().min(1, 'Workspace slug cannot be empty'),
@@ -16,18 +14,12 @@ export const CreateItemSchema = z.object({
 
 export const UpdateItemSchema = CreateItemSchema.partial()
 
-// Tag Validation Schemas
-
 export const CreateTagSchema = z.object({
   name: z.string().min(1, 'Tag name cannot be empty'),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color starting with #').default('#535e85')
 })
 
-// Relation Validation Schemas
-
 export const RelationTypeSchema = z.enum(['blocks', 'relates_to', 'duplicates'])
-
-// Bulk Operations Schemas
 
 export const BulkUpdateSchema = z.object({
   ids: z.array(z.string().min(1)),
@@ -37,8 +29,6 @@ export const BulkUpdateSchema = z.object({
     context: z.string().optional()
   })
 })
-
-// Search Schemas
 
 export const SearchQuerySchema = z.object({
   query: z.string(),

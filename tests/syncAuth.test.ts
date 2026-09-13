@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { sameSecret } from '../src/main/syncService'
 
-// The pairing handshake is the only thing between a LAN socket and the user's
-// database, so what counts as a matching digest is worth pinning down.
+// the handshake is all that guards the LAN socket
 
 const digest = (code: string, salt: string): string =>
   createHmac('sha256', code).update(salt).digest('hex')
@@ -20,9 +19,7 @@ describe('comparing a pairing digest', () => {
   })
 
   it('rejects a digest that is the wrong length rather than throwing', () => {
-    // timingSafeEqual throws when the buffers differ in length, and a throw
-    // inside the connection handler would take the sync host down. A short
-    // answer has to fail, not crash.
+    // timingSafeEqual throws on length, which would crash the host
     expect(() => sameSecret('abcd', digest('123456', salt))).not.toThrow()
     expect(sameSecret('abcd', digest('123456', salt))).toBe(false)
   })

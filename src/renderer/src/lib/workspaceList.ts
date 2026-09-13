@@ -1,21 +1,11 @@
-/**
- * The list of workspaces, as the settings table holds it.
- *
- * One place because six files read this row and each parsed it its own way:
- * the key was a literal in five of them, the JSON guard was written five times,
- * and a corrupt row failed differently depending on which screen found it.
- */
+/** six files parsed this row six ways */
 
 import type { WorkspaceEntry } from './createWorkspace'
 import { getSetting, setSetting } from '../data/settings'
 
 const LIST_KEY = 'contexts_list'
 
-/**
- * Never throws and never returns a non-array. A hand-edited settings row is a
- * real possibility, and a screen that cannot list workspaces is worse than one
- * that lists none.
- */
+/** never throws, always an array; hand edits happen */
 export async function readWorkspaceList(): Promise<WorkspaceEntry[]> {
   try {
     const raw = await getSetting(LIST_KEY)

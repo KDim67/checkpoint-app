@@ -1,13 +1,6 @@
 import { getSetting as getSettingRow, setSetting as setSettingRow } from '../../data/settings'
 
-// AI Provider Profiles.
-//
-// The app's main process reads a single flat config (ai_base_url / ai_api_key /
-// ai_model). Rather than change that, provider profiles are a renderer-side
-// convenience layer: the user defines several named connections (local Ollama,
-// Google Gemini, OpenAI, …) and the ACTIVE one is mirrored into those flat
-// settings. So switching a provider = writing three settings; the backend needs
-// no changes and always uses the active provider.
+// main reads one flat config; profiles live here and the active one is mirrored into it
 
 export interface AiProvider {
   id: string
@@ -27,7 +20,6 @@ export interface ProviderPreset {
   local?: boolean
 }
 
-/** One-click templates for common OpenAI-compatible endpoints. */
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   {
     id: 'ollama', name: 'Ollama',
@@ -63,19 +55,13 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   }
 ]
 
-/**
- * Heuristic: is this a locally-hosted endpoint (Ollama/LM Studio/etc.)?
- * Includes private LAN ranges so an Ollama server on another machine on the
- * same network (192.168.x.x / 10.x / 172.16-31.x / *.local) still gets the
- * local treatment (installed-model dropdown, no API-key requirement).
- */
+/** includes LAN ranges and *.local so a networked ollama still counts as local */
 export function isLocalUrl(url: string): boolean {
   if (!url) return true
   return /localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|\b192\.168\.|\b10\.\d{1,3}\.|\b172\.(1[6-9]|2\d|3[01])\.|\.local(?::\d+)?(\/|$)/i.test(url)
 }
 
 function newId(): string {
-  // Date.now is fine in the renderer (not a workflow script).
   return `prov_${Date.now()}_${Math.floor(Math.random() * 1e4)}`
 }
 
@@ -96,7 +82,6 @@ async function setSetting(key: string, val: string): Promise<void> {
   }
 }
 
-/** Writes the active provider's fields into the flat settings the backend reads. */
 async function mirrorToFlat(p: AiProvider): Promise<void> {
   await setSetting('ai_base_url', p.baseURL.trim())
   await setSetting('ai_api_key', p.apiKey.trim())
@@ -110,10 +95,7 @@ export async function persistProviders(providers: AiProvider[], activeId: string
   if (active) await mirrorToFlat(active)
 }
 
-/**
- * Loads provider profiles, migrating from the legacy flat settings on first run
- * so existing users keep their current connection as "Default".
- */
+/** migrates the legacy flat settings into "Default" on first run */
 export async function loadProviders(): Promise<{ providers: AiProvider[]; activeId: string }> {
   const raw = await getSetting('ai_providers')
   let providers: AiProvider[] = []
@@ -124,8 +106,7 @@ export async function loadProviders(): Promise<{ providers: AiProvider[]; active
     } catch { /* fall through to migration */ }
   }
 
-  // Sanitize names: the display appends "(local)/(cloud)", so a stored name must
-  // not already carry that suffix (early builds did: "LM Studio (local) (local)").
+  // strip a stored "(local)/(cloud)" suffix, early builds doubled it
   let namesFixed = false
   providers = providers.map(p => {
     const clean = (p.name || '').replace(/\s*\((?:local|cloud)\)\s*$/i, '').trim() || 'Provider'
@@ -139,7 +120,6 @@ export async function loadProviders(): Promise<{ providers: AiProvider[]; active
   }
 
   if (providers.length === 0) {
-    // Migrate the existing flat config into a single profile.
     const baseURL = (await getSetting('ai_base_url')) || 'http://localhost:11434/v1'
     const apiKey = (await getSetting('ai_api_key')) || 'ollama'
     const model = (await getSetting('ai_model')) || ''
@@ -158,7 +138,6 @@ export async function loadProviders(): Promise<{ providers: AiProvider[]; active
   return { providers, activeId }
 }
 
-/** Switches the active provider and mirrors it into the flat settings. */
 export async function activateProvider(providers: AiProvider[], id: string): Promise<void> {
   const p = providers.find(x => x.id === id)
   if (!p) return
@@ -166,7 +145,6 @@ export async function activateProvider(providers: AiProvider[], id: string): Pro
   await mirrorToFlat(p)
 }
 
-/** Builds a fresh provider from a preset template. */
 export function providerFromPreset(preset: ProviderPreset): AiProvider {
   return {
     id: newId(),

@@ -99,7 +99,6 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           Add a new column stage to this context's Kanban workflow.
         </p>
 
-        {/* Error Alert Box */}
         {error && (
           <div style={{
             fontSize: 'var(--text-xs)',
@@ -113,7 +112,6 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           </div>
         )}
 
-        {/* Column Name Input */}
         <div className="col-sm">
           <label htmlFor="col-name-input" className="text-hint-strong">
             Column Title
@@ -139,7 +137,6 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           />
         </div>
 
-        {/* WIP Limit Input */}
         <div className="col-sm">
           <label htmlFor="col-wip-input" className="text-hint-strong">
             WIP Limit (Optional)
@@ -163,8 +160,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           />
         </div>
 
-        {/* Definition of done. Shown on the column name's tooltip, and the
-            field the assistant fills in when it designs a workflow. */}
+        {/* definition of done: column tooltip, and what the assistant fills in */}
         <div className="col-sm">
           <label htmlFor="col-desc-input" className="text-hint-strong">
             Definition of Done (Optional)
@@ -187,7 +183,6 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
           />
         </div>
 
-        {/* Column Theme & Mode */}
         <div className="col">
           <label className="text-hint-strong">
             Column Theme & Display Mode

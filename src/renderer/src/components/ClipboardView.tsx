@@ -22,18 +22,16 @@ import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import * as clipboardApi from '../data/clipboard'
 import * as appApi from '../data/app'
 
-// Keep in sync with the DELETE ... LIMIT in db/clipboard.ts (stmtDeleteClipboardHistoryOverflow).
+// keep in sync with the DELETE ... LIMIT in db/clipboard.ts
 const HISTORY_LIMIT = 200
 
-// Content-type detection
-// Best-practice clipboard managers classify each entry so the list is scannable
-// at a glance and can offer type-specific actions (e.g. open a link).
+// classified so the list scans at a glance and can offer per-type actions
 type ContentKind = 'link' | 'email' | 'color' | 'number' | 'code' | 'text'
 
 interface ContentMeta {
   kind: ContentKind
   label: string
-  accent: string // badge/strip accent. For colors this is the colour itself
+  accent: string // strip accent; for colors, the colour itself
 }
 
 function looksLikeCode(text: string): boolean {
@@ -77,25 +75,19 @@ export default function ClipboardView() {
   const [searchHistory, setSearchHistory] = useState('')
   const [searchSnippets, setSearchSnippets] = useState('')
 
-  // Add snippet form state
   const [newLabel, setNewLabel] = useState('')
   const [newContent, setNewContent] = useState('')
   const [isAdding, setIsAdding] = useState(false)
 
-  // Label inline editing state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editLabelText, setEditLabelText] = useState('')
 
-  // Transient "copied" checkmark feedback
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  // Which long items are expanded to full height
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
-  // Clear unpinned history confirm state
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
 
-  // Load history from DB
   const loadHistory = useCallback(async () => {
     try {
       const data = await clipboardApi.getHistory()
@@ -109,9 +101,9 @@ export default function ClipboardView() {
 
   useEffect(() => {
     loadHistory()
-    // Instant refresh the moment the background watcher captures something new…
+    // instant refresh when the watcher captures
     const unsubscribe = clipboardApi.onHistoryChanged(loadHistory)
-    // …plus a relaxed fallback poll in case an event is ever missed.
+    // plus a slow poll in case an event is missed
     const interval = setInterval(loadHistory, 5000)
     return () => {
       unsubscribe()
@@ -119,7 +111,6 @@ export default function ClipboardView() {
     }
   }, [loadHistory])
 
-  // Actions
   const handleTogglePin = async (id: string, isPinned: boolean) => {
     try {
       await clipboardApi.togglePin(id, !isPinned)
@@ -187,7 +178,6 @@ export default function ClipboardView() {
     }
   }
 
-  // Copy to OS clipboard with transient checkmark feedback
   const handleCopyOnly = async (id: string, content: string) => {
     try {
       await navigator.clipboard.writeText(content)
@@ -198,7 +188,7 @@ export default function ClipboardView() {
     }
   }
 
-  // Copy & hide the window (quick-paste flow via the global hotkey panel)
+  // quick-paste flow from the hotkey panel
   const handleCopyAndClose = async (content: string) => {
     try {
       await clipboardApi.paste(content)
@@ -224,8 +214,7 @@ export default function ClipboardView() {
     })
   }
 
-  // Create a new pinned snippet. Unlike copying, saving a snippet should NOT
-  // clobber whatever is currently on the OS clipboard. It's saved for later.
+  // saving a snippet mustn't clobber the OS clipboard
   const handleCreateSnippet = async (e: React.FormEvent) => {
     e.preventDefault()
     const contentTrimmed = newContent.trim()
@@ -244,7 +233,6 @@ export default function ClipboardView() {
     }
   }
 
-  // Helpers
   const formatTime = (ts: number) => {
     const diffMs = Date.now() - ts
     if (diffMs < 60000) return 'Just now'
@@ -270,7 +258,6 @@ export default function ClipboardView() {
     )
   }, [pinnedItems, searchSnippets])
 
-  // Shared card renderer
   const renderCard = (item: ClipboardItem, variant: 'history' | 'snippet') => {
     const isCopied = copiedId === item.id
     const isEditing = editingId === item.id
@@ -285,31 +272,21 @@ export default function ClipboardView() {
     return (
       <div
         key={item.id}
+        className="clipboard-view-card border-offset"
         style={{
           position: 'relative',
           flexShrink: 0,
           background: 'var(--color-surface-1)',
-          border: '1px solid var(--color-surface-offset)',
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
           transition: 'border-color var(--duration-fast), box-shadow var(--duration-fast)'
         }}
-        onMouseEnter={e => {
-          e.currentTarget.style.borderColor = 'rgba(30, 69, 252, 0.35)'
-          e.currentTarget.style.boxShadow = '0 2px 10px -6px rgba(0,0,0,0.4)'
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-          e.currentTarget.style.boxShadow = 'none'
-        }}
       >
-        {/* Content-kind accent strip */}
         <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '3px', background: meta.accent }} />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + 3px)' }}>
-          {/* Header row */}
           <div className="row-between-gap">
-            {/* Left: label (snippet) or type badge + timestamp (history) */}
+            {/* snippet label, or type badge + time for history */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
               {isSnippet && isEditing ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
@@ -386,7 +363,6 @@ export default function ClipboardView() {
               )}
             </div>
 
-            {/* Right: action buttons */}
             <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
               {meta.kind === 'link' && (
                 <button
@@ -433,7 +409,7 @@ export default function ClipboardView() {
             </div>
           </div>
 
-          {/* Content, click to copy */}
+          {/* click to copy */}
           <pre
             onClick={() => {
               if ((window.getSelection()?.toString() ?? '').length > 0) return
@@ -463,7 +439,6 @@ export default function ClipboardView() {
             {item.content}
           </pre>
 
-          {/* Footer meta */}
           <div className="row-between-gap">
             <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
               {item.content.length.toLocaleString()} chars{lineCount > 1 ? ` · ${lineCount} lines` : ''}
@@ -516,7 +491,7 @@ export default function ClipboardView() {
       fontFamily: 'var(--font-sans)'
     }}>
 
-      {/* LEFT COLUMN: Clipboard History (Unpinned) */}
+      {/* left: unpinned history */}
       <div style={{
         flex: 1.5,
         display: 'flex',
@@ -525,7 +500,6 @@ export default function ClipboardView() {
         height: '100%',
         overflow: 'hidden'
       }}>
-        {/* Header section */}
         <div style={{
           padding: 'var(--space-4)',
           borderBottom: '1px solid var(--color-surface-offset)',
@@ -545,10 +519,10 @@ export default function ClipboardView() {
             {unpinnedItems.length > 0 && (
               <button
                 onClick={handleClearHistory}
+                className="bg-clear hover-bg-error-muted"
                 style={{
                   fontSize: 'var(--text-xs)',
                   color: 'var(--color-error)',
-                  background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                   display: 'flex',
@@ -557,8 +531,6 @@ export default function ClipboardView() {
                   padding: '4px 8px',
                   borderRadius: 'var(--radius-sm)'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--color-error-muted)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <Trash2 size={12} />
                 Clear Unpinned
@@ -566,7 +538,6 @@ export default function ClipboardView() {
             )}
           </div>
 
-          {/* Search bar */}
           <div className="row-relative">
             <Search size={14} className="input-icon" />
             <input
@@ -590,7 +561,6 @@ export default function ClipboardView() {
           </div>
         </div>
 
-        {/* History items container */}
         <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {loading ? (
             <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', textAlign: 'center', padding: 'var(--space-6)' }}>
@@ -623,7 +593,7 @@ export default function ClipboardView() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Pinned Snippets */}
+      {/* right: pinned snippets */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -633,7 +603,6 @@ export default function ClipboardView() {
         background: 'var(--color-surface-1)'
       }}>
 
-        {/* Snippets header */}
         <div style={{
           padding: 'var(--space-4)',
           borderBottom: '1px solid var(--color-surface-offset)',
@@ -665,7 +634,6 @@ export default function ClipboardView() {
             </button>
           </div>
 
-          {/* Add form */}
           {isAdding && (
             <form onSubmit={handleCreateSnippet} style={{
               display: 'flex',
@@ -737,7 +705,6 @@ export default function ClipboardView() {
             </form>
           )}
 
-          {/* Snippets search bar */}
           <div className="row-relative">
             <Search size={14} className="input-icon" />
             <input
@@ -761,7 +728,6 @@ export default function ClipboardView() {
           </div>
         </div>
 
-        {/* Snippets container */}
         <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {filteredSnippets.length === 0 ? (
             <div style={{
@@ -790,7 +756,6 @@ export default function ClipboardView() {
           )}
         </div>
 
-        {/* Tip panel at bottom */}
         <div style={{
           padding: 'var(--space-3)',
           borderTop: '1px solid var(--color-surface-offset)',

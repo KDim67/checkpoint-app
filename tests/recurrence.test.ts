@@ -7,7 +7,7 @@ import {
 } from '../src/shared/recurrence'
 import { defined } from './helpers/defined'
 
-/** Local-time constructor, so the tests mean the same thing the rules do. */
+/** local time, like the rules */
 const at = (y: number, m: number, d: number, h = 9, min = 0) =>
   new Date(y, m - 1, d, h, min, 0, 0).getTime()
 
@@ -38,7 +38,7 @@ describe('normalizeRule', () => {
   })
 
   it('rejects a window that closes before it opens', () => {
-    // Such a rule could never fire; creating it would look like it worked.
+    // could never fire, creating it would look like it worked
     expect(normalizeRule({ freq: 'daily', startAt: at(2026, 5, 1), untilAt: at(2026, 1, 1) })).toBeNull()
   })
 
@@ -79,7 +79,7 @@ describe('nextOccurrence: daily', () => {
   })
 
   it('lands on the interval grid after a long gap, not on the gap itself', () => {
-    // Started 1 Jan every 3 days; 1 Mar is day 59, so the grid gives 2 Mar.
+    // started 1 Jan every 3 days: 1 Mar is day 59, the grid gives 2 Mar
     const r = rule({ interval: 3 })
     const next = nextOccurrence(r, at(2026, 3, 1, 12))
     const daysSinceStart = Math.round((defined(next) - r.startAt) / 86_400_000)
@@ -108,7 +108,7 @@ describe('nextOccurrence: weekly', () => {
   })
 
   it('fires on each named weekday', () => {
-    // 1 Jan 2026 is a Thursday. Mondays and Fridays only.
+    // 1 Jan 2026 is a Thursday; Mondays and Fridays only
     const r = rule({ freq: 'weekly', startAt: at(2026, 1, 1), byWeekday: [1, 5] })
     const first = defined(nextOccurrence(r, at(2026, 1, 1)))
     expect(new Date(first).getDay()).toBe(5)
@@ -138,8 +138,7 @@ describe('nextOccurrence: monthly', () => {
   })
 
   it('clamps to the last day of a shorter month instead of rolling over', () => {
-    // The classic bug: 31 Jan + 1 month rolls to 2 or 3 March and then every
-    // later occurrence is permanently shifted.
+    // 31 Jan + 1 month rolling into March shifts everything after
     const r = rule({ freq: 'monthly', startAt: at(2026, 1, 31) })
     const feb = defined(nextOccurrence(r, at(2026, 1, 31)))
     expect(new Date(feb).getMonth()).toBe(1)
@@ -189,8 +188,7 @@ describe('nextOccurrence: termination', () => {
   })
 
   it('answers a far-future cutoff by jumping, not by stepping to it', () => {
-    // The fast-forward is what makes this possible: a daily rule 174 years old
-    // would otherwise need 63,000 steps and hit the loop guard.
+    // fast-forward, or 63,000 steps hit the loop guard
     const r = rule({ startAt: at(2026, 1, 1) })
     const started = process.hrtime.bigint()
     const next = nextOccurrence(r, at(2200, 1, 1))

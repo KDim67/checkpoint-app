@@ -10,7 +10,6 @@ import * as aiApi from '../../data/ai'
 import { setSetting } from '../../data/settings'
 import MemoryVaultManager from './MemoryVaultManager'
 
-// AI Settings
 export default function AiSettings() {
   const { toast } = useToast()
   const [baseURL, setBaseURL] = useState('http://localhost:11434/v1')
@@ -21,7 +20,7 @@ export default function AiSettings() {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [connectionError, setConnectionError] = useState('')
 
-  // Provider profiles (the active one is mirrored into baseURL/apiKey/model above)
+  // the active one is mirrored into the flat settings
   const [providers, setProviders] = useState<AiProvider[]>([])
   const [activeId, setActiveId] = useState<string>('')
   const [showPresetMenu, setShowPresetMenu] = useState(false)
@@ -33,7 +32,7 @@ export default function AiSettings() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Load provider profiles (migrates the old flat settings on first run)
+        // migrates old flat settings on first run
         const { providers: provs, activeId: active } = await loadProviders()
         setProviders(provs)
         setActiveId(active)
@@ -44,9 +43,7 @@ export default function AiSettings() {
           setModel(activeProv.model)
         }
 
-        // Read as numbers rather than tested for truthiness: temperature 0 is a
-        // valid and meaningful setting, and choosing it used to revert to the
-        // default on reopen.
+        // as numbers: temperature 0 is valid and used to revert
         setTemperature(await getNumberSetting('ai_temperature', 0.7))
         setMaxTokens(await getNumberSetting('ai_max_tokens', 2048))
         const samples = await loadEmailSamples()
@@ -56,11 +53,7 @@ export default function AiSettings() {
     load()
   }, [])
 
-  /**
-   * Persists one setting. The failure path matters: this was fire-and-forget,
-   * so a rejected write left the control showing the new value while the
-   * database kept the old one, and the user had no way to know.
-   */
+  /** a rejected write used to leave the control showing a value that never saved */
   const save = (key: string, val: string | number): void => {
     setSetting(key, val).catch(err => {
       console.error(`Failed to save ${key}:`, err)
@@ -68,10 +61,9 @@ export default function AiSettings() {
     })
   }
 
-  // Provider profile management
   const activeProvider = providers.find(p => p.id === activeId) || null
 
-  // Notify the AI panel so it reloads the active provider's model/endpoint.
+  // the AI panel reloads the active provider
   const notifyProviderChanged = (): void => {
     window.dispatchEvent(new CustomEvent('checkpoint-ai-provider-changed'))
   }
@@ -165,7 +157,7 @@ export default function AiSettings() {
 
   return (
     <div className="col-lg">
-      {/* Provider profiles: keep several connections (local + cloud) and switch */}
+      {/* several connections, switch between them */}
       <FieldRow label="Provider">
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', position: 'relative', width: '100%' }}>
           <div style={{ position: 'relative', flex: 1 }}>
@@ -209,9 +201,8 @@ export default function AiSettings() {
                 <button
                   key={preset.id}
                   onClick={() => handleAddPreset(preset)}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-surface-offset)', padding: '8px 12px', cursor: 'pointer' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  className="bg-clear hover-bg-offset"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', textAlign: 'left', border: 'none', borderBottom: '1px solid var(--color-surface-offset)', padding: '8px 12px', cursor: 'pointer' }}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>
                     {preset.local ? <Server size={12} /> : <Cloud size={12} />}
@@ -279,9 +270,7 @@ export default function AiSettings() {
           min={1}
           max={200000}
           value={maxTokens}
-          // Typed freely, clamped on blur: validating per keystroke fights the
-          // user mid-edit, and `parseInt(v) || 0` previously let an empty or
-          // malformed field persist 0, which makes generation fail outright.
+          // clamped on blur; per-keystroke fights the user, and 0 tokens fails generation
           onChange={v => setMaxTokens(parseInt(v, 10) || 0)}
           onBlur={() => {
             const clamped = Math.min(200000, Math.max(1, maxTokens || 2048))
@@ -361,18 +350,16 @@ export default function AiSettings() {
                 </div>
                 <button
                   onClick={() => handleRemoveSample(sample.id)}
+                  className="text-muted hover-text-error"
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: 'var(--color-text-muted)',
                     cursor: 'pointer',
                     padding: '2px',
                     display: 'flex',
                     alignItems: 'center',
                     borderRadius: 'var(--radius-sm)'
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-error)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
                   title="Remove sample draft"
                 >
                   <Trash2 size={13} />

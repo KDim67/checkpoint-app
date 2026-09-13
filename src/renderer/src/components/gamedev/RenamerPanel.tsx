@@ -3,7 +3,7 @@ import type { RenamerPreset, RenamerSuffixPreset } from './types'
 import { Info, Trash2, RefreshCw, CheckCircle, Layers } from 'lucide-react'
 import type { RenamerTool } from './useRenamerTool'
 
-/** The folder a file sits in, with its trailing separator. */
+/** with its trailing separator */
 function folderOf(path: string): string {
   return path.slice(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')) + 1)
 }
@@ -11,14 +11,7 @@ function folderOf(path: string): string {
 export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
   const { files, getNewName } = tool
 
-  /**
-   * How many files are headed for each name, keyed by folder so two files of
-   * the same name in different folders are not a clash.
-   *
-   * Renaming two files onto one name destroys one of them. The main process
-   * refuses that batch outright, and this is so the refusal is not the first
-   * anyone hears of it: the clash is visible in the list before Apply.
-   */
+  /** keyed by folder; main refuses clashing batches, so show the clash before Apply */
   const targetCounts = useMemo(() => {
     const counts = new Map<string, number>()
     files.forEach((file, idx) => {
@@ -40,11 +33,9 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           
-          {/* Settings Card */}
           <div className="panel">
             <h3 className="heading-sm">Naming Conventions</h3>
             
-            {/* Preset Row */}
             <div className="col-4px">
               <label className="text-caption">Asset Type Prefix (Unity/Unreal)</label>
               <select
@@ -59,7 +50,6 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               </select>
             </div>
 
-            {/* Suffix Preset */}
             <div className="col-4px">
               <label className="text-caption">Texture Map Suffix</label>
               <select
@@ -73,7 +63,6 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               </select>
             </div>
 
-            {/* Custom Prefix & Suffix */}
             <div className="grid-2">
               <div className="col-4px">
                 <label className="text-caption">Custom Prefix</label>
@@ -97,7 +86,6 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               </div>
             </div>
 
-            {/* Search and Replace */}
             <div className="grid-2">
               <div className="col-4px">
                 <label className="text-caption">Search For</label>
@@ -121,7 +109,6 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
               </div>
             </div>
 
-            {/* Auto Number Indexing */}
             <div style={{
               border: '1px solid var(--color-surface-offset)',
               borderRadius: 'var(--radius-md)',
@@ -178,7 +165,6 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
             </div>
           </div>
 
-          {/* Drag Zone Card */}
           <div
             onDragOver={tool.handleDragOver}
             onDragLeave={tool.handleDragLeave}
@@ -219,7 +205,6 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
           </div>
         </div>
 
-        {/* Preview List */}
         {files.length > 0 && (
           <div style={{
             background: 'var(--color-surface-1)',

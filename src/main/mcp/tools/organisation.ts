@@ -4,7 +4,7 @@ import { recordMcpActivity } from '../../mcpActivity'
 import { shorten } from '../../../shared/mcpActivity'
 import { json, notifyRenderer, text, z } from '../toolKit'
 
-/** Tags, and the relationships between items. */
+/** tags and item relations */
 export function registerOrganisationTools(mcp: McpServer): void {
   mcp.registerTool(
     'list_tags',
@@ -22,8 +22,7 @@ export function registerOrganisationTools(mcp: McpServer): void {
       }
     },
     async ({ name, color }) => {
-      // The DB validates the hex shape, so a bad colour would reject the whole
-      // call; falling back keeps a tag from being lost over a formatting slip.
+      // the DB rejects bad hex, fall back so a formatting slip doesn't lose the tag
       const hex = color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#535e85'
       const tag = createTag({ name, color: hex })
       recordMcpActivity('create_tag', null, `Created tag "${shorten(name, 30)}"`, [

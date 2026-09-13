@@ -111,7 +111,7 @@ describe('buildTemplateCards', () => {
     const drafts = buildTemplateCards(template)
     expect(drafts[0].position).toBe(1000)
     expect(drafts[1].position).toBe(2000)
-    // Third is first in its own column, so it restarts.
+    // first in its own column, so it restarts
     expect(drafts[2].position).toBe(1000)
   })
 

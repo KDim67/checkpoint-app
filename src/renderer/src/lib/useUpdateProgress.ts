@@ -1,16 +1,4 @@
-/**
- * What the background update download is doing, shared by everything that shows it.
- *
- * Held once for the whole app rather than once per component. Two surfaces want
- * it, the titlebar indicator and the About panel, and each mounting its own
- * subscription would mean two IPC reads and two listeners describing the same
- * single download.
- *
- * It also has to survive the panel being shut, which is where most of a download
- * happens. A component mounting halfway through gets the current figure straight
- * away instead of waiting for the next event, and a download that finished an
- * hour ago still has something to say.
- */
+/** held once for the app: two surfaces, one download; late mounts get the current figure */
 
 import { useEffect, useState } from 'react'
 import type { UpdateProgress } from '../../../shared/types'
@@ -27,17 +15,13 @@ function publish(next: UpdateProgress | null): void {
   for (const listener of listeners) listener(next)
 }
 
-/**
- * Subscribed on first use and never unsubscribed. The indicator is mounted for
- * the whole session anyway, and dropping the listener between components would
- * lose the events that arrive in the gap.
- */
+/** never unsubscribed, dropping the listener would lose events in the gap */
 function ensureSubscribed(): void {
   if (subscribed) return
   subscribed = true
   appApi.onUpdateProgress(publish)
   appApi.updateState()
-    // A live event that lands before this read resolves is the newer answer.
+    // a live event before this resolves is newer
     .then(state => { if (state && !current) publish(state) })
     .catch(err => console.error('Failed to read the update state:', err))
 }

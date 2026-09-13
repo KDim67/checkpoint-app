@@ -11,7 +11,7 @@ const msg = (over: Partial<Message> = {}): Message => ({ role: 'user', content: 
 
 describe('cheatsheetBudget', () => {
   it('splits the budget across the attached sheets rather than giving each the whole', () => {
-    // Five documents at the full budget each is how a context window gets eaten.
+    // five docs at full budget each eat the window
     const one = cheatsheetBudget(false, 32000, 1)
     const five = cheatsheetBudget(false, 32000, 5)
     expect(five).toBeLessThan(one)
@@ -43,14 +43,14 @@ describe('noteCap and fileCap', () => {
   })
 
   it('allow more of a source file than of a note', () => {
-    // Source needs surrounding context to be readable; a note is usually prose.
+    // source needs context, notes are prose
     expect(fileCap(false)).toBeGreaterThan(noteCap(false))
   })
 })
 
 describe('collectAttachments', () => {
   it('gathers across the whole conversation, not just the last message', () => {
-    // A document attached five turns ago is still what the user is asking about.
+    // a doc from five turns ago is still the topic
     const messages = [
       msg({ cheatsheets: ['api.pdf'] }),
       msg({ role: 'assistant', content: 'ok' }),

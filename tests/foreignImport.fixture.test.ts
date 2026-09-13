@@ -8,15 +8,7 @@ import {
 } from '../src/shared/foreignImport'
 import { defined } from './helpers/defined'
 
-/**
- * The unit tests use hand-made objects; this one runs a whole realistic export
- * through, of the shape and size someone actually migrating would bring.
- *
- * The fixture deliberately contains every awkward case at once: lists out of
- * array order, an archived list, an archived card, a card orphaned by that
- * archived list, cards with no labels, a card with two labels, checklists in
- * mixed order, a null due date and a real one.
- */
+/** a realistic export with every awkward case at once */
 const board = JSON.parse(
   readFileSync(join(__dirname, 'fixtures', 'trello-board.json'), 'utf8')
 )
@@ -31,7 +23,7 @@ describe('a whole Trello export', () => {
   })
 
   it('puts the columns in the order Trello showed them', () => {
-    // The fixture lists Done first in the array and last by position.
+    // Done is first in the array, last by position
     expect(parsed.columns.map(c => c.name)).toEqual([
       'To Do', 'In Progress', 'Playtesting', 'Done'
     ])
@@ -43,7 +35,7 @@ describe('a whole Trello export', () => {
   })
 
   it('keeps every card, including the archived and the orphaned one', () => {
-    // Ten cards in, ten cards out. Nothing silently lost in migration.
+    // ten in, ten out
     expect(parsed.cards).toHaveLength(10)
   })
 

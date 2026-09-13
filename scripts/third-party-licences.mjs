@@ -1,23 +1,11 @@
-/**
- * Writes the third-party attribution file that ships with the app.
- *
- * MIT, ISC, BSD and OFL all require their notice to travel with the binary, so
- * this is an obligation rather than a courtesy. Generated rather than
- * hand-kept: a list written once is wrong by the next `npm install`.
- *
- * Walks what actually ships, which is more than `dependencies`. Vite bundles
- * the renderer's libraries into `out/renderer`, so React, Three.js and the
- * rest travel inside the installer even though they are devDependencies.
- *
- *   node scripts/third-party-licences.mjs
- */
+/** MIT/ISC/BSD/OFL notices must ship with the binary; generated since a hand-kept list rots */
 
 import fs from 'fs'
 import path from 'path'
 
 const OUT = path.join('resources', 'THIRD-PARTY-LICENSES.txt')
 
-/** Bundled into the renderer by Vite, so shipped despite being devDependencies. */
+/** vite bundles these into the renderer, so they ship despite being devDependencies */
 const RENDERER_BUNDLED = [
   '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities',
   '@fontsource/inter', '@fontsource/jetbrains-mono',
@@ -37,7 +25,7 @@ const readLicenceText = (dir) => {
     try {
       if (fs.statSync(file).isFile()) return fs.readFileSync(file, 'utf8').trim()
     } catch {
-      // Not this one.
+      // not this one
     }
   }
   return null
@@ -99,8 +87,7 @@ for (const name of names) {
 
 lines.push('', '='.repeat(78), 'FULL LICENCE TEXTS', '='.repeat(78), '')
 
-// Identical texts are shared by hundreds of packages, so they are printed once
-// with the list of packages they cover. Verbatim either way, just not 312 times.
+// shared licence texts print once with their package list
 const byText = new Map()
 for (const name of names) {
   const p = packages.get(name)

@@ -15,7 +15,7 @@ const twoWalls: WallIndex = {
 
 type SwitcherProps = Parameters<typeof WallSwitcher>[0]
 
-/** The switcher is controlled, so the open menu and the rename draft live here the way they do in WallView. */
+/** controlled, so menu and rename draft live here like in WallView */
 function Harness({ index, commitIndex, setPendingDelete }: {
   index: WallIndex
   commitIndex: SwitcherProps['commitIndex']

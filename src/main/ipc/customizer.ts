@@ -1,4 +1,4 @@
-/** User themes, plugins and custom shortcuts. */
+/** user themes, plugins, custom shortcuts */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -7,12 +7,9 @@ import { shell } from 'electron'
 import type { ShortcutMap } from '../../shared/types'
 
 export function registerCustomizerHandlers(): void {
-  // Handled here rather than in mcpServer.ts so the log stays readable and
-  // reversible while the server itself is switched off.
   ipcMain.handle(IpcChannels.CUSTOMIZER_GET_CSS, async () => {
     const { getSetting } = await import('../db')
-    // Silent when the engine is off: the stored variables should not apply until
-    // the user turns it back on.
+    // silent while the engine is off, stored vars wait until it's back on
     if (getSetting<string>('customizer_enabled', 'false') !== 'true') return ''
     const { resolveThemeCss } = await import('../customizer')
     return resolveThemeCss()
@@ -27,7 +24,7 @@ export function registerCustomizerHandlers(): void {
     } else {
       await disableCustomizer()
     }
-    // Re-register hotkeys in either case to apply new or default mappings
+    // re-register either way to apply new or default mappings
     registerAppShortcuts()
   })
 
@@ -81,9 +78,7 @@ export function registerCustomizerHandlers(): void {
     }
 
     if (active) {
-      // Loaded before it is recorded. Persisting first meant a plugin that threw
-      // was still stored as enabled: the switch claimed something untrue, and
-      // the failure was retried silently on every launch.
+      // load before recording; a throwing plugin used to stay stored as enabled
       const result = loadPlugin(filename)
       if (!result.ok) return result
       if (!activePlugins.includes(filename)) {
@@ -111,8 +106,7 @@ export function registerCustomizerHandlers(): void {
       const dir = getPluginsDir()
       ensureDir(dir)
       const target = join(dir, example.filename)
-      // Never overwritten: the copy on disk may have been edited, and silently
-      // replacing someone's edits would be worse than refusing.
+      // never overwrite, the disk copy may have been edited
       if (existsSync(target)) {
         return { ok: false as const, error: `${example.filename} already exists in the plugins folder.` }
       }

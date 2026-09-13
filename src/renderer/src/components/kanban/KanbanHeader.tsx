@@ -7,7 +7,7 @@ import TemplateMenu from './TemplateMenu'
 import BoardThemeMenu from './BoardThemeMenu'
 import type { KanbanBoard } from './useKanbanBoard'
 
-/** The card face fields a board can switch on and off. */
+/** card face fields a board can toggle */
 const CARD_DISPLAY_FIELDS: { key: keyof CardDisplay; label: string }[] = [
   { key: 'priority', label: 'Priority Bar' },
   { key: 'tags', label: 'Tags' },
@@ -29,9 +29,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
   } = kanbanBoard
   return (
     <header className="kanban-header" style={{
-      // Not a fixed height. Everything inside is nowrap now, so it never
-      // needs to grow, but a hard 52px was what let the wrapped text spill
-      // out of the bar rather than being clipped by it.
+      // min not fixed: a hard 52px let wrapped text spill out
       minHeight: '52px',
       display: 'flex',
       alignItems: 'center',
@@ -42,9 +40,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
       background: 'var(--color-surface-1)',
       flexShrink: 0
     }}>
-      {/* minWidth 0 so this side is what gives way when the bar is narrow.
-          Without it a flex child refuses to shrink below its content and
-          pushes the buttons off the right edge instead. */}
+      {/* minWidth 0 so this side gives way when narrow */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
         <h1 className="kanban-header-title" style={{
           fontSize: 'var(--text-base)',
@@ -60,10 +56,10 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen(v => !v)}
+            className="bg-surface-2 hover-bg-offset"
             style={{
               fontSize: 'var(--text-xs)',
               color: 'var(--color-secondary)',
-              background: 'var(--color-surface-2)',
               padding: '2px 10px',
               borderRadius: 'var(--radius-full)',
               border: '1px solid var(--color-surface-offset)',
@@ -73,17 +69,10 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              // A workspace can be called anything. Truncated rather than
-              // wrapped, which turned a chip into a three-line block.
+              // truncated, wrapping turned a chip into three lines
               maxWidth: '190px',
               minWidth: 0,
               whiteSpace: 'nowrap'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'var(--color-surface-offset)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'var(--color-surface-2)'
             }}
           >
             <span className="truncate">
@@ -143,15 +132,12 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
         </span>
       </div>
 
-      {/* Never shrinks. A button pushed past the right edge is a button
-          nobody can press, and this row has gone over it before. */}
+      {/* never shrinks, a button past the edge can't be pressed */}
       <div className="row no-shrink">
         <CollabPanel session={collab} />
 
-        {/* Background Theme Customizer */}
         <BoardThemeMenu theme={theme} persistConfig={persistConfig} />
 
-        {/* Archive Bin side drawer button */}
         <HeaderBtn
           onClick={() => setShowArchiveBin(true)}
           title="View archived cards and lists"
@@ -166,7 +152,6 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
           Archive Bin
         </HeaderBtn>
 
-        {/* Swimlanes toggle */}
         <HeaderBtn
           active={swimlanesEnabled}
           onClick={async () => {
@@ -180,7 +165,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
           {swimlanesEnabled ? 'Priority View' : 'Flat Board'}
         </HeaderBtn>
 
-        {/* Card face toggles. What each card shows */}
+        {/* what each card shows */}
         <div className="relative" ref={cardDisplayRef}>
           <HeaderBtn
             active={showCardDisplayMenu}
@@ -237,7 +222,6 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
           )}
         </div>
 
-        {/* From Template Dropdown */}
         {templateCards.length > 0 && (
           <TemplateMenu
             templates={templateCards}
@@ -247,9 +231,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
           />
         )}
 
-        {/* Adding a column lives at the end of the column row, where the
-            new column will appear. A second button in the header only cost
-            space in a header that has too little of it. */}
+        {/* add column lives at the end of the column row */}
 
       </div>
     </header>

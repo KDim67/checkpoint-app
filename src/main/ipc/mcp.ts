@@ -1,4 +1,4 @@
-/** The MCP server, and undoing what an agent did through it. */
+/** MCP server, and undoing an agent's changes */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -14,8 +14,7 @@ export function registerMcpHandlers(): void {
     const { undoMcpActivity } = await import('../mcpActivity')
     const result = undoMcpActivity(id)
     if (result.ok) {
-      // The board and lists are already open; without this the reversal only
-      // appears after a manual refresh.
+      // otherwise the open board only shows the reversal after a refresh
       sendToWindow(IpcChannels.MCP_DATA_CHANGED)
     }
     return result
@@ -29,9 +28,7 @@ export function registerMcpHandlers(): void {
       ? () => sendToWindow(IpcChannels.MCP_DATA_CHANGED)
       : null)
 
-    // Errors propagate to the renderer rather than being swallowed: a port
-    // clash must be visible in Settings, not leave the toggle looking enabled
-    // while nothing is listening.
+    // let a port clash reach Settings, not a toggle that looks on with nothing listening
     const actualPort = await toggleMcpServer(active, port || fallback)
     setSetting('feature_mcp', active ? 'true' : 'false')
     if (active && actualPort) setSetting('mcp_port', String(actualPort))
@@ -51,8 +48,7 @@ export function registerMcpHandlers(): void {
 
   ipcMain.handle(IpcChannels.MCP_REGENERATE_TOKEN, async () => {
     const { regenerateMcpToken } = await import('../mcpServer')
-    // No restart needed: the token is read per request, so existing clients
-    // simply start getting 401s.
+    // token is read per request, existing clients just start getting 401s
     return regenerateMcpToken()
   })
 }

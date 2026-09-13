@@ -5,8 +5,6 @@ import { z } from 'zod'
 import { getDb, createItem } from './db'
 import { ensureWebhookToken, offeredToken, tokenMatches } from './webhookAuth'
 
-// Webhook Schema
-
 const WebhookPayloadSchema = z.object({
   context: z.string().min(1, 'Workspace slug cannot be empty'),
   title: z.string().default(''),
@@ -16,18 +14,11 @@ const WebhookPayloadSchema = z.object({
   due_at: z.number().nullable().optional().default(null)
 })
 
-// State Variables
-
 let serverInstance: http.Server | null = null
 let currentListeningPort: number | null = null
 const activeSockets = new Set<Socket>()
 
-// Controller Functions
-
-/**
- * Starts the webhook gateway HTTP server.
- * Resolves with the actual port the server bound to.
- */
+/** resolves with the port it actually bound */
 function startWebhookServer(requestedPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
     if (serverInstance) {
@@ -48,11 +39,7 @@ function startWebhookServer(requestedPort: number): Promise<number> {
       const server = http.createServer(async (req, res) => {
         const { method, url } = req
 
-        // Deliberately no CORS headers. A webhook caller is a script, a CI job
-        // or curl, none of which need them; a browser does, and a browser is
-        // exactly what should not be able to reach this. Without the wildcard
-        // that used to be here, a cross-origin page cannot read the response,
-        // and the Authorization header below forces a preflight it cannot pass.
+        // no CORS: scripts don't need it, and browsers shouldn't reach this
         if (method !== 'POST') {
           res.writeHead(405, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ success: false, error: 'Method Not Allowed' }))
@@ -65,8 +52,7 @@ function startWebhookServer(requestedPort: number): Promise<number> {
           return
         }
 
-        // Checked after the route so an unauthenticated caller cannot map the
-        // endpoints by watching which ones answer differently.
+        // auth after routing, so unauthenticated callers can't map endpoints by response
         if (!tokenMatches(offeredToken(req.headers.authorization), ensureWebhookToken())) {
           res.writeHead(401, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({
@@ -149,7 +135,7 @@ function startWebhookServer(requestedPort: number): Promise<number> {
         serverInstance = server
         currentListeningPort = port
 
-        // Keep track of active sockets for force deconstruction
+        // tracked so stop can destroy them
         server.on('connection', (socket) => {
           activeSockets.add(socket)
           socket.on('close', () => {
@@ -158,8 +144,7 @@ function startWebhookServer(requestedPort: number): Promise<number> {
         })
 
         if (port !== requestedPort) {
-          // Deduped: a port that stays blocked would otherwise warn on every
-          // restart, and the message is identical each time.
+          // deduped, a blocked port would warn on every restart
           notify({
             category: 'webhook',
             title: 'Webhook Port Conflict',
@@ -179,10 +164,6 @@ function startWebhookServer(requestedPort: number): Promise<number> {
   })
 }
 
-/**
- * Shuts down the webhook server, destroys all open sockets,
- * and releases server references completely from memory.
- */
 export async function stopWebhookServer(): Promise<void> {
   if (!serverInstance) return
 
@@ -190,7 +171,6 @@ export async function stopWebhookServer(): Promise<void> {
   serverInstance = null
   currentListeningPort = null
 
-  // Force destroy active sockets
   for (const socket of activeSockets) {
     socket.destroy()
   }
@@ -203,9 +183,6 @@ export async function stopWebhookServer(): Promise<void> {
   })
 }
 
-/**
- * Helper to start/stop the gateway based on a toggle state.
- */
 export async function toggleWebhookGateway(active: boolean, port: number): Promise<number | null> {
   if (active) {
     const actualPort = await startWebhookServer(port)

@@ -9,16 +9,16 @@ interface LogInputProps {
 }
 
 const CURATED_COLORS = [
-  '#ef4444', // Red
-  '#f97316', // Orange
-  '#3b82f6', // Blue
-  '#10b981', // Green
-  '#a855f7', // Purple
-  '#ec4899', // Pink
-  '#38bdf8', // Sky
-  '#fbbf24', // Amber
-  '#a3e635', // Lime
-  '#22d3ee'  // Cyan
+  '#ef4444', // red
+  '#f97316', // orange
+  '#3b82f6', // blue
+  '#10b981', // green
+  '#a855f7', // purple
+  '#ec4899', // pink
+  '#38bdf8', // sky
+  '#fbbf24', // amber
+  '#a3e635', // lime
+  '#22d3ee'  // cyan
 ]
 
 export default function LogInput({ context, onSubmit }: LogInputProps) {
@@ -26,7 +26,6 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
   const [submitting, setSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-grow textarea height
   useEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) return
@@ -46,7 +45,7 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
     if (isImage) return
 
     const text = e.clipboardData.getData('text')
-    // If user pastes block starting with ``` and it doesn't end with ```, auto wrap/close it
+    // close an unterminated ``` paste
     if (text.trim().startsWith('```') && !text.trim().endsWith('```')) {
       e.preventDefault()
       const wrappedText = `${text}\n\`\`\``
@@ -67,7 +66,6 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
 
     setSubmitting(true)
     try {
-      // 1. Detect tags (#tagname)
       const tagRegex = /#([a-zA-Z0-9-_]+)/g
       const matches: string[] = []
       let match
@@ -78,7 +76,7 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
         }
       }
 
-      // 2. Fetch all existing tags to see if we need to create any
+      // create tags that don't exist yet
       const tagIds = await resolveTagIds(
         matches.map(name => ({
           name,
@@ -86,11 +84,9 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
         }))
       )
 
-      // 3. Submit
       await onSubmit(text, tagIds)
       setValue('')
       
-      // Focus back
       textareaRef.current?.focus()
     } catch (err) {
       console.error('Failed to save log entry:', err)
@@ -109,19 +105,15 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
       gap: 'var(--space-2)',
       flexShrink: 0
     }}>
-      <div style={{
+      <div className="log-input-box border-offset" style={{
         display: 'flex',
         alignItems: 'flex-end',
         gap: 'var(--space-2)',
         background: 'var(--color-surface-2)',
-        border: '1px solid var(--color-surface-offset)',
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-2) var(--space-3)',
         transition: 'border-color var(--duration-fast) var(--ease-default)'
-      }}
-      onFocusCapture={e => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
-      onBlurCapture={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
-      >
+      }}>
         <textarea
           ref={textareaRef}
           value={value}
@@ -151,6 +143,7 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
           onClick={handleSubmit}
           disabled={!value.trim() || submitting}
           title="Send Log Entry (Enter)"
+          className="log-input-send"
           style={{
             background: value.trim() && !submitting ? 'var(--color-secondary)' : 'transparent',
             border: 'none',
@@ -165,20 +158,11 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
             flexShrink: 0,
             transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)'
           }}
-          onMouseEnter={e => {
-            if (value.trim() && !submitting) {
-              e.currentTarget.style.filter = 'brightness(1.1)'
-            }
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.filter = 'none'
-          }}
         >
           <Send size={16} />
         </button>
       </div>
       
-      {/* Help info / active tags indicator */}
       <div style={{
         display: 'flex',
         alignItems: 'center',

@@ -1,11 +1,4 @@
-/**
- * Reading and writing a workspace's walls. Mirrors `lib/boardConfig.ts`. Pure
- * model there, IPC here. Writes are debounced: a drag changes position every
- * frame.
- *
- * Takes a storage key, not a workspace: a workspace has several walls now and
- * the caller knows which.
- */
+/** mirrors lib/boardConfig; writes debounced since drags change every frame; keyed per wall */
 
 import {
   normalizeWallDoc, normalizeWallIndex, wallIndexKey,
@@ -13,7 +6,7 @@ import {
 } from '../../../shared/wallModel'
 import { deleteSetting, getSetting, setSetting } from '../data/settings'
 
-/** Long enough to swallow a drag, short enough that a crash loses nothing worth having. */
+/** swallows a drag, a crash loses little */
 const SAVE_DEBOUNCE_MS = 400
 
 export async function loadWallDoc(key: string): Promise<WallDoc> {
@@ -21,7 +14,7 @@ export async function loadWallDoc(key: string): Promise<WallDoc> {
     const stored = await getSetting(key)
     return normalizeWallDoc(stored)
   } catch (err) {
-    // Empty wall beats a broken view. The stored value is left alone.
+    // an empty wall beats a broken view, the stored value is untouched
     console.error('[wall] could not load:', err)
     return normalizeWallDoc(null)
   }
@@ -29,7 +22,7 @@ export async function loadWallDoc(key: string): Promise<WallDoc> {
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 
-/** Debounced per wall, so switching walls mid-drag cannot cross the writes. */
+/** per wall, so switching mid-drag can't cross writes */
 export function saveWallDoc(key: string, doc: WallDoc): void {
   const existing = timers.get(key)
   if (existing) clearTimeout(existing)
@@ -38,15 +31,14 @@ export function saveWallDoc(key: string, doc: WallDoc): void {
     key,
     setTimeout(() => {
       timers.delete(key)
-      // An object, not a string: setSetting serialises, and double-encoding bit
-      // the board's persistence once already.
+      // an object, setSetting serialises; double-encoding bit the board once
       setSetting(key, normalizeWallDoc(doc))
         .catch(err => console.error('[wall] could not save:', err))
     }, SAVE_DEBOUNCE_MS)
   )
 }
 
-/** Writes immediately, for when the view is going away and the timer would not fire. */
+/** immediate, for when the view is leaving */
 export async function flushWallDoc(key: string, doc: WallDoc): Promise<void> {
   const existing = timers.get(key)
   if (existing) {
@@ -60,7 +52,7 @@ export async function flushWallDoc(key: string, doc: WallDoc): Promise<void> {
   }
 }
 
-/** Cancels the pending write first, or a debounced save resurrects the wall. */
+/** cancel the pending write or it resurrects the wall */
 export async function deleteWallDoc(key: string): Promise<void> {
   const existing = timers.get(key)
   if (existing) {
@@ -83,10 +75,7 @@ export async function loadWallIndex(context: string): Promise<WallIndex> {
   }
 }
 
-/**
- * Not debounced: the index only changes on create/rename/delete/switch, and
- * losing one of those to a crash strands a wall's contents.
- */
+/** not debounced, losing one of these strands a wall */
 export async function saveWallIndex(context: string, index: WallIndex): Promise<void> {
   try {
     await setSetting(wallIndexKey(context), index)

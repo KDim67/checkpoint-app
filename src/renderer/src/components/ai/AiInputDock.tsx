@@ -21,7 +21,6 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
         position: 'relative'
       }}
     >
-      {/* Jump back to the newest message when scrolled up */}
       {showJumpToLatest && (
         <button
           onClick={() => {
@@ -53,7 +52,6 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
           <span>{isStreaming ? 'Following live…' : 'Latest'}</span>
         </button>
       )}
-      {/* Skill Selector Pill Bar + Workspace pill */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
         {(() => {
           const resolvedAutoSkillId = (() => {
@@ -138,7 +136,6 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
           </button>
         )}
 
-        {/* Token Budget Indicator */}
         <div
           title={`${tokenUsage.measured ? '' : '~'}${tokenUsage.used.toLocaleString()} / ${modelCaps.contextTokens.toLocaleString()} tokens of context window in use${tokenUsage.measured ? ' (reported by the endpoint)' : ' (estimated)'}`}
           style={{

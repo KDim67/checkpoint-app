@@ -1,4 +1,4 @@
-/** The encrypted backup vault. */
+/** backup vault */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

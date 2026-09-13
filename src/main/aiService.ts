@@ -3,15 +3,7 @@ import type { AiStreamParams, AiUsage } from '../shared/types'
 import type { ModelCapabilities } from '../shared/modelCapabilities'
 import { getAiConfig } from './aiConfig'
 
-/**
- * Resolves the configured OpenAI-compatible endpoint (base URL + API key) from
- * the settings DB, applying sane Ollama defaults when unset.
- */
-/**
- * Turns a raw provider/SDK error into an actionable, human-readable message.
- * A bare "404 status code (no body)" tells the user nothing; this names the
- * likely cause (missing model, wrong URL, server down, bad key).
- */
+/** names the likely cause; a bare "404 (no body)" tells the user nothing */
 export function humanizeAiError(err: unknown, ctx: { model?: string; baseURL?: string }): string {
   const e = err as { status?: number; code?: string; message?: string }
   const status = e?.status
@@ -36,10 +28,7 @@ export function humanizeAiError(err: unknown, ctx: { model?: string; baseURL?: s
   return raw || 'Unknown AI error'
 }
 
-/**
- * Constructs an OpenAI SDK client bound to the configured endpoint. Shared by the
- * streaming chat path and the structured-action generator (aiActions.ts).
- */
+/** shared by streaming chat and the structured generator in aiActions */
 export async function createOpenAiClient(): Promise<{ client: OpenAI; isOllama: boolean }> {
   const { default: OpenAI } = await import('openai')
   const { baseURL, apiKey, isOllama } = getAiConfig()
@@ -47,34 +36,23 @@ export async function createOpenAiClient(): Promise<{ client: OpenAI; isOllama: 
   return { client, isOllama }
 }
 
-/**
- * o-series models reject `max_tokens` outright and require the newer name.
- * Sending the wrong one fails the whole request rather than degrading.
- */
+/** o-series rejects max_tokens and fails the whole request */
 export function tokenLimitParam(caps: ModelCapabilities, requested: number): Record<string, number> {
   const capped = Math.max(256, Math.min(requested, caps.maxOutputTokens))
   return { [caps.tokenParamName]: capped }
 }
 
-/** o-series also rejects any temperature but its default. */
+/** o-series rejects any non-default temperature */
 export function temperatureParam(caps: ModelCapabilities, requested: number): Record<string, number> {
   return caps.fixedTemperature !== null ? {} : { temperature: requested }
 }
 
-/**
- * Ollama allocates a KV cache the size of num_ctx, so a flat 32768 made a 2B
- * model reserve four times its trained window while capping a 128k model at a
- * quarter of its own. Ask for what the model actually has.
- */
+/** ollama sizes the KV cache from num_ctx, so ask for the model's real window */
 function ollamaContextParam(caps: ModelCapabilities, isOllama: boolean): object {
   if (!isOllama) return {}
   return { extra_body: { num_ctx: caps.contextTokens } }
 }
 
-/**
- * Initiates an AI completion stream from the configured OpenAI-compatible endpoint.
- * Lazily loads the 'openai' npm package and checks database configuration at run-time.
- */
 export function startAiStream(
   params: AiStreamParams,
   onChunk: (chunk: string) => void,
@@ -82,15 +60,12 @@ export function startAiStream(
   onError: (err: Error) => void
 ): AbortController {
   const controller = new AbortController()
-  // Reasoning arrives before content, so the <think> wrapper is opened on the
-  // first reasoning delta and closed on the first content delta.
+  // reasoning arrives first: open <think> on the first reasoning delta, close on the first content
   let emittedThinkOpen = false
   let closedThink = false
-  // Endpoints that honour stream_options put usage on a final chunk whose
-  // choices array is empty; ones that ignore it never send this at all.
+  // usage comes on a final empty-choices chunk, only if stream_options is honoured
   let usage: AiUsage | undefined
 
-  // Run the async streaming logic in the background
   ;(async () => {
     try {
       const { client: openai, isOllama } = await createOpenAiClient()
@@ -100,13 +75,10 @@ export function startAiStream(
 
       const body: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
         model: params.model,
-        // AiChatMessage permits multimodal parts on any role for simplicity;
-        // in practice only user messages carry image parts, which matches the
-        // OpenAI wire format. Hence the narrowing cast.
+        // only user messages carry image parts in practice, hence the cast
         messages: params.messages as OpenAI.Chat.ChatCompletionMessageParam[],
         stream: true,
-        // Ask for real token counts. Endpoints that do not know the option
-        // ignore it, and the renderer keeps its estimate as a fallback.
+        // real token counts; endpoints that don't know it ignore it and the renderer estimates
         stream_options: { include_usage: true },
         ...tokenLimitParam(caps, params.maxTokens ?? 2048),
         ...temperatureParam(caps, params.temperature ?? 0.7),
@@ -129,9 +101,7 @@ export function startAiStream(
           | { content?: string; reasoning_content?: string; reasoning?: string }
           | undefined
 
-        // Reasoning models over the API stream their chain-of-thought in a
-        // separate field rather than inside <think> tags. Wrapping it in the
-        // tags the renderer already parses keeps both shapes on one path.
+        // reasoning models stream CoT in a separate field; wrap in <think> to reuse the parser
         const reasoning = delta?.reasoning_content ?? delta?.reasoning
         if (reasoning) {
           if (!emittedThinkOpen) {
@@ -156,7 +126,7 @@ export function startAiStream(
       onDone(usage)
     } catch (err) {
       const error = err as Error & { code?: string; status?: number }
-      // Silently ignore user-requested aborts
+      // user aborts aren't errors
       const isAbort =
         error.name === 'AbortError' ||
         error.message?.toLowerCase().includes('aborted') ||
@@ -174,14 +144,7 @@ export function startAiStream(
   return controller
 }
 
-/**
- * Non-streaming completion for background work (memory consolidation,
- * summarisation) that wants one text result rather than a stream.
- *
- * Must run in MAIN, like startAiStream: the OpenAI SDK refuses to construct a
- * client in a browser-like context, and the renderer is where a cloud API key
- * would be exposed.
- */
+/** main only: the SDK refuses browser contexts and the renderer would expose the key */
 export async function runCompletion(params: {
   model: string
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>

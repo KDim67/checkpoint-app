@@ -1,4 +1,4 @@
-/** Window controls, file dialogs and the updater. */
+/** window controls, file dialogs, updater */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -44,10 +44,7 @@ export function registerAppHandlers(): void {
     }
   })
 
-  /**
-   * The text sibling above cannot carry a PNG: writing bytes through a string
-   * mangles them. This takes the buffer as it is.
-   */
+  /** PNG needs the buffer, bytes through a string get mangled */
   ipcMain.handle(
     IpcChannels.APP_SAVE_BINARY_FILE,
     async (_event, defaultName: string, data: ArrayBuffer, extension: string) => {
@@ -76,16 +73,13 @@ export function registerAppHandlers(): void {
     }
   })
 
-  // Imported here rather than at the top so a dev run never pulls
-  // electron-updater in at all, the same way the startup check does.
+  // lazy so dev runs never load electron-updater
   ipcMain.handle(IpcChannels.APP_CHECK_FOR_UPDATES, async () => {
     const { checkForUpdatesNow } = await import('../updater')
     return checkForUpdatesNow()
   })
 
-  // What the background download is doing right now. Asked once when the panel
-  // opens, because a download that finished before then has no events left to
-  // send and the panel would otherwise show nothing at all.
+  // asked on panel open; a finished download has no events left to send
   ipcMain.handle(IpcChannels.APP_UPDATE_STATE, async () => {
     const { currentUpdateProgress } = await import('../updater')
     return currentUpdateProgress()

@@ -12,8 +12,7 @@ vi.mock('../src/renderer/src/data/relations', () => ({ getRelations: vi.fn(), cr
 vi.mock('../src/renderer/src/data/tags', () => ({ listTags: vi.fn(), createTag: vi.fn(), deleteTag: vi.fn(), recolourTag: vi.fn() }))
 vi.mock('../src/renderer/src/data/settings', () => ({ getSetting: vi.fn(async () => null), setSetting: vi.fn(async () => {}) }))
 vi.mock('../src/renderer/src/data/app', () => ({ osUserName: () => 'dimitris', getPathForFile: () => '' }))
-// Rewind reads focus sessions, the tracker, the clipboard and git. It never
-// settling keeps it out of the way.
+// rewind never settles, keeps its streams out of the way
 vi.mock('../src/renderer/src/lib/rewind', () => ({ loadRewind: () => new Promise(() => {}) }))
 
 beforeEach(() => {
@@ -44,7 +43,7 @@ const openCard = async (overrides: Partial<Props> = {}) => {
 const titleField = () => screen.getByPlaceholderText('Enter card title...') as HTMLInputElement
 const saveButton = () => screen.queryByTitle('Save changes (Ctrl+S)')
 const pressCtrlS = () => act(async () => { fireEvent.keyDown(window, { key: 's', ctrlKey: true }) })
-/** The metadata one write carried, or null when it carried none. */
+/** null when a write carried none */
 const metadataOf = (onUpdate: UpdateMock, call: number) =>
   JSON.parse(onUpdate.mock.calls.at(call)?.[1].metadata ?? 'null')
 
@@ -96,7 +95,7 @@ describe('CardDetailModal', () => {
     const written = onUpdate.mock.calls.map((_, call) => metadataOf(onUpdate, call))
     expect(written.some(meta => meta?.comments?.[0]?.text === 'Looks good')).toBe(true)
     expect(written.every(meta => meta?.isTemplate === undefined)).toBe(true)
-    // The flag is still a draft, so the card still has something to save.
+    // the flag's still a draft, so Save stays
     expect(saveButton()).toBeTruthy()
   })
 

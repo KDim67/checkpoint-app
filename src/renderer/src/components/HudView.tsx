@@ -5,8 +5,6 @@ import { resolveTagIds } from '../data/tags'
 import { createItem } from '../data/items'
 import * as hudApi from '../data/hud'
 
-// SVG Icons
-
 function IconChevronRight(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -30,8 +28,6 @@ function IconLoader(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
-// Helpers
-
 interface ParsedResult {
   text: string
   cleanedText: string
@@ -39,9 +35,9 @@ interface ParsedResult {
   context: string
   priority: 0 | 1 | 2 | 3
   tags: string[]
-  /** Epoch milliseconds from a phrase like "tomorrow 3pm", or null. */
+  /** epoch ms, or null */
   dueAt: number | null
-  /** The phrase that produced it, shown back as a pill while typing. */
+  /** shown back as a pill while typing */
   dueSource: string | null
 }
 
@@ -49,7 +45,6 @@ function parseInput(input: string): ParsedResult {
   let text = input.trim()
   let type: 'log' | 'task' = 'log'
 
-  // 1. Check type prefix
   if (text.startsWith('- ')) {
     type = 'task'
     text = text.substring(2)
@@ -58,7 +53,7 @@ function parseInput(input: string): ParsedResult {
     text = text.substring(4)
   }
 
-  // 2. Parse priority (!high, !med, !low, !none or !3, !2, !1, !0)
+  // !high/!med/!low/!none or !3 to !0
   let priority: 0 | 1 | 2 | 3 = 0
   const priorityMatch = text.match(/!(high|med|medium|low|none|3|2|1|0)\b/i)
   if (priorityMatch) {
@@ -70,7 +65,7 @@ function parseInput(input: string): ParsedResult {
     text = text.replace(/!(high|med|medium|low|none|3|2|1|0)\b/i, '')
   }
 
-  // 3. Parse context (@context-slug)
+  // @context-slug
   let context = 'default'
   const contextMatch = text.match(/@([a-zA-Z0-9_-]+)\b/)
   if (contextMatch) {
@@ -78,7 +73,7 @@ function parseInput(input: string): ParsedResult {
     text = text.replace(/@([a-zA-Z0-9_-]+)\b/, '')
   }
 
-  // 4. Parse tags (#tag-slug)
+  // #tag-slug
   const tags: string[] = []
   const tagMatches = Array.from(text.matchAll(/#([a-zA-Z0-9_-]+)\b/g))
   tagMatches.forEach(match => {
@@ -86,8 +81,7 @@ function parseInput(input: string): ParsedResult {
   })
   text = text.replace(/#([a-zA-Z0-9_-]+)\b/g, '')
 
-  // 5. Parse the due date last, so it only ever sees what the other rules left
-  //    behind. Otherwise a tag like #tuesday would be read as a weekday.
+  // due date last, so #tuesday stays a tag instead of a weekday
   const dated = parseNaturalDate(text.replace(/\s+/g, ' ').trim())
   const cleanedText = dated.cleanedText
 
@@ -103,9 +97,6 @@ function parseInput(input: string): ParsedResult {
   }
 }
 
-/**
- * Synthesizes a soft, clean two-tone chime via Web Audio API.
- */
 const playChime = () => {
   try {
     const audioCtx = new AudioContext()
@@ -116,7 +107,6 @@ const playChime = () => {
     gainNode.connect(audioCtx.destination)
 
     osc.type = 'sine'
-    // Two-tone progressive pitch
     osc.frequency.setValueAtTime(587.33, audioCtx.currentTime) // D5
     osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.08) // A5
 
@@ -130,8 +120,6 @@ const playChime = () => {
   }
 }
 
-// Main Component
-
 export default function HudView() {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -139,15 +127,13 @@ export default function HudView() {
   const [isFocused, setIsFocused] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Live parsed state for visual pills
   const parsed = parseInput(value)
 
-  // Focus input automatically on mount
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
-  // Listen to main process reset triggers (e.g. on blur/hide)
+  // main resets it on blur/hide
   useEffect(() => {
     const unsub = hudApi.onReset(() => {
       setValue('')
@@ -156,7 +142,7 @@ export default function HudView() {
     return unsub
   }, [])
 
-  // Handle resizing: resize HUD height dynamically to accommodate errors or syntax tips
+  // grows to fit errors or syntax tips
   useEffect(() => {
     if (error) {
       hudApi.resize(100)
@@ -171,7 +157,7 @@ export default function HudView() {
     if (e.key === 'Escape') {
       e.preventDefault()
       if (submitting) return
-      // Hide window (blur listener will also reset inputs)
+      // the blur listener resets the inputs
       await hudApi.toggle(false)
       return
     }
@@ -189,7 +175,6 @@ export default function HudView() {
       setError(null)
 
       try {
-        // Context validation
         if (parsed.context !== 'default') {
           const contexts = await readWorkspaceList()
           const exists = contexts.some(c => c.slug.toLowerCase() === parsed.context.toLowerCase())
@@ -200,12 +185,10 @@ export default function HudView() {
           }
         }
 
-        // 1. Resolve and create tags as needed
         const tagIds = await resolveTagIds(
           parsed.tags.map(name => ({ name: name.toLowerCase(), color: '#535e85' }))
         )
 
-        // 2. Insert item into SQLite database
         await createItem({
           type: parsed.type,
           context: parsed.context,
@@ -218,7 +201,6 @@ export default function HudView() {
           metadata: '{}'
         }, tagIds)
 
-        // 3. Success feedback & hide HUD
         playChime()
         setValue('')
         await hudApi.toggle(false)
@@ -231,7 +213,6 @@ export default function HudView() {
     }
   }
 
-  // Visual Priority styling
   const priorityLabels = ['None', 'Low', 'Med', 'High']
   const priorityColors = [
     'var(--color-text-faint)',
@@ -352,16 +333,13 @@ export default function HudView() {
             style={{ opacity: submitting ? 0.5 : 1 }}
           />
 
-          {/* Live Parser Visual feedback pills */}
           {value.trim().length > 0 && (
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
-              {/* Type Badge */}
               <div className="hud-pill" style={{ background: 'var(--color-surface-offset)', color: 'var(--color-text-base)' }}>
                 {parsed.type}
               </div>
 
-              {/* Shown resolved rather than as typed, so an ambiguous phrase is
-                  confirmed before the item is created. */}
+              {/* shown resolved, so an ambiguous phrase is confirmed before creating */}
               {parsed.dueAt !== null && (
                 <div
                   className="hud-pill"
@@ -376,21 +354,18 @@ export default function HudView() {
                 </div>
               )}
 
-              {/* Context Badge */}
               {parsed.context !== 'default' && (
                 <div className="hud-pill" style={{ background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)', border: '1px solid var(--color-secondary)' }}>
                   @{parsed.context}
                 </div>
               )}
 
-              {/* Priority Badge */}
               {parsed.priority > 0 && (
                 <div className="hud-pill" style={{ background: 'var(--color-surface-2)', color: priorityColors[parsed.priority] }}>
                   !{priorityLabels[parsed.priority]}
                 </div>
               )}
 
-              {/* Tags Count */}
               {parsed.tags.map((tag, idx) => (
                 <div key={idx} className="hud-pill" style={{ background: 'color-mix(in srgb, var(--color-balance) 25%, transparent)', color: 'var(--color-text-muted)', border: '1px solid var(--color-balance)' }}>
                   #{tag}
@@ -400,14 +375,12 @@ export default function HudView() {
           )}
         </div>
 
-        {/* Error Feedback Drawer */}
         {error && (
           <div className="hud-error-tray">
             ⚠️ {error}
           </div>
         )}
 
-        {/* Syntax Tip Tray */}
         {isFocused && !error && (
           <div className="hud-tip-tray">
             💡 Tip: Use - for tasks, @context, #tag, !high/med/low, and a date like tomorrow 3pm, friday, or in 2 days.

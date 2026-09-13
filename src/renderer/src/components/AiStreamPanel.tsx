@@ -31,33 +31,23 @@ export default function AiStreamPanel() {
         boxSizing: 'border-box'
       }}
     >
-      {/* Selector Header controls */}
       <AiPanelHeader panel={panel} />
 
-      {/* Inline Settings Panel */}
       {showSettingsPanel && <SettingsPanel temperature={temperature} setTemperature={setTemperature} maxTokens={maxTokens} setMaxTokens={setMaxTokens} systemPromptOverride={systemPromptOverride} setSystemPromptOverride={setSystemPromptOverride} />}
 
-      {/* Main chat history list */}
       <AiChatHistory panel={panel} />
 
-      {/* Input panel at bottom */}
       <AiInputDock panel={panel} />
 
-      {/* Custom Quick Actions Manager Modal */}
       {showCustomActionsModal && <CustomActionsModal actions={quickActions} />}
 
-      {/* Cookbook Model Manager Popup Modal */}
       {showCookbookModal && <CookbookModal models={modelConfig} />}
 
-      {/* Saved Chats Drawer Modal */}
       {showSavedChatsModal && <SavedChatsModal chats={chatHistory} handleNewChat={handleNewChat} handleLoadChat={handleLoadChat} handleDeleteChat={handleDeleteChat} />}
-      {/* Memory Vault Modal */}
       {showMemoryPanel && <MemoryVaultModal vault={vault} activeWorkspace={activeWorkspace} />}
 
-      {/* Styled Revert Confirmation Modal */}
       {revertConfirmData && <RevertConfirmModal revertConfirmData={revertConfirmData} setRevertConfirmData={setRevertConfirmData} revertAICreatedEntities={revertAICreatedEntities} setMessages={setMessages} />}
 
-      {/* Custom Model Prompt Modal */}
       {showCustomModelPrompt && <CustomModelPromptModal models={modelConfig} />}
     </div>
   )

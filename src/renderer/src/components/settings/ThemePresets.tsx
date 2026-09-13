@@ -13,7 +13,7 @@ import { getStringSetting, setJsonSetting } from '../../lib/settings'
 
 const PRESETS_SETTING_KEY = 'customizer_theme_presets'
 
-/** The variables worth showing on a card. Enough to recognise a theme at a glance. */
+/** enough to recognise a theme at a glance */
 const SWATCH_KEYS: (keyof ThemeVariables)[] = [
   '--color-background',
   '--color-surface-1',
@@ -23,7 +23,7 @@ const SWATCH_KEYS: (keyof ThemeVariables)[] = [
 ]
 
 interface Props {
-  /** The live variable set, so a card can show as active and Save can capture it. */
+  /** so a card can show active and Save can capture it */
   vars: ThemeVariables
   onApply: (vars: ThemeVariables) => void
 }
@@ -56,8 +56,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
   }, [toast])
 
   const handleSave = async () => {
-    // Built-ins are included in the duplicate-name check: two entries called
-    // "Midnight" would be indistinguishable on the cards.
+    // built-ins count, two "Midnight" cards are indistinguishable
     const result = createPreset(draftName, vars, [...BUILT_IN_PRESETS, ...saved], Date.now())
     if ('error' in result) {
       toast(result.error)
@@ -111,8 +110,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
             autoFocus
             value={draftName}
             onChange={e => setDraftName(e.target.value)}
-            // Electron has no window.prompt, so naming happens inline. Enter
-            // saves and Escape cancels, which is what a prompt would have given.
+            // electron has no window.prompt; Enter saves, Escape cancels
             onKeyDown={e => {
               if (e.key === 'Enter') handleSave()
               if (e.key === 'Escape') { setNaming(false); setDraftName('') }
@@ -204,8 +202,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
                         height: '18px',
                         borderRadius: '3px',
                         background: preset.vars[key],
-                        // Without this a near-black or near-white swatch vanishes
-                        // into the card it sits on.
+                        // near-black or near-white swatches vanish into the card otherwise
                         boxShadow: 'inset 0 0 0 1px rgba(128,128,128,0.25)'
                       }}
                     />
@@ -231,6 +228,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
                   onClick={() => handleDelete(preset)}
                   aria-label={`Delete ${preset.name}`}
                   title={`Delete ${preset.name}`}
+                  className="text-muted hover-text-error"
                   style={{
                     position: 'absolute',
                     top: 'var(--space-1)',
@@ -239,12 +237,9 @@ export default function ThemePresets({ vars, onApply }: Props) {
                     padding: '3px',
                     background: 'var(--color-surface-2)',
                     border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-muted)',
                     borderRadius: '4px',
                     cursor: 'pointer'
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-muted)' }}
                 >
                   <Trash2 size={11} />
                 </button>

@@ -1,10 +1,6 @@
-// Pure helpers, persisted preferences, templates and markdown editing utilities
-// for the Notes feature. Kept framework-free so they are trivially testable and
-// reusable across the notes subcomponents.
+// framework-free so it's testable
 
-// Formatting
-
-/** Human-friendly relative time, e.g. "just now", "5m ago", "3d ago", or a date. */
+/** e.g. "just now", "5m ago", or a date */
 export function formatRelativeTime(ms: number): string {
   if (!ms) return ''
   const diff = Date.now() - ms
@@ -22,28 +18,27 @@ export function formatRelativeTime(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-/** Compact byte formatter, e.g. "812 B", "3.4 KB". */
+/** e.g. "812 B", "3.4 KB" */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/** Word count of arbitrary text. */
 export function countWords(text: string): number {
   const trimmed = text.trim()
   if (!trimmed) return 0
   return trimmed.split(/\s+/).length
 }
 
-/** Estimated reading time at ~200 wpm, e.g. "1 min read". */
+/** ~200 wpm */
 export function readingTime(text: string): string {
   const words = countWords(text)
   const minutes = Math.max(1, Math.round(words / 200))
   return `${minutes} min read`
 }
 
-// Persisted preferences (localStorage)
+// persisted in localStorage
 
 export type SortKey = 'updated' | 'title' | 'size'
 export type ViewMode = 'edit' | 'preview' | 'split'
@@ -81,8 +76,6 @@ export const prefs = {
   setLastNote: (t: string | null): void => write('lastNote', t)
 }
 
-// Templates
-
 interface NoteTemplate {
   id: string
   label: string
@@ -92,7 +85,7 @@ interface NoteTemplate {
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
-/** Local date as YYYY-MM-DD, used for daily-note titles. */
+/** local YYYY-MM-DD for daily-note titles */
 export function isoDate(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
@@ -130,14 +123,13 @@ export const NOTE_TEMPLATES: NoteTemplate[] = [
   }
 ]
 
-/** Content for a fresh daily note. */
 export function dailyNoteContent(title: string): string {
   const tmpl = NOTE_TEMPLATES.find(t => t.id === 'daily')
   if (!tmpl) throw new Error('The daily note template is missing')
   return tmpl.build(title)
 }
 
-// Markdown editing (selection-aware, pure)
+// selection-aware, pure
 
 export type FormatAction =
   | 'bold'
@@ -181,10 +173,7 @@ const LINE_PREFIXES: Partial<Record<FormatAction, string>> = {
   checkbox: '- [ ] '
 }
 
-/**
- * Applies a markdown formatting action to a textarea's value given its current
- * selection, returning the new value and where the selection should land.
- */
+/** returns the new value and where the selection lands */
 export function applyFormat(
   action: FormatAction,
   value: string,
@@ -193,7 +182,7 @@ export function applyFormat(
 ): EditResult {
   const selected = value.slice(selStart, selEnd)
 
-  // Inline wrappers (bold/italic/strike/code)
+  // bold/italic/strike/code
   const wrap = WRAPPERS[action]
   if (wrap) {
     const { marker, placeholder } = wrap
@@ -203,7 +192,7 @@ export function applyFormat(
     return { value: next, selStart: innerStart, selEnd: innerStart + inner.length }
   }
 
-  // Line prefixes (headings, lists, quote, checkbox)
+  // headings, lists, quote, checkbox
   const prefix = LINE_PREFIXES[action]
   if (prefix) {
     const lineStart = value.lastIndexOf('\n', selStart - 1) + 1
@@ -218,7 +207,6 @@ export function applyFormat(
     return { value: next, selStart: lineStart, selEnd: lineStart + updated.length }
   }
 
-  // Block/insert actions
   switch (action) {
     case 'link': {
       const text = selected || 'link text'

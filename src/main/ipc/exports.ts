@@ -1,4 +1,4 @@
-/** Writing items out as markdown, CSV or JSON. */
+/** items out as markdown, CSV or JSON */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -17,8 +17,7 @@ export function registerExportsHandlers(): void {
         await import('../../shared/exportFormats')
 
       try {
-        // Unpaginated, and through the same tag join the app uses, so the file
-        // is everything and each row keeps its tags.
+        // unpaginated and tag-joined, so the file is everything
         const items = getAllItemsForExport(options.context)
         const at = Date.now()
         const content =

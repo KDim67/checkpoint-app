@@ -37,7 +37,6 @@ export default function GitPanel() {
   const [commits, setCommits] = useState<GitCommit[]>([])
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
 
-  // 1. Fetch the gitPath associated with the active context from Settings
   const fetchContextConfig = useCallback(async () => {
     setLoading(true)
     try {
@@ -55,7 +54,6 @@ export default function GitPanel() {
     fetchContextConfig()
   }, [fetchContextConfig])
 
-  // 2. Fetch Git status & log if the repo is valid
   const loadGitData = useCallback(async (path: string) => {
     setChecking(true)
     try {
@@ -97,7 +95,6 @@ export default function GitPanel() {
     }
   }, [gitPath, loadGitData])
 
-  // Copy hash action
   const handleCopyHash = async (hash: string) => {
     try {
       await navigator.clipboard.writeText(hash)
@@ -108,7 +105,6 @@ export default function GitPanel() {
     }
   }
 
-  // Reload action
   const handleReload = () => {
     if (gitPath) {
       loadGitData(gitPath)
@@ -117,13 +113,11 @@ export default function GitPanel() {
     }
   }
 
-  // Get project name from path
   const getRepoName = (path: string) => {
     const parts = path.split(/[/\\]/)
     return parts.filter(Boolean).pop() || path
   }
 
-  // Loading state
   if (loading) {
     return (
       <div style={{ flex: 1, padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', overflow: 'auto' }}>
@@ -142,7 +136,7 @@ export default function GitPanel() {
     )
   }
 
-  // Setup state: No Git repository configured
+  // no repo configured
   if (!gitPath) {
     return (
       <div style={{
@@ -208,7 +202,7 @@ export default function GitPanel() {
     )
   }
 
-  // Error state: Path configured but invalid git repository
+  // path set but not a repo
   if (!isValidRepo) {
     return (
       <div style={{
@@ -306,14 +300,11 @@ export default function GitPanel() {
     )
   }
 
-  // Dashboard Active State
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       
-      {/* Scrollable container */}
       <div style={{ flex: 1, padding: 'var(--space-4)', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         
-        {/* Header summary info */}
         <div className="row-between">
           <div className="min-w-0">
             <h3 style={{
@@ -356,10 +347,8 @@ export default function GitPanel() {
           </button>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid-2">
           
-          {/* Branch badge */}
           <div style={{
             background: 'var(--color-surface-2)',
             border: '1px solid var(--color-surface-offset)',
@@ -386,7 +375,6 @@ export default function GitPanel() {
             </span>
           </div>
 
-          {/* Uncommitted Changes badge */}
           <div style={{
             background: 'var(--color-surface-2)',
             border: '1px solid var(--color-surface-offset)',
@@ -412,7 +400,6 @@ export default function GitPanel() {
           </div>
         </div>
 
-        {/* Commit Log list */}
         <div className="col">
           <div style={{
             fontSize: '10px',
@@ -444,9 +431,9 @@ export default function GitPanel() {
                 return (
                   <div
                     key={commit.hash}
+                    className="git-panel-commit border-offset"
                     style={{
                       background: 'var(--color-surface-2)',
-                      border: '1px solid var(--color-surface-offset)',
                       borderRadius: 'var(--radius-md)',
                       padding: 'var(--space-3)',
                       display: 'flex',
@@ -454,10 +441,7 @@ export default function GitPanel() {
                       gap: 'var(--space-2)',
                       transition: 'border-color var(--duration-fast) var(--ease-default)'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(205, 241, 43, 0.25)')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
                   >
-                    {/* Hash & Copy Button */}
                     <div className="row-between">
                       <span style={{
                         fontFamily: 'var(--font-mono)',
@@ -491,7 +475,6 @@ export default function GitPanel() {
                       </button>
                     </div>
 
-                    {/* Commit Message */}
                     <div style={{
                       fontSize: 'var(--text-xs)',
                       color: 'var(--color-text-base)',
@@ -502,7 +485,6 @@ export default function GitPanel() {
                       {commit.message}
                     </div>
 
-                    {/* Commit Author & Date */}
                     <div style={{
                       display: 'flex',
                       justifyContent: 'space-between',

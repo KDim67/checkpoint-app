@@ -42,7 +42,7 @@ interface CardDetailModalProps {
   columns: Array<{ id: string; name: string }>
   onClose: () => void
   onUpdate: (id: string, patch: Partial<Item>, tagIds?: string[]) => Promise<void>
-  /** The board's own field switches, so the preview shows what the board will. */
+  /** the board's field switches, so the preview matches */
   cardDisplay?: CardDisplay
   isReadOnly?: boolean
 }
@@ -60,10 +60,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   
-  // Editor mode: edit, preview, split
   const [editorMode, setEditorMode] = useState<EditorMode>('split')
 
-  // Tags
   const [allTags, setAllTags] = useState<TagType[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [showTagSelector, setShowTagSelector] = useState(false)
@@ -71,20 +69,17 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const itemRelations = useItemRelations(cardId, card, activeWorkspace)
   const { setRelations } = itemRelations
 
-  // Trello Meta States
   const [cover, setCover] = useState<{ type: 'color' | 'image'; value: string; size?: 'header' | 'full' } | null>(null)
   const [checklist, setChecklist] = useState<Array<{ id: string; text: string; done: boolean }>>([])
   const [comments, setComments] = useState<Array<{ id: string; user: string; text: string; createdAt: number }>>([])
   const [activities, setActivities] = useState<CardChange[]>([])
-  /** Read once per card open. Whoever is named here is credited with the save. */
+  /** read per open, credited with the save */
   const [displayName, setDisplayName] = useState('')
-  /** Drop feedback for the attachments section. */
   const [draggingAttachment, setDraggingAttachment] = useState(false)
   const [attachments, setAttachments] = useState<Array<{ id: string; name: string; path: string; isImage: boolean; createdAt: number }>>([])
   const [isTemplate, setIsTemplate] = useState(false)
   const [dueDateCompleted, setDueDateCompleted] = useState(false)
   
-  // Form inputs
   const [commentInput, setCommentInput] = useState('')
   const [newChecklistText, setNewChecklistText] = useState('')
   const [newLinkName, setNewLinkName] = useState('')
@@ -104,7 +99,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     initialCardRef.current = initialCard
   }, [initialCard])
 
-  // Load card details, tags, relations
   useEffect(() => {
     let active = true
     const loadDetails = async () => {
@@ -140,12 +134,11 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           setIsTemplate(meta.isTemplate === true)
           setDueDateCompleted(meta.dueDateCompleted === true)
 
-          // Distinct objects: one tracks what is on disk, the other what is on
-          // screen, and they diverge the moment anything is drafted.
+          // distinct objects: disk vs screen, they diverge once anything's drafted
           savedMetaRef.current = { ...meta }
           latestMetaRef.current = { ...meta }
 
-          // The baseline every buffered edit is measured against.
+          // baseline for every buffered edit
           savedRef.current = {
             title: found.title.trim(),
             body: found.body,
@@ -161,8 +154,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           setAllTags(tags)
 
           const rawName = await getStringSetting(DISPLAY_NAME_KEY, '')
-          // The account name stands in when the field was never filled, so a
-          // shared board does not fill up with entries credited to nobody.
+          // account name when the field's empty, so entries aren't credited to nobody
           if (active) setDisplayName(resolveAuthor(rawName, appApi.osUserName()))
 
           const rels = await getRelations(cardId)
@@ -178,10 +170,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     return () => { active = false }
   }, [cardId, activeWorkspace, setRelations])
 
-  /**
-   * The card as it was last written. Everything buffered is compared against
-   * this to work out whether there is anything to save, and what.
-   */
+  /** last written state, compared to decide what to save */
   const savedRef = useRef<CardSnapshot | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -197,29 +186,18 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const edit = savedRef.current && current ? cardEdit(savedRef.current, current) : null
   const dirty = edit?.dirty === true
 
-  /** History says "Moved to In Review", not "moved to in_review". */
+  /** "Moved to In Review", not in_review */
   const columnName = (status: string): string =>
     columns.find(c => c.id === status)?.name ?? status
 
-  /**
-   * The unsaved card, for the preview. `card` is the working copy and already
-   * carries the buffered status, priority, due date, tags and metadata; only
-   * the two text fields are held separately, so only they have to be laid over.
-   */
+  /** the working copy already has the buffered fields; only the two text fields get laid over */
   const previewCard: Item | null = card && {
     ...card,
     title: title.trim() || 'Untitled',
     body
   }
 
-  /**
-   * Ctrl+S, because that is what a buffered editor has always meant. Bound on
-   * the modal rather than globally: it should do nothing when no card is open.
-   *
-   * The handler goes through a ref so the listener is registered once instead
-   * of on every keystroke, while still calling the current closure rather than
-   * one captured on mount.
-   */
+  /** modal-bound, not global; ref so the listener registers once */
   const saveRef = useRef<() => Promise<void>>(async () => {})
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -234,15 +212,11 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const handleSave = async () => {
     const snapshot = current
     const baseline = savedRef.current
-    // Read-only is a real guard, not just a hidden button: the drawer blocks
-    // the mouse but not the keyboard, and the modal focuses the title field.
+    // a real guard: the drawer blocks the mouse, not the keyboard
     if (isReadOnly || !card || !edit || !edit.dirty || saving || !snapshot || !baseline) return
     setSaving(true)
     try {
-      // The history rides along in the metadata being written, so one save is
-      // one database write and an entry can never describe a change that did
-      // not land. Worked out first, because it changes the metadata the patch
-      // is then built from.
+      // history rides in the same metadata write, so an entry never describes a change that didn't land
       const phrases = describeCardChanges(baseline, snapshot, columnName)
       const history = appendCardChanges(activities, phrases, displayName, Date.now())
       const written = phrases.length > 0
@@ -256,17 +230,13 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
         latestMetaRef.current = { ...latestMetaRef.current, activities: history }
         setActivities(history)
       }
-      // Everything buffered has just been written, so the two now agree again.
+      // everything's written, the two agree again
       try {
         savedMetaRef.current = JSON.parse(written.metadata)
       } catch {
         savedMetaRef.current = { ...latestMetaRef.current }
       }
-      // The card object is the working copy, so it already holds the new
-      // values; only the baseline has to move. The title comes from the patch
-      // rather than from the field, because the field may hold whitespace the
-      // patch trimmed off, and a baseline holding it would leave the card
-      // looking permanently unsaved.
+      // only the baseline moves; title from the patch since the field may hold trimmed whitespace
       savedRef.current = { ...written, title: write.patch.title ?? baseline.title }
       setCard(prev => prev ? { ...prev, ...write.patch } : null)
       if (write.patch.title) setTitle(write.patch.title)
@@ -278,38 +248,28 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   }
   saveRef.current = handleSave
 
-  // Track latest metadata synchronously in memory to avoid race conditions with sequential updates
-  /**
-   * Metadata is tracked twice on purpose.
-   *
-   * `savedMetaRef` is what is actually on disk. `latestMetaRef` is that plus
-   * the edits still waiting for Save. They were one ref, and an immediate
-   * action merged from it, so posting a comment wrote out whatever cover or
-   * template change was sitting unsaved beside it and then moved the baseline
-   * so it counted as saved. Closing no longer discarded it and the history
-   * never mentioned it.
-   */
+  /** tracked twice: savedMetaRef is disk, latestMetaRef adds drafts; one ref let a comment save an unsaved cover */
   const savedMetaRef = useRef<Record<string, unknown>>({})
   const latestMetaRef = useRef<Record<string, unknown>>({})
 
-  /** Writes something that has already happened, without carrying the drafts with it. */
+  /** writes something that already happened, drafts stay out */
   const updateMetadata = async (newMetaPatch: Record<string, unknown>) => {
     if (!card) return
-    // Built on what is on disk, not on the working copy.
+    // built on disk, not the working copy
     const written = { ...savedMetaRef.current, ...newMetaPatch }
     const serialized = JSON.stringify(written)
     savedMetaRef.current = written
 
-    // The working copy keeps the drafts and gains the new value.
+    // the working copy keeps its drafts
     latestMetaRef.current = { ...latestMetaRef.current, ...newMetaPatch }
     setCard(prev => prev ? { ...prev, metadata: JSON.stringify(latestMetaRef.current) } : null)
-    // The baseline moves to what was written, so this does not read as unsaved.
+    // baseline moves so this doesn't read as unsaved
     if (savedRef.current) savedRef.current = { ...savedRef.current, metadata: serialized }
 
     await onUpdate(card.id, { metadata: serialized })
   }
 
-  /** The buffered half of metadata: the cover and the template flag. Waits for Save. */
+  /** cover and template flag wait for Save */
   const draftMetadata = (newMetaPatch: Record<string, unknown>) => {
     if (!card) return
     const mergedMeta = { ...latestMetaRef.current, ...newMetaPatch }
@@ -317,18 +277,13 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     setCard(prev => prev ? { ...prev, metadata: JSON.stringify(mergedMeta) } : null)
   }
 
-  /**
-   * Logs something that has already been written: a comment, a checklist tick,
-   * an attachment. The buffered field edits are not logged here, because they
-   * have not happened yet; Save records those from what actually changed.
-   */
+  /** logs already-written actions; Save logs the buffered edits */
   const addActivity = (text: string) => {
     const updated = appendCardChanges(activities, [text], displayName, Date.now())
     setActivities(updated)
     updateMetadata({ activities: updated })
   }
 
-  // Checklist helpers
   const handleAddChecklistItem = (text: string) => {
     if (!text.trim()) return
     const newItem = { id: `chk-${Date.now()}`, text: text.trim(), done: false }
@@ -361,7 +316,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     }
   }
 
-  // Comments helpers
   const handlePostComment = () => {
     if (!commentInput.trim()) return
     const newComment = {
@@ -384,7 +338,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     addActivity(`Deleted a comment`)
   }
 
-  // Attachments helpers
   const handleAddLinkAttachment = (name: string, url: string) => {
     if (!url.trim()) return
     const newAttachment = {
@@ -400,25 +353,20 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     addActivity(`Attached link: "${url.trim()}"`)
   }
 
-  /**
-   * Shared by the file picker and the drop zone, and it takes more than one:
-   * dropping a handful of files at once is the whole point of dropping them.
-   */
+  /** file picker and drop zone, many at once */
   const attachFiles = (files: FileList | File[]) => {
     const at = Date.now()
     const added = Array.from(files)
       .map((file, i) => ({
-        // Indexed, because a drop of several files lands in one millisecond.
+        // indexed, a multi-file drop lands in one ms
         id: `att-${at}-${i}`,
         name: file.name,
-        // Electron >= 32: File.path no longer exists. Resolve via preload webUtils.
+        // electron 32 dropped File.path, resolve via preload
         path: appApi.getPathForFile(file),
         isImage: file.type.startsWith('image/'),
         createdAt: at
       }))
-      // Anything not on this disk, such as a file dragged out of a browser,
-      // resolves to no path, and an attachment that points nowhere is worse
-      // than one that was never added.
+      // files not on this disk (browser drags) have no path, skip them
       .filter(a => a.path)
 
     if (added.length === 0) return
@@ -484,7 +432,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
   const handleAiAssist = () => {
     if (!card) return
-    // Pre-seed context for AI Chat in right panel
+    // pre-seed the AI panel's context
     selectItem(card.id)
     toggleRightPanel('ai-chat')
   }
@@ -539,12 +487,11 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
           animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
         }}
-        onClick={e => e.stopPropagation()} // Prevent closing on drawer click
+        onClick={e => e.stopPropagation()} // don't close on drawer click
         role="dialog"
         aria-modal="true"
         aria-labelledby="card-modal-title"
       >
-        {/* Card Cover Header Banner */}
         <div
           id="card-modal-cover-banner"
           style={{
@@ -558,7 +505,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             transition: 'height 0.2s ease, background-color 0.15s ease'
           }}
         />
-        {/* Drawer Header */}
         <div style={{
           height: '56px',
           padding: '0 var(--space-6)',
@@ -585,9 +531,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           <div className="row">
             {aiEnabled && <AiAssistButton onClick={handleAiAssist} />}
 
-            {/* Nothing here is written until this is pressed. It only appears
-                when there is something to write, so a card being read never
-                shows a button that would do nothing. */}
+            {/* only when there's something to write */}
             {!isReadOnly && dirty && (
               <button
                 onClick={handleSave}
@@ -617,7 +561,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           </div>
         </div>
 
-        {/* Drawer Body Scroll Container */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
@@ -646,7 +589,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               <span>You are viewing a shared board in spectate mode. Changes cannot be made.</span>
             </div>
           )}
-          {/* Card Title Editable */}
           <div>
             <DetailTitleInput
               inputRef={titleInputRef}
@@ -657,17 +599,11 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             />
           </div>
 
-          {/* The card as the board will draw it.
-              The board's own component, not a copy of it: a hand-built
-              imitation would drift the first time either one changed, and the
-              point of a preview is that it cannot be wrong. Inert, at the
-              width a column gives a card. */}
+          {/* the board's own card component, inert at column width, so the preview can't drift */}
           {previewCard && (
             <div>
               <span className="label-caps" style={{ fontSize: '10px' }}>On The Board</span>
-              {/* inert, not just pointer-events: the card is focusable and
-                  keeps its shortcuts, so tabbing to the preview and pressing
-                  Space jumped the whole app to the Focus view. */}
+              {/* inert, not pointer-events: tabbing in and pressing Space jumped to Focus */}
               <div
                 ref={node => { node?.setAttribute('inert', '') }}
                 aria-hidden
@@ -685,7 +621,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             </div>
           )}
 
-          {/* Quick Properties Grid */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
@@ -695,7 +630,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             borderRadius: 'var(--radius-lg)',
             border: '1px solid var(--color-surface-offset)'
           }}>
-            {/* Status (Column) Selector */}
             <div className="col-sm">
               <span className="label-caps">
                 Status
@@ -711,7 +645,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </select>
             </div>
 
-            {/* Priority Selector */}
             <div className="col-sm">
               <span className="label-caps">
                 Priority
@@ -728,7 +661,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </select>
             </div>
 
-            {/* Due Date Picker & Done Checkbox */}
             <div className="col-sm">
               <span className="label-caps">
                 Due Date
@@ -766,7 +698,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </div>
             </div>
 
-            {/* Tag Selector */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)', position: 'relative' }}>
               <span className="label-caps">
                 Tags
@@ -794,7 +725,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 <Tag size={14} />
               </button>
 
-              {/* Tags Dropdown Popover */}
               {showTagSelector && (
                 <div style={{
                   position: 'absolute',
@@ -842,7 +772,6 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
             <CardCoverPicker cover={cover} onChange={handleCoverChange} />
 
-            {/* Template Selector */}
             <div className="col-sm">
               <span className="label-caps">
                 Is Template?
@@ -865,14 +794,12 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           </div>
 
 
-          {/* Description / Custom Split Markdown Editor */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, minHeight: '300px' }}>
             <div className="section-head-between">
               <span className="label-caps">
                 Description (Markdown)
               </span>
               
-              {/* Layout Toggle */}
               <div style={{
                 display: 'flex',
                 background: 'var(--color-surface-2)',
@@ -902,9 +829,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </div>
             </div>
 
-            {/* Which pane is which. Only in split, and only because an empty
-                card renders an empty preview: without a label the two boxes
-                are indistinguishable until you have typed something. */}
+            {/* split only: an empty card's panes are indistinguishable without labels */}
             {editorMode === 'split' && (
               <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
                 <span className="label-caps" style={{ flex: 1, fontSize: '10px' }}>Markdown</span>
@@ -912,9 +837,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </div>
             )}
 
-            {/* Editor Panes */}
             <div style={{ display: 'flex', flex: 1, gap: 'var(--space-4)', minHeight: '260px' }}>
-              {/* Textarea pane */}
               {(editorMode === 'edit' || editorMode === 'split') && (
                 <textarea
                   value={body}
@@ -928,10 +851,10 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                   }}
                   onDragOver={e => e.preventDefault()}
                   placeholder="Enter details..."
+                  className="border-offset focus-border-primary"
                   style={{
                     flex: 1,
                     background: 'var(--color-surface-2)',
-                    border: '1px solid var(--color-surface-offset)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-4)',
                     color: 'var(--color-text-base)',
@@ -941,12 +864,9 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                     resize: 'none',
                     lineHeight: 1.5
                   }}
-                  onFocus={e => (e.target.style.borderColor = 'var(--color-primary)')}
-                  onBlurCapture={e => (e.currentTarget.style.borderColor = 'var(--color-surface-offset)')}
                 />
               )}
 
-              {/* Preview pane */}
               {(editorMode === 'preview' || editorMode === 'split') && (
                 <div style={{
                   flex: 1,
@@ -999,9 +919,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             onRemove={handleRemoveAttachment}
           />
 
-          {/* Rewind. What the user was doing the last time this card was
-              worked on. Sits with the historical material rather than above the
-              description, which every card has and most cards edit. */}
+          {/* rewind sits with the history, not above the description */}
           {card && (
             <div style={{ borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
               <RewindPanel item={card} />

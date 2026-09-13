@@ -5,7 +5,6 @@ import { derivePalette, derivePbrMaps, deriveUpscale } from '../../lib/wallImage
 import type { useToast } from '../ui/Toast'
 import type { MenuEntry } from './WallContextMenu'
 
-/** What the wall's context menu needs from the wall to build its entries. */
 export interface WallMenuContext {
   menu: { itemId: string | null; at: { x: number; y: number } } | null
   doc: WallDoc
@@ -21,11 +20,11 @@ export interface WallMenuContext {
   fitToContent: () => void
   runImageOp: (label: string, job: () => Promise<void>) => Promise<void>
   placeDerived: (source: WallItem, made: { filename: string; label: string; width: number; height: number }[]) => void
-  /** Typed off useToast so the two cannot drift apart. */
+  /** typed off useToast so they can't drift */
   toast: ReturnType<typeof useToast>['toast']
 }
 
-/** A right-click on an item offers what can be done to it; on empty wall, what can be put there. */
+/** item menu for an item, canvas menu for a spot */
 export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
   const {
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
@@ -38,8 +37,7 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
     if (!item) return []
     const many = selectedIds.size > 1
 
-    // Only for a single image: these read the source pixels, and there is no
-    // sensible meaning for "generate maps" from a mixed selection.
+    // single image only, these read source pixels
     const imageOps: MenuEntry[] = item.kind === 'image' && item.ref && !many
       ? [
           {
@@ -69,8 +67,7 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
             onClick: () => void runImageOp('Reading colours', async () => {
               const colors = await derivePalette(item.ref as string)
               if (colors.length === 0) { toast('No colours found in that image.'); return }
-              // Swatches: small squares in a row under the image, each one a
-              // colour you can then paint other items with.
+              // swatches: squares under the image to paint other items with
               const base = docRef.current.items
               const swatches = colors.map((c, i) =>
                 createWallItem('note', {

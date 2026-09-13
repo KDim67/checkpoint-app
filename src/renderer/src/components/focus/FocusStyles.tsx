@@ -1,9 +1,5 @@
 
-/**
- * The focus view's own classes. Drawn with the view rather than kept in
- * index.css, because `.btn-ghost` here is not the global one and should only
- * win while this view is on screen.
- */
+/** kept with the view, .btn-ghost here isn't the global one */
 export default function FocusStyles() {
   return (
     <style>{`

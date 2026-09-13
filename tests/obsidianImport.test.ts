@@ -50,7 +50,7 @@ describe('frontmatter', () => {
   })
 
   it('does not treat a list under another key as tags', () => {
-    // Otherwise every alias would arrive as a tag.
+    // or every alias arrives as a tag
     const { tags } = stripFrontmatter('---\naliases:\n  - Other name\ntags:\n  - real\n---\nbody')
     expect(tags).toEqual(['real'])
   })
@@ -66,7 +66,7 @@ describe('frontmatter', () => {
   })
 
   it('does not eat a horizontal rule at the very top', () => {
-    // A `---` on its own with no closing pair is a rule, not frontmatter.
+    // an unclosed --- is a rule, not frontmatter
     const note = '---\nnot closed'
     expect(stripFrontmatter(note).body).toBe(note)
   })
@@ -78,8 +78,7 @@ describe('turning frontmatter tags into Checkpoint tags', () => {
   })
 
   it('flattens a nested tag rather than letting it truncate', () => {
-    // Checkpoint's tag pattern stops at the slash, so "project/checkpoint"
-    // and "project/website" would both silently become "#project".
+    // our tag pattern stops at the slash, both would become #project
     expect(tagLine(['project/checkpoint'])).toBe('#project-checkpoint')
   })
 

@@ -2,11 +2,7 @@ import { app } from 'electron'
 import { join, resolve, relative, isAbsolute } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 
-/**
- * Single source of truth for on-disk locations. This used to be four copies,
- * two resolving the home directory via os.homedir() and two via
- * app.getPath('home'), which disagree whenever Electron's path is overridden.
- */
+/** one source for paths; os.homedir() and app.getPath('home') disagree when electron's path is overridden */
 export function getConfigDir(): string {
   return join(app.getPath('home'), '.config', 'checkpoint')
 }
@@ -19,11 +15,7 @@ export function getMediaDir(): string {
   return join(getConfigDir(), 'media')
 }
 
-/**
- * Derived files, safe to delete at any time: scaled copies of media images.
- * Kept out of the media folder so the orphan prune never reports them and the
- * user never mistakes one for something they added.
- */
+/** derived and deletable; outside media so the orphan prune ignores them */
 export function getPreviewCacheDir(): string {
   return join(getConfigDir(), 'cache', 'previews')
 }
@@ -38,12 +30,7 @@ export function ensureDir(dir: string): void {
   }
 }
 
-/**
- * Maps a user-supplied name to a file inside dir. Strips characters that are
- * illegal in filenames, then re-checks containment after resolution: sanitising
- * alone is not enough, because a name that survives the filter can still
- * traverse once the OS normalises it.
- */
+/** re-check containment after resolving, a sanitised name can still traverse once normalised */
 export function resolveSafePath(dir: string, name: string, ext: string): string {
   const safeName = name.replace(/[\\/:*?"<>|]/g, '_')
   const resolvedPath = resolve(dir, `${safeName}${ext}`)

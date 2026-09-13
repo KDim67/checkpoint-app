@@ -3,13 +3,7 @@ import type { Item, Relation, RelationType } from '@shared/types'
 import { searchItems } from '../../data/items'
 import { createRelation, deleteRelation, getRelations } from '../../data/relations'
 
-/**
- * An item's links to other items, and the search that finds a new one.
- *
- * Held by whatever shows the item rather than by the panel, which unmounts
- * while the item reloads, so a search in progress lasts as long as the item is
- * open.
- */
+/** held by the item's view, the panel unmounts on reload */
 export function useItemRelations(itemId: string, owner: Item | null, activeWorkspace: string) {
   const [relations, setRelations] = useState<Relation[]>([])
   const [relationSearchQuery, setRelationSearchQuery] = useState('')
@@ -28,7 +22,7 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
           query: relationSearchQuery,
           context: activeWorkspace
         })
-        // An item cannot be linked to itself.
+        // can't link to itself
         setRelationSearchResults(res.items.filter(i => i.id !== itemId))
       } catch (err) {
         console.error('Failed to search items for relations:', err)

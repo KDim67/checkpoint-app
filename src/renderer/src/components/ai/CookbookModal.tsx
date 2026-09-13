@@ -1,12 +1,4 @@
-/**
- * The model cookbook: the curated catalogue alongside what Ollama actually has
- * installed, with pull progress for the ones it does not.
- *
- * Lifted out of AiStreamPanel with its JSX unchanged, down to the indentation.
- * State lives in useModelConfig and arrives as one `models` prop: nothing here
- * owns anything, which is what makes it safe for this to unmount every time it
- * closes.
- */
+/** state lives in useModelConfig, so this can unmount on every close */
 
 import { BookOpen, Download, RefreshCw } from 'lucide-react'
 import ChatPanelModal from './ChatPanelModal'
@@ -33,9 +25,8 @@ export default function CookbookModal({ models }: Props) {
       title="Model Cookbook"
       onClose={() => setShowCookbookModal(false)}
     >
-      {/* Models List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        {/* Local Installed Models Section */}
+        {/* installed models */}
         <div>
           <div style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
             Installed Local Models
@@ -92,7 +83,7 @@ export default function CookbookModal({ models }: Props) {
           })()}
         </div>
 
-        {/* Catalog Available Models */}
+        {/* catalogue */}
         <div>
           <div style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
             Catalog Models

@@ -80,7 +80,7 @@ describe('parseFocusTasks', () => {
 
 describe('sessionsForItem', () => {
   it('matches on id, not on title', () => {
-    // Two cards can share a title; the id is what makes the join exact.
+    // titles can repeat, the id joins exactly
     const sessions = [
       session({ id: 'a', tasks_json: JSON.stringify([{ id: 'other', title: 'A card' }]) }),
       session({ id: 'b', tasks_json: JSON.stringify([{ id: 'card-1', title: 'Different name' }]) })
@@ -102,8 +102,7 @@ describe('sessionsForItem', () => {
 
 describe('clusterSittings', () => {
   it('treats a session as spanning backwards from when it ended', () => {
-    // completed_at is the end. Without this the span is an instant and every
-    // window, commit and copy during the session falls outside it.
+    // completed_at is the end, or the span is an instant
     const [sit] = clusterSittings([session({ duration_ms: 25 * MIN, completed_at: T })])
     expect(sit.start).toBe(T - 25 * MIN)
     expect(sit.end).toBe(T)
@@ -133,7 +132,7 @@ describe('clusterSittings', () => {
       session({ id: 'b', duration_ms: 25 * MIN, completed_at: T + 60 * MIN })
     ])
     expect(sittings[0].durationMs).toBe(50 * MIN)
-    // The span is longer than the focused time, and that is the point.
+    // longer than focused time, that's the point
     expect(sittings[0].end - sittings[0].start).toBeGreaterThan(50 * MIN)
   })
 
@@ -209,7 +208,7 @@ describe('looksLikeAnError', () => {
   })
 
   it('stays quiet on ordinary copied text', () => {
-    // A false "you stopped mid-problem" invents a story about the user's work.
+    // a false alarm invents a story about the user's work
     expect(looksLikeAnError('const x = 5')).toBe(false)
     expect(looksLikeAnError('https://example.com/docs')).toBe(false)
     expect(looksLikeAnError('remember to buy milk')).toBe(false)

@@ -1,13 +1,4 @@
-/**
- * SQLite Database Layer. Checkpoint
- *
- * Uses better-sqlite3 (synchronous API, native C++ module).
- * Must be rebuilt for Electron's Node ABI via electron-rebuild (postinstall script).
- *
- * All db.prepare() calls happen once at initDb() time, stored as module-level
- * prepared statements. Query functions call .run()/.get()/.all() on them,
- * never call db.prepare() inside a per-call function.
- */
+/** better-sqlite3, rebuilt for electron's ABI on postinstall; prepare once in initDb, never per call */
 
 import type Database from 'better-sqlite3'
 import { openDb } from './connection'
@@ -75,24 +66,16 @@ export {
 export { insertActivityLog, getActivityStats } from './activity'
 export { exportContextData, importContextData } from './contextTransfer'
 
-/**
- * Re-exported rather than declared here: the renderer needs this type to talk
- * to a peer, and it cannot import from the main process. The definition and its
- * validator live together in shared/collabProtocol.ts.
- */
+/** re-exported: the renderer needs it and can't import from main */
 export type { RemoteMutation } from '../../shared/collabProtocol'
-
-// Init
 
 export function initDb(dataPath: string): Database.Database {
   const db = openDb(dataPath)
 
-  // Apply schema and migrations
   db.exec(SCHEMA_SQL)
   rebuildItemsTableIfLegacyCheck(db)
   runMigrations(db)
 
-  // Prepare all statements once at init time
   prepareItemStatements(db)
   prepareTagStatements(db)
   prepareSettingStatements(db)

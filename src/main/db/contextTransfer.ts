@@ -32,22 +32,17 @@ export function exportContextData(db: Database.Database, context: string): Conte
     `).all(...itemIds, ...itemIds) as Relation[]
   }
 
-  // A workspace is not only its rows. Its columns, background, swimlanes,
-  // backlog layout and walls all live in app_settings, and an export without
-  // them hands back the cards arranged on a board the user never configured.
+  // columns, background, walls etc live in app_settings; without them the board comes back unconfigured
   const settings: Record<string, string> = {}
   const readSetting = db.prepare(`SELECT value FROM app_settings WHERE key = ?`)
   const collect = (key: string): void => {
-    // Secrets are stored encrypted and belong to this machine, not to the
-    // workspace. None of the keys below are secret; the guard is so that stays
-    // true if one is ever added.
+    // secrets are machine-bound; none here, the guard keeps it that way
     if (isSecretSetting(key)) return
     const row = readSetting.get(key) as { value: string } | undefined
     if (row) settings[key] = row.value
   }
 
-  // The index has to be read before the walls can be found: every wall after
-  // the first is keyed by its own id rather than by the workspace.
+  // read the index first, walls after the first are keyed by their own id
   const storedIndex = (readSetting.get(wallIndexKey(context)) as { value: string } | undefined)?.value
   contextSettingKeys(context, storedIndex ?? null).forEach(collect)
 
@@ -64,7 +59,6 @@ export function exportContextData(db: Database.Database, context: string): Conte
 
 export function importContextData(db: Database.Database, newContextSlug: string, data: ContextExport): void {
   db.transaction(() => {
-    // 1. Insert tags
     const stmtTag = db.prepare(`INSERT OR IGNORE INTO tags (id, name, color) VALUES (@id, @name, @color)`)
     if (Array.isArray(data.tags)) {
       for (const t of data.tags) {
@@ -72,7 +66,6 @@ export function importContextData(db: Database.Database, newContextSlug: string,
       }
     }
 
-    // 2. Insert items
     const stmtItem = db.prepare(`
       INSERT OR REPLACE INTO items (id, type, context, title, body, status, priority, position, created_at, updated_at, due_at, metadata)
       VALUES (@id, @type, @context, @title, @body, @status, @priority, @position, @created_at, @updated_at, @due_at, @metadata)
@@ -84,7 +77,6 @@ export function importContextData(db: Database.Database, newContextSlug: string,
       }
     }
 
-    // 3. Insert item_tags
     const stmtItemTag = db.prepare(`INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?, ?)`)
     if (Array.isArray(data.item_tags)) {
       for (const it of data.item_tags) {
@@ -92,7 +84,6 @@ export function importContextData(db: Database.Database, newContextSlug: string,
       }
     }
 
-    // 4. Insert relations
     const stmtRelation = db.prepare(`
       INSERT OR REPLACE INTO relations (id, from_id, to_id, type)
       VALUES (@id, @from_id, @to_id, @type)
@@ -103,8 +94,7 @@ export function importContextData(db: Database.Database, newContextSlug: string,
       }
     }
 
-    // 5. The workspace's own settings, rewritten for the workspace being
-    // imported into. Absent from a version 1 export, which still imports.
+    // rewritten for the target workspace; missing from v1 exports
     if (data.settings && typeof data.settings === 'object') {
       const stmtSetting = db.prepare(
         `INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`

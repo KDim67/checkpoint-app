@@ -1,4 +1,4 @@
-/** Raising a notification, and the policy that governs it. */
+/** raising notifications, and the policy around them */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

@@ -7,19 +7,10 @@ import { errorMessage } from '../../../../shared/errors'
 import * as gamedevApi from '../../data/gamedev'
 import * as appApi from '../../data/app'
 
-/**
- * PBR Map Generator: albedo intake, height/normal/roughness/AO derivation, the
- * three.js material preview, and export.
- *
- * isActive gates the canvas and WebGL work so it only runs while the tool is on
- * screen; the preview renderer is torn down when it goes false. Reads the
- * Kanban hand-off path from the store and asks the parent to switch tabs, so
- * the hand-off lands even from another tool.
- */
+/** isActive gates canvas and WebGL work and tears the preview down; the hand-off switches tabs from anywhere */
 export function usePbrTool(isActive: boolean, onActivate: () => void) {
   const { toast } = useToast()
 
-  // Tab 5: PBR Map Generator State
   const preloadTexturePath = useAppStore(state => state.gamedevPreloadTexturePath)
   const preloadCardId = useAppStore(state => state.gamedevSourceCardId)
 
@@ -31,7 +22,6 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
   const [shape, setShape] = useState<'sphere' | 'cube' | 'plane'>('sphere')
   const [rotate, setRotate] = useState(true)
 
-  // Sliders
   const [normalIntensity, setNormalIntensity] = useState(2.5)
   const [heightDepth, setHeightDepth] = useState(1.0)
   const [roughnessContrast, setRoughnessContrast] = useState(1.0)
@@ -39,7 +29,6 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
   const [aoIntensity, setAoIntensity] = useState(1.0)
   const [invertHeight, setInvertHeight] = useState(false)
 
-  // Canvases
   const albedoCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const heightCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const normalCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -47,11 +36,9 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
   const aoCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  // Image Ref
   const originalImageRef = useRef<HTMLImageElement | null>(null)
 
 
-  // PBR Map Generator Functions
   const loadTexturePath = useCallback(async (path: string) => {
     setIsProcessing(true)
     try {
@@ -88,7 +75,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
 
     setIsProcessing(true)
     try {
-      // Electron ≥32: File.path no longer exists. Resolve via preload webUtils
+      // electron 32 dropped File.path, resolve via preload
       const path = appApi.getPathForFile(file)
       const reader = new FileReader()
       reader.onload = (event) => {
@@ -121,7 +108,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     }
   }, [])
 
-  // Sobel-based real-time 2D pixel calculations. Delegates to shared computePbrMaps()
+  // sobel via the shared computePbrMaps()
   const processTextures = useCallback(() => {
     const img = originalImageRef.current
     if (!img) return
@@ -163,7 +150,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     if (threeTexturesRef.current.aoMap) threeTexturesRef.current.aoMap.needsUpdate = true
   }, [normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight])
 
-  // Full-resolution export. Also delegates to computePbrMaps() for identical output
+  // full-res export through the same computePbrMaps()
   const handleExport = useCallback(async () => {
     const img = originalImageRef.current
     if (!img || !albedoPath) return
@@ -185,7 +172,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
         normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight
       })
 
-      // Convert each typed array to a data URL via an off-screen canvas
+      // typed arrays to data URLs via an off-screen canvas
       const toDataUrl = (data: Uint8ClampedArray<ArrayBuffer>) => {
         const c = document.createElement('canvas')
         c.width = W; c.height = H
@@ -217,7 +204,6 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     }
   }, [albedoPath, normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, invertHeight, toast])
 
-  // Watch preload texture path from appStore
   useEffect(() => {
     if (preloadTexturePath) {
       onActivate()
@@ -225,7 +211,6 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     }
   }, [preloadTexturePath, loadTexturePath, onActivate])
 
-  // Watch albedo dataUrl changes and draw into canvases
   useEffect(() => {
     if (!albedoUrl) return
 
@@ -260,7 +245,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     img.src = albedoUrl
   }, [albedoUrl, processTextures])
 
-  // Triggers processTextures when sliders change or activeTab switches to PBR
+  // on slider change or switching to this tool
   useEffect(() => {
     if (isActive && albedoUrl) {
       if (originalImageRef.current) {
@@ -288,7 +273,6 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     }
   }, [normalIntensity, heightDepth, roughnessContrast, roughnessBase, aoIntensity, albedoUrl, isActive, processTextures])
 
-  // ThreeJS texture refs
   const threeTexturesRef = useRef<{
     map: THREE.CanvasTexture | null;
     normalMap: THREE.CanvasTexture | null;
@@ -313,7 +297,6 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     material: null
   })
 
-  // ThreeJS initialization and loop
   useEffect(() => {
     if (!isActive) return
     const canvas = previewCanvasRef.current
@@ -373,7 +356,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
       roughnessMap: roughnessMap,
       aoMap: aoMap,
       metalness: 0.05,
-      side: THREE.DoubleSide // keeps the plane visible from behind while rotating
+      side: THREE.DoubleSide // visible from behind while rotating
     })
     threeSceneRef.current.material = material
 

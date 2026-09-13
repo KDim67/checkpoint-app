@@ -1,4 +1,4 @@
-/** Hardware profiling and the local Ollama runtime. */
+/** hardware profiling and the local ollama runtime */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -24,7 +24,7 @@ export function registerCookbookHandlers(): void {
     const win = getMainWindow()
     if (!win) return
     const { pullModel } = await import('../ollamaManager')
-    // Run in background and stream progress via push IPC
+    // pulls in the background, progress streams over push IPC
     pullModel(modelTag, win).catch(console.error)
   })
 

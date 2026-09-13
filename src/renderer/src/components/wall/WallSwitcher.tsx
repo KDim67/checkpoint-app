@@ -40,7 +40,7 @@ export default function WallSwitcher({
         <span className="truncate">
           {activeWall?.name ?? '…'}
         </span>
-        {/* Just a hint that there is a choice. */}
+        {/* hint that there's a choice */}
         <ChevronDown size={12} className="icon-faint" />
       </button>
 
@@ -68,9 +68,7 @@ export default function WallSwitcher({
                     autoFocus
                     value={renaming.draft}
                     onChange={e => setRenaming({ id: w.id, draft: e.target.value })}
-                    // Commits rather than discards. Clicking away after
-                    // typing a name is not a request to throw it away, and
-                    // it happened silently.
+                    // commit on blur, clicking away isn't discarding
                     onBlur={() => {
                       commitIndex(renameWall(wallIndex, w.id, renaming.draft))
                       setRenaming(null)
@@ -129,7 +127,7 @@ export default function WallSwitcher({
                     <Pencil size={12} />
                   </button>
 
-                  {/* Hidden, not disabled. An always-greyed button reads as broken. */}
+                  {/* hidden, not disabled: always grey reads broken */}
                   {wallIndex.walls.length > 1 && (
                     <button
                       onClick={() => { setPendingDelete(w); setWallMenuOpen(false) }}
@@ -149,14 +147,13 @@ export default function WallSwitcher({
 
             <button
               onClick={addWall}
+              className="bg-clear hover-bg-offset"
               style={{
                 display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
-                background: 'none', border: 'none', cursor: 'pointer',
+                border: 'none', cursor: 'pointer',
                 padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
                 color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)'
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-offset)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
             >
               <Plus size={12} /> New wall
             </button>

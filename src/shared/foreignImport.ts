@@ -1,14 +1,4 @@
-/**
- * Reading a board exported from another app. Parsing only: the caller writes
- * the config and creates items through the ordinary paths, so an imported
- * workspace is an ordinary one the moment it exists.
- *
- * Nothing is silently dropped. Trello marks archived lists and cards
- * `closed: true`; those cards arrive archived and those lists are reported,
- * because a migration that quietly loses data is the worst kind of importer.
- * Todoist gets the same treatment: completed tasks arrive archived, and
- * anything a format cannot carry is said out loud in `notes`.
- */
+/** parsing only, writes go through ordinary paths; nothing silently dropped */
 
 import type { ItemPriority } from './types'
 
@@ -22,29 +12,27 @@ interface ImportedColumn {
 interface ImportedCard {
   title: string
   body: string
-  /** Resolved column id, or 'archived'. */
+  /** column id, or 'archived' */
   status: string
   position: number
   due_at: number | null
   priority: ItemPriority
-  /** Labels, with the colour Trello gave them, to become tags. */
+  /** Trello label colours, they become tags */
   labels: { name: string; color: string }[]
   checklist: { text: string; done: boolean }[]
 }
 
 export interface ImportedBoard {
   source: ImportSource
-  /** The board's own name, offered as the workspace name. */
+  /** offered as the workspace name */
   name: string
   columns: ImportedColumn[]
   cards: ImportedCard[]
-  /** Human-readable notes about anything that could not be carried over. */
+  /** what couldn't be carried over */
   notes: string[]
 }
 
-// Trello
-
-/** Trello's named colours, mapped onto hex so labels survive as tags. */
+/** named colours to hex */
 const TRELLO_LABEL_COLORS: Record<string, string> = {
   green: '#61bd4f',
   yellow: '#f2d600',
@@ -73,12 +61,7 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-/**
- * Column ids follow the same rule the board templates use, so an imported
- * column and a hand-made one of the same name agree. Two lists can share a
- * name, though, and a duplicate id would silently merge them. Hence the
- * uniqueness pass.
- */
+/** same rule as templates, uniquified so same-named lists don't merge */
 function columnId(name: string, taken: Set<string>): string {
   const base = name.trim().toLowerCase().replace(/\s+/g, '_') || 'column'
   let id = base
@@ -88,15 +71,12 @@ function columnId(name: string, taken: Set<string>): string {
   return id
 }
 
-/** True when the object looks like a board export from somewhere we know. */
 export function detectImportSource(parsed: unknown): ImportSource | null {
   const o = asObject(parsed)
   if (!o) return null
-  // Trello always carries both, and Checkpoint's own export carries neither.
+  // Trello has both, our export neither
   if (Array.isArray(o.lists) && Array.isArray(o.cards)) return 'trello'
-  // Todoist calls its tasks `items` in the Sync API and `tasks` in the REST
-  // one. Projects come with both, and are what tells this apart from
-  // Checkpoint's own export, which also has `items`.
+  // the Sync API says items, REST says tasks; projects tell it apart from our export
   if (Array.isArray(o.projects) && (Array.isArray(o.items) || Array.isArray(o.tasks))) return 'todoist'
   return null
 }
@@ -107,7 +87,7 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
 
   const notes: string[] = []
 
-  // Lists in the order Trello shows them. `pos` is a float, not an index.
+  // Trello's order; pos is a float
   const openLists = asArray(o.lists)
     .map(asObject)
     .filter((l): l is Record<string, unknown> => l !== null)
@@ -121,7 +101,7 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
 
   const taken = new Set<string>()
   const columns: ImportedColumn[] = []
-  /** Trello list id → Checkpoint column id. */
+  /** Trello list id to column id */
   const listToColumn = new Map<string, string>()
 
   for (const list of openLists) {
@@ -133,7 +113,7 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
 
   if (columns.length === 0) return null
 
-  // Checklists are stored alongside the cards, keyed by card id.
+  // keyed by card id
   const checklistsByCard = new Map<string, { text: string; done: boolean }[]>()
   for (const raw of asArray(o.checklists)) {
     const cl = asObject(raw)
@@ -165,8 +145,7 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
 
     const archived = card.closed === true
     const mapped = listToColumn.get(str(card.idList))
-    // A card whose list was archived has nowhere to land. Rather than dropping
-    // it, it goes to the first column. Visible, and therefore fixable.
+    // archived list: land in the first column, visible and fixable
     if (!mapped && !archived) orphaned++
     const status = archived ? 'archived' : (mapped ?? columns[0].id)
 
@@ -182,7 +161,7 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
       status,
       position: (seen + 1) * 1000,
       due_at: Number.isFinite(due) ? due : null,
-      // Trello has no priority; guessing one would be inventing data.
+      // Trello has no priority, don't invent one
       priority: 0,
       labels: asArray(card.labels)
         .map(asObject)
@@ -211,13 +190,7 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
 }
 
 
-// Todoist
-
-/**
- * Todoist's palette, by the names its exports use. Older exports carry a
- * numeric colour id instead, which is not worth a second table: an unknown
- * colour becomes grey and the label still arrives.
- */
+/** by export names; numeric ids become grey */
 const TODOIST_LABEL_COLORS: Record<string, string> = {
   berry_red: '#b8256f',
   red: '#db4035',
@@ -245,36 +218,27 @@ function todoistLabelColor(color: unknown): string {
   return TODOIST_LABEL_COLORS[str(color)] ?? '#6b7280'
 }
 
-/**
- * Todoist has four levels against Checkpoint's four, so this is a straight
- * shift rather than a judgement call. p4 is Todoist's default and means "no
- * priority set", which is Checkpoint's 0.
- *
- * The catch is that the two exports number them in opposite directions. The
- * API calls the urgent one 4; the template CSV calls it 1. Getting that
- * backwards would invert every priority in the board and look like nothing
- * was wrong, so the two directions are separate functions with separate tests.
- */
+/** a straight shift, but API and CSV number opposite ways, so separate functions and tests */
 function shiftPriority(level: number): ItemPriority {
   const clamped = Math.min(4, Math.max(1, Math.round(level)))
   return (clamped - 1) as ItemPriority
 }
 
-/** Sync/REST API numbering, where 4 is p1 and 1 is p4. */
+/** 4 is p1 */
 export function todoistPriorityFromApi(raw: unknown): ItemPriority {
   const n = Number(raw)
   if (!Number.isFinite(n) || n < 1) return 0
   return shiftPriority(n)
 }
 
-/** Template CSV numbering, where 1 is p1 and 4 is p4. An empty cell is p4. */
+/** 1 is p1, empty is p4 */
 export function todoistPriorityFromCsv(raw: unknown): ItemPriority {
   const n = Number(str(raw).trim())
   if (!Number.isFinite(n) || n < 1) return 0
   return shiftPriority(5 - n)
 }
 
-/** Todoist writes `YYYY-MM-DD` for an all-day due date and RFC3339 with a time. */
+/** YYYY-MM-DD all-day, RFC3339 with a time */
 function todoistDue(raw: unknown): number | null {
   const o = asObject(raw)
   const text = str(o ? (o.date ?? o.datetime) : raw).trim()
@@ -290,10 +254,7 @@ function todoistTasks(o: Record<string, unknown>): Record<string, unknown>[] {
     .filter((t): t is Record<string, unknown> => t !== null)
 }
 
-/**
- * Labels are strings in the REST API and numeric ids into a `labels` table in
- * the Sync one. Both end up as names with a colour.
- */
+/** strings in REST, ids in Sync */
 function todoistLabels(o: Record<string, unknown>): Map<string, { name: string; color: string }> {
   const byId = new Map<string, { name: string; color: string }>()
   for (const raw of asArray(o.labels)) {
@@ -328,18 +289,14 @@ export function parseTodoistBoard(parsed: unknown): ImportedBoard | null {
 
   const taken = new Set<string>()
   const columns: ImportedColumn[] = []
-  /** Whatever a task is grouped by, mapped to the column it lands in. */
+  /** grouping to column */
   const groupToColumn = new Map<string, string>()
 
-  /**
-   * One project's sections make good columns. Several projects do not have
-   * comparable sections, so the projects themselves become the columns and the
-   * sections are reported as flattened rather than silently lost.
-   */
+  /** one project's sections are columns; several projects become columns and sections flatten */
   const bySection = projects.length === 1 && sections.length > 0
 
   if (bySection) {
-    // Tasks with no section come first: that is where Todoist shows them.
+    // unsectioned first, like Todoist
     const loose = columnId('Tasks', taken)
     columns.push({ id: loose, name: 'Tasks' })
     groupToColumn.set('', loose)
@@ -367,10 +324,7 @@ export function parseTodoistBoard(parsed: unknown): ImportedBoard | null {
     (a, b) => Number(a.child_order ?? a.order ?? 0) - Number(b.child_order ?? b.order ?? 0)
   )
 
-  /**
-   * Sub-tasks become checklist items on their parent, which is the closest
-   * thing Checkpoint has and keeps them attached to the work they belong to.
-   */
+  /** sub-tasks become checklist items on the parent */
   const childrenByParent = new Map<string, { text: string; done: boolean }[]>()
   for (const task of ordered) {
     const parent = str(task.parent_id)
@@ -392,7 +346,7 @@ export function parseTodoistBoard(parsed: unknown): ImportedBoard | null {
 
     const group = bySection ? str(task.section_id) : str(task.project_id)
     const done = task.checked === true || task.is_completed === true || task.completed === true
-    // A finished task is archived rather than dropped, the same as Trello's.
+    // finished tasks archived, like Trello
     if (done) completed++
     const status = done ? 'archived' : (groupToColumn.get(group) ?? columns[0].id)
 
@@ -430,23 +384,14 @@ export function parseTodoistBoard(parsed: unknown): ImportedBoard | null {
   return { source: 'todoist', name, columns, cards, notes }
 }
 
-// Todoist's template CSV
-
-/**
- * A comma-separated file, quotes and all.
- *
- * Hand-written rather than pulled in: Todoist task descriptions routinely
- * contain commas and newlines inside quoted fields, and the naive split that
- * "just a CSV" suggests would tear those rows in half.
- */
+/** hand-written: descriptions hold commas and newlines in quotes */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = []
   let row: string[] = []
   let field = ''
   let quoted = false
 
-  // A BOM survives Excel round-trips and would otherwise become part of the
-  // first header name, which is how header matching quietly stops working.
+  // a BOM would join the first header
   const input = text.replace(/^\uFEFF/, '')
 
   for (let i = 0; i < input.length; i++) {
@@ -473,7 +418,7 @@ export function parseCsv(text: string): string[][] {
   return rows
 }
 
-/** Todoist's own header, which is how a CSV is recognised as one of theirs. */
+/** Todoist's header identifies it */
 export function isTodoistCsv(text: string): boolean {
   const [header] = parseCsv(text)
   if (!header) return false
@@ -481,10 +426,7 @@ export function isTodoistCsv(text: string): boolean {
   return columns.includes('TYPE') && columns.includes('CONTENT') && columns.includes('INDENT')
 }
 
-/**
- * A project exported with "Export as template". It carries no project name, so
- * the caller passes the filename, which is what Todoist names the download.
- */
+/** no project name, the filename stands in */
 export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): ImportedBoard | null {
   const rows = parseCsv(text)
   if (rows.length < 2) return null
@@ -502,15 +444,13 @@ export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): 
   const cards: ImportedCard[] = []
   const perColumn = new Map<string, number>()
 
-  // Tasks written before any section header belong to no section, so there is
-  // always a column for them. Named for the project, so a file with no
-  // sections at all reads as one column rather than a stray "Tasks".
+  // a column for tasks before any section, named for the project
   const firstId = columnId(fallbackName, taken)
   columns.push({ id: firstId, name: fallbackName })
   let current = firstId
   let sectionsSeen = 0
 
-  /** The most recent task at each indent, so a sub-task can find its parent. */
+  /** latest task per indent so sub-tasks find a parent */
   const parents: (ImportedCard | null)[] = []
   let skippedNotes = 0
 
@@ -529,8 +469,7 @@ export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): 
     }
 
     if (type === 'note') {
-      // A note belongs to the task above it. With no task above it there is
-      // nowhere to put it, and inventing a card for it would be worse.
+      // a note with no task above has nowhere to go
       const owner = parents.filter(Boolean).pop()
       if (owner) owner.body = owner.body ? `${owner.body}\n\n${content}` : content
       else skippedNotes++
@@ -543,16 +482,14 @@ export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): 
 
     const indent = Math.max(1, Math.round(Number(at(row, 'INDENT')) || 1))
 
-    // Indented rows are sub-tasks, and become checklist items on the nearest
-    // task above them rather than cards of their own.
+    // indented rows become checklist items
     if (indent > 1) {
       const parent = parents.slice(0, indent - 1).filter(Boolean).pop()
       if (parent) {
         parent.checklist.push({ text: title, done: false })
         continue
       }
-      // No parent to attach to, so it lands as an ordinary card rather than
-      // being dropped.
+      // no parent, lands as a card
     }
 
     const due = at(row, 'DATE').trim()
@@ -568,7 +505,7 @@ export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): 
       position: (seen + 1) * 1000,
       due_at: Number.isFinite(parsedDue) ? parsedDue : null,
       priority: todoistPriorityFromCsv(at(row, 'PRIORITY')),
-      // The template CSV carries no labels; there is nothing to read.
+      // no labels in the template CSV
       labels: [],
       checklist: []
     }
@@ -590,7 +527,7 @@ export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): 
   return { source: 'todoist', name: fallbackName, columns, cards, notes }
 }
 
-/** Parses whatever the file turned out to be, or null if unrecognised. */
+/** null if unrecognised */
 export function parseForeignBoard(parsed: unknown): ImportedBoard | null {
   switch (detectImportSource(parsed)) {
     case 'trello': return parseTrelloBoard(parsed)
@@ -599,17 +536,16 @@ export function parseForeignBoard(parsed: unknown): ImportedBoard | null {
   }
 }
 
-/** "3 columns · 24 cards" for the confirmation dialog. */
+/** for the confirmation dialog */
 export function describeImport(board: ImportedBoard): string {
   const cols = `${board.columns.length} column${board.columns.length === 1 ? '' : 's'}`
   const cards = `${board.cards.length} card${board.cards.length === 1 ? '' : 's'}`
   return `${cols} · ${cards}`
 }
 
-/** Every distinct label across the board, with the colour to give its tag. */
+/** distinct labels, with the colour for each tag */
 export function collectLabels(board: ImportedBoard): { name: string; color: string }[] {
-  // First colour wins: Trello allows the same label name under two colours, and
-  // a tag can only have one.
+  // first colour wins, a tag has one
   const seen = new Map<string, string>()
   for (const card of board.cards) {
     for (const label of card.labels) {

@@ -4,9 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { batchRenameFiles } from '../src/main/gamedevService'
 
-// The renamer walks over somebody's asset folder. Every case below is one where
-// fs.rename would have quietly destroyed a file: it overwrites the destination
-// on both Windows and POSIX, and nothing used to look at the destination at all.
+// fs.rename overwrites on every OS; each case here destroyed a file before
 
 let dir: string
 
@@ -38,7 +36,7 @@ describe('batchRenameFiles', () => {
   })
 
   it('refuses to rename over a file that is already there', async () => {
-    // Running the Unity texture preset twice does exactly this.
+    // the Unity preset run twice does this
     const src = file('sprite.png', 'the new one')
     const occupied = file('T_sprite.png', 'the one from last time')
 
@@ -46,13 +44,13 @@ describe('batchRenameFiles', () => {
 
     expect(res.success).toBe(false)
     expect(res.renamedCount).toBe(0)
-    // The file that was already there is the one that matters.
+    // the existing file matters
     expect(readFileSync(occupied, 'utf8')).toBe('the one from last time')
     expect(existsSync(src)).toBe(true)
   })
 
   it('refuses when two files in the batch want the same name', async () => {
-    // Search-and-replace collapsing two names onto one.
+    // search-and-replace collapsing two names
     const a = file('tex01.png', 'first')
     const b = file('tex02.png', 'second')
     const target = join(dir, 'tex.png')
@@ -63,7 +61,7 @@ describe('batchRenameFiles', () => {
     ])
 
     expect(res.success).toBe(false)
-    // The first is allowed through; the second must not land on top of it.
+    // the second mustn't land on the first
     expect(res.renamedCount).toBe(1)
     expect(readFileSync(target, 'utf8')).toBe('first')
     expect(existsSync(b)).toBe(true)
@@ -97,7 +95,7 @@ describe('batchRenameFiles', () => {
   })
 
   it('allows a rename that changes nothing but the name it already has', async () => {
-    // A no-op is not a collision with itself.
+    // a no-op isn't a collision
     const src = file('sprite.png', 'body')
 
     const res = await batchRenameFiles([{ oldPath: src, newPath: src }])

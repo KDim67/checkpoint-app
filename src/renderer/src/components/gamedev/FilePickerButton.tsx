@@ -1,22 +1,17 @@
-/**
- * The "choose a file or folder" button the game dev tools open with.
- *
- * Three panels carried an identical copy, down to the ellipsis on the name and
- * the plus on the right.
- */
+/** shared by three panels that carried identical copies */
 
 import React from 'react'
 import { Plus } from 'lucide-react'
 
 interface FilePickerButtonProps {
   onClick: () => void
-  /** The chosen path, or null when nothing is chosen yet. */
+  /** null until chosen */
   path: string | null
-  /** Shown in place of a name before anything is chosen. */
+  /** shown before anything is chosen */
   placeholder: string
 }
 
-/** Just the last segment: the whole path is shown underneath, and will not fit here. */
+/** last segment only, the full path shows underneath */
 function nameOf(path: string): string {
   return path.split(/[\\/]/).pop() || path
 }

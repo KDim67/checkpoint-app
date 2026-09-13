@@ -33,7 +33,6 @@ export function getActivityStats(
   if (isContextFilter) params.push(context)
 
   const db = getDb()
-  // 1. Total duration
   const totalRow = prepareOnce(db, `
     SELECT SUM(duration_ms) as total 
     FROM activity_tracking_logs 
@@ -41,7 +40,6 @@ export function getActivityStats(
   `).get(...params) as { total: number | null }
   const totalDurationMs = totalRow?.total || 0
 
-  // 2. By Process
   const byProcessRows = prepareOnce(db, `
     SELECT process_name as processName, SUM(duration_ms) as durationMs 
     FROM activity_tracking_logs 
@@ -51,7 +49,6 @@ export function getActivityStats(
     LIMIT 15
   `).all(...params) as Array<{ processName: string; durationMs: number }>
 
-  // 3. By Context
   const byContextRows = prepareOnce(db, `
     SELECT context, SUM(duration_ms) as durationMs 
     FROM activity_tracking_logs 
@@ -60,7 +57,6 @@ export function getActivityStats(
     ORDER BY durationMs DESC
   `).all(...params) as Array<{ context: string; durationMs: number }>
 
-  // 4. By Title
   const byTitleRows = prepareOnce(db, `
     SELECT window_title as windowTitle, process_name as processName, SUM(duration_ms) as durationMs 
     FROM activity_tracking_logs 

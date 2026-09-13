@@ -76,7 +76,7 @@ function indexWorkspaceFiles(dirPath: string): WorkspaceFileInfo[] {
   }
 
   walk(dirPath)
-  return filesList.slice(0, 500) // Cap at 500 files for clean memory performance
+  return filesList.slice(0, 500) // cap at 500 files
 }
 
 async function readWorkspaceFile(dirPath: string, relativePath: string): Promise<string> {

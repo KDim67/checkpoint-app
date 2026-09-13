@@ -23,8 +23,7 @@ describe('slugifyWorkspace', () => {
   })
 
   it('returns empty for a name with nothing usable in it', () => {
-    // The caller treats this as a validation failure rather than creating a
-    // workspace whose slug is the empty string.
+    // the caller treats '' as invalid
     expect(slugifyWorkspace('!!!')).toBe('')
     expect(slugifyWorkspace('   ')).toBe('')
   })
@@ -39,8 +38,7 @@ describe('slugifyWorkspace', () => {
   })
 })
 
-// The picker reads this list. A shared board that never reaches it opens once
-// and is then unreachable.
+// the picker reads this list, unlisted shared boards get lost
 describe('ensureWorkspaceListed', () => {
   const entry = (slug: string, over: Partial<WorkspaceEntry> = {}): WorkspaceEntry => ({
     slug, name: slug, color: '#000000', ...over
@@ -62,13 +60,13 @@ describe('ensureWorkspaceListed', () => {
   })
 
   it('hands back the very same list when the workspace is already there', () => {
-    // Identity, not equality: the caller skips the write on it.
+    // identity, the caller skips the write
     const list = [entry('domimorfi')]
     expect(ensureWorkspaceListed(list, 'domimorfi')).toBe(list)
   })
 
   it('never overwrites what is already recorded for that workspace', () => {
-    // Rejoining is not a rename.
+    // rejoining isn't a rename
     const list = [entry('domimorfi', { name: 'Domimorfi', color: '#cdf12b' })]
     const next = ensureWorkspaceListed(list, 'domimorfi', 'Something Else')
     expect(next[0].name).toBe('Domimorfi')
@@ -83,9 +81,7 @@ describe('ensureWorkspaceListed', () => {
   })
 })
 
-// Joining a shared board used to overwrite whatever was already under that
-// name. Keeping both needs somewhere to put the second copy, and the name has
-// to be predictable enough to show in the prompt before it is made.
+// joining used to overwrite same-named workspaces; the copy's name must be predictable
 describe('availableWorkspaceSlug', () => {
   it('gives back the name itself when nothing is using it', () => {
     expect(availableWorkspaceSlug('domimorfi', [])).toBe('domimorfi')
@@ -107,7 +103,7 @@ describe('availableWorkspaceSlug', () => {
   })
 
   it('never returns a name that is taken, which would be a wipe', () => {
-    // The set is everything it could reasonably produce.
+    // everything it could reasonably produce
     const taken = new Set(['x', 'x-shared', ...Array.from({ length: 998 }, (_, i) => `x-shared-${i + 2}`)])
     expect(taken.has(availableWorkspaceSlug('x', taken))).toBe(false)
   })
@@ -117,7 +113,7 @@ describe('availableWorkspaceSlug', () => {
   })
 })
 
-// A workspace holding someone else's board looked exactly like one of your own.
+// someone else's board looked like your own
 describe('setWorkspaceShared / markWorkspaceShared', () => {
   const entry = (slug: string, over: Partial<WorkspaceEntry> = {}): WorkspaceEntry => ({
     slug, name: slug, color: '#000000', ...over
@@ -136,13 +132,13 @@ describe('setWorkspaceShared / markWorkspaceShared', () => {
   })
 
   it('removes the key rather than storing false', () => {
-    // An unshared workspace should serialise the way it did before the flag.
+    // unshared serialises as before the flag
     const next = setWorkspaceShared([entry('domimorfi', { shared: true })], 'domimorfi', false)
     expect('shared' in next[0]).toBe(false)
   })
 
   it('hands back the same list when it already says that', () => {
-    // Identity, because the caller skips the write on it.
+    // identity, the caller skips the write
     const shared = [entry('domimorfi', { shared: true })]
     expect(setWorkspaceShared(shared, 'domimorfi', true)).toBe(shared)
     const plain = [entry('domimorfi')]
@@ -164,7 +160,7 @@ describe('setWorkspaceShared / markWorkspaceShared', () => {
     const list = [entry('domimorfi', { name: 'Domimorfi' })]
     const next = markWorkspaceShared(list, 'domimorfi')
     expect(next[0].shared).toBe(true)
-    // Rejoining is still not a rename.
+    // still not a rename
     expect(next[0].name).toBe('Domimorfi')
   })
 

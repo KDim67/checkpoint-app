@@ -1,24 +1,15 @@
-/**
- * Dates written the way people type them. Quick capture already handled
- * `- task`, `#tag`, `@context` and `!priority`; the due date was the one thing
- * left to set by hand, which defeats a capture bar.
- *
- * A small, predictable grammar rather than a date library: matching more than
- * the user expects silently dates things that were never meant to be dated.
- *
- * Local time, like the recurrence rules. "Tomorrow 3pm" means 3pm where they are.
- */
+/** a small grammar, not a library: overmatching silently dates things; local time */
 
 interface ParsedDate {
-  /** Epoch milliseconds, or null when the text carried no date. */
+  /** null when no date */
   dueAt: number | null
-  /** The input with the date phrase removed. */
+  /** with the date phrase removed */
   cleanedText: string
-  /** What was matched, for showing back to the user. */
+  /** shown back to the user */
   matched: string | null
 }
 
-/** The hour used when a day is given without a time. */
+/** when a day has no time */
 const DEFAULT_HOUR = 9
 
 const WEEKDAYS: Record<string, number> = {
@@ -49,12 +40,7 @@ interface TimeMatch {
   source: string
 }
 
-/**
- * Finds a clock time.
- *
- * Requires either am/pm or a colon: a bare number is far more often part of the
- * task ("upgrade to 18") than a time, and guessing wrong silently dates things.
- */
+/** needs am/pm or a colon, bare numbers are usually part of the task */
 function findTime(text: string): TimeMatch | null {
   const meridiem = /\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(text)
   if (meridiem) {
@@ -81,11 +67,11 @@ function findTime(text: string): TimeMatch | null {
 interface DayMatch {
   date: Date
   source: string
-  /** True when the phrase itself implied a time, so the default is not applied. */
+  /** so the default hour isn't applied */
   impliedTime: boolean
 }
 
-/** Finds the day being referred to, relative to `now`. */
+/** relative to now */
 function findDay(text: string, now: Date): DayMatch | null {
   const relative = /\bin\s+(\d{1,3})\s+(minute|hour|day|week)s?\b/i.exec(text)
   if (relative) {
@@ -96,7 +82,7 @@ function findDay(text: string, now: Date): DayMatch | null {
     else if (unit === 'hour') date.setHours(date.getHours() + amount)
     else if (unit === 'day') date.setDate(date.getDate() + amount)
     else date.setDate(date.getDate() + amount * 7)
-    // "in 2 hours" already names a moment; "in 2 days" does not.
+    // "in 2 hours" names a moment, "in 2 days" doesn't
     return { date, source: relative[0], impliedTime: unit === 'minute' || unit === 'hour' }
   }
 
@@ -113,12 +99,12 @@ function findDay(text: string, now: Date): DayMatch | null {
   const tomorrow = /\b(tomorrow|tmr)\b/i.exec(text)
   if (tomorrow) return { date: startOfDay(addDays(now, 1)), source: tomorrow[0], impliedTime: false }
 
-  // Checked before the bare weekday so "next monday" is not read as "monday".
+  // before the bare weekday, so "next monday" isn't "monday"
   const nextWeekday = new RegExp(`\\bnext\\s+(${Object.keys(WEEKDAYS).join('|')})\\b`, 'i').exec(text)
   if (nextWeekday) {
     const target = WEEKDAYS[nextWeekday[1].toLowerCase()]
     let ahead = (target - now.getDay() + 7) % 7
-    // "next Friday" said on a Friday means the one after, never today.
+    // "next Friday" on a Friday is the one after
     ahead = ahead === 0 ? 7 : ahead
     return { date: startOfDay(addDays(now, ahead + 7 > 13 ? ahead : ahead + 7)), source: nextWeekday[0], impliedTime: false }
   }
@@ -129,7 +115,7 @@ function findDay(text: string, now: Date): DayMatch | null {
   const weekday = new RegExp(`\\b(${Object.keys(WEEKDAYS).join('|')})\\b`, 'i').exec(text)
   if (weekday) {
     const target = WEEKDAYS[weekday[1].toLowerCase()]
-    // Includes today: "standup friday" said on Friday means this morning's.
+    // includes today
     const ahead = (target - now.getDay() + 7) % 7
     return { date: startOfDay(addDays(now, ahead)), source: weekday[0], impliedTime: false }
   }
@@ -137,16 +123,10 @@ function findDay(text: string, now: Date): DayMatch | null {
   return null
 }
 
-/** Collapses the whitespace left where a phrase was removed. */
+/** collapses leftover whitespace */
 const tidy = (text: string): string => text.replace(/\s{2,}/g, ' ').trim()
 
-/**
- * Pulls a due date out of free text.
- *
- * A time on its own is accepted and taken to mean today. "Review notes at 4pm"
- * is a complete thought. If that moment has already passed, it rolls to
- * tomorrow, because nobody sets a reminder for the past.
- */
+/** a bare time means today, or tomorrow if it's passed */
 export function parseNaturalDate(input: string, now: number = Date.now()): ParsedDate {
   const text = input ?? ''
   if (!text.trim()) return { dueAt: null, cleanedText: '', matched: null }
@@ -163,7 +143,7 @@ export function parseNaturalDate(input: string, now: number = Date.now()): Parse
   } else if (time) {
     due = startOfDay(reference)
     due.setHours(time.hours, time.minutes, 0, 0)
-    // A bare time that has already gone means the next one.
+    // a passed bare time means the next one
     if (due.getTime() <= now) due = addDays(due, 1)
   } else {
     return { dueAt: null, cleanedText: text.trim(), matched: null }
@@ -183,7 +163,7 @@ export function parseNaturalDate(input: string, now: number = Date.now()): Parse
   return { dueAt: due.getTime(), cleanedText: tidy(cleaned), matched: parts.join(' ') }
 }
 
-/** Short label for the pill shown while typing. */
+/** for the pill while typing */
 export function describeDue(dueAt: number, now: number = Date.now()): string {
   const due = new Date(dueAt)
   const days = Math.round((startOfDay(due).getTime() - startOfDay(new Date(now)).getTime()) / 86_400_000)

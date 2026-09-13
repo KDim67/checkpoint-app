@@ -1,5 +1,3 @@
-/** The bridge's `memory` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.memory
 
 export const auditMemories = (...args: Parameters<Bridge['auditMemories']>): ReturnType<Bridge['auditMemories']> =>

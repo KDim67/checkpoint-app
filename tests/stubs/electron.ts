@@ -1,12 +1,4 @@
-/**
- * Stand-in for the `electron` module.
- *
- * Nothing under test calls into Electron; the imports exist only because
- * src/main modules sit next to IPC registration in the same files. These
- * members are the ones reached at import time or by `registerDbHandlers`,
- * and they record nothing. A test that genuinely needed Electron behaviour
- * would be testing the wrong layer.
- */
+/** nothing calls electron, the imports only sit beside IPC registration; records nothing */
 
 export const ipcMain = {
   handle(): void {},
@@ -19,10 +11,7 @@ export const nativeTheme = {
 }
 
 export const app = {
-  /**
-   * A test run is not a packaged app, which is what the updater checks before
-   * it will talk to GitHub at all.
-   */
+  /** not packaged, so the updater stays off */
   isPackaged: false,
   getPath(name: string): string {
     return `/tmp/checkpoint-test/${name}`
@@ -35,21 +24,14 @@ export const app = {
   }
 }
 
-/**
- * Records what was raised instead of showing anything, so a test can assert on
- * the notifications a sweep produced. `shown` is cleared between tests.
- */
-/**
- * Reports every image as empty, which is the honest answer here: there is no
- * Chromium to decode one. notificationService treats an empty image as "no icon"
- * and omits it, so the stub exercises that branch rather than a fake success.
- */
+/** every image is empty, there is no chromium; notificationService then omits the icon */
 export const nativeImage = {
   createFromPath(): { isEmpty(): boolean } {
     return { isEmpty: () => true }
   }
 }
 
+/** records raised notifications for assertions; cleared between tests */
 export const shown: { title: string; body: string }[] = []
 
 export class Notification {

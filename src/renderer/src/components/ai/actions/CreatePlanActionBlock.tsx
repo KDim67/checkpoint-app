@@ -17,17 +17,9 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
 
   const parsed = faultTolerantParseJSON(jsonString)
 
-  // Derived with null-safe defaults so every hook below runs unconditionally.
-  // The `!parsed` bail-out has to sit *after* the hooks: streaming AI output is
-  // routinely unparseable on early renders and only parses once complete, so
-  // returning first would change this component's hook count mid-life and make
-  // React throw "rendered more hooks than during the previous render".
-  //
-  // A non-object (the model answered with an array) still renders the plan
-  // shell with zero steps; only `null` reaches the bail-out further down.
+  // hooks run before the !parsed bail: streaming JSON only parses once complete
   const root = asObject(parsed) ?? {}
-  // Field-for-field with what the block declares. No alias widening, so a step
-  // that rendered blank before still renders blank.
+  // field-for-field, no alias widening
   const planTitle = str(root.title)
   const planOverview = str(root.overview)
   const steps: AiPlanStep[] = asArray(root.steps).map(s => {
@@ -35,7 +27,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
     return { title: str(o.title), details: str(o.details), status: str(o.status) }
   })
 
-  // Stable localStorage key for per-step approval persistence (survives chat reload)
+  // per-step approvals survive a chat reload
   const planSignature = `checkpoint_plan::${planTitle.replace(/s+/g, '_').slice(0, 40)}::${steps.length}`
 
   const readStoredApprovals = (sig: string, count: number): boolean[] => {
@@ -64,9 +56,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
   const [showModal, setShowModal] = useState(false)
   const [activeStepIndex, setActiveStepIndex] = useState(0)
 
-  // Those initializers only run on the very first render, which may land before
-  // the plan JSON is parseable. Re-read persisted state once the real steps
-  // arrive, otherwise the block would stay stuck on the empty-plan defaults.
+  // initializers may run before the JSON parses, re-read once steps arrive
   useEffect(() => {
     setStepApprovals(prev =>
       prev.length === steps.length ? prev : readStoredApprovals(planSignature, steps.length)
@@ -146,7 +136,6 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
       boxShadow: 'var(--shadow-sm)',
       transition: 'border-color 300ms ease'
     }}>
-      {/* Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -202,7 +191,6 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
         </div>
       </div>
 
-      {/* Plan Title + Overview */}
       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9', marginBottom: planOverview ? '6px' : '10px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{planTitle}</div>
       {planOverview && (
         <div style={{
@@ -217,7 +205,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
         </div>
       )}
 
-      {/* Step List. Phase 1: clickable toggles */}
+      {/* phase 1: clickable toggles */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
         {steps.map((s, idx) => {
           const isApproved = stepApprovals[idx] !== false
@@ -235,7 +223,6 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                 opacity: isApproved ? 1 : 0.45
               }}
             >
-              {/* Toggle indicator */}
               <div style={{
                 width: '16px', height: '16px', borderRadius: '4px', flexShrink: 0, marginTop: '1px',
                 border: `2px solid ${isApproved ? 'var(--color-info)' : 'rgba(255,255,255,0.2)'}`,
@@ -265,14 +252,12 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
         })}
       </div>
 
-      {/* Action Buttons */}
       {phase === 'review' ? (
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
           <button
             onClick={handleExportMarkdown}
-            style={{ ...btnBase, background: 'rgba(255,255,255,0.06)', color: '#cbd5e1' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+            className="create-plan-action-block-export"
+            style={{ ...btnBase, color: '#cbd5e1' }}
           >
             <FileText size={12} style={{ color: 'var(--color-info)' }} />
             <span>Save as .md</span>
@@ -280,14 +265,12 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
           <button
             onClick={handleCommit}
             disabled={approvedCount === 0}
+            className="create-plan-action-block-commit"
             style={{
               ...btnBase,
-              background: approvedCount === 0 ? 'rgba(255,255,255,0.05)' : '#0284c7',
               color: approvedCount === 0 ? 'var(--color-text-faint)' : '#fff',
               cursor: approvedCount === 0 ? 'not-allowed' : 'pointer'
             }}
-            onMouseEnter={e => { if (approvedCount > 0) (e.currentTarget as HTMLButtonElement).style.background = '#0369a1' }}
-            onMouseLeave={e => { if (approvedCount > 0) (e.currentTarget as HTMLButtonElement).style.background = '#0284c7' }}
           >
             <CheckCircle2 size={12} />
             <span>Approve &amp; Export to Kanban ({approvedCount})</span>
@@ -309,7 +292,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
         </div>
       )}
 
-      {/* Modal Overlay detail view */}
+      {/* detail modal */}
       {showModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1000,
@@ -377,7 +360,6 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
             display: 'flex', flexDirection: 'column',
             boxShadow: 'var(--shadow-lg)', overflow: 'hidden'
           }}>
-            {/* Modal Header */}
             <div style={{
               padding: '16px 24px',
               borderBottom: '1px solid var(--color-surface-offset)',
@@ -391,17 +373,14 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                 </span>
               </div>
               <button onClick={() => setShowModal(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 150ms' }}
-                onMouseEnter={e => e.currentTarget.style.color = 'var(--color-text-base)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}
+                className="text-muted hover-text-base"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 150ms' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Body */}
             <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-              {/* Left Column: Steps list */}
               <div style={{
                 width: '320px', borderRight: '1px solid var(--color-surface-offset)',
                 overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px',
@@ -417,23 +396,17 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                     <div
                       key={idx}
                       onClick={() => setActiveStepIndex(idx)}
+                      className="bg-clear hover-bg-offset create-plan-action-block-step"
+                      data-selected={isSelected || undefined}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px',
-                        background: isSelected ? 'var(--color-surface-offset)' : 'transparent',
                         borderLeft: `3px solid ${isSelected ? 'var(--color-secondary)' : 'transparent'}`,
                         borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
                         padding: '10px 14px 10px 10px',
                         cursor: 'pointer', transition: 'all 150ms ease',
                         marginBottom: '2px'
                       }}
-                      onMouseEnter={e => {
-                        if (!isSelected) e.currentTarget.style.background = 'var(--color-surface-offset)'
-                      }}
-                      onMouseLeave={e => {
-                        if (!isSelected) e.currentTarget.style.background = 'transparent'
-                      }}
                     >
-                      {/* Round Checkbox indicator */}
                       <div
                         onClick={(e) => { e.stopPropagation(); toggleStep(idx) }}
                         style={{
@@ -466,7 +439,6 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                 })}
               </div>
 
-              {/* Right Column: Step details */}
               <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '32px', background: 'var(--color-surface-2)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {steps[activeStepIndex] ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -511,7 +483,6 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div style={{
               padding: '14px 24px',
               borderTop: '1px solid var(--color-surface-offset)',
@@ -522,6 +493,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                 <>
                   <button
                     onClick={handleExportMarkdown}
+                    className="create-plan-action-block-modal-export"
                     style={{
                       ...btnBase,
                       background: 'var(--color-surface-offset)',
@@ -531,13 +503,12 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                       borderRadius: 'var(--radius-sm)',
                       transition: 'opacity 150ms ease'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                   >
                     <FileDown size={13} /> Save as .md
                   </button>
                   <button
                     onClick={() => { handleCommit(); setShowModal(false) }}
+                    className="create-plan-action-block-modal-commit"
                     style={{
                       ...btnBase,
                       background: 'var(--color-secondary)',
@@ -546,8 +517,6 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                       borderRadius: 'var(--radius-sm)',
                       transition: 'opacity 150ms ease'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.9' }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                   >
                     <CheckCircle2 size={13} /> Approve &amp; Export to Kanban ({approvedCount})
                   </button>

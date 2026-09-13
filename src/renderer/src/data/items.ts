@@ -1,18 +1,11 @@
-/**
- * Cards, tasks and log entries, as the rest of the renderer asks for them.
- *
- * The bridge pages, and every screen that wanted a whole board asked for one
- * page with a number it picked itself: 1000 in some places, 500 in others. A
- * workspace past that number lost the rest without saying so, and nothing in
- * the call made that visible.
- */
+/** pages until done; callers used to pick their own page size and silently lose the rest */
 
 import type { Item, ItemType, PaginatedResult } from '../../../shared/types'
 
-/** Big enough that most boards need one round trip, small enough to stay a page. */
+/** one round trip for most boards, still a page */
 const PAGE_SIZE = 500
 
-/** One page, for a caller that genuinely wants paging. */
+/** for callers that really want paging */
 export async function itemPage(
   context: string,
   type: ItemType,
@@ -22,13 +15,7 @@ export async function itemPage(
   return window.electronAPI.db.getItems(context, type, page, pageSize)
 }
 
-/**
- * Every item of a type in a workspace.
- *
- * Pages until the rows run out rather than guessing a ceiling. The guard on the
- * loop is the total the bridge reports, so a board that grows mid-read ends the
- * loop rather than spinning on it.
- */
+/** pages until rows run out, guarded by the reported total so a growing board can't spin */
 export async function readItems(context: string, type: ItemType): Promise<Item[]> {
   const first = await itemPage(context, type, 1, PAGE_SIZE)
   const items = [...first.items]
@@ -41,21 +28,19 @@ export async function readItems(context: string, type: ItemType): Promise<Item[]
   return items
 }
 
-/** How many of a type a workspace holds, without reading them. */
+/** without reading them */
 export async function countItems(context: string, type: ItemType): Promise<number> {
   const res = await itemPage(context, type, 1, 1)
   return res.total ?? 0
 }
 
-/** The most recent item of a type, or null when there is none. */
+/** null when there's none */
 export async function latestItem(context: string, type: ItemType): Promise<Item | null> {
   const res = await itemPage(context, type, 1, 1)
   return res.items[0] ?? null
 }
 
-// Writes and queries. They pass straight through, typed off the bridge so the
-// two cannot drift apart; what they give is one place in the renderer that
-// reaches the database for items.
+// pass-throughs, the one place in the renderer that reaches items
 
 type Db = typeof window.electronAPI.db
 

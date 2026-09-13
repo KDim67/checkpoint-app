@@ -4,7 +4,7 @@ import { useToast } from '../ui/Toast'
 import type { McpActivityEntry } from '../../../../shared/mcpActivity'
 import * as mcpApi from '../../data/mcp'
 
-/** Coarse on purpose. The useful question is "was this just now, or last week?". */
+/** coarse on purpose: just now, or last week? */
 function relativeTime(ms: number, now: number): string {
   const secs = Math.max(0, Math.round((now - ms) / 1000))
   if (secs < 60) return 'just now'
@@ -21,8 +21,7 @@ export default function McpActivityLog(): React.JSX.Element {
   const [entries, setEntries] = useState<McpActivityEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
-  // Captured once per load so every row in a render measures against the same
-  // instant; reading Date.now() per row makes the list flicker between renders.
+  // one instant per load, Date.now() per row flickers
   const [now, setNow] = useState(() => Date.now())
 
   const load = useCallback(async () => {
@@ -39,8 +38,7 @@ export default function McpActivityLog(): React.JSX.Element {
 
   useEffect(() => {
     load()
-    // An agent can write while this panel is open, so refresh on the same event
-    // the rest of the UI uses to notice outside changes.
+    // agents write while this is open, so refresh on the shared event
     const off = mcpApi.onDataChanged(() => load())
     return off
   }, [load])
@@ -134,7 +132,7 @@ export default function McpActivityLog(): React.JSX.Element {
               </button>
             )}
             {!undone && !entry.undo && (
-              // Saying so beats an inert button: not every write has a reverse.
+              // say so instead of an inert button, not every write reverses
               <span style={{ fontSize: '11px', color: 'var(--color-text-faint)', flexShrink: 0 }}>
                 not reversible
               </span>

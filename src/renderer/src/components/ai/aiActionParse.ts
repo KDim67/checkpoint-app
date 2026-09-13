@@ -1,12 +1,9 @@
-// Reads the JSON blocks the model writes into chat into shapes the action
-// blocks can execute. Model output is malformed often enough that every reader
-// here returns null for what it cannot use rather than throwing.
+// model output is malformed often, so readers return null instead of throwing
 
 import type { BatchBoard, BatchCard, BatchColumn, JsonObject, ParsedCardJson, ParsedColumnJson } from './aiActionTypes'
 import { asArray, asObject, str, toItemPriority } from './aiActionTypes'
 
-// Colour resolution
-// The AI sometimes writes colour names instead of hex codes. Resolve them.
+// the AI sometimes writes colour names instead of hex
 const NAMED_COLORS: Record<string, string> = {
   red: '#ef4444', orange: '#f97316', amber: '#f59e0b', yellow: '#eab308',
   lime: '#84cc16', green: '#22c55e', emerald: '#10b981', teal: '#14b8a6',
@@ -21,8 +18,7 @@ export function resolveColor(val?: unknown): string {
   return NAMED_COLORS[v.toLowerCase()] ?? '#3b82f6'
 }
 
-// Returns `unknown`, not `any`: this is raw model output and every reader below
-// has to narrow it before touching a field.
+// unknown not any, raw model output must be narrowed
 export function faultTolerantParseJSON(jsonStr: string): unknown {
   const clean = jsonStr.trim()
   try {
@@ -45,7 +41,6 @@ export function faultTolerantParseJSON(jsonStr: string): unknown {
   }
 }
 
-// Type detectors
 function looksLikeColumn(obj: JsonObject): boolean {
   return !!(
     obj.create_column || obj.column_name || obj.stage_name ||
@@ -58,32 +53,27 @@ function looksLikeCard(obj: JsonObject): boolean {
   return !!(obj.create_card || obj.create_task || obj.title || obj.card_name || obj.task_name || obj.card_title || obj.header)
 }
 
-// Single-block normalizers (used by CreateTaskActionBlock / CreateColumnActionBlock)
-
 export function normalizeCardJson(jsonString: string): ParsedCardJson | null {
   const parsed = asObject(faultTolerantParseJSON(jsonString))
   if (!parsed) return null
 
-  // Hard-reject anything that looks exclusively like a column
+  // reject anything that's only a column
   if (looksLikeColumn(parsed) && !looksLikeCard(parsed)) return null
 
-  // Unwrap wrapper keys. A wrapper key holding a non-object yields no fields,
-  // which is what indexing into a bare string used to produce.
+  // a wrapper key holding a non-object yields no fields
   const wrapped = parsed.create_card || parsed.create_task || parsed.card || parsed.task
   const obj: JsonObject = wrapped ? (asObject(wrapped) ?? {}) : parsed
 
-  // Title from any common key
   const title =
     obj.title || obj.card_name || obj.task_name || obj.card_title || obj.header ||
-    // Accept `name` as title only when the object also has body/description/status/priority
+    // name counts as title only alongside card fields
     (obj.name && (obj.body || obj.description || obj.status || obj.priority !== undefined || obj.tags)
       ? obj.name : null)
 
   if (!title || typeof title !== 'string') return null
   if (looksLikeColumn(obj)) return null   // e.g. { name: "Backlog", wipLimit: 5 }
 
-  // Coerced here rather than left raw: a small model writing "3" for priority or
-  // a number for status used to flow straight into the DB write untouched.
+  // coerced, a "3" priority used to reach the DB raw
   return {
     title: title.trim(),
     body: str(obj.body || obj.description || obj.details || obj.content).trim(),
@@ -97,7 +87,7 @@ export function normalizeColumnJson(jsonString: string): ParsedColumnJson | null
   const parsed = asObject(faultTolerantParseJSON(jsonString))
   if (!parsed) return null
 
-  // Hard-reject anything that looks like a card
+  // reject anything that's only a card
   if (looksLikeCard(parsed) && !looksLikeColumn(parsed)) return null
 
   const wrapped = parsed.create_column || parsed.column || parsed.stage
@@ -114,14 +104,14 @@ export function normalizeColumnJson(jsonString: string): ParsedColumnJson | null
   }
 }
 
-/** A WIP limit the model wrote as "5" is a formatting slip, not a missing limit. */
+/** "5" is a formatting slip, not a missing limit */
 function toWipLimit(raw: unknown): number | null {
   if (raw == null) return null
   const n = Number(raw)
   return Number.isFinite(n) ? n : null
 }
 
-// Batch board parser. Handles every format the AI might produce
+// handles every format the AI produces
 
 export function parseBatchBoardJson(jsonString: string): BatchBoard | null {
   const parsed = faultTolerantParseJSON(jsonString)
@@ -167,26 +157,26 @@ export function parseBatchBoardJson(jsonString: string): BatchBoard | null {
     })
   }
 
-  // Keys that contain leaf/metadata data, never recurse into them
+  // leaf/metadata keys, never recurse
   const SKIP_RECURSE = new Set(['tags', 'choices', 'steps', 'metadata', 'meta', 'options', 'extra', 'properties'])
 
   const root = asObject(parsed)
 
-  // Strategy 1 (most common): { columns: [...], cards: [...] }
+  // 1: { columns, cards }, most common
   if (root && (Array.isArray(root.columns) || Array.isArray(root.cards))) {
     for (const c of asArray(root.columns)) pushCol(c)
     for (const c of asArray(root.cards))   pushCard(c)
     if (columns.length > 0 || cards.length > 0) return { columns, cards }
   }
 
-  // Strategy 2: { stages: [...], tasks: [...] } aliases
+  // 2: stages/tasks/items aliases
   if (root && (Array.isArray(root.stages) || Array.isArray(root.tasks) || Array.isArray(root.items))) {
     for (const c of asArray(root.stages)) pushCol(c)
     for (const c of [...asArray(root.tasks), ...asArray(root.items)]) pushCard(c)
     if (columns.length > 0 || cards.length > 0) return { columns, cards }
   }
 
-  // Strategy 3: root is an array of mixed column/card objects
+  // 3: a mixed array
   if (Array.isArray(parsed)) {
     for (const item of parsed) {
       const o = asObject(item)
@@ -197,7 +187,7 @@ export function parseBatchBoardJson(jsonString: string): BatchBoard | null {
     if (columns.length > 0 || cards.length > 0) return { columns, cards }
   }
 
-  // Strategy 4: recursive walk for wrapped / nested formats
+  // 4: recursive walk for wrapped formats
   function walk(rawNode: unknown, currentStatus = 'open') {
     if (Array.isArray(rawNode)) {
       for (const item of rawNode) walk(item, currentStatus)
@@ -208,7 +198,6 @@ export function parseBatchBoardJson(jsonString: string): BatchBoard | null {
 
     let localStatus = currentStatus
 
-    // Column?
     if (node.create_column || node.column_name || node.stage_name ||
         node.wipLimit !== undefined || node.wip_limit !== undefined) {
       const wrapped = node.create_column || node.column || node.stage
@@ -218,7 +207,6 @@ export function parseBatchBoardJson(jsonString: string): BatchBoard | null {
       if (colName) localStatus = colName
     }
 
-    // Card (wrapped)?
     const cardWrap = asObject(node.create_card || node.create_task || node.card || node.task)
     if (cardWrap) {
       pushCard(cardWrap, localStatus)
@@ -226,7 +214,7 @@ export function parseBatchBoardJson(jsonString: string): BatchBoard | null {
       pushCard(node, localStatus)
     }
 
-    // Recurse into sub-objects, skipping wrapper keys already handled & leaf data
+    // skip wrapper keys already handled and leaf data
     for (const key of Object.keys(node)) {
       if (SKIP_RECURSE.has(key)) continue
       if (['create_column', 'create_card', 'card', 'column', 'task', 'stage'].includes(key)) continue
@@ -244,11 +232,7 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/**
- * Wraps known card titles in assistant prose with internal #card: links.
- * Fenced code blocks and inline code spans are left untouched; each title is
- * linked at most once in each stretch of prose between them, to avoid link spam.
- */
+/** skips code; each title linked once per prose stretch to avoid link spam */
 export function linkifyCardTitles(content: string, entries: Array<{ title: string; id: string }>): string {
   if (!entries.length || !content) return content
   const segments = content.split(/(```[\s\S]*?```|`[^`\n]*`)/g)

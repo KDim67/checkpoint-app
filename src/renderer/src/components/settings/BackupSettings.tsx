@@ -5,7 +5,6 @@ import { useToast } from '../ui/Toast'
 import { setBoolSetting, setNumberSetting, setStringSetting } from '../../lib/settings'
 import * as backupApi from '../../data/backup'
 
-// Database Backup Settings Section
 export default function BackupSettings() {
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -172,7 +171,6 @@ export default function BackupSettings() {
         <>
           <Divider />
 
-          {/* Backup Path */}
           <FieldRow label="Backup Directory Path">
             <input
               value={customPath}
@@ -192,7 +190,6 @@ export default function BackupSettings() {
             />
           </FieldRow>
 
-          {/* Interval */}
           <FieldRow label="Backup Interval">
             <select
               value={interval}
@@ -205,7 +202,6 @@ export default function BackupSettings() {
             </select>
           </FieldRow>
 
-          {/* Max kept backups */}
           <FieldRow label="Rolling Retention Limit">
             <div className="row">
               <input
@@ -234,7 +230,6 @@ export default function BackupSettings() {
 
           <Divider />
 
-          {/* Trigger & List */}
           <div className="row-between">
             <div className="text-item-strong">
               Backup Archives
@@ -242,6 +237,7 @@ export default function BackupSettings() {
             <button
               onClick={handleBackupNow}
               disabled={running}
+              className="hover-brighten-sm"
               style={{
                 background: 'var(--color-secondary)',
                 border: 'none',
@@ -256,8 +252,6 @@ export default function BackupSettings() {
                 gap: 'var(--space-1.5)',
                 transition: 'filter var(--duration-fast)'
               }}
-              onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.1)')}
-              onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
             >
               {running ? 'Creating Backup...' : 'Backup Database Now'}
             </button>

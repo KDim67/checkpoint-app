@@ -18,7 +18,7 @@ const card = (id: string, title: string, status = 'archived'): Item => ({
 const cards = [card('a', 'Fix login'), card('b', 'Ship release notes'), card('c', 'Still on the board', 'todo')]
 const parked = { id: 'col-parked', name: 'Parked' } as ColumnConfig
 
-/** The selection lives on the board, so the harness owns it the way the board does. */
+/** the harness owns selection like the board */
 function Board(props: Omit<Props, 'selectedIds' | 'setSelected'> & { initial?: string[] }) {
   const [selectedIds, setSelected] = useState(new Set(props.initial ?? []))
   return <ArchiveBin {...props} selectedIds={selectedIds} setSelected={setSelected} />
@@ -43,7 +43,7 @@ const parentOf = (el: HTMLElement): HTMLElement => {
   return el.parentElement
 }
 
-/** The row a card title sits in, which is also what toggles its selection. */
+/** the row also toggles selection */
 const cardRow = (title: string) => parentOf(parentOf(screen.getByTitle(title)))
 
 describe('ArchiveBin', () => {

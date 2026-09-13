@@ -1,10 +1,4 @@
-/**
- * Cards marked as templates, and the card a template makes.
- *
- * Pure so the rules are testable: which column the copy lands in when the
- * template's own column is gone, where in it, and what of the template's
- * history the copy must not inherit.
- */
+/** pure: which column, where, and what history the copy mustn't inherit */
 
 import type { CreateItemPayload, Item } from './types'
 
@@ -17,13 +11,7 @@ export function isTemplateCard(card: Item): boolean {
   }
 }
 
-/**
- * The card to create from a template, or null when the board has no column to
- * put it in.
- *
- * The copy keeps the template's content, tags and fields, but none of its
- * comments or activity, and is not a template itself.
- */
+/** content, tags and fields, no comments or activity, not a template; null without a column */
 export function cardFromTemplate(
   template: Item,
   columns: ReadonlyArray<{ id: string }>,
@@ -47,7 +35,7 @@ export function cardFromTemplate(
   try {
     originalMeta = JSON.parse(template.metadata || '{}')
   } catch {
-    // Metadata that is not JSON has nothing worth carrying over.
+    // non-JSON metadata has nothing to carry
   }
 
   const cleanMeta = {

@@ -55,7 +55,6 @@ export default function BacklogTable({
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [showVisibilityMenu, setShowVisibilityMenu] = useState(false)
 
-  // Listen for scroll & resize to update virtual viewport bounds
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -81,7 +80,6 @@ export default function BacklogTable({
     }
   }, [])
 
-  // Shift column left in columnOrder
   const handleShiftLeft = (colKey: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const index = columnOrder.indexOf(colKey)
@@ -92,7 +90,6 @@ export default function BacklogTable({
     onColumnOrderChange(newOrder)
   }
 
-  // Shift column right in columnOrder
   const handleShiftRight = (colKey: string, e: React.MouseEvent) => {
     e.stopPropagation()
     const index = columnOrder.indexOf(colKey)
@@ -103,7 +100,6 @@ export default function BacklogTable({
     onColumnOrderChange(newOrder)
   }
 
-  // Toggle resize handle drag listener
   const handleResizeStart = (colKey: string, e: React.MouseEvent) => {
     e.preventDefault()
     const startX = e.clientX
@@ -124,7 +120,7 @@ export default function BacklogTable({
     document.addEventListener('mouseup', handleMouseUp)
   }
 
-  // Group and flatten items for virtualized registry rendering
+  // grouped and flattened for virtualization
   const flatRows = useMemo<DisplayRow[]>(() => {
     if (grouping === 'none') {
       return items.map((item) => ({ type: 'row' as const, key: item.id, item }))
@@ -133,7 +129,6 @@ export default function BacklogTable({
     const rowsList: DisplayRow[] = []
 
     if (grouping === 'status') {
-      // Create buckets
       const buckets: Record<string, Item[]> = {}
       columns.forEach((col) => {
         buckets[col.id] = []
@@ -271,7 +266,6 @@ export default function BacklogTable({
     return rowsList
   }, [items, columns, allTags, grouping, collapsedGroups])
 
-  // Select all logic
   const allSelected = useMemo(() => {
     if (items.length === 0) return false
     return items.every((item) => selectedIds.includes(item.id))
@@ -285,9 +279,7 @@ export default function BacklogTable({
     }
   }
 
-  // Visual order of selectable rows as currently rendered (respects grouping/collapse).
-  // Used for shift-click ranges so they select what the user actually sees, not the
-  // underlying unsorted `items` array order.
+  // visual order, so shift-click selects what's on screen
   const visibleItemIds = useMemo(
     () => flatRows.filter((r): r is Extract<DisplayRow, { type: 'row' }> => r.type === 'row').map((r) => r.item.id),
     [flatRows]
@@ -295,7 +287,6 @@ export default function BacklogTable({
 
   const handleRowSelectToggle = (id: string, e: React.MouseEvent) => {
     if (e.shiftKey && selectedIds.length > 0) {
-      // Shift-click selection range, based on the visual (possibly grouped) order
       const lastSelectedId = selectedIds[selectedIds.length - 1]
       const lastIndex = visibleItemIds.indexOf(lastSelectedId)
       const currentIndex = visibleItemIds.indexOf(id)
@@ -329,8 +320,7 @@ export default function BacklogTable({
     }))
   }
 
-  // Ctrl/Cmd+A selects all currently loaded rows, as long as focus is within the table
-  // and not inside a text input/textarea (so it doesn't hijack normal text selection).
+  // only with focus in the table and not in a text field
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -349,7 +339,6 @@ export default function BacklogTable({
     return () => container.removeEventListener('keydown', handleKeyDown)
   }, [items, setSelectedIds])
 
-  // Row virtualization geometry
   const rowHeight = 40
   const totalHeight = flatRows.length * rowHeight
   const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 6)
@@ -371,7 +360,6 @@ export default function BacklogTable({
         borderRadius: 'var(--radius-lg)'
       }}
     >
-      {/* Table Header Wrapper */}
       <div
         style={{
           display: 'flex',
@@ -389,7 +377,6 @@ export default function BacklogTable({
           flexShrink: 0
         }}
       >
-        {/* Master Selection Checkbox */}
         <div
           style={{
             width: '40px',
@@ -407,7 +394,6 @@ export default function BacklogTable({
           />
         </div>
 
-        {/* Dynamic Column Headers */}
         {columnOrder.map((colKey, index) => {
           if (!visibleColumns[colKey]) return null
           const width = columnWidths[colKey] || 120
@@ -471,7 +457,6 @@ export default function BacklogTable({
                 )}
               </div>
 
-              {/* Column Shifters (Reorder control) */}
               <div
                 style={{
                   display: 'flex',
@@ -513,7 +498,6 @@ export default function BacklogTable({
                 </button>
               </div>
 
-              {/* Resize Handle */}
               <div
                 onMouseDown={(e) => handleResizeStart(colKey, e)}
                 style={{
@@ -544,21 +528,18 @@ export default function BacklogTable({
           )
         })}
 
-        {/* Column Toggle / Visibility Button */}
         <div style={{ marginLeft: 'auto', marginRight: 'var(--space-3)', position: 'relative' }}>
           <button
             onClick={() => setShowVisibilityMenu(!showVisibilityMenu)}
+            className="text-muted hover-text-base"
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               padding: '4px'
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-base)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-muted)')}
             title="Toggle Columns"
           >
             <Eye size={13} />
@@ -604,6 +585,7 @@ export default function BacklogTable({
                   return (
                     <label
                       key={colKey}
+                      className="hover-bg-offset"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -613,8 +595,6 @@ export default function BacklogTable({
                         color: 'var(--color-text-base)',
                         cursor: 'pointer'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       <input
                         type="checkbox"
@@ -632,7 +612,7 @@ export default function BacklogTable({
         </div>
       </div>
 
-      {/* Table Body - Virtualized Registry List */}
+      {/* virtualized */}
       <div
         ref={containerRef}
         style={{
@@ -653,7 +633,6 @@ export default function BacklogTable({
               padding: 'var(--space-6)'
             }}
           >
-            {/* Illustration */}
             <div style={{
               width: '56px',
               height: '56px',
@@ -740,7 +719,7 @@ export default function BacklogTable({
                       >
                         {row.count}
                       </span>
-                      {/* Progress bar: done / total within this group */}
+                      {/* done / total for this group */}
                       <div
                         title={`${row.doneCount} of ${row.count} done`}
                         style={{
@@ -797,7 +776,6 @@ export default function BacklogTable({
         )}
       </div>
 
-      {/* Styling for column reorder buttons and hover effects */}
       <style>{`
         .backlog-col-header .column-reorder-buttons {
           opacity: 0;

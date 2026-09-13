@@ -1,6 +1,6 @@
 const SWATCH_COLORS = ['none', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#a855f7', '#ec4899']
 
-/** The preset accents. Picking none clears the colour back to the default. */
+/** picking none clears back to the default */
 export default function ColorSwatchButtons({ value, onPick }: { value: string | undefined; onPick: (color: string | undefined) => void }) {
   return (
     <>

@@ -1,11 +1,4 @@
-/**
- * One item on the Wall. Split from the canvas, which is about camera, pointer
- * maths and persistence; the two change for different reasons.
- *
- * The card case matters most: it renders from the live item passed in, never
- * from anything stored on the wall, so a retitled card follows and a deleted
- * one says so instead of showing stale text.
- */
+/** cards render from the live item, so renames follow and deletions say so */
 
 import React from 'react'
 import { FileQuestion, FileText } from 'lucide-react'
@@ -16,11 +9,11 @@ const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
 interface Props {
   item: WallItem
-  /** The real card, when this item references one that still exists. */
+  /** when the referenced card still exists */
   card?: Item
-  /** The real note, for a doc item. */
+  /** for doc items */
   note?: NoteMetadata
-  /** Editing is driven by the canvas so only one item edits at a time. */
+  /** canvas-driven so only one item edits at a time */
   editing: boolean
   onTextChange: (id: string, text: string) => void
   onFinishEditing: () => void
@@ -34,7 +27,6 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     overflow: 'hidden'
   }
 
-  // Sticky note
   if (item.kind === 'note') {
     const bg = item.color || '#f6c453'
     return (
@@ -42,7 +34,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         ...base,
         background: bg,
         borderRadius: '2px',
-        // A sticky note reads as paper because of the shadow, not the colour.
+        // the shadow makes it read as paper, not the colour
         boxShadow: '0 2px 6px rgba(0,0,0,0.28)',
         padding: '12px'
       }}>
@@ -71,7 +63,6 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     )
   }
 
-  // Free text
   if (item.kind === 'text') {
     return (
       <div style={{ ...base, display: 'flex', alignItems: 'center' }}>
@@ -101,9 +92,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     )
   }
 
-  // Frame
-  // Drawn as an outline with the label above it, so whatever it groups stays
-  // fully visible. A frame is an annotation, not a container.
+  // outline plus label above, an annotation not a container
   if (item.kind === 'frame') {
     const stroke = item.color || 'var(--color-surface-elevated)'
     return (
@@ -140,9 +129,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     )
   }
 
-  // A note from the Notes view
-  // Referenced by title, like a card is by id, and rendered from the live
-  // metadata so a renamed or edited note is never shown stale.
+  // by title, rendered from live metadata so it's never stale
   if (item.kind === 'doc') {
     if (!note) {
       return (
@@ -191,23 +178,19 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     )
   }
 
-  // Image
+  // ink
   if (item.kind === 'ink') {
     const natural = inkNaturalSize(item)
     return (
       <svg
         width="100%"
         height="100%"
-        // The box the stroke was drawn in. Keeping it as the viewBox is what
-        // makes resizing scale the drawing rather than crop it.
+        // the drawn box as viewBox, so resizing scales instead of cropping
         viewBox={`0 0 ${natural.width} ${natural.height}`}
         preserveAspectRatio="none"
         style={{ display: 'block', overflow: 'visible', pointerEvents: 'none' }}
       >
-        {/* A fat invisible copy underneath, and the only part that takes a
-            press. The box around a diagonal stroke is mostly empty space, and
-            leaving that clickable meant one stroke could blanket everything
-            under it and swallow every drag aimed at the items beneath. */}
+        {/* fat invisible hit path; a stroke's empty box would swallow drags meant for items under it */}
         <path
           d={inkPath(item)}
           fill="none"
@@ -232,14 +215,11 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
   if (item.kind === 'image') {
     return (
       <img className="wall-paper"
-        // Asks for a copy sized for the box rather than the original, which
-        // Chromium would decode at full resolution however small it is drawn.
-        // Doubled so it still holds up zoomed in a little. See mediaPreview.ts.
+        // display-sized copy, 2x for a little zoom; see mediaPreview.ts
         src={`checkpoint-media://${item.ref}?w=${Math.round(item.width * 2)}`}
         alt={item.text || 'Wall image'}
         draggable={false}
-        // Off the main thread: decoding a large photo synchronously stalls the
-        // frame it lands on, which is felt as a hitch mid-drag.
+        // async decode, a sync one hitches mid-drag
         decoding="async"
         style={{
           ...base,
@@ -252,9 +232,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     )
   }
 
-  // Card
-  // Referenced, never copied. A card deleted from the board leaves a marker
-  // rather than stale text pretending the work still exists.
+  // referenced, never copied: a deleted card leaves a marker
   if (!card) {
     return (
       <div style={{
@@ -319,7 +297,5 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
   )
 }
 
-// Memoised because moving one item re-renders the wall. The unmoved items are
-// handed the same objects again, so with this they are skipped, and a drag
-// costs the items it moves rather than every card, note and stroke on screen.
+// memoised so a drag re-renders only the moved items
 export default React.memo(WallItemView)

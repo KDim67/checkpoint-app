@@ -1,12 +1,4 @@
-/**
- * Copying an Obsidian vault into the notes folder.
- *
- * The walking, copying and writing. Everything that decides what a note should
- * end up looking like is in `shared/obsidianImport.ts`, where it can be tested
- * without a vault on disk.
- *
- * Nothing in the vault is touched. This only ever reads.
- */
+/** walk, copy, write only; shaping lives in shared/obsidianImport for tests; never writes to the vault */
 
 import { join, relative, extname, basename, sep } from 'path'
 import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, copyFileSync } from 'fs'
@@ -21,10 +13,10 @@ import {
 } from '../shared/obsidianImport'
 import { getNotesDir, getMediaDir, ensureDir, resolveSafePath } from './paths'
 
-/** Stop before a runaway walk: a vault is notes, not a whole home directory. */
+/** a vault is notes, not a whole home directory */
 const MAX_FILES = 20000
 
-/** Every file under `root`, as vault-relative paths with forward slashes. */
+/** vault-relative, forward slashes */
 function walk(root: string): string[] {
   const found: string[] = []
 
@@ -47,7 +39,7 @@ function walk(root: string): string[] {
       try {
         stats = statSync(full)
       } catch {
-        // A broken symlink or a file that vanished mid-walk.
+        // broken symlink or a file gone mid-walk
         continue
       }
 
@@ -63,12 +55,7 @@ function walk(root: string): string[] {
 
 const isMarkdown = (path: string): boolean => /\.md$/i.test(path)
 
-/**
- * Resolves an attachment as a note wrote it.
- *
- * Obsidian lets an embed name just the file, wherever it lives in the vault,
- * so a bare name is matched against every non-note file before giving up.
- */
+/** embeds may name just the file, so bare names match any non-note file */
 function resolveAttachment(target: string, files: string[]): string | null {
   const wanted = target.split(/[\\/]/).join('/')
   const direct = files.find(f => f.toLowerCase() === wanted.toLowerCase())
@@ -103,7 +90,7 @@ export function importObsidianVault(vaultPath: string): VaultImportResult {
   const attachmentCandidates = files.filter(f => !isMarkdown(f))
   const titles = planTitles(markdown)
 
-  // Only the notes whose title changed need their inbound links repointed.
+  // only renamed notes need inbound links repointed
   const renamed = new Map<string, string>()
   for (const [path, title] of titles) {
     const original = baseTitle(path)
@@ -113,7 +100,7 @@ export function importObsidianVault(vaultPath: string): VaultImportResult {
     }
   }
 
-  /** Vault path of an attachment → the media filename it was copied to. */
+  /** vault attachment path to its media filename */
   const copied = new Map<string, string>()
   const frontmatterKeys = new Set<string>()
   let unresolved = 0
@@ -130,8 +117,7 @@ export function importObsidianVault(vaultPath: string): VaultImportResult {
       continue
     }
 
-    // Attachments are copied as they are met, so a vault of images nobody
-    // links to does not end up in the media folder.
+    // copied as met, so unlinked images never land in media
     const resolved = new Map<string, string>()
     for (const target of collectAttachmentTargets(raw)) {
       const source = resolveAttachment(target, attachmentCandidates)
@@ -158,8 +144,7 @@ export function importObsidianVault(vaultPath: string): VaultImportResult {
     converted.frontmatterKeys.forEach(key => frontmatterKeys.add(key))
 
     try {
-      // Through the same helper the notes UI uses, so an import cannot write
-      // anywhere a hand-typed title could not.
+      // same helper as the notes UI, an import can't write where a typed title couldn't
       const destination = resolveSafePath(getNotesDir(), title, '.md')
       if (existsSync(destination)) result.notesOverwritten++
       writeFileSync(destination, converted.content, 'utf8')
@@ -190,7 +175,7 @@ export function importObsidianVault(vaultPath: string): VaultImportResult {
   return result
 }
 
-/** The vault's own name, offered as a label in the confirmation. */
+/** shown as a label in the confirmation */
 export function vaultName(vaultPath: string): string {
   return basename(vaultPath) || 'Vault'
 }

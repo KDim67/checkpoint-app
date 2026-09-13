@@ -1,24 +1,13 @@
-/**
- * Which settings belong to a workspace. Columns, background, swimlanes, backlog
- * layout and walls all live in app_settings, so an export of `items` alone
- * loses the workspace's whole shape.
- *
- * Keys are listed, not prefix-scanned: `wall_*` would also catch the rail's
- * own preferences.
- */
+/** workspace shape lives in app_settings; keys listed, a wall_* scan would catch rail prefs */
 
 import {
   boardConfigKey, legacyArchivedKey, legacyBackgroundKey, legacyColumnsKey, legacySwimlanesKey
 } from './boardModel'
 import { DEFAULT_WALL_ID, normalizeWallIndex, wallDocKey, wallIndexKey } from './wallModel'
 
-/** Column widths in the backlog, which the view keys by workspace. */
 export const backlogLayoutKey = (context: string): string => `backlog_columns_layout_${context}`
 
-/**
- * Keyed directly by workspace name. Legacy board keys included: a workspace not
- * opened since the config was consolidated still keeps its columns in them.
- */
+/** legacy keys too, an unopened workspace still keeps columns there */
 export function directContextSettingKeys(context: string): string[] {
   return [
     boardConfigKey(context),
@@ -28,36 +17,28 @@ export function directContextSettingKeys(context: string): string[] {
     legacySwimlanesKey(context),
     backlogLayoutKey(context),
     wallIndexKey(context),
-    // The first wall. Later ones are found through the index.
+    // first wall, later ones via the index
     wallDocKey(context)
   ]
 }
 
-/** Every wall's doc key. No index means one wall. A pre-multi-wall workspace. */
+/** no index means one wall */
 export function wallDocKeysFor(context: string, storedIndex: unknown): string[] {
   return normalizeWallIndex(storedIndex).walls.map(w => wallDocKey(context, w.id))
 }
 
-/** Deduped: the first wall shows up as a direct key and through the index. */
+/** deduped, the first wall appears twice */
 export function contextSettingKeys(context: string, storedIndex: unknown): string[] {
   return [...new Set([...directContextSettingKeys(context), ...wallDocKeysFor(context, storedIndex)])]
 }
 
-// Importing into a different workspace
-
 interface SettingEntry {
   key: string
-  /** Exactly as stored. A JSON string, not a parsed value. */
+  /** JSON string, as stored */
   value: string
 }
 
-/**
- * Re-keys an exported workspace's settings for the one it lands in.
- *
- * Walls after the first are keyed by id alone, so copying the index verbatim
- * would leave both workspaces sharing the same documents. They get fresh ids.
- * `newWallId` is injected so tests are reproducible.
- */
+/** later walls get fresh ids or two workspaces share docs; newWallId injected for tests */
 export function remapContextSettings(
   settings: Record<string, string>,
   fromContext: string,
@@ -79,7 +60,7 @@ export function remapContextSettings(
   const index = normalizeWallIndex(storedIndex)
   const idMap = new Map<string, string>()
   for (const wall of index.walls) {
-    // First wall keeps its id. Its key already changes with the workspace.
+    // the first wall keeps its id, its key changes with the workspace
     idMap.set(wall.id, wall.id === DEFAULT_WALL_ID ? DEFAULT_WALL_ID : newWallId())
   }
 

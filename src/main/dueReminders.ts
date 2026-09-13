@@ -1,12 +1,4 @@
-/**
- * Reminders for work that has reached its due date. `due_at` was stored and
- * displayed from the start with nothing ever firing on it, which made the field
- * look like a promise the app did not keep.
- *
- * Goes through the shared notification layer, so it obeys quiet hours and says
- * each thing once. In main, because a reminder needing the app focused to fire
- * is not a reminder.
- */
+/** due_at never fired before; in main so it works unfocused, via the shared layer for quiet hours */
 
 import { getDb } from './db'
 import { notify } from './notificationService'
@@ -15,10 +7,10 @@ import { emitPluginEvent } from './pluginEvents'
 const CHECK_INTERVAL_MS = 15 * 60 * 1000
 const STARTUP_DELAY_MS = 12_000
 
-/** One reminder per item per day: enough to be useful, not enough to nag. */
+/** once per item per day, useful not naggy */
 const DEDUPE_WINDOW_MS = 20 * 60 * 60 * 1000
 
-/** How far back to look. Older overdue work is a backlog problem, not news. */
+/** older overdue work is backlog, not news */
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
 
 let timer: NodeJS.Timeout | null = null
@@ -32,13 +24,7 @@ interface DueRow {
   status: string
 }
 
-/**
- * Notifies about everything due. Returns how many reminders fired.
- *
- * The query deliberately excludes finished work and anything overdue by more
- * than a week. On first run after this ships, a database with months of stale
- * due dates would otherwise produce a wall of notifications at once.
- */
+/** skips finished and week-old overdue work, or first run floods months of stale dates */
 export function checkDueItems(now = Date.now()): number {
   let fired = 0
   try {
@@ -66,8 +52,7 @@ export function checkDueItems(now = Date.now()): number {
         category: 'due',
         title: row.title || 'Untitled',
         body,
-        // Keyed by item, so an item still open tomorrow is mentioned again then
-        // rather than every fifteen minutes today.
+        // keyed by item so it repeats tomorrow, not every fifteen minutes
         dedupeKey: `due:${row.id}`,
         dedupeWindowMs: DEDUPE_WINDOW_MS,
         itemId: row.id,

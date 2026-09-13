@@ -16,7 +16,6 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
         </div>
 
         {!tool.seamlessUrl ? (
-          /* Drop Zone */
           <TextureDropZone
             onDragOver={tool.handleSeamlessDragOver}
             onDrop={tool.handleSeamlessDrop}
@@ -25,12 +24,10 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
             label="Drag & Drop Base Texture"
           />
         ) : (
-          /* Seamless Workspace */
           <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>
             
-            {/* Left Column: Tweak Sliders */}
+            {/* left: tweak sliders */}
             <div className="panel-scroll">
-              {/* Settings Title */}
               <div className="section-head">
                 <Settings size={14} className="text-muted" />
                 <span className="label-caps">
@@ -38,10 +35,8 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 </span>
               </div>
 
-              {/* Sliders Container */}
               <div className="col-md">
                 
-                {/* Algorithm Toggle */}
                 <div className="col-6px">
                   <span className="text-label-sm">
                     Blending Algorithm
@@ -82,7 +77,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </div>
                 </div>
 
-                {/* Blend Width (only if feathering is selected) */}
+                {/* feather only */}
                 {tool.seamlessAlgorithm === 'feather' && (
                   <div className="col-4px-mt">
                     <div className="row-caption">
@@ -101,7 +96,6 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </div>
                 )}
 
-                {/* Luminance Equalizer */}
                 <div className="col-4px-mt">
                   <div className="row-caption">
                     <span className="text-label">Luminance Equalizer</span>
@@ -118,7 +112,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   />
                 </div>
 
-                {/* Wavy Seams (only if feathering is selected) */}
+                {/* feather only */}
                 {tool.seamlessAlgorithm === 'feather' && (
                   <div className="col-4px-mt">
                     <div className="row-caption">
@@ -137,7 +131,6 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </div>
                 )}
 
-                {/* Tiling Grid Scale */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'var(--space-2)' }}>
                   <span className="text-label-sm">
                     Preview Repetition Scale
@@ -165,7 +158,6 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </div>
                 </div>
 
-                {/* Show Grid Helper Toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-2)' }}>
                   <span className="text-label-sm">
                     Show Tiling Grid Lines
@@ -185,10 +177,9 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
               </div>
             </div>
 
-            {/* Right Column: 3x3 Canvas Grid & Export */}
+            {/* right: 3x3 preview and export */}
             <div className="col-lg-min">
               
-              {/* Metadata Header */}
               <ActiveTextureHeader
                 label="Active Asset:"
                 path={tool.seamlessPath}
@@ -201,7 +192,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 }}
               />
 
-              {/* 3x3 repeating preview grid with before/after compare toggle */}
+              {/* 3x3 tiling with a before/after compare */}
               <div style={{
                 flex: 1,
                 background: 'var(--color-background)',
@@ -215,7 +206,6 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 overflow: 'hidden',
                 gap: 'var(--space-2)'
               }}>
-                {/* Before / After Compare Toggle */}
                 <div style={{ display: 'flex', gap: '4px', alignSelf: 'center', background: 'var(--color-surface-1)', padding: '3px', borderRadius: 'var(--radius-sm)' }}>
                   <button
                     onClick={() => tool.setSeamlessShowOriginal(false)}
@@ -251,7 +241,6 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                 <canvas ref={tool.seamlessTilingCanvasRef} style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '500px', background: 'var(--color-background)', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)' }} />
               </div>
 
-              {/* Export Trigger Block */}
               <div className="panel">
                 <div className="row-between">
                   <div className="col-2px">
@@ -291,7 +280,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                   </button>
                 </div>
 
-                {/* Kanban Card Ticket Done Prompt */}
+                {/* offer to finish the kanban card */}
                 {tool.preloadSeamlessCardId && tool.seamlessExportedFile && (
                   <div style={{
                     background: 'var(--color-secondary-muted)',

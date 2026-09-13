@@ -25,8 +25,7 @@ describe('getBoardBackgroundStyle', () => {
     expect(getBoardBackgroundStyle('linear-gradient(90deg, #000 0%, #fff 100%)')).toBe('linear-gradient(90deg, #000 0%, #fff 100%)')
   })
 
-  // The image field is free text and whatever is applied is saved to the board,
-  // so a name every object inherits must not be taken for a preset.
+  // free text that gets saved, so inherited names aren't presets
   it('does not take an inherited property name for a preset', () => {
     expect(getBoardBackgroundStyle('toString')).toBe('toString')
     expect(getBoardBackgroundStyle('constructor')).toBe('constructor')

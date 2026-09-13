@@ -3,14 +3,7 @@ import { panButtonLabel, type PanButtons, type MenuButton } from '../../lib/wall
 
 export const NUDGE = 4
 
-/**
- * Everything the wall binds, written down somewhere it can be read.
- *
- * V, P and A have switched tools since the tools existed and the first person
- * to use the wall never found them. A tooltip only reaches someone already
- * pointing at the button, which is the one moment they do not need telling;
- * this is the list you open when you do not know what to point at yet.
- */
+/** the list you open before you know what to point at; tooltips only reach people already there */
 export const wallShortcutSections = (
   bindings: ShortcutBindings,
   panButtons: PanButtons,
@@ -18,8 +11,7 @@ export const wallShortcutSections = (
 ): { group: string; rows: [string, string][] }[] => [
   {
     group: 'Tools',
-    // Read from the bindings rather than written out, so the sheet cannot
-    // disagree with what the keys actually do once someone changes one.
+    // read from the bindings so the sheet can't disagree
     rows: [
       ...VIEW_SHORTCUTS
         .filter(s => s.scope === 'wall' && s.id.startsWith('wall_tool_') && bindings[s.id])
@@ -30,9 +22,7 @@ export const wallShortcutSections = (
   {
     group: 'Mouse',
     rows: [
-      // One row, because two rows both reading "Pan the wall" look like a
-      // mistake rather than a choice. Both of these follow the settings, so
-      // the sheet cannot end up describing buttons that do something else.
+      // one row, two "Pan the wall" rows look like a mistake; both follow settings
       [panButtonLabel(panButtons), 'Pan the wall'],
       ['Space + drag', 'Pan without putting the tool down'],
       ...(menuButton === 'none'
@@ -51,7 +41,7 @@ export const wallShortcutSections = (
       ['Ctrl+Shift+Z', 'Redo'],
       [bindings.wall_duplicate || 'Unbound', 'Duplicate the selection'],
       ['Ctrl+A', 'Select everything unlocked'],
-      // Both, because the bound one is a preference and Delete is a fact.
+      // the bound key is a preference, Delete is a fact
       [bindings.wall_delete ? `${bindings.wall_delete} or Delete` : 'Delete', 'Remove the selection'],
       ['Arrows', `Nudge by ${NUDGE}px`],
       ['Shift+Arrows', `Nudge by ${NUDGE * 5}px`]

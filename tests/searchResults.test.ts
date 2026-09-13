@@ -16,7 +16,7 @@ describe('interleave', () => {
   })
 
   it('keeps drawing from the survivors once a group runs dry', () => {
-    // Without this, a search matching only one source would stop early.
+    // or a single-source search stops early
     expect(interleave([['a1'], ['b1', 'b2', 'b3']], 10)).toEqual(['a1', 'b1', 'b2', 'b3'])
   })
 

@@ -6,15 +6,13 @@ import type Database from 'better-sqlite3'
 import { IpcChannels } from '../shared/ipcChannels'
 import type { AiMemory, CreateMemoryPayload } from '../shared/types'
 
-// Re-exported: this module owned the definition before the preload and the
-// renderer needed it too, and existing importers still reach for it here.
+// re-exported for older importers, the type moved to shared
 export type { AiMemory } from '../shared/types'
 
-/** The row as SQLite actually returns it, before is_pinned is normalised. */
+/** is_pinned comes back as 0/1 */
 type AiMemoryRow = Omit<AiMemory, 'is_pinned'> & { is_pinned: number }
 
-// Module-level prepared statement singletons
-// All initialized once in initMemoryStatements(), never inside a per-call function.
+// prepared once in initMemoryStatements, never per call
 let stmtGetMemories: Database.Statement
 let stmtGetExistingByKey: Database.Statement
 let stmtUpdateMemory: Database.Statement
@@ -142,18 +140,12 @@ export function deleteMemory(id: string): boolean {
   return res.changes > 0
 }
 
-/**
- * 3-Tier Semantic Vector Memory Search using TF-IDF cosine similarity.
- * Tier 1. Pinned (semantic): always surfaced first
- * Tier 2. Semantic: project facts, lore, rules, high weight
- * Tier 3. Episodic: past decisions, milestones
- * Working memories excluded from recall (they are session-only scratchpads)
- */
+/** TF-IDF cosine with tier boosts: pinned > semantic > episodic, working excluded */
 export function searchMemories(query: string, context: string = 'default', limit: number = 8): AiMemory[] {
   const memories = getMemories(context)
   if (!query || memories.length === 0) return memories.slice(0, limit)
 
-  // Exclude pure working memories from recall (they are scratchpads, not durable)
+  // working memories are session scratchpads, not recalled
   const recallable = memories.filter(m => m.category !== 'working')
 
   const stopWords = new Set(['the', 'and', 'for', 'that', 'this', 'with', 'are', 'was', 'have', 'has', 'not', 'but', 'from', 'they', 'will', 'been', 'all', 'its', 'you', 'your'])
@@ -163,7 +155,6 @@ export function searchMemories(query: string, context: string = 'default', limit
   const queryTokens = tokenize(query)
   if (queryTokens.length === 0) return recallable.slice(0, limit)
 
-  // Build IDF weights from corpus
   const docFreq: Record<string, number> = {}
   for (const mem of recallable) {
     const tokens = new Set(tokenize(`${mem.memory_key} ${mem.content}`))
@@ -181,7 +172,6 @@ export function searchMemories(query: string, context: string = 'default', limit
     for (const t of memTokens) termFreq[t] = (termFreq[t] || 0) + 1
     const maxTf = Math.max(...Object.values(termFreq), 1)
 
-    // TF-IDF cosine similarity
     let dotProduct = 0
     let memMagnitude = 0
     let queryMagnitude = 0
@@ -200,17 +190,16 @@ export function searchMemories(query: string, context: string = 'default', limit
       ? dotProduct / (Math.sqrt(memMagnitude) * Math.sqrt(queryMagnitude))
       : 0
 
-    // Tier boosts
     let tierBoost = 0
     if (mem.is_pinned) tierBoost += 2.5
     if (mem.category === 'semantic') tierBoost += 0.8
     if (mem.category === 'episodic') tierBoost += 0.4
 
-    // Recency decay: memories updated in last 7 days get a small boost
+    // small boost for memories updated in the last 7 days
     const daysSinceUpdate = (Date.now() - mem.updated_at) / (1000 * 60 * 60 * 24)
     const recencyBoost = Math.max(0, 0.3 - daysSinceUpdate * 0.04)
 
-    // Access frequency boost (popular memories are more relevant)
+    // frequently accessed memories rank a bit higher
     const accessBoost = Math.min(0.5, mem.access_count * 0.05)
 
     const score = cosineSim + tierBoost + recencyBoost + accessBoost
@@ -219,7 +208,6 @@ export function searchMemories(query: string, context: string = 'default', limit
 
   scored.sort((a, b) => b.score - a.score)
 
-  // Increment access_count for retrieved memories
   const topResults = scored.filter(s => s.score > 0.01).map(s => s.mem).slice(0, limit)
   for (const item of topResults) {
     try { stmtIncrementAccess.run(item.id) } catch {}
@@ -228,9 +216,6 @@ export function searchMemories(query: string, context: string = 'default', limit
   return topResults.length > 0 ? topResults : recallable.slice(0, Math.min(limit, 3))
 }
 
-/**
- * Sequential processing of AI-directed memory adjustments (save, update, delete).
- */
 function processMemoryActions(actions: MemoryAction[], context: string): void {
   for (const item of actions) {
     try {
@@ -258,10 +243,7 @@ function processMemoryActions(actions: MemoryAction[], context: string): void {
   }
 }
 
-/**
- * Prunes the database to enforce memory limits (40 for small models, 120 for large).
- * Evicts oldest unpinned memories first.
- */
+/** caps per model size (40 small, 120 large), oldest unpinned go first */
 function pruneMemories(context: string = 'default', limit: number = 40): void {
   const countRow = stmtPruneCount.get(context) as { cnt: number }
   if (countRow.cnt <= limit) return
@@ -279,9 +261,7 @@ function pruneMemories(context: string = 'default', limit: number = 40): void {
   transaction(toDelete)
 }
 
-/**
- * Audit pass: asks the AI to inspect all active memories to resolve redundancies, contradictions, or stale information.
- */
+/** asks the AI to resolve redundant, contradictory or stale memories */
 export async function auditMemories(context: string, model: string): Promise<AiMemory[]> {
   const existingMems = getMemories(context)
   if (existingMems.length === 0) return []
@@ -315,8 +295,7 @@ Return [] if all memories are clean and relevant.`
       jsonString = arrayMatch[0]
     }
 
-    // Normalised, not merely parsed. These actions delete and rewrite rows,
-    // and what comes back is a model's guess at a shape.
+    // normalised not just parsed, these actions delete rows on a model's guess at a shape
     let actions: MemoryAction[] = []
     try {
       actions = normalizeMemoryActions(JSON.parse(jsonString))
@@ -327,7 +306,6 @@ Return [] if all memories are clean and relevant.`
     if (actions.length > 0) {
       processMemoryActions(actions, context)
     }
-    // Prune after consolidation/audit as well
     const isSmall = model.toLowerCase().includes('2b') || model.toLowerCase().includes('3b') || model.toLowerCase().includes('7b') || model.toLowerCase().includes('8b') || model.toLowerCase().includes('phi') || model.toLowerCase().includes('gemma') || model.toLowerCase().includes('llama3:8b')
     pruneMemories(context, isSmall ? 40 : 120)
 
@@ -338,10 +316,6 @@ Return [] if all memories are clean and relevant.`
   }
 }
 
-/**
- * Runs the AI memory-extraction pass for a single user/assistant exchange and
- * saves/updates/deletes whatever durable facts come back.
- */
 export async function consolidateFromExchange(params: {
   context: string
   userText: string
@@ -406,8 +380,7 @@ Keep keys concise (under 60 chars), content brief (under 300 chars). Return [] i
       jsonString = arrayMatch[0]
     }
 
-    // Normalised, not merely parsed. These actions delete and rewrite rows,
-    // and what comes back is a model's guess at a shape.
+    // normalised not just parsed, these actions delete rows on a model's guess at a shape
     let actions: MemoryAction[] = []
     try {
       actions = normalizeMemoryActions(JSON.parse(jsonString))
@@ -419,7 +392,7 @@ Keep keys concise (under 60 chars), content brief (under 300 chars). Return [] i
 
     processMemoryActions(actions, context)
 
-    // Enforce size limits dynamically based on model size
+    // limit scales with model size
     const isSmall = params.model.toLowerCase().includes('2b') || params.model.toLowerCase().includes('3b') || params.model.toLowerCase().includes('7b') || params.model.toLowerCase().includes('8b') || params.model.toLowerCase().includes('phi') || params.model.toLowerCase().includes('gemma') || params.model.toLowerCase().includes('llama3:8b')
     pruneMemories(context, isSmall ? 40 : 120)
 
@@ -431,7 +404,6 @@ Keep keys concise (under 60 chars), content brief (under 300 chars). Return [] i
 }
 
 export function initMemoryIpc(): void {
-  // Initialize all prepared statements once at startup
   initMemoryStatements()
 
   ipcMain.handle(IpcChannels.AI_GET_MEMORIES, (_event, context?: string) => {

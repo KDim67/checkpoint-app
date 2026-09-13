@@ -1,14 +1,7 @@
 import { useEffect, useState } from 'react'
 import { readAiEnabled } from './features'
 
-/**
- * Whether the assistant is switched on.
- *
- * Read per call site, the way the view flags are, so there is no store entry to
- * keep in sync. The last answer is cached at module level: only the very first
- * read is optimistic, so a component mounting later never flashes an AI button
- * at someone who turned AI off.
- */
+/** per call site like the view flags; cached so later mounts never flash an AI button */
 let cached = true
 
 export function useAiEnabled(): boolean {

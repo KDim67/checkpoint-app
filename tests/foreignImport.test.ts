@@ -9,7 +9,7 @@ import {
 } from '../src/shared/foreignImport'
 import { defined } from './helpers/defined'
 
-/** A minimal but realistic Trello export. */
+/** minimal but realistic Trello export */
 const trello = {
   name: 'Game Jam',
   lists: [
@@ -41,7 +41,7 @@ describe('detectImportSource', () => {
   })
 
   it("does not claim Checkpoint's own export", () => {
-    // Its shape is { context, items, tags }. Neither lists nor cards.
+    // our own shape, neither lists nor cards
     expect(detectImportSource({ context: 'work', items: [], tags: [] })).toBeNull()
   })
 
@@ -59,7 +59,7 @@ describe('parseTrelloBoard', () => {
   })
 
   it('orders columns by Trello position, not array order', () => {
-    // The fixture deliberately lists Doing before To Do.
+    // Doing before To Do in the fixture
     expect(defined(parseTrelloBoard(trello)).columns.map(c => c.name)).toEqual(['To Do', 'Doing', 'Done'])
   })
 
@@ -68,7 +68,7 @@ describe('parseTrelloBoard', () => {
   })
 
   it('keeps two lists with the same name apart', () => {
-    // A duplicate id would silently merge them and lose a column.
+    // a duplicate id would merge and lose a column
     const board = defined(parseTrelloBoard({
       name: 'B',
       lists: [

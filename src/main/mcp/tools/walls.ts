@@ -13,11 +13,7 @@ import {
 import { recordMcpActivity } from '../../mcpActivity'
 import { context, json, notifyRenderer, text, z } from '../toolKit'
 
-/**
- * The wall an agent means. Walls after the first are keyed by their own id, so
- * resolving one takes the index, and an unknown id is an error worth naming
- * rather than an empty wall that looks like a wall with nothing on it.
- */
+/** walls after the first are keyed by id; an unknown id errors rather than looking empty */
 function resolveWall(context: string, wallId?: string): { id: string; name: string; key: string } {
   const index = normalizeWallIndex(getSetting<unknown>(wallIndexKey(context), null))
   const wall = wallId
@@ -32,11 +28,7 @@ function readWallDoc(key: string): WallDoc {
   return normalizeWallDoc(getSetting<unknown>(key, null))
 }
 
-/**
- * An item as an agent should see it: coordinates and kind, plus what the thing
- * it points at is actually called. A bare item id would make the wall unreadable
- * without a second call per card.
- */
+/** include the target's title, bare ids would need a call per card */
 function describeWallItem(item: WallItem, titleOf: (item: WallItem) => string | undefined): Record<string, unknown> {
   return {
     id: item.id,
@@ -53,7 +45,7 @@ function describeWallItem(item: WallItem, titleOf: (item: WallItem) => string | 
   }
 }
 
-/** Walls: the freeform canvases, and what is on them. */
+/** freeform canvases and what's on them */
 export function registerWallTools(mcp: McpServer): void {
   mcp.registerTool(
     'list_walls',
@@ -121,8 +113,7 @@ export function registerWallTools(mcp: McpServer): void {
       if ((kind === 'card' || kind === 'doc') && !ref) {
         return text(`kind '${kind}' is a reference and needs ref: an item id for a card, a note title for a doc.`)
       }
-      // Checked rather than placed blindly: a reference to nothing renders as a
-      // tile reading "(missing)", which looks like a bug in the wall.
+      // a missing ref renders as "(missing)" and looks like a bug
       if (kind === 'card' && !getItemById(ref as string)) {
         return text(`No card with id '${ref}'. Use get_board or search_items to find one.`)
       }

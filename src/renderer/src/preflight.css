@@ -1,17 +1,4 @@
-/*
-   PREFLIGHT
-   Vendored verbatim from Tailwind v3.4.19's Preflight, which this app pulled in
-   via "@tailwind base". Tailwind itself is gone: no utility class was ever used
-   except animate-spin and animate-bounce, which index.css now declares itself.
-
-   Preflight could not go with it. The app's own reset covers box-sizing, margin
-   and padding, but not the border zeroing that every explicit "border:" in the
-   codebase is written against, nor the heading, list and form resets markdown
-   output depends on. Removing it would have changed rendering throughout, so it
-   is kept here unmodified rather than reconstructed from memory.
-
-   MIT License, https://tailwindcss.com
-   */
+/* Tailwind v3.4.19 Preflight, vendored verbatim; its resets are load-bearing. MIT, https://tailwindcss.com */
 
 /*
 1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)

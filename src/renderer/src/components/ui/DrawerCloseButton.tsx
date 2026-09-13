@@ -5,16 +5,14 @@ export default function DrawerCloseButton({ onClick, title }: { onClick: () => v
     <button
       onClick={onClick}
       title={title}
+      className="text-muted hover-text-base"
       style={{
         background: 'transparent',
         border: 'none',
-        color: 'var(--color-text-muted)',
         cursor: 'pointer',
         padding: '4px',
         display: 'flex'
       }}
-      onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-      onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
     >
       <X size={20} />
     </button>

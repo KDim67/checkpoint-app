@@ -4,8 +4,8 @@ export default function FormActions({ onCancel, submitLabel }: { onCancel: () =>
       <button
         type="button"
         onClick={onCancel}
+        className="bg-clear hover-bg-offset"
         style={{
-          background: 'transparent',
           border: '1px solid var(--color-surface-offset)',
           color: 'var(--color-text-base)',
           borderRadius: 'var(--radius-md)',
@@ -13,14 +13,13 @@ export default function FormActions({ onCancel, submitLabel }: { onCancel: () =>
           fontSize: 'var(--text-sm)',
           cursor: 'pointer'
         }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
       >
         Cancel
       </button>
 
       <button
         type="submit"
+        className="hover-brighten"
         style={{
           background: 'var(--color-secondary)',
           border: 'none',
@@ -31,8 +30,6 @@ export default function FormActions({ onCancel, submitLabel }: { onCancel: () =>
           fontWeight: 'var(--weight-semibold)',
           cursor: 'pointer'
         }}
-        onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-        onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
       >
         {submitLabel}
       </button>

@@ -1,5 +1,3 @@
-/** The bridge's `widget` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.widget
 
 export const setOpacity = (...args: Parameters<Bridge['setOpacity']>): ReturnType<Bridge['setOpacity']> =>

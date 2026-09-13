@@ -1,5 +1,3 @@
-/** The bridge's `notes` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.notes
 
 export const deleteNote = (...args: Parameters<Bridge['deleteNote']>): ReturnType<Bridge['deleteNote']> =>

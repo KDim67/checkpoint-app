@@ -2,25 +2,18 @@ import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
 export default defineConfig({
-  // The app is built with the automatic JSX runtime, so components never import
-  // React just to render. Without this the test transform expects them to.
+  // automatic JSX runtime, components don't import React
   esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
       '@shared': resolve('src/shared'),
-      // src/main modules are written for the Electron main process, so importing
-      // any of them drags in `electron` and the `better-sqlite3` native binding.
-      // The binding is compiled against Electron's ABI and cannot be dlopen'd by
-      // plain Node, so both are swapped for test doubles that keep the same
-      // surface. See tests/stubs/betterSqlite3.ts for what that costs us.
+      // main modules pull in electron and the ABI-bound sqlite binding, so both are stubbed
       electron: resolve('tests/stubs/electron.ts'),
       'better-sqlite3': resolve('tests/stubs/betterSqlite3.ts')
     }
   },
   test: {
-    // Component tests opt into jsdom with a `@vitest-environment jsdom` line at
-    // the top of the file. Everything else keeps running in plain Node, where
-    // it has always run and where it is fastest.
+    // components opt into jsdom with a `@vitest-environment jsdom` docblock; the rest run in fast plain Node
     include: ['tests/**/*.test.{ts,tsx}'],
     environment: 'node'
   }

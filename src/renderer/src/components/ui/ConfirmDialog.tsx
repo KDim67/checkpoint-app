@@ -2,17 +2,11 @@ import React, { useRef, createContext, useContext, useState, useCallback, useMem
 import useEscapeKey from './useEscapeKey'
 import useFocusTrap from './useFocusTrap'
 
-/**
- * One answer in a stacked choice list.
- *
- * A row rather than a button, because past three answers a button row stops
- * being readable: the labels have to shrink to fit, and a label alone cannot
- * say what the answer does. The row has space to say it.
- */
+/** rows, not buttons: past three answers a label can't say what each does */
 interface PickChoice {
   key: string
   label: string
-  /** One line on what this answer does. Shown under the label. */
+  /** one line under the label */
   detail?: string
   isDestructive?: boolean
 }
@@ -24,16 +18,9 @@ interface ConfirmDialogProps {
   confirmText?: string
   cancelText?: string
   isDestructive?: boolean
-  /** Extra emphasis for irreversible actions, shown below the message. */
+  /** for irreversible actions */
   warning?: string
-  /**
-   * When set, the answers are a stacked list and the button row is just Cancel.
-   *
-   * This replaced a third button that sat between cancelling and going through
-   * with it. Three buttons fit, but a label on its own cannot say what the
-   * answer does, and the question that wanted them was which of three things to
-   * do with a board you are about to overwrite.
-   */
+  /** answers as a list, buttons just Cancel */
   choices?: PickChoice[]
   onConfirm: () => void
   onPick?: (key: string) => void
@@ -90,8 +77,7 @@ export default function ConfirmDialog({
           borderRadius: 'var(--radius-lg)',
           width: '100%',
           maxWidth: '400px',
-          // A dialog that explains its answers can outgrow a short window, and
-          // the button row is the part that must never be the bit off screen.
+          // explained answers can outgrow a short window, keep the buttons on screen
           maxHeight: '85vh',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5)',
           animation: 'confirm-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards',
@@ -102,7 +88,6 @@ export default function ConfirmDialog({
       >
 
         
-        {/* Header */}
         <div style={{
           padding: 'var(--space-5) var(--space-6) var(--space-2)'
         }}>
@@ -119,7 +104,6 @@ export default function ConfirmDialog({
           </h2>
         </div>
 
-        {/* Content */}
         <div style={{
           padding: '0 var(--space-6) var(--space-6)',
           flex: 1,
@@ -159,7 +143,6 @@ export default function ConfirmDialog({
           )}
         </div>
 
-        {/* Actions */}
         <div style={{
           background: 'var(--color-surface-2)',
           padding: 'var(--space-4) var(--space-6)',
@@ -172,8 +155,8 @@ export default function ConfirmDialog({
             ref={cancelBtnRef}
             type="button"
             onClick={onCancel}
+            className="bg-clear hover-bg-offset"
             style={{
-              background: 'transparent',
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
@@ -183,8 +166,6 @@ export default function ConfirmDialog({
               cursor: 'pointer',
               transition: 'background var(--duration-fast) var(--ease-default)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-offset)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             {cancelText}
           </button>
@@ -193,6 +174,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
+            className="hover-brighten-sm"
             style={{
               background: isDestructive ? 'var(--color-error)' : 'var(--color-secondary)',
               border: 'none',
@@ -204,8 +186,6 @@ export default function ConfirmDialog({
               cursor: 'pointer',
               transition: 'filter var(--duration-fast) var(--ease-default)'
             }}
-            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.1)')}
-            onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
           >
             {confirmText}
           </button>
@@ -268,25 +248,17 @@ export interface ConfirmOptions {
 }
 
 interface PickOptions extends ConfirmOptions {
-  /** Answered by pressing one of these. 'cancel' is not a usable key. */
+  /** 'cancel' isn't a usable key */
   choices: PickChoice[]
 }
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
-/** The key of the row that was pressed, or null for every way of refusing. */
+/** null for every way of refusing */
 type PickFn = (options: PickOptions) => Promise<string | null>
 
 const ConfirmContext = createContext<{ confirm: ConfirmFn; pick: PickFn } | undefined>(undefined)
 
-/**
- * Promise-based wrapper around ConfirmDialog, so a call site reads the same
- * shape as the native confirm() it replaces:
- *
- *   if (!(await confirm({ title, message }))) return
- *
- * Native confirm() blocks the renderer process and draws an OS chrome dialog
- * that ignores the app's theme, which is why none of these are left.
- */
+/** same shape as native confirm(), which blocks the renderer and ignores the theme */
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<{
     options: ConfirmOptions & { choices?: PickChoice[] }
@@ -296,8 +268,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const ask = useCallback((options: ConfirmOptions & { choices?: PickChoice[] }) => {
     return new Promise<string>(resolve => {
       setPending(prev => {
-        // A second request while one is open would strand the first promise
-        // forever; treat being displaced as a cancel.
+        // a displaced request counts as cancel, or its promise hangs
         prev?.resolve('cancel')
         return { options, resolve }
       })
@@ -309,8 +280,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     [ask]
   )
 
-  // Anything but the confirm button is a no, which is what every call site
-  // already assumes.
+  // anything but confirm is a no
   const confirm = useCallback<ConfirmFn>(
     options => ask(options).then(value => value === 'confirm'),
     [ask]
@@ -355,10 +325,7 @@ export function useConfirm(): ConfirmFn {
   return useConfirmContext().confirm
 }
 
-/**
- * The same dialog with its answers as a stacked list, for a question with more
- * answers than a button row can label, or answers that need explaining.
- */
+/** for more answers than buttons can label */
 export function usePick(): PickFn {
   return useConfirmContext().pick
 }

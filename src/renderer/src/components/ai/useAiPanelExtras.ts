@@ -7,7 +7,6 @@ import { getStringSetting } from '../../lib/settings'
 import * as memoryApi from '../../data/memory'
 import type { AiChat } from './useAiChat'
 
-/** Exporting and copying a chat, consolidating memories after a turn, and the token budget estimate. */
 export function useAiPanelExtras(aiChat: AiChat) {
   const {
     activeWorkspace, messages, inputValue, selectedModel, modelCaps, modelBudget,
@@ -15,7 +14,6 @@ export function useAiPanelExtras(aiChat: AiChat) {
     consolidateRef, showMemoryPanel, setMemories, setMemoryConsolidating, activeSkillId,
     workspaceFolder, workspaceFiles, setCopiedMsgIndex
   } = aiChat
-  // Export chat as Markdown
   const handleExportChat = () => {
     const chatMessages = messages.filter(m => m.role !== 'system')
     if (chatMessages.length === 0) return
@@ -37,20 +35,10 @@ export function useAiPanelExtras(aiChat: AiChat) {
     URL.revokeObjectURL(url)
   }
 
-  // Memory panel
-  // Load memories whenever the panel opens (from ANY entry point: the button,
-  // the /mem command, or the "N recalled" chip) and whenever the workspace
-  // changes while it's open. This is what keeps the panel in sync with the
-  // Settings memory vault instead of showing a stale/empty count.
-
-  /**
-   * Background memory consolidation. Fires after each AI turn.
-   * Uses a secondary AI call to extract key facts from the last exchange.
-   * Runs silently without blocking the UI.
-   */
+  /** runs after each AI turn, silently */
   const triggerMemoryConsolidation = useCallback(async (currentMessages: Message[]) => {
     try {
-      // Rate-limit: only consolidate every 2 turns to reduce API load
+      // every 2 turns to cut API load
       consolidationTurnRef.current += 1
       if (consolidationTurnRef.current % 2 !== 0) return
 
@@ -59,7 +47,7 @@ export function useAiPanelExtras(aiChat: AiChat) {
       const assistantTurn = [...currentMessages].reverse().find(m => m.role === 'assistant')
       if (!userTurn || !assistantTurn) return
 
-      // Don't consolidate trivially short exchanges
+      // skip trivially short exchanges
       const combinedLength = (userTurn.content?.length || 0) + (assistantTurn.content?.length || 0)
       if (combinedLength < 200) return
 
@@ -69,11 +57,7 @@ export function useAiPanelExtras(aiChat: AiChat) {
 
       setMemoryConsolidating(true)
 
-      // Runs entirely in the main process now. See memoryService.consolidateFromExchange.
-      // (Constructing the OpenAI client here in the renderer never worked: the SDK refuses
-      // to initialize in a browser-like context, which Electron's renderer is, so this used
-      // to throw immediately and get swallowed by the catch below. No memories were ever
-      // actually being written.)
+      // runs in main: the SDK refuses the renderer, so this used to throw silently and save nothing
       const saved = await memoryApi.consolidateMemory({
         context: validContext,
         userText: userTurn.content,
@@ -85,7 +69,7 @@ export function useAiPanelExtras(aiChat: AiChat) {
         setMemories(saved)
       }
 
-      // Every 10 consolidation runs, perform a self-cleaning audit
+      // self-cleaning audit every 10 runs
       auditTurnRef.current += 1
       if (auditTurnRef.current % 10 === 0) {
         const audited = await memoryApi.auditMemories(validContext, model).catch(() => [])
@@ -94,7 +78,7 @@ export function useAiPanelExtras(aiChat: AiChat) {
         }
       }
     } catch (e) {
-      // Background consolidation failures are silent, never block the user
+      // silent, never blocks the user
       console.warn('[Memory] Consolidation pass failed:', e)
     } finally {
       setMemoryConsolidating(false)
@@ -102,27 +86,25 @@ export function useAiPanelExtras(aiChat: AiChat) {
   }, [consolidationTurnRef, activeWorkspace, selectedModel, setMemoryConsolidating, showMemoryPanel, auditTurnRef, setMemories])
   consolidateRef.current = triggerMemoryConsolidation
 
-  // Copy message
   const handleCopyMessage = async (content: string, index: number) => {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedMsgIndex(index)
       setTimeout(() => setCopiedMsgIndex(null), COPIED_FEEDBACK_MS)
     } catch {
-      // fallback for environments without clipboard API
+      // no clipboard API
     }
   }
 
-  // Rough context-window usage estimate for the Token Budget Indicator.
+  // rough estimate for the token budget indicator
   const tokenUsage = (() => {
     const contextWindowTokens = modelCaps.contextTokens
     const historyTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0)
-    const baseOverheadTokens = 900 // base system prompt + live board state scaffolding
+    const baseOverheadTokens = 900 // base system prompt + board state scaffolding
     const skillTokens = activeSkillId ? estimateTokens(getSkillById(activeSkillId)?.systemPrompt || '') : 0
     const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, modelBudget.workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
     const estimated = historyTokens + estimateTokens(inputValue) + baseOverheadTokens + skillTokens + workspaceTokens
-    // The reported figure covers the last completed turn, so anything typed
-    // since is added on top of it.
+    // the reported figure covers the last turn, add what's typed since
     const used = reportedPromptTokens !== null
       ? reportedPromptTokens + estimateTokens(inputValue)
       : estimated

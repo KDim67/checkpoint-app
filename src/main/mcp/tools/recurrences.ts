@@ -6,7 +6,7 @@ import { describeRule } from '../../../shared/recurrence'
 import { shorten } from '../../../shared/mcpActivity'
 import { context, json, notifyRenderer, text, z } from '../toolKit'
 
-/** Work that repeats. */
+/** work that repeats */
 export function registerRecurrenceTools(mcp: McpServer): void {
   mcp.registerTool(
     'list_recurrences',

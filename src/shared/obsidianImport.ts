@@ -1,56 +1,34 @@
-/**
- * Reading an Obsidian vault into Checkpoint's notes.
- *
- * The two formats are close enough that most of a vault needs no translation
- * at all: both are plain Markdown files with `[[wiki links]]` and `#tags`. The
- * differences are the ones handled here.
- *
- * - Checkpoint's notes are a flat folder, a vault is a tree. Two notes called
- *   "Index" in different folders would collide, so titles are made unique and
- *   the links that pointed at them are repointed to match.
- * - Vault attachments live in the vault; Checkpoint's live in its media folder
- *   behind the `checkpoint-media://` protocol, so embeds are rewritten.
- * - YAML frontmatter renders as junk in a plain Markdown view, so it comes off,
- *   and any tags in it are kept as ordinary `#tags`.
- *
- * All of this is pure. The caller does the walking, copying and writing.
- */
+/** flat folder vs tree: unique titles, repointed links, rewritten embeds, frontmatter off; pure */
 
 export interface VaultImportResult {
   notesImported: number
   notesOverwritten: number
   attachmentsCopied: number
-  /** Notes whose title had to change, so the caller can show which. */
+  /** so the caller can show renames */
   renamed: { from: string; to: string }[]
-  /** Anything worth saying out loud, in the same spirit as a board import. */
+  /** said out loud, like a board import */
   notes: string[]
 }
 
-/** Folders a vault keeps for itself, which are not notes. */
+/** vault housekeeping, not notes */
 const SKIPPED_DIRECTORIES = ['.obsidian', '.trash', '.git', 'node_modules']
 
-/** True for a vault path that should not be read at all. */
+/** not read at all */
 export function isSkippedPath(relPath: string): boolean {
   const parts = relPath.split(/[\\/]/)
   return parts.some(part => SKIPPED_DIRECTORIES.includes(part) || part.startsWith('.'))
 }
 
 export interface Frontmatter {
-  /** Tags found in the block, without their `#`. */
+  /** without # */
   tags: string[]
-  /** Everything the block said, for reporting what could not be carried. */
+  /** for reporting what wasn't carried */
   keys: string[]
-  /** The note with the block removed. */
+  /** block removed */
   body: string
 }
 
-/**
- * Pulls a leading `---` block off a note.
- *
- * A deliberately small YAML subset: `key: value`, `key: [a, b]` and a block
- * list under `key:`. Anything more would be a YAML parser, and the only field
- * that maps onto something Checkpoint has is `tags`.
- */
+/** tiny YAML subset, only tags maps onto anything */
 export function stripFrontmatter(markdown: string): Frontmatter {
   const match = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(markdown)
   if (!match) return { tags: [], keys: [], body: markdown }
@@ -76,7 +54,7 @@ export function stripFrontmatter(markdown: string): Frontmatter {
 
     const value = rawValue.trim()
     if (value === '') continue
-    // `[a, b]` and `a, b` both appear in the wild.
+    // [a, b] and a, b both show up
     for (const part of value.replace(/^\[|\]$/g, '').split(',')) {
       tags.push(part)
     }
@@ -93,36 +71,27 @@ export function stripFrontmatter(markdown: string): Frontmatter {
   }
 }
 
-/** A tag line Checkpoint's own `#tag` scan will pick up. */
+/** picked up by our #tag scan */
 export function tagLine(tags: string[]): string {
-  // Spaces and slashes do not survive Checkpoint's tag pattern, so a nested
-  // "project/checkpoint" becomes "project-checkpoint" rather than truncating
-  // at the slash and quietly merging every project into one tag.
+  // spaces and slashes break our tag pattern, so project/checkpoint becomes project-checkpoint
   const usable = tags
     .map(tag => tag.trim().replace(/[\s/]+/g, '-').replace(/[^A-Za-z0-9_-]/g, ''))
     .filter(tag => tag !== '')
   return usable.length === 0 ? '' : usable.map(tag => `#${tag}`).join(' ')
 }
 
-/** `folder/sub/Note.md` → `Note`. */
+/** folder/sub/Note.md to Note */
 export function baseTitle(relPath: string): string {
   const file = relPath.split(/[\\/]/).pop() ?? relPath
   return file.replace(/\.md$/i, '')
 }
 
-/**
- * A flat, unique title per note.
- *
- * Duplicates take the name of the folder they came from, which is the thing
- * that distinguished them in the vault. A second collision falls back to a
- * number, because two folders can share a name too.
- */
+/** duplicates take their folder name, then a number */
 export function planTitles(relPaths: string[]): Map<string, string> {
   const titles = new Map<string, string>()
   const taken = new Set<string>()
 
-  // Sorted so the same vault always produces the same titles, whatever order
-  // the filesystem hands the files over in.
+  // sorted so a vault always yields the same titles
   for (const relPath of [...relPaths].sort()) {
     const base = baseTitle(relPath) || 'Untitled'
     let title = base
@@ -146,28 +115,24 @@ export function planTitles(relPaths: string[]): Map<string, string> {
   return titles
 }
 
-/**
- * Wiki links whose target had to be renamed, so they still point at the note
- * they meant. A link to a name that stayed the same is left exactly as it was.
- */
+/** only renamed targets change */
 export function repointLinks(markdown: string, renamed: Map<string, string>): string {
   if (renamed.size === 0) return markdown
 
   return markdown.replace(
     /\[\[([^\]|#^]+)((?:[#^][^\]|]*)?)(\|[^\]]*)?\]\]/g,
     (whole, target: string, anchor: string, alias: string) => {
-      // Vault links can carry a path; the last segment is the note name.
+      // the last path segment is the note
       const name = target.trim().split(/[\\/]/).pop() ?? ''
       const replacement = renamed.get(name.toLowerCase())
       if (!replacement) return whole
-      // The alias is kept, so a link that displayed as something specific
-      // still displays as that after the rename.
+      // alias kept
       return `[[${replacement}${anchor ?? ''}${alias ?? ''}]]`
     }
   )
 }
 
-/** Every attachment a note points at, as written in the note. */
+/** as written in the note */
 export function collectAttachmentTargets(markdown: string): string[] {
   const targets: string[] = []
 
@@ -178,7 +143,7 @@ export function collectAttachmentTargets(markdown: string): string[] {
   // ![alt](path/to/image.png) and ![alt](<path with spaces.png>)
   for (const m of markdown.matchAll(/!\[[^\]]*\]\(\s*<?([^)>]+?)>?\s*\)/g)) {
     const target = m[1].trim()
-    // Anything already addressable is left alone.
+    // already addressable, left alone
     if (/^[a-z][a-z0-9+.-]*:/i.test(target)) continue
     targets.push(decodeURIComponent(target))
   }
@@ -186,17 +151,13 @@ export function collectAttachmentTargets(markdown: string): string[] {
   return [...new Set(targets.filter(t => t !== '' && !/\.md$/i.test(t)))]
 }
 
-/** `assets/my diagram.png` → `my diagram`, for alt text. */
+/** assets/my diagram.png to "my diagram" */
 function fileStem(target: string): string {
   const file = target.split(/[\\/]/).pop() ?? target
   return file.replace(/\.[^.]+$/, '')
 }
 
-/**
- * Points embeds at the media folder. `resolved` maps a target as written in
- * the note to the media filename it was copied to; anything missing from it is
- * left untouched rather than turned into a broken link.
- */
+/** unmapped targets stay untouched rather than break */
 export function rewriteAttachments(markdown: string, resolved: Map<string, string>): string {
   if (resolved.size === 0) return markdown
 
@@ -207,8 +168,7 @@ export function rewriteAttachments(markdown: string, resolved: Map<string, strin
     .replace(/!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (whole, target: string, alias?: string) => {
       const filename = lookup(target.trim())
       if (!filename) return whole
-      // An Obsidian embed alias is usually a width, which Markdown has no way
-      // to express, so the alt text falls back to the file's own name.
+      // an embed alias is usually a width, fall back to the file name
       const alt = alias && !/^\d+(x\d+)?$/.test(alias) ? alias : fileStem(target)
       return `![${alt}](checkpoint-media://${filename})`
     })
@@ -219,10 +179,7 @@ export function rewriteAttachments(markdown: string, resolved: Map<string, strin
     })
 }
 
-/**
- * The finished note: frontmatter off, its tags kept, links and embeds pointing
- * where they should.
- */
+/** frontmatter off, tags kept, links and embeds pointed right */
 export function convertNote(
   markdown: string,
   renamed: Map<string, string>,

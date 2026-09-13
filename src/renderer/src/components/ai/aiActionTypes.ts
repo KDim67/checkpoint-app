@@ -1,29 +1,14 @@
-// Types for the model-output boundary that the chat action blocks execute.
-//
-// Everything the AI emits arrives as untyped JSON, so the honest shape at the
-// edge is `unknown`. These narrowing helpers are the ONLY sanctioned way to
-// reach into it. A cast would assert a shape the model never promised, and
-// this code writes straight to the user's database.
-//
-// The interfaces below describe what a normalizer PRODUCES, not what the model
-// sent. Once a value has been through one it is concrete, and every call site
-// downstream is typed for free.
+// model output arrives as unknown; narrow with these, a cast asserts a shape it never promised
 
 import type { ItemPriority } from '@shared/types'
 import type { ColumnConfig } from '@shared/boardModel'
 
-/**
- * Narrows a model-supplied column colour mode.
- *
- * Mirrors normalizeBoardConfig, which stores 'full' and treats every other
- * value, including the 'none' the chat parser accepts, as header. Typed via
- * indexed access so it cannot drift from the column type it feeds.
- */
+/** mirrors normalizeBoardConfig: only 'full' is stored, everything else means header */
 export function toColorMode(raw: unknown): ColumnConfig['colorMode'] {
   return raw === 'full' ? 'full' : 'header'
 }
 
-/** A JSON object after narrowing. The only shape worth indexing into. */
+/** the only shape worth indexing */
 export type JsonObject = Record<string, unknown>
 
 export function asObject(v: unknown): JsonObject | null {
@@ -38,25 +23,15 @@ export function str(v: unknown, fallback = ''): string {
   return typeof v === 'string' ? v : v == null ? fallback : String(v)
 }
 
-/**
- * A priority the database will actually accept.
- *
- * `items.priority` is `CHECK(priority IN (0,1,2,3))` and the IPC schema matches
- * it with bare literals. No coercion. So the `"3"` a small model routinely
- * emits, or a made-up `5`, does not degrade: it rejects the entire card write.
- * Anything unusable falls back to the same default the callers already used.
- */
+/** the CHECK constraint rejects "3" or 5 and the whole card write fails */
 export function toItemPriority(raw: unknown, fallback: ItemPriority = 2): ItemPriority {
   const n = Math.round(Number(raw))
   return n === 0 || n === 1 || n === 2 || n === 3 ? n : fallback
 }
 
-// Tags as the model writes them
-// A tag arrives as a bare string, or as an object under any of several aliases.
-// Both readers tolerate every other shape (numbers, null, arrays) because small
-// models produce all of them.
+// bare strings or objects under several aliases; small models send every other shape too
 
-/** Tag name from a raw model tag entry; '' when there isn't one. */
+/** '' when there isn't one */
 export function tagNameOf(raw: unknown): string {
   if (typeof raw === 'string') return raw.trim()
   const o = asObject(raw)
@@ -64,16 +39,12 @@ export function tagNameOf(raw: unknown): string {
   return str(o.name ?? o.label ?? o.tag).trim()
 }
 
-/** Tag colour from a raw model tag entry, falling back when absent. */
 export function tagColorOf(raw: unknown, fallback: string): string {
   const o = asObject(raw)
   return o && o.color ? str(o.color) : fallback
 }
 
-// Normalizer outputs
-
-/** A single card block after `normalizeCardJson`. Tags stay raw. They are only
- *  resolved against the tag table at execution time. */
+/** tags stay raw until execution */
 export interface ParsedCardJson {
   title: string
   body: string
@@ -82,7 +53,6 @@ export interface ParsedCardJson {
   tags: unknown[]
 }
 
-/** A single column block after `normalizeColumnJson`. */
 export interface ParsedColumnJson {
   name: string
   wipLimit: number | null
@@ -90,7 +60,6 @@ export interface ParsedColumnJson {
   color: string
 }
 
-/** A card inside a batch board block. */
 export interface BatchCard {
   title: string
   body: string
@@ -100,7 +69,6 @@ export interface BatchCard {
   due?: string
 }
 
-/** A column inside a batch board block. */
 export interface BatchColumn {
   name: string
   wipLimit: number | null
@@ -113,9 +81,7 @@ export interface BatchBoard {
   cards: BatchCard[]
 }
 
-// Plan / dialogue blocks
-// Produced by boardEnrich's normalizers and re-parsed from the fenced block by
-// the executor, so both ends share these shapes.
+// shared by boardEnrich's normalizers and the executor
 
 export interface AiPlanStep {
   title: string

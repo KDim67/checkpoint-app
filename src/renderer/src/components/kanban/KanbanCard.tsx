@@ -16,33 +16,33 @@ interface KanbanCardProps {
   onConvertToTask: (id: string) => void
   onUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
   isOverlay?: boolean
-  /** Board-level switches for what the card face shows. */
+  /** board-level card face switches */
   display?: CardDisplay
 }
 
 function stripMarkdown(md: string): string {
   if (!md) return ''
   return md
-    // Remove headers
+    // headers
     .replace(/^#+\s+/gm, '')
-    // Remove bold/italic formatting
+    // bold/italic
     .replace(/(\*\*|__)(.*?)\1/g, '$2')
     .replace(/(\*|_)(.*?)\1/g, '$2')
-    // Remove inline code block ticks
+    // inline code
     .replace(/`([^`]+)`/g, '$1')
-    // Remove code blocks
+    // code blocks
     .replace(/```[\s\S]*?```/g, '')
-    // Remove links [text](url) -> text
+    // links
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove images ![alt](url) -> alt
+    // images
     .replace(/!\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove blockquotes
+    // blockquotes
     .replace(/^\s*>\s+/gm, '')
-    // Remove bullet points
+    // bullets
     .replace(/^\s*[-*+]\s+/gm, '')
-    // Remove numbered lists
+    // numbered lists
     .replace(/^\s*\d+\.\s+/gm, '')
-    // Clean up multiple spaces/newlines
+    // collapse whitespace
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -73,7 +73,7 @@ function KanbanCard({
 
   const priority = PRIORITY_COLORS[card.priority] ?? PRIORITY_COLORS[0]
 
-  // Parse Trello Metadata properties
+  // trello-style metadata
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let meta: any = {}
   try {
@@ -82,9 +82,7 @@ function KanbanCard({
 
   const rawCover = display.cover ? (meta.cover || null) : null
   let cover = rawCover
-  // Gated at the source rather than at each render site: the cover also
-  // decides the card's background and text colour, and a half-hidden cover
-  // would leave a card coloured for a banner that is not there.
+  // gated at the source: the cover also sets background and text colour
   if (!cover && display.cover && card.body) {
     const imgMatch = card.body.match(/!\[.*?\]\((.*?)\)/)
     if (imgMatch) {
@@ -129,8 +127,7 @@ function KanbanCard({
     zIndex: isDragging ? 999 : 1,
     overflow: 'hidden',
     flexShrink: 0,
-    // The whole card is the drag handle, so a drag that starts on the title
-    // would otherwise sweep a text selection across the board behind it.
+    // the whole card drags, so no text selection sweeping the board
     userSelect: 'none'
   }
 
@@ -144,8 +141,7 @@ function KanbanCard({
     ? new Date(card.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     : null
 
-  // Worked out once because the footer has to know whether it will hold
-  // anything before it draws itself. An empty footer is still 20px of gap.
+  // worked out once, an empty footer is still 20px
   const showDue = display.due && Boolean(dueDateStr)
   const showChecklist = display.checklist && totalChecklist > 0
   const showTemplate = display.template && isTemplate
@@ -153,10 +149,7 @@ function KanbanCard({
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) return
 
-    // Enter opens the card because Enter activates whatever has focus. That is
-    // a convention rather than a preference, so it stays out of the bindings;
-    // everything below comes from Settings, defaulting to the letters that
-    // were written into this handler before.
+    // Enter activates focus by convention; the rest come from Settings
     if (e.key === 'Enter') {
       e.preventDefault()
       onClick(card.id)
@@ -239,7 +232,6 @@ function KanbanCard({
       tabIndex={0}
       className="kanban-card"
     >
-      {/* Cover Header Banner */}
       {isHeaderCover && (
         <div style={{ height: '28px', backgroundColor: cover.value, width: '100%', flexShrink: 0 }} />
       )}
@@ -255,7 +247,6 @@ function KanbanCard({
       )}
 
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
-        {/* Priority accent bar on left edge */}
         {display.priority && card.priority > 0 && (
           <div style={{
             width: '3px',
@@ -264,7 +255,6 @@ function KanbanCard({
           }} />
         )}
 
-        {/* Main content */}
         <div style={{
           flex: 1,
           padding: 'var(--space-3)',
@@ -275,14 +265,11 @@ function KanbanCard({
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
-              {/* Quick Completion Checkbox. Switched off it takes the done
-                  marker with it, which is the point: the keyboard shortcut and
-                  the detail modal still set the status. */}
+              {/* off hides the done marker too; the shortcut and modal still set status */}
               {display.doneCheckbox && (
               <button
                 title={card.status === 'done' ? "Mark as Incomplete (X)" : "Mark as Done (X)"}
-                // As with the action buttons: ticking a card should never turn
-                // into picking it up.
+                // ticking never picks the card up
                 onPointerDown={e => e.stopPropagation()}
                 onClick={async (e) => {
                   e.stopPropagation()
@@ -302,6 +289,8 @@ function KanbanCard({
                     })
                   }
                 }}
+                className="kanban-card-check"
+                data-done={card.status === 'done' || undefined}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -310,7 +299,6 @@ function KanbanCard({
                   display: 'flex',
                   alignItems: 'center',
                   marginTop: '2px',
-                  color: card.status === 'done' ? '#22c55e' : 'var(--color-text-faint)',
                   transition: 'all 250ms cubic-bezier(0.4, 0, 0.2, 1)',
                   opacity: (hovered || card.status === 'done') ? 1 : 0,
                   width: (hovered || card.status === 'done') ? '14px' : '0px',
@@ -318,12 +306,6 @@ function KanbanCard({
                   overflow: 'hidden',
                   pointerEvents: (hovered || card.status === 'done') ? 'auto' : 'none',
                   flexShrink: 0
-                }}
-                onMouseEnter={e => {
-                  if (card.status !== 'done') e.currentTarget.style.color = 'var(--color-text-muted)'
-                }}
-                onMouseLeave={e => {
-                  if (card.status !== 'done') e.currentTarget.style.color = 'var(--color-text-faint)'
                 }}
               >
                 <div style={{
@@ -356,7 +338,6 @@ function KanbanCard({
               </h4>
             </div>
 
-            {/* Top Right Quick Actions & Drag Handle */}
             <div
               style={{
                 display: 'flex',
@@ -397,9 +378,7 @@ function KanbanCard({
                 </ActionBtn>
               </div>
 
-              {/* The whole card drags now, so this is only the sign that says
-                  so. Kept because without it nothing tells you the card is
-                  draggable until you try. */}
+              {/* the whole card drags, this only signals it */}
               <div
                 aria-hidden
                 style={{
@@ -417,7 +396,6 @@ function KanbanCard({
             </div>
           </div>
 
-          {/* Body preview */}
           {display.bodyPreview && card.body && (
             <p style={{
               margin: 0,
@@ -432,7 +410,6 @@ function KanbanCard({
             </p>
           )}
 
-          {/* Tags */}
           {display.tags && card.tags && card.tags.length > 0 && (
             <div style={{
               display: 'flex',
@@ -462,7 +439,6 @@ function KanbanCard({
             </div>
           )}
 
-          {/* Footer: due date & checklists */}
           {(showDue || showChecklist || showTemplate) && (
             <div style={{
               display: 'flex',
@@ -562,9 +538,7 @@ function ActionBtn({
     <button
       title={title}
       onClick={onClick}
-      // The card drags from anywhere, which includes these. A slightly shaky
-      // press on Delete would otherwise pick the card up instead of pressing
-      // it, so the drag is never armed from a button.
+      // drag never arms from a button, a shaky Delete press would pick the card up
       onPointerDown={e => e.stopPropagation()}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}

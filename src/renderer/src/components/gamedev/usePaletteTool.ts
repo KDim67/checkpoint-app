@@ -1,13 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { PALETTE_COLORS, hexToRgbFloat } from './types'
 
-/**
- * State and derived snippets for the Shader Palette tool.
- *
- * A hook called from GameDevView rather than state inside PalettePanel: panels
- * unmount on every tab switch, so state held inside one would discard the
- * user's palette the moment they looked at another tool.
- */
+/** a hook so a tab switch doesn't discard the palette */
 export function usePaletteTool() {
   const [paletteColors, setPaletteColors] = useState<string[]>(PALETTE_COLORS)
   const [newColor, setNewColor] = useState('#3b82f6')
@@ -22,7 +16,7 @@ export function usePaletteTool() {
     setPaletteColors(prev => prev.filter(c => c !== col))
   }, [])
 
-  // Recomputed only when the palette changes, not on every unrelated render.
+  // only when the palette changes
   const generatedUnityColor = useMemo(() =>
     paletteColors.map(c => {
       const { r, g, b } = hexToRgbFloat(c)

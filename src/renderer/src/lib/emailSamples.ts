@@ -1,11 +1,4 @@
-/**
- * Loading and saving the user's email writing samples.
- *
- * The database is authoritative: it is what gets backed up, synced between
- * machines and restored. localStorage is a cache and a compatibility path for
- * samples written before the database column existed, so a read falls back to
- * it, and every read that finds the database populated refreshes it.
- */
+/** the db is authoritative (backed up, synced); localStorage is a cache and legacy fallback */
 
 import {
   formatSamplesForPrompt,
@@ -16,7 +9,7 @@ import { getSetting, setSetting } from '../data/settings'
 
 const DB_KEY = 'ai_email_writing_samples'
 const CACHE_KEY = 'checkpoint_email_writing_samples'
-/** The single-string form used before samples became a list. */
+/** single-string form from before samples were a list */
 const LEGACY_KEY = 'checkpoint_email_writing_style'
 
 function readCache(): EmailSample[] {
@@ -35,16 +28,12 @@ function readCache(): EmailSample[] {
 function writeCache(samples: EmailSample[]): void {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(samples))
-    // The legacy key is still read by older code paths; keep it pointed at the
-    // first sample so they don't fall back to nothing.
+    // older paths still read the legacy key
     if (samples.length > 0) localStorage.setItem(LEGACY_KEY, samples[0].body)
   } catch {}
 }
 
-/**
- * Database first, cache second. This is the fix for a restored database whose
- * samples were invisible because only the cache was ever consulted.
- */
+/** db first; restored samples were invisible when only the cache was read */
 export async function loadEmailSamples(): Promise<EmailSample[]> {
   try {
     const raw = await getSetting(DB_KEY)
@@ -68,7 +57,7 @@ export async function saveEmailSamples(samples: EmailSample[]): Promise<void> {
   }
 }
 
-/** The prompt block for the current samples, or '' when there are none. */
+/** '' when there are none */
 export async function loadSamplesPromptBlock(): Promise<string> {
   return formatSamplesForPrompt(await loadEmailSamples())
 }

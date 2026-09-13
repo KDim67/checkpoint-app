@@ -16,11 +16,7 @@ import {
 } from '../src/main/db'
 import { listMcpActivity, recordMcpActivity, undoMcpActivity } from '../src/main/mcpActivity'
 
-// The real record → list → undo path against a real database, rather than only
-// the normalizer. Undo replays actions against live rows, so the risk worth
-// covering is what those replays actually do. Deleting the wrong id, or running
-// twice. See tests/db.migrations.test.ts for what the node:sqlite stand-in does
-// and does not cover.
+// record, list and undo against a real db: wrong ids or double runs are the risk
 
 let dir: string
 
@@ -131,8 +127,7 @@ describe('undoing', () => {
 
 describe('undo refuses to run twice', () => {
   it('rejects a second undo rather than replaying the actions', () => {
-    // This is the one that matters: replaying delete_item after the id has been
-    // reused would delete whatever took it.
+    // replaying delete_item onto a reused id is the one that matters
     const item = card('Probe')
     recordMcpActivity('create_item', 'test', 'Created', [{ kind: 'delete_item', id: item.id }])
     const id = listMcpActivity()[0].id
@@ -185,8 +180,7 @@ describe('taking something back off a wall', () => {
   })
 
   it('keeps edits made to the wall after the placement', () => {
-    // The document is read back at undo time rather than remembered, so
-    // reversing a placement must not also reverse everything since.
+    // read back at undo time, later edits stay
     placeTwo()
     recordMcpActivity('place_on_wall', 'work', 'Placed a note', [
       { kind: 'remove_wall_item', key: KEY, itemId: 'placed' }

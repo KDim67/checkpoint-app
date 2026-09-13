@@ -10,16 +10,12 @@ import {
 
 export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
-/**
- * One definition, in the module that creates them. Type-only, so nothing is
- * imported at runtime and the store stays free of a cycle back into lib.
- */
+/** type-only, so no runtime cycle back into lib */
 export type { WorkspaceEntry } from '../lib/createWorkspace'
 import type { WorkspaceEntry } from '../lib/createWorkspace'
 import { setStringSetting } from '../lib/settings'
 
-// Merged tab set: Widget lives in General, Kanban in Workspaces & Board,
-// Theme Builder in Appearance, Extensions in Features & Plugins.
+// merged tabs: Widget in General, Kanban in Workspaces, Theme Builder in Appearance, Extensions in Features
 export type SettingsTab =
   | 'general'
   | 'workspaces'
@@ -34,66 +30,43 @@ export type SettingsTab =
   | 'mcp'
   | 'about'
 
-/**
- * A note on the two words, because the codebase uses both on purpose.
- *
- * The thing is called a **workspace**. That is what the user reads, and what
- * the app state, components and props below call it.
- *
- * Anything that is written down or sent somewhere still calls it a **context**:
- * the `context` column on six tables, the `contexts_list`, `active_context` and
- * `default_context` settings keys, the `db:getContexts` IPC channels, the field
- * on `Item`, and the workspace name inside a collaboration or sync payload.
- *
- * Those are not spellings, they are contracts. Renaming the column means a
- * migration across six tables; renaming the payload field means a 1.0.2 build
- * cannot share a board or sync with a 1.0.1 one; renaming the MCP parameter
- * breaks whatever an agent has already been told. None of it changes anything
- * the user sees, so none of it is worth the risk.
- *
- * The rule, then: workspace above the storage line, context at and below it.
- */
+/** workspace above the storage line, context at and below: the column, keys, IPC and payloads are contracts */
 interface AppState {
-  // Navigation
   activeView: ActiveView
-  // Workspace
   activeWorkspace: string
   availableWorkspaces: string[]
   workspaceList: WorkspaceEntry[]
-  // Settings Tab
   settingsTab: SettingsTab
-  // Right panel
   rightPanelOpen: boolean
   rightPanelContent: 'item-detail' | 'ai-chat' | 'git' | null
   selectedItemId: string | null
-  // Preselected task for Pomodoro Navigation
+  // preselected task for the pomodoro
   preselectedTaskId: string | null
-  /** Note the palette asked for. Consumed and cleared by NotesView on mount. */
+  /** consumed and cleared by NotesView on mount */
   pendingNoteTitle: string | null
-  /** Saved view the palette asked for. Consumed and cleared by BacklogView. */
+  /** consumed and cleared by BacklogView */
   pendingViewId: string | null
-  // Game Dev PBR Generator Preload
+  // PBR generator preload
   gamedevPreloadTexturePath: string | null
   gamedevSourceCardId: string | null
-  // Game Dev Seamless Generator Preload
+  // seamless generator preload
   gamedevPreloadSeamlessPath: string | null
   gamedevSourceSeamlessCardId: string | null
 
-  // Focus Timer Engine (lives here, not in FocusView, so it survives navigation)
+  // focus timer lives here so it survives navigation
   focusStep: 'setup' | 'active' | 'retro'
   focusSelectedTasks: Item[]
   focusPreset: TimerMode
   focusCustomMinutes: number
   focusDurationMs: number
-  focusEndAt: number | null       // timestamp the timer will hit 0 at, while running
-  focusRemainingMs: number        // authoritative remaining time while paused/not started
+  focusEndAt: number | null       // when the timer hits 0, while running
+  focusRemainingMs: number        // remaining while paused or not started
   focusIsRunning: boolean
-  focusElapsedMs: number          // total time actually spent running, for stats/log
-  focusCyclesCompleted: number    // completed focus intervals since app open (for pomodoro dots)
-  focusDistractions: number       // interruptions tallied during the current focus interval
-  focusSettings: FocusSettings    // user-configured lengths, cadence, chime and notifications
+  focusElapsedMs: number          // time actually run, for stats
+  focusCyclesCompleted: number    // focus intervals since launch, for the dots
+  focusDistractions: number       // interruptions this interval
+  focusSettings: FocusSettings    // lengths, cadence, chime, notifications
 
-  // Actions
   setView: (view: ActiveView) => void
   setWorkspace: (slug: string) => void
   setSettingsTab: (tab: SettingsTab) => void
@@ -108,7 +81,6 @@ interface AppState {
   setGamedevPreloadTexture: (path: string | null, cardId?: string | null) => void
   setGamedevPreloadSeamless: (path: string | null, cardId?: string | null) => void
 
-  // Focus Timer Actions
   focusSetStep: (step: 'setup' | 'active' | 'retro') => void
   focusSetSelectedTasks: (tasks: Item[] | ((prev: Item[]) => Item[])) => void
   focusSetPreset: (preset: TimerMode) => void
@@ -160,8 +132,7 @@ export const useAppStore = create<AppState>()(
       set(state => {
         state.activeView = view
       })
-      // Remembered so "Start on: Last used" can restore it next launch.
-      // Settings is deliberately not recorded. Nobody wants to boot into it.
+      // for "Start on: Last used"; never Settings
       if (view !== 'settings') {
         setStringSetting('last_active_view', view).catch(err => {
           console.error('Failed to save last_active_view setting:', err)
@@ -259,11 +230,7 @@ export const useAppStore = create<AppState>()(
         state.gamedevSourceSeamlessCardId = cardId
       }),
 
-    // Focus Timer Engine
-    // Timer state lives in the global store (not component state) so a running
-    // session survives navigating to other views. Countdown is timestamp-based
-    // (focusEndAt) rather than tick-accumulated, so it can never drift even if
-    // the interval driving it is throttled while the window is unfocused.
+    // timestamp-based, so throttled background timers can't drift it
     focusSetStep: step =>
       set(state => {
         state.focusStep = step
@@ -305,13 +272,13 @@ export const useAppStore = create<AppState>()(
     focusPauseResume: () =>
       set(state => {
         if (state.focusIsRunning) {
-          // Pausing: freeze remaining time, drop the end-timestamp
+          // pausing: freeze remaining, drop the end stamp
           const remaining = state.focusEndAt ? Math.max(0, state.focusEndAt - Date.now()) : state.focusRemainingMs
           state.focusRemainingMs = remaining
           state.focusEndAt = null
           state.focusIsRunning = false
         } else {
-          // Resuming: recompute the end-timestamp from remaining time
+          // resuming: new end stamp from remaining
           state.focusEndAt = Date.now() + state.focusRemainingMs
           state.focusIsRunning = true
         }
@@ -325,9 +292,7 @@ export const useAppStore = create<AppState>()(
         state.focusElapsedMs = 0
       }),
 
-    // Called on every tick by the global timer engine hook. Recomputes
-    // remaining/elapsed from wall-clock time so drift and throttled
-    // background tabs can never desync the displayed time.
+    // recomputed from wall-clock time each tick
     focusTick: () =>
       set(state => {
         if (!state.focusIsRunning || state.focusEndAt === null) return
@@ -347,16 +312,13 @@ export const useAppStore = create<AppState>()(
         }
       }),
 
-    // Tally an interruption during the current focus interval. A core Pomodoro
-    // practice: acknowledge the distraction, keep working, review the count in
-    // the retrospective to spot patterns over time.
+    // tallied for the retro
     focusLogDistraction: () =>
       set(state => {
         state.focusDistractions += 1
       }),
 
-    // Cancel a running/paused session: stop the clock and return to setup,
-    // but keep the chosen tasks selected so the user can just hit start again.
+    // back to setup, tasks stay selected
     focusStop: () =>
       set(state => {
         state.focusStep = 'setup'
@@ -366,9 +328,7 @@ export const useAppStore = create<AppState>()(
         state.focusElapsedMs = 0
       }),
 
-    // Applied once at boot and again whenever the Focus settings are edited.
-    // A running session keeps its current length; the new one takes effect on
-    // the next interval, so changing a duration mid-session is not disruptive.
+    // a running session keeps its length, changes apply next interval
     focusApplySettings: (settings: FocusSettings) =>
       set(state => {
         state.focusSettings = settings
@@ -379,8 +339,7 @@ export const useAppStore = create<AppState>()(
         }
       }),
 
-    // Full reset: used after discarding/saving a retrospective, clears the
-    // task selection too so the next session starts from a clean slate.
+    // full reset, clears the task selection too
     focusExitToSetup: () =>
       set(state => {
         state.focusStep = 'setup'

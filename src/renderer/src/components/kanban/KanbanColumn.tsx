@@ -28,19 +28,19 @@ interface KanbanColumnProps {
   onClearColumn?: (columnId: string) => void
   onArchiveColumn?: (columnId: string) => void
   isReadOnly?: boolean
-  /** Collapsed to a narrow strip; cards stay in place, just hidden. */
+  /** cards stay in place, just hidden */
   collapsed?: boolean
   onToggleCollapse?: (columnId: string) => void
-  /** Persistent display order for this column. */
+  /** persistent display order */
   sort?: ColumnSort
   onSetSort?: (columnId: string, sort: ColumnSort) => void
-  /** Definition of done, shown under the column name. */
+  /** definition of done, under the name */
   description?: string
-  /** Board-level card face switches, forwarded to every card. */
+  /** forwarded to every card */
   cardDisplay?: CardDisplay
-  /** Where to hold a gap open for the card in the air. null for nowhere. */
+  /** null for nowhere */
   dropSlot?: number | null
-  /** The height that card had, so the gap is the footprint it will take. */
+  /** so the gap matches its footprint */
   dropHeight?: number
 }
 
@@ -70,21 +70,7 @@ function MenuItem({ label, onClick, danger = false }: { label: string; onClick: 
   )
 }
 
-/**
- * The space the card will land in.
- *
- * Cross-column dragging used to show nothing at all: the target column lit up
- * and the card teleported into place on drop. This is the missing half, drawn
- * as the same dashed outline the card leaves behind at its origin, so the two
- * ends of the move look like one gesture.
- *
- * Sized from the card actually being dragged rather than a guess, so the gap
- * is the footprint the card will really take.
- *
- * `warn` is the column saying the card will not fit under its WIP limit. Said
- * here rather than after the drop, while there is still a chance to aim
- * somewhere else.
- */
+/** where the card will land, same dashed outline as its origin; warns when over WIP */
 function DropPlaceholder({ height, warn }: { height: number; warn: boolean }) {
   return (
     <div
@@ -140,10 +126,9 @@ function KanbanColumn({
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Guard against double-submit (onBlur + onMouseDown both firing on confirm click)
+  // onBlur and onMouseDown both fire on confirm
   const saveInProgressRef = React.useRef(false)
 
-  // Close dropdown on click outside
   useEffect(() => {
     if (!showMenu) return
     const handler = (e: MouseEvent) => {
@@ -155,7 +140,7 @@ function KanbanColumn({
     return () => document.removeEventListener('mousedown', handler)
   }, [showMenu])
 
-  // Keep editName in sync if parent renames column externally
+  // follow external renames
   useEffect(() => { setEditName(name) }, [name])
   useEffect(() => { setEditWip(wipLimit) }, [wipLimit])
   useEffect(() => { setEditColor(color) }, [color])
@@ -173,7 +158,7 @@ function KanbanColumn({
       setEditColor(color)
       setEditColorMode(colorMode || 'header')
     }
-    // Reset guard after a tick so next edit session works
+    // reset after a tick so the next edit works
     setTimeout(() => { saveInProgressRef.current = false }, 0)
   }
 
@@ -191,27 +176,18 @@ function KanbanColumn({
   const isWipExceeded = wipLimit !== null && cards.length > wipLimit
   const cardIds = cards.map(c => c.id)
 
-  /**
-   * This column is where the card would land.
-   *
-   * The droppable only counts the pointer as being on the column when it is not
-   * on one of the cards, which past the first card is almost never. Holding a
-   * gap open is the same statement, so the column lights up for both and a drag
-   * across the board reads the same wherever in a column it is aimed.
-   */
+  /** the droppable misses the pointer over cards, so light up for a held gap too */
   const isOver = pointedAt || dropSlot !== null
 
-  // A card is on its way in and the column is already at its limit. Warned on
-  // the gap itself rather than only counted afterwards.
+  // warn on the gap itself, not after
   const dropExceedsWip = dropSlot !== null && wipLimit !== null && cards.length >= wipLimit
 
-  // Roughly one line of card, for a drag whose rect was never measured.
+  // about one card line when the rect was never measured
   const slotHeight = dropHeight > 0 ? dropHeight : 56
 
-  // System default columns cannot be deleted
+  // defaults can't be deleted
   const isDefaultCol = id === 'open' || id === 'done' || id === 'in_progress' || id === 'in_review'
 
-  // Column status color accent
   const statusAccent: Record<string, string> = {
     open:        '#535e85',
     in_progress: '#3b82f6',
@@ -227,9 +203,7 @@ function KanbanColumn({
     : (activeColor || statusAccent[id] || 'var(--color-primary)')
   const colTextColor = isFullCol ? getTextColorForBackground(activeColor) : 'var(--color-text-muted)'
 
-  // Collapsed: a narrow vertical strip carrying only the name and count. The
-  // droppable ref stays attached so a card can still be dragged onto a
-  // collapsed column rather than forcing the user to expand it first.
+  // droppable stays attached so cards can drop onto a collapsed strip
   if (collapsed) {
     return (
       <div
@@ -273,7 +247,7 @@ function KanbanColumn({
             fontSize: 'var(--text-xs)',
             fontWeight: 'var(--weight-semibold)',
             color: 'var(--color-text-base)',
-            // Rotated so a long column name still reads in a 48px strip.
+            // rotated so long names fit 48px
             writingMode: 'vertical-rl',
             transform: 'rotate(180deg)',
             whiteSpace: 'nowrap',
@@ -301,9 +275,7 @@ function KanbanColumn({
 
   return (
     <div
-      // The whole column, not just the list inside it. A pointer over the
-      // header or the Add card button is still aimed at this column, and the
-      // drop logic reads the column's rectangle to decide which one that is.
+      // the whole column: header and Add card count as aimed at it
       ref={setNodeRef}
       id={`kanban-col-${id}`}
       style={{
@@ -330,7 +302,6 @@ function KanbanColumn({
           : 'var(--shadow-sm)'
       }}
     >
-      {/* Column top accent bar */}
       <div
         className="col-top-bar"
         style={{
@@ -341,7 +312,6 @@ function KanbanColumn({
         }}
       />
 
-      {/* Column Header */}
       <div
         onMouseEnter={() => setHeaderHover(true)}
         onMouseLeave={() => setHeaderHover(false)}
@@ -355,7 +325,6 @@ function KanbanColumn({
           flexShrink: 0
         }}
       >
-        {/* Column drag handle */}
         <div
           {...dragHandleProps}
           style={{
@@ -370,11 +339,9 @@ function KanbanColumn({
           <GripVertical size={14} />
         </div>
 
-        {/* Title / Edit Input */}
         <div className="fill">
           {isEditing ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', padding: '2px 0' }}>
-              {/* Row 1: Name, WIP, Save, Cancel */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
                 <input
                   type="text"
@@ -463,7 +430,6 @@ function KanbanColumn({
                 </button>
               </div>
 
-              {/* Row 2: Display Mode & Color Swatches */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-surface-2)', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-surface-offset)' }}>
                 <div className="row-between">
                   <span style={{ fontSize: '9px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -598,17 +564,12 @@ function KanbanColumn({
                   cursor: 'pointer',
                   userSelect: 'none'
                 }}
-                // The definition of done rides on the name's tooltip rather
-                // than taking a second header row, which would cost vertical
-                // space on every column to serve an occasional glance. The
-                // rename affordance stays in the tooltip when there is no
-                // description to show instead.
+                // definition of done rides the tooltip instead of a second header row
                 title={description ? `${name}, ${description}` : 'Double-click to rename'}
               >
                 {name}
               </h3>
 
-              {/* Card count badge */}
               <span style={{
                 fontSize: '10px',
                 fontWeight: 'var(--weight-bold)',
@@ -630,7 +591,7 @@ function KanbanColumn({
           )}
         </div>
 
-        {/* Column action buttons (visible on header hover) */}
+        {/* visible on header hover */}
         {!isEditing && !isReadOnly && (
           <div style={{
             display: 'flex',
@@ -644,7 +605,6 @@ function KanbanColumn({
               <Edit2 size={11} />
             </HeaderBtn>
             
-            {/* Column Actions Dropdown */}
             <div className="relative" ref={menuRef}>
               <HeaderBtn title="List Actions" onClick={() => setShowMenu(!showMenu)} colTextColor={isFullCol ? colTextColor : undefined}>
                 <MoreHorizontal size={11} />
@@ -666,10 +626,7 @@ function KanbanColumn({
                   flexDirection: 'column',
                   padding: '6px 0'
                 }}>
-                  {/* A persistent view order, not a one-off reshuffle. The
-                      previous entries here rewrote every card's position, so
-                      picking a sort permanently destroyed the manual order and
-                      there was no way back to it. */}
+                  {/* a view order, not a reshuffle: the old entries destroyed the manual order */}
                   <MenuItem
                     label={`${sort === 'manual' ? '✓ ' : ''}Order: Manual`}
                     onClick={() => { onSetSort?.(id, 'manual'); setShowMenu(false) }}
@@ -723,7 +680,7 @@ function KanbanColumn({
         )}
       </div>
 
-      {/* WIP-limit progress bar. Visualizes how full the column is vs its limit */}
+      {/* WIP fill */}
       {wipLimit !== null && wipLimit > 0 && (
         <div style={{ height: '3px', margin: '0 var(--space-3) 2px', background: 'var(--color-surface-offset)', borderRadius: '2px', overflow: 'hidden', flexShrink: 0 }}>
           <div style={{
@@ -735,7 +692,6 @@ function KanbanColumn({
         </div>
       )}
 
-      {/* Cards Area */}
       <div
         style={{
           flex: 1,
@@ -789,7 +745,6 @@ function KanbanColumn({
         )}
       </div>
 
-      {/* Add Card Footer */}
       {onAddCard && !isReadOnly && (
         <AddCardFooter onAdd={() => onAddCard(id)} accentColor={accentColor} colTextColor={isFullCol ? colTextColor : undefined} isFullCol={isFullCol} />
       )}
@@ -876,12 +831,11 @@ function AddCardFooter({ onAdd, accentColor, colTextColor, isFullCol }: { onAdd:
 
 function areKanbanColumnPropsEqual(prev: KanbanColumnProps, next: KanbanColumnProps) {
   if (prev.isReadOnly !== next.isReadOnly) return false
-  // Only the column under the pointer is given a slot, so a drag re-renders
-  // that one column rather than every column on the board.
+  // only the column under the pointer gets a slot
   if (prev.dropSlot !== next.dropSlot || prev.dropHeight !== next.dropHeight) return false
   if (prev.id !== next.id || prev.name !== next.name || prev.wipLimit !== next.wipLimit) return false
   if (prev.color !== next.color || prev.colorMode !== next.colorMode) return false
-  // The second memo, and it dropped the same props the outer one did.
+  // the inner memo dropped the same props as the outer
   if (prev.collapsed !== next.collapsed) return false
   if (prev.sort !== next.sort || prev.description !== next.description) return false
   if (!sameCardDisplay(prev.cardDisplay, next.cardDisplay)) return false

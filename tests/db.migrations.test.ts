@@ -5,21 +5,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { initDb, closeDb, getDb, searchItems } from '../src/main/db'
 
-// These run the real initDb. Real SCHEMA_SQL, real legacy-CHECK rebuild, real
-// user_version ladder. Against a throwaway file in the OS temp directory. The
-// user's own database is never opened.
-//
-// `better-sqlite3` is aliased to a node:sqlite facade (see vitest.config.ts),
-// so the SQL is executed by SQLite 3.53 rather than by the Electron-ABI native
-// binding. The migrations are plain SQL and pragmas, so what is under test here
-// is unaffected; what a plain-Node runner cannot check is the binding itself.
+// real initDb on a temp file through the node:sqlite facade; the native binding itself isn't covered
 
-// Deliberately a literal rather than an import from the db module: asserting the
-// pragma against the same constant that set it would pass no matter what. Bump
-// this by hand whenever a migration is added.
+// a literal on purpose, bump it with each migration
 const CURRENT_VERSION = 9
 
-/** The items table as shipped by early builds: status carried a CHECK constraint. */
+/** early builds' items table, with the status CHECK */
 const LEGACY_SCHEMA = `
 CREATE TABLE items (
   id          TEXT PRIMARY KEY,
@@ -78,7 +69,7 @@ function dbFile(): string {
   return join(dir, 'checkpoint.db')
 }
 
-/** Writes a pre-versioning database with real user content in it. */
+/** a pre-versioning db with real content */
 function seedLegacyDatabase(userVersion = 0): void {
   const raw = new DatabaseSync(dbFile())
   raw.exec(LEGACY_SCHEMA)
@@ -100,7 +91,7 @@ function seedLegacyDatabase(userVersion = 0): void {
   raw.close()
 }
 
-/** Everything a migration could plausibly damage, in one comparable value. */
+/** everything a migration could damage, comparable */
 function snapshot(): unknown {
   const raw = new DatabaseSync(dbFile())
   const objects = raw
@@ -111,7 +102,7 @@ function snapshot(): unknown {
   const data: Record<string, unknown[]> = {}
   for (const table of tables) {
     const name = table.name as string
-    // FTS shadow tables hold opaque blobs; their parent table is what matters.
+    // FTS shadow tables are blobs, the parent matters
     if (name.startsWith('items_fts')) continue
     data[name] = raw.prepare(`SELECT * FROM "${name}"`).all().map((r) => ({ ...r }))
   }
@@ -155,8 +146,7 @@ describe('upgrading a legacy database', () => {
   })
 
   it('does not cascade-delete tag links or relations when items is dropped', () => {
-    // item_tags and relations both declare ON DELETE CASCADE against items, so
-    // the rebuild's DROP TABLE would wipe them if foreign_keys were left on.
+    // both cascade from items, so FKs on would wipe them
     seedLegacyDatabase()
     initDb(dir)
     const db = getDb()
@@ -227,12 +217,7 @@ describe('upgrading a legacy database', () => {
     })
   })
 
-  // Known defect
-  // SCHEMA_SQL creates the items_fts triggers, and the legacy rebuild then does
-  // DROP TABLE items, which drops the triggers attached to it. The renamed
-  // items_rebuild table comes back without them, so for the whole session that
-  // performed the migration nothing written to items reaches the FTS index and
-  // search silently returns fewer results than it should.
+  // was a defect: the rebuild dropped the FTS triggers and search missed that session's writes
   it('leaves the full-text search triggers attached after the rebuild', () => {
     seedLegacyDatabase()
     initDb(dir)
@@ -256,11 +241,7 @@ describe('upgrading a legacy database', () => {
     })
   })
 
-  // Known defect
-  // items_fts is an external-content FTS5 table. Creating it over a populated
-  // items table leaves the index empty. Nothing backfills it, so every item a
-  // user wrote before upgrading to the search build is invisible to search, with
-  // no error anywhere to suggest the results are incomplete.
+  // was a defect: FTS created over existing items stayed empty, old items unsearchable
   it('can still find items that predate the full-text index', () => {
     seedLegacyDatabase()
     initDb(dir)
@@ -295,7 +276,7 @@ describe('re-running migrations', () => {
 describe('partial upgrades', () => {
   it('adds only the missing tables when resuming from an intermediate version', () => {
     seedLegacyDatabase(3)
-    // A version-3 database already has focus_sessions with data in it.
+    // v3 already has focus_sessions with data
     const raw = new DatabaseSync(dbFile())
     raw.exec(`
       CREATE TABLE focus_sessions (
@@ -321,7 +302,7 @@ describe('partial upgrades', () => {
     closeDb()
     const migrated = snapshot()
 
-    // Nothing in runMigrations should fire on a second open at CURRENT_VERSION.
+    // nothing should fire on a second open
     expect((migrated as { userVersion: number }).userVersion).toBe(CURRENT_VERSION)
     initDb(dir)
     closeDb()
@@ -340,15 +321,14 @@ describe('a fresh database', () => {
   })
 
   it('is not put through the legacy rebuild', () => {
-    // The rebuild is detected from the items DDL; a false positive here would
-    // mean every launch drops and recreates the user's items table.
+    // a false positive would rebuild items every launch
     initDb(dir)
     closeDb()
     const raw = new DatabaseSync(dbFile())
     const sql = (raw.prepare(`SELECT sql FROM sqlite_master WHERE name = 'items'`).get() as { sql: string }).sql
     raw.close()
     expect(sql).not.toMatch(/items_rebuild/)
-    // The detector keys off a CHECK on status; a fresh table must not carry one.
+    // a fresh table mustn't carry the CHECK
     expect(sql).toMatch(/status\s+TEXT NOT NULL DEFAULT 'open',/)
   })
 

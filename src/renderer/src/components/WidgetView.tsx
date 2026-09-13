@@ -31,7 +31,6 @@ async function fetchWidgetData(context: string): Promise<WidgetData> {
     const openCount = activeItems.filter(i => i.status === 'open' || i.status === 'todo').length
     const totalCount = activeItems.length
 
-    // Fetch the most recent log entry
     const rawLog = (await latestItem(context, 'log'))?.title ?? null
     const recentLog = rawLog
       ? rawLog.length > 38
@@ -80,7 +79,7 @@ export default function WidgetView() {
   }
 
   useEffect(() => {
-    // Load context, then poll every 5 seconds for live responsiveness
+    // then poll every 5s
     getStringSetting('active_context', '').then((ctx) => {
       if (ctx) {
         contextRef.current = ctx
@@ -128,7 +127,7 @@ export default function WidgetView() {
         transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
       }}
     >
-      {/* Top: Header spans full width to prevent time/logo overlap */}
+      {/* full-width header so time and logo don't overlap */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexShrink: 0 }}>
         <Logo size={14} showText />
         <span style={{
@@ -143,12 +142,10 @@ export default function WidgetView() {
         </span>
       </div>
 
-      {/* Divider */}
       <div style={{ height: '1px', background: 'var(--color-surface-offset)', width: '100%', flexShrink: 0 }} />
 
-      {/* Bottom Area: Split columns */}
       <div style={{ display: 'flex', flex: 1, gap: '12px', minHeight: 0 }}>
-        {/* Left Column: Task Progress Circle */}
+        {/* task progress ring */}
         <div style={{
           width: '74px',
           display: 'flex',
@@ -209,7 +206,7 @@ export default function WidgetView() {
           </div>
         </div>
 
-        {/* Right Column: Time, Metrics & Logs */}
+        {/* time, metrics, logs */}
         <div style={{
           flex: 1,
           display: 'flex',
@@ -219,7 +216,6 @@ export default function WidgetView() {
           paddingTop: '2px',
           paddingBottom: '2px'
         }}>
-          {/* Middle: Micro Indicators */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-priority-low)', boxShadow: '0 0 6px var(--color-priority-low)' }} />
@@ -235,7 +231,6 @@ export default function WidgetView() {
             </div>
           </div>
 
-          {/* Bottom: Activity Log */}
           <div style={{
             background: 'var(--color-surface-2)',
             border: '1px solid var(--color-surface-offset)',

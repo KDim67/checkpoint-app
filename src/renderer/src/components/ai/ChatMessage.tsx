@@ -25,11 +25,11 @@ interface ChatMessageProps {
     thinking?: string
     mode?: string
     cheatsheets?: string[]
-    /** Attached note titles (knowledge docs pulled from the Notes feature). */
+    /** knowledge docs from Notes */
     notes?: string[]
-    /** Attached workspace file relative paths. */
+    /** relative paths */
     files?: string[]
-    /** Attached images as data URLs (vision-capable models). */
+    /** data URLs for vision models */
     images?: string[]
     timestamp?: number
     boardSnapshot?: {
@@ -45,17 +45,14 @@ interface ChatMessageProps {
   isCopied?: boolean
   isStreaming?: boolean
   hasRevertAction?: boolean
-  /** The panel's global streaming flag. Compared by React.memo so committed
-   *  messages re-render (fresh handler closures) when streaming toggles. */
+  /** compared by memo so committed messages get fresh handlers when streaming toggles */
   actionsLocked?: boolean
 }
 
 function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onCopy, isCopied, isStreaming, hasRevertAction }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
-  // Card-title linkification only for committed assistant messages (streaming
-  // text shifts constantly; user text is their own words). Memoized: the
-  // regex sweep over up to 80 titles must not run on unrelated re-renders.
+  // committed assistant messages only; memoized, the sweep over 80 titles isn't cheap
   const boardTitles = useBoardTitles(activeWorkspace || 'default', !isUser && !isStreaming)
   const renderedContent = React.useMemo(
     () => (!isUser && !isStreaming) ? linkifyCardTitles(message.content, boardTitles) : message.content,
@@ -85,12 +82,10 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
     return new Date(ts).toLocaleDateString()
   }
 
-  if (message.role === 'system') return null // Do not render system instructions in bubbles
+  if (message.role === 'system') return null // system prompts aren't shown
 
   return (
-    // Timestamp/copy reveal is pure CSS (.chat-msg-row:hover). A state-driven
-    // hover re-rendered the whole message subtree (ReactMarkdown + action
-    // blocks) on every mouse crossing, which made the chat visibly stutter.
+    // hover reveal is CSS; a state hover re-rendered markdown on every crossing and stuttered
     <div
       className="chat-msg-row"
       style={{
@@ -102,7 +97,6 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
         boxSizing: 'border-box'
       }}
     >
-      {/* Role Avatar */}
       <div
         style={{
           width: '24px',
@@ -120,7 +114,6 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
         {isUser ? <User size={12} /> : <Sparkles size={12} fill="currentColor" />}
       </div>
 
-      {/* Bubble Content */}
       <div
         style={{
           background: isUser ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
@@ -212,7 +205,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
           ))}
         </div>
 
-        {/* Attached images (vision input) */}
+        {/* vision input */}
         {message.images && message.images.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '6px' }}>
             {message.images.map((src, idx) => (
@@ -226,7 +219,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                   cursor: 'zoom-in'
                 }}
                 onClick={e => {
-                  // Simple lightbox: toggle between thumbnail and large preview
+                  // click toggles thumbnail and large preview
                   const img = e.currentTarget
                   const large = img.style.width !== '84px'
                   img.style.width = large ? '84px' : '260px'
@@ -295,7 +288,6 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
               <div style={{ whiteSpace: 'pre-wrap' }}>{message.displayContent || message.content}</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '6px', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              {/* Timestamp */}
               <span className="msg-hover-reveal text-nano-faint">
                 {relativeTime(message.timestamp)}
               </span>
@@ -303,13 +295,12 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 {onRewrite && !isEditing && (
                   <button
                     onClick={() => setIsEditing(true)}
+                    className="chat-message-rewrite"
                     style={{
                       background: 'transparent', border: 'none',
-                      color: 'var(--color-text-muted)', fontSize: '10px', cursor: 'pointer',
+                      fontSize: '10px', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 4px', borderRadius: '4px'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
                     title="Edit prompt and resubmit"
                   >
                     <Pencil size={11} />
@@ -319,13 +310,12 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 {onResend && !isEditing && (
                   <button
                     onClick={() => onResend(messageIndex ?? 0)}
+                    className="chat-message-resend"
                     style={{
                       background: 'transparent', border: 'none',
                       color: 'var(--color-secondary)', fontSize: '10px', fontWeight: 'bold',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 4px', borderRadius: '4px'
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
-                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                     title="Resend this prompt turn"
                   >
                     <RefreshCw size={11} />
@@ -399,7 +389,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
               urlTransform={url => url}
               components={{
                 a({ href, children }) {
-                  // Internal card reference. Open the card's detail panel
+                  // internal card link opens the detail panel
                   if (href && href.startsWith('#card:')) {
                     const cardId = href.slice(6)
                     return (
@@ -413,7 +403,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                       </a>
                     )
                   }
-                  // External links open in the system browser, not inside the app
+                  // external links open in the system browser
                   return (
                     <a
                       href={href}
@@ -432,10 +422,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                   const lang = match ? match[1] : ''
                   const rawContent = String(children)
 
-                  // Step 1: Explicit language tag wins. Use the rich single-block UIs
-                  // Checked before update_board: "configure_board" contains
-                  // neither substring, but keeping the more specific tag first
-                  // keeps the ordering obvious if either name ever changes.
+                  // explicit language tag wins; configure_board first to keep the ordering obvious
                   if (lang === 'configure_board' || lang.includes('configure_board')) {
                     return <ConfigureBoardActionBlock jsonString={rawContent} dedupeKey={String(message.timestamp ?? messageIndex ?? '')} />
                   }
@@ -457,7 +444,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     return <CreateDialogueTreeActionBlock jsonString={rawContent} />
                   }
 
-                  // Step 2: Generic JSON. Try batch (handles all AI output formats)
+                  // generic JSON: the batch parser handles every AI output format
                   if (lang === 'json' || lang === 'create_batch' || lang === 'batch' || lang === '') {
                     const batch = parseBatchBoardJson(rawContent)
                     if (batch && (batch.columns.length > 0 || batch.cards.length > 0)) {
@@ -465,7 +452,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     }
                   }
 
-                  // Step 3: Unlabelled fenced block. Try all parsers as a last resort
+                  // unlabelled block: try every parser
                   if (!lang || lang === 'json') {
                     const normCard = normalizeCardJson(rawContent)
                     if (normCard) return <CreateTaskActionBlock jsonString={rawContent} />
@@ -473,7 +460,6 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     if (normCol) return <CreateColumnActionBlock jsonString={rawContent} />
                   }
 
-                  // Fallback: plain code block
                   const isBlock = className?.includes('language-') || String(children).includes('\n')
                   return isBlock ? (
                     <CodeBlock
@@ -502,12 +488,10 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
               {renderedContent}
             </ReactMarkdown>
 
-            {/* Blinking cursor at end of streaming message */}
             {isStreaming && (
               <span className="ai-streaming-cursor" />
             )}
 
-            {/* Bottom row: timestamp + copy button */}
             <div
               className={`msg-meta-row ${isCopied ? 'force-visible' : ''}`}
               style={{
@@ -541,12 +525,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
     </div>
   )
 }
-// Memoized on data props only: the panel re-renders on every keystroke, and
-// re-rendering every committed message (ReactMarkdown + title linkify) made
-// the chat visibly stutter. Handler props are recreated each render but only
-// close over the message PREFIX up to this index, which never changes for a
-// committed message. `actionsLocked` (the panel's isStreaming) is compared so
-// handlers pick up fresh closures whenever streaming starts/stops.
+// memo on data props: handlers only close over this message's prefix; actionsLocked refreshes them
 export default React.memo(ChatMessage, (prev, next) =>
   prev.message === next.message &&
   prev.messageIndex === next.messageIndex &&

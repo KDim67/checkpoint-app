@@ -8,8 +8,7 @@ import {
 } from '../src/shared/collabProtocol'
 import type { Item } from '../src/shared/types'
 
-// Two things have to hold at once: a genuine peer's messages survive unchanged,
-// and nothing that would corrupt a row gets through.
+// genuine messages pass unchanged, corrupting ones don't
 
 const item = (over: Partial<Item> = {}): Item => ({
   id: 'i1',
@@ -29,8 +28,7 @@ const item = (over: Partial<Item> = {}): Item => ({
 
 describe('an item off the wire', () => {
   it('passes a genuine one through unchanged', () => {
-    // The half that matters most: this runs on every mutation of a live
-    // session, so anything it alters, it alters for real users.
+    // runs on every live mutation, anything it alters it alters for real
     expect(normalizeSyncItem(item())).toEqual(item())
   })
 
@@ -40,8 +38,7 @@ describe('an item off the wire', () => {
   })
 
   it('refuses one with no id, workspace or kind', () => {
-    // Each of these decides which row is replaced and where it lands, so a
-    // wrong one overwrites something unrelated to the message.
+    // these decide which row is replaced and where
     expect(normalizeSyncItem({ ...item(), id: '' })).toBeNull()
     expect(normalizeSyncItem({ ...item(), id: '   ' })).toBeNull()
     expect(normalizeSyncItem({ ...item(), context: undefined })).toBeNull()
@@ -74,8 +71,7 @@ describe('an item off the wire', () => {
   })
 
   it('replaces metadata that is not a string', () => {
-    // The column holds JSON text. An object written straight in becomes
-    // "[object Object]" and breaks every reader of it.
+    // JSON text; objects write "[object Object]"
     expect(normalizeSyncItem({ ...item(), metadata: { pinned: true } })?.metadata).toBe('{}')
   })
 
@@ -122,8 +118,7 @@ describe('a mutation off the wire', () => {
   })
 
   it('tells absent tags from empty tags', () => {
-    // Absent leaves the row's tags alone; empty clears them. Collapsing the two
-    // turns an ordinary edit into a silent untagging.
+    // absent leaves tags, empty clears; collapsing them untags silently
     expect(normalizeRemoteMutation({ type: 'updateItem', item: item() })).not.toHaveProperty('tagIds')
     expect(normalizeRemoteMutation({ type: 'updateItem', item: item(), tagIds: [] })).toHaveProperty('tagIds', [])
     expect(normalizeRemoteMutation({ type: 'updateItem', item: item(), tagIds: ['t1'] }))
@@ -152,10 +147,7 @@ describe('a mutation off the wire', () => {
   })
 
   it('accepts the bulk payload the app actually broadcasts', () => {
-    // The union used to declare `{ updates: [{ id, position, status }] }` here,
-    // which nothing has ever sent. The receiving end read `payload.updates`,
-    // got undefined and threw, so every bulk edit in a shared session failed on
-    // the peer while succeeding locally.
+    // the old { updates } shape was never sent, so shared bulk edits threw on the peer
     const payload = { ids: ['a', 'b'], patch: { status: 'done' } }
     expect(normalizeRemoteMutation({ type: 'bulkUpdateItems', payload }))
       .toEqual({ type: 'bulkUpdateItems', payload })
@@ -178,8 +170,7 @@ describe('a mutation off the wire', () => {
   })
 
   it('refuses a bulk update with no rows or nothing to set', () => {
-    // An empty patch means an UPDATE with an empty SET clause, which is a
-    // syntax error rather than a no-op.
+    // an empty SET clause is a syntax error
     expect(normalizeRemoteMutation({ type: 'bulkUpdateItems', payload: { ids: [], patch: { status: 'done' } } })).toBeNull()
     expect(normalizeRemoteMutation({ type: 'bulkUpdateItems', payload: { ids: ['a'], patch: {} } })).toBeNull()
     expect(normalizeRemoteMutation({ type: 'bulkUpdateItems', payload: { ids: ['a'] } })).toBeNull()
@@ -214,14 +205,12 @@ describe('a message off the wire', () => {
   }
 
   it('passes a genuine baseline through', () => {
-    // The install id is the host's, and a baseline without one reads as having
-    // no peer to file the board under rather than as a bad message.
+    // no install id means no peer to file under, not a bad message
     expect(normalizeCollabMessage(baseline)).toEqual({ ...baseline, install: '' })
   })
 
   it('drops the rows it cannot write, keeping the board', () => {
-    // One corrupt card should cost the user that card, not the board they are
-    // in the middle of joining.
+    // a corrupt card costs that card, not the board
     const got = normalizeCollabMessage({
       ...baseline,
       items: [item(), { id: 'broken' }, null],
@@ -233,8 +222,7 @@ describe('a message off the wire', () => {
   })
 
   it('falls back to read-only when the mode is missing or unknown', () => {
-    // Collaborative starts this end broadcasting its own writes back. Guessing
-    // it is the wrong way to be wrong.
+    // guessing collaborative would broadcast writes back
     expect(normalizeCollabMessage({ ...baseline, mode: undefined })).toMatchObject({ mode: 'readonly' })
     expect(normalizeCollabMessage({ ...baseline, mode: 'admin' })).toMatchObject({ mode: 'readonly' })
   })

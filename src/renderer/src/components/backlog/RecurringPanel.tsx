@@ -8,11 +8,11 @@ const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 interface Props {
   context: string
-  /** Called after anything changes, so the task list can reload. */
+  /** so the task list can reload */
   onChanged?: () => void
 }
 
-/** Today at 9am. A saner default than "this exact second" for repeating work. */
+/** today 9am, saner than this exact second */
 function defaultStart(): string {
   const d = new Date()
   d.setHours(9, 0, 0, 0)
@@ -50,8 +50,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
 
   const handleCreate = async () => {
     if (!title.trim()) { toast('Give the repeating task a title'); return }
-    // datetime-local has no timezone, so this parses as local time, which is
-    // what the rule means by "9am".
+    // datetime-local has no timezone, parses as local, which is what 9am means
     const start = new Date(startAt).getTime()
     if (!Number.isFinite(start)) { toast('That start date is not valid'); return }
 

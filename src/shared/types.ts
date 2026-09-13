@@ -1,10 +1,4 @@
-/**
- * All shared domain types for Checkpoint.
- * This file is imported by BOTH the main process and the renderer.
- * Do NOT use Node.js-specific types (Buffer, NodeJS.*) here.
- */
-
-// Core Domain Types
+/** imported by main and renderer, no Node types */
 
 export type ItemType = 'log' | 'card' | 'task'
 type ItemStatus = string
@@ -14,24 +8,17 @@ export type RelationType = 'blocks' | 'relates_to' | 'duplicates'
 export interface Item {
   id: string             // UUID v4
   type: ItemType
-  /**
-   * The workspace this belongs to, by slug.
-   *
-   * Called `context` because that is the column name and the field name in
-   * every sync and collaboration payload, including ones sent by builds older
-   * than this one. The user-facing word for it is "workspace" everywhere, and
-   * the renderer's own state says workspace too. See appStore for the rule.
-   */
+  /** context is the column and payload name; the UI says workspace (see appStore) */
   context: string        // e.g. 'dayjob' | 'unity-project' | 'personal'
   title: string
-  body: string           // Markdown content
+  body: string           // markdown
   status: ItemStatus
   priority: ItemPriority
   position: number       // fractional index for drag-and-drop ordering
-  created_at: number     // Unix timestamp ms
-  updated_at: number     // Unix timestamp ms
-  due_at: number | null  // nullable Unix timestamp ms
-  metadata: string       // JSON string for type-specific extensions
+  created_at: number     // unix ms
+  updated_at: number     // unix ms
+  due_at: number | null  // nullable unix ms
+  metadata: string       // JSON string, per-type extensions
   tags?: Tag[]           // populated by join queries
 }
 
@@ -59,17 +46,14 @@ interface AppSetting {
 
 export type MemoryCategory = 'semantic' | 'episodic' | 'working'
 
-/** A row of `ai_memories`. What the assistant has remembered about a workspace. */
+/** what the assistant remembered about a workspace */
 export interface AiMemory {
   id: string
   context: string
   category: MemoryCategory
   memory_key: string
   content: string
-  /**
-   * SQLite stores this as 0 or 1; memoryService normalises it before the row
-   * leaves the main process, so everything downstream sees a real boolean.
-   */
+  /** 0/1 in SQLite, normalised before leaving main */
   is_pinned: boolean
   access_count: number
   created_at: number
@@ -78,7 +62,7 @@ export interface AiMemory {
 
 export type CreateMemoryPayload = Pick<AiMemory, 'context' | 'category' | 'memory_key' | 'content'>
 
-/** One file in an imported workspace folder. */
+/** one file in an imported folder */
 export interface WorkspaceFileInfo {
   name: string
   relativePath: string
@@ -86,13 +70,7 @@ export interface WorkspaceFileInfo {
   size: number
 }
 
-/**
- * A whole workspace, as written by Export and read by Import.
- *
- * `item_tags` is the join table verbatim rather than tags nested inside items:
- * the import replays it into the same table, and flattening it there and
- * rebuilding it here would be work that could only introduce discrepancies.
- */
+/** item_tags kept verbatim so import replays it directly */
 export interface ContextExport {
   version: number
   context: string
@@ -100,31 +78,18 @@ export interface ContextExport {
   tags: Tag[]
   item_tags: { item_id: string; tag_id: string }[]
   relations: Relation[]
-  /**
-   * The workspace's own settings. Board columns, background, swimlanes,
-   * backlog layout and every wall. Keyed as stored, with values as stored.
-   *
-   * Absent in a version 1 export, which is why it is optional: those files
-   * still import, they just arrive with default columns the way they always
-   * did.
-   */
+  /** board, backlog and walls, as stored; missing in v1 exports */
   settings?: Record<string, string>
 }
 
-/** A row of `sync_tombstones`. A deletion, so peers can replay it. */
+/** a deletion peers can replay */
 export interface SyncTombstone {
   id: string
   table_name: string
   deleted_at: number
 }
 
-/**
- * The whole database as it travels between paired machines.
- *
- * Every field is the table verbatim. `app_settings` has already been filtered
- * by `shared/syncSettings` before it gets here. Credentials and machine-local
- * rows never reach this shape.
- */
+/** tables verbatim; settings already filtered by syncSettings */
 export interface SyncPayload {
   items: Item[]
   tags: Tag[]
@@ -143,8 +108,6 @@ export interface Context {
   icon?: string          // emoji or icon name
 }
 
-// Pagination
-
 export interface PaginatedResult<T> {
   items: T[]
   total: number
@@ -152,9 +115,7 @@ export interface PaginatedResult<T> {
   pageSize: number
 }
 
-// AI
-
-/** Multimodal content part (OpenAI-compatible). Used for vision-model image input. */
+/** OpenAI-compatible, for vision input */
 type AiContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } }
@@ -171,7 +132,7 @@ export interface AiStreamParams {
   maxTokens?: number
 }
 
-/** Real token counts, when the endpoint reports them via stream_options. */
+/** when the endpoint reports them */
 export interface AiUsage {
   promptTokens: number
   completionTokens: number
@@ -184,8 +145,6 @@ export interface AiSettings {
   model: string
 }
 
-// Structured AI actions (reliable board/plan/dialogue/update generation)
-
 export type AiStructuredKind = 'board' | 'plan' | 'dialogue' | 'update' | 'config'
 
 export interface AiStructuredParams {
@@ -197,14 +156,12 @@ export interface AiStructuredParams {
 
 export interface AiStructuredResult {
   ok: boolean
-  /** Parsed JSON object whose shape depends on `kind`. */
+  /** shape depends on kind */
   data?: unknown
-  /** Which generation strategy succeeded: tools | json_schema | json_object | text. */
+  /** which strategy worked */
   method?: string
   error?: string
 }
-
-// AI Cookbook / Hardware
 
 export type GpuVendor = 'nvidia' | 'amd' | 'intel' | 'apple' | 'unknown'
 
@@ -236,7 +193,7 @@ export interface FitResult {
   recommendedVariant: QuantizationLevel
 }
 
-/** Model capabilities used for filtering and capability badges. */
+/** for filters and badges */
 type ModelCapability = 'chat' | 'code' | 'reasoning' | 'vision' | 'tools' | 'embedding'
 
 export interface CatalogModel {
@@ -247,13 +204,13 @@ export interface CatalogModel {
   description: string
   useCases: string[]
   homepageUrl: string
-  /** Not every model ships every quantization on Ollama, so variants are partial. */
+  /** not every quantization ships */
   variants: Partial<Record<QuantizationLevel, ModelVariant>>
-  /** Capabilities for filtering + badges (tools = function calling, vision = multimodal). */
+  /** tools means function calling, vision multimodal */
   capabilities?: ModelCapability[]
-  /** Max context window in tokens. */
+  /** in tokens */
   contextLength?: number
-  /** License short name, e.g. "Apache 2.0", "MIT", "Llama 3.1". */
+  /** e.g. "Apache 2.0" */
   license?: string
 }
 
@@ -272,14 +229,10 @@ export interface PullProgressEvent {
   percent: number        // 0–100, -1 if total unknown
 }
 
-// Bulk Operations
-
 export interface BulkUpdatePayload {
   ids: string[]
   patch: Partial<Pick<Item, 'status' | 'priority' | 'context'>>
 }
-
-// Search
 
 export interface SearchQuery {
   query: string
@@ -302,14 +255,11 @@ export interface TaskQueryParams {
   sortDesc?: boolean
   page?: number
   pageSize?: number
-  /** When true, returns only archived (soft-deleted) tasks instead of the normal active set. */
+  /** archived only */
   archivedOnly?: boolean
-  /**
-   * Only tasks with no due date. Distinct from an open dueStart/dueEnd range,
-   * which a task without a date can never satisfy.
-   */
+  /** no due date, which a range can't express */
   noDueDate?: boolean
-  /** Only tasks carrying no tags at all, which tagIds cannot express. */
+  /** no tags, which tagIds can't express */
   untagged?: boolean
 }
 
@@ -319,7 +269,7 @@ export interface FocusSession {
   duration_ms: number
   completed_at: number
   notes: string
-  tasks_json: string // JSON array of selected task titles/details
+  tasks_json: string // JSON array of selected tasks
 }
 
 export interface CreateFocusSessionPayload {
@@ -335,17 +285,17 @@ export interface NoteMetadata {
   links: string[]
   updatedAt: number
   size: number
-  /** Short plain-text preview of the note body (markdown stripped). */
+  /** markdown stripped */
   excerpt: string
 }
 
 export interface NoteSearchResult {
   title: string
-  /** Contextual snippet around the first content match, with markers stripped. */
+  /** around the first content match */
   snippet: string
-  /** Number of matches of the query within the note body. */
+  /** matches in the body */
   matchCount: number
-  /** True when the query also matches the note title. */
+  /** the title matches too */
   titleMatch: boolean
 }
 
@@ -416,12 +366,7 @@ export interface PluginInfo {
 
 export type ShortcutMap = Record<string, string>;
 
-/**
- * How a background download is getting on.
- *
- * The byte counts travel with the percentage because both surfaces that show
- * this say how long is left, and a percentage on its own cannot answer that.
- */
+/** byte counts ride along so both surfaces can say time left */
 export type UpdateProgress =
   | {
       phase: 'downloading'
@@ -429,18 +374,12 @@ export type UpdateProgress =
       percent: number
       transferred: number
       total: number
-      /** Averaged over the whole download by electron-updater, not a spot reading. */
+      /** averaged over the download by electron-updater */
       bytesPerSecond: number
     }
   | { phase: 'ready'; version: string }
 
-/**
- * What a manual update check found.
- *
- * `unsupported` is a dev run: only the packaged app has a release to compare
- * itself against. The version on `current` is the one already installed; on
- * `available` it is the newer one now downloading.
- */
+/** unsupported means a dev run; current is installed, available is downloading */
 export type UpdateCheckResult =
   | { status: 'unsupported' }
   | { status: 'current'; version: string }

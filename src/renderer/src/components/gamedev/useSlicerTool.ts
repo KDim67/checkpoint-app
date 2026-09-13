@@ -3,16 +3,10 @@ import { useToast } from '../ui/Toast'
 import { errorMessage } from '../../../../shared/errors'
 import * as gamedevApi from '../../data/gamedev'
 
-/**
- * Sprite Slicer: sheet selection, grid/auto slicing, and export.
- *
- * A hook rather than state inside SlicerPanel. The panel unmounts on tab
- * switch, which would throw away the sliced frames.
- */
+/** a hook: the panel unmounts on tab switch and would drop the sliced frames */
 export function useSlicerTool() {
   const { toast } = useToast()
 
-  // Tab 8: Sprite Slicer State
   const [slicerPath, setSlicerPath] = useState<string | null>(null)
   const [slicerUrl, setSlicerUrl] = useState<string | null>(null)
   const [sliceMode, setSliceMode] = useState<'grid' | 'auto'>('grid')
@@ -26,7 +20,6 @@ export function useSlicerTool() {
   const [slicerDims, setSlicerDims] = useState<{ w: number; h: number } | null>(null)
 
 
-  // Tab 8: Sprite Slicer Callbacks
   const handleSelectSlicerFile = useCallback(async () => {
     setIsSlicerProcessing(true)
     try {
@@ -85,7 +78,7 @@ export function useSlicerTool() {
           }
         }
       } else {
-        // Run BFS Pixel Island detection
+        // BFS pixel islands
         const { width, height } = img
         const imgData = ctx.getImageData(0, 0, width, height)
         const { data } = imgData
@@ -138,7 +131,7 @@ export function useSlicerTool() {
         }
       }
 
-      // Convert each slice to a base64 png
+      // each slice to a base64 png
       const frames = boundsList.map((bounds, idx) => {
         const sliceCanvas = document.createElement('canvas')
         sliceCanvas.width = bounds.w
@@ -158,7 +151,7 @@ export function useSlicerTool() {
         }
       })
 
-      // Redraw preview showing green bounding boxes
+      // green bounding boxes
       ctx.clearRect(0, 0, img.width, img.height)
       ctx.drawImage(img, 0, 0)
       ctx.strokeStyle = '#00ff80'
@@ -199,8 +192,7 @@ export function useSlicerTool() {
     }
   }, [slicerPath, slicedFrames, toast])
 
-  // Run whenever the image or slice parameters change. runSlicer is a no-op
-  // when slicerUrl is null, so no activeTab guard is needed.
+  // no tab guard needed, a null slicerUrl makes it a no-op
   useEffect(() => {
     runSlicer()
   }, [slicerUrl, sliceMode, sliceCellW, sliceCellH, runSlicer])

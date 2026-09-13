@@ -16,8 +16,7 @@ const settings = (over: Partial<StartupSettings> = {}): StartupSettings => ({
 
 describe('defaults', () => {
   it('leaves close-to-tray off', () => {
-    // Closing has always quit this app. Changing what the X button does without
-    // being asked would leave people thinking they had shut it down.
+    // closing has always quit, don't change the X silently
     expect(DEFAULT_STARTUP_SETTINGS.closeToTray).toBe(false)
   })
 
@@ -39,8 +38,7 @@ describe('normalizeStartupSettings', () => {
   })
 
   it('ignores non-boolean values rather than coercing them', () => {
-    // "false" the string is a value someone's settings row might hold; treating
-    // it as truthy would silently enable a thing they turned off.
+    // the string "false" mustn't read as truthy
     expect(normalizeStartupSettings({ openAtLogin: 'false' }).openAtLogin).toBe(false)
     expect(normalizeStartupSettings({ openAtLogin: 1 }).openAtLogin).toBe(false)
   })
@@ -65,8 +63,7 @@ describe('reconcile', () => {
   })
 
   it('refuses to hide the app when there is nothing to click', () => {
-    // Both of these with no tray icon leave a running process with no window and
-    // no way to summon one back short of Task Manager.
+    // both without a tray icon strand a windowless process
     const out = reconcile(settings({ showTrayIcon: false, closeToTray: true, startMinimised: true }))
     expect(out.closeToTray).toBe(false)
     expect(out.startMinimised).toBe(false)
@@ -85,9 +82,9 @@ describe('trayVisibilityChanged', () => {
   })
 })
 
-// The helper that read this flag was never called, so the switch did nothing.
+// the helper reading this was never called, so the switch did nothing
 describe('shouldStartHidden', () => {
-  // argv[0] is the executable. Only what follows it matters here.
+  // argv[0] is the exe
   const argv = (...extra: string[]): string[] => ['Checkpoint.exe', ...extra]
 
   it('stays hidden when Windows launched it with the flag', () => {
@@ -95,12 +92,12 @@ describe('shouldStartHidden', () => {
   })
 
   it('shows a window when the app was opened by hand', () => {
-    // No flag means they opened it themselves.
+    // no flag means opened by hand
     expect(shouldStartHidden(argv(), settings({ startMinimised: true, showTrayIcon: true }))).toBe(false)
   })
 
   it('shows a window when there is no tray icon to hide behind', () => {
-    // Nothing to click otherwise.
+    // nothing to click otherwise
     expect(shouldStartHidden(argv(MINIMISED_FLAG), settings({ showTrayIcon: false }))).toBe(false)
   })
 
@@ -113,7 +110,7 @@ describe('shouldStartHidden', () => {
   })
 
   it('uses the same flag the login item is given', () => {
-    // Written in one file, read in another.
+    // written in one file, read in another
     expect(MINIMISED_FLAG).toBe('--start-minimised')
   })
 })

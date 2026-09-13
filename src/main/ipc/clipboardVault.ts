@@ -1,4 +1,4 @@
-/** The clipboard history vault: snippets, pins and labels. */
+/** clipboard history: snippets, pins, labels */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -15,7 +15,6 @@ import {
 } from '../db'
 
 export function registerClipboardVaultHandlers(): void {
-  // Clipboard History Handlers
   ipcMain.handle(IpcChannels.CLIPBOARD_GET_HISTORY, () => {
     return handleSafe(() => getClipboardHistory())
   })

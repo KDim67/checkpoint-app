@@ -8,26 +8,18 @@ import { errorMessage } from '../shared/errors'
 let activeAbortController: AbortController | null = null
 let lastOfflineLogged = false
 
-/**
- * Ollama's REST root for the configured endpoint. isLocalUrl deliberately
- * accepts LAN addresses, so an Ollama on another machine is a supported setup,
- * but these calls used to hardcode localhost, leaving that user with an empty
- * model list. Falls back to localhost when the endpoint is a cloud provider.
- */
+/** isLocalUrl accepts LAN, so don't hardcode localhost; cloud endpoints fall back to it */
 function ollamaHost(): string {
   const { baseURL, isOllama } = getAiConfig()
   if (!isOllama || !baseURL) return 'http://localhost:11434'
   return baseURL.replace(/\/+$/, '').replace(/\/v1$/, '')
 }
 
-/**
- * Checks if Ollama is running, installed, and gets currently available local models.
- * Never throws.
- */
+/** never throws */
 export async function checkOllama(): Promise<OllamaStatus> {
   const downloadUrl = 'https://ollama.com/download'
 
-  // Tier 1: check if Ollama server is running (API is reachable)
+  // server up?
   try {
     const response = await fetch(`${ollamaHost()}/api/tags`, {
       signal: AbortSignal.timeout(2000)
@@ -43,10 +35,10 @@ export async function checkOllama(): Promise<OllamaStatus> {
       }
     }
   } catch {
-    // Server is not running. Check if the executable is installed in PATH.
+    // not running, maybe installed
   }
 
-  // Tier 2: check if Ollama CLI is installed in PATH
+  // CLI on PATH?
   try {
     const versionOutput = await execFileQuiet('ollama', ['--version'], 2000)
     if (versionOutput) {
@@ -58,7 +50,7 @@ export async function checkOllama(): Promise<OllamaStatus> {
       }
     }
   } catch {
-    // Executable not found
+    // not installed
   }
 
   return {
@@ -69,12 +61,8 @@ export async function checkOllama(): Promise<OllamaStatus> {
   }
 }
 
-/**
- * Streams the pull download request from Ollama, parsing the NDJSON format
- * and broadcasting progress percentage updates to the renderer process.
- */
+/** parses NDJSON progress and forwards percentages to the renderer */
 export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Promise<void> {
-  // Cancel any existing pull operation first
   if (activeAbortController) {
     activeAbortController.abort()
   }
@@ -107,7 +95,7 @@ export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Pr
 
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
-      // Save last partial line back to the buffer
+      // keep the partial last line for the next chunk
       buffer = lines.pop() || ''
 
       for (const line of lines) {
@@ -135,7 +123,6 @@ export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Pr
       }
     }
 
-    // Success done
     if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IpcChannels.OLLAMA_PULL_DONE, { modelTag })
     }
@@ -152,9 +139,6 @@ export async function pullModel(modelTag: string, mainWindow: BrowserWindow): Pr
   }
 }
 
-/**
- * Deletes a locally-installed Ollama model. Returns true on success.
- */
 export async function deleteModel(modelTag: string): Promise<boolean> {
   try {
     const response = await fetch(`${ollamaHost()}/api/delete`, {
@@ -170,9 +154,6 @@ export async function deleteModel(modelTag: string): Promise<boolean> {
   }
 }
 
-/**
- * Aborts the active pull operation if running.
- */
 export function stopPull(): void {
   if (activeAbortController) {
     activeAbortController.abort()
@@ -180,9 +161,6 @@ export function stopPull(): void {
   }
 }
 
-/**
- * Helper to get list of local models directly.
- */
 export async function listLocalModels(): Promise<string[]> {
   try {
     const response = await fetch(`${ollamaHost()}/api/tags`, {

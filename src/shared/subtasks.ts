@@ -1,25 +1,18 @@
-/**
- * Subtasks as rows, not `- [ ]` lines in a body. Those could not be counted,
- * rolled up, or handed to an agent.
- *
- * Their own small table rather than full items: items would bring tags and due
- * dates for free, but every existing query would have to learn to exclude them,
- * and anything that forgot would show subtasks as top-level work.
- */
+/** rows, not body lines; own table so item queries needn't exclude them */
 
 export interface Subtask {
   id: string
   itemId: string
   title: string
   done: boolean
-  /** Sort order within its parent. Sparse, so one can be inserted between two. */
+  /** sparse, room to insert between */
   position: number
 }
 
 interface SubtaskProgress {
   total: number
   done: number
-  /** 0–1. Zero when there are no subtasks, so callers can render a bar directly. */
+  /** 0-1, zero with none so a bar renders directly */
   ratio: number
 }
 
@@ -29,7 +22,7 @@ export function computeProgress(subtasks: Subtask[]): SubtaskProgress {
   return { total, done, ratio: total === 0 ? 0 : done / total }
 }
 
-/** Coerces one stored row. Returns null when it has no usable identity. */
+/** null without an identity */
 export function normalizeSubtask(raw: unknown): Subtask | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -43,7 +36,7 @@ export function normalizeSubtask(raw: unknown): Subtask | null {
     id,
     itemId,
     title,
-    // SQLite has no boolean, so the stored value is 0/1.
+    // SQLite 0/1
     done: o.done === true || o.done === 1,
     position: Number.isFinite(position) ? position : 0
   }
@@ -59,35 +52,23 @@ export function normalizeSubtasks(raw: unknown): Subtask[] {
   return out.sort((a, b) => a.position - b.position)
 }
 
-/**
- * Position for a new subtask appended to a list.
- *
- * Spaced by 1000 so a later insertion between two neighbours has room without
- * renumbering the whole list. The same trick the board uses for cards.
- */
+/** spaced 1000 like the board's cards */
 export function nextPosition(existing: Subtask[]): number {
   if (existing.length === 0) return 1000
   return Math.max(...existing.map(s => s.position)) + 1000
 }
 
-/** Matches a markdown task list line, capturing its state and text. */
+/** captures state and text */
 const CHECKLIST_LINE = /^\s*[-*]\s+\[([ xX])\]\s*(.*)$/
 
 interface ParsedChecklist {
-  /** The checkbox lines found, in document order. */
+  /** in document order */
   items: { title: string; done: boolean }[]
-  /** The body with those lines removed, for when they are converted. */
+  /** with those lines removed */
   remainingBody: string
 }
 
-/**
- * Pulls markdown checkboxes out of a body, so `- [ ]` lines people already
- * wrote can become real subtasks. Offered, never applied automatically:
- * rewriting someone's note unasked is data loss with extra steps.
- *
- * Empty lines are skipped, since a bare `- [ ]` is usually a template about to
- * be filled in rather than a subtask named "".
- */
+/** offered, never automatic; a bare - [ ] is a template, skipped */
 export function parseChecklist(body: string): ParsedChecklist {
   const items: { title: string; done: boolean }[] = []
   const kept: string[] = []
@@ -102,13 +83,11 @@ export function parseChecklist(body: string): ParsedChecklist {
     }
   }
 
-  // Collapse the run of blank lines a removed block leaves behind, but keep
-  // paragraph breaks the user wrote.
+  // collapse blank runs, keep paragraph breaks
   const remainingBody = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
   return { items, remainingBody }
 }
 
-/** True when a body contains at least one convertible checkbox. */
 export function hasChecklist(body: string): boolean {
   return parseChecklist(body).items.length > 0
 }

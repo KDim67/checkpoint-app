@@ -44,8 +44,7 @@ export default function HeaderBtn({
       }}
     >
       {icon}
-      {/* Hidden by a container query when the bar is narrow, leaving the
-          icon and the title tooltip. See .kanban-btn-label in index.css. */}
+      {/* hidden by a container query when narrow, see .kanban-btn-label */}
       <span className="kanban-btn-label">{children}</span>
     </button>
   )

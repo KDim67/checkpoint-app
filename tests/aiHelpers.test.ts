@@ -25,8 +25,7 @@ describe('parseThinkingAndContent', () => {
   })
 
   it('treats an unclosed block as still-streaming reasoning', () => {
-    // The tag arrives before its close while tokens are still coming in; the
-    // partial thought must not be shown as the answer.
+    // the partial thought mustn't show as the answer
     const { thinking, content } = parseThinkingAndContent('Prefix <think>half a thou')
     expect(thinking).toBe('half a thou')
     expect(content).toBe('Prefix')
@@ -43,8 +42,7 @@ describe('estimateTokens', () => {
   })
 
   it('counts CJK far higher, which is the whole point of the split', () => {
-    // A flat 4 chars/token put a Chinese conversation at a quarter of its real
-    // size and blew the context window silently.
+    // 4 chars/token put Chinese at a quarter of its size
     const cjk = '你好世界'.repeat(10) // 40 codepoints
     expect(estimateTokens(cjk)).toBe(40)
     expect(estimateTokens(cjk)).toBeGreaterThan(estimateTokens('a'.repeat(40)))
@@ -87,7 +85,7 @@ describe('classifyIntent', () => {
   })
 
   it('separates renaming a column from renaming a card', () => {
-    // The two share every verb; only the noun tells them apart.
+    // shared verbs, only the noun differs
     expect(classifyIntent('rename the column to Review', null)).toBe('configure_board')
     expect(classifyIntent('rename the card to Review', null)).toBe('update_items')
   })
@@ -100,7 +98,7 @@ describe('classifyIntent', () => {
 
   it('requires both a verb and a noun before creating items', () => {
     expect(classifyIntent('create three cards for the auth work', null)).toBe('create_items')
-    // A verb with no item noun is conversation, not a create request.
+    // a verb with no item noun is conversation
     expect(classifyIntent('create a summary of what we discussed', null)).toBe('converse')
   })
 

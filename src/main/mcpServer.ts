@@ -1,15 +1,4 @@
-/**
- * Model Context Protocol server. Exposes workspaces, cards, tasks, notes and
- * board config to MCP clients over loopback while the app runs.
- *
- * In main out of necessity: better-sqlite3 is built against Electron's ABI, so
- * plain Node cannot open checkpoint.db (it fails with ERR_DLOPEN_FAILED). It
- * also means every tool goes through the same `db` functions the app uses.
- *
- * Separate from the webhook gateway, which is unauthenticated with wildcard
- * CORS. Defensible for "append a log line", wrong for something that reads
- * every note.
- */
+/** in main since better-sqlite3 is built for electron's ABI; authed, unlike the webhook gateway */
 
 import http from 'http'
 import crypto from 'crypto'
@@ -28,27 +17,18 @@ import { registerRecurrenceTools } from './mcp/tools/recurrences'
 import { registerReferenceTools } from './mcp/tools/reference'
 import { registerTrackingTools } from './mcp/tools/tracking'
 
-// Re-exported so the dynamic importers in index.ts keep resolving it here.
+// re-exported for the dynamic importers in index.ts
 export { MCP_DEFAULT_PORT }
 const TOKEN_SETTING_KEY = 'mcp_auth_token'
 export { setMcpDataChangedHandler } from './mcp/toolKit'
 
-/** Host header values accepted. Anything else is a rebinding attempt. */
+/** anything else is a rebinding attempt */
 const ALLOWED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 
 let server: http.Server | null = null
 let activePort: number | null = null
 
-// Token
-
-/**
- * Returns the bearer token, generating one on first use.
- *
- * The key is registered in secureSettings' SECRET_SETTING_KEYS, so it is
- * encrypted at rest by the OS keychain exactly like the AI provider keys.
- * A token granting full read/write over someone's workspace should not sit in
- * plaintext next to them.
- */
+/** encrypted at rest via SECRET_SETTING_KEYS, like the AI keys */
 export function getOrCreateMcpToken(): string {
   const existing = getSetting<string>(TOKEN_SETTING_KEY, '')
   if (existing) return existing
@@ -63,32 +43,21 @@ export function regenerateMcpToken(): string {
   return token
 }
 
-// Request guards
-
-/** Strips the port so `localhost:9990` and `localhost` both resolve. */
+/** so localhost:9990 and localhost both match */
 function hostnameOf(headerValue: string | undefined): string {
   if (!headerValue) return ''
   const value = headerValue.trim()
-  // IPv6 literals are bracketed, and their colons must not be split on.
+  // IPv6 literals are bracketed, don't split on their colons
   if (value.startsWith('[')) return value.slice(0, value.indexOf(']') + 1).toLowerCase()
   return value.split(':')[0].toLowerCase()
 }
 
-/**
- * Defence in depth against DNS rebinding. The bearer token is the primary
- * control. The classic attack targets *unauthenticated* localhost servers, and
- * a page cannot read a token it was never given, but a page should not get as
- * far as presenting credentials in the first place.
- *
- * The SDK's own protection moved to Express middleware in 1.30 and is
- * deprecated on the Node transport, so it is done here rather than pulling a
- * web framework into the main process for one endpoint.
- */
+/** DNS rebinding defence behind the token; the SDK moved its own check to Express middleware */
 function isOriginAllowed(req: http.IncomingMessage): boolean {
   if (!ALLOWED_HOSTNAMES.has(hostnameOf(req.headers.host))) return false
 
   const origin = req.headers.origin
-  // A non-browser client sends no Origin at all; that is the normal case.
+  // non-browser clients send no Origin, the normal case
   if (!origin) return true
   try {
     return ALLOWED_HOSTNAMES.has(new URL(origin).hostname.toLowerCase())
@@ -97,7 +66,7 @@ function isOriginAllowed(req: http.IncomingMessage): boolean {
   }
 }
 
-/** Constant-time compare so the token cannot be recovered by timing. */
+/** constant-time, no timing leak */
 function tokenMatches(provided: string, expected: string): boolean {
   const a = Buffer.from(provided)
   const b = Buffer.from(expected)
@@ -110,8 +79,6 @@ function isAuthorized(req: http.IncomingMessage): boolean {
   if (!header || !header.startsWith('Bearer ')) return false
   return tokenMatches(header.slice('Bearer '.length).trim(), getOrCreateMcpToken())
 }
-
-// Server construction
 
 function buildMcpServer(): McpServer {
   const mcp = new McpServer({ name: 'checkpoint', version: '1.0.0' })
@@ -130,8 +97,6 @@ function buildMcpServer(): McpServer {
   return mcp
 }
 
-// Lifecycle
-
 function startMcpServer(requestedPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
     if (server) {
@@ -142,24 +107,21 @@ function startMcpServer(requestedPort: number): Promise<number> {
     const port = requestedPort > 0 ? requestedPort : MCP_DEFAULT_PORT
 
     const httpServer = http.createServer(async (req, res) => {
-      // Order matters: reject on host before touching the body or the token, so
-      // a rebinding attempt learns nothing and costs nothing.
+      // host check before body or token, a rebinding attempt learns nothing
       if (!isOriginAllowed(req)) {
         res.writeHead(403, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'Forbidden' }))
         return
       }
       if (!isAuthorized(req)) {
-        // Deliberately vague: distinguishing "no token" from "wrong token"
-        // tells an attacker which half they got right.
+        // vague on purpose, don't say which half was wrong
         res.writeHead(401, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'Unauthorized' }))
         return
       }
 
       try {
-        // Stateless: a desktop process runs for days, and a session map is a
-        // leak waiting to happen for what is a single local user.
+        // stateless, a session map in a days-long process is a leak
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
         const mcp = buildMcpServer()
         res.on('close', () => {
@@ -180,8 +142,7 @@ function startMcpServer(requestedPort: number): Promise<number> {
     httpServer.on('error', (err: NodeJS.ErrnoException) => {
       server = null
       activePort = null
-      // Surfaced rather than silently rebinding: a client config pointing at a
-      // port the server did not get is worse than a visible failure.
+      // fail visibly, a client pointed at a port we didn't get is worse
       reject(
         err.code === 'EADDRINUSE'
           ? new Error(`Port ${port} is already in use. Choose another port in Settings.`)

@@ -1,8 +1,4 @@
-/**
- * The project folder attached for codebase context. The folder is remembered
- * across sessions and its file list is not, so a restored folder is indexed
- * again on mount.
- */
+/** the folder is remembered, its file list isn't, so re-index on mount */
 
 import { useEffect, useRef, useState } from 'react'
 import type { WorkspaceFileInfo } from './types'
@@ -21,9 +17,7 @@ export function useWorkspaceFolder() {
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileInfo[]>([])
   const [workspaceIndexing, setWorkspaceIndexing] = useState(false)
 
-  // Re-index a previously selected workspace folder on mount. Only the
-  // folder restored from the last session is indexed here: picking a new one
-  // indexes it where it is picked.
+  // only the restored folder; a newly picked one indexes where it's picked
   const restoredFolderRef = useRef(workspaceFolder)
   useEffect(() => {
     const restoredFolder = restoredFolderRef.current

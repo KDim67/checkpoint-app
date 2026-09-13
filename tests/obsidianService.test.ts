@@ -5,9 +5,7 @@ import { join, dirname } from 'node:path'
 import { importObsidianVault, vaultName } from '../src/main/obsidianService'
 import { getNotesDir, getMediaDir } from '../src/main/paths'
 
-// A real vault on disk, imported by the real service. The electron stub fixes
-// the home directory at a throwaway path, so this writes to that rather than
-// anywhere a person keeps notes. Both directories are wiped between tests.
+// a real vault through the real service; the stub pins home to a throwaway dir
 
 let vault: string
 
@@ -75,7 +73,7 @@ describe('importing a vault off disk', () => {
     expect(result.notesImported).toBe(3)
     expect(result.renamed).toHaveLength(1)
 
-    // The link now names whichever one was renamed, so it still resolves.
+    // the link names whichever one was renamed
     const renamedTo = result.renamed[0].to
     expect(noteBody('Hub')).toBe(`See [[${renamedTo}]].`)
     expect(existsSync(join(getNotesDir(), `${renamedTo}.md`))).toBe(true)

@@ -6,10 +6,8 @@ export interface AssetFile {
 }
 
 
-/** The naming conventions the batch renamer offers. Closed sets, so a select
- * element's string value is checked against them rather than trusted. */
+/** closed sets, so select values get checked, not trusted */
 export type RenamerPreset = 'none' | 'texture' | 'mesh' | 'audio'
-/** The sizes an atlas may be packed into, and the ways a sprite may be scaled. */
 export type AtlasMaxSize = 1024 | 2048 | 4096
 export type UpscaleAlgorithm =
   | 'nearest2x' | 'nearest4x' | 'nearest8x'
@@ -23,16 +21,7 @@ export interface DialogueNode {
   choices: Array<{ text: string; nextId: string }>
 }
 
-/**
- * Reads a dialogue tree the AI produced.
- *
- * The model is asked for a particular shape and returns its best attempt, so
- * every field is treated as absent until proved otherwise. A node with no id
- * gets one, since the editor keys off it and two blanks would collide.
- *
- * `target` as well as `nextId`: the two prompts in the app have asked for both
- * names over time, and replies still come back either way.
- */
+/** every field absent until proven; missing ids get one; target and nextId both come back from older prompts */
 export function normalizeDialogueNodes(raw: unknown, makeId: () => string): DialogueNode[] {
   if (!Array.isArray(raw)) return []
 
@@ -69,7 +58,7 @@ export type GameDevTab =
 
 export const PALETTE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
-/** Hex to RGB in the 0–1 float range the shader/engine snippets expect. */
+/** 0 to 1 floats for the shader snippets */
 export function hexToRgbFloat(hex: string) {
   let c = hex.substring(1)
   if (c.length === 3) {

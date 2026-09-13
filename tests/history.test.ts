@@ -38,8 +38,7 @@ describe('history', () => {
   })
 
   it('discards the future when a new edit lands', () => {
-    // Every tool the user has ever used behaves this way; branching would be
-    // surprising rather than powerful.
+    // no branching, like every tool
     let h = initHistory('a')
     h = pushHistory(h, 'b')
     h = undo(h)
@@ -49,7 +48,7 @@ describe('history', () => {
   })
 
   it('skips a no-op edit when told how to compare', () => {
-    // Dragging an item and putting it back should not cost an undo step.
+    // dragging back mustn't cost an undo step
     let h = initHistory({ x: 1 })
     const same = { x: 1 }
     h = pushHistory(h, same, (a, b) => a.x === b.x)
@@ -66,12 +65,12 @@ describe('history', () => {
     let h = initHistory(0)
     for (let i = 1; i <= HISTORY_LIMIT + 20; i++) h = pushHistory(h, i)
     expect(h.past.length).toBe(HISTORY_LIMIT)
-    // The oldest states are the ones dropped, so recent history survives.
+    // oldest dropped, recent survives
     expect(h.past[h.past.length - 1]).toBe(HISTORY_LIMIT + 19)
   })
 
   it('replaces the present without making it undoable', () => {
-    // A document arriving from disk is not something the user can "undo".
+    // a load from disk isn't undoable
     let h = initHistory('a')
     h = replacePresent(h, 'from disk')
     expect(h.present).toBe('from disk')

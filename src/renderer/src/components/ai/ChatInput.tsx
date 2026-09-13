@@ -1,9 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
 
-/**
- * The slice of the Web Speech API this uses. Declared here because the draft
- * spec is not in lib.dom and Chromium still ships it prefixed.
- */
+/** the Web Speech draft isn't in lib.dom and chromium still prefixes it */
 interface SpeechRecognitionResultEvent {
   resultIndex: number
   results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }>
@@ -45,16 +42,16 @@ interface ChatInputProps {
   onTriggerPrompt: (prompt: string, displayContent?: string, intentHint?: 'create' | 'analyze') => void
   activeSkill?: { id: string; label: string; shortLabel: string; color: string } | null
   onClearSkill?: () => void
-  /** Indexed files of the imported workspace folder (for @-mentions). */
+  /** for @-mentions */
   workspaceFiles?: Array<{ name: string; relativePath: string }>
-  /** User-defined saved prompts, shown in the ＋ menu. */
+  /** shown in the + menu */
   customActions?: CustomQuickAction[]
   onManageCustomActions?: () => void
-  /** Whether the selected model accepts image input. Gates attach & paste. */
+  /** gates attach and paste */
   visionCapable?: boolean
 }
 
-/** Downscale an image file to a reasonable size for model input (max 1280px). */
+/** max 1280px for model input */
 async function fileToDataUrl(file: File): Promise<string | null> {
   return new Promise(resolve => {
     const reader = new FileReader()
@@ -84,8 +81,7 @@ async function fileToDataUrl(file: File): Promise<string | null> {
   })
 }
 
-// Data-driven quick actions. "create" actions produce board items via the
-// structured generator; "analyze" actions return plain-text answers.
+// create actions build board items, analyze actions answer in text
 interface QuickAction {
   icon: React.ElementType
   label: string
@@ -176,8 +172,7 @@ export default function ChatInput({
   ]
 
   const handleToggleListening = () => {
-    // Not in lib.dom: the Web Speech API is still a draft, and Chromium
-    // exposes it under the webkit prefix.
+    // not in lib.dom, chromium ships it webkit-prefixed
     const w = window as unknown as {
       SpeechRecognition?: SpeechRecognitionConstructor
       webkitSpeechRecognition?: SpeechRecognitionConstructor
@@ -212,7 +207,6 @@ export default function ChatInput({
     }
   }
 
-  // Load cheatsheets + note titles on mount & menu toggle
   useEffect(() => {
     const fetchSources = async () => {
       try {
@@ -231,7 +225,7 @@ export default function ChatInput({
     fetchSources()
   }, [showPlusMenu])
 
-  // External attach requests (e.g. the Cheatsheets page's "Ask AI" button)
+  // e.g. Ask AI from the Cheatsheets page
   useEffect(() => {
     const handler = (e: Event) => {
       const name = (e as CustomEvent).detail?.name
@@ -244,7 +238,6 @@ export default function ChatInput({
     return () => window.removeEventListener('checkpoint-ai-attach-cheatsheet', handler)
   }, [])
 
-  // Image attachment (picker + paste)
   const addImageFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return
     const dataUrl = await fileToDataUrl(file)
@@ -268,14 +261,12 @@ export default function ChatInput({
     }
   }
 
-  // Auto-resize textarea height as user types
   useEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) return
     textarea.style.height = 'auto'
     textarea.style.height = `${Math.min(180, textarea.scrollHeight)}px`
 
-    // Detect @ trigger for mention popup
     const cursor = textarea.selectionStart || 0
     const textBeforeCursor = value.slice(0, cursor)
     const lastAtIdx = textBeforeCursor.lastIndexOf('@')
@@ -287,7 +278,6 @@ export default function ChatInput({
       setMentionQuery(null)
     }
 
-    // Detect / trigger for slash command popup
     const lastSlashIdx = textBeforeCursor.lastIndexOf('/')
     if (
       lastSlashIdx !== -1 &&
@@ -301,7 +291,6 @@ export default function ChatInput({
     }
   }, [value])
 
-  // Close plus menu on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -323,7 +312,6 @@ export default function ChatInput({
     }
   }
 
-  // Remove the @query fragment from the textarea after a mention is picked
   const stripMentionQuery = () => {
     const textarea = textareaRef.current
     const cursor = textarea?.selectionStart || value.length
@@ -376,7 +364,7 @@ export default function ChatInput({
   const [savedInputBeforeHistory, setSavedInputBeforeHistory] = useState<string>('')
 
   const handleFormSubmit = () => {
-    // Allow submission with any attachment (docs, notes, files, images) even with no text
+    // attachments alone are enough to send
     if ((!value.trim() && !hasAnyAttachment) || isStreaming) return
     const mode = isEmailDraftMode ? 'email_draft' : undefined
     onSubmit({
@@ -386,7 +374,6 @@ export default function ChatInput({
       files: attachedFiles.length > 0 ? attachedFiles : undefined,
       images: attachedImages.length > 0 ? attachedImages : undefined
     })
-    // Save to prompt history
     if (value.trim()) {
       setPromptHistory(prev => [value.trim(), ...prev.slice(0, 49)])
     }
@@ -410,7 +397,7 @@ export default function ChatInput({
       return
     }
 
-    // Prompt history navigation with Up/Down arrows (only on single-line input at boundaries)
+    // history only on single-line input at the boundaries
     if (!isStreaming && mentionQuery === null) {
       if (e.key === 'ArrowUp' && !e.shiftKey) {
         const textarea = textareaRef.current
@@ -442,7 +429,6 @@ export default function ChatInput({
 
     if (e.key === 'Enter' && !e.shiftKey) {
       if (mentionQuery !== null) {
-        // Pick the first suggestion across all mention groups
         if (filteredCheatsheets.length > 0) {
           e.preventDefault()
           handleSelectMention(filteredCheatsheets[0].name)
@@ -477,8 +463,7 @@ export default function ChatInput({
     mentionQuery === null ? true : n.toLowerCase().includes(mentionQuery)
   ).slice(0, 6)
 
-  // Workspace files only appear once the user starts typing a query.
-  // An unfiltered list of hundreds of files is pure noise.
+  // files only once a query is typed, hundreds unfiltered is noise
   const filteredFiles = (mentionQuery && mentionQuery.length >= 1)
     ? workspaceFiles.filter(f =>
         f.name.toLowerCase().includes(mentionQuery) ||
@@ -494,7 +479,6 @@ export default function ChatInput({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', width: '100%', position: 'relative' }}>
-      {/* Slash Commands Auto-complete Popover */}
       {slashQuery !== null && filteredSlashCommands.length > 0 && (
         <div
           style={{
@@ -523,20 +507,18 @@ export default function ChatInput({
             <button
               key={cmd.name}
               onClick={() => handleSelectSlash(cmd.name)}
+              className="bg-clear hover-bg-surface-2"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '2px',
                 padding: '6px 8px',
-                background: 'transparent',
                 border: 'none',
                 color: 'var(--color-text-base)',
                 borderRadius: 'var(--radius-sm)',
                 cursor: 'pointer',
                 textAlign: 'left'
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <div className="row-6px">
                 <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)' }}>
@@ -551,7 +533,7 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Mentions Auto-complete Popover. Cheatsheets, notes and workspace files */}
+      {/* cheatsheets, notes and workspace files */}
       {mentionQuery !== null && hasMentionResults && (
         <div
           style={{
@@ -582,14 +564,13 @@ export default function ChatInput({
             <button
               key={`cs-${cs.name}`}
               onClick={() => handleSelectMention(cs.name)}
+              className="bg-clear hover-bg-surface-2 chat-input-mention"
+              data-attached={attachedCheatsheets.includes(cs.name) || undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                background: attachedCheatsheets.includes(cs.name) ? 'var(--color-surface-offset)' : 'transparent',
                 border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
                 fontSize: '11px', cursor: 'pointer', textAlign: 'left'
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = attachedCheatsheets.includes(cs.name) ? 'var(--color-surface-offset)' : 'transparent')}
             >
               <BookOpen size={13} style={{ color: 'var(--color-primary-soft)', flexShrink: 0 }} />
               <span className="truncate-fill">{cs.name}</span>
@@ -608,14 +589,13 @@ export default function ChatInput({
             <button
               key={`n-${title}`}
               onClick={() => handleSelectNoteMention(title)}
+              className="bg-clear hover-bg-surface-2 chat-input-mention"
+              data-attached={attachedNotes.includes(title) || undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                background: attachedNotes.includes(title) ? 'var(--color-surface-offset)' : 'transparent',
                 border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
                 fontSize: '11px', cursor: 'pointer', textAlign: 'left'
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = attachedNotes.includes(title) ? 'var(--color-surface-offset)' : 'transparent')}
             >
               <FileText size={13} style={{ color: 'var(--color-success-soft)', flexShrink: 0 }} />
               <span className="truncate-fill">{title}</span>
@@ -635,14 +615,13 @@ export default function ChatInput({
               key={`f-${f.relativePath}`}
               onClick={() => handleSelectFileMention(f.relativePath)}
               title={f.relativePath}
+              className="bg-clear hover-bg-surface-2 chat-input-mention"
+              data-attached={attachedFiles.includes(f.relativePath) || undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                background: attachedFiles.includes(f.relativePath) ? 'var(--color-surface-offset)' : 'transparent',
                 border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
                 fontSize: '11px', cursor: 'pointer', textAlign: 'left'
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = attachedFiles.includes(f.relativePath) ? 'var(--color-surface-offset)' : 'transparent')}
             >
               <FileCode size={13} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
               <div className="col-fill">
@@ -657,7 +636,6 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Input Field Container */}
       <div
         style={{
           display: 'flex',
@@ -672,15 +650,14 @@ export default function ChatInput({
           flexWrap: 'wrap'
         }}
       >
-        {/* Left Plus Dropdown Button */}
         <div ref={menuRef} style={{ position: 'relative', alignSelf: 'center', display: 'flex', alignItems: 'center' }}>
           <button
             onClick={() => setShowPlusMenu(!showPlusMenu)}
             disabled={isStreaming}
+            className={showPlusMenu ? 'text-accent' : 'text-muted chat-input-plus'}
             style={{
               background: showPlusMenu ? 'var(--color-secondary-muted)' : 'transparent',
               border: 'none',
-              color: showPlusMenu ? 'var(--color-secondary)' : 'var(--color-text-muted)',
               borderRadius: 'var(--radius-sm)',
               width: '24px',
               height: '24px',
@@ -691,18 +668,11 @@ export default function ChatInput({
               transition: 'all 150ms ease',
               flexShrink: 0
             }}
-            onMouseEnter={e => {
-              if (!isStreaming && !showPlusMenu) e.currentTarget.style.color = 'var(--color-text-base)'
-            }}
-            onMouseLeave={e => {
-              if (!isStreaming && !showPlusMenu) e.currentTarget.style.color = 'var(--color-text-muted)'
-            }}
             title="AI Features & Tools"
           >
             <Plus size={16} />
           </button>
 
-          {/* Plus Features Menu Popover */}
           {showPlusMenu && (
             <div
               style={{
@@ -732,12 +702,13 @@ export default function ChatInput({
                   setIsEmailDraftMode(true)
                   textareaRef.current?.focus()
                 }}
+                className="bg-clear hover-bg-surface-2 chat-input-menu-toggle"
+                data-active={isEmailDraftMode || undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
                   padding: '6px 8px',
-                  background: isEmailDraftMode ? 'var(--color-surface-2)' : 'transparent',
                   border: 'none',
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-sm)',
@@ -745,8 +716,6 @@ export default function ChatInput({
                   cursor: 'pointer',
                   textAlign: 'left'
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = isEmailDraftMode ? 'var(--color-surface-2)' : 'transparent')}
               >
                 <Mail size={13} className="text-accent" />
                 <span>Draft Email Mode</span>
@@ -754,12 +723,13 @@ export default function ChatInput({
 
               <button
                 onClick={() => setShowCheatsheetSubmenu(!showCheatsheetSubmenu)}
+                className="bg-clear hover-bg-surface-2 chat-input-menu-toggle"
+                data-active={showCheatsheetSubmenu || undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '6px 8px',
-                  background: showCheatsheetSubmenu ? 'var(--color-surface-2)' : 'transparent',
                   border: 'none',
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-sm)',
@@ -767,8 +737,6 @@ export default function ChatInput({
                   cursor: 'pointer',
                   textAlign: 'left'
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = showCheatsheetSubmenu ? 'var(--color-surface-2)' : 'transparent')}
               >
                 <div className="row-8px">
                   <BookOpen size={13} style={{ color: 'var(--color-primary-soft)' }} />
@@ -777,7 +745,6 @@ export default function ChatInput({
                 <span className="text-nano-faint">({attachedCheatsheets.length})</span>
               </button>
 
-              {/* Submenu for Cheatsheet attachment selection */}
               {showCheatsheetSubmenu && (
                 <div
                   style={{
@@ -831,14 +798,13 @@ export default function ChatInput({
                   }
                   imageInputRef.current?.click()
                 }}
+                className="bg-clear hover-bg-surface-2"
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                  background: 'transparent', border: 'none',
+                  border: 'none',
                   color: visionCapable ? 'var(--color-text-base)' : 'var(--color-text-faint)',
                   borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left'
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 title={visionCapable
                   ? 'Attach an image. You can also paste one directly into the input.'
                   : 'The selected model does not support images. Switch to a vision model (llava, moondream, gpt-4o, gemini…).'}
@@ -875,9 +841,7 @@ export default function ChatInput({
                       key={a.id}
                       onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, a.intent) }}
                       title={a.prompt}
-                      className="menu-row-btn"
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      className="menu-row-btn hover-bg-surface-2"
                     >
                       <Sparkles size={13} style={{ color: a.intent === 'create' ? 'var(--color-secondary)' : 'var(--color-text-muted)' }} />
                       <span className="truncate">{a.label}</span>
@@ -896,9 +860,7 @@ export default function ChatInput({
                   <button
                     key={a.label}
                     onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, 'create') }}
-                    className="menu-row-btn"
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    className="menu-row-btn hover-bg-surface-2"
                   >
                     <Icon size={13} style={{ color: 'var(--color-secondary)' }} />
                     <span>{a.label}</span>
@@ -916,9 +878,7 @@ export default function ChatInput({
                   <button
                     key={a.label}
                     onClick={() => { setShowPlusMenu(false); onTriggerPrompt(a.prompt, a.label, 'analyze') }}
-                    className="menu-row-btn"
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    className="menu-row-btn hover-bg-surface-2"
                   >
                     <Icon size={13} style={{ color: 'var(--color-text-muted)' }} />
                     <span>{a.label}</span>
@@ -929,7 +889,6 @@ export default function ChatInput({
           )}
         </div>
 
-        {/* Email Draft Attachment Pill */}
         {isEmailDraftMode && (
           <div
             style={{
@@ -968,7 +927,6 @@ export default function ChatInput({
           </div>
         )}
 
-        {/* Active Skill Pill */}
         {activeSkill && (
           <div
             style={{
@@ -1007,7 +965,6 @@ export default function ChatInput({
           </div>
         )}
 
-        {/* Hidden image file input */}
         <input
           ref={imageInputRef}
           type="file"
@@ -1021,7 +978,6 @@ export default function ChatInput({
           }}
         />
 
-        {/* Attached Note Pills */}
         {attachedNotes.map(title => (
           <div
             key={`np-${title}`}
@@ -1044,7 +1000,6 @@ export default function ChatInput({
           </div>
         ))}
 
-        {/* Attached Workspace File Pills */}
         {attachedFiles.map(relPath => (
           <div
             key={`fp-${relPath}`}
@@ -1068,7 +1023,6 @@ export default function ChatInput({
           </div>
         ))}
 
-        {/* Attached Image Thumbnails */}
         {attachedImages.map((src, idx) => (
           <div key={`img-${idx}`} style={{ position: 'relative', alignSelf: 'center', flexShrink: 0 }}>
             <img
@@ -1092,7 +1046,6 @@ export default function ChatInput({
           </div>
         ))}
 
-        {/* Attached Cheatsheets Pills */}
         {attachedCheatsheets.map(csName => (
           <div
             key={csName}
@@ -1187,7 +1140,6 @@ export default function ChatInput({
           <Mic size={14} />
         </button>
 
-        {/* Action Button: Send or Stop */}
         {isStreaming ? (
           <button
             onClick={onAbort}

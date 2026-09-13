@@ -11,13 +11,7 @@ import { faultTolerantParseJSON } from '../aiActionParse'
 import { readItems, updateItem } from '../../../data/items'
 import { executedActionSignaturesSet, type UpdateOutcome, executedUpdateOutcomesMap, errorText } from './shared'
 
-// Board edit executor (```json:update_board)
-// Applies move / set_priority / retitle / update_body / archive operations to
-// EXISTING cards. Honest reporting: lists exactly what was applied, what was a
-// no-op, and which targets couldn't be found on the board.
-// The one field that distinguishes two edits of the same op on the same card.
-// Only move/set_priority/retitle carry one; the rest collapse to '', which is
-// what the old `toColumn || priority || newTitle || ''` chain produced.
+// the one field that tells two same-op edits on a card apart; the rest collapse to ''
 function opSignatureValue(o: UpdateOperation): string | number {
   if (o.op === 'move') return o.toColumn
   if (o.op === 'set_priority') return o.priority
@@ -35,10 +29,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
   const parsed = faultTolerantParseJSON(jsonString)
   const normalized = parsed ? normalizeUpdate(parsed) : null
   const operations = normalized?.operations || []
-  // dedupeKey (the message timestamp) scopes idempotency to THIS message:
-  // remounts of the same message replay, but asking for the same edit again
-  // in a NEW message must execute again. Repeating a request is the most
-  // natural user reaction when something didn't work.
+  // scoped to this message: remounts replay, the same ask in a new message runs again
   const signature = operations.length
     ? `update::${activeWorkspace || 'default'}::${dedupeKey || ''}::${operations.map(o => `${o.op}:${o.target}:${opSignatureValue(o)}`).join('|')}`
     : ''
@@ -49,8 +40,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
       try {
         if (operations.length === 0 || !signature) return
         if (executedActionSignaturesSet.has(signature)) {
-          // Already executed (e.g. reloaded saved chat / remount). Replay the
-          // REAL recorded outcome, never a fabricated "all applied" summary.
+          // replay the real recorded outcome, never a made-up "all applied"
           const recorded = executedUpdateOutcomesMap.get(signature)
           if (isMounted) {
             setResult(recorded
@@ -68,17 +58,11 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
             readItems(validContext, 'task').catch(() => []),
             readItems(validContext, 'card').catch(() => [])
           ])
-          // Kept separate on purpose: the Kanban board renders ONLY 'card'
-          // items, so board edits must prefer cards. A Backlog task with the
-          // same title must never shadow the visible card (that "moved"
-          // something invisible and left the board looking untouched).
+          // the board shows only cards, so a same-titled backlog task must never shadow one
           const cardItems = (cardsRes || []).filter(i => i.status !== 'archived')
           const taskItems = (tasksRes || []).filter(i => i.status !== 'archived')
 
-          // Unified board document, read unlocked because this block already
-          // holds the board lock. The legacy key it used to read stopped being
-          // written when configuration was unified, so column moves resolved
-          // against a frozen snapshot of the board.
+          // unified board doc, read unlocked under the held lock; the legacy key was a frozen snapshot
           const { columns: colsList } = await readBoardConfigUnlocked(validContext)
 
           const resolveCol = (nameOrId: string): ColumnConfig | null => {
@@ -96,10 +80,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
             )
           }
 
-          // Exact title match first; fall back to a UNIQUE prefix/containment
-          // match (card title contains the query) so a slightly-shortened title
-          // still resolves. The reverse direction (query contains title) is
-          // deliberately NOT allowed. It let short junk titles hijack edits.
+          // exact match, then a unique containment match; query-contains-title let junk hijack edits
           const findIn = (list: Item[], q: string): Item | undefined => {
             const exact = list.find(i => i.title.trim().toLowerCase() === q)
             if (exact) return exact
@@ -107,15 +88,13 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
             const loose = list.filter(i => i.title.trim().toLowerCase().includes(q))
             return loose.length === 1 ? loose[0] : undefined
           }
-          // Cards always win over tasks; moves are card-only (tasks aren't on the board).
+          // cards win, moves are card-only
           const findCard = (title: string, cardsOnly: boolean): Item | undefined => {
             const q = title.trim().toLowerCase()
             return findIn(cardItems, q) ?? (cardsOnly ? undefined : findIn(taskItems, q))
           }
 
-          // Small models sometimes put the COLUMN in "target" ("move In Review
-          // to in_review"). Catch that explicitly so the report tells the truth
-          // instead of hijacking whatever loosely matches.
+          // small models put the column in target, catch it so the report stays honest
           const isColumnName = (title: string): boolean => {
             const q = title.trim().toLowerCase()
             return colsList.some(c => c.id.toLowerCase() === q || c.name.toLowerCase() === q)
@@ -140,15 +119,13 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
               }
               continue
             }
-            // Even with a loose match: never edit a card when the stated target
-            // is actually a column name. That's a confused instruction.
+            // never edit a card when the target is really a column name
             if (isColumnName(op.target) && item.title.trim().toLowerCase() !== op.target.trim().toLowerCase()) {
               notFound.push(`"${op.target}" is a column, not a card: specify which card to ${op.op === 'move' ? 'move' : 'edit'}`)
               continue
             }
 
-            // One failing operation must never abort the rest of the batch.
-            // Report it honestly and keep going.
+            // one failing op mustn't abort the batch
             try {
               if (op.op === 'move') {
                 const col = resolveCol(op.toColumn || '')
@@ -188,7 +165,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
                 await updateItem(item.id, { status: 'archived' })
                 inverse.push({ id: item.id, patch: { status: item.status } })
                 applied.push(`Archived "${item.title}"`)
-                // Remove from whichever list holds it so later ops can't target it
+                // drop it so later ops can't target it
                 for (const list of [cardItems, taskItems]) {
                   const idx = list.indexOf(item)
                   if (idx >= 0) list.splice(idx, 1)
@@ -205,16 +182,14 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
           return { applied, notFound, failed, noops, inverse }
         })
 
-        // Record the truth for future remounts BEFORE any state updates.
-        // A replay must show what actually happened, not what was requested.
+        // record the outcome before any state update
         executedUpdateOutcomesMap.set(signature, outcome)
 
         window.dispatchEvent(new CustomEvent('kanban-refresh'))
         window.dispatchEvent(new CustomEvent('item-updated'))
         if (isMounted) setResult(outcome)
       } catch (err) {
-        // A crashed run must not fake "previously applied" on remount.
-        // Release the signature so a retry (or remount) re-executes honestly.
+        // a crashed run releases its signature so a retry really runs
         executedActionSignaturesSet.delete(signature)
         if (isMounted) setError(errorText(err))
       }
@@ -224,7 +199,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jsonString, activeWorkspace, signature])
 
-  // One-click rollback: replay the recorded inverse patches in reverse order.
+  // replay inverse patches in reverse
   const handleUndo = async () => {
     if (!result?.inverse?.length || undoing || result.undone) return
     setUndoing(true)

@@ -1,5 +1,3 @@
-/** The bridge's `tray` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.tray
 
 export const action = (...args: Parameters<Bridge['action']>): ReturnType<Bridge['action']> =>

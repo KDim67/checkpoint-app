@@ -10,7 +10,7 @@ import Logo from '../ui/Logo'
 import PathRow from './PathRow'
 import * as appApi from '../../data/app'
 
-/** The tone of the status line, so a failure does not read like good news. */
+/** so a failure doesn't read like good news */
 const UPDATE_TONE: Record<UpdateCheckResult['status'], string> = {
   unsupported: 'var(--color-text-faint)',
   current:     'var(--color-text-muted)',
@@ -65,7 +65,7 @@ export default function AboutPanel() {
 
   const [checking, setChecking] = useState(false)
   const [update, setUpdate] = useState<UpdateCheckResult | null>(null)
-  /** The same download the titlebar indicator is showing, read from one place. */
+  /** same source as the titlebar indicator */
   const progress = useUpdateProgress()
 
   const checkForUpdates = useCallback(async () => {
@@ -74,8 +74,7 @@ export default function AboutPanel() {
     try {
       setUpdate(await appApi.checkForUpdates())
     } catch (err) {
-      // The handler answers with a result rather than throwing, so reaching
-      // here means the channel itself failed.
+      // the handler returns results, so this means the channel itself failed
       setUpdate({ status: 'error', message: errorMessage(err, 'The check could not run.') })
     } finally {
       setChecking(false)
@@ -91,7 +90,6 @@ export default function AboutPanel() {
 
   return (
     <div className="col-xl">
-      {/* Brand header */}
       <div className="row-lg">
         <Logo size={48} />
         <div>
@@ -106,9 +104,7 @@ export default function AboutPanel() {
 
       <Divider />
 
-      {/* Replay of the first-run panel. Lives here rather than in Appearance
-          because this is where someone looks when they want to know what the
-          app is, which is the same question the panel answers. */}
+      {/* first-run replay lives here, where people ask what the app is */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
         <div>
           <div className="text-item">
@@ -130,7 +126,6 @@ export default function AboutPanel() {
 
       <Divider />
 
-      {/* Version table */}
       <div className="col">
         {versions.map(v => (
           <div
@@ -156,7 +151,6 @@ export default function AboutPanel() {
         ))}
       </div>
 
-      {/* Database path */}
       <div>
         <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
           Database Location
@@ -168,7 +162,6 @@ export default function AboutPanel() {
 
       <Divider />
 
-      {/* Actions */}
       <div>
         <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
           <button
@@ -190,8 +183,7 @@ export default function AboutPanel() {
           </button>
         </div>
 
-        {/* The live line below says the same thing with a number attached, so
-            only one of the two is shown. */}
+        {/* the live line below already says it with a number */}
         {update && !(update.status === 'available' && progress) && (
           <div
             role="status"
@@ -206,9 +198,7 @@ export default function AboutPanel() {
           </div>
         )}
 
-        {/* The background download in full, with the size and the time left.
-            The titlebar indicator says the same thing in two words; this is
-            where the rest of it goes. */}
+        {/* full download detail, the titlebar says it in two words */}
         {progress && (
           <div
             role="status"
@@ -242,7 +232,6 @@ export default function AboutPanel() {
         )}
       </div>
 
-      {/* License notice */}
       <div style={{
         fontSize: '11px',
         color: 'var(--color-text-faint)',

@@ -18,9 +18,7 @@ import {
 } from '../src/main/recurrenceService'
 import { defined } from './helpers/defined'
 
-// The invariant under test is the one the whole design rests on: at most one
-// unfinished instance per rule. Get it wrong and a daily task left alone for a
-// month produces thirty cards.
+// at most one open instance per rule, or a month-old daily makes thirty cards
 
 let dir: string
 
@@ -60,7 +58,7 @@ describe('createRecurrence', () => {
   })
 
   it('does not backfill a rule that started long ago', () => {
-    // A rule anchored a year back should be due once, not 365 times.
+    // a year-old rule is due once, not 365 times
     const row = daily(Date.now() - 365 * DAY)
     expect(defined(row).next_due).toBeGreaterThan(Date.now() - DAY)
   })
@@ -87,7 +85,7 @@ describe('materialising', () => {
     materialiseDueRecurrences()
     expect(tasks()).toHaveLength(1)
 
-    // Ten more sweeps, ten days overdue: still one card.
+    // ten more sweeps, still one card
     for (let i = 0; i < 10; i++) materialiseDueRecurrences(Date.now() + i * DAY)
     expect(tasks()).toHaveLength(1)
   })
@@ -141,8 +139,7 @@ describe('materialising', () => {
 
 describe('completing an instance', () => {
   it('creates nothing when the next occurrence is not due yet', () => {
-    // Wired the way index.ts wires it. Finishing today's task on time must not
-    // immediately produce tomorrow's. It would sit on the board a day early.
+    // wired like index.ts; on-time completion mustn't spawn tomorrow's early
     setRecurrenceInstanceClosedHandler(onInstanceClosed)
 
     daily(Date.now() - 2 * DAY)
@@ -157,8 +154,7 @@ describe('completing an instance', () => {
     materialiseDueRecurrences()
     const open = tasks()[0]
 
-    // Sweeps while the instance sits open must skip it AND leave next_due alone,
-    // which is what makes the rule overdue by the time it is finally completed.
+    // sweeps skip the open instance and leave next_due, so it's overdue at completion
     const dueBefore = defined(getRecurrenceById(defined(row).id)).next_due
     materialiseDueRecurrences(Date.now() + 3 * DAY)
     expect(defined(getRecurrenceById(defined(row).id)).next_due).toBe(dueBefore)
@@ -191,7 +187,7 @@ describe('completing an instance', () => {
     updateItem(getDb(), first.id, { status: 'done' })
     const afterFirst = tasks().length
 
-    // Editing an already-done item must not spawn another occurrence.
+    // editing a done item mustn't spawn another
     updateItem(getDb(), first.id, { title: 'Water the plants (edited)' })
     updateItem(getDb(), first.id, { status: 'done' })
     expect(tasks()).toHaveLength(afterFirst)

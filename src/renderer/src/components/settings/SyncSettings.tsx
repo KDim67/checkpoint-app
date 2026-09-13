@@ -19,7 +19,6 @@ interface Peer {
 export default function SyncSettings() {
   const { toast } = useToast()
   
-  // Settings States
   const [syncEnabled, setSyncEnabled] = useState(false)
   const [hostStatus, setHostStatus] = useState({
     active: false,
@@ -30,13 +29,11 @@ export default function SyncSettings() {
   })
   const [discoveredPeers, setDiscoveredPeers] = useState<Peer[]>([])
   
-  // Manual Connect Inputs
   const [manualIp, setManualIp] = useState('')
   const [manualPort, setManualPort] = useState(String(SYNC_TCP_PORT))
   const [manualCode, setManualCode] = useState('')
   const [isManualSyncing, setIsManualSyncing] = useState(false)
 
-  // WebRTC States
   const [webrtcCode, setWebrtcCode] = useState('')
   const [webrtcInputCode, setWebrtcInputCode] = useState('')
   const [webrtcProgress, setWebrtcProgress] = useState('')
@@ -50,7 +47,6 @@ export default function SyncSettings() {
     filesSynced: number
   } | null>(null)
 
-  // Console Logs
   const [logs, setLogs] = useState<string[]>([])
   const [peerToPair, setPeerToPair] = useState<Peer | null>(null)
   const [passcodeVal, setPasscodeVal] = useState('')
@@ -80,7 +76,6 @@ export default function SyncSettings() {
     loadSetting()
   }, [])
 
-  // Poll status & discovered peers
   useEffect(() => {
     let interval: NodeJS.Timeout
     if (syncEnabled) {
@@ -100,7 +95,6 @@ export default function SyncSettings() {
     return () => clearInterval(interval)
   }, [syncEnabled])
 
-  // Master Switch Toggle
   const handleToggleSync = async (checked: boolean) => {
     try {
       setSyncEnabled(checked)
@@ -123,7 +117,6 @@ export default function SyncSettings() {
     }
   }
 
-  // LAN Client Connection Trigger
   const handleManualLANConnect = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!manualIp || !manualCode) {
@@ -153,7 +146,6 @@ export default function SyncSettings() {
     }
   }
 
-  // Peer-list Connection Trigger
   const handlePeerSync = (peer: Peer) => {
     setPasscodeVal('')
     setPeerToPair(peer)
@@ -177,7 +169,7 @@ export default function SyncSettings() {
     }
   }
 
-  // WebRTC Internet Host: Wait for peer
+  // WebRTC host: wait for a peer
   const handleStartWebRTCHost = async () => {
     if (!hostStatus.pairingCode) {
       toast('Please enable Sync Engine first')
@@ -212,7 +204,7 @@ export default function SyncSettings() {
     webrtcCoordinator.current.start()
   }
 
-  // WebRTC Internet Client: Connect to Host
+  // WebRTC client: connect to the host
   const handleStartWebRTCClient = () => {
     if (!webrtcInputCode || webrtcInputCode.length !== 6) {
       toast('Please enter a valid 6-digit passcode')
@@ -438,10 +430,10 @@ export default function SyncSettings() {
               <button
                 type="submit"
                 disabled={isManualSyncing}
+                className="border-offset hover-border-accent"
                 style={{
                   background: 'var(--color-surface-offset)',
                   color: 'var(--color-text-base)',
-                  border: '1px solid var(--color-surface-offset)',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-semibold)',
                   padding: '8px',
@@ -453,8 +445,6 @@ export default function SyncSettings() {
                   gap: 'var(--space-2)',
                   transition: 'all var(--duration-fast)'
                 }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-secondary)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-surface-offset)'}
               >
                 {isManualSyncing ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                 Connect & Sync
@@ -531,17 +521,15 @@ export default function SyncSettings() {
                     />
                     <button
                       onClick={handleStartWebRTCClient}
+                      className="border-offset hover-border-accent"
                       style={{
                         background: 'var(--color-surface-offset)',
                         color: 'var(--color-text-base)',
-                        border: '1px solid var(--color-surface-offset)',
                         fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-semibold)',
                         borderRadius: 'var(--radius-sm)',
                         cursor: 'pointer'
                       }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-secondary)'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--color-surface-offset)'}
                     >
                       Connect
                     </button>

@@ -5,7 +5,7 @@ import { shorten } from '../../../shared/mcpActivity'
 import type { CreateItemPayload, Item } from '../../../shared/types'
 import { context, json, notifyRenderer, PRIORITY_SCALE, readBoardConfig, summarizeItem, text, z } from '../toolKit'
 
-/** Logs, cards and tasks: finding them, making them and changing them. */
+/** logs, cards and tasks: find, create, change */
 export function registerItemTools(mcp: McpServer): void {
   mcp.registerTool(
     'search_items',
@@ -44,9 +44,7 @@ export function registerItemTools(mcp: McpServer): void {
           .array(z.number().int())
           .optional()
           .describe(`Priority levels to include. ${PRIORITY_SCALE}`),
-        // An enum rather than a free string: an unrecognised field used to fall
-        // back to created_at silently, so a client got results that looked
-        // sorted and were not.
+        // enum: unknown fields used to fall back to created_at and only look sorted
         sortBy: z
           .enum(['status', 'priority', 'title', 'created_at', 'due_at', 'relations_count'])
           .optional()
@@ -86,8 +84,7 @@ export function registerItemTools(mcp: McpServer): void {
         context: ctx,
         title,
         body: body ?? '',
-        // A card with a status no column owns is invisible on the board, so an
-        // unspecified or unknown status resolves to the first real column.
+        // a status no column owns hides the card, so fall back to the first real column
         status: status && config.columns.some(c => c.id === status)
           ? status
           : type === 'card' ? config.columns[0].id : 'open',
@@ -129,8 +126,7 @@ export function registerItemTools(mcp: McpServer): void {
       const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))
       if (Object.keys(clean).length === 0) return text('Nothing to update.')
 
-      // Captured before the write: afterwards the old values are gone, and only
-      // the fields actually being changed are worth restoring.
+      // captured before the write, only changed fields are worth restoring
       const before = getItemById(id)
       const restored: Record<string, unknown> = {}
       if (before) {
@@ -161,9 +157,7 @@ export function registerItemTools(mcp: McpServer): void {
     },
     async ({ id }) => {
       if (!getItemById(id)) return text(`No item with id "${id}".`)
-      // Archiving rather than deleting is deliberate: an agent acting on a
-      // misread instruction should not be able to destroy work irreversibly,
-      // and the app already treats 'archived' as its recoverable state.
+      // archive not delete, a misread instruction shouldn't destroy work
       const before = getItemById(id)
       updateItem(getDb(), id, { status: 'archived' })
       recordMcpActivity(

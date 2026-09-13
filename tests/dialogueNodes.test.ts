@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { normalizeDialogueNodes } from '../src/renderer/src/components/gamedev/types'
 
-// The dialogue editor is loaded straight from a model's reply, so what it is
-// handed decides whether the editor opens or throws.
+// loaded straight from a model reply, it decides open or throw
 
 let counter = 0
 const makeId = (): string => `generated_${counter++}`
@@ -18,8 +17,7 @@ describe('a dialogue tree the model returned', () => {
   })
 
   it('accepts target as well as nextId', () => {
-    // Both names have been asked for by prompts in this app, and replies still
-    // come back either way.
+    // both names have been asked for
     const [node] = normalizeDialogueNodes([
       { id: 'n', speaker: 's', text: 't', choices: [{ text: 'go', target: 'elsewhere' }] }
     ], makeId)
@@ -27,7 +25,7 @@ describe('a dialogue tree the model returned', () => {
   })
 
   it('invents an id when the model forgot one', () => {
-    // The editor keys off the id, so two blanks would collide into one node.
+    // two blank ids would collide
     const nodes = normalizeDialogueNodes([
       { speaker: 'a', text: 'one' },
       { speaker: 'b', text: 'two' }

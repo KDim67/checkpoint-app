@@ -11,12 +11,12 @@ describe('errorMessage', () => {
   })
 
   it('reads a message off a plain object', () => {
-    // IPC and fetch failures often arrive shaped like an Error without being one.
+    // Error-shaped objects from IPC and fetch
     expect(errorMessage({ message: 'Connection refused' })).toBe('Connection refused')
   })
 
   it('does not show the user "[object Object]"', () => {
-    // The old `err.message || String(err)` idiom did exactly that.
+    // what err.message || String(err) did
     expect(errorMessage({})).toBe('Something went wrong.')
     expect(errorMessage({ code: 42 })).toBe('Something went wrong.')
   })
@@ -43,9 +43,7 @@ describe('errorMessage', () => {
   })
 })
 
-// This is the shape a WebRTC failure arrives in: an Event, not an Error, with
-// the text one level down. Read as-is it came out as the fallback, and a dead
-// sharing session reported nothing about why it died.
+// WebRTC failures arrive as an Event with the text one level down
 describe('errorMessage, an event carrying an error', () => {
   it('reads the error hanging off an event', () => {
     expect(errorMessage({ type: 'error', error: new Error('sctp-failure') })).toBe('sctp-failure')

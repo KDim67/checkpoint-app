@@ -1,11 +1,4 @@
-/**
- * Free-text entry for a model the catalogue does not list.
- *
- * Lifted out of AiStreamPanel with its JSX unchanged, down to the indentation.
- * State lives in useModelConfig and arrives as one `models` prop: nothing here
- * owns anything, which is what makes it safe for this to unmount every time it
- * closes.
- */
+/** for models the catalogue doesn't list; state lives in useModelConfig */
 
 import type { ModelConfig } from './useModelConfig'
 

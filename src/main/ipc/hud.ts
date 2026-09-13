@@ -1,4 +1,4 @@
-/** The quick-capture overlay. */
+/** quick-capture overlay */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'

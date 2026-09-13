@@ -16,10 +16,8 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
         </div>
 
         <div className="tool-layout">
-          {/* Left Configuration Column */}
           <SettingsColumn title="Slicing Settings">
 
-            {/* File input button */}
             <div className="col-6px">
               <span className="text-label-sm">
                 Sprite Sheet Image
@@ -31,7 +29,6 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
               />
             </div>
 
-            {/* Slicing mode selector */}
             <div className="col-6px">
               <span className="text-label-sm">
                 Slicing Mode
@@ -70,7 +67,6 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
               </div>
             </div>
 
-            {/* Grid Slicing inputs */}
             {tool.sliceMode === 'grid' && (
               <div className="col-md">
                 <div className="col-4px">
@@ -111,9 +107,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
             )}
           </SettingsColumn>
 
-          {/* Right Canvas Column */}
           <div className="col-lg-min">
-            {/* Meta header */}
             <div className="panel-row">
               <div className="col-2px">
                 <span className="text-caption">Slicer Status:</span>
@@ -129,7 +123,6 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
               </div>
             </div>
 
-            {/* Preview Canvas Area */}
             <div className="preview-area">
               {!tool.slicerUrl ? (
                 <NoImageLoaded
@@ -147,7 +140,6 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
               )}
             </div>
 
-            {/* Sliced Export Trigger */}
             {tool.slicerPath && tool.slicedFrames.length > 0 && (
               <div className="panel">
                 <div className="row-between">

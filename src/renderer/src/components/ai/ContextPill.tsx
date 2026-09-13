@@ -54,7 +54,6 @@ export default function ContextPill({ item, onClear }: ContextPillProps) {
         boxSizing: 'border-box'
       }}
     >
-      {/* Type Badge */}
       <span
         style={{
           display: 'inline-flex',
@@ -75,7 +74,6 @@ export default function ContextPill({ item, onClear }: ContextPillProps) {
         <span>{styles.label}</span>
       </span>
 
-      {/* Truncated Item Title */}
       <span
         style={{
           fontSize: 'var(--text-xs)',
@@ -90,21 +88,18 @@ export default function ContextPill({ item, onClear }: ContextPillProps) {
         {item.title || 'Untitled'}
       </span>
 
-      {/* Clear Button */}
       <button
         onClick={onClear}
+        className="text-muted hover-text-base"
         style={{
           background: 'transparent',
           border: 'none',
-          color: 'var(--color-text-muted)',
           cursor: 'pointer',
           padding: '2px',
           display: 'flex',
           alignItems: 'center',
           flexShrink: 0
         }}
-        onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-base)')}
-        onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
         title="Remove context item"
       >
         <X size={13} />

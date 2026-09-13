@@ -16,7 +16,7 @@ const policy = (over: Partial<NotificationPolicy> = {}): NotificationPolicy => (
   ...over
 })
 
-/** A timestamp at a given local hour, so quiet-hour tests read plainly. */
+/** a local hour, so quiet-hour tests read plainly */
 const atHour = (h: number) => new Date(2026, 0, 15, h, 30).getTime()
 
 describe('normalizePolicy', () => {
@@ -59,7 +59,7 @@ describe('isQuietHour', () => {
   })
 
   it('handles a window that wraps midnight', () => {
-    // The case a naive from <= h < to gets exactly backwards.
+    // the case from <= h < to gets backwards
     const p = policy({ quietEnabled: true, quietFrom: 22, quietTo: 8 })
     expect(isQuietHour(p, 23)).toBe(true)
     expect(isQuietHour(p, 3)).toBe(true)
@@ -108,8 +108,7 @@ describe('shouldNotify', () => {
 
   describe('dedupe', () => {
     it('suppresses a repeat inside the window', () => {
-      // The reason this layer exists: an hourly sweep must not re-announce the
-      // same overdue task every pass.
+      // an hourly sweep mustn't re-announce
       const seen = new Map<string, DedupeEntry>([['item:1', { at: atHour(9) }]])
       const decision = shouldNotify(policy(), 'due', atHour(10), {
         dedupeKey: 'item:1',
@@ -140,14 +139,14 @@ describe('shouldNotify', () => {
     })
 
     it('is skipped entirely when no key is given', () => {
-      // Two focus intervals ending really are two things to say.
+      // two intervals are two things
       const seen = new Map<string, DedupeEntry>([['item:1', { at: atHour(12) }]])
       expect(shouldNotify(policy(), 'focus', atHour(12), { seen }).allow).toBe(true)
     })
   })
 
   it('reports the strongest reason first', () => {
-    // Disabled outranks everything: the user turned it all off.
+    // disabled outranks everything
     const p = policy({ enabled: false, quietEnabled: true, quietFrom: 0, quietTo: 23 })
     expect(shouldNotify(p, 'due', atHour(12)).reason).toBe('disabled')
   })
@@ -173,8 +172,7 @@ describe('the shipped categories', () => {
   })
 
   it('leaves the noisy ones off by default', () => {
-    // Agent and recurrence writes can arrive in bursts; opting in is the right
-    // default for anything that can fire ten times in a row.
+    // bursty sources default to opted out
     expect(DEFAULT_POLICY.categories.agent).toBe(false)
     expect(DEFAULT_POLICY.categories.recurrence).toBe(false)
   })

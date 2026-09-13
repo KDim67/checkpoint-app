@@ -1,11 +1,4 @@
-/**
- * The inline settings drawer: temperature, response length and a per-session
- * system-prompt override.
- *
- * Lifted out of AiStreamPanel with its JSX unchanged, down to the indentation.
- * State stays in the panel and arrives as props: nothing here owns anything,
- * which is what makes it safe for this to unmount every time it closes.
- */
+/** temperature, length and a per-session system prompt; state stays in the panel */
 
 import React from 'react'
 import { setNumberSetting } from '../../lib/settings'
@@ -38,7 +31,6 @@ export default function SettingsPanel({
           flexShrink: 0
         }}>
           <div className="col">
-            {/* Temperature Slider */}
             <div className="col-4px">
               <div className="row-between">
                 <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -63,7 +55,6 @@ export default function SettingsPanel({
               />
             </div>
 
-            {/* Max Tokens Slider */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
               <div className="row-between">
                 <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

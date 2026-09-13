@@ -12,16 +12,13 @@ export function applyBoardBaselineTx(
 ): void {
   const db = getDb()
   db.transaction(() => {
-    // 1. Delete all items in context of type 'card' or 'task'
     db.prepare("DELETE FROM items WHERE context = ? AND type IN ('card', 'task')").run(context)
 
-    // 2. Insert tags
     const stmtTag = db.prepare('INSERT OR IGNORE INTO tags (id, name, color) VALUES (?, ?, ?)')
     for (const t of tags) {
       stmtTag.run(t.id, t.name, t.color)
     }
 
-    // 3. Insert items
     const stmtItem = db.prepare(`
       INSERT OR REPLACE INTO items (id, type, context, title, body, status, priority, position, created_at, updated_at, due_at, metadata)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -43,13 +40,11 @@ export function applyBoardBaselineTx(
       )
     }
 
-    // 4. Insert item_tags
     const stmtItemTag = db.prepare('INSERT OR REPLACE INTO item_tags (item_id, tag_id) VALUES (?, ?)')
     for (const it of itemTags) {
       stmtItemTag.run(it.item_id, it.tag_id)
     }
 
-    // 5. Insert relations
     const stmtRelation = db.prepare('INSERT OR REPLACE INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)')
     for (const r of relations) {
       stmtRelation.run(r.id, r.from_id, r.to_id, r.type)
@@ -112,9 +107,7 @@ export function applyRemoteMutationTx(mutation: RemoteMutation): void {
     const { id } = mutation
     db.prepare('DELETE FROM relations WHERE id = ?').run(id)
   } else if (type === 'bulkUpdateItems') {
-    // Built from whichever fields the patch actually carries, matching the
-    // local handler for the same payload. A fixed SET clause would write nulls
-    // over the fields the user did not touch.
+    // SET from the fields the patch carries, a fixed clause would null untouched fields
     const { ids, patch } = mutation.payload
     const setFields: string[] = []
     const params: Record<string, unknown> = { updated_at: Date.now() }

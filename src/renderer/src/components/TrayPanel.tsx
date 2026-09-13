@@ -17,18 +17,10 @@ interface Summary {
   open: number
 }
 
-// The tray panel omits "Show tray icon": switching it off from here would
-// destroy the window the switch is drawn in. It lives in Settings instead.
+// no "Show tray icon" here, turning it off would destroy this window
 const TRAY_PANEL_OPTIONS = STARTUP_OPTIONS.filter(o => o.key !== 'showTrayIcon')
 
-/**
- * The tray popup.
- *
- * A themed window rather than a native menu, so it can carry live counts and
- * real controls. It measures itself and asks main to resize: the content grows
- * with the user's font-size setting, and a fixed height clipped the Quit button
- * at anything above the default.
- */
+/** themed window, not a native menu; measures itself since font size grows it and a fixed height clipped Quit */
 export default function TrayPanel(): React.JSX.Element {
   const [summary, setSummary] = useState<Summary>({ context: '', overdue: 0, dueToday: 0, open: 0 })
   const [startup, setStartup] = useState<StartupSettings>(DEFAULT_STARTUP_SETTINGS)
@@ -55,11 +47,9 @@ export default function TrayPanel(): React.JSX.Element {
     const stopWatching = watchTheme()
     load()
 
-    // The window is reused between openings, so a mount-only read would be stale
-    // the second time it is shown.
+    // the window is reused, a mount-only read goes stale
     window.addEventListener('focus', load)
-    // Counts move while the panel is open. A card completed in the main window,
-    // or an agent writing over MCP, and the switches are also shown in Settings.
+    // counts move while open: main window edits, MCP writes, Settings switches
     const stopData = mcpApi.onDataChanged(load)
     const stopStartup = trayApi.onStartupChanged(setStartup)
 
@@ -71,7 +61,7 @@ export default function TrayPanel(): React.JSX.Element {
     }
   }, [load])
 
-  // Measured after paint so the height accounts for the real fonts.
+  // after paint so the real fonts count
   useLayoutEffect(() => {
     if (!ready || !rootRef.current) return
     const height = Math.ceil(rootRef.current.getBoundingClientRect().height)
@@ -83,8 +73,7 @@ export default function TrayPanel(): React.JSX.Element {
   const toggle = async (key: keyof StartupSettings): Promise<void> => {
     const next = { ...startup, [key]: !startup[key] }
     setStartup(next)
-    // Main reconciles (turning the tray icon off forces the other two off), so
-    // its answer is authoritative, not the optimistic value above.
+    // main reconciles (no tray icon forces the others off), trust its answer
     setStartup(await trayApi.setStartup(next))
   }
 
@@ -94,7 +83,6 @@ export default function TrayPanel(): React.JSX.Element {
     gap: 'var(--space-2-5)',
     width: '100%',
     padding: 'var(--space-2) var(--space-2-5)',
-    background: 'transparent',
     border: 'none',
     borderRadius: 'var(--radius-md)',
     color: 'var(--color-text-base)',
@@ -103,10 +91,6 @@ export default function TrayPanel(): React.JSX.Element {
     cursor: 'pointer',
     textAlign: 'left',
     transition: 'background 100ms ease'
-  }
-
-  const hover = (enter: boolean) => (e: React.MouseEvent<HTMLElement>) => {
-    e.currentTarget.style.background = enter ? 'var(--color-surface-2)' : 'transparent'
   }
 
   const Stat = ({ value, label, warn }: { value: number; label: string; warn?: boolean }) => {
@@ -184,11 +168,11 @@ export default function TrayPanel(): React.JSX.Element {
       </div>
 
       <div style={{ padding: '0 var(--space-2)', display: 'flex', flexDirection: 'column' }}>
-        <button style={actionRow} onMouseEnter={hover(true)} onMouseLeave={hover(false)} onClick={() => act('open')}>
+        <button className="bg-clear hover-bg-surface-2" style={actionRow} onClick={() => act('open')}>
           <LayoutGrid size={14} className="icon-muted" />
           Open Checkpoint
         </button>
-        <button style={actionRow} onMouseEnter={hover(true)} onMouseLeave={hover(false)} onClick={() => act('capture')}>
+        <button className="bg-clear hover-bg-surface-2" style={actionRow} onClick={() => act('capture')}>
           <Zap size={14} className="icon-muted" />
           Quick capture
         </button>
@@ -206,8 +190,7 @@ export default function TrayPanel(): React.JSX.Element {
         </span>
 
         {TRAY_PANEL_OPTIONS.map(({ key, label, hint, needsTray }) => {
-          // Without a tray icon these would strand the window, so main refuses
-          // them and the control says so rather than appearing to work.
+          // these would strand the window without a tray icon, main refuses them
           const disabled = needsTray && !startup.showTrayIcon
           return (
             <div
@@ -234,9 +217,8 @@ export default function TrayPanel(): React.JSX.Element {
 
       <div style={{ padding: 'var(--space-2-5) var(--space-2) var(--space-2)' }}>
         <button
+          className="bg-clear hover-bg-error-muted"
           style={{ ...actionRow, color: 'var(--color-error)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-error-muted)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           onClick={() => act('quit')}
         >
           <Power size={14} className="no-shrink" />

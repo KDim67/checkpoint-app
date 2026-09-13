@@ -31,7 +31,7 @@ describe('describeCardChanges', () => {
   })
 
   it('names the column rather than printing its id', () => {
-    // "moved to in_review" is not what anybody calls that column.
+    // nobody calls it in_review
     expect(describeCardChanges(snap(), snap({ status: 'done' }), columnName))
       .toEqual(['Moved to Done'])
   })
@@ -93,8 +93,7 @@ describe('describeCardChanges', () => {
   })
 
   it('ignores the half of metadata that saves as it happens', () => {
-    // Comments, checklist items and attachments log themselves at the moment
-    // they are written, so counting them here would record each one twice.
+    // those log themselves when written, counting here doubles them
     const after = snap({ metadata: '{"comments":[{"id":"c1"}],"checklist":[{"id":"k1"}]}' })
     expect(describeCardChanges(snap(), after, columnName)).toEqual([])
   })
@@ -137,7 +136,7 @@ describe('appendCardChanges', () => {
   })
 
   it('gives every entry from one save a distinct id', () => {
-    // They share a millisecond, so the timestamp alone is not unique.
+    // same millisecond, timestamps aren't unique
     const next = appendCardChanges([], ['a', 'b', 'c'], 'Dimitris', now)
     expect(new Set(next.map(c => c.id)).size).toBe(3)
   })
@@ -170,9 +169,7 @@ describe('readCardHistory', () => {
   })
 
   it('keeps everything it can parse, so opening a card destroys nothing', () => {
-    // It used to trim here, and the next comment wrote the trimmed list back:
-    // opening a card built before the cap and then touching anything lost the
-    // rest of its history.
+    // trimming on read got written back and lost history
     const raw = Array.from({ length: 20 }, (_, i) => ({ id: `e${i}`, at: i, by: '', what: `c${i}` }))
     expect(readCardHistory(raw)).toHaveLength(20)
   })
@@ -185,8 +182,7 @@ describe('readCardHistory', () => {
   })
 
   it('reads entries written before this feature existed', () => {
-    // Older cards store { text, createdAt } and no author. Throwing that away
-    // on first open would lose history the user can still see today.
+    // older cards store { text, createdAt }, don't lose them
     const [entry] = readCardHistory([{ id: 'act-1', text: 'Added a comment', createdAt: 1234 }])
     expect(entry.what).toBe('Added a comment')
     expect(entry.at).toBe(1234)
@@ -232,16 +228,14 @@ describe('resolveAuthor', () => {
   })
 
   it('falls back to the account name when the field was left alone', () => {
-    // Two people sharing a board and both credited to "Someone" is as useless
-    // as no attribution at all.
+    // everyone as "Someone" is no attribution
     expect(resolveAuthor('', 'dimit')).toBe('dimit')
     expect(resolveAuthor('   ', 'dimit')).toBe('dimit')
     expect(resolveAuthor(null, 'dimit')).toBe('dimit')
   })
 
   it('is empty when there is no name anywhere', () => {
-    // A locked-down account with no passwd entry. An entry with no author
-    // still reads as a sentence, so this is not worth inventing a name for.
+    // no passwd entry; an authorless entry still reads fine
     expect(resolveAuthor('', '')).toBe('')
     expect(resolveAuthor(null, undefined)).toBe('')
   })

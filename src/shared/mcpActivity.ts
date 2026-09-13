@@ -1,16 +1,6 @@
-/**
- * What an external agent did through the MCP server. Without this, cards just
- * appeared on a board with nothing to say where they came from.
- *
- * An entry is one tool call, a sentence describing it, and where the change can
- * be reversed, the actions that put it back.
- *
- * Undo is stored rather than reconstructed later: the state needed to reverse a
- * call only exists at the moment of the call. Deriving it afterwards would be
- * guessing at what used to be true.
- */
+/** one entry per tool call; undo stored at call time since that state is gone later */
 
-/** A single reversing step. An entry's undo is an ordered list of these. */
+/** one reversing step, an entry holds an ordered list */
 export type McpUndoAction =
   | { kind: 'delete_item'; id: string }
   | { kind: 'restore_item'; id: string; fields: Record<string, unknown> }
@@ -22,37 +12,27 @@ export type McpUndoAction =
   | { kind: 'delete_recurrence'; id: string }
   | { kind: 'delete_subtask'; id: string }
   | { kind: 'set_subtask_done'; id: string; done: boolean }
-  /**
-   * Takes one item back off a wall. The wall is named by its storage key rather
-   * than by workspace-and-id, because that key is what actually locates the
-   * document, and it stays correct even if the wall is renamed afterwards.
-   */
+  /** by storage key, which survives wall renames */
   | { kind: 'remove_wall_item'; key: string; itemId: string }
 
 export interface McpActivityEntry {
   id: string
-  /** The MCP tool that ran, e.g. `create_item`. */
+  /** e.g. create_item */
   tool: string
-  /** Workspace the change landed in, or null for tools that are not scoped. */
+  /** null for unscoped tools */
   context: string | null
-  /** One sentence, already written for a human: "Created card X in Y". */
+  /** already human-readable */
   summary: string
-  /** Ordered reversing steps, or null when the call cannot be undone. */
+  /** null when it can't be undone */
   undo: McpUndoAction[] | null
-  /** When this entry was reversed, or null while it still stands. */
+  /** null while it stands */
   undoneAt: number | null
   createdAt: number
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
-/**
- * Narrows one stored action, or returns null if it is not one we can run.
- *
- * These rows are replayed against the database, so an unrecognised or
- * half-formed action must be dropped rather than attempted. A `delete_item`
- * with no id would otherwise reach the delete path with an empty string.
- */
+/** replayed against the db, so unknown or half-formed actions are dropped */
 export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
@@ -70,7 +50,7 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
     case 'delete_note':
       return str(o.title) ? { kind: 'delete_note', title: str(o.title) } : null
     case 'write_note':
-      // An empty body is a legitimate note, so only the title is required.
+      // an empty body is a legit note
       return str(o.title)
         ? { kind: 'write_note', title: str(o.title), content: str(o.content) }
         : null
@@ -95,14 +75,7 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
   }
 }
 
-/**
- * Parses a stored undo payload.
- *
- * Returns null when nothing usable survives, which the UI reads as "this one
- * cannot be undone". Better than offering a button that would half-work. A
- * partially valid list is also rejected: running some of the steps would leave
- * the workspace in a state neither before nor after the original call.
- */
+/** partial lists rejected, running some steps leaves neither state */
 export function normalizeUndo(raw: unknown): McpUndoAction[] | null {
   let parsed: unknown = raw
   if (typeof raw === 'string') {
@@ -124,7 +97,7 @@ export function normalizeUndo(raw: unknown): McpUndoAction[] | null {
   return actions
 }
 
-/** Tools that change something. Anything else is a read and is never recorded. */
+/** everything else is a read, never recorded */
 export const MCP_WRITE_TOOLS = [
   'create_item',
   'update_item',
@@ -145,7 +118,7 @@ export function isWriteTool(tool: string): tool is McpWriteTool {
   return (MCP_WRITE_TOOLS as readonly string[]).includes(tool)
 }
 
-/** Trims a title for use inside a one-line summary. */
+/** for one-line summaries */
 export function shorten(value: string, max = 60): string {
   const clean = value.replace(/\s+/g, ' ').trim()
   return clean.length > max ? clean.slice(0, max - 1) + '…' : clean

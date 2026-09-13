@@ -2,15 +2,9 @@ import { useState, useEffect } from 'react'
 import { str } from './aiActionTypes'
 import { readItems } from '../../data/items'
 
-// Clickable card references
-// Known card titles mentioned in assistant prose become internal #card: links
-// that open the card's detail panel. Titles are cached per-context with a
-// short TTL and invalidated by kanban-refresh events.
+// card titles in replies become #card: links; cached per context with a short TTL, cleared on kanban-refresh
 let boardTitlesCache: { ctx: string; ts: number; entries: Array<{ title: string; id: string }> } | null = null
-// Single-flight: every ChatMessage instance shares ONE in-flight fetch so all
-// messages receive the same entries in the same React batch. Without this,
-// each message fetched independently and re-laid-out at a slightly different
-// moment, making the chat visibly bounce up and down.
+// single-flight so every message gets titles in one batch, or the chat bounces
 let boardTitlesPromise: { ctx: string; promise: Promise<Array<{ title: string; id: string }>> } | null = null
 
 function fetchBoardTitles(context: string): Promise<Array<{ title: string; id: string }>> {
@@ -29,7 +23,7 @@ function fetchBoardTitles(context: string): Promise<Array<{ title: string; id: s
       const items = [...(t || []), ...(c || [])].filter(i => i.status !== 'archived')
       const list = items
         .map(i => ({ title: str(i.title).trim(), id: i.id }))
-        // Short titles false-positive on prose; markdown-special chars break link syntax.
+        // short titles false-positive, markdown chars break links
         .filter(e => e.title.length >= 5 && !/[[\]()`*_]/.test(e.title))
         .sort((a, b) => b.title.length - a.title.length)
         .slice(0, 80)

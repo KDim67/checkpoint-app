@@ -12,7 +12,7 @@ vi.mock('../src/renderer/src/data/settings', () => ({ getSetting: vi.fn(), setSe
 beforeEach(() => vi.mocked(setSetting).mockClear())
 afterEach(cleanup)
 
-/** Every one of these is the Wall's state; the harness holds it the same way. */
+/** Wall state, held by the harness the same way */
 function Palette({ tool }: { tool: 'pen' | 'arrow' }) {
   const [penColor, setPenColor] = useState(WALL_COLORS[0])
   const [penWidth, setPenWidth] = useState(4)

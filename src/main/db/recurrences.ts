@@ -40,7 +40,6 @@ export function getRecurrenceById(id: string): RecurrenceRow | null {
   return (getDb().prepare(`SELECT * FROM recurrences WHERE id = ?`).get(id) as RecurrenceRow | undefined) ?? null
 }
 
-/** Active rules whose next occurrence has come due. */
 export function getDueRecurrences(now: number): RecurrenceRow[] {
   return getDb()
     .prepare(`SELECT * FROM recurrences WHERE active = 1 AND next_due IS NOT NULL AND next_due <= ? ORDER BY next_due`)
@@ -48,8 +47,7 @@ export function getDueRecurrences(now: number): RecurrenceRow[] {
 }
 
 export function setRecurrenceNextDue(id: string, nextDue: number | null): void {
-  // A rule with no further occurrences is deactivated rather than deleted, so
-  // the instances it already produced keep something to point back at.
+  // deactivated not deleted, so past instances still point somewhere
   getDb()
     .prepare(`UPDATE recurrences SET next_due = ?, active = ? WHERE id = ?`)
     .run(nextDue, nextDue === null ? 0 : 1, id)
@@ -63,13 +61,7 @@ export function deleteRecurrence(id: string): void {
   getDb().prepare(`DELETE FROM recurrences WHERE id = ?`).run(id)
 }
 
-/**
- * True when an unfinished instance of this rule already exists.
- *
- * This is what bounds the items table: a rule spawns its next occurrence only
- * once the previous one is done or archived, so a daily task left untouched for
- * a month produces one card, not thirty.
- */
+/** bounds the items table: a daily task ignored for a month makes one card, not thirty */
 export function hasOpenRecurrenceInstance(recurrenceId: string): boolean {
   const row = getDb()
     .prepare(

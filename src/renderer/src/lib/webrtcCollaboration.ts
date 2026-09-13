@@ -1,8 +1,4 @@
-/**
- * WebRTC P2P Board Collaboration Coordinator.
- * Ephemeral signaling lobby over ntfy.sh.
- * Syncs workspace baseline on connect and broadcasts drag & drop, edits, deletes in real-time.
- */
+/** P2P board sharing: ntfy.sh signalling lobby, baseline on connect, live edits after */
 
 import { useAppStore } from '../store/appStore'
 import { deriveKey, deriveTopic, encryptData, decryptData, COLLAB_SALT } from './webrtcCrypto'
@@ -43,67 +39,38 @@ interface CollabOptions {
   onProgress: (progress: string) => void
   onConnect: () => void
   onDisconnect: () => void
-  /**
-   * Anything can arrive here: a caught unknown, or an RTCErrorEvent, which is
-   * not an Error at all. Read it with errorMessage rather than reaching for
-   * .message.
-   */
+  /** could be an RTCErrorEvent, not an Error; read with errorMessage */
   onError: (err: unknown) => void
-  /**
-   * Asked only when the incoming board would land on top of one that already
-   * exists here. Replacing wipes every card and task under that slug, so this
-   * is the user's one chance to say no, or to take the board as a copy and
-   * keep what they had.
-   */
+  /** only when the board would land on an existing one: replace wipes it, so replace, copy or refuse */
   onResolveBaseline: (
     info: { context: string; incomingItems: number; mode: CollabMode }
   ) => Promise<BaselineChoice>
-  /** Your name, sent with a deliberate goodbye so the peer can say who left. */
+  /** sent with a goodbye so the peer can say who left */
   displayName?: string
-  /** One guest went away. The session stays open for them to come back. */
+  /** one guest left, the session stays open */
   onPeerLeft?: (name: string) => void
-  /** Everyone currently in the room. The host knows; the guests are told. */
+  /** the host knows, guests are told */
   onRoster?: (members: { id: string; name: string }[]) => void
-  /**
-   * What this side is allowed to do, as the host has it. Arrives with the
-   * board, and again whenever the host changes its mind.
-   */
+  /** arrives with the board and whenever the host changes it */
   onMode?: (mode: CollabMode) => void
-  /** The host showed this side the door. Not the same as them leaving. */
+  /** removed by the host, not the same as leaving */
   onRemoved?: (by: string) => void
-  /**
-   * A guest merged its copy with the board it joined and is offering the
-   * result. Asked of the host only, whose answer is the room's: see
-   * BoardResetMessage. Answering no leaves this board exactly as it is.
-   */
+  /** a guest's merged board, asked of the host only; no leaves this board as is */
   onMergeProposed?: (info: { by: string; impact: MergeImpact }) => Promise<boolean>
-  /** What the host did with the merge this side offered. */
+  /** what the host did with our merge */
   onMergeAnswer?: (accepted: boolean, by: string, reason: string) => void
-  /** The host took someone's merge, and this is the board now. */
+  /** the host took a merge, this is the board now */
   onBoardReset?: (by: string) => void
 }
 
-/** The tables whose tombstones hold a row id, and so mean something to a merge. */
+/** tombstones whose id is a row id, the ones a merge can use */
 const MERGEABLE_TABLES = new Set(['items', 'tags', 'relations'])
 
-/**
- * Where the board is remembered as it stood when two copies were last the same.
- *
- * Written every time the two sides are known to agree: when a baseline arrives,
- * and when a merge is taken. A later merge of the same pair reads it as the
- * common ancestor and can tell a card somebody changed from a card somebody
- * merely saved.
- *
- * Per workspace and per peer. The workspace is what a session is about, and the
- * peer is who the agreement was with: boards called "default" are everywhere,
- * and an ancestor borrowed from a different person decides conflicts by a
- * history the two of you never had. Peerless keys the name alone, which is
- * where a board agreed with a build that sends no id still lands.
- */
+/** last agreed state per workspace and peer, the ancestor for later merges; peerless keys the name alone */
 const mergeBaseKey = (context: string, peer: string): string =>
   peer ? `merge_base_${context}_${peer}` : `merge_base_${context}`
 
-/** Just enough of each card to say whether it has moved since. */
+/** enough to tell whether a card moved since */
 interface BaseCard {
   id: string
   updated_at: number
@@ -117,8 +84,7 @@ async function readMergeBase(context: string, peer: string): Promise<Map<string,
     const base = new Map<string, Item>()
     for (const entry of raw as BaseCard[]) {
       if (!entry || typeof entry.id !== 'string') continue
-      // Only the three fields the comparison reads are stored, so the rest is
-      // filled in to satisfy the shape and never looked at.
+      // only the three compared fields are real, the rest fill the shape
       base.set(entry.id, {
         id: entry.id,
         updated_at: typeof entry.updated_at === 'number' ? entry.updated_at : 0,
@@ -132,12 +98,7 @@ async function readMergeBase(context: string, peer: string): Promise<Map<string,
   }
 }
 
-/**
- * Records what both sides hold right now.
- *
- * Only the stamp and the metadata, because that is all the comparison reads and
- * a whole board copy in a settings row would be the same data stored twice.
- */
+/** stamp and metadata only, a whole board in a settings row would be stored twice */
 async function writeMergeBase(context: string, peer: string, items: Item[]): Promise<void> {
   try {
     const base: BaseCard[] = items.map(item => ({
@@ -151,50 +112,39 @@ async function writeMergeBase(context: string, peer: string, items: Item[]): Pro
   }
 }
 
-/**
- * What to do with an arriving board.
- *
- * 'copy' carries its own slug rather than deriving one here: the caller holds
- * the workspace list, and two places computing the same name is two places
- * that can disagree about it.
- */
+/** copy carries its slug since the caller holds the workspace list */
 type BaselineChoice =
   | { action: 'replace' }
   | { action: 'copy'; slug: string }
-  /** Keep this side's board and fold theirs into it. Loses nothing either way. */
+  /** keep ours and fold theirs in, loses nothing */
   | { action: 'merge' }
   | { action: 'cancel' }
 
-/**
- * One connection to one peer.
- *
- * A host holds several, a guest holds the one to its host. That is the whole of
- * the difference between the two roles at this level.
- */
+/** a host holds several, a guest holds one to its host */
 interface PeerLink {
   id: string
   pc: RTCPeerConnection
   channel: RTCDataChannel | null
-  /** Frames arrive interleaved per connection, so the reassembly is per link. */
+  /** frames interleave per connection, reassembly is per link */
   assembler: FrameAssembler
-  /** As they call themselves. Empty until they have said hello. */
+  /** empty until hello */
   name: string
-  /** Their install, which is what a removal is remembered against. Empty for an older peer. */
+  /** removals are remembered against it; empty for older peers */
   install: string
-  /** Messages apply in the order they arrived, and each one awaits IPC. */
+  /** apply in arrival order, each awaits IPC */
   queue: Promise<void>
   open: boolean
 }
 
-/** The one link a guest has. A guest never holds more than the host. */
+/** a guest's only link */
 const HOST_LINK = 'host'
 
-/** Short enough to fit an ntfy title, long enough not to collide. */
+/** fits an ntfy title without colliding */
 function newPeerId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-/** This install's id, minted on first use and kept from then on. */
+/** minted on first use, kept after */
 async function loadInstallId(): Promise<string> {
   try {
     const stored = readInstallId(await getSetting(INSTALL_ID_KEY))
@@ -203,35 +153,23 @@ async function loadInstallId(): Promise<string> {
     await setSetting(INSTALL_ID_KEY, minted)
     return minted
   } catch (err) {
-    // Without one this side simply cannot be blocked, which is the old
-    // behaviour rather than a reason to refuse the session.
+    // without one this side just can't be blocked, like before
     console.warn('[Collab Coordinator] Could not read this install id:', err)
     return ''
   }
 }
 
 export class WebRTCCollaborationCoordinator {
-  /**
-   * Every peer this side is talking to, by id.
-   *
-   * The host answers each offer with its own connection rather than ignoring
-   * every offer after the first, which is what made the session two people.
-   */
+  /** the host answers every offer with its own connection; ignoring later ones capped it at two people */
   private links = new Map<string, PeerLink>()
 
-  /**
-   * Removed, and refused if they come back.
-   *
-   * Keyed on the other side's install id, which survives them restarting. The
-   * id published for signalling is minted per attempt, so blocking that alone
-   * made a removal last only until they reopened the app.
-   */
+  /** keyed on install id, which survives restarts; the per-attempt signalling id didn't */
   private blocked = new Set<string>()
 
-  /** This install's own id, read once so an offer can carry it. */
+  /** read once so offers can carry it */
   private installId = ''
 
-  /** This side's own id, published with its offer so answers can be addressed. */
+  /** published with the offer so answers can be addressed */
   private myPeerId = newPeerId()
 
   private sse: EventSource | null = null
@@ -240,40 +178,23 @@ export class WebRTCCollaborationCoordinator {
 
   private isApplyingRemote = false
 
-  /**
-   * The workspace this session is actually working in, and the name both peers
-   * call it on the wire. They differ only for someone who joined a shared board
-   * as a copy, which is why they are two fields rather than one.
-   *
-   * The local one used to be read from options.context, which for a joiner is
-   * whatever workspace they happened to be sitting in when they clicked Join.
-   * The baseline lands in the host's workspace and switches to it, so that
-   * comparison was against the wrong name and every edit the joiner made was
-   * filtered out and never sent.
-   */
+  /** local vs wire name differ only for a copy; reading options.context filtered every joiner edit out */
   private sessionContext: string
   private wireContext: string
 
-  /** Kept so a host whose guest left can reopen the same room rather than mint a new code. */
+  /** so a host can reopen the same room instead of minting a new code */
   private signalingRoom = ''
 
-  /** Set once the session is deliberately over, so its own closing events say nothing. */
+  /** so the session's own closing events stay quiet */
   private ended = false
 
-  /** Which installation is hosting, as the peer key a joiner files its board under. */
+  /** the peer key a joiner files its board under */
   private hostInstall = ''
 
-  /**
-   * A merge is being decided on right now.
-   *
-   * One at a time, and the rest are refused rather than queued. Every proposal
-   * is the whole board as its author found it, so a second one decided after
-   * the first went in would put back exactly what the first took away, and the
-   * author of it never saw the board they are overwriting.
-   */
+  /** one at a time, others refused: a second full-board proposal would undo the first */
   private decidingMerge = false
 
-  /** This side offered a merge, so an answer to one is addressed to it. */
+  /** so an answer is addressed to us */
   private offeredMerge = false
 
   constructor(options: CollabOptions) {
@@ -285,15 +206,13 @@ export class WebRTCCollaborationCoordinator {
   public async start(): Promise<void> {
     try {
       this.cleanup()
-      // After the cleanup, which sets it. Left standing it would silence every
-      // close event of the session about to begin: no disconnect ever reported,
-      // and a host that never reopened its room.
+      // after cleanup sets it, or the new session's close events are silenced
       this.ended = false
       this.installId = await loadInstallId()
       this.key = await deriveKey(this.options.pairingCode, COLLAB_SALT)
       this.options.onProgress('Deriving security key...')
 
-      // Hashed, so the pairing code never appears in the public topic name.
+      // hashed, the pairing code never appears in the public topic
       const signalingRoom = `checkpoint-collab-${await deriveTopic(this.options.pairingCode, COLLAB_SALT)}`
       this.signalingRoom = signalingRoom
 
@@ -307,7 +226,7 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
-  /** Wires the failure paths every peer connection needs. */
+  /** failure paths every peer connection needs */
   private newPeerConnection(): RTCPeerConnection {
     const pc = new RTCPeerConnection({ iceServers: iceServers() })
     onConnectionFailed(pc, reason => this.options.onError(new Error(reason)))
@@ -329,11 +248,9 @@ export class WebRTCCollaborationCoordinator {
     return link
   }
 
-  /** Everyone currently connected, in the order they arrived. */
+  /** in arrival order */
   private roster(): { id: string; name: string }[] {
-    // The host first, and always. A list built only from the host's own
-    // connections shows a guest every other guest and not the person actually
-    // sharing the board, which is the one name they came for.
+    // host first: a list from the host's own links hid the one name guests came for
     return [
       { id: HOST_LINK, name: this.options.displayName ?? '' },
       ...[...this.links.values()]
@@ -342,45 +259,25 @@ export class WebRTCCollaborationCoordinator {
     ]
   }
 
-  /**
-   * Tells everyone who is in the room.
-   *
-   * Only the host knows: the guests are connected to it and not to each other,
-   * so the list has to come from the middle. Sent on every change rather than
-   * asked for, because a guest with a stale list is a guest who thinks someone
-   * is still here.
-   */
+  /** only the host knows who's in; sent on every change so no guest thinks someone's still here */
   private publishRoster(): void {
     if (!this.options.isHost) return
     const members = this.roster()
-    // Nobody is shown to themselves. The host is the entry under HOST_LINK, and
-    // each guest is the entry under the id it published its own offer with.
+    // nobody is shown to themselves
     this.options.onRoster?.(members.filter(member => member.id !== HOST_LINK))
     void this.broadcast({ type: 'roster', members }).catch(err => {
       console.warn('[Collab Host] Could not send the roster:', err)
     })
   }
 
-  // Host: Listen for client offers, one connection each
-
-  /**
-   * Who an offer or an answer is for.
-   *
-   * A guest publishes under `offer:<its id>` and the host replies under
-   * `answer:<that id>`, so several guests can share one signalling room without
-   * reading each other's half of the handshake. A build that predates this
-   * sends the bare titles, and is answered the old way as the one unnamed
-   * guest: never be stricter than the sender.
-   */
+  /** offer:<id> / answer:<id> so guests share a room without reading each other; bare titles still answered */
   private static offerIdFrom(title: string): string | null {
     if (title.startsWith('offer:')) return title.slice('offer:'.length) || null
     return title === 'client-offer' ? 'legacy' : null
   }
 
   private setupHostSignaling(room: string): void {
-    // A host reopens the room every time it loses a guest, and without this
-    // each reopening left the previous stream running: a leaked connection per
-    // guest, and two live handlers racing to answer the next offer.
+    // close the previous stream on reopen, or each guest leaks one and handlers race
     this.sse?.close()
     this.sse = new EventSource(signalingStreamUrl(room))
     this.options.onProgress('Waiting for someone to join...')
@@ -392,18 +289,16 @@ export class WebRTCCollaborationCoordinator {
         if (!signal) return
 
         const peerId = WebRTCCollaborationCoordinator.offerIdFrom(signal.title)
-        // Not an offer at all: this room also carries the host's own answers.
+        // this room also carries the host's own answers
         if (!peerId) return
-        // Removed earlier in this session, and not on the way back in.
+        // removed earlier this session
         if (this.blocked.has(peerId)) return
-        // Already connected, or the same frame delivered twice.
+        // already connected, or a duplicate delivery
         if (this.links.has(peerId)) return
 
         this.options.onProgress('Connecting with someone...')
 
-        // Claimed before the first await, not after. Decrypting yields, and two
-        // deliveries of one offer would both have passed the check above and
-        // built a connection each, the second orphaning the first.
+        // claimed before the first await, or a duplicate offer builds a second connection
         const link = this.openLink(peerId)
 
         const release = (): void => {
@@ -425,8 +320,7 @@ export class WebRTCCollaborationCoordinator {
           return
         }
 
-        // Read here rather than on hello, so a removed guest is turned away
-        // before it is handed the board.
+        // checked here so a removed guest is turned away before getting the board
         if (link.install && this.blocked.has(link.install)) {
           release()
           return
@@ -465,29 +359,25 @@ export class WebRTCCollaborationCoordinator {
         return
       }
 
-      // The stream stays open. Closing it after the first answer is exactly
-      // what made this a two-person feature: nobody else could ever be heard.
+      // the stream stays open, closing after one answer limited it to two people
     } catch (err) {
       this.options.onError(err)
     }
   }
 
-  // Client: Create offer
   private async setupClientConnection(room: string): Promise<void> {
     const link = this.openLink(HOST_LINK)
     link.channel = link.pc.createDataChannel('collab-channel', { ordered: true })
     this.setupDataChannelHandlers(link)
 
-    // Subscribe before publishing: ntfy's SSE stream only carries messages
-    // posted after subscription, so publishing first can miss the host's reply.
+    // subscribe before publishing, ntfy's SSE only carries later messages
     this.sse = new EventSource(signalingStreamUrl(room))
     this.sse.onmessage = async (e) => {
       try {
         if (!this.key) return
         const signal = readSignalingMessage(e.data)
         if (!signal) return
-        // Addressed to this guest, or from a host old enough to answer everyone
-        // at once. Someone else's answer is not this one's to read.
+        // ours, or from an old host answering everyone
         if (signal.title !== `answer:${this.myPeerId}` && signal.title !== 'host-reply') return
         if (link.pc.signalingState === 'stable') return
 
@@ -506,8 +396,7 @@ export class WebRTCCollaborationCoordinator {
 
         await link.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
 
-        // A guest has exactly one handshake to complete, so it is done with the
-        // room. Only the host keeps listening.
+        // a guest has one handshake, only the host keeps listening
         if (this.sse) {
           this.sse.close()
           this.sse = null
@@ -526,7 +415,7 @@ export class WebRTCCollaborationCoordinator {
   private async publishClientOffer(room: string, link: PeerLink): Promise<void> {
     if (!this.key) return
     try {
-      // The install id rides inside the encrypted body, not the public title.
+      // install id inside the encrypted body, not the public title
       const sdpData = JSON.stringify({
         sdp: link.pc.localDescription?.sdp,
         install: this.installId
@@ -535,8 +424,7 @@ export class WebRTCCollaborationCoordinator {
 
       const res = await fetch(signalingPublishUrl(room), {
         method: 'POST',
-        // Named, so the host's answer can come back to this guest and not to
-        // whoever else happens to be joining at the same moment.
+        // named so the answer comes back to this guest
         headers: { 'Title': `offer:${this.myPeerId}` },
         body: encryptedSdp
       })
@@ -551,7 +439,6 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
-  // Data channel handlers
   private setupDataChannelHandlers(link: PeerLink): void {
     const channel = link.channel
     if (!channel) return
@@ -559,18 +446,14 @@ export class WebRTCCollaborationCoordinator {
     channel.onopen = () => {
       link.open = true
       this.options.onConnect()
-      // Before the board, and by both sides. The host has to know who it has
-      // let in before it can decide anything about them, and the guest is owed
-      // the same courtesy.
+      // hello before the board, both sides
       this.sendTo(link, { type: 'peer-hello', by: this.options.displayName ?? '' })
         .catch(err => console.warn('[Collab Coordinator] Could not introduce myself:', err))
       void this.sendBaselineTo(link)
       this.publishRoster()
     }
 
-    // Serialized per link: messages apply in the order that peer sent them, and
-    // each handler awaits IPC into the main process. Two peers talking at once
-    // interleave, which is fine, because only one peer's order is a promise.
+    // per-link order; peers interleave, only each peer's own order is promised
     channel.onmessage = (event) => {
       link.queue = link.queue.then(async () => {
         try {
@@ -590,10 +473,7 @@ export class WebRTCCollaborationCoordinator {
     }
 
     channel.onerror = (event) => {
-      // A channel that errors is a peer that is gone, and for a host that is
-      // the same event as a peer who left politely: keep the room, keep the
-      // passcode, let them come back. Ending the whole session over it cost the
-      // host its passcode for what is usually a blip.
+      // an erroring channel is a gone peer; the host keeps the room and passcode for a blip
       const what = describeChannelError(event)
       console.warn('[Collab Coordinator] Data channel error:', what, event)
       if (this.dropLink(link)) return
@@ -601,14 +481,12 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
-  // Send baseline data if Host
-  /** The board as it stands here, sent to one person who has just joined. */
+  /** the board as it stands, for someone who just joined */
   private async sendBaselineTo(link: PeerLink): Promise<void> {
     if (!this.options.isHost) return
     this.options.onProgress('Sending the board...')
 
     try {
-      // 1. Gather all database records for this context
       const fullDb = await syncApi.getDbPayload()
       const items = fullDb.items.filter(
         i => i.context === this.options.context && (i.type === 'card' || i.type === 'task')
@@ -619,8 +497,7 @@ export class WebRTCCollaborationCoordinator {
         r => items.some(item => item.id === r.from_id || item.id === r.to_id)
       )
 
-      // The columns travel with the cards. A card's status is a column id, so
-      // without them the peer holds cards addressed to columns it does not have.
+      // columns travel with cards, statuses are column ids
       const board = await loadBoardConfig(this.options.context)
 
       await this.sendTo(link, {
@@ -632,18 +509,13 @@ export class WebRTCCollaborationCoordinator {
         relations,
         mode: this.options.mode,
         board,
-        // Who they are agreeing with, so a merge later on reads the ancestor
-        // this pair actually has rather than one left by whoever last shared a
-        // board of the same name.
+        // so a later merge reads this pair's ancestor, not a same-named board's
         install: this.installId,
-        // What this side has deleted, so a merge on the other end honours it
-        // instead of handing every one of them back. Only the tables whose
-        // tombstone id is a row id mean anything to the receiver.
+        // our deletions, so their merge honours them; row-id tables only
         tombstones: fullDb.tombstones.filter(stone => MERGEABLE_TABLES.has(stone.table_name))
       })
 
-      // Bound once somebody is in, and not before: a host with nobody connected
-      // has nothing to broadcast to.
+      // bound once someone's in
       window.addEventListener('db-mutation', this.handleLocalMutation)
       window.addEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
     } catch (err) {
@@ -652,34 +524,25 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
-  // Dispatch local changes to every peer
   private handleLocalMutation = (event: Event): void => {
     if (this.isApplyingRemote || this.links.size === 0) return
 
     const e = event as CustomEvent
     const { detail } = e
 
-    // Only this session's workspace goes over the wire.
-    //
-    // Create and update events carry the whole item, so the workspace is on
-    // `detail.item.context`. A delete has no item (it is gone), so the
-    // preload attaches the context it read just before deleting. Without that
-    // this check simply did not apply to deletes, and deleting anything in any
-    // other workspace was broadcast to the peer.
+    // only this workspace; deletes carry the context the preload read, or every delete was broadcast
     const mutationContext: string | null =
       detail.item?.context ?? (typeof detail.context === 'string' ? detail.context : null)
     if (mutationContext !== null && mutationContext !== this.sessionContext) return
 
-    // Validated here rather than only on arrival, so a malformed mutation is
-    // dropped where it can be seen instead of silently on the peer.
+    // validated here so a bad mutation drops visibly
     const mutation = normalizeRemoteMutation(detail)
     if (!mutation) {
       console.warn('[Collab Coordinator] Skipped a local change of an unrecognised shape.')
       return
     }
 
-    // Event handlers cannot await; a failed broadcast must not become an
-    // unhandled rejection.
+    // handlers can't await, a failed broadcast mustn't go unhandled
     void this.broadcast({
       type: 'db-mutation-event',
       mutation: retargetMutation(mutation, this.wireContext)
@@ -688,14 +551,7 @@ export class WebRTCCollaborationCoordinator {
     })
   }
 
-  /**
-   * The board document, sent the same way a card is.
-   *
-   * Columns, the background, swimlanes and the card face only ever travelled
-   * with the opening baseline, so a column added mid-session never reached
-   * anyone. Cards moved into it then arrived addressed to a column the other
-   * side did not have, and rendered nowhere at all while still being counted.
-   */
+  /** board doc sent like a card; it only went with the baseline, so new columns never arrived */
   private handleLocalBoardConfig = (event: Event): void => {
     if (this.isApplyingRemote || this.links.size === 0) return
     const detail = (event as CustomEvent).detail
@@ -705,7 +561,7 @@ export class WebRTCCollaborationCoordinator {
 
     void this.broadcast({
       type: 'board-config',
-      // Named as the other side knows it, exactly as a mutation is retargeted.
+      // named as the other side knows it
       context: this.wireContext,
       board: normalizeBoardConfig(board)
     }).catch(err => {
@@ -713,19 +569,7 @@ export class WebRTCCollaborationCoordinator {
     })
   }
 
-  /**
-   * Folds an arriving board into the one already here.
-   *
-   * What the host sent is only half of the merge, so this side's copy is read
-   * back out of the database first. The result then goes through the same
-   * baseline apply a replace would use: the merged board holds everything that
-   * was already here, so clearing the workspace and writing it back loses
-   * nothing, and it keeps one path into the database rather than two.
-   *
-   * The merge is this side's alone. The host keeps its own board, and finds out
-   * about the difference through the ordinary live updates, or by joining back
-   * the other way and merging in turn.
-   */
+  /** folds theirs into ours, then through the baseline apply: one path into the db, and the merge is ours alone */
   private async foldIntoLocalBoard(
     target: string,
     msg: BoardBaselineMessage,
@@ -736,8 +580,7 @@ export class WebRTCCollaborationCoordinator {
       loadBoardConfig(target)
     ])
 
-    // The same slice the baseline apply is about to clear, so the merge is
-    // working with exactly what is at stake.
+    // the same slice the baseline apply clears
     const mine = local.items.filter(
       item => item.context === target && (item.type === 'card' || item.type === 'task')
     )
@@ -760,27 +603,18 @@ export class WebRTCCollaborationCoordinator {
         tags: msg.tags,
         itemTags: msg.itemTags,
         relations: msg.relations,
-        // A peer older than the board message sends no columns. Reading this
-        // side's own back in their place adds nothing and takes nothing away.
+        // older peers send no columns, use ours
         board: msg.board ?? board
       },
-      // A card deleted here stays deleted. It is the one thing that stops the
-      // merge being a plain union, and without it every card ever thrown away
-      // would walk back in from the other copy.
-      //
-      // Read by table, because the tombstone id is only a row id for these
-      // three. A deleted note records its filename there instead, and a note
-      // named after a card id would quietly keep that card out of the merge.
+      // deleted here stays deleted; by table, since only these ids are row ids
       new Set(
         local.tombstones
           .filter(stone => MERGEABLE_TABLES.has(stone.table_name))
           .map(stone => stone.id)
       ),
-      // What they deleted, with the times, so their deletions count for
-      // something too without undoing anything edited here since.
+      // their deletions with times, without undoing edits made here since
       new Map((msg.tombstones ?? []).map(stone => [stone.id, stone.deleted_at])),
-      // The board as it stood when these two were last together, if this pair
-      // has met before. Turns "whose save was later" into "who changed it".
+      // last agreed board with this pair, turns "whose save was later" into "who changed it"
       await readMergeBase(target, this.hostInstall)
     )
 
@@ -797,14 +631,7 @@ export class WebRTCCollaborationCoordinator {
       what ? `Merged into ${target}: ${what}.` : `Merged into ${target}: nothing new to take.`
     )
 
-    // Offered to the host, so the merge is something the two of them did rather
-    // than something one of them did quietly. The result travels whole: the
-    // host merging for itself would break ties its own way and honour only its
-    // own deletions, and two boards that are nearly the same is the worst
-    // outcome available here.
-    //
-    // Nothing is recorded as agreed yet. Until the answer comes back this side
-    // is the only one holding this board.
+    // offered whole to the host so both agree on one board; nothing's recorded until the answer
     try {
       this.offeredMerge = true
       await this.broadcast({
@@ -818,22 +645,13 @@ export class WebRTCCollaborationCoordinator {
         board: merged.board
       })
     } catch (err) {
-      // This side is merged either way. Only the offer failed.
+      // merged either way, only the offer failed
       this.offeredMerge = false
       console.warn('[Collab Client] Could not offer the merge to the host:', err)
     }
   }
 
-  /**
-   * Records that both sides hold the same board as of now.
-   *
-   * The one moment an ancestor is worth writing down, and a later merge with
-   * this peer reads it to tell a card somebody changed from a card that merely
-   * has a newer save stamp on it.
-   *
-   * Read back out of the database rather than taken from the message, because
-   * what is here is what this side actually agreed to.
-   */
+  /** read from the db, what's here is what we agreed to */
   private async recordAgreement(target: string, peer: string): Promise<void> {
     try {
       const db = await syncApi.getDbPayload()
@@ -849,31 +667,18 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
-  /**
-   * A guest has merged its copy with the board it joined and is offering the
-   * result to the room.
-   *
-   * The host decides, and decides for everybody: the board being shared is the
-   * host's, and a guest is live with it, so a guest allowed to say no would sit
-   * in the room holding a board nobody else has and nobody else would know.
-   *
-   * The question is put with numbers on it, because "do you want to merge" is
-   * not a question anyone can answer and this one overwrites a board.
-   */
+  /** the host decides for the room; asked with numbers since yes overwrites a board */
   private async considerMergeProposal(from: PeerLink, msg: MergeProposalMessage): Promise<void> {
     const target = this.sessionContext
     const who = msg.by.trim()
 
-    // Only the host is asked, and only the host relays the result. A proposal
-    // arriving anywhere else is a peer talking out of turn.
+    // only the host is asked and relays
     if (!this.options.isHost) {
       await this.answerMerge(from, false, 'only the host decides that')
       return
     }
 
-    // A proposal is the whole board as its author found it. Deciding a second
-    // one after the first has gone in would put back everything the first took
-    // away, and its author never saw the board they would be overwriting.
+    // a second full-board proposal would undo the first
     if (this.decidingMerge) {
       this.options.onProgress(
         who
@@ -884,9 +689,7 @@ export class WebRTCCollaborationCoordinator {
       return
     }
 
-    // Read-only is the host saying the guests cannot change this board, and
-    // replacing all of it is the largest change there is. Refused without
-    // asking, so the answer does not depend on who is at the keyboard.
+    // read-only refuses outright, whoever's at the keyboard
     if (this.options.mode === 'readonly') {
       await this.answerMerge(from, false, 'the board is shared read-only')
       return
@@ -914,7 +717,7 @@ export class WebRTCCollaborationCoordinator {
       if (accepted) {
         this.isApplyingRemote = true
         try {
-          // Their name for the board is not necessarily this side's.
+          // their name for the board isn't necessarily ours
           const items = msg.items.map(item =>
             item.context === target ? item : { ...item, context: target }
           )
@@ -926,11 +729,7 @@ export class WebRTCCollaborationCoordinator {
           this.options.onProgress(
             who ? `Merged with ${who}. Both boards now match.` : 'Merged. Both boards now match.'
           )
-          // The board the room is on now, sent to everyone else in it. They are
-          // told rather than asked: they are live with this board, so one of
-          // them keeping the old one would be holding cards nobody else has and
-          // missing edits to cards it does not, quietly, for as long as the
-          // session lasts.
+          // told, not asked: everyone's live on this board
           await this.broadcast(
             {
               type: 'board-reset',
@@ -947,8 +746,7 @@ export class WebRTCCollaborationCoordinator {
         } finally {
           this.isApplyingRemote = false
         }
-        // Only now, and only for the peer whose board this is. What everyone
-        // else holds is the host's doing, not an agreement with them.
+        // only now, and only for the peer whose board it is
         await this.recordAgreement(target, from.install)
       } else {
         this.options.onProgress(
@@ -957,25 +755,18 @@ export class WebRTCCollaborationCoordinator {
       }
     } catch (err) {
       console.error('[Collab] Failed to take the offered merge:', err)
-      // A merge that threw is a merge that was not taken, whatever the user
-      // said, and the other side has to be told that and not the intention.
+      // a merge that threw wasn't taken, whatever was clicked
       accepted = false
       this.options.onError(err)
     } finally {
       this.decidingMerge = false
     }
 
-    // No reason either way: this one was answered by a person.
+    // answered by a person, no reason
     await this.answerMerge(from, accepted)
   }
 
-  /**
-   * Back to whoever offered the merge.
-   *
-   * A reason only when the no was the app's rather than the user's: "they said
-   * no" and "nobody was asked" read the same from the other end otherwise, and
-   * only one of them is worth trying again.
-   */
+  /** a reason only when the app said no, so the other side knows whether to retry */
   private async answerMerge(to: PeerLink, accepted: boolean, reason?: string): Promise<void> {
     try {
       await this.sendTo(to, {
@@ -989,30 +780,18 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
-  /**
-   * Everything a peer sends arrives here, and nothing else does. The argument
-   * is `unknown` on purpose: what came off the wire is only a message once it
-   * has been through the normalizer.
-   */
+  /** unknown until the normalizer says otherwise */
   private async handleIncomingMessage(from: PeerLink, raw: unknown): Promise<void> {
     const msg = normalizeCollabMessage(raw)
     if (!msg) {
-      // Not applied and not fatal. A peer on a different build sending
-      // something this one does not know is the ordinary case, and dropping the
-      // session over it would be worse than ignoring the message.
+      // ignored, not fatal: other builds send things we don't know
       console.warn('[Collab Coordinator] Ignored a message this build does not understand.')
       return
     }
 
     switch (msg.type) {
       case 'board-baseline': {
-        // applyBoardBaseline deletes every card and task in the target
-        // workspace before seeding the host's, and that is unrecoverable. The
-        // caller decides what to do about it: replace, take the board as a
-        // copy under a free name, fold the two together, or refuse.
-        // Who is hosting, before anything is decided: the choice about to be
-        // made is filed against them, and a merge is not on offer at all when
-        // the board is being shared read-only.
+        // the baseline apply wipes the workspace; the caller picks replace, copy, merge or refuse
         this.hostInstall = msg.install ?? ''
         const choice = await this.options.onResolveBaseline({
           context: msg.context,
@@ -1022,21 +801,15 @@ export class WebRTCCollaborationCoordinator {
         if (choice.action === 'cancel') {
           this.cleanup()
           this.options.onDisconnect()
-          // After the disconnect, which posts a notice of its own. Said first
-          // it was overwritten in the same tick, so backing out of the dialog
-          // reported "Host disconnected" instead of what actually happened.
+          // after the disconnect, or its notice overwrites this
           this.options.onProgress('Join cancelled: your local board was left untouched.')
           break
         }
 
-        // What the host is letting this side do. The board has always carried
-        // it and nothing ever read it, so a board shared read-only arrived with
-        // every editing control live and the restriction existed only in the
-        // host's own description of the session.
+        // the mode was always sent and never read, so read-only boards stayed editable
         this.options.onMode?.(msg.mode)
 
-        // The host's name for the board stays the name on the wire whatever it
-        // is called here, or the two sides stop talking about the same board.
+        // keep the host's name on the wire, or the sides stop talking about one board
         this.wireContext = msg.context
         this.sessionContext = choice.action === 'copy' ? choice.slug : msg.context
         const target = this.sessionContext
@@ -1047,7 +820,7 @@ export class WebRTCCollaborationCoordinator {
         this.isApplyingRemote = true
 
         try {
-          // Into the picker before switching in, or leaving it is a one-way trip.
+          // into the picker first, or leaving it is one-way
           const store = useAppStore.getState()
           const workspaces = await registerSharedWorkspace(target)
           store.setWorkspaceList(workspaces)
@@ -1055,10 +828,7 @@ export class WebRTCCollaborationCoordinator {
           store.setWorkspace(target)
           store.setView('kanban')
 
-          // Every item still carries the host's workspace. applyBoardBaseline
-          // deletes by the slug it is given but inserts each item under its
-          // own, so without this a copy would arrive empty and the board it
-          // was meant to spare would be overwritten instead.
+          // items carry the host's slug; retarget or a copy arrives empty and overwrites the spared board
           const items = target === msg.context
             ? msg.items
             : msg.items.map(item => ({ ...item, context: target }))
@@ -1066,9 +836,7 @@ export class WebRTCCollaborationCoordinator {
           if (choice.action === 'merge') {
             await this.foldIntoLocalBoard(target, msg, items)
           } else {
-            // The host's columns first, so the cards are never briefly addressed
-            // to columns this side does not have. Absent from an older peer, in
-            // which case whatever board is already here is the best guess.
+            // host's columns first so cards never point at missing ones; older peers send none
             if (msg.board) {
               try {
                 await saveBoardConfig(target, msg.board)
@@ -1078,27 +846,20 @@ export class WebRTCCollaborationCoordinator {
             }
 
             await syncApi.applyBoardBaseline(target, items, msg.tags, msg.itemTags, msg.relations)
-            // Both sides now hold the host's board exactly, which is the one
-            // moment they are known to agree and so the ancestor a later merge
-            // of this pair reasons from.
+            // both hold the host's board now, the ancestor for later merges
             await writeMergeBase(target, this.hostInstall, items)
             this.options.onProgress(`Joined board: ${target}. Ready!`)
           }
 
           window.dispatchEvent(new CustomEvent('kanban-refresh'))
 
-          // If collaborative mode, bind local writes listener
           if (msg.mode === 'collaborative') {
             window.addEventListener('db-mutation', this.handleLocalMutation)
-            // The board document too, and not only on the host. A guest adding
-            // or renaming a column is the same change as the host doing it, and
-            // wiring only one side would have left it travelling one way.
+            // the board doc too, on both sides, or column changes go one way
             window.addEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
           }
         } catch (err) {
-          // Said out loud, not just to the console. The last thing on screen
-          // was "Merging the two boards...", and leaving that up is the app
-          // claiming to be doing something it gave up on.
+          // say it on screen, not just the console, or "Merging..." stays up
           console.error('[Collab Client] Failed to seed baseline:', err)
           this.options.onError(err)
         } finally {
@@ -1113,9 +874,7 @@ export class WebRTCCollaborationCoordinator {
       }
 
       case 'merge-answer': {
-        // An answer to nothing is a peer talking out of turn, and reporting it
-        // would tell this user their board had been taken somewhere it was
-        // never sent.
+        // an answer to nothing is out of turn, don't report it
         if (!this.offeredMerge) {
           console.warn('[Collab Coordinator] Ignored an answer to a merge this side never offered.')
           break
@@ -1127,30 +886,19 @@ export class WebRTCCollaborationCoordinator {
           break
         }
 
-        // Refused, so this side is holding the board the two of them would have
-        // made and the room is holding the host's. There is nothing shared here
-        // any more, and staying would be worse than leaving: every card this
-        // board has and the room does not would be wiped without a word the
-        // moment the host takes somebody else's merge.
-        //
-        // The merged board stays. It is what this side asked for, and the only
-        // copy of it.
+        // refused: we hold the merged board, the room holds the host's; leave before ours gets wiped
         this.options.onMergeAnswer?.(false, msg.by.trim(), msg.reason?.trim() ?? '')
         await this.leave()
         break
       }
 
       case 'board-reset': {
-        // Only the host says what the shared board is. A guest sending one is
-        // asking to overwrite the host's board without anyone being asked,
-        // which is what the proposal exists for.
+        // only the host says what the shared board is
         if (this.options.isHost) {
           console.warn('[Collab Host] Ignored a guest trying to replace the shared board.')
           break
         }
-        // The host took somebody's merge, so this is the board now. Applied the
-        // way the opening baseline is, because that is what it is: the whole
-        // board, replacing the whole board.
+        // the host took a merge, applied like the opening baseline
         const target = this.sessionContext
         this.isApplyingRemote = true
         try {
@@ -1169,8 +917,7 @@ export class WebRTCCollaborationCoordinator {
         } finally {
           this.isApplyingRemote = false
         }
-        // Still an agreement with the host, whoever ran the merge: the host is
-        // the only side this one has, and its board is what arrived.
+        // still an agreement with the host
         await this.recordAgreement(target, this.hostInstall)
         this.options.onBoardReset?.(msg.by.trim())
         break
@@ -1178,8 +925,7 @@ export class WebRTCCollaborationCoordinator {
 
       case 'peer-hello': {
         from.name = msg.by.trim()
-        // The list only changes for a host, and only a host publishes it. A
-        // guest learns who else is here from the roster the host sends back.
+        // only the host publishes the list
         this.publishRoster()
         break
       }
@@ -1187,24 +933,19 @@ export class WebRTCCollaborationCoordinator {
       case 'peer-removed': {
         const who = msg.by.trim()
         this.options.onRemoved?.(who)
-        // Nothing to say back, and the host is closing anyway. Ending here
-        // stops the close that follows being reported as a second, unrelated
-        // thing going wrong.
+        // nothing to answer and the host is closing; end so its close isn't reported twice
         this.cleanup()
         break
       }
 
       case 'mode-change': {
-        // The host's word on what this side may do. A host that receives one
-        // ignores it: the mode is the host's to set, and a guest sending this
-        // would be a guest granting itself permission.
+        // a guest can't grant itself permission, the host ignores these
         if (!this.options.isHost) this.options.onMode?.(msg.mode)
         break
       }
 
       case 'peer-leaving': {
-        // Said before they hang up, so the close that follows is explained
-        // rather than just silent.
+        // said before they hang up so the close is explained
         const who = msg.by.trim()
         this.options.onProgress(
           who ? `${who} closed the connection.` : 'They closed the connection.'
@@ -1215,8 +956,7 @@ export class WebRTCCollaborationCoordinator {
       case 'db-mutation-event': {
         this.isApplyingRemote = true
         try {
-          // Arrives addressed to the host's workspace, which is not what this
-          // side calls it when the board was joined as a copy.
+          // addressed to the host's workspace name, not ours for a copy
           await syncApi.applyRemoteMutation(
             retargetMutation(msg.mutation, this.sessionContext)
           )
@@ -1226,10 +966,7 @@ export class WebRTCCollaborationCoordinator {
         } finally {
           this.isApplyingRemote = false
         }
-        // Guests are connected to the host and not to each other, so a change
-        // one of them makes only reaches the rest if the host passes it on. Sent
-        // on the wire's own name for the board, which is the host's, and back
-        // to everyone except whoever made it.
+        // guests only reach each other through the host; relay on the wire name, not back to the sender
         if (this.options.isHost) {
           await this.broadcast(
             { type: 'db-mutation-event', mutation: retargetMutation(msg.mutation, this.wireContext) },
@@ -1256,9 +993,7 @@ export class WebRTCCollaborationCoordinator {
       }
 
       case 'roster': {
-        // Only the host can know this, so a guest takes it as told. A host that
-        // receives one ignores it: it is the one keeping the list. This side's
-        // own entry comes out, because a room does not list you to yourself.
+        // the host keeps the list; our own entry comes out
         if (!this.options.isHost) {
           this.options.onRoster?.(msg.members.filter(member => member.id !== this.myPeerId))
         }
@@ -1267,22 +1002,13 @@ export class WebRTCCollaborationCoordinator {
     }
   }
 
-  /**
-   * A board baseline exceeds the 256 KB single-message ceiling on any board of
-   * real size, so everything goes through the framing transport.
-   */
+  /** baselines exceed 256 KB, so always framed */
   private async sendTo(link: PeerLink, msg: CollabMessage): Promise<void> {
     if (!link.channel || link.channel.readyState !== 'open') return
     await sendFramed(link.channel, msg)
   }
 
-  /**
-   * To everyone, or to everyone but one.
-   *
-   * The exception is how the host relays a change without echoing it back to
-   * whoever made it. Failures are per link: one peer whose channel has gone
-   * must not stop the message reaching the rest.
-   */
+  /** per-link failures, one gone channel mustn't stop the rest; exceptId avoids echoes */
   private async broadcast(msg: CollabMessage, exceptId?: string): Promise<void> {
     await Promise.all(
       [...this.links.values()]
@@ -1295,32 +1021,14 @@ export class WebRTCCollaborationCoordinator {
     )
   }
 
-  /**
-   * The peer is gone, however it went.
-   *
-   * A host keeps the room and the passcode so whoever left can come straight
-   * back, which is what a reconnect almost always is. Returns false when this
-   * side has nothing to keep and the session really is over.
-   *
-   * One departure can raise both an error and a close, so this has to be safe
-   * to call twice. The peer connection being gone is what says it already ran.
-   */
+  /** the host keeps room and passcode for reconnects; false when the session is really over; safe twice */
   private keepHostingWithoutPeer(): boolean {
-    // Closing on purpose closes the channel too, and the event lands a tick
-    // later. Without this the host pressing Disconnect was told "Peer
-    // disconnected" over the top of its own "Disconnected".
+    // our own close fires the channel event a tick later
     if (this.ended) return true
     return this.options.isHost && this.signalingRoom !== ''
   }
 
-  /**
-   * One peer is gone. Returns true when the session carries on without them.
-   *
-   * A host loses a guest and keeps the room, the passcode and everyone else. A
-   * guest losing the host has lost the session, because the host was all of it.
-   * One departure can raise both an error and a close, so this has to be safe
-   * to call twice: the link no longer being in the map is what says it ran.
-   */
+  /** true when the session carries on; a guest losing the host loses it; safe twice */
   private dropLink(link: PeerLink): boolean {
     const known = this.links.get(link.id) === link
     if (known) {
@@ -1335,7 +1043,7 @@ export class WebRTCCollaborationCoordinator {
     }
 
     if (!this.keepHostingWithoutPeer()) {
-      // Nothing left to talk to, so nothing left to broadcast.
+      // nothing left to broadcast to
       window.removeEventListener('db-mutation', this.handleLocalMutation)
       window.removeEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
       return false
@@ -1348,7 +1056,7 @@ export class WebRTCCollaborationCoordinator {
     return true
   }
 
-  /** Ends every connection without giving up the room. */
+  /** keeps the room */
   private closeAllPeers(): void {
     window.removeEventListener('db-mutation', this.handleLocalMutation)
     window.removeEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
@@ -1364,29 +1072,16 @@ export class WebRTCCollaborationCoordinator {
     this.links.clear()
   }
 
-  /**
-   * Says goodbye before hanging up, so the other side can name who left rather
-   * than watching the connection go quiet. Best effort: a channel that is
-   * already gone is exactly the case this cannot help with.
-   */
+  /** goodbye first so the other side can name who left; best effort */
   public async leave(): Promise<void> {
     await this.hangUp({ type: 'peer-leaving', by: this.options.displayName ?? '' })
   }
 
-  /**
-   * Shows one guest the door, told to their face, and keeps everyone else.
-   *
-   * Their id goes on a block list so their own client will not reconnect on
-   * its own. That is a door, not a lock: the id is theirs to choose, so anyone
-   * determined can mint another and come back. Changing the passcode is the
-   * lock, and it is a separate action because it removes everybody.
-   */
+  /** a door, not a lock: a determined guest can mint a new id; changing the passcode is the lock */
   public async remove(peerId: string): Promise<void> {
     const link = this.links.get(peerId)
     if (!link) return
-    // An older peer sends no install id and so cannot be barred from returning.
-    // Changing the passcode is the answer there, and it is the answer anyway
-    // for anyone willing to go and clear the id themselves.
+    // older peers send no install id and can't be barred
     if (link.install) this.blocked.add(link.install)
 
     try {
@@ -1400,33 +1095,28 @@ export class WebRTCCollaborationCoordinator {
     this.dropLink(link)
   }
 
-  /** Tells the room this side is called something else now. */
   public async rename(name: string): Promise<void> {
     if (this.options.displayName === name) return
     this.options.displayName = name
     try {
       await this.broadcast({ type: 'peer-hello', by: name })
-      // The host's own entry rides in the roster, so it has to go out again.
+      // the host's own entry rides in the roster
       this.publishRoster()
     } catch (err) {
       console.warn('[Collab Coordinator] Could not pass on the new name:', err)
     }
   }
 
-  /** The host's word on what the guests may do, sent without ending anything. */
+  /** without ending anything */
   public async setMode(mode: CollabMode): Promise<void> {
     if (!this.options.isHost) return
-    // Kept, not only sent. It was told to whoever was already in the room and
-    // nowhere else, so the next person to join was handed the mode the session
-    // started on and the change never reached them.
+    // kept, not only sent, or the next joiner got the starting mode
     this.options.mode = mode
     await this.broadcast({ type: 'mode-change', mode })
   }
 
   private async hangUp(farewell: CollabMessage): Promise<void> {
-    // Before anything closes, because closing a channel to flush the message
-    // raises the same event a guest leaving raises, and a host would otherwise
-    // answer its own departure by reopening the room.
+    // before anything closes, or the host answers its own departure by reopening
     this.ended = true
 
     const open = [...this.links.values()].filter(link => link.channel?.readyState === 'open')
@@ -1434,8 +1124,7 @@ export class WebRTCCollaborationCoordinator {
       open.map(async link => {
         try {
           await this.sendTo(link, farewell)
-          // Non-null: readyState was read off it a line above, and nothing in
-          // between can have cleared it.
+          // readyState was read off it a line above
           await closeGracefully(link.channel as RTCDataChannel)
         } catch (err) {
           console.warn('[Collab Coordinator] Could not say goodbye to a peer:', err)
@@ -1449,8 +1138,7 @@ export class WebRTCCollaborationCoordinator {
     this.ended = true
     this.closeAllPeers()
     this.signalingRoom = ''
-    // A merge nobody can answer any more. Left standing, the next session would
-    // refuse its first proposal on the strength of one from the last.
+    // reset, or the next session refuses its first proposal
     this.decidingMerge = false
     this.offeredMerge = false
 

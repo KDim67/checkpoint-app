@@ -5,9 +5,7 @@ import {
 } from '../src/shared/licence'
 import { defined } from './helpers/defined'
 
-// The About panel used to spell the copyright out by hand, and said 2025 for a
-// project whose first commit is from 2026, under a holder LICENSE does not
-// name. These keep the one remaining copy honest.
+// the About panel once said 2025 under the wrong holder
 
 describe('the copyright years shown in the app', () => {
   it('shows one year until there is a range to show', () => {
@@ -19,7 +17,7 @@ describe('the copyright years shown in the app', () => {
   })
 
   it('never claims a year before the first release', () => {
-    // A machine with a wrong clock, or someone testing in the past.
+    // a wrong clock, or testing in the past
     expect(copyrightYears(1999)).toBe(String(COPYRIGHT_FROM))
   })
 
@@ -50,13 +48,9 @@ describe('agreement with the LICENSE file', () => {
 })
 
 describe('agreement with what ships in the installer', () => {
-  // This used to check the year alone, which is how the config came to name
-  // "Checkpoint" as the copyright holder while LICENSE, the About panel and
-  // the licence module all named a person. The holder was the half that went
-  // wrong, so it is the half worth asserting.
+  // the holder once went wrong in the config, so assert it
   it('names the same holder in the packaged metadata', () => {
-    // electron-builder bakes this into the exe properties, where nobody looks
-    // until it is wrong.
+    // baked into the exe, where nobody looks
     const match = /^copyright:\s*"(.+)"$/m.exec(readFileSync('electron-builder.yml', 'utf8'))
     expect(match, 'electron-builder.yml has no copyright line').not.toBeNull()
     expect(defined(match)[1]).toContain(COPYRIGHT_HOLDER)

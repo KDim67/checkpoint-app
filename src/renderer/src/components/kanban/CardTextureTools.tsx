@@ -42,15 +42,14 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
               </div>
               
               <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                {/* Generate Maps (PBR) Button */}
                 <button
                   onClick={() => {
                     useAppStore.getState().setGamedevPreloadTexture(path, cardId);
                     useAppStore.getState().setView('gamedev');
                     onClose();
                   }}
+                  className="card-texture-tools-pbr"
                   style={{
-                    background: 'var(--color-primary)',
                     border: 'none',
                     borderRadius: 'var(--radius-sm)',
                     color: 'white',
@@ -62,23 +61,19 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
                     alignItems: 'center',
                     gap: '4px'
                   }}
-                  onMouseOver={e => e.currentTarget.style.background = 'var(--color-primary-hover)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'var(--color-primary)'}
                 >
                   <Sparkles size={12} />
                   <span>PBR Maps</span>
                 </button>
 
-                {/* Make Seamless Button */}
                 <button
                   onClick={() => {
                     useAppStore.getState().setGamedevPreloadSeamless(path, cardId);
                     useAppStore.getState().setView('gamedev');
                     onClose();
                   }}
+                  className="card-texture-tools-seamless hover-bg-surface-2 hover-border-accent"
                   style={{
-                    background: 'var(--color-surface-offset)',
-                    border: '1px solid var(--color-balance)',
                     borderRadius: 'var(--radius-sm)',
                     color: 'var(--color-text-base)',
                     fontSize: '11px',
@@ -88,14 +83,6 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px'
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.background = 'var(--color-surface-2)'
-                    e.currentTarget.style.borderColor = 'var(--color-secondary)'
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.background = 'var(--color-surface-offset)'
-                    e.currentTarget.style.borderColor = 'var(--color-balance)'
                   }}
                 >
                   <Layers size={12} className="text-accent" />

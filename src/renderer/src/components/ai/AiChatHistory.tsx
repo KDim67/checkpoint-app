@@ -23,7 +23,6 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
         gap: 'var(--space-4)'
       }}
     >
-      {/* Context pre-seeded pill if active */}
       {contextItem && (
         <div className="no-shrink">
           <ContextPill item={contextItem} onClear={() => { selectItem(null); setContextItem(null) }} />
@@ -55,7 +54,7 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
             </div>
           </div>
 
-          {/* Example chips. Make the invisible feature surface visible */}
+          {/* example chips make a hidden feature visible */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', maxWidth: '340px' }}>
             {[
               { label: '🗂 Set up a board for my project', action: () => handleSubmitWithText('Design a Kanban board for this project: propose the workflow COLUMNS (each with a fitting color) and seed each column with a few well-scoped starter cards (with tags and priorities).', { displayContent: 'Set up a board', intentHint: 'create' }) },
@@ -66,10 +65,9 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
               <button
                 key={chip.label}
                 onClick={chip.action}
+                className="ai-chat-history-chip"
                 style={{
                   background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
                   borderRadius: '999px',
                   padding: '5px 12px',
                   fontSize: '10px',
@@ -77,8 +75,6 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
                   cursor: 'pointer',
                   transition: 'all 120ms ease'
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-secondary)'; e.currentTarget.style.color = 'var(--color-secondary)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-surface-offset)'; e.currentTarget.style.color = 'var(--color-text-base)' }}
               >
                 {chip.label}
               </button>
@@ -92,7 +88,7 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
       )}
 
       {messages.map((msg, index) => {
-        // Check if subsequent message has JSON entities that can be reverted
+        // does the next message carry revertable JSON entities
         const nextMsg = messages[index + 1]
         const hasRevertAction = !!(
           nextMsg &&
@@ -110,8 +106,7 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
             onRevert={handleRevert}
             onCopy={handleCopyMessage}
             isCopied={copiedMsgIndex === index}
-            // Committed messages are final. The blinking cursor belongs ONLY to
-            // the live streaming preview below, never to already-written messages.
+            // committed messages are final, the cursor belongs to the live preview only
             isStreaming={false}
             hasRevertAction={hasRevertAction}
             actionsLocked={isStreaming}
@@ -119,7 +114,6 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
         )
       })}
 
-      {/* "Thinking…" indicator while waiting for first chunk */}
       {isWaitingForFirstChunk && !streamingText && (
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', width: '100%' }}>
           <div style={{
@@ -151,7 +145,6 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
         </div>
       )}
 
-      {/* Streaming text preview bubble */}
       {streamingText && (() => {
         const { thinking, content } = parseThinkingAndContent(streamingText)
         return (

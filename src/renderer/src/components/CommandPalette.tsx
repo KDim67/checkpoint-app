@@ -39,8 +39,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Read once per opening: a view toggled off while the palette is shut should
-  // not still be offered the next time it opens.
+  // read per opening, a view toggled off while shut shouldn't be offered
   useEffect(() => {
     if (!open) return
     setQuery('')
@@ -48,9 +47,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
     let cancelled = false
     const load = async () => {
       const entries = await Promise.all(
-        // getBoolSetting rather than a raw read: these keys are written as both
-        // a boolean and the string "false" depending on which panel wrote them,
-        // and Game Dev defaults to off, so an unset key is not the same as on.
+        // keys are stored as a boolean or the string "false", and Game Dev defaults off
         VIEW_FEATURES.map(async f => [f.view, await getBoolSetting(f.key, f.defaultOn)] as const)
       )
       if (!cancelled) setEnabledViews(Object.fromEntries(entries) as Partial<Record<ActiveView, boolean>>)
@@ -70,8 +67,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
     let cancelled = false
     const timer = setTimeout(async () => {
       const found = await searchEverything(q, activeWorkspace)
-      // Guarded because a slower earlier query can land after a faster later
-      // one, which would show results for something no longer typed.
+      // a slower earlier query can land after a faster later one
       if (!cancelled) setHits(found)
     }, 140)
 
@@ -92,7 +88,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         enabledViews,
         savedViews,
         applyView: id => {
-          // Parked in the store, then navigate: BacklogView reads it on arrival.
+          // parked in the store, BacklogView reads it on arrival
           setPendingViewId(id)
           setView('backlog')
         }
@@ -102,8 +98,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
 
   const results = useMemo(() => rankCommands(commands, query), [commands, query])
 
-  // One flat list so the arrow keys and Enter cross the boundary without the
-  // user having to think about which half they are in.
+  // one flat list so arrows and Enter cross groups
   const rows = useMemo(
     () => [
       ...results.map(command => ({ type: 'command' as const, command })),
@@ -112,8 +107,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
     [results, hits]
   )
 
-  // Clamped rather than reset: typing a narrower query should not throw away the
-  // selection when the highlighted row is still in the list.
+  // clamped, not reset, so narrowing keeps a still-visible selection
   const active = Math.min(selected, Math.max(0, rows.length - 1))
 
   useEffect(() => {
@@ -136,8 +130,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
     if (!hit.target) return
     switch (hit.kind) {
       case 'note':
-        // Parked in the store rather than dispatched: setView only schedules a
-        // render, so NotesView has not mounted yet and would miss an event.
+        // parked in the store: setView only schedules a render, NotesView would miss an event
         setPendingNoteTitle(hit.target)
         setView('notes')
         break
@@ -190,7 +183,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
       style={{
         position: 'fixed',
         inset: 0,
-        // Sits above the right panel and every popover, below nothing.
+        // above the right panel and every popover
         zIndex: 9999,
         background: 'rgba(0, 0, 0, 0.45)',
         display: 'flex',
@@ -257,8 +250,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
             const isActive = index === active
             const key = row.type === 'command' ? row.command.id : row.hit.id
 
-            // Group headings only make sense while the authored order still
-            // holds; once rows are score-ordered they would appear to repeat.
+            // headings only while authored order holds, scored rows would repeat them
             let heading: string | null = null
             if (row.type === 'command' && !query.trim() && row.command.group !== lastGroup) {
               heading = row.command.group

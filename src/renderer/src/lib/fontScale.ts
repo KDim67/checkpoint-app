@@ -1,11 +1,4 @@
-/**
- * Applies the persisted text-scale setting to the document.
- *
- * Lives in `lib/` rather than beside the Appearance settings tab because React
- * Fast Refresh only handles a module that exports components *or* plain values,
- * not both. Exporting this helper from the tab component meant every edit to
- * that file forced a full page reload instead of a hot swap.
- */
+/** in lib/ since Fast Refresh needs a module to export components or values, not both */
 
 export type FontSize = 'small' | 'medium' | 'large'
 
@@ -15,7 +8,7 @@ const FONT_SCALES: Record<FontSize, string> = {
   large: '1.125'
 }
 
-/** Base sizes in rem, scaled together so the type ramp keeps its proportions. */
+/** rem, scaled together to keep the ramp's proportions */
 const BASE_TOKENS: Record<string, number> = {
   '--text-2xs': 0.625,
   '--text-xs': 0.75,

@@ -3,9 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// The plugins directory is derived from app.getPath('home'), so the electron
-// stub is pointed at a throwaway directory per test. Everything else. The
-// require, the metadata read, the load and unload. Is the real code path.
+// the stub points home at a throwaway dir; require, metadata, load and unload are all real
 
 let home: string
 
@@ -27,7 +25,7 @@ const writePlugin = (filename: string, source: string): void => {
   writeFileSync(join(pluginsDir(), filename), source, 'utf8')
 }
 
-/** A plugin that records what ran, so side effects can be asserted on. */
+/** records what ran */
 const recordingPlugin = (marker: string) => `
 globalThis.__pluginMarks = globalThis.__pluginMarks || []
 globalThis.__pluginMarks.push('${marker}:toplevel')
@@ -67,10 +65,7 @@ describe('scanPlugins', () => {
   })
 
   it('still lists a file it cannot make sense of, by filename', async () => {
-    // The trade for not executing anything while listing: a syntax error can no
-    // longer be detected here, because detecting it meant running the file. It
-    // surfaces at load time instead, with a real message. See the loadPlugin
-    // test below.
+    // not executing means syntax errors surface at load instead
     writePlugin('broken.js', 'this is not javascript {{{')
     const { scanPlugins } = await import('../src/main/pluginRegistry')
 
@@ -93,8 +88,7 @@ describe('scanPlugins', () => {
   })
 
   it('does NOT execute a disabled plugin merely to list it', async () => {
-    // Listing is a read. A plugin the user has switched off must not get to run
-    // its top-level code every time the settings tab is opened.
+    // listing is a read, disabled plugins mustn't run
     writePlugin('one.js', recordingPlugin('one'))
     const { scanPlugins } = await import('../src/main/pluginRegistry')
 
@@ -128,7 +122,7 @@ describe('loadPlugin', () => {
   })
 
   it('refuses a filename that escapes the plugins directory', async () => {
-    // The name arrives over IPC from the renderer, so it is untrusted input.
+    // the name arrives over IPC, untrusted
     const { loadPlugin } = await import('../src/main/pluginRegistry')
     const result = loadPlugin('../../../evil.js')
     expect(result.ok).toBe(false)
@@ -173,8 +167,7 @@ describe('unloadPlugin', () => {
   })
 
   it('picks up edits to a plugin file between loads', async () => {
-    // The require cache is purged on unload; without that, editing a plugin and
-    // re-enabling it would silently run the old code.
+    // the cache is purged on unload, or re-enabling runs old code
     writePlugin('one.js', recordingPlugin('first'))
     const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
 

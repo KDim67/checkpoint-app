@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseColor, flattenToHex } from '../src/shared/color'
 
-// Mermaid parses the colours in a `classDef` with its own grammar, which has no
-// production for `rgba(...)`. A translucent theme token reaching diagram source
-// took the whole Dialogue graph down with a syntax error, not just its colour.
+// mermaid's classDef grammar has no rgba, a translucent token broke the whole graph
 
 describe('parseColor', () => {
   it('reads a six digit hex as opaque', () => {
@@ -51,7 +49,7 @@ describe('flattenToHex', () => {
   })
 
   it('flattens the token that broke the Dialogue graph', () => {
-    // --color-secondary-muted over --color-surface-2, the chart background.
+    // secondary-muted over surface-2, the chart background
     expect(flattenToHex('rgba(205, 241, 43, 0.1)', '#131622')).toBe('#262c23')
   })
 

@@ -2,22 +2,14 @@ import { nativeTheme, BrowserWindow } from 'electron'
 
 let appThemeGetter: (() => string) | null = null
 
-/**
- * Paints the native window buttons on every window that has an overlay.
- *
- * Only the main window is built with one. The widget, the HUD and the tray
- * panel are frameless without it, and Electron throws for those by design, so
- * the failure is expected rather than something to report. The customizer used
- * to run its own copy of this loop and log that expected throw three times over
- * on every theme change.
- */
+/** only the main window has an overlay; electron throws for the rest by design, so don't report it */
 export function paintTitleBarOverlay(color: string, symbolColor: string): void {
   BrowserWindow.getAllWindows().forEach(win => {
     if (win.isDestroyed() || typeof win.setTitleBarOverlay !== 'function') return
     try {
       win.setTitleBarOverlay({ color, symbolColor })
     } catch {
-      // This window was not made with an overlay. There is nothing to paint.
+      // no overlay on this window, nothing to paint
     }
   })
 }

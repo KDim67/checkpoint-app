@@ -1,10 +1,4 @@
-/**
- * Everything the assistant says to the model before the user's own words.
- *
- * Inline in runChatStream these were unreadable, so the prompt contract could
- * only be checked by trusting a 550-line function. Pure here, so it can be
- * tested. Strings are verbatim: a reworded prompt is a behaviour change.
- */
+/** pure and testable; strings verbatim, rewording a prompt changes behaviour */
 
 import { PALETTE_HINT } from './boardEnrich'
 import { getSkillById } from './skills'
@@ -13,7 +7,7 @@ import type { Item, Tag } from '../../../../shared/types'
 import type { IntentType, WorkspaceFileInfo } from './types'
 import { detectSkill, estimateTokens } from './aiHelpers'
 
-/** The house rules. Terse for small models, which lose the long form. */
+/** terse for small models, they lose the long form */
 export function buildBasePrompt(isSmallModel: boolean): string {
   const baseSystemPromptContent = isSmallModel
     ? `You are Checkpoint AI, a helpful project assistant with DIRECT WRITE ACCESS to the user's Kanban board. Anything you create is added to the board automatically.
@@ -35,7 +29,7 @@ If asked to create, respond with a JSON batch block:
 Otherwise, answer the user's question in friendly plain text.`
     : `You are the Checkpoint AI Assistant, a pair-programming partner and project coordinator built directly into a game developer's visual Kanban workspace. Everything you create is automatically added to the board; there is no copy-paste and no external tool (never mention Trello/Jira/Asana/Notion).
 
-██ WHEN CREATING BOARD ITEMS ██
+WHEN CREATING BOARD ITEMS:
 1. AUDIT first: read the live board state below (columns + card titles) before creating anything.
 2. NO DUPLICATES: never create a card whose title matches or heavily overlaps an existing one.
 3. REUSE COLUMNS: if the existing columns fit, place cards in them and DO NOT create columns. Only introduce a column for a genuinely new workflow stage.
@@ -43,11 +37,11 @@ Otherwise, answer the user's question in friendly plain text.`
 5. BE CREATIVE & VISUAL: give every card a fitting priority (1-3) and 1-3 topical tags, each with a hex color. Give any new column a fitting hex color. ${PALETTE_HINT}
 6. When creation is justified, just do it. Don't ask permission or explain first.
 
-██ WHEN CONVERSING ██
+WHEN CONVERSING:
 - For questions, explanations, audits, or advice: reply in friendly natural-language text. Do NOT emit JSON action blocks unless the user asked to create/add something.
 - "Cards" and "Columns" are Checkpoint Kanban items (not playing cards).
 
-██ FORMAT (only when creating) ██
+FORMAT (only when creating):
 - Batch (preferred for cards): \`\`\`json { "cards": [ { "title", "body", "status", "priority", "tags": [{ "name", "color" }] } ], "columns": [ { "name", "color", "colorMode": "header" } ] } \`\`\`. Omit "columns" unless adding new stages.
 - Implementation plan: \`\`\`json:create_plan { "title", "overview", "steps": [{ "title", "details", "status": "pending" }] } \`\`\`
 - Branching dialogue: \`\`\`json:create_dialogue_tree { "startNode", "nodes": [{ "id", "speaker", "text", "choices": [{ "text", "target" }] }] } \`\`\`
@@ -55,27 +49,19 @@ Otherwise, answer the user's question in friendly plain text.`
   return baseSystemPromptContent
 }
 
-/**
- * Models have no clock, so "Friday", "next week" and "overdue" mean nothing
- * without being pinned to a moment.
- */
+/** models have no clock */
 export function buildDateBlock(now: Date): string {
   return `CURRENT DATE & TIME: ${now.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (ISO date: ${now.toISOString().slice(0, 10)}). Resolve every relative date ("Friday", "next week", "overdue", "this sprint") against this moment. Cards may carry a deadline shown as (Due: …) in the board state below.`
 }
 
-/**
- * The live board, as the model sees it: legal column ids, what is in each
- * column, and the titles it must not duplicate.
- */
+/** legal column ids, what's in each, titles not to duplicate */
 export function buildBoardState(
   validContext: string,
   colsList: ColumnConfig[],
   cardOnlyItems: Item[],
   allItems: Item[]
 ): string {
-  // Per-column card summaries, ONLY type 'card' items: that is what
-  // the Kanban board actually renders. Listing backlog tasks here made
-  // the model (and the edit executor) target invisible items.
+  // cards only: listing backlog tasks made the model target invisible items
   const colSummaries: string[] = []
   for (const col of colsList) {
     const colCards = cardOnlyItems.filter(i => i.status === col.id || i.status.toLowerCase() === col.name.toLowerCase())
@@ -93,10 +79,10 @@ export function buildBoardState(
     colSummaries.push(`Column "${col.name}" [ID: "${col.id}"]:\n${cardListText}`)
   }
 
-  // VALID COLUMN IDs as a bullet list so the model can copy them exactly
+  // bullets so the model copies ids exactly
   const validColIds = colsList.map(c => `  • "${c.id}" → "${c.name}"`).join('\n')
 
-  // FORBIDDEN DUPLICATE TITLES as a bullet list (easier to match than CSV)
+  // bullets match better than CSV
   const forbiddenTitles = allItems.length > 0
     ? allItems.map((i: Item) => `  • ${i.title}`).join('\n')
     : '  (none yet)'
@@ -122,7 +108,6 @@ export function buildBoardState(
   return liveBoardStateText
 }
 
-/** Recalled memories, one per line, tagged with their category. */
 export function buildMemoryBlock(
   memories: { category: string; memory_key: string; content: string }[]
 ): string {
@@ -130,10 +115,7 @@ export function buildMemoryBlock(
   return `RECALLED PROJECT MEMORIES & KNOWN FACTS:\n${memFormatted}\n\nUse these persistent memories to maintain consistency with past decisions, user rules, and game lore.`
 }
 
-/**
- * The imported codebase, grouped by top-level folder and file type. Structure
- * rather than a flat list of names, which a model cannot reason about.
- */
+/** structure, not a flat name list a model can't reason about */
 export function buildWorkspaceIndex(
   workspaceFolder: string,
   workspaceFiles: WorkspaceFileInfo[],
@@ -141,7 +123,6 @@ export function buildWorkspaceIndex(
 ): string {
   const cappedFiles = workspaceFiles.slice(0, workspaceFileCap)
 
-  // Group files by top-level folder
   const folderGroups: Record<string, typeof cappedFiles[0][]> = {}
   for (const f of cappedFiles) {
     const parts = f.relativePath.replace(/\\/g, '/').split('/')
@@ -150,7 +131,7 @@ export function buildWorkspaceIndex(
     folderGroups[topFolder].push(f)
   }
 
-  // Summarize each folder: file count + extension buckets
+  // file count + extension buckets
   const folderSummaries = Object.entries(folderGroups)
     .map(([folder, files]) => {
       const extBuckets: Record<string, number> = {}
@@ -169,13 +150,7 @@ export function buildWorkspaceIndex(
   return `IMPORTED WORKSPACE CODEBASE INDEX:\nProject folder: ${workspaceFolder}\nTotal files: ${workspaceFiles.length}${workspaceFiles.length > 500 ? ' (capped at 500)' : ''}\n\nFile structure by folder:\n${folderSummaries}\n\nUse this structure to understand the project architecture. If you need a specific file's contents, ask the user to paste it or attach it as a cheatsheet.`
 }
 
-/**
- * Which skill to run under.
- *
- * A pinned skill wins. Otherwise one is recalled from the wording, and failing
- * that inferred from the intent, so asking for a dialogue tree gets the
- * narrative skill without the user having to pick it.
- */
+/** pinned wins, then recalled from wording, then inferred from intent */
 export function resolveSkillId(
   activeSkillId: string | null,
   text: string,
@@ -189,7 +164,7 @@ export function resolveSkillId(
   return resolvedSkillId
 }
 
-/** Which structured generator an intent maps to, or null to just stream. */
+/** null to just stream */
 export function structuredKindFor(
   intent: IntentType
 ): 'board' | 'plan' | 'dialogue' | 'update' | 'config' | null {
@@ -200,7 +175,6 @@ export function structuredKindFor(
     intent === 'configure_board' ? 'config' : null
 }
 
-/** What the spinner says while the structured generator runs. */
 export function waitingLabelFor(kind: 'board' | 'plan' | 'dialogue' | 'update' | 'config'): string {
   return kind === 'board' ? 'Composing board changes…' :
     kind === 'plan' ? 'Drafting a plan…' :
@@ -208,7 +182,6 @@ export function waitingLabelFor(kind: 'board' | 'plan' | 'dialogue' | 'update' |
     kind === 'config' ? 'Adjusting board settings…' : 'Writing dialogue…'
 }
 
-/** The instruction handed to the structured generator for each kind. */
 export function buildStructuredInstruction(
   structuredKind: 'board' | 'plan' | 'dialogue' | 'update' | 'config',
   wantsCols: boolean
@@ -226,10 +199,7 @@ export function buildStructuredInstruction(
   return instruction
 }
 
-/**
- * How much of the conversation can be carried, once the fixed costs of the
- * system prompt, the skill and the workspace index are paid for.
- */
+/** what's left after the system prompt, skill and workspace index */
 export function historyBudgetFor(
   contextWindowTokens: number,
   resolvedSkillId: string | null,
@@ -240,11 +210,10 @@ export function historyBudgetFor(
   const baseOverheadTokens = 900
   const skillTokens = resolvedSkillId ? estimateTokens(getSkillById(resolvedSkillId)?.systemPrompt || '') : 0
   const workspaceTokens = workspaceFolder ? estimateTokens(workspaceFiles.slice(0, workspaceFileCap).map(f => f.relativePath).join('\n')) : 0
-  // 2000 held back for system docs and response safety.
+  // 2000 held back for system docs and response safety
   return contextWindowTokens - baseOverheadTokens - skillTokens - workspaceTokens - 2000
 }
 
-/** Reasoning style, tuned to what the model can actually do. */
 export function buildReasoningInstruction(modelLower: string, isSmallModel: boolean): string {
   let reasoningInstruction = ''
   const isNativeThinking = modelLower.includes('r1') || modelLower.includes('think') || modelLower.includes('qwq')
@@ -264,10 +233,7 @@ Format your reasoning clearly before giving your final response.`
   return reasoningInstruction
 }
 
-/**
- * The last thing in the prompt stack, and so the heaviest: exactly what shape
- * the answer must take for this intent.
- */
+/** last in the stack, so it weighs most */
 export function buildEnforcement(intent: IntentType): string {
   let enforcementContent = ''
   switch (intent) {

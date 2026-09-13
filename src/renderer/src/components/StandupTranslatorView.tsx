@@ -14,7 +14,6 @@ import * as ollamaApi from '../data/ollama'
 import * as aiApi from '../data/ai'
 import * as appApi from '../data/app'
 
-// Zero-dependency SVG Icons
 const SparklesIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
@@ -59,7 +58,7 @@ const FeedIcon = () => (
   </svg>
 )
 
-// Dedicated stream channel. Isolates this modal's stream from the AI panel's.
+// own stream channel, isolated from the AI panel
 const STANDUP_STREAM_ID = 'standup'
 
 const SYSTEM_PROMPT = `You are a professional Agile Scrum Master and an Executive AI Summarizer.
@@ -78,7 +77,7 @@ CRITICAL INSTRUCTIONS:
 
 Provide ONLY the markdown output. Do not output any preamble, introduction, or conversational filler like "Here is your report". Start immediately with the markdown content.`
 
-// Colour-code the three standup sections so the report is scannable at a glance.
+// colour-code the three sections so the report scans
 function sectionAccent(text: string): string | null {
   const t = text.toLowerCase()
   if (/achiev|complet|done|shipped|resolved|accomplish/.test(t)) return '#22c55e'
@@ -108,31 +107,26 @@ export default function StandupTranslatorView({
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const { toast } = useToast()
 
-  // State Management
   const [logs, setLogs] = useState<Item[]>([])
   const [loadingLogs, setLoadingLogs] = useState(false)
   const [timeRange, setTimeRange] = useState<number>(24)
   const [selectedLogIds, setSelectedLogIds] = useState<string[]>([])
   const [style, setStyle] = useState<'Corporate' | 'Agile' | 'Executive'>('Agile')
 
-  // AI Configuration
   const [selectedModel, setSelectedModel] = useState('llama3')
   const [localModels, setLocalModels] = useState<string[]>([])
   const [useOllamaSelector, setUseOllamaSelector] = useState(false)
   const [temperature, setTemperature] = useState(0.5)
   const [maxTokens, setMaxTokens] = useState(2048)
 
-  // AI Streaming State
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState('')
   const streamRef = useRef(createStreamBuffer(text => setStreamingText(text)))
   const reportEndRef = useRef<HTMLDivElement>(null)
 
-  // Action feedback states
   const [copied, setCopied] = useState(false)
   const [posting, setPosting] = useState(false)
 
-  // 1. Load active contexts & logs when modal opens
   const fetchLogs = useCallback(async () => {
     setLoadingLogs(true)
     try {
@@ -141,7 +135,7 @@ export default function StandupTranslatorView({
       const now = Date.now()
       const hoursMs = timeRange * 60 * 60 * 1000
       
-      // Filter logs by the time range (newest first as returned, we preserve this)
+      // keeps the newest-first order
       const filtered = res.filter(item => {
         const diff = now - item.created_at
         return diff >= 0 && diff <= hoursMs
@@ -164,11 +158,7 @@ export default function StandupTranslatorView({
     }
   }, [isOpen, fetchLogs])
 
-  // 2. Load the active AI provider + models whenever the modal opens, so the
-  //    standup uses the same endpoint/model as the assistant. For a local
-  //    provider we auto-heal the model to one that's actually installed (the
-  //    old code could get stuck on an uninstalled default like "llama3", which
-  //    made generation silently fail).
+  // same endpoint/model as the assistant; local providers heal to an installed model or generation silently failed
   useEffect(() => {
     if (!isOpen) return
     const loadAiConfig = async () => {
@@ -192,7 +182,7 @@ export default function StandupTranslatorView({
             setUseOllamaSelector(false)
           }
         } else {
-          // Cloud provider: use its typed model, no Ollama dropdown.
+          // cloud provider: typed model, no ollama dropdown
           setLocalModels([])
           setUseOllamaSelector(false)
         }
@@ -203,9 +193,7 @@ export default function StandupTranslatorView({
     loadAiConfig()
   }, [isOpen])
 
-  // 3. Register IPC Streaming listeners. Scoped to the dedicated 'standup'
-  //    stream channel, so this modal and the AI Assistant panel can stream at
-  //    the same time without intercepting each other's chunks.
+  // scoped to 'standup' so this and the assistant can stream at once
   useEffect(() => {
     if (!isOpen) return
     const stream = streamRef.current
@@ -235,17 +223,16 @@ export default function StandupTranslatorView({
     }
   }, [isOpen])
 
-  // Auto-scroll streaming output
   useEffect(() => {
     if (isStreaming && reportEndRef.current) {
       reportEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [streamingText, isStreaming])
 
-  // Defined before the ESC effect so it's always current when Escape fires
+  // defined before the ESC effect so it's current when Escape fires
   const handleClose = useCallback(() => {
     if (isStreaming) {
-      // handleAbort is called inline here to avoid circular dependency
+      // abort inline to avoid a circular dependency
       aiApi.abortStream(STANDUP_STREAM_ID).catch(() => {})
       streamRef.current.flush()
       setIsStreaming(false)
@@ -253,7 +240,6 @@ export default function StandupTranslatorView({
     onClose()
   }, [isStreaming, onClose])
 
-  // ESC key handler to close
   useEffect(() => {
     if (!isOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -265,7 +251,6 @@ export default function StandupTranslatorView({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, handleClose])
 
-  // Lock body scroll when open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -305,8 +290,6 @@ export default function StandupTranslatorView({
     }
     setIsStreaming(false)
   }
-
-  // handleClose is now defined above (before ESC effect) as a useCallback
 
   const handleGenerate = async () => {
     if (isStreaming) return
@@ -454,7 +437,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
           overflow: 'hidden'
         }}
       >
-        {/* Header */}
         <header
           style={{
             padding: 'var(--space-4) var(--space-6)',
@@ -492,9 +474,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
             onClick={handleClose}
             aria-label="Close Standup Translator"
             style={{
-              background: 'transparent',
               border: 'none',
-              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -503,23 +483,13 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               borderRadius: 'var(--radius-sm)',
               transition: 'background var(--duration-fast), color var(--duration-fast)'
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'var(--color-surface-offset)'
-              e.currentTarget.style.color = 'var(--color-text-base)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.color = 'var(--color-text-muted)'
-            }}
           >
             <CloseIcon />
           </button>
         </header>
 
-        {/* Body columns */}
         <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
           
-          {/* Left Column: Controls & Checklist */}
           <div
             style={{
               width: '42%',
@@ -530,7 +500,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               background: 'rgba(19, 22, 34, 0.2)'
             }}
           >
-            {/* Timeframe & Style Options */}
             <div
               style={{
                 padding: 'var(--space-4) var(--space-5)',
@@ -541,7 +510,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 flexShrink: 0
               }}
             >
-              {/* Time Range */}
               <div>
                 <label className="label-caps-block">
                   Timeframe
@@ -577,7 +545,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 </div>
               </div>
 
-              {/* Style Selection */}
               <div>
                 <label className="label-caps-block">
                   Output Summary Format
@@ -604,7 +571,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 </select>
               </div>
 
-              {/* Model status selector */}
               <div>
                 <label className="label-caps-block">
                   AI Model
@@ -652,7 +618,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               </div>
             </div>
 
-            {/* Checklist Header */}
             <div
               style={{
                 padding: 'var(--space-3) var(--space-5)',
@@ -686,7 +651,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               )}
             </div>
 
-            {/* Logs List Scroll */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3) var(--space-5)' }}>
               {loadingLogs ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-4) 0' }}>
@@ -762,7 +726,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               )}
             </div>
 
-            {/* Bottom Generate Trigger */}
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderTop: '1px solid var(--color-surface-offset)', background: 'var(--color-surface-2)' }}>
               {isStreaming ? (
                 <button
@@ -810,10 +773,8 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
             </div>
           </div>
 
-          {/* Right Column: Markdown Output Summary */}
           <div style={{ width: '58%', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--color-background)' }}>
             
-            {/* Header / Actions Bar */}
             <div
               style={{
                 height: '42px',
@@ -902,7 +863,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               )}
             </div>
 
-            {/* Markdown rendering viewport */}
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-6)' }}>
               {isStreaming && !streamingText ? (
                 <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', textAlign: 'center', gap: 'var(--space-3)' }}>

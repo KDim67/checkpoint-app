@@ -49,8 +49,7 @@ describe('buildBasePrompt', () => {
   })
 
   it('keeps the full form warning against naming rival tools', () => {
-    // Mentioning Trello or Jira makes the assistant sound like it is describing
-    // somewhere else to go, in an app that is the destination.
+    // naming Trello or Jira sounds like pointing elsewhere
     expect(buildBasePrompt(false)).toContain('Trello')
   })
 })
@@ -83,7 +82,7 @@ describe('buildBoardState', () => {
   })
 
   it('matches a status that names the column rather than its id', () => {
-    // Cards created before ids settled carry the display name as their status.
+    // older cards carry the display name as status
     const cards = [card({ title: 'Legacy', status: 'Done' })]
     const text = buildBoardState('work', cols, cards, cards)
     expect(text.slice(text.indexOf('Column "Done"'))).toContain('Legacy')
@@ -142,8 +141,7 @@ describe('buildWorkspaceIndex', () => {
   it('caps the listing for the model tier but still reports the real total', () => {
     const text = buildWorkspaceIndex('C:/proj', files, 1)
     expect(text).not.toContain('docs/')
-    // The count is of everything indexed, not of what fitted. Otherwise the
-    // model is told the project is smaller than it is.
+    // counts everything indexed, not what fitted
     expect(text).toContain('Total files: 4')
   })
 })
@@ -199,7 +197,7 @@ describe('buildStructuredInstruction', () => {
   })
 
   it('tells the update generator that target is a card title, never a column', () => {
-    // The single most common structured-output mistake.
+    // the most common structured-output mistake
     const text = buildStructuredInstruction('update', false)
     expect(text).toContain('NEVER a column name')
     expect(text).toContain('toColumn')
@@ -256,8 +254,7 @@ describe('buildEnforcement', () => {
   })
 
   it('lists every configure_board operation the MCP schema accepts', () => {
-    // These two lists have to agree; a model told about six of seven ops simply
-    // never uses the seventh.
+    // the lists must agree, a model told six of seven ops never uses the seventh
     const text = buildEnforcement('configure_board')
     for (const op of [
       'add_column', 'update_column', 'delete_column', 'reorder_columns',

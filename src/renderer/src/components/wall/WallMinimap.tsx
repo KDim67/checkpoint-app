@@ -23,7 +23,7 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
   const ox = pad - b.minX * k
   const oy = pad - b.minY * k
 
-  // The camera's own window onto the wall, drawn in the same space.
+  // the camera's window, in the same space
   const viewX = (-camera.x / camera.zoom) * k + ox
   const viewY = (-camera.y / camera.zoom) * k + oy
   const viewW = (rect.width / camera.zoom) * k
@@ -33,8 +33,7 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
     <div
       onPointerDown={e => {
         e.stopPropagation()
-        // Click the map, go there: the wall point under the click
-        // becomes the centre of the view.
+        // click to centre the view there
         const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
         const wx = (e.clientX - box.left - ox) / k
         const wy = (e.clientY - box.top - oy) / k
@@ -71,8 +70,7 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
       ))}
       <div
         data-wall-minimap-view
-        // Scale, offsets and the size of the viewport, so a pan can
-        // move this without recomputing the whole map.
+        // geometry on the element so a pan can move it without recomputing
         data-geom={`${k},${ox},${oy},${rect.width},${rect.height}`}
         style={{
           position: 'absolute',

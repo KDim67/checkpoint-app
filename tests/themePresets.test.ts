@@ -34,8 +34,7 @@ describe('deriveThemeVars', () => {
   })
 
   it('flips inverted text to stay readable on the chosen secondary', () => {
-    // A bright accent needs dark text on it; a dark one needs white. Before this
-    // was derived, inverted text stayed white against every accent.
+    // bright accents need dark text; inverted text used to stay white
     expect(deriveThemeVars(vars({ '--color-secondary': '#cdf12b' }))['--color-text-inverted']).toBe('#0f172a')
     expect(deriveThemeVars(vars({ '--color-secondary': '#1a2b0a' }))['--color-text-inverted']).toBe('#ffffff')
   })
@@ -227,7 +226,7 @@ describe('the shipped presets', () => {
       expect(worst('--color-text-muted'), `${p.name} muted text`).toBeGreaterThanOrEqual(4.5)
       expect(worst('--color-primary'), `${p.name} primary`).toBeGreaterThanOrEqual(4.5)
       expect(worst('--color-secondary'), `${p.name} secondary`).toBeGreaterThanOrEqual(4.5)
-      // Idle sidebar icons are marks, not text, so 3:1 is the bar they must clear.
+      // icons are marks, 3:1 is their bar
       expect(worst('--color-balance'), `${p.name} idle icons`).toBeGreaterThanOrEqual(3)
     }
   })

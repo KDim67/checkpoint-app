@@ -26,7 +26,7 @@ export async function loadFocusSettings(): Promise<FocusSettings> {
 
   return {
     durations: Object.fromEntries(minutes) as Record<TimerPreset, number>,
-    // An interval below 2 would make every break a long break.
+    // below 2 every break is a long break
     longBreakInterval: Math.min(12, Math.max(2, Math.round(longBreakInterval))),
     autoStartNext,
     chimeEnabled,

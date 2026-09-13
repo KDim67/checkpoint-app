@@ -46,14 +46,13 @@ describe('escapeCsvField', () => {
   })
 
   it('quotes a field containing a newline', () => {
-    // A card body spanning lines is the common case that breaks naive CSV.
+    // multi-line bodies break naive CSV
     expect(escapeCsvField('line one\nline two')).toBe('"line one\nline two"')
     expect(escapeCsvField('with\r\nCRLF')).toBe('"with\r\nCRLF"')
   })
 
   it('defuses a value that would run as a spreadsheet formula', () => {
-    // Cards can be written by webhooks and by agents over MCP, so a title is not
-    // necessarily something the user typed.
+    // titles can come from webhooks or agents
     expect(escapeCsvField('=1+1')).toBe("'=1+1")
     expect(escapeCsvField('=HYPERLINK("http://x")')).toBe('"\'=HYPERLINK(""http://x"")"')
     for (const leader of ['+', '-', '@']) {
@@ -103,7 +102,7 @@ describe('itemsToCsv', () => {
 
   it('survives a body with commas, quotes and newlines', () => {
     const csv = itemsToCsv([item({ body: 'has, a comma\nand "quotes"' })])
-    // One header line plus one record, however many newlines the body held.
+    // one header plus one record, however many newlines
     const records = csv.trim().split(/\r\n(?=[0-9a-zA-Z-]+,)/)
     expect(records).toHaveLength(2)
     expect(csv).toContain('""quotes""')

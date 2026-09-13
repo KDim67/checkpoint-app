@@ -19,11 +19,10 @@ export default function DetailTitleInput({ inputRef, id, value, onChange, onBlur
       onChange={e => onChange(e.target.value)}
       onBlur={onBlur}
       placeholder={placeholder}
+      className="detail-title-input"
       style={{
         width: '100%',
         background: 'transparent',
-        border: 'none',
-        borderBottom: '1px solid transparent',
         fontSize: 'var(--text-xl)',
         fontWeight: 'var(--weight-bold)',
         color: 'var(--color-text-base)',
@@ -31,8 +30,6 @@ export default function DetailTitleInput({ inputRef, id, value, onChange, onBlur
         padding: '4px 0',
         transition: 'border-color var(--duration-fast)'
       }}
-      onFocus={e => (e.target.style.borderBottomColor = 'var(--color-surface-offset)')}
-      onBlurCapture={e => (e.currentTarget.style.borderBottomColor = 'transparent')}
     />
   )
 }

@@ -1,5 +1,3 @@
-/** The bridge's `workspace` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.workspace
 
 export const getStructure = (...args: Parameters<Bridge['getStructure']>): ReturnType<Bridge['getStructure']> =>

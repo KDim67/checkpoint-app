@@ -40,11 +40,7 @@ const ACTION_LABELS: Record<GlobalAction, { label: string; desc: string; default
   }
 }
 
-/**
- * Which list a recording is for. Three now, stored separately: the OS-level
- * hotkeys, the in-app ones that work anywhere, and the per-view commands,
- * where the scope also decides what counts as a collision.
- */
+/** global, app-wide and per-view lists; the scope decides what collides */
 type RecordingTarget = { scope: 'global' | 'app' | ShortcutScope; id: string }
 
 const VIEW_SCOPES = [...new Set(VIEW_SHORTCUTS.map(s => s.scope))]
@@ -61,7 +57,6 @@ const MENU_CHOICES: { value: MenuButton; label: string }[] = [
   { value: 'none', label: 'No button' }
 ]
 
-/** A labelled dropdown, for the settings that pick from a short list. */
 function ChoiceRow<T extends string>({
   label, desc, value, choices, onChange
 }: {
@@ -180,13 +175,12 @@ function ShortcutRow({
           <button
             onClick={onStartRecording}
             aria-label={`Change shortcut for ${label}. Currently ${combo || 'unassigned'}`}
+            className={`hotkey-binder-shortcut-trigger border-offset ${combo ? 'text-base' : 'text-faint'}`}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--space-1)',
               background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              color: combo ? 'var(--color-text-base)' : 'var(--color-text-faint)',
               fontFamily: 'var(--font-mono)',
               fontSize: 'var(--text-xs)',
               borderRadius: '4px',
@@ -195,14 +189,6 @@ function ShortcutRow({
               minWidth: '110px',
               justifyContent: 'center',
               transition: 'all 100ms ease'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--color-primary)'
-              e.currentTarget.style.color = 'var(--color-primary)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'var(--color-surface-offset)'
-              e.currentTarget.style.color = combo ? 'var(--color-text-base)' : 'var(--color-text-faint)'
             }}
           >
             <Keyboard size={12} />
@@ -226,14 +212,13 @@ function ActionButton({
   variant: 'primary' | 'secondary'
 }) {
   const base = variant === 'primary' ? 'var(--color-primary)' : 'var(--color-surface-offset)'
-  const hover = variant === 'primary' ? 'var(--color-primary-hover)' : 'var(--color-surface-elevated)'
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      className={variant === 'primary' ? 'hotkey-binder-action-primary' : 'hotkey-binder-action-secondary'}
       style={{
         padding: 'var(--space-2) var(--space-4)',
-        background: base,
         border: `1px solid ${base}`,
         color: variant === 'primary' ? '#ffffff' : 'var(--color-text-base)',
         borderRadius: 'var(--radius-md)',
@@ -243,8 +228,6 @@ function ActionButton({
         transition: 'all 100ms ease',
         opacity: disabled ? 0.5 : 1
       }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = hover }}
-      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = base }}
     >
       {children}
     </button>
@@ -299,7 +282,7 @@ export default function HotkeyBinder() {
     e.preventDefault()
     e.stopPropagation()
 
-    // Escape abandons the recording rather than binding itself.
+    // Escape cancels instead of binding
     if (e.key === 'Escape') {
       setRecording(null)
       setCollisionWarning(null)
@@ -322,8 +305,7 @@ export default function HotkeyBinder() {
       }
       setBindings(prev => ({ ...prev, [recording.id]: combo }))
     } else if (recording.scope === 'app') {
-      // Checked against every view as well: an in-app shortcut fires wherever
-      // you are, so sharing a combo with one would double-fire.
+      // in-app shortcuts fire everywhere, so check every view
       const clash = shortcutClash(combo, { id: recording.id, scope: 'global' }, appBindings, viewBindings)
       if (clash) {
         setCollisionWarning(`"${combo}" is already bound to "${clash}".`)
@@ -331,12 +313,10 @@ export default function HotkeyBinder() {
       }
       const next = { ...appBindings, [recording.id]: combo }
       setAppBindings(next)
-      // Applied immediately. These are in-window listeners, so unlike the
-      // global hotkeys there is nothing to register with the OS.
+      // in-window listeners, nothing to register with the OS
       saveBindings(next).catch(err => console.error('Failed to save shortcuts:', err))
     } else {
-      // Only its own view and the app-wide list. Another view's keys are free
-      // to take: the two are never on screen together.
+      // another view's keys are free, never on screen together
       const clash = shortcutClash(combo, { id: recording.id, scope: recording.scope }, appBindings, viewBindings)
       if (clash) {
         setCollisionWarning(`"${combo}" is already bound to "${clash}".`)

@@ -10,34 +10,18 @@ interface RenameResult {
   errors: Array<{ oldPath: string; newPath: string; error: string }>
 }
 
-/**
- * Two paths that mean the same file. Windows filenames are case-insensitive, so
- * renaming `sprite.png` to `Sprite.png` is a real rename onto itself and must
- * not be mistaken for a collision.
- */
+/** windows names are case-insensitive, sprite.png to Sprite.png renames onto itself */
 function sameFile(a: string, b: string): boolean {
   return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b
 }
 
-/**
- * Safely renames a batch of files on disk.
- * Validates that all paths are absolute and the source files exist.
- *
- * Nothing here overwrites. `rename` replaces the destination without a word on
- * both Windows and POSIX, and this tool runs over asset folders where the name
- * it is about to produce very often already exists: running the Unity texture
- * preset twice turns `sprite.png` into `T_sprite.png` both times, and the second
- * run used to destroy the first.
- *
- * A batch that would swap two names (a to b while b goes to c) is refused
- * rather than reordered. Refusing costs a second run; guessing costs a file.
- */
+/** never overwrites: rename clobbers silently and presets rerun onto existing names; swaps refused, not reordered */
 export async function batchRenameFiles(
   files: Array<{ oldPath: string; newPath: string }>
 ): Promise<RenameResult> {
   let renamedCount = 0
   const errors: Array<{ oldPath: string; newPath: string; error: string }> = []
-  /** Destinations already spoken for by an earlier entry in this same batch. */
+  /** destinations already claimed earlier in this batch */
   const claimed = new Set<string>()
 
   for (const { oldPath, newPath } of files) {
@@ -56,7 +40,7 @@ export async function batchRenameFiles(
       if (claimed.has(claimKey)) {
         throw new Error(`Another file in this batch is already becoming ${newPath}`)
       }
-      // Renaming a file onto its own name is a no-op, not a collision.
+      // renaming onto its own name isn't a collision
       if (!sameFile(oldPath, newPath) && existsSync(newPath)) {
         throw new Error(`Something already exists at ${newPath}`)
       }
@@ -81,9 +65,6 @@ export async function batchRenameFiles(
   }
 }
 
-/**
- * Opens a native file dialog to let the user select an Albedo texture file.
- */
 export async function selectTextureFile(): Promise<{ path: string; dataUrl: string } | null> {
   const result = await dialog.showOpenDialog({
     title: 'Select Albedo Texture',
@@ -101,9 +82,6 @@ export async function selectTextureFile(): Promise<{ path: string; dataUrl: stri
   return await loadTextureFile(filePath)
 }
 
-/**
- * Reads a texture image from disk and converts it to a base64 Data URL.
- */
 export async function loadTextureFile(filePath: string): Promise<{ path: string; dataUrl: string } | null> {
   try {
     if (!filePath || !isAbsolute(filePath) || !existsSync(filePath)) {
@@ -126,9 +104,6 @@ export async function loadTextureFile(filePath: string): Promise<{ path: string;
   }
 }
 
-/**
- * Saves generated PBR maps next to the original Albedo map on disk.
- */
 export async function savePbrMaps(
   albedoPath: string,
   maps: { normal?: string; height?: string; roughness?: string; ao?: string }
@@ -142,7 +117,7 @@ export async function savePbrMaps(
     const ext = extname(albedoPath)
     const baseName = basename(albedoPath, ext)
 
-    // Strip common albedo/color suffixes so map filenames are clean
+    // drop albedo/color suffixes
     let cleanBase = baseName
     const albedoSuffixes = [
       '_albedo', '_Albedo', '-albedo', '-Albedo',
@@ -169,7 +144,7 @@ export async function savePbrMaps(
       }
 
       const buffer = Buffer.from(matches[2], 'base64')
-      const targetFilename = `${cleanBase}_${mapType}.png` // Export as .png for high quality/lossless
+      const targetFilename = `${cleanBase}_${mapType}.png` // png, lossless
       const targetPath = join(dir, targetFilename)
 
       await writeFile(targetPath, buffer)
@@ -190,9 +165,6 @@ export async function savePbrMaps(
   }
 }
 
-/**
- * Saves the generated seamless texture next to the original Albedo texture on disk.
- */
 export async function saveSeamlessTexture(
   originalPath: string,
   dataUrl: string
@@ -206,7 +178,6 @@ export async function saveSeamlessTexture(
     const ext = extname(originalPath)
     const baseName = basename(originalPath, ext)
 
-    // Strip common suffixes so output filenames are clean
     let cleanBase = baseName
     const albedoSuffixes = [
       '_albedo', '_Albedo', '-albedo', '-Albedo',
@@ -229,7 +200,7 @@ export async function saveSeamlessTexture(
     }
 
     const buffer = Buffer.from(matches[2], 'base64')
-    const targetFilename = `${cleanBase}_seamless.png` // Export as .png for high quality/lossless
+    const targetFilename = `${cleanBase}_seamless.png` // png, lossless
     const targetPath = join(dir, targetFilename)
 
     await writeFile(targetPath, buffer)
@@ -247,9 +218,6 @@ export async function saveSeamlessTexture(
   }
 }
 
-/**
- * Opens a native folder selection dialog and returns the files in it.
- */
 export async function selectFolder(): Promise<{ path: string; files: Array<{ name: string; path: string; dataUrl: string }> } | null> {
   const result = await dialog.showOpenDialog({
     title: 'Select Folder of Sprites',
@@ -264,7 +232,7 @@ export async function selectFolder(): Promise<{ path: string; files: Array<{ nam
   const filenames = await readdir(folderPath)
   const pngFiles = filenames.filter(f => extname(f).toLowerCase() === '.png')
 
-  // Hard-cap at 200 files to prevent Chrome from crashing
+  // more than this crashes chrome
   const MAX_FILES = 200
   const limitedFiles = pngFiles.slice(0, MAX_FILES)
 
@@ -284,9 +252,6 @@ export async function selectFolder(): Promise<{ path: string; files: Array<{ nam
   return { path: folderPath, files }
 }
 
-/**
- * Saves the packed sprite atlas (.png) and metadata (.json) to the selected folder.
- */
 export async function saveSpriteAtlas(
   folderPath: string,
   atlasDataUrl: string,
@@ -323,9 +288,6 @@ export async function saveSpriteAtlas(
   }
 }
 
-/**
- * Saves a list of sliced sprite frames to the directory of the original sprite sheet.
- */
 export async function saveSlicedSprites(
   originalPath: string,
   files: Array<{ index: number; dataUrl: string }>
@@ -359,9 +321,6 @@ export async function saveSlicedSprites(
   }
 }
 
-/**
- * Saves the color-graded LUT strip next to the original reference.
- */
 export async function saveLutTexture(
   originalPath: string,
   dataUrl: string
@@ -391,9 +350,6 @@ export async function saveLutTexture(
   }
 }
 
-/**
- * Saves the upscaled texture image next to the original asset.
- */
 export async function saveUpscaledTexture(
   originalPath: string,
   suffix: string,

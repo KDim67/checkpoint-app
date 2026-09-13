@@ -1,5 +1,3 @@
-/** The bridge's `clipboard` calls, as the renderer reaches them. Typed off the bridge. */
-
 type Bridge = typeof window.electronAPI.clipboard
 
 export const clearHistory = (...args: Parameters<Bridge['clearHistory']>): ReturnType<Bridge['clearHistory']> =>

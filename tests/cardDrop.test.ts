@@ -10,14 +10,12 @@ import {
   type ColumnBox
 } from '../src/shared/cardDrop'
 
-// Two columns side by side with a gutter between them, the shape the board
-// actually has: full-height columns, a gap, and empty space past the last one.
+// two full-height columns, a gutter, and space past the last
 const TODO: ColumnBox = { id: 'todo', left: 100, right: 400, top: 0, bottom: 800 }
 const DONE: ColumnBox = { id: 'done', left: 420, right: 720, top: 0, bottom: 800 }
 const COLUMNS = [TODO, DONE]
 
-// Three cards, 100 tall, with the 8px gap the column's flex layout puts
-// between them. Midpoints at 150, 258 and 366.
+// three 100px cards with 8px gaps; midpoints 150, 258, 366
 const CARDS: CardBox[] = [
   { id: 'a', column: 'todo', top: 100, height: 100 },
   { id: 'b', column: 'todo', top: 208, height: 100 },
@@ -35,9 +33,7 @@ describe('cardAbove', () => {
     expect(cardAbove(CARDS, 'todo', 290)).toBe('c')
   })
 
-  // This is the bug the whole file exists for. The gap is inside no card, so
-  // asking which card the pointer was in found none and the drop fell through
-  // to the column, which means the end of the list.
+  // the bug this file exists for: gaps fell through to the column end
   it('gives the gap between two cards to the card below it', () => {
     expect(cardAbove(CARDS, 'todo', 204)).toBe('b')
     expect(cardAbove(CARDS, 'todo', 312)).toBe('c')
@@ -102,9 +98,7 @@ describe('dropTargetAt', () => {
       .toEqual({ column: 'done', before: null })
   })
 
-  // The gutter, the board's own padding and the Add Column tile are all
-  // outside every column. Snapping to the nearest one keeps the preview on
-  // screen instead of blinking out every time the pointer crosses a gap.
+  // gutters and padding snap to the nearer column so the preview doesn't blink
   it('snaps to the nearer column from the gutter between them', () => {
     expect(dropTargetAt(COLUMNS, CARDS, { x: 405, y: 120 })?.column).toBe('todo')
     expect(dropTargetAt(COLUMNS, CARDS, { x: 416, y: 120 })?.column).toBe('done')
@@ -115,7 +109,7 @@ describe('dropTargetAt', () => {
   })
 
   it('carries the pointer height into the column it snapped to', () => {
-    // Level with card b, so the snap lands mid-list rather than at the end.
+    // level with b, so it lands mid-list
     expect(dropTargetAt(COLUMNS, CARDS, { x: 60, y: 230 }))
       .toEqual({ column: 'todo', before: 'b' })
   })
@@ -148,10 +142,7 @@ describe('dropIndex', () => {
     expect(dropIndex(order, 'c', 'b')).toBe(1)
   })
 
-  // The preview shifts every card the dragged one passes up into the slot it
-  // left, so dropping "above c" on the way down is the same gesture as landing
-  // where c was. Without the step of one the card landed one slot short of
-  // where the preview had just shown it.
+  // passed cards shift up, so "above c" going down is c's old slot
   it('moves a card down its own column to the slot it was shown in', () => {
     expect(dropIndex(order, 'a', 'b')).toBe(1)
     expect(dropIndex(order, 'a', 'c')).toBe(2)
@@ -162,10 +153,7 @@ describe('dropIndex', () => {
     expect(dropIndex(order, 'b', null)).toBe(2)
   })
 
-  // Dragging past the last card of your own column names that card instead of
-  // the column, because dnd-kit can only part the list around another card and
-  // naming the column parted nothing, so the drag looked dead. The two have to
-  // mean the same thing or the card would land one slot short of the bottom.
+  // past your own last card names that card; both must mean the end
   it('reads the bottom card of your own column as the end of it', () => {
     expect(dropIndex(order, 'a', 'c')).toBe(dropIndex(order, 'a', null))
     expect(dropIndex(order, 'b', 'c')).toBe(dropIndex(order, 'b', null))
@@ -190,8 +178,7 @@ describe('dropIndex', () => {
     expect(dropIndex([], 'x', 'a')).toBe(0)
   })
 
-  // Reordering one column is the same operation either way round, so the
-  // answer has to survive being applied.
+  // the answer has to survive being applied
   it('agrees with lifting the card out and putting it back', () => {
     const move = (list: string[], dragged: string, before: string | null): string[] => {
       const rest = list.filter(id => id !== dragged)
@@ -227,9 +214,7 @@ describe('positionForIndex', () => {
     expect(positionForIndex([1000, 2000, 3000], 2)).toBe(2500)
   })
 
-  // Halving only makes room above a positive number. A column renumbered down
-  // to zero, or one carrying a negative from an older build, would otherwise
-  // have handed the new card the very position it was meant to go above.
+  // halving can't get above zero, or a negative from an older build
   it('steps away from a first card that halving cannot get above', () => {
     expect(positionForIndex([0, 1000], 0)).toBe(-POSITION_STEP)
     expect(positionForIndex([-40, 1000], 0)).toBe(-1040)

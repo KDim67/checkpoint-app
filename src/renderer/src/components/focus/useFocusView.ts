@@ -15,23 +15,14 @@ export interface SelectedTask {
   completed: boolean
 }
 
-/**
- * What the focus view reads and does, apart from drawing it.
- *
- * The timer lives in the store and FocusTimerEngine, so a session keeps running
- * while this view is closed. What is here is the task picker, the history, the
- * retrospective and the settings the view edits. The three screens take its
- * return as one prop, the way GameDevView hands each tool to its panel.
- */
+/** the timer lives in the store; this is picker, history, retro and settings, passed as one prop */
 export function useFocusView() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
   const { match: matchKey } = useViewShortcuts('focus')
 
-  // Timer engine state. Lives in the global store (see FocusTimerEngine,
-  // mounted at the app root) so a running session survives navigating away
-  // from this view entirely, instead of silently resetting.
+  // in the global store so a running session survives leaving the view
   const step = useAppStore(s => s.focusStep)
   const selectedTasks = useAppStore(s => s.focusSelectedTasks)
   const preset = useAppStore(s => s.focusPreset)
@@ -58,26 +49,21 @@ export function useFocusView() {
   const focusExitToSetup = useAppStore(s => s.focusExitToSetup)
   const focusLogDistraction = useAppStore(s => s.focusLogDistraction)
 
-  // Component-local state
   const [dbItems, setDbItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [quickAddText, setQuickAddText] = useState('')
   const [addingTask, setAddingTask] = useState(false)
 
-  // Retrospective State
   const [retroNotes, setRetroNotes] = useState('')
   const [retroTasks, setRetroTasks] = useState<SelectedTask[]>([])
   const [pastSessions, setPastSessions] = useState<FocusSession[]>([])
 
-  // Confirmation dialog states
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
-  // Load Uncompleted Items & History
   const loadFocusData = useCallback(async () => {
     setLoading(true)
     try {
-      // 1. Fetch uncompleted cards and tasks
       const cardsRes = await itemPage(activeWorkspace, 'card', 1, 100)
       const tasksRes = await itemPage(activeWorkspace, 'task', 1, 100)
 
@@ -86,11 +72,10 @@ export function useFocusView() {
       )
       setDbItems(merged)
 
-      // 2. Fetch past focus sessions
       const sessions = await getFocusSessions(activeWorkspace)
-      setPastSessions(sessions.slice(0, 5)) // show top 5 recent sessions
+      setPastSessions(sessions.slice(0, 5)) // top 5 recent
 
-      // 3. Handle preselected task navigation for immediate Pomodoro timer start
+      // a preselected task starts the timer right away
       const preselectedId = useAppStore.getState().preselectedTaskId
       if (preselectedId) {
         const found = merged.find(item => item.id === preselectedId)
@@ -115,15 +100,10 @@ export function useFocusView() {
     loadFocusData()
   }, [loadFocusData])
 
-  // The task picker was a one-shot read per workspace, so cards deleted or
-  // completed anywhere else went on being offered here until the context
-  // changed. These are the same events the board itself reloads on.
+  // reload on the same events as the board, the one-shot read kept offering deleted cards
   useEffect(() => {
     const refresh = (): void => { loadFocusData() }
-    // 'db-mutation' is the one that matters: the preload fires it on every
-    // create/update/delete, and archiving a Kanban card is an updateItem, so
-    // listening only for the board's own events would miss the exact case this
-    // fixes. The other two cover AI- and MCP-driven changes.
+    // db-mutation is the key one since archiving is an updateItem; the others cover AI and MCP
     window.addEventListener('db-mutation', refresh)
     window.addEventListener('item-updated', refresh)
     window.addEventListener('kanban-refresh', refresh)
@@ -134,9 +114,7 @@ export function useFocusView() {
     }
   }, [loadFocusData])
 
-  // Whenever the global timer engine transitions us into the retro screen
-  // (on natural completion or a manual skip), build the checklist from
-  // whichever tasks were selected for the session that just ended.
+  // build the retro checklist from the session's tasks when the engine moves to retro
   useEffect(() => {
     if (step === 'retro' && retroTasks.length === 0 && selectedTasks.length > 0) {
       setRetroTasks(
@@ -150,7 +128,6 @@ export function useFocusView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
-  // Timer Setup Helpers
   const getSelectedDurationMs = useCallback(() => {
     if (preset === 'custom') {
       return customMinutes * 60 * 1000
@@ -158,7 +135,7 @@ export function useFocusView() {
     return durationMsFor(focusSettings, preset)
   }, [preset, customMinutes, focusSettings])
 
-  // Keep the configured duration in sync with the chosen preset while on setup
+  // keep the duration in step with the preset on setup
   useEffect(() => {
     if (step === 'setup') {
       focusConfigureDuration(getSelectedDurationMs())
@@ -178,9 +155,7 @@ export function useFocusView() {
   const handleResetTimer = () => focusReset()
 
   const handleSkipTimer = () => {
-    // End the current interval early and move straight to its natural
-    // next step. A retrospective for focus intervals, or just back to
-    // setup for breaks (mirrors the automatic-completion behavior).
+    // end early and go to the natural next step
     const isFocus = preset === 'focus'
     focusFinish()
     if (isFocus) {
@@ -203,8 +178,7 @@ export function useFocusView() {
     loadFocusData()
   }
 
-  // Keyboard shortcuts, while a session is running. Which key does what comes
-  // from Settings; the defaults are Space, D and R.
+  // while running; keys come from Settings, default Space, D, R
   useEffect(() => {
     if (step !== 'active') return
     const handler = (e: KeyboardEvent) => {
@@ -215,7 +189,7 @@ export function useFocusView() {
           handleToggleTimer()
           break
         case 'focus_log_distraction':
-          // Quick-tally an interruption without breaking flow (Pomodoro practice)
+          // tally an interruption without breaking flow
           if (preset !== 'focus') return
           e.preventDefault()
           focusLogDistraction()
@@ -231,7 +205,6 @@ export function useFocusView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, isRunning, preset, matchKey])
 
-  // Task Selection / Inline Completion
   const handleToggleTaskSelection = (task: Item) => {
     const isSelected = selectedTasks.some(t => t.id === task.id)
     if (isSelected) {
@@ -250,10 +223,8 @@ export function useFocusView() {
     const newStatus = isDone ? 'open' : 'done'
 
     try {
-      // 1. Update status in Database
       await updateItem(task.id, { status: newStatus })
 
-      // 2. Update local state
       focusSetSelectedTasks(prev =>
         prev.map(t => (t.id === task.id ? { ...t, status: newStatus } : t))
       )
@@ -274,10 +245,7 @@ export function useFocusView() {
     )
   }
 
-  // Quick-add a task directly from the Focus setup screen
-  // Previously the only way to get a task into Focus Mode was to leave this
-  // view, create it in Backlog/Kanban, then come back. A real friction point
-  // for a "jot it down and get back to focusing" workflow.
+  // jot a task down without leaving Focus
   const handleQuickAddTask = async () => {
     const title = quickAddText.trim()
     if (!title) return
@@ -308,17 +276,13 @@ export function useFocusView() {
     }
   }
 
-  // Save Retrospective Row & Log
-  // Shared persistence step used by both "Save & Log Session" and
-  // "Save & Take a Break". Previously the break shortcut skipped saving
-  // entirely, silently losing the retrospective.
+  // shared by both save buttons; the break one used to skip saving
   const persistRetrospective = async (): Promise<boolean> => {
     try {
       const selectedTasksJson = JSON.stringify(
         retroTasks.map(t => ({ id: t.id, title: t.title, completed: t.completed }))
       )
 
-      // 1. Write session row to focus_sessions
       await createFocusSession({
         context: activeWorkspace,
         duration_ms: elapsedTimeMs,
@@ -326,7 +290,7 @@ export function useFocusView() {
         tasks_json: selectedTasksJson
       })
 
-      // 2. Sync database status for any checked retro tasks that were not updated yet
+      // sync checked retro tasks not updated yet
       for (const t of retroTasks) {
         const dbItem = dbItems.find(item => item.id === t.id)
         const expectedStatus = t.completed ? 'done' : 'open'
@@ -335,7 +299,6 @@ export function useFocusView() {
         }
       }
 
-      // 3. Format beautiful markdown for retrospective log entry
       const totalMinutes = Math.max(1, Math.round(elapsedTimeMs / 60000))
       const tasksMarkdownList = retroTasks
         .map(t => `- [${t.completed ? 'x' : ' '}] ${t.title}`)
@@ -355,7 +318,6 @@ ${retroNotes.trim() || '_No custom notes written._'}`
 
       const title = `Focus Session (${totalMinutes}m)`
 
-      // 4. Create log entry in DB
       await createItem({
         type: 'log',
         context: activeWorkspace,
@@ -382,8 +344,7 @@ ${retroNotes.trim() || '_No custom notes written._'}`
     const ok = await persistRetrospective()
     if (!ok) return
     toast('Session retrospective saved to log feed', { type: 'success' })
-    // Reset back to setup. Stay on Focus so the user can chain straight
-    // into a break or another round without losing their place.
+    // stay on Focus so the next round or break is one click
     focusExitToSetup()
     loadFocusData()
   }
@@ -420,25 +381,22 @@ ${retroNotes.trim() || '_No custom notes written._'}`
     loadFocusData()
   }
 
-  // Rendering Helper Computations
   const progressPercent = useMemo(() => {
     return durationMs > 0 ? (timeLeftMs / durationMs) * 100 : 0
   }, [timeLeftMs, durationMs])
 
-  // Projected clock time this interval will finish at. Helps plan around it.
+  // projected finish time
   const projectedEnd = useMemo(() => {
     if (!isRunning) return null
     return new Date(Date.now() + timeLeftMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }, [isRunning, timeLeftMs])
 
-  // Classic Pomodoro cadence: after every 4th completed focus interval, a
-  // long break is due instead of a short one.
+  // long break after every 4th focus interval
   const longBreakDue = cyclesCompleted > 0 && cyclesCompleted % focusSettings.longBreakInterval === 0
 
-  // Context color picker
   const activeColor = preset === 'focus' ? 'var(--color-secondary)' : (preset === 'short-break' ? '#10b981' : '#8b5cf6')
 
-  // Today's focused-minutes stat, derived from recent session history
+  // today's focused minutes, from recent history
   const todayStats = useMemo(() => {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)

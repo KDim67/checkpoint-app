@@ -4,9 +4,7 @@ import type { NoteMetadata, NoteSearchResult } from '../shared/types'
 import { recordTombstone } from './db'
 import { getConfigDir, getNotesDir, ensureDir, resolveSafePath as resolveInDir } from './paths'
 
-/**
- * Initializes the notes directory. Idempotent and fast after first call.
- */
+/** idempotent, fast after the first call */
 let _notesFsReady = false
 function initNotesFs(): void {
   if (_notesFsReady) return
@@ -19,11 +17,7 @@ function resolveSafePath(title: string): string {
   return resolveInDir(getNotesDir(), title, '.md')
 }
 
-/**
- * Reduces a chunk of markdown to a plain-text, single-line preview. Strips
- * headings, emphasis, code fences, list markers, links and wiki-links so the
- * note list can show a clean excerpt.
- */
+/** one-line plain-text preview for the note list */
 function toPlainText(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, ' ')          // fenced code blocks
@@ -40,10 +34,9 @@ function toPlainText(markdown: string): string {
     .trim()
 }
 
-/** Builds a bounded plain-text excerpt, skipping a leading H1 that just repeats the title. */
+/** skips a leading H1 that repeats the title */
 function buildExcerpt(content: string, title: string): string {
   const lines = content.split('\n')
-  // Drop a leading level-1 heading that merely echoes the title.
   const firstMeaningful = lines.findIndex(l => l.trim() !== '')
   if (firstMeaningful !== -1) {
     const h = lines[firstMeaningful].match(/^\s{0,3}#\s+(.*)$/)
@@ -55,27 +48,24 @@ function buildExcerpt(content: string, title: string): string {
   return plain.length > 180 ? `${plain.slice(0, 180).trimEnd()}…` : plain
 }
 
-/** Extracts `#tags` from note content (lower-cased, deduped). */
+/** lower-cased, deduped */
 function extractTags(content: string): string[] {
   const tagMatches = content.match(/(?:^|\s)(#[a-zA-Z0-9_-]+)/g) || []
   return Array.from(
     new Set(
       tagMatches
         .map(t => t.trim().toLowerCase())
-        .filter(t => t.length > 1) // filter out solitary '#' characters
+        .filter(t => t.length > 1) // lone '#'
     )
   )
 }
 
-/** Extracts `[[wiki links]]` from note content (original case, deduped, alias-aware). */
+/** original case, deduped, alias-aware */
 function extractLinks(content: string): string[] {
   const linkMatches = content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)
   return Array.from(new Set(Array.from(linkMatches).map(m => m[1].trim())))
 }
 
-/**
- * Lists all markdown notes in the directory along with their metadata.
- */
 export async function listNotes(): Promise<NoteMetadata[]> {
   initNotesFs()
   try {
@@ -100,7 +90,6 @@ export async function listNotes(): Promise<NoteMetadata[]> {
       })
     }
 
-    // Sort by last updated (newest first)
     return results.sort((a, b) => b.updatedAt - a.updatedAt)
   } catch (err) {
     console.error('Failed to list markdown notes:', err)
@@ -108,9 +97,6 @@ export async function listNotes(): Promise<NoteMetadata[]> {
   }
 }
 
-/**
- * Reads a single note's content by its title.
- */
 export async function readNote(title: string): Promise<string> {
   initNotesFs()
   try {
@@ -125,13 +111,7 @@ export async function readNote(title: string): Promise<string> {
   }
 }
 
-/**
- * Writes or renames a note.
- *
- * When `oldTitle` is provided and differs from `title`, the note is renamed.
- * Renaming onto an existing, different note is refused so a rename can never
- * silently overwrite (and destroy) another note.
- */
+/** renaming onto a different existing note is refused, never overwrite */
 export async function writeNote(title: string, content: string, oldTitle?: string): Promise<void> {
   initNotesFs()
 
@@ -143,10 +123,8 @@ export async function writeNote(title: string, content: string, oldTitle?: strin
   try {
     const newPath = resolveSafePath(trimmedTitle)
 
-    // Handle rename if oldTitle is provided and different
     if (oldTitle && oldTitle !== trimmedTitle) {
       const oldPath = resolveSafePath(oldTitle)
-      // Refuse to clobber a different existing note during a rename.
       if (fs.existsSync(newPath) && newPath !== oldPath) {
         throw new Error(`A note titled "${trimmedTitle}" already exists`)
       }
@@ -162,9 +140,6 @@ export async function writeNote(title: string, content: string, oldTitle?: strin
   }
 }
 
-/**
- * Deletes a note by its title.
- */
 export async function deleteNote(title: string): Promise<void> {
   initNotesFs()
   try {
@@ -180,10 +155,7 @@ export async function deleteNote(title: string): Promise<void> {
   }
 }
 
-/**
- * Full-text search across all note bodies (and titles). Returns matches with a
- * contextual snippet around the first hit, ranked by relevance.
- */
+/** title and body, snippet around the first hit, ranked */
 export async function searchNotes(query: string): Promise<NoteSearchResult[]> {
   initNotesFs()
   const trimmed = query.trim().toLowerCase()
@@ -204,7 +176,7 @@ export async function searchNotes(query: string): Promise<NoteSearchResult[]> {
       const haystack = plain.toLowerCase()
       const titleMatch = title.toLowerCase().includes(trimmed)
 
-      // Count body matches without regex (query may contain special chars).
+      // no regex, the query may have special chars
       let matchCount = 0
       let idx = haystack.indexOf(trimmed)
       const firstIdx = idx
@@ -227,7 +199,7 @@ export async function searchNotes(query: string): Promise<NoteSearchResult[]> {
       results.push({ title, snippet, matchCount, titleMatch })
     }
 
-    // Rank: title matches first, then by number of body matches.
+    // title matches first, then body match count
     return results.sort((a, b) => {
       if (a.titleMatch !== b.titleMatch) return a.titleMatch ? -1 : 1
       return b.matchCount - a.matchCount

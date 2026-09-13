@@ -2,26 +2,16 @@ import type Database from 'better-sqlite3'
 import { isEncrypted, encryptSecret, secretSettingKeys } from '../secureSettings'
 import { ITEMS_FTS_TRIGGERS_SQL } from './schema'
 
-// Current schema version
 const CURRENT_VERSION = 9
 
-/**
- * Databases created by early builds carry a CHECK constraint limiting
- * items.status to ('open','in_progress','done','archived'). Custom Kanban
- * columns store the column id in status, so ANY move to a non-default column
- * (including the built-in "in_review") failed with SQLITE_CONSTRAINT_CHECK on
- * those databases. SQLite cannot drop a CHECK, so the table is rebuilt once,
- * detected via sqlite_master (safe on fresh databases: no-op).
- */
+/** early dbs had a CHECK on items.status that broke custom columns; SQLite can't drop a CHECK, so rebuild once */
 export function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
   const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'items'`).get() as { sql?: string } | undefined
   const tableSql = row?.sql || ''
   if (!/status[^,]*CHECK\s*\(/i.test(tableSql)) return
 
   console.log('[db] Legacy items.status CHECK constraint detected: rebuilding table')
-  // FK enforcement must be off during the rebuild or DROP TABLE would cascade
-  // into item_tags/relations. The pragma is a no-op inside a transaction, so
-  // it is toggled outside and the rebuild wrapped in its own transaction.
+  // FKs off or DROP TABLE cascades; the pragma is a no-op inside a transaction
   db.pragma('foreign_keys = OFF')
   try {
     db.transaction(() => {
@@ -114,14 +104,11 @@ export function runMigrations(db: Database.Database): void {
       `)
     }
     if (userVersion < 6) {
-      // Repairs two things at once: rowids invalidated by the legacy items
-      // rebuild, and rows written either before items_fts existed or during a
-      // session when the rebuild had dropped its triggers. Cheap and idempotent.
+      // fixes rowids from the legacy rebuild and rows written while triggers were missing; cheap, idempotent
       db.exec(`INSERT INTO items_fts(items_fts) VALUES('rebuild');`)
     }
     if (userVersion < 7) {
-      // Same DDL as SCHEMA_SQL. Existing databases predate the MCP server
-      // keeping any record of what it changed.
+      // same DDL as SCHEMA_SQL, for dbs that predate the MCP log
       db.exec(`
         CREATE TABLE IF NOT EXISTS subtasks (
   id          TEXT PRIMARY KEY,
@@ -165,7 +152,7 @@ CREATE TABLE IF NOT EXISTS mcp_activity (
       `)
     }
     if (userVersion < 8) {
-      // Same DDL as SCHEMA_SQL.
+      // same DDL as SCHEMA_SQL
       db.exec(`CREATE TABLE IF NOT EXISTS recurrences (
   id           TEXT PRIMARY KEY,
   context      TEXT NOT NULL,
@@ -187,8 +174,7 @@ CREATE INDEX IF NOT EXISTS idx_recurrences_context ON recurrences(context);
 CREATE INDEX IF NOT EXISTS idx_recurrences_due ON recurrences(active, next_due);`)
     }
     if (userVersion < 9) {
-      // Same DDL as SCHEMA_SQL. Subtasks previously lived as markdown checkboxes
-      // inside a task body; those are converted on request, not automatically.
+      // same DDL as SCHEMA_SQL; markdown checkboxes convert on request, not here
       db.exec(`CREATE TABLE IF NOT EXISTS subtasks (
   id          TEXT PRIMARY KEY,
   item_id     TEXT NOT NULL,
@@ -204,14 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_subtasks_item ON subtasks(item_id, position);`)
   })()
 }
 
-/**
- * Re-writes credential settings that predate at-rest encryption, so an existing
- * install does not keep its provider keys in plaintext forever. Runs every boot,
- * no-op once the rows carry an envelope.
- *
- * Not via setSetting(): its side effects (titlebar sync, clipboard watcher) have
- * no business running during init.
- */
+/** encrypts pre-encryption secrets each boot; not via setSetting, its side effects don't belong in init */
 export function encryptLegacyPlaintextSecrets(db: Database.Database): void {
   try {
     const read = db.prepare(`SELECT value FROM app_settings WHERE key = ?`)
@@ -220,8 +199,7 @@ export function encryptLegacyPlaintextSecrets(db: Database.Database): void {
       const row = read.get(key) as { value: string } | undefined
       if (!row || isEncrypted(row.value)) continue
       const enveloped = encryptSecret(row.value)
-      // encryptSecret falls back to plaintext when no keyring is available;
-      // writing that back would be a pointless no-op UPDATE every boot.
+      // no keyring means plaintext back, skip the pointless UPDATE
       if (isEncrypted(enveloped)) write.run(enveloped, key)
     }
   } catch (err) {

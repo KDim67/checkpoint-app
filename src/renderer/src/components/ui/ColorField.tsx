@@ -1,14 +1,4 @@
-/**
- * A colour picker that belongs to the app.
- *
- * `<input type="color">` opens the OS picker, which on Windows is a white panel
- * with system fonts that has nothing to do with the surrounding theme. It is
- * also unstyleable, so the only fix is not to use it.
- *
- * A saturation square, a hue bar and a hex field: the arrangement everyone
- * already knows, drawn with the app's own tokens so it reads as part of the
- * app in either theme.
- */
+/** the OS picker ignores the theme and can't be styled, so our own square, hue bar and hex field */
 
 import React, { useEffect, useRef, useState } from 'react'
 import { hexToHsv, hsvToHex, isHex, type Hsv } from '../../../../shared/color'
@@ -16,7 +6,7 @@ import { hexToHsv, hsvToHex, isHex, type Hsv } from '../../../../shared/color'
 interface Props {
   value: string
   onChange: (hex: string) => void
-  /** Fires when the gesture ends, for callers that persist on commit. */
+  /** fires when the gesture ends, for persist-on-commit */
   onCommit?: (hex: string) => void
 }
 
@@ -28,8 +18,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
   const areaRef = useRef<HTMLDivElement>(null)
   const hueRef = useRef<HTMLDivElement>(null)
 
-  // Follows the outside value unless this component is the one changing it,
-  // which would otherwise fight the pointer during a drag.
+  // follows the outside value except mid-drag
   const draggingRef = useRef(false)
   useEffect(() => {
     if (draggingRef.current) return
@@ -45,7 +34,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
     onChange(hex)
   }
 
-  /** Shared by both surfaces: capture, track, and release on the way out. */
+  /** both surfaces: capture, track, release */
   const track = (
     ref: React.RefObject<HTMLDivElement | null>,
     read: (fx: number, fy: number) => Hsv
@@ -76,8 +65,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
     el.addEventListener('pointerup', up)
   }
 
-  // The listeners above close over the state at bind time, so the committed
-  // value is read from a ref that always holds the latest.
+  // listeners close over bind-time state, read the latest from a ref
   const hsvRef = useRef(hsv)
   hsvRef.current = hsv
 
@@ -85,7 +73,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', width: '196px' }}>
-      {/* Saturation across, value down, over the current hue. */}
+      {/* saturation across, value down */}
       <div
         ref={areaRef}
         onPointerDown={track(areaRef, (fx, fy) => ({ ...hsvRef.current, s: fx, v: 1 - fy }))}
@@ -142,8 +130,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
           value={typed}
           onChange={e => {
             setTyped(e.target.value)
-            // Applied only once it is a whole colour, so the square does not
-            // lurch about while the value is half-typed.
+            // only whole hex values, so the square doesn't lurch mid-typing
             if (isHex(e.target.value)) {
               const next = hexToHsv(e.target.value)
               if (next) { setHsv(next); onChange(hsvToHex(next)) }

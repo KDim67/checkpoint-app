@@ -21,8 +21,7 @@ describe('choosing a preview width', () => {
   })
 
   it('caps at the largest rather than growing without limit', () => {
-    // Otherwise a wall item resized to something absurd would cache a copy
-    // per pixel width and defeat the point of the ladder.
+    // or absurd widths cache a copy per pixel
     expect(previewWidthFor(99999)).toBe(PREVIEW_WIDTHS[PREVIEW_WIDTHS.length - 1])
   })
 
@@ -41,8 +40,7 @@ describe('naming a cached copy', () => {
   it('re-encodes as JPEG only when the source had no alpha to lose', () => {
     expect(previewFilename('photo.jpg', 960)).toBe('photo@960.jpg')
     expect(previewFilename('photo.JPEG', 960)).toBe('photo@960.jpg')
-    // PNG, WebP and GIF can all carry transparency; flattening it to black
-    // would be a visible bug, so they stay PNG.
+    // these carry transparency, flattening goes black
     expect(previewFilename('logo.png', 960)).toBe('logo@960.png')
     expect(previewFilename('logo.webp', 960)).toBe('logo@960.png')
     expect(previewFilename('anim.gif', 960)).toBe('anim@960.png')
@@ -55,9 +53,7 @@ describe('generating a preview', () => {
   })
 
   it('declines anything it cannot decode, so the original is served', () => {
-    // Null here means "serve the original", not "something went wrong".
-    // The electron stub reports every image as empty, so what this pins down
-    // is the empty-image branch rather than Chromium's real SVG support.
+    // null means serve the original; the stub returns empty images
     const dir = mkdtempSync(join(tmpdir(), 'checkpoint-preview-'))
     try {
       const svg = join(dir, 'diagram.svg')
@@ -77,8 +73,7 @@ describe('recognising a cached copy', () => {
   })
 
   it('does not match a different file that starts the same way', () => {
-    // Media filenames are UUIDs, but a prefix match would still be a bug
-    // waiting for the day they are not.
+    // prefix matching would be a bug waiting
     expect(isPreviewOf('abc.png', 'abcd@480.png')).toBe(false)
     expect(isPreviewOf('abc.png', 'ab@480.png')).toBe(false)
   })
@@ -92,13 +87,12 @@ describe('recognising a cached copy', () => {
 
 describe('warming previews when an image arrives', () => {
   it('builds the widths a new image is actually asked for', () => {
-    // The Wall requests twice an item's box, and an item starts at 280 wide.
+    // twice a 280px item's box
     expect(EAGER_WIDTHS).toContain(previewWidthFor(280 * 2))
   })
 
   it('leaves the largest for someone who actually enlarges one', () => {
-    // 1920 costs as much as the other two together and most images never
-    // reach a box that wants it.
+    // 1920 costs as much as both and is rarely needed
     expect(EAGER_WIDTHS).not.toContain(1920)
     expect(PREVIEW_WIDTHS).toContain(1920)
   })
@@ -108,8 +102,7 @@ describe('warming previews when an image arrives', () => {
   })
 
   it('does not throw on a file it cannot read', () => {
-    // Nothing depends on warming having worked: the protocol handler still
-    // builds whatever is missing on demand.
+    // nothing depends on warming
     expect(() => warmPreviews(join(tmpdir(), 'checkpoint-no-such-image.png'))).not.toThrow()
   })
 })

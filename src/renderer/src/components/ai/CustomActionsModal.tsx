@@ -1,11 +1,4 @@
-/**
- * The user's own quick-action prompts: a small library of reusable prompts, each
- * tagged with the intent it should be sent under.
- *
- * Lifted out of AiStreamPanel with its JSX unchanged. State lives in
- * useCustomActions and arrives as one `actions` prop: this unmounts every time
- * it closes, so it must not own anything worth keeping.
- */
+/** state lives in useCustomActions; this unmounts on close, so it owns nothing */
 
 import { Sparkles, Trash2, X } from 'lucide-react'
 import type { CustomActions } from './useCustomActions'
@@ -57,7 +50,6 @@ export default function CustomActionsModal({ actions }: Props) {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {/* Existing actions */}
               {customActions.length === 0 ? (
                 <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-3)' }}>
                   No custom actions yet. Save the prompts you find yourself retyping. They'll appear in the ＋ menu.
@@ -94,7 +86,6 @@ export default function CustomActionsModal({ actions }: Props) {
                 ))
               )}
 
-              {/* Add form */}
               <div style={{
                 borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-3)',
                 display: 'flex', flexDirection: 'column', gap: '6px'

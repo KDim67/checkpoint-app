@@ -4,7 +4,7 @@ import { recordMcpActivity } from '../../mcpActivity'
 import { shorten, type McpUndoAction } from '../../../shared/mcpActivity'
 import { json, notifyRenderer, text, z } from '../toolKit'
 
-/** Markdown notes. */
+/** markdown notes */
 export function registerNoteTools(mcp: McpServer): void {
   mcp.registerTool(
     'list_notes',
@@ -43,7 +43,7 @@ export function registerNoteTools(mcp: McpServer): void {
       }
     },
     async ({ title, content, oldTitle }) => {
-      // Read before writing: this is the only moment the previous body exists.
+      // read first, the only moment the previous body exists
       let previous: string | null = null
       try {
         previous = await readNote(oldTitle ?? title)

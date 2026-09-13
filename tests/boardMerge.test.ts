@@ -47,8 +47,7 @@ describe('columnMap', () => {
     expect(columnMap(cols, cols).size).toBe(0)
   })
 
-  // Two boards built separately both have a To Do. Without this the merge would
-  // leave the user with two of every column and their cards split across them.
+  // separately built boards both have To Do; unpaired, every column doubles
   it('pairs a column of the same name carrying a different id', () => {
     const map = columnMap([column('open', 'To Do')], [column('col-todo-1', 'to do')])
     expect(map.get('col-todo-1')).toBe('open')
@@ -137,7 +136,7 @@ describe('mergeMetadata', () => {
       JSON.stringify({ cover: { type: 'color', value: '#0f0' } })
     ))
     expect(out.cover.value).toBe('#0f0')
-    // Only the older side has it, so it survives rather than being dropped.
+    // only the older side has it, so it survives
     expect(out.isTemplate).toBe(true)
   })
 
@@ -186,8 +185,7 @@ describe('mergeItem', () => {
     expect(merged.updated_at).toBe(300)
   })
 
-  // The whole point of a merge rather than a pick: a comment written on each
-  // side is two comments, not one.
+  // a comment on each side is two comments, the point of merging
   it('keeps a comment written on each side even though one card wins', () => {
     const mine = card({
       id: 'c1',
@@ -203,12 +201,10 @@ describe('mergeItem', () => {
     expect(out.comments).toHaveLength(2)
   })
 
-  // Without an ancestor this can only ask which save came last, and a card
-  // somebody opened and saved unchanged beats one the other person rewrote.
-  // With it, only a card changed on both sides is a real contest.
+  // without an ancestor a no-op save beats a real rewrite; with one only double changes contest
   it('takes the side that changed it, whatever the stamps say', () => {
     const base = card({ id: 'c1', title: 'Base', updated_at: 100 })
-    // This side saved later, but changed nothing since the two last agreed.
+    // saved later but unchanged since agreeing
     const mine = card({ id: 'c1', title: 'Base', updated_at: 900, metadata: '{}' })
     const theirs = card({ id: 'c1', title: 'Theirs wrote this', updated_at: 200 })
     expect(mergeItem(mine, theirs, { ...base, updated_at: 900 }).title).toBe('Theirs wrote this')
@@ -270,8 +266,7 @@ describe('mergeBoards', () => {
     expect(merged.summary.cardsUpdated).toBe(0)
   })
 
-  // A merge that resurrects everything you ever deleted is not a merge anyone
-  // wants. The tombstone is the only record that the delete was deliberate.
+  // reviving every deleted card isn't a merge; the tombstone proves intent
   it('leaves a card deleted here deleted', () => {
     const merged = mergeBoards(
       side(),
@@ -403,8 +398,7 @@ describe('mergeBoards', () => {
     })
   })
 
-  // Their deletions count for something too, which they could not before: the
-  // baseline carried no tombstones, so a merge only ever knew its own.
+  // their deletions count now, baselines used to carry no tombstones
   it('takes away a card they deleted after this side last touched it', () => {
     const merged = mergeBoards(
       side({ items: [card({ id: 'c1', updated_at: 100 })] }),
@@ -416,9 +410,7 @@ describe('mergeBoards', () => {
     expect(merged.summary.cardsTakenAway).toBe(1)
   })
 
-  // The other half of the same rule. Deleting something and then being handed
-  // back work done after the delete is one surprise; having work done after
-  // someone else's delete silently undone is a worse one.
+  // silently undoing work done after someone else's delete is worse
   it('keeps a card they deleted before this side edited it', () => {
     const merged = mergeBoards(
       side({ items: [card({ id: 'c1', updated_at: 300 })] }),
@@ -454,8 +446,7 @@ describe('mergeImpact', () => {
   })
 
   it('counts a card whose metadata grew even though the stamp did not', () => {
-    // A comment pooled in from the other copy is a change to the card, and the
-    // stamp alone would have called the two of them the same card.
+    // a pooled comment is a change the stamp alone would miss
     const impact = mergeImpact(
       [card({ id: 'c1', metadata: '{}' })],
       [card({ id: 'c1', metadata: JSON.stringify({ comments: [{ id: 'com-1' }] }) })]
@@ -469,16 +460,13 @@ describe('mergeImpact', () => {
       .toEqual({ cardsAdded: 0, cardsChanged: 0, cardsReturning: 0, cardsRemoved: 0 })
   })
 
-  // The one the user has to be told about before agreeing, because it is the
-  // one that undoes something they meant.
+  // the one to warn about, it undoes something meant
   it('separates a card coming back from a card arriving', () => {
     const impact = mergeImpact([], [card({ id: 'c1' }), card({ id: 'c2' })], new Set(['c2']))
     expect(impact).toEqual({ cardsAdded: 1, cardsChanged: 0, cardsReturning: 1, cardsRemoved: 0 })
   })
 
-  // The proposal is the whole board, so a card missing from it is a card the
-  // other side deleted. It is the only way agreeing can cost this board
-  // something, and it used to be counted nowhere and said nowhere.
+  // missing from the proposal means deleted there; used to go uncounted
   it('counts a card of this side the proposal does not have', () => {
     const impact = mergeImpact([card({ id: 'c1' }), card({ id: 'c2' })], [card({ id: 'c1' })])
     expect(impact).toEqual({ cardsAdded: 0, cardsChanged: 0, cardsReturning: 0, cardsRemoved: 1 })

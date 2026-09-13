@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import { FieldRow } from './SettingsSection'
 import { getStringSetting, setStringSetting } from '../../lib/settings'
 
-// Theme mode (dark / light / system). Rendered in Appearance & Theme
+// dark / light / system
 export default function ThemeModeSettings() {
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark')
 
@@ -30,8 +30,7 @@ export default function ThemeModeSettings() {
     await setStringSetting('app_theme', t)
   }
 
-  // Icons rather than emoji: emoji are rendered by the OS font, so they ignore
-  // the theme entirely and shift shape between Windows versions.
+  // icons not emoji, the OS font ignores the theme
   const THEME_OPTIONS: { value: typeof theme; Icon: LucideIcon; label: string; desc: string }[] = [
     { value: 'dark',   Icon: Moon,    label: 'Dark',   desc: 'Easy on the eyes' },
     { value: 'light',  Icon: Sun,     label: 'Light',  desc: 'High contrast'    },

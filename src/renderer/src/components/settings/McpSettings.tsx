@@ -7,14 +7,7 @@ import McpActivityLog from './McpActivityLog'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 import * as mcpApi from '../../data/mcp'
 
-/**
- * Controls the Model Context Protocol server.
- *
- * The server hands an external agent read and write access to every workspace,
- * so this panel is deliberately explicit about that: it is off by default, the
- * token is masked, and regenerating it is behind a confirmation because it
- * silently breaks every client already configured against it.
- */
+/** full read/write to every workspace: off by default, token masked, regenerate behind a confirm */
 export default function McpSettings(): React.JSX.Element {
   const { toast } = useToast()
   const confirm = useConfirm()
@@ -45,8 +38,7 @@ export default function McpSettings(): React.JSX.Element {
 
   const handleToggle = async (next: boolean): Promise<void> => {
     setBusy(true)
-    // Optimistic, then reconciled from the main process: a port clash must not
-    // leave the switch showing "on" while nothing is listening.
+    // optimistic, then reconciled: a port clash mustn't leave it looking on
     setEnabled(next)
     try {
       await mcpApi.toggle(next, parseInt(port, 10) || 9990)
@@ -60,7 +52,7 @@ export default function McpSettings(): React.JSX.Element {
     }
   }
 
-  /** Applied on blur so a half-typed port never gets bound. */
+  /** on blur so a half-typed port never binds */
   const handlePortCommit = async (): Promise<void> => {
     const parsed = parseInt(port, 10)
     if (!Number.isFinite(parsed) || parsed < 1024 || parsed > 65535) {
@@ -153,7 +145,7 @@ export default function McpSettings(): React.JSX.Element {
         <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={busy} label="Enable MCP Server" />
       </RowBetween>
 
-      {/* Stated plainly rather than buried: this grants full read and write. */}
+      {/* say plainly it grants full read and write */}
       <div
         style={{
           display: 'flex',

@@ -26,7 +26,7 @@ describe('normalizeUndoAction', () => {
   })
 
   it('rejects actions missing the field their replay depends on', () => {
-    // A delete with no id would reach the delete path with an empty string.
+    // would reach delete with an empty string
     expect(normalizeUndoAction({ kind: 'delete_item' })).toBeNull()
     expect(normalizeUndoAction({ kind: 'delete_item', id: '' })).toBeNull()
     expect(normalizeUndoAction({ kind: 'restore_item', id: 'a' })).toBeNull()
@@ -59,8 +59,7 @@ describe('normalizeUndo', () => {
   })
 
   it('rejects the whole list when any single action is unusable', () => {
-    // Running only the valid half would leave the workspace in a state that is
-    // neither before nor after the original call.
+    // half a list leaves neither state
     const mixed = [{ kind: 'delete_item', id: 'a' }, { kind: 'delete_item' }]
     expect(normalizeUndo(mixed)).toBeNull()
   })

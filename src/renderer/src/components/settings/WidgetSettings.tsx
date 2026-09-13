@@ -4,7 +4,6 @@ import { getBoolSetting, getNumberSetting, getStringSetting, setBoolSetting, set
 import * as appApi from '../../data/app'
 import * as widgetApi from '../../data/widget'
 
-// Widget Settings
 export default function WidgetSettings() {
   const isWindows = appApi.platform() === 'win32'
   const [enabled, setEnabled] = useState(false)

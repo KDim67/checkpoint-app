@@ -8,8 +8,7 @@ import {
 import { normalizeRemoteMutation } from '../src/shared/collabProtocol'
 import type { Item } from '../src/shared/types'
 
-// A peer's mutation against a real database. What actually lands in the rows,
-// which a pure test cannot reach.
+// a peer mutation against a real db, what actually lands
 
 let dir: string
 
@@ -30,7 +29,7 @@ const seedCard = (over: Partial<Item> = {}): Item =>
     ...over
   })
 
-/** The path a real message takes: validated, then applied. */
+/** validated then applied, like a real message */
 const apply = (raw: unknown): void => {
   const mutation = normalizeRemoteMutation(raw)
   if (mutation) applyRemoteMutationTx(mutation)
@@ -38,9 +37,7 @@ const apply = (raw: unknown): void => {
 
 describe('a bulk edit arriving from a peer', () => {
   it('applies the payload the app actually broadcasts', () => {
-    // This is the regression. The union declared `{ updates: [...] }`, the app
-    // sends `{ ids, patch }`, and the handler read `payload.updates`, so every
-    // bulk edit in a shared session threw on the peer and changed nothing.
+    // regression: { updates } was declared but { ids, patch } sent, so shared bulk edits threw
     const a = seedCard()
     const b = seedCard()
 
@@ -60,8 +57,7 @@ describe('a bulk edit arriving from a peer', () => {
   })
 
   it('leaves the fields the patch did not name alone', () => {
-    // A fixed SET clause would write nulls over everything the user did not
-    // touch, which is how a bulk status change loses every card's position.
+    // a fixed SET clause would null positions on a bulk status change
     const card = seedCard({ title: 'Keep me', position: 4200 })
     apply({ type: 'bulkUpdateItems', payload: { ids: [card.id], patch: { status: 'done' } } })
 
@@ -103,7 +99,7 @@ describe('the other mutations a peer sends', () => {
 describe('what the validator keeps out of the database', () => {
   it('writes nothing for a mutation with no target', () => {
     const card = seedCard()
-    // Previously this reached `DELETE FROM items WHERE id = ?` with undefined.
+    // this used to reach DELETE with undefined
     apply({ type: 'deleteItem' })
     expect(getItemById(card.id)).toBeTruthy()
   })
@@ -122,8 +118,7 @@ describe('what the validator keeps out of the database', () => {
   it('stores metadata as text even when a peer sends an object', () => {
     const card = seedCard()
     apply({ type: 'updateItem', item: { ...card, metadata: { pinned: true } } })
-    // Not "[object Object]", which is what an unvalidated write produced and
-    // what every reader of the column would then fail to parse.
+    // not "[object Object]", which broke every reader
     expect(getItemById(card.id)?.metadata).toBe('{}')
   })
 })

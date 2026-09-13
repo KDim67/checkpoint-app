@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { hexToHsv, hsvToHex, isHex } from '../src/shared/color'
 import { defined } from './helpers/defined'
 
-// The picker converts on every pointer move, so a round trip that drifts would
-// walk the colour away from itself while the user just holds still.
+// converts every pointer move, drift would walk the colour while holding still
 
 describe('hex to HSV and back', () => {
   const cases: [string, string][] = [

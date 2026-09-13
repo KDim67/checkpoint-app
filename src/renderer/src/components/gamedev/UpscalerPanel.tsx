@@ -17,10 +17,8 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
         </div>
 
         <div className="tool-layout">
-          {/* Left Configuration Column */}
           <SettingsColumn title="Upscale Settings">
 
-            {/* File picker */}
             <div className="col-6px">
               <span className="text-label-sm">
                 Source Image
@@ -32,7 +30,6 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               />
             </div>
 
-            {/* Algorithm selection dropdown */}
             <div className="col-4px">
               <span className="text-label-sm">
                 Scaling Filter
@@ -68,7 +65,6 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               </span>
             </div>
 
-            {/* Before / after compare */}
             {tool.upscaleUrl && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', cursor: 'pointer', userSelect: 'none' }}>
                 <input
@@ -81,9 +77,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
             )}
           </SettingsColumn>
 
-          {/* Right Viewport Column */}
           <div className="col-lg-min">
-            {/* Meta header */}
             <div className="panel-row">
               <div className="col-2px">
                 <span className="text-caption">
@@ -97,7 +91,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               </div>
             </div>
 
-            {/* Viewport canvas. Accepts drag & drop */}
+            {/* accepts drag and drop */}
             <div
               onDragOver={e => e.preventDefault()}
               onDrop={tool.handleUpscaleDrop}
@@ -110,8 +104,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                   onChoose={tool.handleSelectUpscaleFile}
                 />
               ) : (
-                // imageRendering: pixelated. Without it the browser's smooth
-                // downscale blurs the crisp result, defeating the whole tool
+                // pixelated, a smooth downscale blurs the crisp result
                 <canvas
                   ref={tool.upscalePreviewCanvasRef}
                   style={{
@@ -129,7 +122,6 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
               )}
             </div>
 
-            {/* Export trigger */}
             {tool.upscalePath && tool.upscaleUrl && (
               <div className="panel">
                 <div className="row-between">

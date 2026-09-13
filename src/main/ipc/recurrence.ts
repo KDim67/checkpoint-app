@@ -1,4 +1,4 @@
-/** Rules that create work on a schedule. */
+/** rules that create work on a schedule */
 
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
@@ -26,8 +26,7 @@ export function registerRecurrenceHandlers(): void {
     const { createRecurrence, materialiseDueRecurrences } = await import('../recurrenceService')
     const row = createRecurrence(input as Parameters<typeof createRecurrence>[0])
     if (!row) return { ok: false, reason: 'That repeat rule could not be understood.' }
-    // Swept at once so a rule that is already due produces its first item now
-    // rather than on the next hourly pass.
+    // sweep now so an already-due rule makes its first item immediately
     materialiseDueRecurrences()
     return { ok: true, id: row.id }
   })

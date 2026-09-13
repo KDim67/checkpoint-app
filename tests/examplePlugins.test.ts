@@ -5,9 +5,7 @@ import { join } from 'node:path'
 import { EXAMPLE_PLUGINS, findExamplePlugin } from '../src/shared/examplePlugins'
 import { parsePluginMetadata, isSafePluginFilename } from '../src/shared/pluginMetadata'
 
-// The examples double as the API's documentation, so they are held to the same
-// bar as the app: they must load, and their metadata must be readable without
-// running them.
+// they double as docs: must load, metadata readable without running
 
 let home: string
 
@@ -51,8 +49,7 @@ describe('the shipped examples', () => {
   })
 
   it('describe themselves consistently with their own metadata', () => {
-    // The gallery shows `name`; the plugin list shows the parsed metadata. If
-    // they disagree, installing one appears to install something else.
+    // gallery name and parsed metadata must agree
     for (const example of EXAMPLE_PLUGINS) {
       expect(parsePluginMetadata(example.source).name, example.filename).toBe(example.name)
     }
@@ -64,8 +61,7 @@ describe('the shipped examples', () => {
   })
 
   it('every one of them actually loads', async () => {
-    // The real registry, the real require, the real API object. An example that
-    // throws on load would be worse than shipping none.
+    // the real registry, require and API
     const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
     mkdirSync(pluginsDir(), { recursive: true })
 
@@ -88,7 +84,7 @@ describe('the shipped examples', () => {
     }
     for (const example of EXAMPLE_PLUGINS) unloadPlugin(example.filename)
 
-    // Enable/disable cycles would otherwise leak a listener each time.
+    // enable/disable cycles would leak a listener
     expect(pluginEventListenerCount('item:created')).toBe(0)
     expect(pluginEventListenerCount('item:completed')).toBe(0)
   })
@@ -108,8 +104,7 @@ describe('pluginEvents', () => {
   })
 
   it('keeps going when one handler throws', async () => {
-    // Emitted from inside a database write: a throwing plugin must not surface
-    // as a failed card creation.
+    // fired inside a db write, a throwing plugin mustn't fail card creation
     const { onPluginEvent, emitPluginEvent, clearPluginEvents } = await import('../src/main/pluginEvents')
     clearPluginEvents()
 

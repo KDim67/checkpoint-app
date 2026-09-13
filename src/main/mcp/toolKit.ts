@@ -1,14 +1,6 @@
-/**
- * What every group of MCP tools shares: the workspace argument, the shape of a
- * reply, how a board is read and written, and the nudge that tells the open
- * window to reload.
- */
+/** shared by the MCP tool groups: workspace arg, reply shape, board IO, reload nudge */
 
-// 'zod/v3', not 'zod'. Zod 3.25 ships the v3 and v4 APIs under separate
-// subpaths, and the SDK's schema types are declared against `zod/v3`. Importing
-// the package root yields a nominally different ZodTypeAny, which fails to
-// satisfy the SDK's AnySchema and buries the real errors under
-// "type instantiation is excessively deep".
+// zod/v3 not zod: the SDK types target v3 and the root import breaks AnySchema
 import { z } from 'zod/v3'
 import { getSetting, setSetting } from '../db'
 import {
@@ -25,28 +17,20 @@ import type { Item } from '../../shared/types'
 
 export { z }
 
-/** Repeated in every tool that takes a priority; the direction is not guessable. */
+/** repeated in every priority tool, the direction isn't guessable */
 export const PRIORITY_SCALE = '0 none, 1 low, 2 medium, 3 high.'
 
-/** Set by the owner so writes can nudge the open window to reload. */
+/** lets writes nudge the open window to reload */
 let onDataChanged: (() => void) | null = null
 
 export function setMcpDataChangedHandler(fn: (() => void) | null): void {
   onDataChanged = fn
 }
 
-// Every tool takes an explicit workspace rather than reading the app's active
-// context: an agent's target must not silently change because the user
-// clicked something in the UI mid-task.
+// explicit workspace, so a UI click mid-task can't retarget an agent
 export const context = z.string().describe('Workspace slug. Use list_workspaces to discover valid values.')
 
-// Board config access (main-process side)
-
-/**
- * Reads a board document, running the same legacy migration the renderer does.
- * Shares `src/shared/boardModel` with the renderer and the AI action blocks, so
- * there is exactly one definition of what a board's configuration means.
- */
+/** same legacy migration as the renderer, via shared/boardModel */
 export function readBoardConfig(context: string): BoardConfig {
   const stored = getSetting<unknown>(boardConfigKey(context), null)
   if (stored !== null && stored !== undefined && stored !== '') {
@@ -64,9 +48,7 @@ export function writeBoardConfig(context: string, config: BoardConfig): void {
   setSetting(boardConfigKey(context), normalizeBoardConfig(config))
 }
 
-// Tool helpers
-
-/** Every tool returns text; structured payloads go out as pretty JSON. */
+/** structured payloads go out as pretty JSON */
 export function json(value: unknown): { content: { type: 'text'; text: string }[] } {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] }
 }
@@ -75,7 +57,7 @@ export function text(value: string): { content: { type: 'text'; text: string }[]
   return { content: [{ type: 'text' as const, text: value }] }
 }
 
-/** Trimmed for transport: full bodies would blow the context on a large board. */
+/** trimmed, full bodies blow the context on big boards */
 export function summarizeItem(item: Item): Record<string, unknown> {
   return {
     id: item.id,

@@ -19,13 +19,7 @@ function getThemePath(): string {
   return join(getConfigDir(), 'theme.css')
 }
 
-/**
- * The CSS the engine should be applying, or '' for none.
- *
- * Split from enableCustomizer because a broadcast only reaches windows that
- * already exist and subscribed, and at startup neither is true. Renderers pull
- * this on mount instead, which works whatever the ordering.
- */
+/** split from enableCustomizer: at startup no window is there for a broadcast, renderers pull on mount */
 export function resolveThemeCss(): string {
   try {
     const rawVars = getSetting<string>('customizer_theme_vars', '{}')
@@ -33,7 +27,7 @@ export function resolveThemeCss(): string {
     const css = buildCssVariablesString(vars)
     if (css) return css
 
-    // No stored variables: fall back to a hand-written theme.css if present.
+    // no stored vars, fall back to a hand-written theme.css
     const themePath = getThemePath()
     if (existsSync(themePath)) return readFileSync(themePath, 'utf8')
   } catch (err) {
@@ -42,7 +36,6 @@ export function resolveThemeCss(): string {
   return ''
 }
 
-/** Broadcasts a CSS string to all open renderer windows. */
 export function broadcastTheme(css: string): void {
   BrowserWindow.getAllWindows().forEach(win => {
     if (!win.isDestroyed()) {
@@ -51,9 +44,6 @@ export function broadcastTheme(css: string): void {
   })
 }
 
-/**
- * Parses CSS variable declarations from a CSS variables string.
- */
 function parseVarsFromCss(css: string): Record<string, string> {
   const vars: Record<string, string> = {}
   const regex = /(--[\w-]+)\s*:\s*([^;}\n]+)/g
@@ -64,9 +54,7 @@ function parseVarsFromCss(css: string): Record<string, string> {
   return vars
 }
 
-/**
- * Updates the native title bar controls overlay colors dynamically on Windows.
- */
+/** windows title bar overlay only */
 export function updateTitleBarOverlay(vars: Record<string, string>): void {
   paintTitleBarOverlay(
     vars['--color-background'] || '#0b0c10',
@@ -74,9 +62,6 @@ export function updateTitleBarOverlay(vars: Record<string, string>): void {
   )
 }
 
-/**
- * Builds a CSS variables override block from key-value mappings.
- */
 export function buildCssVariablesString(vars: Record<string, string>): string {
   const entries = Object.entries(vars)
   if (entries.length === 0) return ''
@@ -84,17 +69,13 @@ export function buildCssVariablesString(vars: Record<string, string>): string {
   return `:root {\n${declarations}\n}`
 }
 
-/**
- * Starts the customization engine, watcher, plugins, and custom themes.
- */
 export async function enableCustomizer(): Promise<void> {
   if (isEngineRunning) return
 
   ensurePluginsDir()
   const configDir = getConfigDir()
 
-  // 1. Apply the stored theme. The broadcast is kept for windows that are
-  //    already open; a window opening later fetches the same CSS on mount.
+  // broadcast covers open windows, later ones fetch on mount
   try {
     const css = resolveThemeCss()
     if (css) {
@@ -105,15 +86,13 @@ export async function enableCustomizer(): Promise<void> {
     console.error('[customizer] Failed to load initial custom theme variables:', err)
   }
 
-  // 2. Load active plugins
   try {
     const rawPlugins = getSetting<string>('customizer_active_plugins', '[]')
     const activePlugins: string[] = JSON.parse(rawPlugins)
     console.log(`[customizer] Loading active plugins:`, activePlugins)
     for (const pluginFile of activePlugins) {
       const result = loadPlugin(pluginFile)
-      // Logged rather than thrown: one bad plugin must not stop the others, or
-      // the engine, from starting.
+      // logged not thrown, one bad plugin mustn't stop the rest
       if (!result.ok) {
         console.error(`[customizer] Plugin "${pluginFile}" failed to load: ${result.error}`)
       }
@@ -122,13 +101,12 @@ export async function enableCustomizer(): Promise<void> {
     console.error('[customizer] Failed to load active plugins:', err)
   }
 
-  // 3. Start Chokidar watcher for plugins/theme changes
   try {
     const chokidar = await import('chokidar')
     watcher = chokidar.watch(configDir, {
       persistent: true,
-      ignoreInitial: true,      // do not re-run on startup files
-      depth: 1,                 // only watch root and plugins/ subdirectory
+      ignoreInitial: true,      // skip files already there at start
+      depth: 1,                 // root and plugins/ only
       awaitWriteFinish: {
         stabilityThreshold: 100,
         pollInterval: 50
@@ -147,23 +125,17 @@ export async function enableCustomizer(): Promise<void> {
   isEngineRunning = true
 }
 
-/**
- * Halts the customization engine, unloads watchers/plugins, and reverts style variables.
- */
 export async function disableCustomizer(): Promise<void> {
   if (!isEngineRunning) return
 
-  // 1. Close chokidar file watcher
   if (watcher) {
     await watcher.close()
     watcher = null
     console.log('[customizer] Chokidar watcher stopped.')
   }
 
-  // 2. Unload all plugins
   unloadAllPlugins()
 
-  // 3. Reset injected theme variables
   broadcastTheme('')
   try {
     const appTheme = getSetting<string>('app_theme', 'dark')
@@ -190,7 +162,6 @@ function handleFileChange(filePath: string): void {
     return
   }
 
-  // Hot reload plugins if they are active
   const pluginsDir = getPluginsDir()
   if (filePath.startsWith(pluginsDir) && filePath.endsWith('.js')) {
     const filename = filePath.slice(pluginsDir.length + 1)

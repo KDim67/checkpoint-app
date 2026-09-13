@@ -1,9 +1,4 @@
-/**
- * A bounded undo/redo stack. Generic so it can be tested without a canvas.
- *
- * A new edit clears the redo stack, like every tool anyone has used. Capped
- * because each canvas entry holds every item. Uncapped is a slow leak.
- */
+/** generic so it's testable without a canvas; a new edit clears redo; capped since canvas entries hold every item */
 
 export interface History<T> {
   past: T[]
@@ -11,14 +6,14 @@ export interface History<T> {
   future: T[]
 }
 
-/** Deep enough for a long session, shallow enough not to hoard a big canvas. */
+/** deep enough for a long session, shallow enough for a big canvas */
 export const HISTORY_LIMIT = 50
 
 export function initHistory<T>(present: T): History<T> {
   return { past: [], present, future: [] }
 }
 
-/** `equals` skips no-op edits, so a drag does not cost an undo step per frame. */
+/** equals skips no-ops, so a drag isn't an undo step per frame */
 export function pushHistory<T>(
   history: History<T>,
   next: T,
@@ -62,7 +57,7 @@ export function redo<T>(history: History<T>): History<T> {
   }
 }
 
-/** For changes the user did not make. A load, or a rename from elsewhere. */
+/** for changes the user didn't make: a load, or a rename elsewhere */
 export function replacePresent<T>(history: History<T>, present: T): History<T> {
   return { ...history, present }
 }

@@ -3,9 +3,7 @@ import { applyAiGate, AI_FEATURE_KEY, type ViewEnabledMap } from '../src/rendere
 import { buildCommands, type CommandContext } from '../src/renderer/src/lib/commands'
 import type { ActiveView } from '../src/renderer/src/store/appStore'
 
-// The AI switch has to reach places that never mention AI: the sidebar, the
-// redirect guard and the palette all read the view map, so gating the Cookbook
-// there is what makes one toggle cover them.
+// gating the map is what makes one toggle cover sidebar, guard and palette
 
 const allOn = (): ViewEnabledMap => ({
   kanban: true, log: true, backlog: true, focus: true, notes: true, wall: true,
@@ -49,8 +47,7 @@ describe('the AI switch', () => {
   })
 
   it('does not mutate the map it was given', () => {
-    // The caller holds this map; gating it in place would silently disable the
-    // Cookbook's own toggle rather than overriding it.
+    // don't mutate the caller's map, it'd disable the Cookbook's own toggle
     const map = allOn()
     applyAiGate(map, false)
     expect(map.cookbook).toBe(true)
@@ -66,8 +63,7 @@ describe('the command palette with AI off', () => {
   })
 
   it('does not offer it when AI is off', () => {
-    // The palette reaches anything by name, which would be a way straight back
-    // into a panel the user switched off.
+    // the palette would be a way back into a switched-off panel
     expect(idsFor(false)).not.toContain('panel:ai')
   })
 
