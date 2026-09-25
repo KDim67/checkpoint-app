@@ -726,7 +726,11 @@ const api = {
     getStorageInfo: (): Promise<{ fileCount: number; totalSize: number; path: string }> =>
       ipcRenderer.invoke(IpcChannels.MEDIA_GET_STORAGE_INFO),
     linkPreview: (url: string): Promise<PagePreview | null> =>
-      ipcRenderer.invoke(IpcChannels.MEDIA_LINK_PREVIEW, url)
+      ipcRenderer.invoke(IpcChannels.MEDIA_LINK_PREVIEW, url),
+    saveNamedBuffer: (arrayBuffer: ArrayBuffer, filename: string): Promise<string> =>
+      ipcRenderer.invoke(IpcChannels.MEDIA_SAVE_NAMED_BUFFER, arrayBuffer, filename),
+    readBuffer: (filename: string): Promise<ArrayBuffer | null> =>
+      ipcRenderer.invoke(IpcChannels.MEDIA_READ_BUFFER, filename)
   },
   sync: {
     startHost: (port?: number): Promise<void> =>

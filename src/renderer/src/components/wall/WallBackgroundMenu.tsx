@@ -19,27 +19,28 @@ export default function WallBackgroundMenu({
       {toolButton('Wall background', <Paintbrush size={14} />, () => setBgOpen(v => !v), { active: bgOpen })}
 
       {bgOpen && (
-        <>
-          <div
-            style={{
-              position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
-              padding: 'var(--space-2)', width: '188px',
-              background: 'var(--color-surface-elevated)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
-            }}
-          >
-            <WallColorPicker
-              colors={WALL_COLORS}
-              value={custom ?? undefined}
-              onChange={setBackground}
-              columns={4}
-              defaultLabel="Follow the theme"
-              onDefault={() => { setBackground('default'); setBgOpen(false) }}
-            />
-          </div>
-        </>
+        <div
+          data-wall-ui
+          style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
+            padding: 'var(--space-2)',
+            minWidth: 'max-content',
+            background: 'var(--color-surface-elevated)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
+          }}
+        >
+          <WallColorPicker
+            colors={WALL_COLORS}
+            value={custom ?? undefined}
+            onChange={setBackground}
+            columns={4}
+            defaultLabel="Follow the theme"
+            onDefault={() => { setBackground('default'); setBgOpen(false) }}
+          />
+        </div>
       )}
     </div>
   )
 }
+

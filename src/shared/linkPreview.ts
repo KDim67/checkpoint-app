@@ -5,14 +5,18 @@ export interface LinkPreview {
   description?: string
   /** http(s) or data:, the site's favicon.ico when the page names none */
   iconUrl?: string
+  /** http(s) or data:, the open graph or twitter card image */
+  imageUrl?: string
 }
 
-/** what main hands the renderer; the icon is already in media */
+/** what main hands the renderer; the icon and image are already in media */
 export interface PagePreview {
   title?: string
   description?: string
   /** media filename */
   icon?: string
+  /** preview image media filename */
+  image?: string
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' }
@@ -82,11 +86,14 @@ export function parseLinkPreview(html: string, pageUrl: string): LinkPreview {
 
   const titleTag = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(head)?.[1]
   const pick = (...values: (string | undefined)[]): string | undefined => values.find(v => v?.trim())
+  const rawImage = pick(meta.get('og:image:secure_url'), meta.get('og:image'), meta.get('twitter:image:src'), meta.get('twitter:image'))
+  const imageUrl = resolveIcon(rawImage, pageUrl)
 
   return {
     title: clean(pick(meta.get('og:title'), meta.get('twitter:title'), titleTag), 300),
     description: clean(pick(meta.get('og:description'), meta.get('twitter:description'), meta.get('description')), 400),
-    iconUrl: icon ?? touchIcon ?? resolveIcon('/favicon.ico', pageUrl)
+    iconUrl: icon ?? touchIcon ?? resolveIcon('/favicon.ico', pageUrl),
+    ...(imageUrl ? { imageUrl } : {})
   }
 }
 

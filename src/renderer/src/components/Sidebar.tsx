@@ -169,7 +169,7 @@ const NAV_ITEMS: Array<{
   { view: 'wall',        label: 'Wall',        Icon: IconWall },
   { view: 'clipboard',   label: 'Clipboard',   Icon: IconClipboard },
   { view: 'analytics',   label: 'Analytics',   Icon: IconAnalytics },
-  { view: 'cookbook',    label: 'Cookbook',    Icon: IconCookbook },
+  { view: 'cookbook',    label: 'AI Cookbook', Icon: IconCookbook },
   { view: 'cheatsheets', label: 'Cheatsheets', Icon: IconCheatsheets }
 ]
 

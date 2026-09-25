@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { StickyNote, Type, Shapes, Square, Layers, Image as ImageIcon, Maximize2, Undo2, Redo2, Grid3x3, FileText, PanelRight, PenLine, Spline, MousePointer2 } from 'lucide-react'
 import { redo, undo } from '../../../../shared/history'
 import WallSwitcher from './WallSwitcher'
 import { panHintLabel } from '../../lib/wallInput'
-import { toolButton } from './wallButtons'
+import { toolButton, ShapePickerMenu } from './wallButtons'
 import WallBackgroundMenu from './WallBackgroundMenu'
 import WallSearch from './WallSearch'
 import WallShortcutsMenu from './WallShortcutsMenu'
@@ -10,6 +11,8 @@ import WallPlacePicker from './WallPlacePicker'
 import WallFramesMenu from './WallFramesMenu'
 import WallExportMenu from './WallExportMenu'
 import WallBinMenu from './WallBinMenu'
+import WallPresenceRoster from './WallPresenceRoster'
+import CollabPanel from '../kanban/CollabPanel'
 import { isDrawTool, type WallTool } from './wallTools'
 import type { WallViewState } from './useWallView'
 
@@ -33,9 +36,10 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
     toggleRail, applyHistory, addItem, placeImageFiles, jumpTo, exportWall, fitToContent, zoomReset,
     camera, custom, pickerRows, labelOf, matches, undoable, redoable, linkPickFor, selectedIds,
     framesOpen, setFramesOpen, exportOpen, setExportOpen, binOpen, setBinOpen, frames, binEntries,
-    restoreDeleted, showFrame, startPresenting, setFrameOrder
+    restoreDeleted, showFrame, startPresenting, setFrameOrder, collab, isReadOnly
   } = wallView
   const atFullSize = Math.round(camera.zoom * 100) === 100
+  const [shapePickerOpen, setShapePickerOpen] = useState(false)
 
   return (
     <div style={{
@@ -69,7 +73,22 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
 
       {toolButton('Sticky note', <StickyNote size={14} />, () => addItem('note'))}
       {toolButton('Text', <Type size={14} />, () => addItem('text'))}
-      {toolButton('Shape', <Shapes size={14} />, () => addItem('shape'))}
+      <div className="relative" data-wall-popover="shape">
+        {toolButton('Shape', <Shapes size={14} />, () => setShapePickerOpen(v => !v), { active: shapePickerOpen })}
+        {shapePickerOpen && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41
+          }}>
+            <ShapePickerMenu
+              onPick={shape => {
+                addItem('shape', { shape })
+                setShapePickerOpen(false)
+              }}
+              onClose={() => setShapePickerOpen(false)}
+            />
+          </div>
+        )}
+      </div>
       {toolButton('Frame', <Square size={14} />, () => addItem('frame'))}
       {toolButton('Place a card', <Layers size={14} />, () => setPicker(p => (p === 'card' ? null : 'card')))}
       {toolButton('Place a note', <FileText size={14} />, () => setPicker(p => (p === 'doc' ? null : 'doc')))}
@@ -118,9 +137,27 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       </button>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', position: 'relative' }}>
+        {isReadOnly && (
+          <span style={{
+            fontSize: '11px',
+            color: 'var(--color-warning)',
+            background: 'var(--color-warning-muted)',
+            border: '1px solid var(--color-warning)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '2px 6px',
+            fontWeight: 'var(--weight-semibold)',
+            whiteSpace: 'nowrap'
+          }}>
+            Read-only
+          </span>
+        )}
+
         <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
           {toolHint(tool, !!linkPickFor, arrowFrom, panHintLabel(panButtons))}
         </span>
+
+        <WallPresenceRoster members={collab?.roster ?? []} />
+        <CollabPanel session={collab} />
 
         <WallSearch
           query={query}

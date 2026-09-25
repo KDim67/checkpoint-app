@@ -252,4 +252,166 @@ describe('a message off the wire', () => {
       expect(normalizeCollabMessage(bad)).toBeNull()
     }
   })
+
+  it('normalizes valid asset-request and rejects path traversal', () => {
+    const valid = normalizeCollabMessage({
+      type: 'asset-request',
+      context: 'ws-main',
+      filename: 'image-123.png',
+      requesterId: 'peer-abc'
+    })
+    expect(valid).toEqual({
+      type: 'asset-request',
+      context: 'ws-main',
+      filename: 'image-123.png',
+      requesterId: 'peer-abc'
+    })
+
+    // Path traversal rejects
+    expect(normalizeCollabMessage({ type: 'asset-request', context: 'ws-main', filename: '../secret.png' })).toBeNull()
+    expect(normalizeCollabMessage({ type: 'asset-request', context: 'ws-main', filename: 'sub/dir.png' })).toBeNull()
+    expect(normalizeCollabMessage({ type: 'asset-request', context: '', filename: 'img.png' })).toBeNull()
+  })
+
+  it('normalizes valid asset-chunk and rejects invalid bounds or traversal', () => {
+    const valid = normalizeCollabMessage({
+      type: 'asset-chunk',
+      context: 'ws-main',
+      filename: 'asset-456.jpg',
+      chunkIndex: 0,
+      totalChunks: 3,
+      totalBytes: 90000,
+      chunkData: 'aGVsbG8=',
+      mimeType: 'image/jpeg'
+    })
+    expect(valid).toEqual({
+      type: 'asset-chunk',
+      context: 'ws-main',
+      filename: 'asset-456.jpg',
+      chunkIndex: 0,
+      totalChunks: 3,
+      totalBytes: 90000,
+      chunkData: 'aGVsbG8=',
+      mimeType: 'image/jpeg'
+    })
+
+    // Invalid bounds
+    expect(normalizeCollabMessage({
+      type: 'asset-chunk', context: 'ws', filename: 'a.png', chunkIndex: 3, totalChunks: 3, totalBytes: 10, chunkData: 'abc'
+    })).toBeNull()
+    expect(normalizeCollabMessage({
+      type: 'asset-chunk', context: 'ws', filename: 'a.png', chunkIndex: -1, totalChunks: 3, totalBytes: 10, chunkData: 'abc'
+    })).toBeNull()
+    expect(normalizeCollabMessage({
+      type: 'asset-chunk', context: 'ws', filename: 'a.png', chunkIndex: 0, totalChunks: 0, totalBytes: 10, chunkData: 'abc'
+    })).toBeNull()
+    // Path traversal
+    expect(normalizeCollabMessage({
+      type: 'asset-chunk', context: 'ws', filename: '../etc/passwd', chunkIndex: 0, totalChunks: 1, totalBytes: 10, chunkData: 'abc'
+    })).toBeNull()
+  })
+
+  it('normalizes valid peer-view and rejects malformed ones', () => {
+    const valid = normalizeCollabMessage({
+      type: 'peer-view',
+      context: 'ws-main',
+      peerId: 'peer-1',
+      view: 'wall',
+      wallId: 'wall-abc',
+      name: 'Alice',
+      color: '#10b981'
+    })
+    expect(valid).toEqual({
+      type: 'peer-view',
+      context: 'ws-main',
+      peerId: 'peer-1',
+      view: 'wall',
+      wallId: 'wall-abc',
+      name: 'Alice',
+      color: '#10b981'
+    })
+
+    expect(normalizeCollabMessage({ type: 'peer-view', context: '', peerId: 'p1', view: 'wall' })).toBeNull()
+    expect(normalizeCollabMessage({ type: 'peer-view', context: 'ws', peerId: '', view: 'wall' })).toBeNull()
+    expect(normalizeCollabMessage({ type: 'peer-view', context: 'ws', peerId: 'p1', view: '' })).toBeNull()
+  })
+
+  it('normalizes valid peer-live-move and clamps items length', () => {
+    const valid = normalizeCollabMessage({
+      type: 'peer-live-move',
+      context: 'ws-main',
+      wallId: 'wall-abc',
+      peerId: 'peer-1',
+      items: [
+        { id: 'item-1', x: 100, y: 150 },
+        { id: 'item-2', x: 200, y: 250 },
+        { id: 'bad-item', x: 'invalid' }
+      ],
+      name: 'Bob',
+      color: '#3b82f6'
+    })
+    expect(valid).toEqual({
+      type: 'peer-live-move',
+      context: 'ws-main',
+      wallId: 'wall-abc',
+      peerId: 'peer-1',
+      items: [
+        { id: 'item-1', x: 100, y: 150 },
+        { id: 'item-2', x: 200, y: 250 }
+      ],
+      name: 'Bob',
+      color: '#3b82f6'
+    })
+
+    // Empty items array for clearing move
+    const clearMove = normalizeCollabMessage({
+      type: 'peer-live-move',
+      context: 'ws-main',
+      wallId: 'wall-abc',
+      peerId: 'peer-1',
+      items: []
+    })
+    expect(clearMove).toEqual({
+      type: 'peer-live-move',
+      context: 'ws-main',
+      wallId: 'wall-abc',
+      peerId: 'peer-1',
+      items: []
+    })
+
+    expect(normalizeCollabMessage({ type: 'peer-live-move', context: 'ws', wallId: '', peerId: 'p1', items: [] })).toBeNull()
+    expect(normalizeCollabMessage({ type: 'peer-live-move', context: 'ws', wallId: 'w1', peerId: 'p1', items: null })).toBeNull()
+  })
+
+  it('normalizes valid peer-card-drag and rejects invalid dragging state', () => {
+    const valid = normalizeCollabMessage({
+      type: 'peer-card-drag',
+      context: 'ws-main',
+      peerId: 'peer-1',
+      cardId: 'card-123',
+      columnId: 'col-doing',
+      overCardId: 'card-456',
+      isDragging: true,
+      name: 'Charlie',
+      color: '#f59e0b'
+    })
+    expect(valid).toEqual({
+      type: 'peer-card-drag',
+      context: 'ws-main',
+      peerId: 'peer-1',
+      cardId: 'card-123',
+      columnId: 'col-doing',
+      overCardId: 'card-456',
+      isDragging: true,
+      name: 'Charlie',
+      color: '#f59e0b'
+    })
+
+    expect(normalizeCollabMessage({
+      type: 'peer-card-drag', context: 'ws', peerId: 'p1', cardId: 'c1', isDragging: 'yes'
+    })).toBeNull()
+    expect(normalizeCollabMessage({
+      type: 'peer-card-drag', context: 'ws', peerId: '', cardId: 'c1', isDragging: true
+    })).toBeNull()
+  })
 })

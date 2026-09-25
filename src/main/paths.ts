@@ -2,8 +2,49 @@ import { app } from 'electron'
 import { join, resolve, relative, isAbsolute } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 
+export function getCustomProfileName(): string | null {
+  if (process.env.CHECKPOINT_PROFILE) {
+    return process.env.CHECKPOINT_PROFILE
+  }
+  for (let i = 0; i < process.argv.length; i++) {
+    const arg = process.argv[i]
+    if (arg.startsWith('--profile=')) {
+      return arg.slice('--profile='.length)
+    }
+    if (arg === '--profile' && i + 1 < process.argv.length) {
+      return process.argv[i + 1]
+    }
+  }
+  return null
+}
+
+export function getCustomDataDir(): string | null {
+  if (process.env.CHECKPOINT_DATA_DIR) {
+    return resolve(process.env.CHECKPOINT_DATA_DIR)
+  }
+  for (let i = 0; i < process.argv.length; i++) {
+    const arg = process.argv[i]
+    if (arg.startsWith('--data-dir=')) {
+      return resolve(arg.slice('--data-dir='.length))
+    }
+    if (arg === '--data-dir' && i + 1 < process.argv.length) {
+      return resolve(process.argv[i + 1])
+    }
+  }
+  const profile = getCustomProfileName()
+  if (profile) {
+    const safeProfile = profile.replace(/[\\/:*?"<>|]/g, '_')
+    return join(app.getPath('home'), '.config', `checkpoint-profile-${safeProfile}`)
+  }
+  return null
+}
+
 /** one source for paths; os.homedir() and app.getPath('home') disagree when electron's path is overridden */
 export function getConfigDir(): string {
+  const custom = getCustomDataDir()
+  if (custom) {
+    return join(custom, 'config')
+  }
   return join(app.getPath('home'), '.config', 'checkpoint')
 }
 

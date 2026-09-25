@@ -1,14 +1,18 @@
-import { inPaintOrder, patchItems, itemAtPoint, gridSpacing, toWallPoint, arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type WallItem } from '../../../../shared/wallModel'
+import React, { useEffect } from 'react'
+import { inPaintOrder, patchItems, itemAtPoint, gridSpacing, toWallPoint, arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, setActiveWall, type WallItem } from '../../../../shared/wallModel'
 import WallItemLayer from './WallItemLayer'
 import WallMinimap from './WallMinimap'
 import { decodeWallDrag, WALL_DRAG_MIME } from '../../../../shared/wallBoard'
 import WallSelectionBar from './WallSelectionBar'
-import { WALL_GAP_SLOTS, WALL_GUIDE_SLOTS } from './wallPaint'
+import { WALL_GAP_SLOTS, WALL_GUIDE_SLOTS, paintWallItems } from './wallPaint'
 import WallPresenter from './WallPresenter'
 import { frameLabel } from '../../../../shared/wallFrames'
 import { HIGHLIGHT_OPACITY, HIGHLIGHT_SCALE } from '../../../../shared/wallInk'
 import WallPenSettings from './WallPenSettings'
 import { describeLink, isLinkable, pastedLink } from '../../../../shared/wallLink'
+import WallRemotePresence from './WallRemotePresence'
+import { useRemotePresence } from './useRemotePresence'
+import { peerPresenceColor, type PeerLiveMoveMessage } from '../../../../shared/collabProtocol'
 import type { WallViewState } from './useWallView'
 
 export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
@@ -24,8 +28,81 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
     wallIndex, activeWall, labelOf, previewing, addBookmark, growFrom, searching, matchIds, presenting,
     frames, stepPresenting, stopPresenting, setTool, eraserMode, setEraserMode, penPresets, choosePenColor,
-    choosePenWidth, pickPreset
+    choosePenWidth, pickPreset, isReadOnly, collab, commitIndex, panCameraRef
   } = wallView
+
+  const myName = collab?.displayName || collab?.osUserName || 'Anonymous'
+  const {
+    cursors: remoteCursors,
+    peerSelectedMap,
+    followingPeer,
+    followingPeerId,
+    stopFollowing,
+    broadcastCursor,
+    broadcastSelection
+  } = useRemotePresence({
+    wallId: activeWall?.id ?? 'default',
+    myName,
+    viewportRef,
+    camera,
+    setCamera,
+    panCameraRef,
+    onSwitchWall: (targetWallId: string) => {
+      if (wallIndex) {
+        commitIndex(setActiveWall(wallIndex, targetWallId))
+      }
+    }
+  })
+
+  // Live remote item movement preview
+  useEffect(() => {
+    const handlePeerLiveMove = (e: Event) => {
+      const detail = (e as CustomEvent<PeerLiveMoveMessage>).detail
+      if (!detail || !viewportRef.current) return
+      if (detail.wallId !== (activeWall?.id ?? 'default')) return
+
+      const viewport = viewportRef.current
+      const currentItems = docRef.current.items
+      const byId = new Map(currentItems.map(i => [i.id, i]))
+
+      if (detail.items.length === 0) {
+        // Gesture ended - clear remote moving attributes and outlines
+        viewport.querySelectorAll<HTMLElement>('[data-wall-peer-moving]').forEach(el => {
+          el.removeAttribute('data-wall-peer-moving')
+          el.style.outline = ''
+        })
+        return
+      }
+
+      const movedItems: WallItem[] = []
+      const movedIds = new Set<string>()
+
+      for (const moved of detail.items) {
+        const existing = byId.get(moved.id)
+        if (!existing) continue
+        const updated = { ...existing, x: moved.x, y: moved.y }
+        movedItems.push(updated)
+        movedIds.add(moved.id)
+
+        const el = viewport.querySelector<HTMLElement>(`[data-wall-item="${moved.id}"]`)
+        if (el) {
+          el.setAttribute('data-wall-peer-moving', detail.name || detail.peerId)
+          el.style.outline = `2px dashed ${detail.color || peerPresenceColor(detail.peerId)}`
+        }
+      }
+
+      if (movedItems.length > 0) {
+        paintWallItems(viewport, movedItems, movedIds)
+      }
+    }
+
+    window.addEventListener('collab-peer-live-move', handlePeerLiveMove)
+    return () => window.removeEventListener('collab-peer-live-move', handlePeerLiveMove)
+  }, [activeWall?.id, docRef, viewportRef])
+
+  useEffect(() => {
+    broadcastSelection(Array.from(selectedIds))
+  }, [selectedIds, broadcastSelection])
 
   /** the chip's words, from this wall's items and the wall list */
   const describe = (link: string) => describeLink(link, {
@@ -41,9 +118,19 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
   return (
     <div
       ref={viewportRef}
-      onWheel={onWheel}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
+      onWheel={e => {
+        if (followingPeerId) stopFollowing()
+        onWheel(e)
+      }}
+      onPointerDown={e => {
+        if (followingPeerId) stopFollowing()
+        onPointerDown(e)
+      }}
+      onPointerMove={e => {
+        onPointerMove(e)
+        const at = toWallPoint(screenPoint(e), docRef.current.camera)
+        broadcastCursor(at.x, at.y)
+      }}
       onPointerLeave={onPointerLeave}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
@@ -260,6 +347,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               onFollowLink={followLink}
               previewing={previewing.has(item.id)}
               dimmed={searching && !matchIds.has(item.id)}
+              remoteSelectedBy={peerSelectedMap.get(item.id)}
             />
           )
         })}
@@ -271,6 +359,16 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         {WALL_GAP_SLOTS.map(slot => (
           <div key={slot} data-wall-gap={slot} className="wall-gap-guide" style={{ display: 'none' }} />
         ))}
+      </div>
+
+      {/* Remote peer cursors layer */}
+      <div data-wall-camera-layer style={{
+        position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
+        transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+        transformOrigin: '0 0', zIndex: 20, pointerEvents: 'none',
+        willChange: 'transform'
+      }}>
+        <WallRemotePresence cursors={remoteCursors} zoom={camera.zoom} />
       </div>
 
       {/* labels above lines and items; arrow labels live in text like frames */}
@@ -392,7 +490,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       })()}
 
       {/* floated above the selection */}
-      {floatingPos && selectedItems.length > 0 && presenting === null && (
+      {floatingPos && selectedItems.length > 0 && presenting === null && !isReadOnly && (
         <WallSelectionBar
           floatingPos={floatingPos}
           floatingRef={floatingRef}
@@ -464,6 +562,62 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           onStep={stepPresenting}
           onExit={stopPresenting}
         />
+      )}
+
+      {followingPeer && (
+        <div
+          data-wall-following-banner="true"
+          style={{
+            position: 'absolute',
+            top: 'var(--space-4)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 40,
+            background: 'var(--color-surface-elevated)',
+            border: '1px solid var(--color-surface-offset)',
+            boxShadow: 'var(--shadow-lg)',
+            borderRadius: 'var(--radius-full)',
+            padding: '6px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '12px',
+            color: 'var(--color-text-base)',
+            pointerEvents: 'auto',
+            animation: 'dropdown-in 150ms var(--ease-enter)'
+          }}
+        >
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: followingPeer.color,
+              boxShadow: `0 0 6px ${followingPeer.color}`
+            }}
+          />
+          <span>
+            Following <strong>{followingPeer.name}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => stopFollowing()}
+            title="Stop following (Esc)"
+            style={{
+              background: 'var(--color-surface-offset)',
+              border: 'none',
+              borderRadius: 'var(--radius-full)',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: 'var(--weight-semibold)',
+              color: 'var(--color-text-muted)',
+              cursor: 'pointer',
+              marginLeft: '4px'
+            }}
+          >
+            Stop (Esc)
+          </button>
+        </div>
       )}
 
     {busy && (

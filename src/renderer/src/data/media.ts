@@ -14,3 +14,22 @@ export const saveFromBuffer = (...args: Parameters<Bridge['saveFromBuffer']>): R
 
 export const scanAndPrune = (...args: Parameters<Bridge['scanAndPrune']>): ReturnType<Bridge['scanAndPrune']> =>
   window.electronAPI.media.scanAndPrune(...args)
+
+export const saveNamedBuffer = (
+  arrayBuffer: ArrayBuffer,
+  filename: string
+): Promise<string> => {
+  if (!window.electronAPI?.media?.saveNamedBuffer) {
+    return Promise.resolve(filename)
+  }
+  return window.electronAPI.media.saveNamedBuffer(arrayBuffer, filename)
+}
+
+export const readBuffer = (
+  filename: string
+): Promise<ArrayBuffer | null> => {
+  if (!window.electronAPI?.media?.readBuffer) {
+    return Promise.resolve(null)
+  }
+  return window.electronAPI.media.readBuffer(filename)
+}

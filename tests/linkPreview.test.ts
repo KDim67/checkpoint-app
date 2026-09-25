@@ -57,10 +57,19 @@ describe('parseLinkPreview', () => {
     expect(parseLinkPreview(html, PAGE).iconUrl).toBe('data:image/png;base64,iVBORw0KGgo=')
   })
 
+  it('extracts og:image or twitter:image and resolves relative image URLs', () => {
+    const ogHtml = '<meta property="og:image" content="/assets/hero.jpg">'
+    expect(parseLinkPreview(ogHtml, PAGE).imageUrl).toBe('https://example.com/assets/hero.jpg')
+
+    const twitterHtml = '<meta name="twitter:image" content="https://cdn.example.com/thumb.png">'
+    expect(parseLinkPreview(twitterHtml, PAGE).imageUrl).toBe('https://cdn.example.com/thumb.png')
+  })
+
   it('returns nothing it could not find', () => {
     const got = parseLinkPreview('', PAGE)
     expect(got.title).toBeUndefined()
     expect(got.description).toBeUndefined()
+    expect(got.imageUrl).toBeUndefined()
   })
 })
 

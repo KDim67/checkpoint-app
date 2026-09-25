@@ -1,4 +1,4 @@
-import { join, extname } from 'path'
+import { join, extname, basename } from 'path'
 import { existsSync, readdirSync, writeFileSync, copyFileSync, statSync, unlinkSync, readFileSync } from 'fs'
 import type Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
@@ -19,6 +19,39 @@ export function saveBufferToMedia(buffer: Buffer, extension: string): string {
   // scaled now, not on first view (see warmPreviews)
   warmPreviews(filePath)
   return filename
+}
+
+export function saveNamedBufferToMedia(buffer: Buffer, filename: string): string {
+  ensureMediaDir()
+  const cleanFilename = basename(filename)
+  if (!cleanFilename || cleanFilename === '.' || cleanFilename === '..' || cleanFilename.includes('/') || cleanFilename.includes('\\')) {
+    throw new Error('Invalid filename for media save')
+  }
+  const filePath = join(getMediaDir(), cleanFilename)
+  writeFileSync(filePath, buffer)
+  warmPreviews(filePath)
+  return cleanFilename
+}
+
+export function readMediaBuffer(filename: string): Buffer | null {
+  ensureMediaDir()
+  const cleanFilename = basename(filename)
+  if (!cleanFilename || cleanFilename === '.' || cleanFilename === '..' || cleanFilename.includes('/') || cleanFilename.includes('\\')) {
+    return null
+  }
+  const filePath = join(getMediaDir(), cleanFilename)
+  if (!existsSync(filePath)) return null
+  return readFileSync(filePath)
+}
+
+export function hasMediaFile(filename: string): boolean {
+  ensureMediaDir()
+  const cleanFilename = basename(filename)
+  if (!cleanFilename || cleanFilename === '.' || cleanFilename === '..' || cleanFilename.includes('/') || cleanFilename.includes('\\')) {
+    return false
+  }
+  const filePath = join(getMediaDir(), cleanFilename)
+  return existsSync(filePath)
 }
 
 export function saveFilesToMedia(filePaths: string[]): Array<{ originalPath: string; filename: string }> {

@@ -191,10 +191,10 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
     }
 
     if (e.ctrlKey || e.metaKey) {
-      const k = e.key.toLowerCase()
-      if (k === 'b') { e.preventDefault(); runFormat('bold'); return }
-      if (k === 'i') { e.preventDefault(); runFormat('italic'); return }
-      if (k === 'k') { e.preventDefault(); runFormat('link'); return }
+      const k = typeof e.key === 'string' ? e.key.toLowerCase() : ''
+      if (k === 'b' || e.code === 'KeyB') { e.preventDefault(); runFormat('bold'); return }
+      if (k === 'i' || e.code === 'KeyI') { e.preventDefault(); runFormat('italic'); return }
+      if (k === 'k' || e.code === 'KeyK') { e.preventDefault(); runFormat('link'); return }
     }
 
     // Tab/Shift+Tab indents by 2 spaces

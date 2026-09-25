@@ -1804,6 +1804,37 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   background: rgba(127, 127, 127, 0.2);
 }
 
+/* prominent inline formatting on wall items */
+[data-wall-line] strong {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+[data-wall-line] em {
+  font-style: italic;
+}
+
+[data-wall-line] u {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+[data-wall-line] s {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.8px;
+  opacity: 0.65;
+}
+
+[data-wall-line] code.wall-code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  background: rgba(127, 127, 127, 0.22);
+  border: 1px solid rgba(127, 127, 127, 0.18);
+}
+
 /* a code block: its language on top, the source under it in its own panel */
 .wall-code-block {
   display: flex;

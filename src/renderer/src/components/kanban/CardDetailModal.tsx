@@ -201,7 +201,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const saveRef = useRef<() => Promise<void>>(async () => {})
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's') return
+      const isS = (typeof e.key === 'string' && e.key.toLowerCase() === 's') || e.code === 'KeyS'
+      if (!(e.ctrlKey || e.metaKey) || !isS) return
       e.preventDefault()
       void saveRef.current()
     }

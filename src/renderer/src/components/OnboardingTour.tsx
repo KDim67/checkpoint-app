@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { Command, Compass, Zap, ClipboardList, Check, ArrowRight, ArrowLeft } from 'lucide-react'
 import useFocusTrap from './ui/useFocusTrap'
 import { PROJECT_TEMPLATES, DEFAULT_TEMPLATE_ID, describeTemplate } from '../../../shared/projectTemplates'
+import { applyLayoutProfile, type LayoutProfile } from '../lib/features'
 
 /** padding around the revealed element */
 const SPOT_PAD = 8
@@ -38,9 +39,14 @@ const STEPS: Step[] = [
     body: 'A workspace keeps one project’s board, notes and tasks together. You can add more later.'
   },
   {
+    id: 'layout',
+    title: 'Choose your starter layout',
+    body: 'Checkpoint offers a wide range of capabilities. Choose how streamlined you want your sidebar to start. You can turn any view back on in Settings anytime.'
+  },
+  {
     id: 'sidebar',
     title: 'Your workspaces and views',
-    body: 'The badge at the top switches between workspaces. Each has its own board, notes and history. Below it is every view: board, backlog, notes, the Wall, focus timer, clipboard, analytics. Hover any icon for its name.',
+    body: 'The badge at the top switches between workspaces. Each has its own board, notes and history. Below it is every active view: board, backlog, notes, the Wall, focus timer, and AI assistant. Hover any icon for its name.',
     target: '#app-sidebar'
   },
   {
@@ -76,6 +82,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   const [error, setError] = useState('')
   /** remembers the created workspace so Back doesn't show a form that can only fail */
   const [created, setCreated] = useState<string | null>(null)
+  const [layoutProfile, setLayoutProfile] = useState<LayoutProfile>('focused')
   const nameRef = useRef<HTMLInputElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
 
@@ -127,7 +134,8 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
   useEffect(() => {
     if (step.id !== 'palette' || palettePressed) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      const isK = (typeof e.key === 'string' && e.key.toLowerCase() === 'k') || e.code === 'KeyK'
+      if ((e.ctrlKey || e.metaKey) && isK) {
         e.preventDefault()
         e.stopPropagation()
         setPalettePressed(true)
@@ -307,6 +315,16 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
 
         {step.id === 'palette' && (
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Try Ctrl + K to continue"
+            onClick={() => setPalettePressed(true)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setPalettePressed(true)
+              }
+            }}
             aria-live="polite"
             style={{
               display: 'flex',
@@ -317,6 +335,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               background: 'var(--color-surface-2)',
               border: `1px solid ${palettePressed ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
               borderRadius: 'var(--radius-md)',
+              cursor: palettePressed ? 'default' : 'pointer',
               transition: 'border-color var(--duration-normal) var(--ease-default)'
             }}
           >
@@ -443,6 +462,86 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
               </div>
             </div>
           </>
+        )}
+
+        {step.id === 'layout' && (
+          <div className="col" style={{ gap: 'var(--space-2)' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setLayoutProfile('focused')
+                void applyLayoutProfile('focused')
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-3)',
+                background: layoutProfile === 'focused' ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
+                border: `1px solid ${layoutProfile === 'focused' ? 'var(--color-primary)' : 'var(--color-surface-offset)'}`,
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                width: '100%'
+              }}
+            >
+              <div style={{
+                width: '18px', height: '18px', borderRadius: '50%',
+                border: `2px solid ${layoutProfile === 'focused' ? 'var(--color-primary)' : 'var(--color-text-faint)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px'
+              }}>
+                {layoutProfile === 'focused' && (
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-primary)' }} />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
+                  Focused & Clean (Recommended)
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: '2px' }}>
+                  Keeps the essential Kanban board, Wall canvas, Notes, and Focus timer. Hides developer logs and secondary tools.
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setLayoutProfile('full')
+                void applyLayoutProfile('full')
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-3)',
+                background: layoutProfile === 'full' ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
+                border: `1px solid ${layoutProfile === 'full' ? 'var(--color-primary)' : 'var(--color-surface-offset)'}`,
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                width: '100%'
+              }}
+            >
+              <div style={{
+                width: '18px', height: '18px', borderRadius: '50%',
+                border: `2px solid ${layoutProfile === 'full' ? 'var(--color-primary)' : 'var(--color-text-faint)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px'
+              }}>
+                {layoutProfile === 'full' && (
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-primary)' }} />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
+                  Full Suite (All Tools)
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: '2px' }}>
+                  All views visible, including Daily Logs, Analytics, and Quick Cheatsheets.
+                </div>
+              </div>
+            </button>
+          </div>
         )}
 
         {step.id === 'keys' && (

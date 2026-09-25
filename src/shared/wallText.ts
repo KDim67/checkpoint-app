@@ -98,18 +98,184 @@ interface Edit {
   end: number
 }
 
-/** Ctrl+B and friends; the words stay selected and the markers sit outside them */
-export function toggleWrap(value: string, start: number, end: number, marker: string): Edit {
-  const n = marker.length
-  const selected = value.slice(start, end)
+export type WallTextStyleKind = 'bold' | 'italic' | 'strike' | 'underline' | 'code'
 
-  if (start >= n && value.slice(start - n, start) === marker && value.slice(end, end + n) === marker) {
-    return { value: value.slice(0, start - n) + selected + value.slice(end + n), start: start - n, end: end - n }
+export const WALL_STYLE_MARKERS: Record<WallTextStyleKind, string> = {
+  bold: '**',
+  italic: '_',
+  strike: '~~',
+  underline: '++',
+  code: '`'
+}
+
+export const MARKER_TO_STYLE: Record<string, WallTextStyleKind> = {
+  '**': 'bold',
+  '~~': 'strike',
+  '++': 'underline',
+  '`': 'code',
+  '_': 'italic'
+}
+
+const KNOWN_MARKERS: { kind: WallTextStyleKind; marker: string }[] = [
+  { kind: 'bold', marker: '**' },
+  { kind: 'strike', marker: '~~' },
+  { kind: 'underline', marker: '++' },
+  { kind: 'code', marker: '`' },
+  { kind: 'italic', marker: '_' }
+]
+
+const CANONICAL_ORDER: WallTextStyleKind[] = ['bold', 'italic', 'strike', 'underline', 'code']
+
+export function getStylesAtRange(value: string, start: number, end: number): Set<WallTextStyleKind> {
+  const styles = new Set<WallTextStyleKind>()
+  if (start === end) return styles
+  const [s, e] = start < end ? [start, end] : [end, start]
+
+  let left = s
+  let right = e
+  while (left < right && /\s/.test(value[left])) left++
+  while (right > left && /\s/.test(value[right - 1])) right--
+  if (left >= right) return styles
+
+  let expanded = true
+  while (expanded) {
+    expanded = false
+    for (const { kind, marker: m } of KNOWN_MARKERS) {
+      const n = m.length
+      if (left >= n && right + n <= value.length) {
+        if (value.slice(left - n, left) === m && value.slice(right, right + n) === m) {
+          styles.add(kind)
+          left -= n
+          right += n
+          expanded = true
+          break
+        }
+      }
+    }
   }
-  if (selected.length >= n * 2 && selected.startsWith(marker) && selected.endsWith(marker)) {
-    return { value: value.slice(0, start) + selected.slice(n, -n) + value.slice(end), start, end: end - n * 2 }
+
+  let innerLeft = left
+  let innerRight = right
+  let peeled = true
+  while (peeled && innerLeft < innerRight) {
+    peeled = false
+    const span = value.slice(innerLeft, innerRight)
+    for (const { kind, marker: m } of KNOWN_MARKERS) {
+      const n = m.length
+      if (span.length >= n * 2 && span.startsWith(m) && span.endsWith(m)) {
+        styles.add(kind)
+        innerLeft += n
+        innerRight -= n
+        peeled = true
+        break
+      }
+    }
   }
-  return { value: value.slice(0, start) + marker + selected + marker + value.slice(end), start: start + n, end: end + n }
+
+  return styles
+}
+
+export function hasWrap(value: string, start: number, end: number, marker: string): boolean {
+  const kind = MARKER_TO_STYLE[marker]
+  if (!kind) return false
+  return getStylesAtRange(value, start, end).has(kind)
+}
+
+/** Ctrl+B and friends; toggles markdown formatting cleanly without duplicating or corrupting nested markers */
+export function toggleWrap(value: string, start: number, end: number, marker: string): Edit {
+  if (start === end) {
+    return {
+      value: value.slice(0, start) + marker + marker + value.slice(start),
+      start: start + marker.length,
+      end: start + marker.length
+    }
+  }
+
+  const [s, e] = start < end ? [start, end] : [end, start]
+  const targetKind = MARKER_TO_STYLE[marker]
+
+  const selected = value.slice(s, e)
+  const leading = /^\s*/.exec(selected)?.[0] ?? ''
+  const trailing = /\s*$/.exec(selected)?.[0] ?? ''
+  if (selected.length - leading.length - trailing.length <= 0) {
+    return { value, start, end }
+  }
+
+  let left = s + leading.length
+  let right = e - trailing.length
+  const appliedStyles = new Set<WallTextStyleKind>()
+
+  let expanded = true
+  while (expanded) {
+    expanded = false
+    for (const { kind, marker: m } of KNOWN_MARKERS) {
+      const n = m.length
+      if (left >= n && right + n <= value.length) {
+        if (value.slice(left - n, left) === m && value.slice(right, right + n) === m) {
+          appliedStyles.add(kind)
+          left -= n
+          right += n
+          expanded = true
+          break
+        }
+      }
+    }
+  }
+
+  let innerLeft = left
+  let innerRight = right
+  let peeled = true
+  while (peeled && innerLeft < innerRight) {
+    peeled = false
+    const span = value.slice(innerLeft, innerRight)
+    for (const { kind, marker: m } of KNOWN_MARKERS) {
+      const n = m.length
+      if (span.length >= n * 2 && span.startsWith(m) && span.endsWith(m)) {
+        appliedStyles.add(kind)
+        innerLeft += n
+        innerRight -= n
+        peeled = true
+        break
+      }
+    }
+  }
+
+  let coreText = value.slice(innerLeft, innerRight)
+
+  if (targetKind) {
+    while (coreText.startsWith(marker) && coreText.endsWith(marker) && coreText.length >= marker.length * 2) {
+      coreText = coreText.slice(marker.length, coreText.length - marker.length)
+    }
+  }
+
+  if (targetKind) {
+    if (appliedStyles.has(targetKind)) {
+      appliedStyles.delete(targetKind)
+    } else {
+      appliedStyles.add(targetKind)
+    }
+  }
+
+  let formatted = coreText
+  let prefixLen = 0
+  for (let i = CANONICAL_ORDER.length - 1; i >= 0; i--) {
+    const k = CANONICAL_ORDER[i]
+    if (appliedStyles.has(k)) {
+      const m = WALL_STYLE_MARKERS[k]
+      formatted = m + formatted + m
+      prefixLen += m.length
+    }
+  }
+
+  const resultValue = value.slice(0, left) + formatted + value.slice(right)
+  const nextStart = left + prefixLen
+  const nextEnd = nextStart + coreText.length
+
+  return {
+    value: resultValue,
+    start: nextStart,
+    end: nextEnd
+  }
 }
 
 const lineStartOf = (value: string, at: number): number => (at === 0 ? 0 : value.lastIndexOf('\n', at - 1) + 1)

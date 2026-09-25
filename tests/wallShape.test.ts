@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cardFromText, shapeOutline, shapeTextBox, switchKinds } from '../src/shared/wallShape'
+import { cardFromText, shapeOutline, shapeTextBox, switchKinds, SHAPE_NAMES } from '../src/shared/wallShape'
 import { DEFAULT_SIZES, type WallItem } from '../src/shared/wallModel'
 
 const item = (id: string, over: Partial<WallItem> = {}): WallItem => ({
@@ -93,3 +93,13 @@ describe('cardFromText', () => {
     expect(cardFromText('x'.repeat(500)).title).toHaveLength(200)
   })
 })
+
+describe('SHAPE_NAMES', () => {
+  it('defines human-readable names for every shape type', () => {
+    for (const type of ['rectangle', 'rounded', 'oval', 'diamond', 'triangle'] as const) {
+      expect(SHAPE_NAMES[type]).toBeTruthy()
+      expect(typeof SHAPE_NAMES[type]).toBe('string')
+    }
+  })
+})
+

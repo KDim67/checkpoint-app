@@ -51,4 +51,27 @@ export function registerMediaHandlers(): void {
       throw err
     }
   })
+
+  ipcMain.handle(IpcChannels.MEDIA_SAVE_NAMED_BUFFER, async (_event, arrayBuffer: ArrayBuffer, filename: string) => {
+    try {
+      const { saveNamedBufferToMedia } = await import('../mediaService')
+      const buffer = Buffer.from(arrayBuffer)
+      return saveNamedBufferToMedia(buffer, filename)
+    } catch (err) {
+      console.error('IPC media:saveNamedBuffer failed:', err)
+      throw err
+    }
+  })
+
+  ipcMain.handle(IpcChannels.MEDIA_READ_BUFFER, async (_event, filename: string) => {
+    try {
+      const { readMediaBuffer } = await import('../mediaService')
+      const buffer = readMediaBuffer(filename)
+      if (!buffer) return null
+      return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+    } catch (err) {
+      console.error('IPC media:readBuffer failed:', err)
+      return null
+    }
+  })
 }

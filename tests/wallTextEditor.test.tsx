@@ -120,4 +120,30 @@ describe('WallTextEditor', () => {
 
     expect(onNext).not.toHaveBeenCalled()
   })
+
+  it('shows formatting toolbar when text is selected and formats via buttons', () => {
+    render(<Harness initial="make bold" />)
+    expect(screen.queryByRole('toolbar', { name: 'Format selected text' })).toBeNull()
+
+    box().setSelectionRange(5, 9)
+    fireEvent.select(box())
+
+    const toolbar = screen.getByRole('toolbar', { name: 'Format selected text' })
+    expect(toolbar).toBeTruthy()
+    expect(toolbar.hasAttribute('data-wall-ui')).toBe(true)
+
+    const boldBtn = screen.getByRole('button', { name: 'Bold (Ctrl+B)' })
+    fireEvent.click(boldBtn)
+    expect(box().value).toBe('make **bold**')
+
+    // clicking bold again toggles it off
+    fireEvent.click(boldBtn)
+    expect(box().value).toBe('make bold')
+
+    // clicking underline wraps in ++
+    const underBtn = screen.getByRole('button', { name: 'Underline (Ctrl+U)' })
+    fireEvent.click(underBtn)
+    expect(box().value).toBe('make ++bold++')
+  })
 })
+

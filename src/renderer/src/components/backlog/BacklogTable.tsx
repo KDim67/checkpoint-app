@@ -326,7 +326,7 @@ export default function BacklogTable({
     if (!container) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isSelectAll = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a'
+      const isSelectAll = (e.ctrlKey || e.metaKey) && ((typeof e.key === 'string' && e.key.toLowerCase() === 'a') || e.code === 'KeyA')
       if (!isSelectAll) return
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return

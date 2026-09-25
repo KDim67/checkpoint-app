@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar'
 import { ToastProvider } from './components/ui/Toast'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
+import { CollabProvider } from './context/CollabContext'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './lib/fontScale'
 import { applyStoredTheme, watchTheme } from './lib/themeBoot'
@@ -39,6 +40,8 @@ import * as appApi from './data/app'
 import * as customizerApi from './data/customizer'
 import * as mcpApi from './data/mcp'
 import { onThemeUpdate } from './data/theme'
+import { useCollabFollow } from './lib/useCollabFollow'
+import CollabFollowBanner from './components/collab/CollabFollowBanner'
 
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
 const OnboardingTour = lazy(() => import('./components/OnboardingTour'))
@@ -516,6 +519,11 @@ function HudShell() {
   )
 }
 
+function CollabFollowController() {
+  const { followingPeer, stopFollowing } = useCollabFollow()
+  return <CollabFollowBanner followingPeer={followingPeer} onStop={stopFollowing} />
+}
+
 export default function App() {
   const activeView = useAppStore(s => s.activeView)
   const setView = useAppStore(s => s.setView)
@@ -575,7 +583,8 @@ export default function App() {
   // renderer-bound, a global shortcut would steal Ctrl+K from other apps
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      const isK = (typeof e.key === 'string' && e.key.toLowerCase() === 'k') || e.code === 'KeyK'
+      if ((e.ctrlKey || e.metaKey) && isK) {
         e.preventDefault()
         // not during the tour: it opened over the tour and one Escape closed both for good
         if (showOnboarding) return
@@ -805,39 +814,42 @@ export default function App() {
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <FocusTimerEngine />
-        {/* outermost net: a throw in the titlebar or sidebar would otherwise white out the window */}
-        <ErrorBoundary label="Checkpoint">
-        <Suspense fallback={null}>
-          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-          {showOnboarding && (
-            <OnboardingTour
-              onCreateWorkspace={createOnboardingWorkspace}
-              onClose={closeOnboarding}
-            />
-          )}
-        </Suspense>
-        <div className="app-shell">
-          <Titlebar />
-          <div className="app-body">
-            <Sidebar />
-            <main
-              id="main-content"
-              className="app-content"
-              role="main"
-              aria-label={`${activeView} view`}
-            >
-              <ErrorBoundary label="This view" resetKey={activeView}>
-                <Suspense fallback={<ViewSkeleton />}>
-                  {renderView()}
-                </Suspense>
-              </ErrorBoundary>
-            </main>
-            <RightPanel />
+        <CollabProvider>
+          <CollabFollowController />
+          <FocusTimerEngine />
+          {/* outermost net: a throw in the titlebar or sidebar would otherwise white out the window */}
+          <ErrorBoundary label="Checkpoint">
+          <Suspense fallback={null}>
+            <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+            {showOnboarding && (
+              <OnboardingTour
+                onCreateWorkspace={createOnboardingWorkspace}
+                onClose={closeOnboarding}
+              />
+            )}
+          </Suspense>
+          <div className="app-shell">
+            <Titlebar />
+            <div className="app-body">
+              <Sidebar />
+              <main
+                id="main-content"
+                className="app-content"
+                role="main"
+                aria-label={`${activeView} view`}
+              >
+                <ErrorBoundary label="This view" resetKey={activeView}>
+                  <Suspense fallback={<ViewSkeleton />}>
+                    {renderView()}
+                  </Suspense>
+                </ErrorBoundary>
+              </main>
+              <RightPanel />
+            </div>
           </div>
-        </div>
-        </ErrorBoundary>
-        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+          </ErrorBoundary>
+          <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+        </CollabProvider>
       </ConfirmProvider>
     </ToastProvider>
   )

@@ -2,6 +2,7 @@ import { Layers, LayoutGrid, Eye } from 'lucide-react'
 import type { CardDisplay } from '../../lib/boardConfig'
 import MenuItem, { MenuDivider, MenuPanel } from '../ui/MenuItem'
 import CollabPanel from './CollabPanel'
+import CollabPresenceRoster from '../collab/CollabPresenceRoster'
 import HeaderBtn from './HeaderBtn'
 import TemplateMenu from './TemplateMenu'
 import BoardThemeMenu from './BoardThemeMenu'
@@ -134,6 +135,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
 
       {/* never shrinks, a button past the edge can't be pressed */}
       <div className="row no-shrink">
+        <CollabPresenceRoster members={collab?.roster ?? []} />
         <CollabPanel session={collab} />
 
         <BoardThemeMenu theme={theme} persistConfig={persistConfig} />

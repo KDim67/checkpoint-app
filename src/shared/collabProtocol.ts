@@ -11,6 +11,7 @@ import type {
   Tag
 } from './types'
 import { normalizeBoardConfig, type BoardConfig } from './boardModel'
+import { normalizeWallDoc, normalizeWallIndex, type WallDoc, type WallIndex } from './wallModel'
 import { readInstallId } from './identity'
 
 export type RemoteMutation =
@@ -60,6 +61,103 @@ export interface BoardBaselineMessage {
   tombstones?: SyncTombstone[]
   /** file the board against the host, not the name; empty falls back to the name */
   install?: string
+  /** optional wall state for the workspace */
+  walls?: {
+    index: WallIndex
+    docs: Record<string, WallDoc>
+  }
+}
+
+export interface WallDocMessage {
+  type: 'wall-doc-sync'
+  context: string
+  wallId: string
+  doc: WallDoc
+}
+
+export interface WallIndexMessage {
+  type: 'wall-index-sync'
+  context: string
+  index: WallIndex
+}
+
+export interface PeerCursorMessage {
+  type: 'peer-cursor'
+  context: string
+  wallId: string
+  peerId: string
+  x: number
+  y: number
+  view?: string
+  name?: string
+  color?: string
+}
+
+export interface PeerViewMessage {
+  type: 'peer-view'
+  context: string
+  peerId: string
+  view: string
+  wallId?: string
+  name?: string
+  color?: string
+}
+
+export interface PeerLiveMoveItem {
+  id: string
+  x: number
+  y: number
+}
+
+export interface PeerLiveMoveMessage {
+  type: 'peer-live-move'
+  context: string
+  wallId: string
+  peerId: string
+  items: PeerLiveMoveItem[]
+  name?: string
+  color?: string
+}
+
+export interface PeerCardDragMessage {
+  type: 'peer-card-drag'
+  context: string
+  peerId: string
+  cardId: string
+  columnId?: string
+  overCardId?: string
+  isDragging: boolean
+  name?: string
+  color?: string
+}
+
+export interface PeerSelectionMessage {
+  type: 'peer-selection'
+  context: string
+  wallId: string
+  peerId: string
+  selectedIds: string[]
+  name?: string
+  color?: string
+}
+
+export const PRESENCE_COLORS = [
+  '#f43f5e', // rose
+  '#06b6d4', // cyan
+  '#8b5cf6', // purple
+  '#10b981', // emerald
+  '#f59e0b', // amber
+  '#3b82f6', // blue
+  '#ec4899', // pink
+  '#14b8a6'  // teal
+] as const
+
+export function peerPresenceColor(peerId: string): string {
+  let hash = 0
+  for (let i = 0; i < peerId.length; i++) {
+    hash = (hash * 31 + peerId.charCodeAt(i)) >>> 0
+  }
+  return PRESENCE_COLORS[hash % PRESENCE_COLORS.length]
 }
 
 /** only the host knows, sent on every change */
@@ -140,6 +238,24 @@ interface MergeAnswerMessage {
   reason?: string
 }
 
+export interface AssetRequestMessage {
+  type: 'asset-request'
+  context: string
+  filename: string
+  requesterId?: string
+}
+
+export interface AssetChunkMessage {
+  type: 'asset-chunk'
+  context: string
+  filename: string
+  chunkIndex: number
+  totalChunks: number
+  totalBytes: number
+  chunkData: string
+  mimeType?: string
+}
+
 export type CollabMessage =
   | BoardBaselineMessage
   | DbMutationMessage
@@ -152,6 +268,15 @@ export type CollabMessage =
   | BoardResetMessage
   | RosterMessage
   | BoardConfigMessage
+  | WallDocMessage
+  | WallIndexMessage
+  | PeerCursorMessage
+  | PeerViewMessage
+  | PeerLiveMoveMessage
+  | PeerCardDragMessage
+  | PeerSelectionMessage
+  | AssetRequestMessage
+  | AssetChunkMessage
 
 function obj(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -354,7 +479,16 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
         ? undefined
         : normalizeAll(o.tombstones, normalizeTombstone),
       // empty covers old hosts and unreadable ids
-      install: readInstallId(o.install)
+      install: readInstallId(o.install),
+      walls: o.walls && typeof o.walls === 'object' ? {
+        index: normalizeWallIndex((o.walls as Record<string, unknown>).index),
+        docs: typeof (o.walls as Record<string, unknown>).docs === 'object' && (o.walls as Record<string, unknown>).docs !== null
+          ? Object.fromEntries(
+              Object.entries((o.walls as Record<string, unknown>).docs as Record<string, unknown>)
+                .map(([wid, wdoc]) => [wid, normalizeWallDoc(wdoc)])
+            )
+          : {}
+      } : undefined
     }
   }
 
@@ -432,6 +566,181 @@ export function normalizeCollabMessage(raw: unknown): CollabMessage | null {
     // rejected, not defaulted: an unreadable mode mustn't become permissive
     if (o.mode !== 'collaborative' && o.mode !== 'readonly') return null
     return { type: 'mode-change', mode: o.mode }
+  }
+
+  if (o.type === 'wall-doc-sync') {
+    const context = id(o.context)
+    const wallId = str(o.wallId)
+    if (!context || !wallId) return null
+    return {
+      type: 'wall-doc-sync',
+      context,
+      wallId,
+      doc: normalizeWallDoc(o.doc)
+    }
+  }
+
+  if (o.type === 'wall-index-sync') {
+    const context = id(o.context)
+    if (!context) return null
+    return {
+      type: 'wall-index-sync',
+      context,
+      index: normalizeWallIndex(o.index)
+    }
+  }
+
+  if (o.type === 'peer-cursor') {
+    const context = id(o.context)
+    const wallId = str(o.wallId)
+    const peerId = id(o.peerId)
+    const x = num(o.x)
+    const y = num(o.y)
+    if (!context || !wallId || !peerId || x === null || y === null) return null
+    return {
+      type: 'peer-cursor',
+      context,
+      wallId,
+      peerId,
+      x,
+      y,
+      view: str(o.view) || undefined,
+      name: str(o.name) || undefined,
+      color: str(o.color) || undefined
+    }
+  }
+
+  if (o.type === 'peer-view') {
+    const context = id(o.context)
+    const peerId = id(o.peerId)
+    const view = str(o.view)
+    if (!context || !peerId || !view) return null
+    return {
+      type: 'peer-view',
+      context,
+      peerId,
+      view,
+      wallId: str(o.wallId) || undefined,
+      name: str(o.name) || undefined,
+      color: str(o.color) || undefined
+    }
+  }
+
+  if (o.type === 'peer-live-move') {
+    const context = id(o.context)
+    const wallId = str(o.wallId)
+    const peerId = id(o.peerId)
+    if (!context || !wallId || !peerId || !Array.isArray(o.items)) return null
+    const items: PeerLiveMoveItem[] = []
+    const maxItems = Math.min(o.items.length, 50)
+    for (let i = 0; i < maxItems; i++) {
+      const itemObj = obj(o.items[i])
+      if (!itemObj) continue
+      const itemId = id(itemObj.id)
+      const x = num(itemObj.x)
+      const y = num(itemObj.y)
+      if (itemId && x !== null && y !== null) {
+        items.push({ id: itemId, x, y })
+      }
+    }
+    return {
+      type: 'peer-live-move',
+      context,
+      wallId,
+      peerId,
+      items,
+      name: str(o.name) || undefined,
+      color: str(o.color) || undefined
+    }
+  }
+
+  if (o.type === 'peer-card-drag') {
+    const context = id(o.context)
+    const peerId = id(o.peerId)
+    const cardId = id(o.cardId)
+    const isDragging = typeof o.isDragging === 'boolean' ? o.isDragging : null
+    if (!context || !peerId || !cardId || isDragging === null) return null
+    return {
+      type: 'peer-card-drag',
+      context,
+      peerId,
+      cardId,
+      columnId: str(o.columnId) || undefined,
+      overCardId: str(o.overCardId) || undefined,
+      isDragging,
+      name: str(o.name) || undefined,
+      color: str(o.color) || undefined
+    }
+  }
+
+  if (o.type === 'peer-selection') {
+    const context = id(o.context)
+    const wallId = str(o.wallId)
+    const peerId = id(o.peerId)
+    if (!context || !wallId || !peerId) return null
+    const selectedIds = Array.isArray(o.selectedIds)
+      ? o.selectedIds.filter((item): item is string => typeof item === 'string')
+      : []
+    return {
+      type: 'peer-selection',
+      context,
+      wallId,
+      peerId,
+      selectedIds,
+      name: str(o.name) || undefined,
+      color: str(o.color) || undefined
+    }
+  }
+
+  if (o.type === 'asset-request') {
+    const context = id(o.context)
+    const filename = str(o.filename)
+    if (!context || !filename || filename.includes('/') || filename.includes('\\') || filename.includes('..')) {
+      return null
+    }
+    return {
+      type: 'asset-request',
+      context,
+      filename,
+      requesterId: id(o.requesterId) || undefined
+    }
+  }
+
+  if (o.type === 'asset-chunk') {
+    const context = id(o.context)
+    const filename = str(o.filename)
+    const chunkIndex = num(o.chunkIndex)
+    const totalChunks = num(o.totalChunks)
+    const totalBytes = num(o.totalBytes)
+    const chunkData = typeof o.chunkData === 'string' ? o.chunkData : null
+
+    if (
+      !context ||
+      !filename ||
+      filename.includes('/') ||
+      filename.includes('\\') ||
+      filename.includes('..') ||
+      chunkIndex === null ||
+      totalChunks === null ||
+      totalBytes === null ||
+      chunkIndex < 0 ||
+      totalChunks <= 0 ||
+      chunkIndex >= totalChunks ||
+      !chunkData
+    ) {
+      return null
+    }
+
+    return {
+      type: 'asset-chunk',
+      context,
+      filename,
+      chunkIndex,
+      totalChunks,
+      totalBytes,
+      chunkData,
+      mimeType: str(o.mimeType) || undefined
+    }
   }
 
   return null

@@ -25,7 +25,8 @@ export function useWallView() {
     setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark, growFrom,
     searchKind, setSearchKind, framesOpen, setFramesOpen, exportOpen, setExportOpen, binOpen, setBinOpen,
     presenting, restoreDeleted, frameSelection, showFrame, startPresenting, stopPresenting, stepPresenting,
-    setFrameOrder, eraserMode, setEraserMode, penPresets, choosePenColor, choosePenWidth, pickPreset
+    setFrameOrder, eraserMode, setEraserMode, penPresets, choosePenColor, choosePenWidth, pickPreset,
+    collab, isReadOnly, panCameraRef
   } = wallDocument
   const {
     screenPoint, onWheel, jumpTo, exportWall, zoomBy, zoomReset, zoomToSelection, fitToContent, arrowAt,
@@ -194,7 +195,10 @@ export function useWallView() {
     penPresets,
     choosePenColor,
     choosePenWidth,
-    pickPreset
+    pickPreset,
+    collab,
+    isReadOnly,
+    panCameraRef
   }
 }
 

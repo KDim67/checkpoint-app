@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid } from 'lucide-react'
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
-import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature } from '../../lib/features'
+import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature, readLayoutProfile, applyLayoutProfile, type LayoutProfile } from '../../lib/features'
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 import { getBoolSetting, getNumberSetting, getStringSetting, setBoolSetting } from '../../lib/settings'
@@ -317,23 +317,40 @@ function FeatureRow({ cfg, on, busy, onChange }: {
 
 export default function FeatureToggleCenter() {
   const [states, setStates] = useState<Record<string, boolean>>({})
+  const [profile, setProfile] = useState<LayoutProfile>('focused')
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<string | null>(null)
 
+  const reloadStates = async (): Promise<Record<string, boolean>> => {
+    const results: Record<string, boolean> = {}
+    await Promise.all(
+      TOGGLE_CONFIGS.map(async cfg => {
+        try { results[cfg.key] = await cfg.getState() }
+        catch { results[cfg.key] = false }
+      })
+    )
+    return results
+  }
+
   useEffect(() => {
     const loadAll = async () => {
-      const results: Record<string, boolean> = {}
-      await Promise.all(
-        TOGGLE_CONFIGS.map(async cfg => {
-          try { results[cfg.key] = await cfg.getState() }
-          catch { results[cfg.key] = false }
-        })
-      )
+      const [currentProfile, results] = await Promise.all([
+        readLayoutProfile(),
+        reloadStates()
+      ])
+      setProfile(currentProfile)
       setStates(results)
       setLoading(false)
     }
     loadAll()
   }, [])
+
+  const handleSelectProfile = async (targetProfile: LayoutProfile) => {
+    setProfile(targetProfile)
+    await applyLayoutProfile(targetProfile)
+    const results = await reloadStates()
+    setStates(results)
+  }
 
   const handleToggle = async (cfg: ToggleConfig, newValue: boolean) => {
     setToggling(cfg.key)
@@ -397,6 +414,122 @@ export default function FeatureToggleCenter() {
         <div className="section-kicker">
           Workspace Views & Sidebar Customization
         </div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginBottom: 'var(--space-3)', lineHeight: 1.5 }}>
+          Switch your workspace layout in one click or fine-tune individual sidebar views below.
+        </div>
+
+        {/* 1-Click Profile Switcher */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 'var(--space-3)',
+          marginBottom: 'var(--space-4)'
+        }}>
+          <button
+            type="button"
+            data-testid="profile-focused-btn"
+            onClick={() => handleSelectProfile('focused')}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-3)',
+              background: profile === 'focused' ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
+              border: `1.5px solid ${profile === 'focused' ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'border-color 150ms ease, background 150ms ease'
+            }}
+          >
+            <div style={{
+              width: '18px', height: '18px', borderRadius: '50%',
+              border: `2px solid ${profile === 'focused' ? 'var(--color-secondary)' : 'var(--color-text-faint)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px'
+            }}>
+              {profile === 'focused' && (
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-secondary)' }} />
+              )}
+            </div>
+            <div className="min-w-0" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
+                  Focused & Clean
+                </span>
+                {profile === 'focused' && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    background: 'var(--color-secondary-muted)',
+                    color: 'var(--color-secondary)'
+                  }}>
+                    Active
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45, marginTop: '4px' }}>
+                Kanban, Wall canvas, Notes, and Focus timer. Hides developer logs and secondary tools to minimize distractions.
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            data-testid="profile-full-btn"
+            onClick={() => handleSelectProfile('full')}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-3)',
+              background: profile === 'full' ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
+              border: `1.5px solid ${profile === 'full' ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'border-color 150ms ease, background 150ms ease'
+            }}
+          >
+            <div style={{
+              width: '18px', height: '18px', borderRadius: '50%',
+              border: `2px solid ${profile === 'full' ? 'var(--color-secondary)' : 'var(--color-text-faint)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px'
+            }}>
+              {profile === 'full' && (
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-secondary)' }} />
+              )}
+            </div>
+            <div className="min-w-0" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
+                  Full Suite
+                </span>
+                {profile === 'full' && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    background: 'var(--color-secondary-muted)',
+                    color: 'var(--color-secondary)'
+                  }}>
+                    Active
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45, marginTop: '4px' }}>
+                Unlocks the complete workspace: Activity Log stream, Reference Cheatsheets, App Analytics, and Game Dev helpers.
+              </div>
+            </div>
+          </button>
+        </div>
+
         <div className="col-xs">
           {SIDEBAR_VIEW_CONFIGS.map((cfg, i) => (
             <React.Fragment key={cfg.key}>

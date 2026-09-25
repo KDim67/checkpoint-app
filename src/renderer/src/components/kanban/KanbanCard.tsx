@@ -9,6 +9,12 @@ import { PRIORITY_COLORS } from '../../lib/priority'
 import { DEFAULT_CARD_DISPLAY, type CardDisplay } from '../../lib/boardConfig'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
 
+export interface RemoteCardDragInfo {
+  peerId: string
+  name: string
+  color: string
+}
+
 interface KanbanCardProps {
   card: Item
   onClick: (id: string) => void
@@ -18,6 +24,7 @@ interface KanbanCardProps {
   isOverlay?: boolean
   /** board-level card face switches */
   display?: CardDisplay
+  remoteDrag?: RemoteCardDragInfo | null
 }
 
 function stripMarkdown(md: string): string {
@@ -554,7 +561,7 @@ function ActionBtn({
 // memoized apart: dnd-kit re-renders every sortable when a drag starts and whenever the card under the pointer changes
 const MemoCardFace = React.memo(CardFace)
 
-function KanbanCard({ isOverlay = false, ...face }: KanbanCardProps) {
+function KanbanCard({ isOverlay = false, remoteDrag, ...face }: KanbanCardProps) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: face.card.id, disabled: isOverlay })
   // the overlay copy only borrows the look, it has no place in a list
   if (isOverlay) return <MemoCardFace {...face} isDragging={false} />
@@ -569,9 +576,37 @@ function KanbanCard({ isOverlay = false, ...face }: KanbanCardProps) {
         transition,
         position: 'relative',
         zIndex: isDragging ? 999 : 1,
-        flexShrink: 0
+        flexShrink: 0,
+        outline: remoteDrag ? `2px dashed ${remoteDrag.color}` : undefined,
+        borderRadius: remoteDrag ? 'var(--radius-md)' : undefined
       }}
     >
+      {remoteDrag && (
+        <div
+          data-testid="remote-card-drag-badge"
+          style={{
+            position: 'absolute',
+            top: '-8px',
+            left: '8px',
+            zIndex: 10,
+            background: remoteDrag.color,
+            color: '#ffffff',
+            fontSize: '10px',
+            fontWeight: 700,
+            padding: '1px 6px',
+            borderRadius: '4px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            animation: 'dropdown-in 150ms ease'
+          }}
+        >
+          <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#ffffff' }} />
+          {remoteDrag.name} is moving
+        </div>
+      )}
       <MemoCardFace {...face} dragAttributes={attributes} isDragging={isDragging} />
     </div>
   )
