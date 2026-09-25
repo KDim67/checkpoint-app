@@ -15,10 +15,17 @@ import {
   normalizeCollabMessage,
   normalizeRemoteMutation,
   retargetMutation,
+  peerPresenceColor,
   type BoardBaselineMessage,
   type CollabMessage,
   type CollabMode,
-  type MergeProposalMessage
+  type MergeProposalMessage,
+  type PeerCursorMessage,
+  type PeerViewMessage,
+  type PeerLiveMoveItem,
+  type PeerLiveMoveMessage,
+  type PeerCardDragMessage,
+  type PeerSelectionMessage
 } from '../../../shared/collabProtocol'
 import { describeMerge, mergeBoards, mergeImpact, type MergeImpact } from '../../../shared/boardMerge'
 import type { Item } from '../../../shared/types'
@@ -28,7 +35,18 @@ import { signalingPublishUrl, signalingStreamUrl } from '../../../shared/signali
 import { registerSharedWorkspace } from './createWorkspace'
 import { BOARD_CONFIG_EVENT, loadBoardConfig, saveBoardConfig } from './boardConfig'
 import { normalizeBoardConfig } from '../../../shared/boardModel'
+import {
+  WALL_DOC_EVENT,
+  WALL_INDEX_EVENT,
+  loadWallIndex,
+  loadWallDoc,
+  saveWallIndex,
+  flushWallDoc
+} from './wallDoc'
+import { normalizeWallDoc, normalizeWallIndex, wallDocKey, type WallDoc, type WallIndex } from '../../../shared/wallModel'
 import * as syncApi from '../data/sync'
+import * as mediaApi from '../data/media'
+import { chunkAsset, AssetAssembler, scanMissingWallAssets, DEFAULT_ASSET_CHUNK_SIZE } from './webrtcAssetSync'
 import { getSetting, setSetting } from '../data/settings'
 
 interface CollabOptions {
@@ -197,6 +215,23 @@ export class WebRTCCollaborationCoordinator {
   /** so an answer is addressed to us */
   private offeredMerge = false
 
+  private lastCursorBroadcast = 0
+  private pendingCursorMsg: PeerCursorMessage | null = null
+  private cursorTimer: ReturnType<typeof setTimeout> | null = null
+
+  private lastLiveMoveBroadcast = 0
+  private pendingLiveMoveMsg: PeerLiveMoveMessage | null = null
+  private liveMoveTimer: ReturnType<typeof setTimeout> | null = null
+
+  private lastCardDragBroadcast = 0
+  private pendingCardDragMsg: PeerCardDragMessage | null = null
+  private cardDragTimer: ReturnType<typeof setTimeout> | null = null
+
+  private lastLocalViewMsg: PeerViewMessage | null = null
+
+  private assetAssembler = new AssetAssembler()
+  private requestedAssets = new Set<string>()
+
   constructor(options: CollabOptions) {
     this.options = options
     this.sessionContext = options.context
@@ -251,11 +286,12 @@ export class WebRTCCollaborationCoordinator {
   /** in arrival order */
   private roster(): { id: string; name: string }[] {
     // host first: a list from the host's own links hid the one name guests came for
+    const hostId = this.installId || HOST_LINK
     return [
-      { id: HOST_LINK, name: this.options.displayName ?? '' },
+      { id: hostId, name: this.options.displayName ?? '' },
       ...[...this.links.values()]
         .filter(link => link.open)
-        .map(link => ({ id: link.id, name: link.name }))
+        .map(link => ({ id: link.install || link.id, name: link.name }))
     ]
   }
 
@@ -263,8 +299,9 @@ export class WebRTCCollaborationCoordinator {
   private publishRoster(): void {
     if (!this.options.isHost) return
     const members = this.roster()
+    const hostId = this.installId || HOST_LINK
     // nobody is shown to themselves
-    this.options.onRoster?.(members.filter(member => member.id !== HOST_LINK))
+    this.options.onRoster?.(members.filter(member => member.id !== hostId && member.id !== HOST_LINK))
     void this.broadcast({ type: 'roster', members }).catch(err => {
       console.warn('[Collab Host] Could not send the roster:', err)
     })
@@ -451,6 +488,13 @@ export class WebRTCCollaborationCoordinator {
         .catch(err => console.warn('[Collab Coordinator] Could not introduce myself:', err))
       void this.sendBaselineTo(link)
       this.publishRoster()
+
+      if (this.lastLocalViewMsg) {
+        this.sendTo(link, this.lastLocalViewMsg).catch(err =>
+          console.warn('[Collab Coordinator] Could not send initial view to peer:', err)
+        )
+      }
+      window.dispatchEvent(new CustomEvent('collab-request-view'))
     }
 
     // per-link order; peers interleave, only each peer's own order is promised
@@ -500,6 +544,18 @@ export class WebRTCCollaborationCoordinator {
       // columns travel with cards, statuses are column ids
       const board = await loadBoardConfig(this.options.context)
 
+      let walls: { index: WallIndex; docs: Record<string, WallDoc> } | undefined
+      try {
+        const wallIndex = await loadWallIndex(this.options.context)
+        const wallDocs: Record<string, WallDoc> = {}
+        for (const ref of wallIndex.walls) {
+          wallDocs[ref.id] = await loadWallDoc(wallDocKey(this.options.context, ref.id))
+        }
+        walls = { index: wallIndex, docs: wallDocs }
+      } catch (err) {
+        console.warn('[Collab Host] Could not compile walls into baseline:', err)
+      }
+
       await this.sendTo(link, {
         type: 'board-baseline',
         context: this.options.context,
@@ -509,6 +565,7 @@ export class WebRTCCollaborationCoordinator {
         relations,
         mode: this.options.mode,
         board,
+        walls,
         // so a later merge reads this pair's ancestor, not a same-named board's
         install: this.installId,
         // our deletions, so their merge honours them; row-id tables only
@@ -518,6 +575,14 @@ export class WebRTCCollaborationCoordinator {
       // bound once someone's in
       window.addEventListener('db-mutation', this.handleLocalMutation)
       window.addEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
+      window.addEventListener(WALL_DOC_EVENT, this.handleLocalWallDoc)
+      window.addEventListener(WALL_INDEX_EVENT, this.handleLocalWallIndex)
+      window.addEventListener('collab-my-cursor', this.handleLocalCursor)
+      window.addEventListener('collab-my-selection', this.handleLocalSelection)
+      window.addEventListener('collab-my-view', this.handleLocalView)
+      window.addEventListener('collab-my-live-move', this.handleLocalLiveMove)
+      window.addEventListener('collab-my-card-drag', this.handleLocalCardDrag)
+      window.addEventListener('collab-broadcast-asset', this.handleLocalAssetBroadcast)
     } catch (err) {
       console.error('[Collab Host] Failed to compile baseline:', err)
       this.options.onError(err)
@@ -567,6 +632,371 @@ export class WebRTCCollaborationCoordinator {
     }).catch(err => {
       console.error('[Collab Coordinator] Failed to broadcast the board change:', err)
     })
+  }
+
+  private handleLocalWallDoc = (event: Event): void => {
+    if (this.isApplyingRemote || this.links.size === 0) return
+    if (this.options.mode === 'readonly' && !this.options.isHost) return
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { context, wallId, doc } = detail as { context?: unknown; wallId?: unknown; doc?: unknown }
+    if (context !== this.sessionContext || typeof wallId !== 'string' || !wallId) return
+
+    void this.broadcast({
+      type: 'wall-doc-sync',
+      context: this.wireContext,
+      wallId,
+      doc: normalizeWallDoc(doc)
+    }).catch(err => {
+      console.error('[Collab Coordinator] Failed to broadcast wall doc:', err)
+    })
+  }
+
+  private handleLocalWallIndex = (event: Event): void => {
+    if (this.isApplyingRemote || this.links.size === 0) return
+    if (this.options.mode === 'readonly' && !this.options.isHost) return
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { context, index } = detail as { context?: unknown; index?: unknown }
+    if (context !== this.sessionContext) return
+
+    void this.broadcast({
+      type: 'wall-index-sync',
+      context: this.wireContext,
+      index: normalizeWallIndex(index)
+    }).catch(err => {
+      console.error('[Collab Coordinator] Failed to broadcast wall index:', err)
+    })
+  }
+
+  private handleLocalCursor = (event: Event): void => {
+    if (this.links.size === 0) return
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { wallId, x, y, name, color } = detail as {
+      wallId?: unknown
+      x?: unknown
+      y?: unknown
+      name?: unknown
+      color?: unknown
+    }
+    if (typeof wallId !== 'string' || typeof x !== 'number' || typeof y !== 'number') return
+
+    const peerId = this.installId
+    const peerName = typeof name === 'string' && name.trim() ? name.trim() : (this.options.displayName || peerId.slice(0, 6))
+    const peerColor = typeof color === 'string' && color.trim() ? color.trim() : peerPresenceColor(peerId)
+
+    const msg: PeerCursorMessage = {
+      type: 'peer-cursor',
+      context: this.wireContext,
+      wallId,
+      peerId,
+      x,
+      y,
+      name: peerName,
+      color: peerColor
+    }
+
+    const now = performance.now()
+    const THROTTLE_MS = 45 // max ~22 updates/sec
+    if (now - this.lastCursorBroadcast >= THROTTLE_MS) {
+      this.lastCursorBroadcast = now
+      if (this.cursorTimer) {
+        clearTimeout(this.cursorTimer)
+        this.cursorTimer = null
+      }
+      this.pendingCursorMsg = null
+      void this.broadcast(msg).catch(err => {
+        console.warn('[Collab Coordinator] Failed to broadcast cursor:', err)
+      })
+    } else {
+      this.pendingCursorMsg = msg
+      if (!this.cursorTimer) {
+        this.cursorTimer = setTimeout(() => {
+          this.cursorTimer = null
+          if (this.pendingCursorMsg && this.links.size > 0) {
+            this.lastCursorBroadcast = performance.now()
+            const toSend = this.pendingCursorMsg
+            this.pendingCursorMsg = null
+            void this.broadcast(toSend).catch(err => {
+              console.warn('[Collab Coordinator] Failed to broadcast throttled cursor:', err)
+            })
+          }
+        }, THROTTLE_MS - (now - this.lastCursorBroadcast))
+      }
+    }
+  }
+
+  private handleLocalSelection = (event: Event): void => {
+    if (this.links.size === 0) return
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { wallId, selectedIds, name, color } = detail as {
+      wallId?: unknown
+      selectedIds?: unknown
+      name?: unknown
+      color?: unknown
+    }
+    if (typeof wallId !== 'string' || !Array.isArray(selectedIds)) return
+
+    const peerId = this.installId
+    const peerName = typeof name === 'string' && name.trim() ? name.trim() : (this.options.displayName || peerId.slice(0, 6))
+    const peerColor = typeof color === 'string' && color.trim() ? color.trim() : peerPresenceColor(peerId)
+
+    const msg: PeerSelectionMessage = {
+      type: 'peer-selection',
+      context: this.wireContext,
+      wallId,
+      peerId,
+      selectedIds: selectedIds.filter((id): id is string => typeof id === 'string'),
+      name: peerName,
+      color: peerColor
+    }
+
+    void this.broadcast(msg).catch(err => {
+      console.warn('[Collab Coordinator] Failed to broadcast selection:', err)
+    })
+  }
+
+  private handleLocalView = (event: Event): void => {
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { view, wallId, name, color } = detail as {
+      view?: unknown
+      wallId?: unknown
+      name?: unknown
+      color?: unknown
+    }
+    if (typeof view !== 'string' || !view.trim()) return
+
+    const peerId = this.installId
+    const peerName = typeof name === 'string' && name.trim() ? name.trim() : (this.options.displayName || peerId.slice(0, 6))
+    const peerColor = typeof color === 'string' && color.trim() ? color.trim() : peerPresenceColor(peerId)
+
+    const msg: PeerViewMessage = {
+      type: 'peer-view',
+      context: this.wireContext,
+      peerId,
+      view: view.trim(),
+      wallId: typeof wallId === 'string' ? wallId : undefined,
+      name: peerName,
+      color: peerColor
+    }
+
+    this.lastLocalViewMsg = msg
+
+    if (this.links.size === 0) return
+
+    void this.broadcast(msg).catch(err => {
+      console.warn('[Collab Coordinator] Failed to broadcast view:', err)
+    })
+  }
+
+  private handleLocalLiveMove = (event: Event): void => {
+    if (this.links.size === 0) return
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { wallId, items, name, color } = detail as {
+      wallId?: unknown
+      items?: unknown
+      name?: unknown
+      color?: unknown
+    }
+    if (typeof wallId !== 'string' || !Array.isArray(items)) return
+
+    const peerId = this.installId
+    const peerName = typeof name === 'string' && name.trim() ? name.trim() : (this.options.displayName || peerId.slice(0, 6))
+    const peerColor = typeof color === 'string' && color.trim() ? color.trim() : peerPresenceColor(peerId)
+
+    const validItems: PeerLiveMoveItem[] = []
+    const maxItems = Math.min(items.length, 50)
+    for (let i = 0; i < maxItems; i++) {
+      const it = items[i]
+      if (it && typeof it === 'object' && typeof it.id === 'string' && typeof it.x === 'number' && typeof it.y === 'number') {
+        validItems.push({ id: it.id, x: it.x, y: it.y })
+      }
+    }
+
+    const msg: PeerLiveMoveMessage = {
+      type: 'peer-live-move',
+      context: this.wireContext,
+      wallId,
+      peerId,
+      items: validItems,
+      name: peerName,
+      color: peerColor
+    }
+
+    // Empty items means gesture ended - send immediately
+    if (validItems.length === 0) {
+      if (this.liveMoveTimer) {
+        clearTimeout(this.liveMoveTimer)
+        this.liveMoveTimer = null
+      }
+      this.pendingLiveMoveMsg = null
+      void this.broadcast(msg).catch(err => {
+        console.warn('[Collab Coordinator] Failed to broadcast end live move:', err)
+      })
+      return
+    }
+
+    // Throttled ~40ms during drag
+    const now = performance.now()
+    const THROTTLE_MS = 40
+    if (now - this.lastLiveMoveBroadcast >= THROTTLE_MS) {
+      this.lastLiveMoveBroadcast = now
+      if (this.liveMoveTimer) {
+        clearTimeout(this.liveMoveTimer)
+        this.liveMoveTimer = null
+      }
+      this.pendingLiveMoveMsg = null
+      void this.broadcast(msg).catch(err => {
+        console.warn('[Collab Coordinator] Failed to broadcast live move:', err)
+      })
+    } else {
+      this.pendingLiveMoveMsg = msg
+      if (!this.liveMoveTimer) {
+        this.liveMoveTimer = setTimeout(() => {
+          this.liveMoveTimer = null
+          if (this.pendingLiveMoveMsg && this.links.size > 0) {
+            this.lastLiveMoveBroadcast = performance.now()
+            const toSend = this.pendingLiveMoveMsg
+            this.pendingLiveMoveMsg = null
+            void this.broadcast(toSend).catch(err => {
+              console.warn('[Collab Coordinator] Failed to broadcast throttled live move:', err)
+            })
+          }
+        }, THROTTLE_MS - (now - this.lastLiveMoveBroadcast))
+      }
+    }
+  }
+
+  private handleLocalCardDrag = (event: Event): void => {
+    if (this.links.size === 0) return
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { cardId, columnId, overCardId, isDragging, name, color } = detail as {
+      cardId?: unknown
+      columnId?: unknown
+      overCardId?: unknown
+      isDragging?: unknown
+      name?: unknown
+      color?: unknown
+    }
+    if (typeof cardId !== 'string' || typeof isDragging !== 'boolean') return
+
+    const peerId = this.installId
+    const peerName = typeof name === 'string' && name.trim() ? name.trim() : (this.options.displayName || peerId.slice(0, 6))
+    const peerColor = typeof color === 'string' && color.trim() ? color.trim() : peerPresenceColor(peerId)
+
+    const msg: PeerCardDragMessage = {
+      type: 'peer-card-drag',
+      context: this.wireContext,
+      peerId,
+      cardId,
+      columnId: typeof columnId === 'string' ? columnId : undefined,
+      overCardId: typeof overCardId === 'string' ? overCardId : undefined,
+      isDragging,
+      name: peerName,
+      color: peerColor
+    }
+
+    // Start or End of drag -> send immediately
+    if (!isDragging) {
+      if (this.cardDragTimer) {
+        clearTimeout(this.cardDragTimer)
+        this.cardDragTimer = null
+      }
+      this.pendingCardDragMsg = null
+      void this.broadcast(msg).catch(err => {
+        console.warn('[Collab Coordinator] Failed to broadcast card drag end:', err)
+      })
+      return
+    }
+
+    const now = performance.now()
+    const THROTTLE_MS = 45
+    if (now - this.lastCardDragBroadcast >= THROTTLE_MS) {
+      this.lastCardDragBroadcast = now
+      if (this.cardDragTimer) {
+        clearTimeout(this.cardDragTimer)
+        this.cardDragTimer = null
+      }
+      this.pendingCardDragMsg = null
+      void this.broadcast(msg).catch(err => {
+        console.warn('[Collab Coordinator] Failed to broadcast card drag:', err)
+      })
+    } else {
+      this.pendingCardDragMsg = msg
+      if (!this.cardDragTimer) {
+        this.cardDragTimer = setTimeout(() => {
+          this.cardDragTimer = null
+          if (this.pendingCardDragMsg && this.links.size > 0) {
+            this.lastCardDragBroadcast = performance.now()
+            const toSend = this.pendingCardDragMsg
+            this.pendingCardDragMsg = null
+            void this.broadcast(toSend).catch(err => {
+              console.warn('[Collab Coordinator] Failed to broadcast throttled card drag:', err)
+            })
+          }
+        }, THROTTLE_MS - (now - this.lastCardDragBroadcast))
+      }
+    }
+  }
+
+  private handleLocalAssetBroadcast = (event: Event): void => {
+    if (this.links.size === 0) return
+    const detail = (event as CustomEvent).detail
+    if (!detail || typeof detail !== 'object') return
+    const { filename, buffer, mimeType } = detail as {
+      filename?: unknown
+      buffer?: unknown
+      mimeType?: unknown
+    }
+    if (typeof filename !== 'string' || !(buffer instanceof ArrayBuffer)) return
+
+    try {
+      const chunks = chunkAsset(
+        filename,
+        buffer,
+        this.wireContext,
+        DEFAULT_ASSET_CHUNK_SIZE,
+        typeof mimeType === 'string' ? mimeType : undefined
+      )
+      for (const chunk of chunks) {
+        void this.broadcast(chunk).catch(err => {
+          console.warn('[Collab Coordinator] Failed to broadcast asset chunk:', filename, err)
+        })
+      }
+    } catch (err) {
+      console.warn('[Collab Coordinator] Failed to chunk asset for broadcast:', filename, err)
+    }
+  }
+
+  private async requestMissingAssetsInDoc(doc: WallDoc): Promise<void> {
+    if (this.links.size === 0) return
+    try {
+      const missing = await scanMissingWallAssets(doc, async (fn) => {
+        const buf = await mediaApi.readBuffer(fn)
+        return buf !== null
+      })
+
+      for (const filename of missing) {
+        if (!this.requestedAssets.has(filename)) {
+          this.requestedAssets.add(filename)
+          void this.broadcast({
+            type: 'asset-request',
+            context: this.wireContext,
+            filename,
+            requesterId: this.installId
+          }).catch(err => {
+            console.warn('[Collab Coordinator] Failed to request asset:', filename, err)
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('[Collab Coordinator] Failed scanning missing assets in doc:', err)
+    }
   }
 
   /** folds theirs into ours, then through the baseline apply: one path into the db, and the merge is ours alone */
@@ -845,10 +1275,32 @@ export class WebRTCCollaborationCoordinator {
               }
             }
 
+            if (msg.walls) {
+              try {
+                if (msg.walls.index) {
+                  await saveWallIndex(target, msg.walls.index, { skipBroadcast: true })
+                }
+                if (msg.walls.docs) {
+                  for (const [wallId, doc] of Object.entries(msg.walls.docs)) {
+                    await flushWallDoc(wallDocKey(target, wallId), doc, {
+                      context: target,
+                      wallId,
+                      skipBroadcast: true
+                    })
+                    void this.requestMissingAssetsInDoc(doc)
+                  }
+                }
+                window.dispatchEvent(new CustomEvent('wall-index-refresh', { detail: { index: msg.walls.index } }))
+                window.dispatchEvent(new CustomEvent('wall-refresh'))
+              } catch (err) {
+                console.error('[Collab Client] Failed to take the host walls:', err)
+              }
+            }
+
             await syncApi.applyBoardBaseline(target, items, msg.tags, msg.itemTags, msg.relations)
             // both hold the host's board now, the ancestor for later merges
             await writeMergeBase(target, this.hostInstall, items)
-            this.options.onProgress(`Joined board: ${target}. Ready!`)
+            this.options.onProgress(`Joined workspace: ${target}. Ready!`)
           }
 
           window.dispatchEvent(new CustomEvent('kanban-refresh'))
@@ -857,7 +1309,15 @@ export class WebRTCCollaborationCoordinator {
             window.addEventListener('db-mutation', this.handleLocalMutation)
             // the board doc too, on both sides, or column changes go one way
             window.addEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
+            window.addEventListener(WALL_DOC_EVENT, this.handleLocalWallDoc)
+            window.addEventListener(WALL_INDEX_EVENT, this.handleLocalWallIndex)
           }
+          window.addEventListener('collab-my-cursor', this.handleLocalCursor)
+          window.addEventListener('collab-my-selection', this.handleLocalSelection)
+          window.addEventListener('collab-my-view', this.handleLocalView)
+          window.addEventListener('collab-my-live-move', this.handleLocalLiveMove)
+          window.addEventListener('collab-my-card-drag', this.handleLocalCardDrag)
+          window.addEventListener('collab-broadcast-asset', this.handleLocalAssetBroadcast)
         } catch (err) {
           // say it on screen, not just the console, or "Merging..." stays up
           console.error('[Collab Client] Failed to seed baseline:', err)
@@ -927,6 +1387,12 @@ export class WebRTCCollaborationCoordinator {
         from.name = msg.by.trim()
         // only the host publishes the list
         this.publishRoster()
+        if (this.lastLocalViewMsg) {
+          this.sendTo(from, this.lastLocalViewMsg).catch(err =>
+            console.warn('[Collab Coordinator] Could not send view on hello:', err)
+          )
+        }
+        window.dispatchEvent(new CustomEvent('collab-request-view'))
         break
       }
 
@@ -992,10 +1458,129 @@ export class WebRTCCollaborationCoordinator {
         break
       }
 
+      case 'wall-doc-sync': {
+        if (this.options.isHost && this.options.mode === 'readonly') return
+        this.isApplyingRemote = true
+        try {
+          const key = wallDocKey(this.sessionContext, msg.wallId)
+          await flushWallDoc(key, msg.doc, { context: this.sessionContext, wallId: msg.wallId, skipBroadcast: true })
+          window.dispatchEvent(new CustomEvent('wall-refresh', { detail: { wallId: msg.wallId, doc: msg.doc } }))
+          void this.requestMissingAssetsInDoc(msg.doc)
+        } catch (err) {
+          console.error('[Collab Coordinator] Failed to apply the remote wall doc:', err)
+        } finally {
+          this.isApplyingRemote = false
+        }
+        if (this.options.isHost) {
+          await this.broadcast({ ...msg, context: this.wireContext }, from.id)
+        }
+        break
+      }
+
+      case 'wall-index-sync': {
+        if (this.options.isHost && this.options.mode === 'readonly') return
+        this.isApplyingRemote = true
+        try {
+          await saveWallIndex(this.sessionContext, msg.index, { skipBroadcast: true })
+          window.dispatchEvent(new CustomEvent('wall-index-refresh', { detail: { index: msg.index } }))
+          window.dispatchEvent(new CustomEvent('wall-refresh'))
+        } catch (err) {
+          console.error('[Collab Coordinator] Failed to apply the remote wall index:', err)
+        } finally {
+          this.isApplyingRemote = false
+        }
+        if (this.options.isHost) {
+          await this.broadcast({ ...msg, context: this.wireContext }, from.id)
+        }
+        break
+      }
+
+      case 'peer-cursor': {
+        window.dispatchEvent(new CustomEvent('collab-peer-cursor', { detail: msg }))
+        if (this.options.isHost) {
+          await this.broadcast({ ...msg, context: this.wireContext }, from.id)
+        }
+        break
+      }
+
+      case 'peer-view': {
+        window.dispatchEvent(new CustomEvent('collab-peer-view', { detail: msg }))
+        if (this.options.isHost) {
+          await this.broadcast({ ...msg, context: this.wireContext }, from.id)
+        }
+        break
+      }
+
+      case 'peer-live-move': {
+        window.dispatchEvent(new CustomEvent('collab-peer-live-move', { detail: msg }))
+        if (this.options.isHost) {
+          await this.broadcast({ ...msg, context: this.wireContext }, from.id)
+        }
+        break
+      }
+
+      case 'peer-card-drag': {
+        window.dispatchEvent(new CustomEvent('collab-peer-card-drag', { detail: msg }))
+        if (this.options.isHost) {
+          await this.broadcast({ ...msg, context: this.wireContext }, from.id)
+        }
+        break
+      }
+
+      case 'peer-selection': {
+        window.dispatchEvent(new CustomEvent('collab-peer-selection', { detail: msg }))
+        if (this.options.isHost) {
+          await this.broadcast({ ...msg, context: this.wireContext }, from.id)
+        }
+        break
+      }
+
+      case 'asset-request': {
+        const { filename } = msg
+        try {
+          const buffer = await mediaApi.readBuffer(filename)
+          if (buffer) {
+            const chunks = chunkAsset(filename, buffer, this.wireContext, DEFAULT_ASSET_CHUNK_SIZE)
+            for (const chunk of chunks) {
+              await this.sendTo(from, chunk)
+            }
+          }
+        } catch (err) {
+          console.warn('[Collab Coordinator] Failed to fulfill asset request:', filename, err)
+        }
+        if (this.options.isHost) {
+          await this.broadcast(msg, from.id)
+        }
+        break
+      }
+
+      case 'asset-chunk': {
+        const completedBuffer = this.assetAssembler.acceptChunk(msg)
+        if (completedBuffer) {
+          try {
+            await mediaApi.saveNamedBuffer(completedBuffer, msg.filename)
+            window.dispatchEvent(
+              new CustomEvent('collab-asset-received', {
+                detail: { filename: msg.filename }
+              })
+            )
+            window.dispatchEvent(new CustomEvent('wall-refresh'))
+          } catch (err) {
+            console.error('[Collab Coordinator] Failed to save received asset:', msg.filename, err)
+          }
+        }
+        if (this.options.isHost) {
+          await this.broadcast(msg, from.id)
+        }
+        break
+      }
+
       case 'roster': {
         // the host keeps the list; our own entry comes out
         if (!this.options.isHost) {
-          this.options.onRoster?.(msg.members.filter(member => member.id !== this.myPeerId))
+          this.options.onRoster?.(
+            msg.members.filter(member => member.id !== this.installId && member.id !== this.myPeerId)
+          )
         }
         break
       }
@@ -1040,12 +1625,26 @@ export class WebRTCCollaborationCoordinator {
         console.warn('[Collab Coordinator] Could not close a peer connection:', err)
       }
       link.channel = null
+      window.dispatchEvent(
+        new CustomEvent('collab-peer-left', {
+          detail: { peerId: link.install || link.id }
+        })
+      )
     }
 
     if (!this.keepHostingWithoutPeer()) {
       // nothing left to broadcast to
       window.removeEventListener('db-mutation', this.handleLocalMutation)
       window.removeEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
+      window.removeEventListener(WALL_DOC_EVENT, this.handleLocalWallDoc)
+      window.removeEventListener(WALL_INDEX_EVENT, this.handleLocalWallIndex)
+      window.removeEventListener('collab-my-cursor', this.handleLocalCursor)
+      window.removeEventListener('collab-my-selection', this.handleLocalSelection)
+      window.removeEventListener('collab-my-view', this.handleLocalView)
+      window.removeEventListener('collab-my-live-move', this.handleLocalLiveMove)
+      window.removeEventListener('collab-my-card-drag', this.handleLocalCardDrag)
+      window.removeEventListener('collab-broadcast-asset', this.handleLocalAssetBroadcast)
+      window.dispatchEvent(new CustomEvent('collab-presence-clear'))
       return false
     }
 
@@ -1058,8 +1657,34 @@ export class WebRTCCollaborationCoordinator {
 
   /** keeps the room */
   private closeAllPeers(): void {
+    if (this.cursorTimer) {
+      clearTimeout(this.cursorTimer)
+      this.cursorTimer = null
+    }
+    if (this.liveMoveTimer) {
+      clearTimeout(this.liveMoveTimer)
+      this.liveMoveTimer = null
+    }
+    if (this.cardDragTimer) {
+      clearTimeout(this.cardDragTimer)
+      this.cardDragTimer = null
+    }
+    this.pendingCursorMsg = null
+    this.pendingLiveMoveMsg = null
+    this.pendingCardDragMsg = null
+    this.assetAssembler.reset()
+    this.requestedAssets.clear()
     window.removeEventListener('db-mutation', this.handleLocalMutation)
     window.removeEventListener(BOARD_CONFIG_EVENT, this.handleLocalBoardConfig)
+    window.removeEventListener(WALL_DOC_EVENT, this.handleLocalWallDoc)
+    window.removeEventListener(WALL_INDEX_EVENT, this.handleLocalWallIndex)
+    window.removeEventListener('collab-my-cursor', this.handleLocalCursor)
+    window.removeEventListener('collab-my-selection', this.handleLocalSelection)
+    window.removeEventListener('collab-my-view', this.handleLocalView)
+    window.removeEventListener('collab-my-live-move', this.handleLocalLiveMove)
+    window.removeEventListener('collab-my-card-drag', this.handleLocalCardDrag)
+    window.removeEventListener('collab-broadcast-asset', this.handleLocalAssetBroadcast)
+    window.dispatchEvent(new CustomEvent('collab-presence-clear'))
     for (const link of this.links.values()) {
       link.open = false
       try {
@@ -1079,7 +1704,7 @@ export class WebRTCCollaborationCoordinator {
 
   /** a door, not a lock: a determined guest can mint a new id; changing the passcode is the lock */
   public async remove(peerId: string): Promise<void> {
-    const link = this.links.get(peerId)
+    const link = this.links.get(peerId) || [...this.links.values()].find(l => l.install === peerId || l.id === peerId)
     if (!link) return
     // older peers send no install id and can't be barred
     if (link.install) this.blocked.add(link.install)

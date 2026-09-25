@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { continueList, indentLines, parseWallText, plainWallText, toggleWrap } from '../src/shared/wallText'
+import { continueList, hasWrap, indentLines, parseWallText, plainWallText, toggleWrap } from '../src/shared/wallText'
 
 describe('parseWallText', () => {
   it('reads bold, italic, strikethrough and code', () => {
@@ -80,6 +80,70 @@ describe('toggleWrap', () => {
 
   it('puts the caret between a new pair when nothing is selected', () => {
     expect(toggleWrap('ab', 1, 1, '_')).toEqual({ value: 'a__b', start: 2, end: 2 })
+  })
+
+  it('unwraps when wrapped across another style marker', () => {
+    expect(toggleWrap('make **_bold_**', 8, 12, '**')).toEqual({ value: 'make _bold_', start: 6, end: 10 })
+  })
+
+  it('stacks multiple styles and unwraps them in arbitrary order without corruption', () => {
+    // 1. Start with plain word
+    let res = toggleWrap('hello word test', 6, 10, '**')
+    expect(res.value).toBe('hello **word** test')
+    expect(hasWrap(res.value, res.start, res.end, '**')).toBe(true)
+    expect(hasWrap(res.value, res.start, res.end, '_')).toBe(false)
+
+    // 2. Add italic -> **_word_**
+    res = toggleWrap(res.value, res.start, res.end, '_')
+    expect(res.value).toBe('hello **_word_** test')
+    expect(hasWrap(res.value, res.start, res.end, '**')).toBe(true)
+    expect(hasWrap(res.value, res.start, res.end, '_')).toBe(true)
+
+    // 3. Add underline -> **_++word++_**
+    res = toggleWrap(res.value, res.start, res.end, '++')
+    expect(res.value).toBe('hello **_++word++_** test')
+    expect(hasWrap(res.value, res.start, res.end, '**')).toBe(true)
+    expect(hasWrap(res.value, res.start, res.end, '_')).toBe(true)
+    expect(hasWrap(res.value, res.start, res.end, '++')).toBe(true)
+
+    // 4. Remove bold first (arbitrary order) -> _++word++_
+    res = toggleWrap(res.value, res.start, res.end, '**')
+    expect(res.value).toBe('hello _++word++_ test')
+    expect(hasWrap(res.value, res.start, res.end, '**')).toBe(false)
+    expect(hasWrap(res.value, res.start, res.end, '_')).toBe(true)
+    expect(hasWrap(res.value, res.start, res.end, '++')).toBe(true)
+
+    // 5. Remove underline -> _word_
+    res = toggleWrap(res.value, res.start, res.end, '++')
+    expect(res.value).toBe('hello _word_ test')
+    expect(hasWrap(res.value, res.start, res.end, '_')).toBe(true)
+
+    // 6. Remove italic -> word
+    res = toggleWrap(res.value, res.start, res.end, '_')
+    expect(res.value).toBe('hello word test')
+    expect(hasWrap(res.value, res.start, res.end, '_')).toBe(false)
+    expect(hasWrap(res.value, res.start, res.end, '**')).toBe(false)
+  })
+
+  it('heals corrupted multi-layered duplicate markers into clean markdown', () => {
+    const corrupted = '_~~++_~~++_**++dafdaf++**_++~~_++~~_'
+    // Toggling bold peels all corrupted layers and re-outputs clean canonical markdown without bold
+    const healed = toggleWrap(corrupted, 0, corrupted.length, '**')
+    expect(healed.value).toBe('_~~++dafdaf++~~_')
+    expect(hasWrap(healed.value, healed.start, healed.end, '**')).toBe(false)
+    expect(hasWrap(healed.value, healed.start, healed.end, '_')).toBe(true)
+    expect(hasWrap(healed.value, healed.start, healed.end, '++')).toBe(true)
+    expect(hasWrap(healed.value, healed.start, healed.end, '~~')).toBe(true)
+
+    // Removing remaining styles one by one cleanly unwraps to plain text
+    const noItalic = toggleWrap(healed.value, healed.start, healed.end, '_')
+    expect(noItalic.value).toBe('~~++dafdaf++~~')
+
+    const noUnderline = toggleWrap(noItalic.value, noItalic.start, noItalic.end, '++')
+    expect(noUnderline.value).toBe('~~dafdaf~~')
+
+    const clean = toggleWrap(noUnderline.value, noUnderline.start, noUnderline.end, '~~')
+    expect(clean.value).toBe('dafdaf')
   })
 })
 

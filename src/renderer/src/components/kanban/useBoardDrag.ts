@@ -69,6 +69,7 @@ export function useBoardDrag(boardState: BoardState) {
 
   /** a ref: the detector runs every pointer move and mustn't rebuild when a card changes */
   const dropGeometryRef = useRef<DropGeometry>({ columns: new Map(), cardColumn: new Map() })
+  const draggingCardIdRef = useRef<string | null>(null)
   useEffect(() => {
     const columnOrder = new Map<string, boolean>()
     for (const col of columns) columnOrder.set(col.id, canAimAtSlot(col, swimlanesEnabled))
@@ -122,6 +123,7 @@ export function useBoardDrag(boardState: BoardState) {
     const { active } = event
     const id = active.id as string
     if (id.startsWith('col::')) return
+    draggingCardIdRef.current = id
     setCards(currentCards => {
       const found = currentCards.find(c => c.id === id)
       if (found) setActiveDragCard(found)
@@ -129,6 +131,14 @@ export function useBoardDrag(boardState: BoardState) {
     })
     // read before the card lifts out, so the gap matches its footprint
     setDragHeight(active.rect.current.initial?.height ?? 0)
+    window.dispatchEvent(
+      new CustomEvent('collab-my-card-drag', {
+        detail: {
+          cardId: id,
+          isDragging: true
+        }
+      })
+    )
   }, [isReadOnlyMode, setActiveDragCard, setCards, setDragHeight])
 
   /** notes the target instead of moving the card; moving remounted it across SortableContexts and crawled */
@@ -142,17 +152,47 @@ export function useBoardDrag(boardState: BoardState) {
     }
     const overId = String(over.id)
     const { columns: columnOrder, cardColumn } = dropGeometryRef.current
+    let targetCol: string | null = null
+    let targetBefore: string | null = null
+
     if (columnOrder.has(overId)) {
+      targetCol = overId
       setDropTarget({ column: overId, before: null })
-      return
+    } else {
+      const column = cardColumn.get(overId)
+      targetCol = column ?? null
+      targetBefore = overId
+      setDropTarget(column ? { column, before: overId } : null)
     }
-    const column = cardColumn.get(overId)
-    setDropTarget(column ? { column, before: overId } : null)
+
+    if (draggingCardIdRef.current) {
+      window.dispatchEvent(
+        new CustomEvent('collab-my-card-drag', {
+          detail: {
+            cardId: draggingCardIdRef.current,
+            columnId: targetCol ?? undefined,
+            overCardId: targetBefore ?? undefined,
+            isDragging: true
+          }
+        })
+      )
+    }
   }, [isReadOnlyMode, setDropTarget])
 
   const endDrag = useCallback(() => {
     setActiveDragCard(null)
     setDropTarget(null)
+    if (draggingCardIdRef.current) {
+      window.dispatchEvent(
+        new CustomEvent('collab-my-card-drag', {
+          detail: {
+            cardId: draggingCardIdRef.current,
+            isDragging: false
+          }
+        })
+      )
+      draggingCardIdRef.current = null
+    }
   }, [setActiveDragCard, setDropTarget])
 
   const handleDragCancel = useCallback(() => {

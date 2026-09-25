@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
@@ -21,6 +21,7 @@ import { DEFAULT_PEN_PRESETS, normalizePenPresets, presetFor, withActivePreset, 
 import * as notesApi from '../../data/notes'
 import * as mediaApi from '../../data/media'
 import * as appApi from '../../data/app'
+import { useCollab } from '../../context/CollabContext'
 import { itemLink, parseWallLink } from '../../../../shared/wallLink'
 import { applyStyle, placeClip, styleOf, type WallClip } from '../../../../shared/wallClipboard'
 import { rememberStyle, rememberedStyle } from './wallClipboardMemory'
@@ -48,6 +49,8 @@ export function useWallDocument() {
   const setView = useAppStore(s => s.setView)
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
   const { toast } = useToast()
+  const collab = useCollab()
+  const isReadOnly = collab.active && collab.isReadOnly && collab.workspace === activeWorkspace
 
   const [doc, setDoc] = useState<WallDoc>(() => normalizeWallDoc(null))
   const [cards, setCards] = useState<Item[]>([])
@@ -271,7 +274,23 @@ export function useWallDocument() {
     loadWallIndex(activeWorkspace).then(loaded => {
       if (!cancelled) setIndex({ context: activeWorkspace, value: loaded })
     })
-    return () => { cancelled = true }
+
+    const onIndexRefresh = (e: Event): void => {
+      if (cancelled) return
+      const custom = e as CustomEvent
+      if (custom.detail?.index) {
+        setIndex({ context: activeWorkspace, value: normalizeWallIndex(custom.detail.index) })
+      } else {
+        void loadWallIndex(activeWorkspace).then(loaded => {
+          if (!cancelled) setIndex({ context: activeWorkspace, value: loaded })
+        })
+      }
+    }
+    window.addEventListener('wall-index-refresh', onIndexRefresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener('wall-index-refresh', onIndexRefresh)
+    }
   }, [activeWorkspace])
 
   useEffect(() => {
@@ -308,18 +327,27 @@ export function useWallDocument() {
   useEffect(() => {
     if (!docKey) return
     const discarded = discardedRef.current
+    const wallId = activeWall?.id
     // on the way out of this wall, while docRef still holds it
     return () => {
       if (discarded.delete(docKey)) return
-      void flushWallDoc(docKey, docRef.current)
+      void flushWallDoc(docKey, docRef.current, wallId ? { context: activeWorkspace, wallId } : undefined)
     }
-  }, [docKey])
+  }, [docKey, activeWall?.id, activeWorkspace])
 
-  /** MCP writes from main, so re-read; skipped mid-gesture */
+  /** MCP writes and collaborative peer writes; skipped mid-gesture */
   useEffect(() => {
     if (!docKey) return
-    const refresh = (): void => {
+    const refresh = (e?: Event): void => {
       if (dragRef.current || editingId) return
+      const customEvent = e as CustomEvent | undefined
+      if (customEvent?.detail?.doc && activeWall && customEvent.detail.wallId === activeWall.id) {
+        const loaded = normalizeWallDoc(customEvent.detail.doc)
+        setDoc(loaded)
+        historyRef.current = initHistory(stepOf(loaded))
+        setHistoryTick(t => t + 1)
+        return
+      }
       void loadWallDoc(docKey).then(loaded => {
         setDoc(loaded)
         historyRef.current = initHistory(stepOf(loaded))
@@ -328,17 +356,27 @@ export function useWallDocument() {
     }
     window.addEventListener('wall-refresh', refresh)
     return () => window.removeEventListener('wall-refresh', refresh)
-  }, [docKey, editingId])
+  }, [docKey, editingId, activeWall])
 
   const write = useCallback((next: WallDoc) => {
+    if (isReadOnly) {
+      toast('This workspace is shared read-only', { type: 'warning' })
+      return
+    }
     setDoc(next)
-    if (docKey) saveWallDoc(docKey, next)
-  }, [docKey])
+    if (docKey && activeWall) {
+      saveWallDoc(docKey, next, { context: activeWorkspace, wallId: activeWall.id })
+    }
+  }, [docKey, activeWall, activeWorkspace, isReadOnly, toast])
 
   const commitIndex = useCallback((next: WallIndex) => {
+    if (isReadOnly) {
+      toast('This workspace is shared read-only', { type: 'warning' })
+      return
+    }
     setIndex({ context: activeWorkspace, value: next })
     void saveWallIndex(activeWorkspace, next)
-  }, [activeWorkspace])
+  }, [activeWorkspace, isReadOnly, toast])
 
   const addWall = useCallback(() => {
     // from the loaded index, so a slow load can't start a competing list
@@ -632,7 +670,13 @@ export function useWallDocument() {
       }
       // folded into the paste's undo step, not one of its own
       setItems(docRef.current.items.map(i => i.id === id
-        ? { ...i, text: preview.title ?? i.text, summary: preview.description ?? i.summary, ref: preview.icon ?? i.ref }
+        ? {
+            ...i,
+            text: preview.title ?? i.text,
+            summary: preview.description ?? i.summary,
+            ref: preview.icon ?? i.ref,
+            ...(preview.image ? { previewImage: preview.image, height: Math.max(i.height, 230) } : {})
+          }
         : i
       ), { record: false })
     } catch (err) {
@@ -946,6 +990,11 @@ export function useWallDocument() {
         const ext = (file.type.split('/')[1] || 'png').replace('+xml', '')
         const filename = await mediaApi.saveFromBuffer(buffer, ext)
         addItem('image', { ref: filename, text: file.name }, at)
+        window.dispatchEvent(
+          new CustomEvent('collab-broadcast-asset', {
+            detail: { filename, buffer, mimeType: file.type }
+          })
+        )
       } catch (err) {
         toast(`Could not add image: ${errorMessage(err)}`, { type: 'error' })
       }
@@ -1117,7 +1166,9 @@ export function useWallDocument() {
     penPresets,
     choosePenColor,
     choosePenWidth,
-    pickPreset
+    pickPreset,
+    collab,
+    isReadOnly
   }
 }
 

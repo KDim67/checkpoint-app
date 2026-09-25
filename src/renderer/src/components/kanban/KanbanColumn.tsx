@@ -42,6 +42,10 @@ interface KanbanColumnProps {
   dropSlot?: number | null
   /** so the gap matches its footprint */
   dropHeight?: number
+  /** remote peer drags for cards in this column */
+  remoteCardDrags?: Map<string, { peerId: string; name: string; color: string }>
+  /** remote drop indicators hovering over this column */
+  remoteDropTargets?: Array<{ peerId: string; name: string; color: string; beforeCardId?: string }>
 }
 
 interface ColumnBodyProps extends KanbanColumnProps {
@@ -119,6 +123,8 @@ function ColumnBody({
   cardDisplay,
   dropSlot = null,
   dropHeight = 0,
+  remoteCardDrags,
+  remoteDropTargets,
   nodeRef,
   pointedAt
 }: ColumnBodyProps) {
@@ -714,6 +720,26 @@ function ColumnBody({
           {cards.map((card, i) => (
             <React.Fragment key={card.id}>
               {dropSlot === i && <DropPlaceholder height={slotHeight} warn={dropExceedsWip} />}
+              {remoteDropTargets?.filter(t => t.beforeCardId === card.id).map(t => (
+                <div
+                  key={`remote-target-${t.peerId}-${card.id}`}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius-md)',
+                    border: `2px dashed ${t.color}`,
+                    background: `${t.color}15`,
+                    color: t.color,
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: t.color }} />
+                  {t.name} dropping here...
+                </div>
+              ))}
               <KanbanCard
                 card={card}
                 onClick={onCardClick}
@@ -721,10 +747,31 @@ function ColumnBody({
                 onConvertToTask={onCardConvertToTask}
                 onUpdate={onCardUpdate}
                 display={cardDisplay}
+                remoteDrag={remoteCardDrags?.get(card.id)}
               />
             </React.Fragment>
           ))}
           {dropSlot === cards.length && <DropPlaceholder height={slotHeight} warn={dropExceedsWip} />}
+          {remoteDropTargets?.filter(t => !t.beforeCardId || !cards.some(c => c.id === t.beforeCardId)).map(t => (
+            <div
+              key={`remote-target-${t.peerId}-end`}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 'var(--radius-md)',
+                border: `2px dashed ${t.color}`,
+                background: `${t.color}15`,
+                color: t.color,
+                fontSize: '11px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: t.color }} />
+              {t.name} dropping here...
+            </div>
+          ))}
         </SortableContext>
 
 
@@ -850,6 +897,28 @@ function areKanbanColumnPropsEqual(prev: KanbanColumnProps, next: KanbanColumnPr
   for (let i = 0; i < prev.cards.length; i++) {
     if (prev.cards[i] !== next.cards[i]) return false
   }
+
+  // remote drags comparison
+  if (prev.remoteCardDrags !== next.remoteCardDrags) {
+    if (!prev.remoteCardDrags || !next.remoteCardDrags) return false
+    if (prev.remoteCardDrags.size !== next.remoteCardDrags.size) return false
+    for (const [k, v] of prev.remoteCardDrags) {
+      const nv = next.remoteCardDrags.get(k)
+      if (!nv || nv.peerId !== v.peerId || nv.name !== v.name || nv.color !== v.color) return false
+    }
+  }
+
+  // remote drop targets comparison
+  if (prev.remoteDropTargets !== next.remoteDropTargets) {
+    if (!prev.remoteDropTargets || !next.remoteDropTargets) return false
+    if (prev.remoteDropTargets.length !== next.remoteDropTargets.length) return false
+    for (let i = 0; i < prev.remoteDropTargets.length; i++) {
+      const pt = prev.remoteDropTargets[i]
+      const nt = next.remoteDropTargets[i]
+      if (pt.peerId !== nt.peerId || pt.beforeCardId !== nt.beforeCardId || pt.name !== nt.name || pt.color !== nt.color) return false
+    }
+  }
+
   return true
 }
 

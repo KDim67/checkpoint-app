@@ -183,7 +183,8 @@ export default function NotesView(): React.JSX.Element {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      const isS = (typeof e.key === 'string' && e.key.toLowerCase() === 's') || e.code === 'KeyS'
+      if ((e.ctrlKey || e.metaKey) && isS) {
         e.preventDefault()
         if (activeNoteTitle && isDirty) {
           saveContent()

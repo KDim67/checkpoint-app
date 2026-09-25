@@ -90,6 +90,7 @@ export default function WallColorPicker({
           aria-pressed={!value}
           style={{
             display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
+            whiteSpace: 'nowrap',
             padding: 'var(--space-1) var(--space-2)', cursor: 'pointer',
             background: !value ? 'var(--color-secondary-muted)' : 'none',
             border: 'none', borderRadius: 'var(--radius-sm)',
@@ -98,12 +99,12 @@ export default function WallColorPicker({
             transition: 'background var(--duration-fast) var(--ease-default)'
           }}
         >
-          <Check size={12} style={{ opacity: value ? 0 : 1 }} />
-          {defaultLabel}
+          <Check size={12} style={{ opacity: value ? 0 : 1, flexShrink: 0 }} />
+          <span>{defaultLabel}</span>
         </button>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, ${TARGET}px)`, gap: '4px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, ${TARGET}px)`, gap: '4px', justifyContent: 'center' }}>
         {colors.map(color => swatch(color, value === color, color, () => onChange(color)))}
 
         {allowCustom && (

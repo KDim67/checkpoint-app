@@ -68,3 +68,18 @@ describe('frame order', () => {
     expect(normalizeWallDoc({ items: [] })).not.toHaveProperty('frameOrder')
   })
 })
+
+describe('wall fonts', () => {
+  it('normalizes font selection for items with words and drops default sans', () => {
+    expect(read({ kind: 'note', font: 'serif' }).font).toBe('serif')
+    expect(read({ kind: 'note', font: 'mono' }).font).toBe('mono')
+    expect(read({ kind: 'note', font: 'handwriting' }).font).toBe('handwriting')
+    expect(read({ kind: 'note', font: 'rounded' }).font).toBe('rounded')
+    expect(read({ kind: 'note', font: 'display' }).font).toBe('display')
+    expect(read({ kind: 'note', font: 'typewriter' }).font).toBe('typewriter')
+    expect(read({ kind: 'note', font: 'comic' }).font).toBe('comic')
+    expect(read({ kind: 'note', font: 'sans' })).not.toHaveProperty('font')
+    expect(read({ kind: 'note', font: 'unknown' })).not.toHaveProperty('font')
+    expect(read({ kind: 'frame', font: 'serif' })).not.toHaveProperty('font')
+  })
+})

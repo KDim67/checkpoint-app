@@ -10,7 +10,7 @@ import { loadBoardConfig, patchBoardConfig, DEFAULT_CARD_DISPLAY, type BoardConf
 import type { DropTarget } from '../../../../shared/cardDrop'
 import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
-import { useCollabSession } from './useCollabSession'
+import { useCollab } from '../../context/CollabContext'
 import { useBoardTheme } from './useBoardTheme'
 
 export function useBoardState() {
@@ -130,7 +130,7 @@ export function useBoardState() {
   const [selectedArchived, setSelectedArchived] = useState<Set<string>>(new Set())
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
 
-  const collab = useCollabSession()
+  const collab = useCollab()
   const isReadOnlyMode = collab.isReadOnly
   readOnlyRef.current = isReadOnlyMode
 

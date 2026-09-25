@@ -20,33 +20,60 @@ export async function loadWallDoc(key: string): Promise<WallDoc> {
   }
 }
 
+export const WALL_DOC_EVENT = 'wall-doc-written'
+export const WALL_INDEX_EVENT = 'wall-index-written'
+
+export interface WallDocWriteMeta {
+  context?: string
+  wallId?: string
+  skipBroadcast?: boolean
+}
+
+export interface WallIndexWriteMeta {
+  skipBroadcast?: boolean
+}
+
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 
 /** per wall, so switching mid-drag can't cross writes */
-export function saveWallDoc(key: string, doc: WallDoc): void {
+export function saveWallDoc(key: string, doc: WallDoc, meta?: WallDocWriteMeta): void {
   const existing = timers.get(key)
   if (existing) clearTimeout(existing)
 
+  const normalized = normalizeWallDoc(doc)
   timers.set(
     key,
     setTimeout(() => {
       timers.delete(key)
       // an object, setSetting serialises; double-encoding bit the board once
-      setSetting(key, normalizeWallDoc(doc))
+      setSetting(key, normalized)
+        .then(() => {
+          if (!meta?.skipBroadcast && meta?.context && meta?.wallId) {
+            window.dispatchEvent(
+              new CustomEvent(WALL_DOC_EVENT, { detail: { context: meta.context, wallId: meta.wallId, doc: normalized } })
+            )
+          }
+        })
         .catch(err => console.error('[wall] could not save:', err))
     }, SAVE_DEBOUNCE_MS)
   )
 }
 
 /** immediate, for when the view is leaving */
-export async function flushWallDoc(key: string, doc: WallDoc): Promise<void> {
+export async function flushWallDoc(key: string, doc: WallDoc, meta?: WallDocWriteMeta): Promise<void> {
   const existing = timers.get(key)
   if (existing) {
     clearTimeout(existing)
     timers.delete(key)
   }
+  const normalized = normalizeWallDoc(doc)
   try {
-    await setSetting(key, normalizeWallDoc(doc))
+    await setSetting(key, normalized)
+    if (!meta?.skipBroadcast && meta?.context && meta?.wallId) {
+      window.dispatchEvent(
+        new CustomEvent(WALL_DOC_EVENT, { detail: { context: meta.context, wallId: meta.wallId, doc: normalized } })
+      )
+    }
   } catch (err) {
     console.error('[wall] could not flush:', err)
   }
@@ -76,9 +103,15 @@ export async function loadWallIndex(context: string): Promise<WallIndex> {
 }
 
 /** not debounced, losing one of these strands a wall */
-export async function saveWallIndex(context: string, index: WallIndex): Promise<void> {
+export async function saveWallIndex(context: string, index: WallIndex, meta?: WallIndexWriteMeta): Promise<void> {
+  const normalized = normalizeWallIndex(index)
   try {
-    await setSetting(wallIndexKey(context), index)
+    await setSetting(wallIndexKey(context), normalized)
+    if (!meta?.skipBroadcast) {
+      window.dispatchEvent(
+        new CustomEvent(WALL_INDEX_EVENT, { detail: { context, index: normalized } })
+      )
+    }
   } catch (err) {
     console.error('[wall] could not save index:', err)
   }

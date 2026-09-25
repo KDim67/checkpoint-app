@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react'
-import { continueList, indentLines, takesIndent, toggleWrap } from '../../../../shared/wallText'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { continueList, hasWrap, indentLines, takesIndent, toggleWrap } from '../../../../shared/wallText'
 
 interface Props {
   value: string
@@ -20,20 +20,84 @@ interface Props {
 // under ctrl or cmd; strikethrough takes shift too
 const MARKERS: Record<string, string> = { b: '**', i: '_', e: '`', u: '++' }
 
+function FormatButton({
+  label,
+  active,
+  onClick,
+  children
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      data-wall-ui
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      onPointerDown={e => {
+        e.stopPropagation()
+      }}
+      onMouseDown={e => {
+        e.preventDefault()
+        e.stopPropagation()
+      }}
+      onClick={e => {
+        e.preventDefault()
+        e.stopPropagation()
+        onClick()
+      }}
+      className="btn-icon"
+      style={{
+        width: '28px',
+        height: '28px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: 'none',
+        borderRadius: 'var(--radius-sm)',
+        background: active ? 'var(--color-primary)' : 'transparent',
+        color: active ? '#ffffff' : 'var(--color-text-base)',
+        cursor: 'pointer',
+        userSelect: 'none',
+        transition: 'background 0.15s ease, color 0.15s ease'
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 /** a plain textarea with list-aware Enter, Tab indents and formatting keys */
 export default function WallTextEditor({ value, onChange, onFinish, style, onHeight, onNext, code, onChild, onSibling }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
   /** set once the new value has rendered, or React leaves the caret at the end */
   const pendingSelection = useRef<[number, number] | null>(null)
+  const [selection, setSelection] = useState<[number, number] | null>(null)
+
+  const updateSelection = (): void => {
+    const el = ref.current
+    if (!el) return
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    if (start !== end) {
+      setSelection([start, end])
+    } else {
+      setSelection(null)
+    }
+  }
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
 
-    const selection = pendingSelection.current
-    if (selection) {
+    const sel = pendingSelection.current
+    if (sel) {
       pendingSelection.current = null
-      el.setSelectionRange(selection[0], selection[1])
+      el.setSelectionRange(sel[0], sel[1])
     }
 
     if (onHeight) {
@@ -48,6 +112,32 @@ export default function WallTextEditor({ value, onChange, onFinish, style, onHei
   const apply = (edit: { value: string; start: number; end: number }): void => {
     pendingSelection.current = [edit.start, edit.end]
     onChange(edit.value)
+    if (edit.start !== edit.end) {
+      setSelection([edit.start, edit.end])
+    } else {
+      setSelection(null)
+    }
+    const el = ref.current
+    if (el) {
+      el.focus()
+      requestAnimationFrame(() => {
+        if (ref.current) {
+          ref.current.focus()
+          ref.current.setSelectionRange(edit.start, edit.end)
+        }
+      })
+    }
+  }
+
+  const toggleMarker = (marker: string): void => {
+    const el = ref.current
+    if (!el) return
+    const selStart = el.selectionStart
+    const selEnd = el.selectionEnd
+    const [start, end] = (selStart !== selEnd) ? [selStart, selEnd] : (selection ?? [0, 0])
+    if (start === end) return
+    const edit = toggleWrap(el.value, start, end, marker)
+    apply(edit)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -112,16 +202,95 @@ export default function WallTextEditor({ value, onChange, onFinish, style, onHei
   }
 
   return (
-    <textarea
-      ref={ref}
-      autoFocus
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      onBlur={onFinish}
-      onKeyDown={onKeyDown}
-      spellCheck={code ? false : undefined}
-      wrap={code ? 'off' : undefined}
-      style={style}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {!code && selection && selection[0] !== selection[1] && (
+        <div
+          data-wall-ui
+          role="toolbar"
+          aria-label="Format selected text"
+          onPointerDown={e => {
+            e.stopPropagation()
+          }}
+          onMouseDown={e => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 6px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            padding: '3px 4px',
+            background: 'var(--color-surface-elevated)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            zIndex: 60,
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <FormatButton
+            label="Bold (Ctrl+B)"
+            active={hasWrap(value, selection[0], selection[1], '**')}
+            onClick={() => toggleMarker('**')}
+          >
+            <strong style={{ fontSize: '13px', fontWeight: 800 }}>B</strong>
+          </FormatButton>
+
+          <FormatButton
+            label="Italic (Ctrl+I)"
+            active={hasWrap(value, selection[0], selection[1], '_')}
+            onClick={() => toggleMarker('_')}
+          >
+            <em style={{ fontSize: '13px', fontStyle: 'italic', fontFamily: 'serif' }}>I</em>
+          </FormatButton>
+
+          <FormatButton
+            label="Underline (Ctrl+U)"
+            active={hasWrap(value, selection[0], selection[1], '++')}
+            onClick={() => toggleMarker('++')}
+          >
+            <u style={{ fontSize: '13px', textDecorationThickness: '1.8px', textUnderlineOffset: '2px' }}>U</u>
+          </FormatButton>
+
+          <FormatButton
+            label="Strikethrough (Ctrl+Shift+X)"
+            active={hasWrap(value, selection[0], selection[1], '~~')}
+            onClick={() => toggleMarker('~~')}
+          >
+            <s style={{ fontSize: '13px', textDecorationThickness: '1.8px' }}>S</s>
+          </FormatButton>
+
+          <FormatButton
+            label="Code (Ctrl+E)"
+            active={hasWrap(value, selection[0], selection[1], '`')}
+            onClick={() => toggleMarker('`')}
+          >
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>&lt;/&gt;</span>
+          </FormatButton>
+        </div>
+      )}
+      <textarea
+        ref={ref}
+        autoFocus
+        value={value}
+        onChange={e => {
+          onChange(e.target.value)
+          updateSelection()
+        }}
+        onSelect={updateSelection}
+        onMouseUp={updateSelection}
+        onKeyUp={updateSelection}
+        onBlur={onFinish}
+        onKeyDown={onKeyDown}
+        spellCheck={code ? false : undefined}
+        wrap={code ? 'off' : undefined}
+        style={style}
+      />
+    </div>
   )
 }

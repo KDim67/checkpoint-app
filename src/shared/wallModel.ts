@@ -18,6 +18,8 @@ export interface WallItem {
   height: number
   /** item id for card, note title for doc, media filename for image and a bookmark's icon */
   ref?: string
+  /** preview image media filename for bookmark cards */
+  previewImage?: string
   /** body for note/text, label for frame and arrow, a bookmark's page title */
   text?: string
   /** a bookmark's page description */
@@ -26,6 +28,8 @@ export interface WallItem {
   shape?: ShapeType
   /** the side words sit on in a sticky, text box or shape; absent for the kind's own */
   align?: TextAlign
+  /** typography font family for items with words, absent for default sans */
+  font?: WallFont
   /** a shape's outline colour, absent for the default */
   borderColor?: string
   /** a rounded shape's corners in pixels, absent for the default curve */
@@ -110,6 +114,28 @@ export interface WallDoc {
 export type TextAlign = 'left' | 'center' | 'right'
 export const TEXT_ALIGNS: readonly TextAlign[] = ['left', 'center', 'right']
 
+export const WALL_FONTS = [
+  'sans',
+  'serif',
+  'mono',
+  'handwriting',
+  'rounded',
+  'display',
+  'typewriter',
+  'comic'
+] as const
+export type WallFont = (typeof WALL_FONTS)[number]
+export const WALL_FONT_NAMES: Record<WallFont, string> = {
+  sans: 'Sans',
+  serif: 'Serif',
+  mono: 'Mono',
+  handwriting: 'Handwritten',
+  rounded: 'Rounded',
+  display: 'Display',
+  typewriter: 'Typewriter',
+  comic: 'Comic'
+}
+
 export const MIN_ZOOM = 0.2
 export const MAX_ZOOM = 3
 
@@ -135,6 +161,19 @@ export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number
 export const WALL_COLORS = [
   '#f6c453', '#f28b82', '#a7c7e7', '#b5e6b5',
   '#d7b3e8', '#f5b78c', '#9fdfd5', '#cfd3da'
+]
+
+export interface CanvasPreset {
+  id: string
+  name: string
+  color: string
+}
+
+export const WALL_CANVAS_PRESETS: CanvasPreset[] = [
+  { id: 'miro-white', name: 'Miro White', color: '#ffffff' },
+  { id: 'canvas-soft', name: 'Off-White', color: '#f8f9fa' },
+  { id: 'canvas-cream', name: 'Warm Paper', color: '#fbf9f4' },
+  { id: 'canvas-dark', name: 'Dark Board', color: '#18181b' }
 ]
 
 const DEFAULT_CAMERA: WallCamera = { x: 0, y: 0, zoom: 1 }
@@ -255,6 +294,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const shape = kind === 'shape' ? oneOf(o.shape, SHAPE_TYPES) : null
   // a side only for words, and only when it isn't where the kind puts them anyway
   const align = kind === 'note' || kind === 'text' || kind === 'shape' ? oneOf(o.align, TEXT_ALIGNS) : null
+  const font = kind === 'note' || kind === 'text' || kind === 'shape' ? oneOf(o.font, WALL_FONTS) : null
   const ownAlign: TextAlign = kind === 'shape' ? 'center' : 'left'
   const radius = kind === 'shape' ? num(o.radius, NaN) : NaN
   const opacity = kind === 'shape' ? num(o.opacity, NaN) : NaN
@@ -275,6 +315,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     width: Math.max(40, num(o.width, size.width)),
     height: Math.max(32, num(o.height, size.height)),
     ...(ref ? { ref } : {}),
+    ...(kind === 'bookmark' && str(o.previewImage).trim() ? { previewImage: str(o.previewImage).trim() } : {}),
     ...(typeof o.text === 'string' ? { text: o.text } : {}),
     ...(str(o.summary).trim() ? { summary: str(o.summary) } : {}),
     ...(str(o.color) ? { color: str(o.color) } : {}),
@@ -293,6 +334,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(arrowHeads && arrowHeads !== ARROW_HEAD_MODES[0] ? { arrowHeads } : {}),
     ...(shape && shape !== SHAPE_TYPES[0] ? { shape } : {}),
     ...(align && align !== ownAlign ? { align } : {}),
+    ...(font && font !== 'sans' ? { font } : {}),
     ...(kind === 'shape' && str(o.borderColor) ? { borderColor: str(o.borderColor) } : {}),
     ...(Number.isFinite(radius) ? { radius: Math.min(200, Math.max(0, radius)) } : {}),
     // a fill too faint to see can't be found to click
@@ -590,16 +632,29 @@ export function itemAtPoint(items: WallItem[], point: { x: number; y: number }):
 }
 
 /** keeps zoom */
-export function cameraCentredOn(
-  item: WallItem,
+export function cameraCentredOnPoint(
+  point: { x: number; y: number },
   viewport: { width: number; height: number },
   zoom: number
 ): WallCamera {
   return {
     zoom,
-    x: viewport.width / 2 - (item.x + item.width / 2) * zoom,
-    y: viewport.height / 2 - (item.y + item.height / 2) * zoom
+    x: viewport.width / 2 - point.x * zoom,
+    y: viewport.height / 2 - point.y * zoom
   }
+}
+
+/** keeps zoom */
+export function cameraCentredOn(
+  item: WallItem,
+  viewport: { width: number; height: number },
+  zoom: number
+): WallCamera {
+  return cameraCentredOnPoint(
+    { x: item.x + item.width / 2, y: item.y + item.height / 2 },
+    viewport,
+    zoom
+  )
 }
 
 /** titles live on the referenced record, the caller resolves them */

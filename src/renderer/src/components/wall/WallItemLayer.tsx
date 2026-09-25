@@ -31,10 +31,12 @@ interface Props {
   onGrow?: (id: string, side: Side) => void
   /** a search is on and this isn't in it */
   dimmed?: boolean
+  /** peers who currently have this item selected */
+  remoteSelectedBy?: { peerId: string; name: string; color: string }[]
 }
 
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
-function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow, dimmed }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow, dimmed, remoteSelectedBy }: Props) {
   const link = item.link
   const linkTitle = linkMissing
     ? `${linkLabel}. Edit the link to point somewhere else.`
@@ -60,10 +62,41 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         // selected outline lives in index.css via data-wall-selected
         outline: arrowTarget
           ? '3px solid var(--color-secondary)'
-          : arrowFrom ? '2px dashed var(--color-secondary)' : undefined,
+          : arrowFrom
+            ? '2px dashed var(--color-secondary)'
+            : remoteSelectedBy && remoteSelectedBy.length > 0
+              ? `2px solid ${remoteSelectedBy[0].color}`
+              : undefined,
         outlineOffset: '2px'
       }}
     >
+      {remoteSelectedBy && remoteSelectedBy.length > 0 && (
+        <div
+          data-wall-remote-selection-badge
+          style={{
+            position: 'absolute',
+            top: '-20px',
+            left: '0px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '1px 6px',
+            borderRadius: '4px',
+            background: remoteSelectedBy[0].color,
+            color: '#ffffff',
+            fontSize: '10px',
+            fontWeight: 600,
+            lineHeight: 1.25,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+            pointerEvents: 'none',
+            zIndex: 10,
+            userSelect: 'none'
+          }}
+        >
+          {remoteSelectedBy.map(p => p.name).join(', ')}
+        </div>
+      )}
       <WallItemView
         item={item}
         card={card}

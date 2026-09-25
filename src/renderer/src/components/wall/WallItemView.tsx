@@ -1,6 +1,6 @@
 /** cards render from the live item, so renames follow and deletions say so */
 
-import React, { useLayoutEffect, useRef } from 'react'
+import React, { useLayoutEffect, useRef, useState, useEffect } from 'react'
 import { FileQuestion, FileText, Globe } from 'lucide-react'
 import { inkNaturalSize, inkPath, SHAPE_TYPES, type TextAlign, type WallItem } from '../../../../shared/wallModel'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../../shared/wallShape'
@@ -11,6 +11,7 @@ import WallRichText from './WallRichText'
 import WallTextEditor from './WallTextEditor'
 import type { Side } from '../../../../shared/wallGrow'
 import { HIGHLIGHT_OPACITY } from '../../../../shared/wallInk'
+import { fontCssFamily } from './wallButtons'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
@@ -19,7 +20,7 @@ const SHAPE_FONT = 14
 const FIT_FONT_MIN = 8
 
 /** shrinks to fit instead of clipping the last lines, never past its size; set on the element, no re-render */
-function FittedText({ text, width, height, base, color, align = 'left', middle = false }: {
+function FittedText({ text, width, height, base, color, align = 'left', middle = false, fontFamily }: {
   text?: string
   width: number
   height: number
@@ -28,6 +29,7 @@ function FittedText({ text, width, height, base, color, align = 'left', middle =
   align?: TextAlign
   /** down the middle as well, the way a shape holds its words */
   middle?: boolean
+  fontFamily?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -47,7 +49,8 @@ function FittedText({ text, width, height, base, color, align = 'left', middle =
     <div ref={ref} style={{
       display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
       color, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-      textAlign: align
+      textAlign: align,
+      fontFamily: fontFamily || 'var(--font-sans)'
     }}>
       {/* auto margins centre it, and give way to the top once the words overflow */}
       <div style={middle ? { marginTop: 'auto', marginBottom: 'auto' } : undefined}>
@@ -78,6 +81,78 @@ function TextBox({ item, style, onAutoSize }: {
   )
 }
 
+function WallImageItem({
+  item,
+  base
+}: {
+  item: WallItem
+  base: React.CSSProperties
+}) {
+  const [reloadKey, setReloadKey] = useState(0)
+  const [loadError, setLoadError] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ filename: string }>).detail
+      if (detail?.filename === item.ref) {
+        setLoadError(false)
+        setReloadKey(k => k + 1)
+      }
+    }
+    window.addEventListener('collab-asset-received', handler)
+    return () => window.removeEventListener('collab-asset-received', handler)
+  }, [item.ref])
+
+  if (loadError) {
+    return (
+      <div
+        className="wall-paper"
+        style={{
+          ...base,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--space-1)',
+          background: 'var(--color-surface-2)',
+          border: '1px dashed var(--color-surface-offset)',
+          borderRadius: 'var(--radius-sm)',
+          color: 'var(--color-text-faint)',
+          fontSize: '11px',
+          padding: 'var(--space-2)',
+          textAlign: 'center'
+        }}
+      >
+        <span style={{ fontSize: '18px' }}>🖼️</span>
+        <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
+          {item.text || 'Syncing image...'}
+        </span>
+        <span style={{ fontSize: '9px', opacity: 0.7 }}>Transferring via WebRTC</span>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      key={reloadKey}
+      className="wall-paper"
+      src={`checkpoint-media://${item.ref}?w=${Math.round(item.width * 2)}&k=${reloadKey}`}
+      alt={item.text || 'Wall image'}
+      draggable={false}
+      decoding="async"
+      onError={() => setLoadError(true)}
+      onLoad={() => setLoadError(false)}
+      style={{
+        ...base,
+        objectFit: 'cover',
+        borderRadius: 'var(--radius-sm)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        display: 'block'
+      }}
+    />
+  )
+}
+
 interface Props {
   item: WallItem
   /** when the referenced card still exists */
@@ -98,11 +173,12 @@ interface Props {
 
 function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize, onGrow }: Props) {
   const onNext = onGrow && ((side: Side) => onGrow(item.id, side))
+  const itemFont = fontCssFamily(item.font)
   const base: React.CSSProperties = {
     width: '100%',
     height: '100%',
     boxSizing: 'border-box',
-    overflow: 'hidden'
+    overflow: editing ? 'visible' : 'hidden'
   }
 
   if (item.kind === 'note') {
@@ -111,6 +187,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
       <div className="wall-paper" style={{
         ...base,
         background: bg,
+        overflow: editing ? 'visible' : 'hidden',
         borderRadius: '2px',
         // the shadow makes it read as paper, not the colour
         boxShadow: '0 2px 6px rgba(0,0,0,0.28)',
@@ -125,11 +202,11 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             style={{
               width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
               outline: 'none', background: 'transparent', color: '#1a1a1a', textAlign: textAlignOf(item),
-              fontFamily: 'var(--font-sans)', fontSize: `${NOTE_FONT}px`, lineHeight: 1.45
+              fontFamily: itemFont, fontSize: `${NOTE_FONT}px`, lineHeight: 1.45
             }}
           />
         ) : (
-          <FittedText text={item.text} width={item.width} height={item.height} base={NOTE_FONT} color="#1a1a1a" align={textAlignOf(item)} />
+          <FittedText text={item.text} width={item.width} height={item.height} base={NOTE_FONT} color="#1a1a1a" align={textAlignOf(item)} fontFamily={itemFont} />
         )}
       </div>
     )
@@ -139,7 +216,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     // one style for writing and reading, or the box jumps when editing ends
     const textStyle: React.CSSProperties = {
       color: item.color || 'var(--color-text-base)', textAlign: textAlignOf(item),
-      fontFamily: 'var(--font-sans)', fontSize: '20px', fontWeight: 600, lineHeight: 1.3
+      fontFamily: itemFont, fontSize: '20px', fontWeight: 600, lineHeight: 1.3
     }
     return (
       <div style={base}>
@@ -191,7 +268,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             }}
           />
         </svg>
-        <div style={{ position: 'absolute', top: `${room.top}%`, right: `${room.right}%`, bottom: `${room.bottom}%`, left: `${room.left}%` }}>
+        <div style={{ position: 'absolute', top: `${room.top}%`, right: `${room.right}%`, bottom: `${room.bottom}%`, left: `${room.left}%`, overflow: editing ? 'visible' : 'hidden' }}>
           {editing ? (
             <WallTextEditor
               value={item.text ?? ''}
@@ -201,11 +278,11 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
               style={{
                 width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
                 outline: 'none', background: 'transparent', color, textAlign: textAlignOf(item),
-                fontFamily: 'var(--font-sans)', fontSize: `${SHAPE_FONT}px`, lineHeight: 1.45
+                fontFamily: itemFont, fontSize: `${SHAPE_FONT}px`, lineHeight: 1.45
               }}
             />
           ) : (
-            <FittedText text={item.text} width={item.width} height={item.height} base={SHAPE_FONT} color={color} align={textAlignOf(item)} middle />
+            <FittedText text={item.text} width={item.width} height={item.height} base={SHAPE_FONT} color={color} align={textAlignOf(item)} middle fontFamily={itemFont} />
           )}
         </div>
       </div>
@@ -305,47 +382,66 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     return (
       <div className="wall-paper" style={{
         ...base,
-        display: 'flex', flexDirection: 'column', gap: '6px',
-        padding: 'var(--space-3)',
+        display: 'flex', flexDirection: 'column',
         background: 'var(--color-surface-1)',
         border: `1px solid ${item.color || 'var(--color-surface-offset)'}`,
         borderRadius: 'var(--radius-md)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+        overflow: 'hidden'
       }}>
-        <div className="row-6px">
-          {item.ref ? (
+        {item.previewImage && (
+          <div style={{
+            width: '100%', height: '110px', overflow: 'hidden', flexShrink: 0,
+            background: 'var(--color-surface-offset)', borderBottom: '1px solid var(--color-surface-offset)'
+          }}>
             <img
-              src={`checkpoint-media://${item.ref}`}
+              src={`checkpoint-media://${item.previewImage}`}
               alt=""
-              width={14}
-              height={14}
               draggable={false}
-              style={{ flexShrink: 0, borderRadius: '3px', objectFit: 'contain' }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
-          ) : (
-            <Globe size={14} className="icon-faint" style={{ flexShrink: 0 }} />
-          )}
-          <span className="truncate" style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
-            {host}
-          </span>
-        </div>
-        <span style={{
-          fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',
-          color: 'var(--color-text-base)', lineHeight: 1.35, wordBreak: 'break-word',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+          </div>
+        )}
+        <div style={{
+          padding: 'var(--space-3)',
+          display: 'flex', flexDirection: 'column', gap: '6px',
+          flex: 1, minHeight: 0
         }}>
-          {item.text || host}
-        </span>
-        {previewing ? (
-          <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>Fetching the page…</span>
-        ) : item.summary && (
+          <div className="row-6px">
+            {item.ref ? (
+              <img
+                src={`checkpoint-media://${item.ref}`}
+                alt=""
+                width={14}
+                height={14}
+                draggable={false}
+                style={{ flexShrink: 0, borderRadius: '3px', objectFit: 'contain' }}
+              />
+            ) : (
+              <Globe size={14} className="icon-faint" style={{ flexShrink: 0 }} />
+            )}
+            <span className="truncate" style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+              {host}
+            </span>
+          </div>
           <span style={{
-            fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45,
+            fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)',
+            color: 'var(--color-text-base)', lineHeight: 1.35, wordBreak: 'break-word',
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
           }}>
-            {item.summary}
+            {item.text || host}
           </span>
-        )}
+          {previewing ? (
+            <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>Fetching the page…</span>
+          ) : item.summary && (
+            <span style={{
+              fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+            }}>
+              {item.summary}
+            </span>
+          )}
+        </div>
       </div>
     )
   }
@@ -386,23 +482,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
   }
 
   if (item.kind === 'image') {
-    return (
-      <img className="wall-paper"
-        // display-sized copy, 2x for a little zoom; see mediaPreview.ts
-        src={`checkpoint-media://${item.ref}?w=${Math.round(item.width * 2)}`}
-        alt={item.text || 'Wall image'}
-        draggable={false}
-        // async decode, a sync one hitches mid-drag
-        decoding="async"
-        style={{
-          ...base,
-          objectFit: 'cover',
-          borderRadius: 'var(--radius-sm)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          display: 'block'
-        }}
-      />
-    )
+    return <WallImageItem item={item} base={base} />
   }
 
   // referenced, never copied: a deleted card leaves a marker

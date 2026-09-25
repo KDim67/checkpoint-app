@@ -150,15 +150,17 @@ describe('WallSelectionBar', () => {
     expect(startLinkPick).toHaveBeenCalledWith('a')
   })
 
-  it('cycles the outline of every selected shape, and shows the button only for shapes', () => {
+  it('opens shape picker and updates outline of every selected shape, and shows button only for shapes', () => {
     renderBar()
-    expect(screen.queryByLabelText('Shape: Rectangle')).toBeNull()
+    expect(screen.queryByLabelText('Shape')).toBeNull()
     cleanup()
 
     const shapes = [item('a', { kind: 'shape' }), item('b', { kind: 'shape', shape: 'oval' })]
     const both = new Set(['a', 'b'])
     const { setItems } = renderBar({ items: shapes, selectedIds: both })
-    fireEvent.click(button('Shape: Rectangle'))
+    fireEvent.click(button('Shape'))
+
+    fireEvent.click(screen.getByLabelText('Rounded Rectangle'))
 
     expect(setItems).toHaveBeenCalledWith(patchItems(shapes, both, { shape: 'rounded' }))
   })
@@ -216,6 +218,31 @@ describe('WallSelectionBar', () => {
     const arrows = [item('a', { kind: 'arrow' }), item('b', { kind: 'arrow' })]
     renderBar({ items: arrows, selectedIds: new Set(['a', 'b']), arrowsSelected: true })
     expect(screen.queryByLabelText(/^Text alignment/)).toBeNull()
+  })
+
+  it('opens a font dropdown and picks a font for every selected item that holds words', () => {
+    const { setItems } = renderBar()
+    const fontBtn = button('Font: Sans')
+    expect(fontBtn).toBeDefined()
+
+    fireEvent.click(fontBtn)
+    expect(screen.getByRole('menu', { name: 'Pick a font family' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Serif' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Mono' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Handwritten' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Rounded' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Display' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Typewriter' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Comic' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Serif' }))
+    expect(setItems).toHaveBeenCalledWith(patchItems(notes, new Set(['a', 'b']), { font: 'serif' }))
+    expect(screen.queryByRole('menu', { name: 'Pick a font family' })).toBeNull()
+    cleanup()
+
+    const arrows = [item('a', { kind: 'arrow' }), item('b', { kind: 'arrow' })]
+    renderBar({ items: arrows, selectedIds: new Set(['a', 'b']), arrowsSelected: true })
+    expect(screen.queryByLabelText(/^Font:/)).toBeNull()
   })
 
   it('styles a shape\'s border, corners and fill from the shape style panel', () => {

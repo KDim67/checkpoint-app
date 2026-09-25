@@ -213,6 +213,8 @@ export const enum IpcChannels {
   MEDIA_SCAN_AND_PRUNE          = 'media:scanAndPrune',
   MEDIA_GET_STORAGE_INFO        = 'media:getStorageInfo',
   MEDIA_LINK_PREVIEW            = 'media:linkPreview',
+  MEDIA_READ_BUFFER             = 'media:readBuffer',
+  MEDIA_SAVE_NAMED_BUFFER       = 'media:saveNamedBuffer',
 
   // P2P sync
   SYNC_START_HOST               = 'sync:startHost',

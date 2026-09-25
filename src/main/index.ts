@@ -52,6 +52,8 @@ app.commandLine.appendSwitch('log-level', '3')
 Menu.setApplicationMenu(null)
 
 
+import { getCustomDataDir, getCustomProfileName, ensureDir } from './paths'
+
 /** last resort: electron's default kills the process and loses in-flight work, so log and survive */
 process.on('uncaughtException', err => {
   console.error('[main] uncaught exception:', err)
@@ -59,6 +61,16 @@ process.on('uncaughtException', err => {
 process.on('unhandledRejection', reason => {
   console.error('[main] unhandled rejection:', reason)
 })
+
+// If custom data dir or profile is requested, set an isolated userData directory
+// before requestSingleInstanceLock() so each profile/data-dir instance has its own
+// single-instance lock and isolated SQLite/cache/cookies storage.
+const customDataDir = getCustomDataDir()
+if (customDataDir) {
+  const customUserData = join(customDataDir, 'userData')
+  ensureDir(customUserData)
+  app.setPath('userData', customUserData)
+}
 
 const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
@@ -106,8 +118,26 @@ const DEFAULT_BOUNDS: WindowBounds = { width: 1280, height: 800 }
 /** only if it lands on a connected display, an unplugged monitor would strand it (custom titlebar) */
 function loadWindowBounds(): WindowBounds {
   try {
+    for (let i = 0; i < process.argv.length; i++) {
+      const arg = process.argv[i]
+      if (arg.startsWith('--window-bounds=')) {
+        const parts = arg.slice('--window-bounds='.length).split(',').map(Number)
+        if (parts.length === 4 && parts.every(n => Number.isFinite(n))) {
+          return { x: parts[0], y: parts[1], width: parts[2], height: parts[3] }
+        }
+      }
+    }
     const raw = getSetting<string | null>('window_bounds', null)
-    if (!raw) return DEFAULT_BOUNDS
+    if (!raw) {
+      const offsetArg = process.argv.find(arg => arg.startsWith('--window-offset='))
+      if (offsetArg) {
+        const offset = parseInt(offsetArg.slice('--window-offset='.length), 10)
+        if (Number.isFinite(offset)) {
+          return { ...DEFAULT_BOUNDS, x: 80 + offset, y: 80 + Math.floor(offset / 2) }
+        }
+      }
+      return DEFAULT_BOUNDS
+    }
     const saved = (typeof raw === 'string' ? JSON.parse(raw) : raw) as WindowBounds
     if (!Number.isFinite(saved.width) || !Number.isFinite(saved.height)) return DEFAULT_BOUNDS
 
@@ -167,8 +197,11 @@ function createWindow(): void {
   const appIcon = nativeImage.createFromPath(iconPath)
 
   const bounds = loadWindowBounds()
+  const profileName = getCustomProfileName()
+  const windowTitle = profileName ? `Checkpoint (${profileName})` : 'Checkpoint'
 
   const win = new BrowserWindow({
+    title: windowTitle,
     icon: appIcon,
     width: bounds.width,
     height: bounds.height,
@@ -477,6 +510,7 @@ app.whenReady().then(async () => {
   }
 
   registerDbHandlers(db)
+  registerClipboardVaultHandlers()
 
   // last, packaged only; updater starts at most once however often this runs
   void import('./updater').then(({ initializeUpdater }) => initializeUpdater())

@@ -1,5 +1,5 @@
 import type { ActiveView } from '../store/appStore'
-import { getBoolSetting, setBoolSetting, getStringSetting } from './settings'
+import { getBoolSetting, setBoolSetting, getStringSetting, getEnumSetting, setStringSetting } from './settings'
 
 /** sidebar order; three hand-kept copies drifted apart */
 interface ViewFeature {
@@ -64,6 +64,36 @@ export async function readViewFeatures(): Promise<ViewEnabledMap> {
 
 export async function setViewFeature(key: string, enabled: boolean): Promise<void> {
   await setBoolSetting(key, enabled)
+  window.dispatchEvent(new CustomEvent('settings-update-features'))
+}
+
+export type LayoutProfile = 'focused' | 'full'
+
+export const LAYOUT_PROFILE_KEY = 'layout_profile'
+export const LAYOUT_PROFILES: readonly LayoutProfile[] = ['focused', 'full'] as const
+
+export async function readLayoutProfile(): Promise<LayoutProfile> {
+  return getEnumSetting(LAYOUT_PROFILE_KEY, LAYOUT_PROFILES, 'focused')
+}
+
+/** simplifies initial sidebar views so casual users aren't overwhelmed by logs and tools */
+export async function applyLayoutProfile(profile: LayoutProfile): Promise<void> {
+  await setStringSetting(LAYOUT_PROFILE_KEY, profile)
+  if (profile === 'focused') {
+    await Promise.all([
+      setBoolSetting('feature_view_log', false),
+      setBoolSetting('feature_view_cheatsheets', false),
+      setBoolSetting('feature_view_analytics', false),
+      setBoolSetting('feature_view_clipboard', false)
+    ])
+  } else {
+    await Promise.all([
+      setBoolSetting('feature_view_log', true),
+      setBoolSetting('feature_view_cheatsheets', true),
+      setBoolSetting('feature_view_analytics', true),
+      setBoolSetting('feature_view_clipboard', false)
+    ])
+  }
   window.dispatchEvent(new CustomEvent('settings-update-features'))
 }
 

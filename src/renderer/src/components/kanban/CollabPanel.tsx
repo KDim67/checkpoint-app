@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import { authorLabel, DISPLAY_NAME_MAX } from '@shared/identity'
@@ -13,6 +13,19 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
   const collabPopoverRef = useRef<HTMLDivElement>(null)
   const { setPopoverOpen } = session
+
+  const [followingPeerId, setFollowingPeerId] = useState<string | null>(null)
+  const [followingPeerName, setFollowingPeerName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleFollowingChanged = (e: Event) => {
+      const detail = (e as CustomEvent<{ followingPeerId: string | null; name?: string | null }>).detail
+      setFollowingPeerId(detail ? detail.followingPeerId : null)
+      setFollowingPeerName(detail?.name ?? null)
+    }
+    window.addEventListener('collab-following-changed', handleFollowingChanged)
+    return () => window.removeEventListener('collab-following-changed', handleFollowingChanged)
+  }, [])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -311,39 +324,92 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                       Nobody yet
                     </span>
                   ) : (
-                    session.roster.map(member => (
-                      <div key={member.id} className="row-between" style={{ gap: 'var(--space-2)' }}>
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 'var(--weight-semibold)',
-                          color: 'var(--color-text-base)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {authorLabel(member.name)}
-                        </span>
-                        {/* host only, and not from a board it isn't looking at */}
-                        {session.isHost && !session.elsewhere && (
-                          <button
-                            onClick={() => session.removeGuest(member)}
-                            title={`Remove ${authorLabel(member.name)}`}
-                            className="collab-panel-remove text-faint"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              padding: '0 2px',
-                              fontSize: '10px',
-                              fontWeight: 'var(--weight-semibold)',
-                              cursor: 'pointer',
-                              flexShrink: 0
-                            }}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    ))
+                    session.roster.map(member => {
+                      const isFollowing = (followingPeerId !== null && followingPeerId === member.id) ||
+                        (Boolean(followingPeerName) && Boolean(member.name) && followingPeerName?.trim().toLowerCase() === member.name.trim().toLowerCase())
+
+                      return (
+                        <div key={member.id} className="row-between" style={{ gap: 'var(--space-2)' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 'var(--weight-semibold)',
+                            color: 'var(--color-text-base)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {authorLabel(member.name)}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto', flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                window.dispatchEvent(new CustomEvent('collab-jump-to-peer', { detail: { peerId: member.id, name: member.name } }))
+                                session.setPopoverOpen(false)
+                              }}
+                              title={`Jump to ${authorLabel(member.name)}`}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid var(--color-surface-offset)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '1px 6px',
+                                fontSize: '10px',
+                                color: 'var(--color-text-muted)',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Jump
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isFollowing) {
+                                  window.dispatchEvent(new CustomEvent('collab-stop-following'))
+                                  toast(`Stopped following ${authorLabel(member.name)}`)
+                                } else {
+                                  window.dispatchEvent(new CustomEvent('collab-follow-peer', { detail: { peerId: member.id, name: member.name } }))
+                                  toast(`Following ${authorLabel(member.name)}`)
+                                  session.setPopoverOpen(false)
+                                }
+                              }}
+                              title={isFollowing ? `Stop following ${authorLabel(member.name)}` : `Auto-follow ${authorLabel(member.name)}`}
+                              style={{
+                                background: isFollowing ? 'var(--color-secondary)' : 'transparent',
+                                border: isFollowing ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '1px 6px',
+                                fontSize: '10px',
+                                color: isFollowing ? '#ffffff' : 'var(--color-text-muted)',
+                                fontWeight: isFollowing ? 'var(--weight-bold)' : 'normal',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isFollowing ? 'Unfollow' : 'Follow'}
+                            </button>
+                            {/* host only, and not from a board it isn't looking at */}
+                            {session.isHost && !session.elsewhere && (
+                              <button
+                                onClick={() => session.removeGuest(member)}
+                                title={`Remove ${authorLabel(member.name)}`}
+                                className="collab-panel-remove text-faint"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  padding: '0 2px',
+                                  fontSize: '10px',
+                                  fontWeight: 'var(--weight-semibold)',
+                                  cursor: 'pointer',
+                                  flexShrink: 0
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
 

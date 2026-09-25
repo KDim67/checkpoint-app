@@ -1,4 +1,4 @@
-import React, { useCallback, useLayoutEffect } from 'react'
+import React, { useCallback, useLayoutEffect, useRef } from 'react'
 import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Point, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
 import { arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedSize, rotationAngle, rotationStart, snapMoving, type WallDrag } from '../../../../shared/wallPointer'
 import { pushHistory, replacePresent } from '../../../../shared/history'
@@ -42,6 +42,7 @@ export function useWallPointer(wallDocument: WallDocument) {
     selectedRef, historyRef, itemsById, single, activeWall, handOffToColumn, setItems, setCamera,
     addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef, growFrom, eraserMode, stepWith
   } = wallDocument
+  const lastLiveMoveDispatchRef = useRef(0)
   const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
     return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : { x: 0, y: 0 }
@@ -568,6 +569,25 @@ export function useWallPointer(wallDocument: WallDocument) {
       paintItems(live, moving)
       paintGuides(guided?.guides ?? [], cam.zoom)
       paintGaps(guided?.gaps ?? [], cam.zoom)
+
+      const now = performance.now()
+      if (now - lastLiveMoveDispatchRef.current >= 40) {
+        lastLiveMoveDispatchRef.current = now
+        const wallId = activeWall?.id ?? 'default'
+        const itemsToBroadcast: { id: string; x: number; y: number }[] = []
+        for (const id of moving) {
+          const it = live.find(i => i.id === id)
+          if (it) itemsToBroadcast.push({ id: it.id, x: it.x, y: it.y })
+        }
+        window.dispatchEvent(
+          new CustomEvent('collab-my-live-move', {
+            detail: {
+              wallId,
+              items: itemsToBroadcast
+            }
+          })
+        )
+      }
     } else {
       const size = resizedSize(drag.w, drag.h, dx, dy, snapping)
       setItems(
@@ -754,6 +774,17 @@ export function useWallPointer(wallDocument: WallDocument) {
         : historyRef.current
       historyRef.current = pushHistory(base, stepWith(movedItems ?? docRef.current.items))
       setHistoryTick(t => t + 1)
+    }
+
+    if (drag?.mode === 'move') {
+      window.dispatchEvent(
+        new CustomEvent('collab-my-live-move', {
+          detail: {
+            wallId: activeWall?.id ?? 'default',
+            items: []
+          }
+        })
+      )
     }
   }
 

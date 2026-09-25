@@ -50,8 +50,8 @@ export default function WallShortcutsMenu({
               }}>
                 {section.group}
               </div>
-              {section.rows.map(([keys, what]) => (
-                <div key={keys} style={{
+              {section.rows.map(([keys, what], index) => (
+                <div key={`${section.group}-${keys}-${what}-${index}`} style={{
                   display: 'flex', alignItems: 'baseline',
                   justifyContent: 'space-between', gap: 'var(--space-3)',
                   padding: '2px 0'

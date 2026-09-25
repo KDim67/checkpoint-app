@@ -3,6 +3,14 @@
 import { DEFAULT_SIZES, type ShapeType, type TextAlign, type WallItem } from './wallModel'
 import { plainWallText } from './wallText'
 
+export const SHAPE_NAMES: Record<ShapeType, string> = {
+  rectangle: 'Rectangle',
+  rounded: 'Rounded Rectangle',
+  oval: 'Oval',
+  diamond: 'Diamond',
+  triangle: 'Triangle'
+}
+
 /** two decimals, paths stay short on odd sizes */
 const n = (value: number): number => Math.round(value * 100) / 100
 

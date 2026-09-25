@@ -32,6 +32,7 @@ import KanbanSkeleton from './kanban/KanbanSkeleton'
 import KanbanHeader from './kanban/KanbanHeader'
 import KanbanFilterBar from './kanban/KanbanFilterBar'
 import { canAimAtSlot } from './kanban/dropSlots'
+import { useRemoteCardDrags } from '../lib/useRemoteCardDrags'
 
 
 // re-exported for existing importers, lib/boardConfig owns the shape
@@ -57,6 +58,10 @@ interface SortableColumnProps {
   dropSlot?: number | null
   /** dragged card's height, so the gap matches its footprint */
   dropHeight?: number
+  /** remote peer drags for cards in this column */
+  remoteCardDrags?: Map<string, { peerId: string; name: string; color: string }>
+  /** remote drop indicators hovering over this column */
+  remoteDropTargets?: Array<{ peerId: string; name: string; color: string; beforeCardId?: string }>
 }
 
 function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableColumnProps) {
@@ -70,6 +75,28 @@ function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableCo
   for (let i = 0; i < prev.cards.length; i++) {
     if (prev.cards[i] !== next.cards[i]) return false
   }
+
+  // Compare remoteCardDrags
+  if (prev.remoteCardDrags !== next.remoteCardDrags) {
+    if (!prev.remoteCardDrags || !next.remoteCardDrags) return false
+    if (prev.remoteCardDrags.size !== next.remoteCardDrags.size) return false
+    for (const [k, v] of prev.remoteCardDrags) {
+      const nv = next.remoteCardDrags.get(k)
+      if (!nv || nv.peerId !== v.peerId || nv.name !== v.name || nv.color !== v.color) return false
+    }
+  }
+
+  // Compare remoteDropTargets
+  if (prev.remoteDropTargets !== next.remoteDropTargets) {
+    if (!prev.remoteDropTargets || !next.remoteDropTargets) return false
+    if (prev.remoteDropTargets.length !== next.remoteDropTargets.length) return false
+    for (let i = 0; i < prev.remoteDropTargets.length; i++) {
+      const pt = prev.remoteDropTargets[i]
+      const nt = next.remoteDropTargets[i]
+      if (pt.peerId !== nt.peerId || pt.beforeCardId !== nt.beforeCardId || pt.name !== nt.name || pt.color !== nt.color) return false
+    }
+  }
+
   return true
 }
 
@@ -90,7 +117,9 @@ const SortableColumn = React.memo(function SortableColumn({
   onSetSort,
   cardDisplay,
   dropSlot = null,
-  dropHeight
+  dropHeight,
+  remoteCardDrags,
+  remoteDropTargets
 }: SortableColumnProps) {
   const {
     attributes,
@@ -139,6 +168,8 @@ const SortableColumn = React.memo(function SortableColumn({
         cardDisplay={cardDisplay}
         dropSlot={dropSlot}
         dropHeight={dropHeight}
+        remoteCardDrags={remoteCardDrags}
+        remoteDropTargets={remoteDropTargets}
       />
     </div>
   )
@@ -158,6 +189,8 @@ export default function KanbanView() {
     handleRestoreColumn, handleDeleteColumnPermanently, handleRestoreCard, handleBulkDeleteArchived,
     handleBulkRestoreArchived, handleDeleteArchivedCard
   } = kanbanBoard
+
+  const remoteCardDrags = useRemoteCardDrags()
 
   if (loading) {
     return (
@@ -228,6 +261,29 @@ export default function KanbanView() {
                       ? colCards.length
                       : colCards.findIndex(c => c.id === dropTarget.before))
                   : -1
+
+                let colRemoteDrags: Map<string, { peerId: string; name: string; color: string }> | undefined
+                for (const card of colCards) {
+                  const d = remoteCardDrags.get(card.id)
+                  if (d) {
+                    if (!colRemoteDrags) colRemoteDrags = new Map()
+                    colRemoteDrags.set(card.id, { peerId: d.peerId, name: d.name, color: d.color })
+                  }
+                }
+
+                let colDropTargets: Array<{ peerId: string; name: string; color: string; beforeCardId?: string }> | undefined
+                for (const drag of remoteCardDrags.values()) {
+                  if (drag.columnId === col.id) {
+                    if (!colDropTargets) colDropTargets = []
+                    colDropTargets.push({
+                      peerId: drag.peerId,
+                      name: drag.name,
+                      color: drag.color,
+                      beforeCardId: drag.overCardId
+                    })
+                  }
+                }
+
                 return (
                 <SortableColumn
                   key={col.id}
@@ -236,6 +292,8 @@ export default function KanbanView() {
                   dropSlot={slot === -1 ? null : slot}
                   // only the aimed column gets the height, or lifting a card redraws every column
                   dropHeight={slot === -1 ? 0 : dragHeight}
+                  remoteCardDrags={colRemoteDrags}
+                  remoteDropTargets={colDropTargets}
                   onRename={handleRenameColumn}
                   onDelete={handleDeleteColumn}
                   onCardClick={setActiveCardId}

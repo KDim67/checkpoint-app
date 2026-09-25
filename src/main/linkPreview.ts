@@ -6,6 +6,7 @@ import { isPublicHost } from './publicAddress'
 /** a head fits many times over; past this we'd only be reading a body we ignore */
 const PAGE_BYTES = 512 * 1024
 const ICON_BYTES = 256 * 1024
+const IMAGE_BYTES = 2 * 1024 * 1024
 const TIMEOUT_MS = 8000
 const MAX_REDIRECTS = 5
 // some sites refuse a request with no agent
@@ -117,6 +118,26 @@ async function fetchIcon(iconUrl: string, deps: Deps): Promise<string | undefine
   }
 }
 
+/** fetches and caches an open graph preview image into media storage */
+async function fetchImage(imageUrl: string, deps: Deps): Promise<string | undefined> {
+  try {
+    const init = { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': USER_AGENT } }
+    const response = imageUrl.startsWith('data:')
+      ? await deps.fetch(imageUrl, init)
+      : (await guardedFetch(imageUrl, init, deps))?.response
+    if (!response || !response.ok) {
+      response?.body?.cancel().catch(() => {})
+      return undefined
+    }
+    const bytes = await readCapped(response, IMAGE_BYTES + 1)
+    if (bytes.byteLength > IMAGE_BYTES) return undefined
+    const extension = iconExtension(bytes, response.headers.get('content-type'))
+    return extension ? await deps.saveIcon(Buffer.from(bytes), extension) : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** null when the page can't or mustn't be read; a page with no title or icon is still an answer */
 export async function fetchLinkPreview(url: string, deps: Deps = defaultDeps): Promise<PagePreview | null> {
   let fetched: { response: Response; finalUrl: string } | null
@@ -161,10 +182,12 @@ export async function fetchLinkPreview(url: string, deps: Deps = defaultDeps): P
   let icon = parsed.iconUrl ? await fetchIcon(parsed.iconUrl, deps) : undefined
   // a named icon that won't load; the site root usually still has one
   if (!icon && parsed.iconUrl !== favicon) icon = await fetchIcon(favicon, deps)
+  const image = parsed.imageUrl ? await fetchImage(parsed.imageUrl, deps) : undefined
 
   return {
     ...(parsed.title ? { title: parsed.title } : {}),
     ...(parsed.description ? { description: parsed.description } : {}),
-    ...(icon ? { icon } : {})
+    ...(icon ? { icon } : {}),
+    ...(image ? { image } : {})
   }
 }

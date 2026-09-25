@@ -5,14 +5,14 @@ import {
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter
 } from 'lucide-react'
-import { bringToFront, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
+import { bringToFront, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, WALL_FONT_NAMES, type WallItem } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { alignableUnits, alignItems, distributeItems, type AlignEdge } from '../../../../shared/wallAlign'
 import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
 import { isWritable, textAlignOf } from '../../../../shared/wallShape'
 import WallColorPicker from './WallColorPicker'
 import WallLinkEditor from './WallLinkEditor'
-import { toolButton, arrowStyleButtons, shapeButton, textAlignButton } from './wallButtons'
+import { toolButton, arrowStyleButtons, textAlignButton, shapeGlyph, ShapePickerMenu, FontPickerMenu } from './wallButtons'
 
 interface WallSelectionBarProps {
   floatingPos: { left: number; top: number }
@@ -76,13 +76,19 @@ export default function WallSelectionBar({
   // tied to the selection that opened them, a new pick closes them without an effect
   const [alignFor, setAlignFor] = useState<Set<string> | null>(null)
   const [styleFor, setStyleFor] = useState<Set<string> | null>(null)
+  const [shapePickerFor, setShapePickerFor] = useState<Set<string> | null>(null)
+  const [fontPickerFor, setFontPickerFor] = useState<Set<string> | null>(null)
   const alignOpen = alignFor === selectedIds
   const styleOpen = styleFor === selectedIds
+  const shapePickerOpen = shapePickerFor === selectedIds
+  const fontPickerOpen = fontPickerFor === selectedIds
   const closeOthers = (): void => {
     setSwatchOpen(false)
     setLinkOpen(false)
     setAlignFor(null)
     setStyleFor(null)
+    setShapePickerFor(null)
+    setFontPickerFor(null)
   }
   const first = chosen[0]
   // the drag was record: false, letting go makes it one undo step
@@ -180,9 +186,59 @@ export default function WallSelectionBar({
         textAlignOf(first),
         v => setItems(patchItems(items, selectedIds, { align: v }))
       )}
-      {shapesSelected && shapeButton(
-        single?.shape ?? SHAPE_TYPES[0],
-        v => setItems(patchItems(items, selectedIds, { shape: v }))
+      {wordsSelected && (
+        <div className="relative" data-wall-popover="font">
+          {toolButton(
+            `Font: ${WALL_FONT_NAMES[first?.font ?? 'sans']}`,
+            <span style={{
+              fontSize: '13px',
+              fontWeight: 700,
+              lineHeight: 1
+            }}>
+              T
+            </span>,
+            () => {
+              const open = fontPickerOpen
+              closeOthers()
+              setFontPickerFor(open ? null : selectedIds)
+            },
+            { active: fontPickerOpen }
+          )}
+          {fontPickerOpen && (
+            <div style={{ ...popover, top: 'calc(100% + 4px)', left: 0 }}>
+              <FontPickerMenu
+                current={first?.font ?? 'sans'}
+                onPick={v => {
+                  setItems(patchItems(items, selectedIds, { font: v }))
+                  setFontPickerFor(null)
+                }}
+                onClose={() => setFontPickerFor(null)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      {shapesSelected && (
+        <div className="relative">
+          {toolButton(
+            'Shape',
+            shapeGlyph(single?.shape ?? SHAPE_TYPES[0]),
+            () => { const open = shapePickerOpen; closeOthers(); setShapePickerFor(open ? null : selectedIds) },
+            { active: shapePickerOpen }
+          )}
+          {shapePickerOpen && (
+            <div style={{ ...popover, top: 'calc(100% + 4px)', left: 0 }}>
+              <ShapePickerMenu
+                current={single?.shape ?? SHAPE_TYPES[0]}
+                onPick={v => {
+                  setItems(patchItems(items, selectedIds, { shape: v }))
+                  setShapePickerFor(null)
+                }}
+                onClose={() => setShapePickerFor(null)}
+              />
+            </div>
+          )}
+        </div>
       )}
       {shapesSelected && (
         <div className="relative">
