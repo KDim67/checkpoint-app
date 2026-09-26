@@ -260,7 +260,6 @@ export default function BacklogFilters({
               borderRadius: 'var(--radius-md)',
               padding: 'var(--space-2) var(--space-3)',
               fontSize: 'var(--text-xs)',
-              outline: 'none'
             }}
           >
             <option value="all">Show All</option>

@@ -14,6 +14,8 @@ export default function ChatPanelModal({ icon, title, actions, onClose, children
   const close = (
     <button
       onClick={onClose}
+      aria-label="Close"
+      title="Close"
       className="icon-btn"
     >
       <X size={14} />

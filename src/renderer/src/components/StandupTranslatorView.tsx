@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import useFocusTrap from './ui/useFocusTrap'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAppStore } from '../store/appStore'
@@ -239,6 +240,7 @@ export default function StandupTranslatorView({
     }
     onClose()
   }, [isStreaming, onClose])
+  const dialogRef = useFocusTrap(true)
 
   useEffect(() => {
     if (!isOpen) return
@@ -409,6 +411,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
         justifyContent: 'center',
         padding: 'var(--space-6)'
       }}
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="standup-modal-title"
@@ -561,7 +564,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-2) var(--space-3)',
                     fontSize: 'var(--text-xs)',
-                    outline: 'none',
                     cursor: isStreaming ? 'default' : 'pointer'
                   }}
                 >
@@ -588,7 +590,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                       borderRadius: 'var(--radius-md)',
                       padding: 'var(--space-2) var(--space-3)',
                       fontSize: 'var(--text-xs)',
-                      outline: 'none',
                       cursor: isStreaming ? 'default' : 'pointer'
                     }}
                   >

@@ -176,7 +176,6 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
               padding: '4px 8px',
               borderRadius: 'var(--radius-sm)',
               transition: 'all var(--duration-fast)',
-              outline: 'none'
             }}
           >
             {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
@@ -201,7 +200,6 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
               padding: '4px 8px',
               borderRadius: 'var(--radius-sm)',
               transition: 'all var(--duration-fast)',
-              outline: 'none'
             }}
           >
             <Download size={14} />

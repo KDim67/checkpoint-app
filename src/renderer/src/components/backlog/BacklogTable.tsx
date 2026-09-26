@@ -446,7 +446,6 @@ export default function BacklogTable({
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
-                  outline: 'none'
                 }}
               >
                 <span>{label}</span>
@@ -703,7 +702,6 @@ export default function BacklogTable({
                         color: 'var(--color-text-base)',
                         gap: 'var(--space-2)',
                         userSelect: 'none',
-                        outline: 'none'
                       }}
                     >
                       {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}

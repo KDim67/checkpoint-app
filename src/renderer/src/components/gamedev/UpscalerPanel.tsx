@@ -46,7 +46,6 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                   padding: '8px var(--space-2)',
                   cursor: 'pointer',
                   width: '100%',
-                  outline: 'none'
                 }}
               >
                 <optgroup label="Edge-smart (EPX / AdvMAME)">

@@ -85,6 +85,8 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
           <button
             className="btn-ghost"
             onClick={handleQuickAddTask}
+            aria-label="Add task"
+            title="Add task"
             disabled={addingTask || !quickAddText.trim()}
             style={{ opacity: addingTask || !quickAddText.trim() ? 0.5 : 1, cursor: addingTask || !quickAddText.trim() ? 'not-allowed' : 'pointer', padding: '8px 12px' }}
           >

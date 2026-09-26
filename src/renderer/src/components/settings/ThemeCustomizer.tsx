@@ -214,7 +214,6 @@ export default function ThemeCustomizer() {
                   borderRadius: 'var(--radius-md)',
                   padding: 'var(--space-1-5) var(--space-3)',
                   fontSize: 'var(--text-xs)',
-                  outline: 'none',
                   cursor: 'pointer'
                 }}
               >

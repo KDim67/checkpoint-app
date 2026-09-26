@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import useFocusTrap from './ui/useFocusTrap'
 import { Search, CornerDownLeft, FileText } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { useAiEnabled } from '../lib/useAiEnabled'
@@ -114,6 +115,8 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [active])
 
+  const dialogRef = useFocusTrap(open)
+
   if (!open) return null
 
   const runCommand = async (command: Command) => {
@@ -193,6 +196,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"

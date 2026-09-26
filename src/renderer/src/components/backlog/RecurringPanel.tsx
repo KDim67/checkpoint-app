@@ -86,7 +86,6 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
     borderRadius: 'var(--radius-md)',
     padding: 'var(--space-1-5) var(--space-2)',
     fontSize: 'var(--text-xs)',
-    outline: 'none'
   }
 
   return (

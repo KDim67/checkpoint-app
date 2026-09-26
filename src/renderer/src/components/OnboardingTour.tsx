@@ -252,7 +252,6 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
           display: 'flex',
           flexDirection: 'column',
           gap: 'var(--space-4)',
-          outline: 'none',
           maxHeight: 'calc(100vh - 32px)',
           overflowY: 'auto',
           boxSizing: 'border-box',

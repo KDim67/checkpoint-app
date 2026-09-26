@@ -477,7 +477,6 @@ export default function CookbookView() {
               backgroundColor: safeMode ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
               border: '1px solid var(--color-surface-offset)',
               cursor: 'pointer',
-              outline: 'none',
               padding: 0
             }}
           >

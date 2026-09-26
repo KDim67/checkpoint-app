@@ -1,6 +1,8 @@
 /** destructive and final, so it names every card and column; state stays in the panel */
 
-import React from 'react'
+import React, { useRef } from 'react'
+import useEscapeKey from '../ui/useEscapeKey'
+import useFocusTrap from '../ui/useFocusTrap'
 import { Trash2 } from 'lucide-react'
 import type { Message } from './types'
 
@@ -17,6 +19,11 @@ export default function RevertConfirmModal({
   revertAICreatedEntities,
   setMessages
 }: Props) {
+  // a destructive answer, so Cancel takes the focus and Escape backs out
+  const cancelRef = useRef<HTMLButtonElement | null>(null)
+  const containerRef = useFocusTrap(true, cancelRef)
+  useEscapeKey(() => setRevertConfirmData(null), true)
+
   return (
         <div className="modal-overlay" onClick={() => setRevertConfirmData(null)}>
           <style>{`
@@ -47,10 +54,10 @@ export default function RevertConfirmModal({
               animation: modal-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
             }
           `}</style>
-          <div className="revert-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div ref={containerRef} className="revert-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="revert-confirm-title">
             <div className="row-md">
               <Trash2 style={{ color: 'var(--color-error)' }} size={22} />
-              <h2 style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>
+              <h2 id="revert-confirm-title" style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>
                 Revert Board State
               </h2>
             </div>
@@ -66,6 +73,7 @@ export default function RevertConfirmModal({
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
               <button
+                ref={cancelRef}
                 onClick={() => setRevertConfirmData(null)}
                 className="bg-clear hover-bg-surface-2"
                 style={{

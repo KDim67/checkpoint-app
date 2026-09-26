@@ -73,7 +73,6 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                     padding: '8px var(--space-2)',
                     cursor: 'pointer',
                     width: '100%',
-                    outline: 'none'
                   }}
                 >
                   <option value={1024}>1024 x 1024</option>

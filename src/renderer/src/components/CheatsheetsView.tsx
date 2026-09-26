@@ -747,6 +747,7 @@ export default function CheatsheetsView() {
               <input
                 type="text"
                 placeholder="Search names & contents…"
+                aria-label="Search cheatsheets"
                 className="search-input"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}

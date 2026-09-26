@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import useFocusTrap from './ui/useFocusTrap'
 import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2, Repeat } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { useAiEnabled } from '../lib/useAiEnabled'
@@ -355,6 +356,7 @@ export default function BacklogView() {
 
   // archive browser, since the toast Undo only lasts seconds
   const [showArchive, setShowArchive] = useState(false)
+  const archiveRef = useFocusTrap(showArchive)
   const [archivedTasks, setArchivedTasks] = useState<Item[]>([])
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [deleteArchivedId, setDeleteArchivedId] = useState<string | null>(null)
@@ -739,7 +741,6 @@ export default function BacklogView() {
               borderRadius: 'var(--radius-sm)',
               padding: '3px var(--space-2)',
               fontSize: 'var(--text-xs)',
-              outline: 'none',
               cursor: 'pointer'
             }}
           >
@@ -1088,6 +1089,7 @@ export default function BacklogView() {
               animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
             }}
             onClick={e => e.stopPropagation()}
+            ref={archiveRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="archive-panel-title"

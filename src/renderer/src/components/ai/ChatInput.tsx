@@ -1163,6 +1163,8 @@ export default function ChatInput({
         ) : (
           <button
             onClick={handleFormSubmit}
+            aria-label="Send message"
+            title="Send message"
             disabled={(!value.trim() && !hasAnyAttachment)}
             style={{
               background: (value.trim() || hasAnyAttachment) ? 'var(--color-secondary)' : 'var(--color-surface-offset)',

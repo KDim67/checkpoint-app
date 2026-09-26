@@ -585,6 +585,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               />
               <button
                 type="submit"
+                aria-label="Add subtask"
+                title="Add subtask"
                 disabled={!newSubtaskText.trim()}
                 style={{
                   background: newSubtaskText.trim() ? 'var(--color-secondary)' : 'var(--color-surface-offset)',

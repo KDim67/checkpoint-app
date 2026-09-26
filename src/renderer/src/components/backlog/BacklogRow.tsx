@@ -406,7 +406,6 @@ export default function BacklogRow({
         fontSize: 'var(--text-xs)',
         transition: 'background var(--duration-fast)',
         overflow: 'hidden',
-        outline: 'none'
       }}
       className="backlog-row-container"
     >

@@ -92,7 +92,6 @@ function ChoiceRow<T extends string>({
           padding: '5px 8px',
           fontSize: 'var(--text-xs)',
           minWidth: '170px',
-          outline: 'none'
         }}
       >
         {choices.map(choice => (

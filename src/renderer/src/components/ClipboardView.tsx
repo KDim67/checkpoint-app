@@ -543,6 +543,7 @@ export default function ClipboardView() {
             <input
               type="text"
               placeholder="Search history…"
+              aria-label="Search clipboard history"
               value={searchHistory}
               onChange={e => setSearchHistory(e.target.value)}
               onKeyDown={e => { if (e.key === 'Escape') setSearchHistory('') }}
@@ -710,6 +711,7 @@ export default function ClipboardView() {
             <input
               type="text"
               placeholder="Search snippets…"
+              aria-label="Search snippets"
               value={searchSnippets}
               onChange={e => setSearchSnippets(e.target.value)}
               onKeyDown={e => { if (e.key === 'Escape') setSearchSnippets('') }}

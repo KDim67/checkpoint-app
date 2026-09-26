@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import useFocusTrap from './ui/useFocusTrap'
 import {
   Save, Trash2, FileText, Eye, Edit3, Columns,
   Download, PanelRightOpen, PanelRightClose, ArrowLeft, ArrowRight, FileWarning, Maximize2, X } from 'lucide-react'
@@ -385,6 +386,8 @@ export default function NotesView(): React.JSX.Element {
 
   const saveLabel = saving ? 'Saving…' : isDirty ? 'Unsaved' : 'Saved'
 
+  const graphRef = useFocusTrap(graphExpanded)
+
   return (
     <div className={`notes-layout-grid ${showInfo ? '' : 'no-info'}`}>
       <style>{NOTES_CSS}</style>
@@ -405,6 +408,7 @@ export default function NotesView(): React.JSX.Element {
           }}
         >
           <div
+            ref={graphRef}
             role="dialog"
             aria-modal="true"
             aria-label="Note graph"

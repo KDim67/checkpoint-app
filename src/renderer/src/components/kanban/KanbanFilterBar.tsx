@@ -22,6 +22,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
         <input
           type="text"
           placeholder="Search cards (title, body, tag)..."
+          aria-label="Search cards"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           className="border-offset focus-border-accent"
@@ -51,7 +52,6 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
               borderRadius: 'var(--radius-sm)',
               padding: '3px 6px',
               fontSize: 'var(--text-xs)',
-              outline: 'none'
             }}
           >
             <option value={-1}>All</option>
@@ -74,7 +74,6 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
               borderRadius: 'var(--radius-sm)',
               padding: '3px 6px',
               fontSize: 'var(--text-xs)',
-              outline: 'none',
               maxWidth: '120px'
             }}
           >

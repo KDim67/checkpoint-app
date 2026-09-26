@@ -147,7 +147,6 @@ export default function CollabPresenceRoster({
                   : '0 1px 3px rgba(0,0,0,0.15)',
                 cursor: 'pointer',
                 padding: 0,
-                outline: 'none',
                 userSelect: 'none',
                 transition: 'transform 0.15s ease, box-shadow 0.15s ease'
               }}

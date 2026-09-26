@@ -235,7 +235,6 @@ export default function ItemDetailPanel() {
                 padding: '2px 6px',
                 fontSize: 'var(--text-xs)',
                 cursor: 'pointer',
-                outline: 'none'
               }}
             >
               {columns.map(col => (
@@ -263,7 +262,6 @@ export default function ItemDetailPanel() {
                 padding: '2px 6px',
                 fontSize: 'var(--text-xs)',
                 cursor: 'pointer',
-                outline: 'none',
                 fontWeight: priority > 0 ? 'var(--weight-semibold)' : 'var(--weight-normal)'
               }}
             >

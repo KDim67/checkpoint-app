@@ -71,7 +71,6 @@ function MenuItem({ label, onClick, danger = false }: { label: string; onClick: 
         cursor: 'pointer',
         display: 'block',
         width: '100%',
-        outline: 'none',
         transition: 'background var(--duration-fast), color var(--duration-fast)'
       }}
     >

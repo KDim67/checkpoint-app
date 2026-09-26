@@ -59,6 +59,7 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
           <input
             type="text"
             placeholder="Search chats…"
+            aria-label="Search saved chats"
             value={chatSearchQuery}
             onChange={e => setChatSearchQuery(e.target.value)}
             onKeyDown={e => { if (e.key === 'Escape') setChatSearchQuery('') }}

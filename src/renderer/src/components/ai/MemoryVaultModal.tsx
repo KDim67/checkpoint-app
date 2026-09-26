@@ -170,6 +170,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                 <input
                   type="text"
                   placeholder="Search memories by keyword, fact, or type…"
+                  aria-label="Search memories"
                   value={memorySearchQuery}
                   onChange={e => setMemorySearchQuery(e.target.value)}
                   style={{

@@ -69,7 +69,6 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
             borderRadius: 'var(--radius-md)',
             padding: 'var(--space-2) var(--space-3)',
             fontSize: 'var(--text-xs)',
-            outline: 'none',
             flexShrink: 0
           }}
         >
