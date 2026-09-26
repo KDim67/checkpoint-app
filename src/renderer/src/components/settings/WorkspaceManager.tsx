@@ -4,7 +4,7 @@ import { Plus, Trash2, Edit2, ChevronUp, ChevronDown, AlertTriangle, Download, U
 import { Divider, RowBetween } from './SettingsSection'
 import { useAppStore } from '../../store/appStore'
 import ColorPicker from '../ui/ColorPicker'
-import { useToast } from '../ui/Toast'
+import { useToast, useFailureReport } from '../ui/Toast'
 import ModalShell from '../ui/ModalShell'
 import {
   applyImportedBoard,
@@ -40,6 +40,7 @@ export default function WorkspaceManager() {
   const setWorkspaceList = useAppStore(s => s.setWorkspaceList)
 
   const { toast } = useToast()
+  const report = useFailureReport()
 
   const [contexts, setContexts] = useState<WorkspaceEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -174,11 +175,11 @@ export default function WorkspaceManager() {
         setContexts(bootstrapped)
       }
     } catch (err) {
-      console.error('Failed to load contexts:', err)
+      report('load the workspaces', err)
     } finally {
       setLoading(false)
     }
-  }, [availableWorkspaces])
+  }, [availableWorkspaces, report])
 
   useEffect(() => { load() }, [load])
 
@@ -196,7 +197,7 @@ export default function WorkspaceManager() {
     try {
       await persist(updated)
     } catch (err) {
-      console.error('Failed to clear the shared label:', err)
+      report('clear the shared label', err)
     }
   }
 

@@ -5,6 +5,7 @@ import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import { Trash2 } from 'lucide-react'
 import type { Message } from './types'
+import { useFailureReport } from '../ui/Toast'
 
 interface Props {
   revertConfirmData: { cardTitles: string[]; columnNames: string[]; index: number }
@@ -19,6 +20,7 @@ export default function RevertConfirmModal({
   revertAICreatedEntities,
   setMessages
 }: Props) {
+  const report = useFailureReport()
   // a destructive answer, so Cancel takes the focus and Escape backs out
   const cancelRef = useRef<HTMLButtonElement | null>(null)
   const containerRef = useFocusTrap(true, cancelRef)
@@ -97,7 +99,7 @@ export default function RevertConfirmModal({
                     await revertAICreatedEntities(data.cardTitles, data.columnNames)
                     setMessages(prev => prev.slice(0, data.index))
                   } catch (err) {
-                    console.error('Failed to revert AI changes:', err)
+                    report("undo the assistant's changes", err)
                   }
                 }}
                 className="revert-confirm-modal-revert"

@@ -9,7 +9,8 @@ import type { BoardTheme } from './useBoardTheme'
 
 interface BoardThemeMenuProps {
   theme: BoardTheme
-  persistConfig: (patch: Partial<BoardConfig>) => Promise<void>
+  /** false when the save failed; it has already said why */
+  persistConfig: (patch: Partial<BoardConfig>) => Promise<boolean>
 }
 
 export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuProps) {

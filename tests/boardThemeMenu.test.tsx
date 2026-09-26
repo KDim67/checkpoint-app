@@ -22,7 +22,7 @@ function Board({ persistConfig }: { persistConfig: PersistConfig }) {
 }
 
 const renderBoard = () => {
-  const persistConfig = vi.fn<PersistConfig>(async () => {})
+  const persistConfig = vi.fn<PersistConfig>(async () => true)
   render(<ToastProvider><Board persistConfig={persistConfig} /></ToastProvider>)
   fireEvent.click(screen.getByTitle('Change board background theme'))
   return { persistConfig }

@@ -6,6 +6,7 @@ import type { Tag } from '../../../../shared/types'
 import ColorPicker from './ColorPicker'
 import { useConfirm } from './ConfirmDialog'
 import { deleteTag, recolourTag } from '../../data/tags'
+import { useFailureReport } from './Toast'
 
 interface TagRowProps {
   tag: Tag
@@ -19,12 +20,13 @@ interface TagRowProps {
 
 export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDeleted }: TagRowProps) {
   const confirm = useConfirm()
+  const report = useFailureReport()
 
   const recolour = async (color: string): Promise<void> => {
     try {
       onTagsChanged(await recolourTag(tag.id, color))
     } catch (err) {
-      console.error(err)
+      report(`recolour “${tag.name}”`, err)
     }
   }
 
@@ -40,7 +42,7 @@ export default function TagRow({ tag, isSelected, onToggle, onTagsChanged, onDel
       onDeleted(tag.id)
       onTagsChanged(await deleteTag(tag.id))
     } catch (err) {
-      console.error(err)
+      report(`delete “${tag.name}”`, err)
     }
   }
 

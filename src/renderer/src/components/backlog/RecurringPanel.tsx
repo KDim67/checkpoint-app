@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Repeat, Plus, Trash2, Pause, Play, X } from 'lucide-react'
-import { useToast } from '../ui/Toast'
+import { useToast, useFailureReport } from '../ui/Toast'
 import type { RecurrenceSummary } from '../../../../shared/recurrence'
 import * as recurrenceApi from '../../data/recurrence'
 
@@ -22,6 +22,7 @@ function defaultStart(): string {
 
 export default function RecurringPanel({ context, onChanged }: Props): React.JSX.Element {
   const { toast } = useToast()
+  const report = useFailureReport()
   const [rules, setRules] = useState<RecurrenceSummary[]>([])
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
@@ -34,9 +35,9 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
     try {
       setRules(await recurrenceApi.list(context))
     } catch (err) {
-      console.error('Failed to load recurrences:', err)
+      report('load the repeating tasks', err)
     }
-  }, [context])
+  }, [context, report])
 
   useEffect(() => { load() }, [load])
 

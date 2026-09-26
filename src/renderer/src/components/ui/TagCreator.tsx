@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import type { Tag } from '../../../../shared/types'
 import ColorPicker from './ColorPicker'
 import { createTag, listTags } from '../../data/tags'
+import { useFailureReport } from './Toast'
 
 /** enough to tell apart, few enough to pick from */
 const SWATCHES = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#cdf12b', '#ff45b5']
@@ -14,6 +15,7 @@ interface TagCreatorProps {
 }
 
 export default function TagCreator({ onCreated }: TagCreatorProps) {
+  const report = useFailureReport()
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3b82f6')
 
@@ -25,7 +27,7 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
       onCreated(created, await listTags())
       setName('')
     } catch (err) {
-      console.error(err)
+      report(`create “${trimmed}”`, err)
     }
   }
 

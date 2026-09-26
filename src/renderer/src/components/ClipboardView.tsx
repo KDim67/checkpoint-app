@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import type { ClipboardItem } from '../../../shared/types'
 import ConfirmDialog from './ui/ConfirmDialog'
-import { useToast } from './ui/Toast'
+import { useToast, useFailureReport } from './ui/Toast'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import * as clipboardApi from '../data/clipboard'
 import * as appApi from '../data/app'
@@ -70,6 +70,7 @@ const countLines = (text: string): number => text.split('\n').length
 
 export default function ClipboardView() {
   const { toast } = useToast()
+  const report = useFailureReport()
   const [history, setHistory] = useState<ClipboardItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchHistory, setSearchHistory] = useState('')
@@ -93,11 +94,11 @@ export default function ClipboardView() {
       const data = await clipboardApi.getHistory()
       setHistory(data)
     } catch (err) {
-      console.error('Failed to load clipboard history:', err)
+      report('load the clipboard history', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [report])
 
   useEffect(() => {
     loadHistory()
@@ -116,7 +117,7 @@ export default function ClipboardView() {
       await clipboardApi.togglePin(id, !isPinned)
       loadHistory()
     } catch (err) {
-      console.error('Failed to toggle pin:', err)
+      report('change the pin', err)
     }
   }
 
@@ -131,7 +132,7 @@ export default function ClipboardView() {
       setEditingId(null)
       loadHistory()
     } catch (err) {
-      console.error('Failed to update label:', err)
+      report('save the label', err)
     }
   }
 
@@ -156,13 +157,13 @@ export default function ClipboardView() {
               loadHistory()
               toast('Clipboard item restored.')
             } catch (err) {
-              console.error('Failed to restore clipboard item:', err)
+              report('bring the item back', err)
             }
           }
         }
       })
     } catch (err) {
-      console.error('Failed to delete item:', err)
+      report('delete the item', err)
     }
   }
 
@@ -174,7 +175,7 @@ export default function ClipboardView() {
       await clipboardApi.clearHistory()
       loadHistory()
     } catch (err) {
-      console.error('Failed to clear clipboard history:', err)
+      report('clear the history', err)
     }
   }
 
@@ -184,7 +185,7 @@ export default function ClipboardView() {
       setCopiedId(id)
       setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), COPIED_FEEDBACK_MS)
     } catch (err) {
-      console.error('Failed to copy item:', err)
+      report('copy it', err)
     }
   }
 
@@ -193,7 +194,7 @@ export default function ClipboardView() {
     try {
       await clipboardApi.paste(content)
     } catch (err) {
-      console.error('Failed to copy and close:', err)
+      report('copy it', err)
     }
   }
 
@@ -201,7 +202,7 @@ export default function ClipboardView() {
     try {
       await appApi.openExternal(normalizeUrl(content))
     } catch (err) {
-      console.error('Failed to open link:', err)
+      report('open the link', err)
     }
   }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { useToast } from '../ui/Toast'
 import type { AiMemory, MemoryCategory } from '../../../../shared/types'
 import * as memoryApi from '../../data/memory'
+import { useFailureReport } from '../ui/Toast'
 
 // re-exported so imports stay beside the vault
 export type { MemoryCategory, AiMemory as MemoryRow } from '../../../../shared/types'
@@ -17,6 +18,7 @@ interface Options {
 
 export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Options) {
   const [showMemoryPanel, setShowMemoryPanel] = useState(false)
+  const report = useFailureReport()
   const [memories, setMemories] = useState<AiMemory[]>([])
   const [memoryLoading, setMemoryLoading] = useState(false)
   const [memorySearchQuery, setMemorySearchQuery] = useState('')
@@ -48,7 +50,7 @@ export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Option
       setMemories(audited)
       toast('Memory vault audited and optimized!', { type: 'success' })
     } catch (e) {
-      console.warn('Memory audit failed:', e)
+      report('check the memories', e)
     } finally {
       setMemoryLoading(false)
     }
@@ -63,7 +65,7 @@ export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Option
       await memoryApi.deleteMemory(id)
       setMemories(prev => prev.filter(m => m.id !== id))
     } catch (e) {
-      console.warn('Failed to delete memory:', e)
+      report('delete the memory', e)
     }
   }
 
@@ -72,7 +74,7 @@ export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Option
       const newPinned = await memoryApi.togglePinMemory(id)
       setMemories(prev => prev.map(m => m.id === id ? { ...m, is_pinned: newPinned } : m))
     } catch (e) {
-      console.warn('Failed to toggle pin memory:', e)
+      report('change the pin', e)
     }
   }
 
@@ -87,7 +89,7 @@ export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Option
       setMemories(prev => prev.map(m => m.id === id ? { ...m, content: editingMemoryContent, updated_at: Date.now() } : m))
       setEditingMemoryId(null)
     } catch (e) {
-      console.warn('Failed to update memory:', e)
+      report('save the memory', e)
     }
   }
 
@@ -106,7 +108,7 @@ export function useMemoryVault({ activeWorkspace, selectedModel, toast }: Option
       setNewMemoryCategory('semantic')
       setShowAddMemoryForm(false)
     } catch (e) {
-      console.warn('Failed to add memory:', e)
+      report('add the memory', e)
     }
   }
 

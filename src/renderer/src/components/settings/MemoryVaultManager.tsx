@@ -3,9 +3,11 @@ import type { AiMemory } from '../../../../shared/types'
 import { Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import * as memoryApi from '../../data/memory'
+import { useFailureReport } from '../ui/Toast'
 
 export default function MemoryVaultManager() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const report = useFailureReport()
   const [memories, setMemories] = useState<AiMemory[]>([])
   const [newKey, setNewKey] = useState('')
   const [newContent, setNewContent] = useState('')
@@ -15,9 +17,9 @@ export default function MemoryVaultManager() {
     try {
       const list = await memoryApi.getMemories(activeWorkspace)
       setMemories(list || [])
-    } catch (e) { console.warn('Failed to load memories:', e) }
+    } catch (e) { report('load the memories', e) }
     finally { setLoading(false) }
-  }, [activeWorkspace])
+  }, [activeWorkspace, report])
 
   useEffect(() => { loadMemories() }, [loadMemories])
 
@@ -33,14 +35,14 @@ export default function MemoryVaultManager() {
       setNewKey('')
       setNewContent('')
       loadMemories()
-    } catch (e) { console.warn('Failed to save memory:', e) }
+    } catch (e) { report('save the memory', e) }
   }
 
   const handleDeleteMemory = async (id: string) => {
     try {
       await memoryApi.deleteMemory(id)
       loadMemories()
-    } catch (e) { console.warn('Failed to delete memory:', e) }
+    } catch (e) { report('delete the memory', e) }
   }
 
   return (

@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
-import { useToast } from '../ui/Toast'
+import { useToast, useFailureReport } from '../ui/Toast'
 import { setBoolSetting, setNumberSetting, setStringSetting } from '../../lib/settings'
 import * as backupApi from '../../data/backup'
 
 export default function BackupSettings() {
   const confirm = useConfirm()
   const { toast } = useToast()
+  const report = useFailureReport()
   const [enabled, setEnabled] = useState(true)
   const [interval, setIntervalVal] = useState('daily')
   const [maxCount, setMaxCount] = useState(10)
@@ -24,7 +25,8 @@ export default function BackupSettings() {
   const [restoring, setRestoring] = useState<string | null>(null)
 
 
-  const loadStatus = async () => {
+  // stable, so the effect below can list it without running again
+  const loadStatus = useCallback(async () => {
     try {
       const status = await backupApi.getStatus()
       setEnabled(status.enabled)
@@ -33,15 +35,15 @@ export default function BackupSettings() {
       setCustomPath(status.path)
       setBackups(status.backups)
     } catch (err) {
-      console.error('Failed to load backup status:', err)
+      report('read the backup status', err)
     } finally {
       setLoading(false)
     }
-  }
+  }, [report])
 
   useEffect(() => {
     loadStatus()
-  }, [])
+  }, [loadStatus])
 
   const handleToggle = async (checked: boolean) => {
     try {
@@ -64,7 +66,7 @@ export default function BackupSettings() {
       toast(`Backup schedule set to: ${val}`)
       loadStatus()
     } catch (err) {
-      console.error(err)
+      report('change the backup schedule', err)
     }
   }
 
@@ -76,7 +78,7 @@ export default function BackupSettings() {
       await backupApi.run('init')
       loadStatus()
     } catch (err) {
-      console.error(err)
+      report('change how many backups are kept', err)
     }
   }
 
@@ -87,7 +89,7 @@ export default function BackupSettings() {
       toast('Backup destination path updated')
       loadStatus()
     } catch (err) {
-      console.error(err)
+      report('change the backup folder', err)
     }
   }
 

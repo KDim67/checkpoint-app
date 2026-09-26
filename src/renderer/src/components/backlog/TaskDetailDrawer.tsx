@@ -22,6 +22,7 @@ import { searchItems } from '../../data/items'
 import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
 import * as subtasksApi from '../../data/subtasks'
+import { useFailureReport } from '../ui/Toast'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -43,6 +44,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const aiEnabled = useAiEnabled()
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const report = useFailureReport()
 
   const [task, setTask] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
@@ -60,9 +62,9 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     try {
       setSubtasks(await subtasksApi.list(id))
     } catch (err) {
-      console.error('Failed to load subtasks:', err)
+      report('load the subtasks', err)
     }
-  }, [])
+  }, [report])
 
   const [editorMode, setEditorMode] = useState<EditorMode>('split')
 
@@ -119,14 +121,14 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
           setRelations(rels)
         }
       } catch (err) {
-        console.error('Failed to load task details:', err)
+        report('load this task', err)
       } finally {
         if (active) setLoading(false)
       }
     }
     loadDetails()
     return () => { active = false }
-  }, [taskId, activeWorkspace, setRelations, loadSubtasks])
+  }, [taskId, activeWorkspace, setRelations, loadSubtasks, report])
 
   const handleTitleBlur = () => {
     if (!task || !title.trim() || title === task.title) return
@@ -150,7 +152,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
       onUpdate(task.id, { metadata: metadataStr })
       setTask(prev => prev ? { ...prev, metadata: metadataStr } : null)
     } catch (err) {
-      console.error('Failed to save estimate:', err)
+      report('save the estimate', err)
     }
   }
 

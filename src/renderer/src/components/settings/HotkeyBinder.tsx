@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useToast } from '../ui/Toast'
+import { useToast, useFailureReport } from '../ui/Toast'
 import { useAiEnabled } from '../../lib/useAiEnabled'
 import { getEnumSetting, setStringSetting } from '../../lib/settings'
 import {
@@ -235,6 +235,7 @@ function ActionButton({
 
 export default function HotkeyBinder() {
   const { toast } = useToast()
+  const report = useFailureReport()
   const aiEnabled = useAiEnabled()
   const [engineEnabled, setEngineEnabled] = useState(false)
   const [bindings, setBindings] = useState<Record<string, string>>({
@@ -259,7 +260,7 @@ export default function HotkeyBinder() {
           setBindings(prev => ({ ...prev, ...stored }))
         }
       } catch (err) {
-        console.error('Failed to load shortcuts:', err)
+        report('load your shortcuts', err)
       }
       setAppBindings(await loadBindings())
       setViewBindings(await loadViewBindings())
@@ -267,7 +268,7 @@ export default function HotkeyBinder() {
       setMenuButton(await getEnumSetting(MENU_BUTTON_KEY, MENU_BUTTON_MODES, MENU_BUTTON_MODES[0]))
     }
     load().catch(err => console.error('Failed to load shortcuts:', err))
-  }, [])
+  }, [report])
 
   const startRecording = (target: RecordingTarget) => {
     setRecording(target)
@@ -352,7 +353,7 @@ export default function HotkeyBinder() {
       await customizerApi.registerShortcuts(defaults)
       toast('Shortcut keys reset to defaults')
     } catch (err) {
-      console.error(err)
+      report('reset the shortcut keys', err)
     }
   }
 

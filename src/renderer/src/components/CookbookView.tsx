@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Cpu,
   Database,
@@ -20,7 +20,7 @@ import { calculateFitResult, USABLE_RAM_FRACTION } from '../../../shared/scoreEn
 import type { CatalogModel, HardwareSpecs, OllamaStatus, PullProgressEvent } from '../../../shared/cookbookTypes'
 import Skeleton from './ui/Skeleton'
 import EmptyState from './ui/EmptyState'
-import { useToast } from './ui/Toast'
+import { useToast, useFailureReport } from './ui/Toast'
 import { useConfirm } from './ui/ConfirmDialog'
 import { getBoolSetting, setBoolSetting } from '../lib/settings'
 import * as cookbookApi from '../data/cookbook'
@@ -143,6 +143,7 @@ const SAFE_MODE_MAX_PARAMS = 4
 
 export default function CookbookView() {
   const { toast } = useToast()
+  const report = useFailureReport()
   const confirm = useConfirm()
   const [searchQuery, setSearchQuery] = useState('')
   const [capFilter, setCapFilter] = useState<string>('all')
@@ -167,29 +168,30 @@ export default function CookbookView() {
     pullingModelTagRef.current = tag
   }
 
-  const loadHardwareSpecs = async () => {
+  // stable, so the effects below can list them without running again
+  const loadHardwareSpecs = useCallback(async () => {
     setLoadingSpecs(true)
     try {
       const hardwareSpecs = await cookbookApi.getHardwareSpecs()
       setSpecs(hardwareSpecs)
     } catch (err) {
-      console.error('Failed to load hardware specs:', err)
+      report("read this machine's hardware", err)
     } finally {
       setLoadingSpecs(false)
     }
-  }
+  }, [report])
 
-  const loadOllamaStatus = async () => {
+  const loadOllamaStatus = useCallback(async () => {
     setLoadingOllama(true)
     try {
       const status = await cookbookApi.checkOllama()
       setOllamaStatus(status)
     } catch (err) {
-      console.error('Failed to check Ollama status:', err)
+      report('check whether Ollama is running', err)
     } finally {
       setLoadingOllama(false)
     }
-  }
+  }, [report])
 
   useEffect(() => {
     loadHardwareSpecs()
@@ -201,11 +203,11 @@ export default function CookbookView() {
           setSafeMode(await getBoolSetting('unitySafeMode', false))
         }
       } catch (err) {
-        console.error('Failed to load the safe mode setting:', err)
+        report('load the safe mode setting', err)
       }
     }
     loadSafeModeSetting()
-  }, [])
+  }, [loadHardwareSpecs, loadOllamaStatus, report])
 
   useEffect(() => {
     const unsubscribeProgress = cookbookApi.onPullProgress((event: PullProgressEvent) => {
@@ -240,14 +242,14 @@ export default function CookbookView() {
       cleanDone()
       cleanError()
     }
-  }, [toast])
+  }, [toast, loadOllamaStatus])
 
   const handleToggleSafeMode = async (newValue: boolean) => {
     setSafeMode(newValue)
     try {
       await setBoolSetting('unitySafeMode', newValue)
     } catch (err) {
-      console.error('Failed to save the safe mode setting:', err)
+      report('save the safe mode setting', err)
     }
   }
 
@@ -281,7 +283,7 @@ export default function CookbookView() {
         toast(`Pull of "${tag}" canceled.`)
       }
     } catch (err) {
-      console.error('Failed to abort pull:', err)
+      report('stop the download', err)
     } finally {
       updatePullingModel(null)
       setPullPercent(0)
@@ -293,7 +295,7 @@ export default function CookbookView() {
     try {
       await appApi.openExternal(url)
     } catch (err) {
-      console.error('Failed to open URL:', err)
+      report('open the link', err)
     }
   }
 

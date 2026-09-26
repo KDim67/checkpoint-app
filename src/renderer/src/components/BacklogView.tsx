@@ -10,7 +10,7 @@ import BulkActionsBar from './backlog/BulkActionsBar'
 import TaskDetailDrawer from './backlog/TaskDetailDrawer'
 import Skeleton from './ui/Skeleton'
 import EmptyState from './ui/EmptyState'
-import { useToast } from './ui/Toast'
+import { useFailureReport, useToast } from './ui/Toast'
 import { loadBoardConfig } from '../lib/boardConfig'
 import StandupTranslatorView from './StandupTranslatorView'
 import ConfirmDialog from './ui/ConfirmDialog'
@@ -55,6 +55,7 @@ export default function BacklogView() {
     return () => { cancelled = true }
   }, [pendingViewId])
   const { toast } = useToast()
+  const report = useFailureReport()
 
   const [tasks, setTasks] = useState<Item[]>([])
   const [totalTasks, setTotalTasks] = useState(0)
@@ -162,9 +163,9 @@ export default function BacklogView() {
       const config = await loadBoardConfig(activeWorkspace)
       setWorkflowColumns(config.columns)
     } catch (err) {
-      console.error('Failed to load columns:', err)
+      report('load the board columns', err)
     }
-  }, [activeWorkspace])
+  }, [activeWorkspace, report])
 
   const loadColumnLayout = useCallback(async () => {
     try {
@@ -180,9 +181,9 @@ export default function BacklogView() {
         if (config.visibility) setVisibleColumns(config.visibility)
       }
     } catch (err) {
-      console.error('Failed to load column layout:', err)
+      report('load the table layout', err)
     }
-  }, [activeWorkspace])
+  }, [activeWorkspace, report])
 
   const saveColumnLayout = async (
     widths: typeof columnWidths,
@@ -196,7 +197,7 @@ export default function BacklogView() {
         ({ widths, order, visibility })
       )
     } catch (err) {
-      console.error('Failed to save column layout:', err)
+      report('save the table layout', err)
     }
   }
 
@@ -205,9 +206,9 @@ export default function BacklogView() {
       const tags = await listTags()
       setAllTags(tags)
     } catch (err) {
-      console.error('Failed to load tags:', err)
+      report('load the tags', err)
     }
-  }, [])
+  }, [report])
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -240,11 +241,11 @@ export default function BacklogView() {
       setTasks(res.items)
       setTotalTasks(res.total)
     } catch (err) {
-      console.error('Failed to load tasks:', err)
+      report('load the tasks', err)
     } finally {
       setLoading(false)
     }
-  }, [
+  }, [report,
     activeView,
     activeWorkspace,
     debouncedQuery,
@@ -296,7 +297,7 @@ export default function BacklogView() {
       await updateItem(id, patch, tagIds)
       await loadTasks()
     } catch (err) {
-      console.error('Failed to update task field:', err)
+      report('save the change', err)
     }
   }
 
@@ -314,7 +315,7 @@ export default function BacklogView() {
       setSelectedIds([])
       await loadTasks()
     } catch (err) {
-      console.error('Failed to bulk update status:', err)
+      report('change the status', err)
     }
   }
 
@@ -328,7 +329,7 @@ export default function BacklogView() {
       setSelectedIds([])
       await loadTasks()
     } catch (err) {
-      console.error('Failed to bulk update priority:', err)
+      report('change the priority', err)
     }
   }
 
@@ -348,7 +349,7 @@ export default function BacklogView() {
       setSelectedIds([])
       await loadTasks()
     } catch (err) {
-      console.error('Failed to bulk add tag:', err)
+      report('add the tag', err)
     }
   }
 
@@ -373,11 +374,11 @@ export default function BacklogView() {
       })
       setArchivedTasks(res.items)
     } catch (err) {
-      console.error('Failed to load archived tasks:', err)
+      report('load the archive', err)
     } finally {
       setArchiveLoading(false)
     }
-  }, [activeWorkspace])
+  }, [activeWorkspace, report])
 
   useEffect(() => {
     if (showArchive) loadArchivedTasks()
@@ -391,7 +392,7 @@ export default function BacklogView() {
       toast('Task restored to ' + (workflowColumns[0]?.name || 'Backlog'))
       await loadTasks()
     } catch (err) {
-      console.error('Failed to restore archived task:', err)
+      report('restore the task', err)
     }
   }
 
@@ -402,7 +403,7 @@ export default function BacklogView() {
       setDeleteArchivedId(null)
       toast('Task permanently deleted')
     } catch (err) {
-      console.error('Failed to permanently delete archived task:', err)
+      report('delete the task', err)
     }
   }
 
@@ -438,13 +439,13 @@ export default function BacklogView() {
               await loadTasks()
               toast('Tasks restored')
             } catch (err) {
-              console.error('Failed to undo deletion:', err)
+              report('bring the tasks back', err)
             }
           }
         }
       })
     } catch (err) {
-      console.error('Failed to bulk delete tasks:', err)
+      report('delete the tasks', err)
     }
   }
 

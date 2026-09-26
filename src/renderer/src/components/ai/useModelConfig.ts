@@ -5,8 +5,10 @@ import { activateProvider, isLocalUrl, loadProviders, persistProviders, type AiP
 import { getNumberSetting, setStringSetting } from '../../lib/settings'
 import * as ollamaApi from '../../data/ollama'
 import * as cookbookApi from '../../data/cookbook'
+import { useFailureReport } from '../ui/Toast'
 
 export function useModelConfig() {
+  const report = useFailureReport()
   const [selectedModel, setSelectedModel] = useState('llama3')
   const [localModels, setLocalModels] = useState<string[]>([])
   const [temperature, setTemperature] = useState(0.7)
@@ -122,7 +124,7 @@ export function useModelConfig() {
       await refreshLocalModels()
       await handleModelChange(tag)
     } catch (e) {
-      console.error('Failed to pull model:', e)
+      report(`download ${tag}`, e)
     } finally {
       unsub()
       setPullingTag(null)

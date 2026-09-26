@@ -21,7 +21,7 @@ interface SpeechRecognitionLike {
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
 import { Send, Square, Plus, Mail, Sparkles, FileText, X, BookOpen, Mic, LayoutGrid, ListTree, ArrowUpDown, ShieldAlert, Image as ImageIcon, Settings2, FileCode } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
-import { useToast } from '../ui/Toast'
+import { useToast, useFailureReport } from '../ui/Toast'
 import * as cheatsheetsApi from '../../data/cheatsheets'
 import * as notesApi from '../../data/notes'
 
@@ -139,6 +139,7 @@ export default function ChatInput({
   onManageCustomActions,
   visionCapable = false
 }: ChatInputProps) {
+  const report = useFailureReport()
   const { toast } = useToast()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -202,7 +203,7 @@ export default function ChatInput({
       }
       recognition.start()
     } catch (e) {
-      console.warn('Failed to start speech recognition:', e)
+      report('start listening', e)
       setIsListening(false)
     }
   }

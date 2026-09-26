@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Send, Hash } from 'lucide-react'
 import { handleImagePaste, handleImageDrop } from '../../lib/mediaHelper'
 import { resolveTagIds } from '../../data/tags'
+import { useFailureReport } from '../ui/Toast'
 
 interface LogInputProps {
   context: string
@@ -22,6 +23,7 @@ const CURATED_COLORS = [
 ]
 
 export default function LogInput({ context, onSubmit }: LogInputProps) {
+  const report = useFailureReport()
   const [value, setValue] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -89,7 +91,8 @@ export default function LogInput({ context, onSubmit }: LogInputProps) {
       
       textareaRef.current?.focus()
     } catch (err) {
-      console.error('Failed to save log entry:', err)
+      // the words stay in the box to try again
+      report('save the entry', err)
     } finally {
       setSubmitting(false)
     }

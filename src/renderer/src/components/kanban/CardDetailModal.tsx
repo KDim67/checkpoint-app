@@ -35,6 +35,7 @@ import DrawerCloseButton from '../ui/DrawerCloseButton'
 import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
 import * as appApi from '../../data/app'
+import { useFailureReport } from '../ui/Toast'
 
 interface CardDetailModalProps {
   cardId: string
@@ -53,6 +54,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const selectItem = useAppStore(s => s.selectItem)
   const toggleRightPanel = useAppStore(s => s.toggleRightPanel)
   const aiEnabled = useAiEnabled()
+  const report = useFailureReport()
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
 
   const [card, setCard] = useState<Item | null>(null)
@@ -161,14 +163,14 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           setRelations(rels)
         }
       } catch (err) {
-        console.error('Failed to load card details:', err)
+        if (active) report('load all of this card', err)
       } finally {
         if (active) setLoading(false)
       }
     }
     loadDetails()
     return () => { active = false }
-  }, [cardId, activeWorkspace, setRelations])
+  }, [cardId, activeWorkspace, setRelations, report])
 
   /** last written state, compared to decide what to save */
   const savedRef = useRef<CardSnapshot | null>(null)
@@ -257,6 +259,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const updateMetadata = async (newMetaPatch: Record<string, unknown>) => {
     if (!card) return
     // built on disk, not the working copy
+    const before = { saved: savedMetaRef.current, latest: latestMetaRef.current, baseline: savedRef.current }
     const written = { ...savedMetaRef.current, ...newMetaPatch }
     const serialized = JSON.stringify(written)
     savedMetaRef.current = written
@@ -267,7 +270,15 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     // baseline moves so this doesn't read as unsaved
     if (savedRef.current) savedRef.current = { ...savedRef.current, metadata: serialized }
 
-    await onUpdate(card.id, { metadata: serialized })
+    try {
+      await onUpdate(card.id, { metadata: serialized })
+    } catch {
+      // the board has said why; the tick or comment goes back to how it was saved
+      savedMetaRef.current = before.saved
+      latestMetaRef.current = before.latest
+      savedRef.current = before.baseline
+      setCard(prev => prev ? { ...prev, metadata: JSON.stringify(before.latest) } : null)
+    }
   }
 
   /** cover and template flag wait for Save */

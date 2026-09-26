@@ -5,6 +5,7 @@ import type { GitCommit, GitStatusResult } from '../../../shared/types'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { readWorkspaceList } from '../lib/workspaceList'
 import * as gitApi from '../data/git'
+import { useFailureReport } from './ui/Toast'
 
 function formatGitDate(dateStr: string): string {
   if (!dateStr || dateStr === 'unknown') return dateStr
@@ -25,6 +26,7 @@ function formatGitDate(dateStr: string): string {
 
 export default function GitPanel() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const report = useFailureReport()
   const setView = useAppStore(s => s.setView)
 
   const [gitPath, setGitPath] = useState<string | null>(null)
@@ -101,7 +103,7 @@ export default function GitPanel() {
       setCopiedHash(hash)
       setTimeout(() => setCopiedHash(null), COPIED_FEEDBACK_MS)
     } catch (err) {
-      console.error('Failed to copy hash:', err)
+      report('copy the commit hash', err)
     }
   }
 

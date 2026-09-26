@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Sparkles, CheckCircle2, Layout, ArrowRight, Check, FileText, FileDown, X } from 'lucide-react'
 import { useAppStore } from '../../../store/appStore'
-import { useToast } from '../../ui/Toast'
+import { useToast, useFailureReport } from '../../ui/Toast'
 import type { AiPlanStep } from '../aiActionTypes'
 import { asArray, asObject, str } from '../aiActionTypes'
 import { faultTolerantParseJSON } from '../aiActionParse'
@@ -11,6 +11,7 @@ import { createItem } from '../../../data/items'
 import * as appApi from '../../../data/app'
 
 export default function CreatePlanActionBlock({ jsonString }: { jsonString: string }) {
+  const report = useFailureReport()
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setView = useAppStore(s => s.setView)
   const { toast } = useToast()
@@ -84,6 +85,8 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
 
   const handleCommit = async () => {
     let count = 0
+    let failed = 0
+    let lastError: unknown = null
     const context = activeWorkspace || 'default'
     const posBase = Date.now() // ascending positions keep plan order on the board
     for (const step of approvedSteps) {
@@ -98,9 +101,11 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
           due_at: null, metadata: '{}'
         }, [])
         count++
-      } catch (e) { console.warn('Failed to export plan step:', e) }
+      } catch (e) { failed++; lastError = e }
     }
     setExportedCount(count)
+    // once for the lot, a toast a step would bury the screen
+    if (failed > 0) report(`add ${failed} of the steps`, lastError)
     setPhase('committed')
     try { localStorage.setItem(planSignature + '_committed', '1') } catch {}
     window.dispatchEvent(new CustomEvent('kanban-refresh'))

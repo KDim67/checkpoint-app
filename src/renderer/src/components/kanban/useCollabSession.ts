@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
-import { useToast } from '../ui/Toast'
+import { useToast, useFailureReport } from '../ui/Toast'
 import { useConfirm, usePick } from '../ui/ConfirmDialog'
 import { describeImpact, type MergeImpact } from '@shared/boardMerge'
 import { authorLabel, DISPLAY_NAME_KEY, normalizeDisplayName } from '@shared/identity'
@@ -13,6 +13,7 @@ import * as appApi from '../../data/app'
 
 /** on the board, not the panel: the board needs write permission and the session outlives the panel */
 export function useCollabSession() {
+  const report = useFailureReport()
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const workspaceList = useAppStore(s => s.workspaceList)
   const setWorkspaceList = useAppStore(s => s.setWorkspaceList)
@@ -358,9 +359,9 @@ export function useCollabSession() {
     try {
       await collabCoordinatorRef.current?.setMode(mode)
     } catch (err) {
-      console.error('Failed to tell the peer about the mode change:', err)
+      report('tell the others about the change', err)
     }
-  }, [])
+  }, [report])
 
   useEffect(() => {
     return () => {

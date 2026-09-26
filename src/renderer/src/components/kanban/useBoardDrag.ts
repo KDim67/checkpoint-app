@@ -6,6 +6,7 @@ import { dropIndex, dropTargetAt, lastCardIn, positionForIndex, type CardBox, ty
 import { rebalancePositions, updateItem } from '../../data/items'
 import { canAimAtSlot } from './dropSlots'
 import type { BoardState } from './useBoardState'
+import { useFailureReport } from '../ui/Toast'
 
 /** columns, cards and each card's column, from board state: a col:: sortable read as a card sent drops to the end */
 interface DropGeometry {
@@ -18,6 +19,7 @@ interface DropGeometry {
 const EMPTY_ITEMS: Item[] = []
 
 export function useBoardDrag(boardState: BoardState) {
+  const report = useFailureReport()
   const {
     activeWorkspace, cards, setCards, columns, swimlanesEnabled, columnsRef, persistColumns,
     setActiveDragCard, setDropTarget, setDragHeight, searchQuery, filterPriority, filterTagId,
@@ -255,10 +257,10 @@ export function useBoardDrag(boardState: BoardState) {
         loadCards()
       }
     } catch (err) {
-      console.error('Failed to update card position:', err)
+      report('move the card', err)
       loadCards()
     }
-  }, [endDrag, isReadOnlyMode, cards, columns, cardsByColumn, swimlanesEnabled, setCards, columnsRef, persistColumns, activeWorkspace, loadCards])
+  }, [endDrag, isReadOnlyMode, cards, columns, cardsByColumn, swimlanesEnabled, setCards, columnsRef, persistColumns, activeWorkspace, loadCards, report])
 
 
   return {

@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import type { Item } from '../../../../shared/types'
+import { useFailureReport } from '../ui/Toast'
 import { bulkUpdateItems, createItem, deleteItem, updateItem } from '../../data/items'
 import { cardFromTemplate, isTemplateCard } from '../../../../shared/cardTemplates'
 import type { BoardState } from './useBoardState'
@@ -12,23 +13,30 @@ export function useBoardActions(boardState: BoardState) {
     selectedArchived, setSelectedArchived, setShowTemplateSelector, loadCards
   } = boardState
 
+  const report = useFailureReport()
+
   const handleCreateColumnSubmit = async (name: string, wipLimit: number | null, color?: string, colorMode?: 'header' | 'full', description?: string) => {
     const id = `col-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`
     const updatedCols = [...columnsRef.current, { id, name, wipLimit, color, colorMode, description }]
     try {
-      await persistColumns(updatedCols)
+      // the modal stays open with what was typed when the save fails
+      if (!(await persistColumns(updatedCols))) return
       setShowAddColModal(false)
       toast(`Column "${name}" created`)
     } catch (err) {
-      console.error('Failed to create column:', err)
+      report('create the column', err)
     }
   }
 
   const handleRenameColumn = useCallback(async (colId: string, newName: string, newWipLimit: number | null, color?: string, colorMode?: 'header' | 'full') => {
     const updatedCols = columnsRef.current.map(c => c.id === colId ? { ...c, name: newName, wipLimit: newWipLimit, color, colorMode } : c)
-    await persistColumns(updatedCols)
-    toast(`Column "${newName}" updated`)
-  }, [columnsRef, persistColumns, toast])
+    try {
+      if (!(await persistColumns(updatedCols))) return
+      toast(`Column "${newName}" updated`)
+    } catch (err) {
+      report('update the column', err)
+    }
+  }, [columnsRef, persistColumns, toast, report])
 
   const performDeleteColumn = useCallback(async (colId: string) => {
     // latest columns via ref, so two quick deletes don't write back a removed one
@@ -44,14 +52,15 @@ export function useBoardActions(boardState: BoardState) {
           patch: { status: fallbackColId }
         })
       }
-      await persistColumns(updatedCols)
+      const saved = await persistColumns(updatedCols)
       setPendingDeleteColId(null)
       loadCards()
-      toast(`Column "${colName}" deleted. Remaining cards moved.`)
+      if (saved) toast(`Column "${colName}" deleted. Remaining cards moved.`)
     } catch (err) {
-      console.error('Failed to delete column:', err)
+      report('delete the column', err)
+      loadCards()
     }
-  }, [columnsRef, cards, persistColumns, setPendingDeleteColId, loadCards, toast])
+  }, [columnsRef, cards, persistColumns, setPendingDeleteColId, loadCards, toast, report])
 
   const handleDeleteColumn = useCallback(async (colId: string) => {
     const cardsToMove = cards.filter(c => c.status === colId)
@@ -74,15 +83,16 @@ export function useBoardActions(boardState: BoardState) {
       loadCards()
       toast(`Archived all cards in column`)
     } catch (err) {
-      console.error(err)
+      report('archive the cards', err)
     }
-  }, [cards, loadCards, toast])
+  }, [cards, loadCards, toast, report])
 
   const handleArchiveColumn = useCallback(async (colId: string) => {
     const current = columnsRef.current
     const colToArchive = current.find(c => c.id === colId)
     if (!colToArchive) return
 
+    const before = { columns: current, archived: archivedColumnsRef.current }
     try {
       // one patch: separate writes could leave the column in neither list
       const updatedArchived = [...archivedColumnsRef.current, colToArchive]
@@ -91,13 +101,19 @@ export function useBoardActions(boardState: BoardState) {
       archivedColumnsRef.current = updatedArchived
       setColumns(updatedCols)
       setArchivedColumns(updatedArchived)
-      await persistConfig({ columns: updatedCols, archivedColumns: updatedArchived })
+      if (!(await persistConfig({ columns: updatedCols, archivedColumns: updatedArchived }))) {
+        columnsRef.current = before.columns
+        archivedColumnsRef.current = before.archived
+        setColumns(before.columns)
+        setArchivedColumns(before.archived)
+        return
+      }
       loadCards()
       toast(`Column "${colToArchive.name}" archived`)
     } catch (err) {
-      console.error(err)
+      report('archive the column', err)
     }
-  }, [columnsRef, archivedColumnsRef, setColumns, setArchivedColumns, persistConfig, loadCards, toast])
+  }, [columnsRef, archivedColumnsRef, setColumns, setArchivedColumns, persistConfig, loadCards, toast, report])
 
   const handleUpdateCardDetails = useCallback(async (id: string, patch: Partial<Item>, tagIds?: string[]) => {
     try {
@@ -114,9 +130,11 @@ export function useBoardActions(boardState: BoardState) {
       await updateItem(id, patch, tagIds)
       loadCards()
     } catch (err) {
-      console.error('Failed to update card details:', err)
+      report('save the card', err)
+      loadCards()
+      throw err
     }
-  }, [setCards, loadCards, allTags])
+  }, [setCards, loadCards, allTags, report])
 
   const handleCardDelete = useCallback(async (id: string) => {
     try {
@@ -139,15 +157,15 @@ export function useBoardActions(boardState: BoardState) {
               })
               toast('Card restored')
             } catch (err) {
-              console.error('Failed to restore card:', err)
+              report('restore the card', err)
             }
           }
         }
       })
     } catch (err) {
-      console.error('Failed to delete card:', err)
+      report('archive the card', err)
     }
-  }, [cards, setCards, toast])
+  }, [cards, setCards, toast, report])
 
   const handleCardConvertToTask = useCallback(async (id: string) => {
     try {
@@ -156,9 +174,9 @@ export function useBoardActions(boardState: BoardState) {
       setCards(prev => prev.filter(c => c.id !== id))
       toast(`Card "${targetCard?.title}" converted to Backlog Task`)
     } catch (err) {
-      console.error('Failed to promote card to task:', err)
+      report('move the card to the backlog', err)
     }
-  }, [cards, setCards, toast])
+  }, [cards, setCards, toast, report])
 
   const handleAddCardToColumn = useCallback(async (columnId: string) => {
     try {
@@ -199,7 +217,7 @@ export function useBoardActions(boardState: BoardState) {
       setActiveCardId(created.id)
       toast(`Created card from template "${templateCard.title}"`)
     } catch (err) {
-      console.error('Failed to create card from template:', err)
+      report('create the card from the template', err)
     }
   }
 
@@ -207,6 +225,7 @@ export function useBoardActions(boardState: BoardState) {
     const colToRestore = archivedColumns.find(c => c.id === colId)
     if (!colToRestore) return
 
+    const before = { columns, archived: archivedColumns }
     try {
       // one patch, a half-failed restore left it in both lists
       const updatedCols = [...columns, colToRestore]
@@ -214,11 +233,15 @@ export function useBoardActions(boardState: BoardState) {
       columnsRef.current = updatedCols
       setColumns(updatedCols)
       setArchivedColumns(updatedArchived)
-      await persistConfig({ columns: updatedCols, archivedColumns: updatedArchived })
-
+      if (!(await persistConfig({ columns: updatedCols, archivedColumns: updatedArchived }))) {
+        columnsRef.current = before.columns
+        setColumns(before.columns)
+        setArchivedColumns(before.archived)
+        return
+      }
       toast(`Column "${colToRestore.name}" restored`)
     } catch (err) {
-      console.error(err)
+      report('restore the column', err)
     }
   }
 
@@ -231,13 +254,17 @@ export function useBoardActions(boardState: BoardState) {
       isDestructive: true
     })
     if (confirmed) {
+      const before = archivedColumns
       try {
         const updatedArchived = archivedColumns.filter(c => c.id !== colId)
         setArchivedColumns(updatedArchived)
-        await persistConfig({ archivedColumns: updatedArchived })
+        if (!(await persistConfig({ archivedColumns: updatedArchived }))) {
+          setArchivedColumns(before)
+          return
+        }
         toast(`List "${colName}" deleted permanently`)
       } catch (err) {
-        console.error(err)
+        report('delete the list', err)
       }
     }
   }
@@ -261,7 +288,7 @@ export function useBoardActions(boardState: BoardState) {
       loadCards()
       toast(`Card "${targetCard.title}" restored`)
     } catch (err) {
-      console.error(err)
+      report('restore the card', err)
     }
   }
 
@@ -281,8 +308,8 @@ export function useBoardActions(boardState: BoardState) {
       setSelectedArchived(new Set())
       toast(`${ids.length} card${ids.length > 1 ? 's' : ''} deleted permanently`)
     } catch (err) {
-      console.error(err)
-      toast('Failed to delete some cards', { type: 'error' })
+      report('delete every card', err)
+      loadCards()
     }
   }
 
@@ -304,8 +331,8 @@ export function useBoardActions(boardState: BoardState) {
       loadCards()
       toast(`${ids.length} card${ids.length > 1 ? 's' : ''} restored`)
     } catch (err) {
-      console.error(err)
-      toast('Failed to restore some cards', { type: 'error' })
+      report('restore every card', err)
+      loadCards()
     }
   }
 
@@ -323,7 +350,7 @@ export function useBoardActions(boardState: BoardState) {
         setSelectedArchived(prev => { const n = new Set(prev); n.delete(card.id); return n })
         toast('Card deleted permanently')
       } catch (err) {
-        console.error(err)
+        report('delete the card', err)
       }
     }
   }

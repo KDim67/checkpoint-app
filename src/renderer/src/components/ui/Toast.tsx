@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { TOAST_DISMISS_MS } from '../../lib/timings'
+import { errorMessage } from '../../../../shared/errors'
 
 export interface ToastAction {
   label: string
@@ -167,4 +168,19 @@ export function useToast() {
     throw new Error('useToast must be used within a ToastProvider')
   }
   return context
+}
+
+/**
+ * says a failed action out loud, as "Could not <what>: <reason>", and logs it; a failure only in the
+ * console looked like success. Stable, so effects can list it without running again
+ */
+export function useFailureReport(): (what: string, err: unknown) => void {
+  // a window without toasts, the tray or a widget, still logs instead of crashing
+  const toast = useContext(ToastContext)?.toast
+  const toastRef = useRef(toast)
+  toastRef.current = toast
+  return useCallback((what: string, err: unknown) => {
+    console.error(`Failed to ${what}:`, err)
+    toastRef.current?.(`Could not ${what}: ${errorMessage(err)}`, { type: 'error' })
+  }, [])
 }

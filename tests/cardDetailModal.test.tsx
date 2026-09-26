@@ -11,6 +11,9 @@ vi.mock('../src/renderer/src/data/items', () => ({ readItems: vi.fn(), searchIte
 vi.mock('../src/renderer/src/data/relations', () => ({ getRelations: vi.fn(), createRelation: vi.fn(), deleteRelation: vi.fn() }))
 vi.mock('../src/renderer/src/data/tags', () => ({ listTags: vi.fn(), createTag: vi.fn(), deleteTag: vi.fn(), recolourTag: vi.fn() }))
 vi.mock('../src/renderer/src/data/settings', () => ({ getSetting: vi.fn(async () => null), setSetting: vi.fn(async () => {}) }))
+// one function for every render, as the real provider gives
+const report = vi.hoisted(() => vi.fn())
+vi.mock('../src/renderer/src/components/ui/Toast', () => ({ useFailureReport: () => report }))
 vi.mock('../src/renderer/src/data/app', () => ({ osUserName: () => 'dimitris', getPathForFile: () => '' }))
 // rewind never settles, keeps its streams out of the way
 vi.mock('../src/renderer/src/lib/rewind', () => ({ loadRewind: () => new Promise(() => {}) }))

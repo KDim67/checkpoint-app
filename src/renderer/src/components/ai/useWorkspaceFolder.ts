@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WorkspaceFileInfo } from './types'
 import * as workspaceApi from '../../data/workspaceFolder'
+import { useFailureReport } from '../ui/Toast'
 
 const STORAGE_KEY_WORKSPACE_FOLDER = 'checkpoint_ai_workspace_folder'
 
 export function useWorkspaceFolder() {
+  const report = useFailureReport()
   const [workspaceFolder, setWorkspaceFolder] = useState<string | null>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY_WORKSPACE_FOLDER) || null
@@ -41,7 +43,7 @@ export function useWorkspaceFolder() {
       const files = await workspaceApi.getStructure(folder)
       setWorkspaceFiles(files || [])
     } catch (err) {
-      console.warn('Failed to import workspace folder:', err)
+      report('read the folder', err)
     } finally {
       setWorkspaceIndexing(false)
     }

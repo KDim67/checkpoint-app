@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import type { Item, Relation, RelationType } from '@shared/types'
 import { searchItems } from '../../data/items'
 import { createRelation, deleteRelation, getRelations } from '../../data/relations'
+import { useFailureReport } from './Toast'
 
 /** held by the item's view, the panel unmounts on reload */
 export function useItemRelations(itemId: string, owner: Item | null, activeWorkspace: string) {
   const [relations, setRelations] = useState<Relation[]>([])
+  const report = useFailureReport()
   const [relationSearchQuery, setRelationSearchQuery] = useState('')
   const [relationSearchResults, setRelationSearchResults] = useState<Item[]>([])
   const [selectedRelationType, setSelectedRelationType] = useState<RelationType>('relates_to')
@@ -25,12 +27,12 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
         // can't link to itself
         setRelationSearchResults(res.items.filter(i => i.id !== itemId))
       } catch (err) {
-        console.error('Failed to search items for relations:', err)
+        report('search for items to link', err)
       }
     }, 300)
 
     return () => clearTimeout(delayDebounceFn)
-  }, [relationSearchQuery, itemId, activeWorkspace])
+  }, [relationSearchQuery, itemId, activeWorkspace, report])
 
   const add = async (targetId: string) => {
     if (!owner) return
@@ -41,7 +43,7 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
       setRelationSearchQuery('')
       setRelationSearchResults([])
     } catch (err) {
-      console.error('Failed to create relation:', err)
+      report('link the items', err)
     }
   }
 
@@ -50,7 +52,7 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
       await deleteRelation(relationId)
       setRelations(prev => prev.filter(r => r.id !== relationId))
     } catch (err) {
-      console.error('Failed to delete relation:', err)
+      report('remove the link', err)
     }
   }
 

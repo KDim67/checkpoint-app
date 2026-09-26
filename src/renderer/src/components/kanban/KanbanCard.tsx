@@ -145,6 +145,15 @@ function CardFace({
   const showChecklist = display.checklist && totalChecklist > 0
   const showTemplate = display.template && isTemplate
 
+  /** the board says why a save failed, so a shortcut here only has to not throw */
+  const save = async (patch: Partial<Item>): Promise<void> => {
+    try {
+      await onUpdate?.(card.id, patch)
+    } catch {
+      // already reported
+    }
+  }
+
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) return
 
@@ -175,7 +184,7 @@ function CardFace({
       const nextVal = !dueDateCompleted
       const updatedMeta = { ...meta, dueDateCompleted: nextVal }
       if (onUpdate) {
-        await onUpdate(card.id, { metadata: JSON.stringify(updatedMeta) })
+        await save({ metadata: JSON.stringify(updatedMeta) })
       }
       return
     }
@@ -185,7 +194,7 @@ function CardFace({
       const nextVal = !isTemplate
       const updatedMeta = { ...meta, isTemplate: nextVal }
       if (onUpdate) {
-        await onUpdate(card.id, { metadata: JSON.stringify(updatedMeta) })
+        await save({ metadata: JSON.stringify(updatedMeta) })
       }
       return
     }
@@ -208,7 +217,7 @@ function CardFace({
         } else {
           nextMeta.prevStatus = card.status
         }
-        await onUpdate(card.id, {
+        await save({
           status: newStatus,
           metadata: JSON.stringify(nextMeta)
         })
@@ -280,7 +289,7 @@ function CardFace({
                     } else {
                       nextMeta.prevStatus = card.status
                     }
-                    await onUpdate(card.id, {
+                    await save({
                       status: newStatus,
                       metadata: JSON.stringify(nextMeta)
                     })

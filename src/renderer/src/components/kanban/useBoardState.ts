@@ -6,6 +6,7 @@ import { useAppStore } from '../../store/appStore'
 import type { Item } from '../../../../shared/types'
 import { useConfirm } from '../ui/ConfirmDialog'
 import { useToast } from '../ui/Toast'
+import { errorMessage } from '../../../../shared/errors'
 import { loadBoardConfig, patchBoardConfig, DEFAULT_CARD_DISPLAY, type BoardConfig, type CardDisplay, type ColumnConfig, type ColumnSort } from '../../lib/boardConfig'
 import type { DropTarget } from '../../../../shared/cardDrop'
 import { listTags } from '../../data/tags'
@@ -53,27 +54,37 @@ export function useBoardState() {
   /** a ref, written during render so it's never a frame behind the permission */
   const readOnlyRef = useRef(false)
 
-  const persistColumns = useCallback(async (next: ColumnConfig[]): Promise<void> => {
+  /** true once saved; a failure says so and puts the columns back, so the screen never shows what isn't on disk */
+  const persistColumns = useCallback(async (next: ColumnConfig[]): Promise<boolean> => {
     // the board doc travels between peers, a read-only guest can't change it
-    if (readOnlyRef.current) return
+    if (readOnlyRef.current) return false
+    const before = columnsRef.current
     columnsRef.current = next
     setColumns(next)
     try {
       await patchBoardConfig(activeWorkspace, { columns: next })
+      return true
     } catch (err) {
       console.error('Failed to persist columns:', err)
+      columnsRef.current = before
+      setColumns(before)
+      toast(`Could not save the columns: ${errorMessage(err)}`, { type: 'error' })
+      return false
     }
-  }, [activeWorkspace])
+  }, [activeWorkspace, toast])
 
-  /** state is set by the caller */
-  const persistConfig = useCallback(async (patch: Partial<BoardConfig>): Promise<void> => {
-    if (readOnlyRef.current) return
+  /** state is set by the caller, which puts it back when this answers false; the failure is said here */
+  const persistConfig = useCallback(async (patch: Partial<BoardConfig>): Promise<boolean> => {
+    if (readOnlyRef.current) return false
     try {
       await patchBoardConfig(activeWorkspace, patch)
+      return true
     } catch (err) {
       console.error('Failed to persist board config:', err)
+      toast(`Could not save the board: ${errorMessage(err)}`, { type: 'error' })
+      return false
     }
-  }, [activeWorkspace])
+  }, [activeWorkspace, toast])
 
   const updateColumn = useCallback((colId: string, patch: Partial<ColumnConfig>): void => {
     const next = columnsRef.current.map(c => (c.id === colId ? { ...c, ...patch } : c))
@@ -161,16 +172,18 @@ export function useBoardState() {
       setCardDisplay(config.cardDisplay)
     } catch (err) {
       console.error('Failed to load Kanban column settings:', err)
+      toast(`Could not load the board's columns: ${errorMessage(err)}`, { type: 'error' })
     }
-  }, [activeWorkspace, setBoardBg])
+  }, [activeWorkspace, setBoardBg, toast])
 
   const loadCards = useCallback(async () => {
     try {
       setCards(await readItems(activeWorkspace, 'card'))
     } catch (err) {
       console.error('Failed to load Kanban cards:', err)
+      toast(`Could not load the cards: ${errorMessage(err)}`, { type: 'error' })
     }
-  }, [activeWorkspace])
+  }, [activeWorkspace, toast])
 
   const loadTags = useCallback(async () => {
     try {
@@ -178,8 +191,9 @@ export function useBoardState() {
       setAllTags(tags)
     } catch (err) {
       console.error('Failed to load tags:', err)
+      toast(`Could not load the tags: ${errorMessage(err)}`, { type: 'error' })
     }
-  }, [])
+  }, [toast])
 
   const initializeBoard = useCallback(async () => {
     setLoading(true)

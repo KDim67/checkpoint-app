@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import type { Message, SavedChat } from './types'
+import { useFailureReport } from '../ui/Toast'
 
 const STORAGE_KEY_SAVED_CHATS = 'checkpoint_ai_saved_chats'
 
 export function useSavedChats(messages: Message[]) {
+  const report = useFailureReport()
   const [savedChats, setSavedChats] = useState<SavedChat[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SAVED_CHATS)
@@ -50,11 +52,12 @@ export function useSavedChats(messages: Message[]) {
       try {
         localStorage.setItem(STORAGE_KEY_SAVED_CHATS, JSON.stringify(capped))
       } catch (e) {
-        console.warn('Failed to persist saved chats:', e)
+        // usually a full storage: the chat would be gone on the next start
+        report('keep the saved chat', e)
       }
       return capped
     })
-  }, [messages, currentChatId])
+  }, [messages, currentChatId, report])
 
   const removeChat = (id: string) => {
     const updated = savedChats.filter(c => c.id !== id)

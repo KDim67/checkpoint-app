@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { loadBoardConfig, patchBoardConfig, type ColumnConfig } from '../../lib/boardConfig'
+import { useFailureReport } from '../ui/Toast'
 
 // per-context column config
 export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: string }) {
+  const report = useFailureReport()
   const [columns, setColumns] = useState<ColumnConfig[]>([])
   const [loading, setLoading] = useState(true)
   // unsaved name edits kept apart
@@ -16,11 +18,11 @@ export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: s
         const config = await loadBoardConfig(activeWorkspace)
         setColumns(config.columns)
         setLocalNames(Object.fromEntries(config.columns.map(c => [c.id, c.name])))
-      } catch (err) { console.error(err) }
+      } catch (err) { report('load the board columns', err) }
       setLoading(false)
     }
     load()
-  }, [activeWorkspace])
+  }, [activeWorkspace, report])
 
   const save = async (updated: ColumnConfig[]) => {
     await patchBoardConfig(activeWorkspace, { columns: updated })

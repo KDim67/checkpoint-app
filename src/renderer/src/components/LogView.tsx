@@ -6,7 +6,7 @@ import { useAiEnabled } from '../lib/useAiEnabled'
 import type { Item } from '../../../shared/types'
 import Skeleton from './ui/Skeleton'
 import EmptyState from './ui/EmptyState'
-import { useToast } from './ui/Toast'
+import { useToast, useFailureReport } from './ui/Toast'
 import { FileText } from 'lucide-react'
 import StandupTranslatorView from './StandupTranslatorView'
 import { createItem, itemPage, updateItem } from '../data/items'
@@ -42,6 +42,7 @@ export default function LogView() {
   }, [dropdownOpen])
 
   const { toast } = useToast()
+  const report = useFailureReport()
 
   const loadInitialFeed = useCallback(async () => {
     setLoading(true)
@@ -56,11 +57,11 @@ export default function LogView() {
       // a full page (50) means there may be more
       setHasMore(res.items.length === 50)
     } catch (err) {
-      console.error('Failed to load initial log feed:', err)
+      report('load the log', err)
     } finally {
       setLoading(false)
     }
-  }, [activeWorkspace])
+  }, [activeWorkspace, report])
 
   useEffect(() => {
     loadInitialFeed()
@@ -87,9 +88,9 @@ export default function LogView() {
       
       setHasMore(res.items.length === 50 && items.length + res.items.length < res.total)
     } catch (err) {
-      console.error('Failed to load more logs:', err)
+      report('load older entries', err)
     }
-  }, [activeWorkspace, page, items.length])
+  }, [activeWorkspace, page, items.length, report])
 
   const handleSubmitLog = async (body: string, tagIds: string[]) => {
     try {
@@ -109,7 +110,7 @@ export default function LogView() {
       // newest at the bottom
       setItems(prev => [...prev, newItem])
     } catch (err) {
-      console.error('Failed to create log entry:', err)
+      report('add the entry', err)
     }
   }
 
@@ -121,7 +122,7 @@ export default function LogView() {
       setItems(prev => prev.map(item => item.id === id ? { ...item, priority: newPriority } : item))
       toast(newPriority === 3 ? 'Log entry pinned to top' : 'Log entry unpinned')
     } catch (err) {
-      console.error('Failed to toggle log pin:', err)
+      report('change the pin', err)
     }
   }
 
@@ -147,13 +148,13 @@ export default function LogView() {
               })
               toast('Log entry restored')
             } catch (err) {
-              console.error('Failed to restore log entry:', err)
+              report('bring the entry back', err)
             }
           }
         }
       })
     } catch (err) {
-      console.error('Failed to soft delete log:', err)
+      report('delete the entry', err)
     }
   }
 
@@ -168,7 +169,7 @@ export default function LogView() {
       setItems(prev => prev.filter(item => item.id !== id))
       toast(`Promoted to Kanban Card: "${title}"`)
     } catch (err) {
-      console.error('Failed to promote log to card:', err)
+      report('make a card from the entry', err)
     }
   }
 
