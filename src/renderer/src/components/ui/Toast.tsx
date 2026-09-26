@@ -86,7 +86,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           bottom: 'var(--space-6)',
           left: '50%',
           transform: 'translateX(-50%)',
-          zIndex: 9999,
+          zIndex: 'var(--z-float)',
           display: 'flex',
           flexDirection: 'column',
           gap: 'var(--space-2)',

@@ -77,7 +77,7 @@ export default function PalettePanel({
               borderRadius: '4px',
               boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)'
             }} />
-            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', marginTop: '4px', color: 'var(--color-text-muted)' }}>
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', marginTop: '4px', color: 'var(--color-text-muted)' }}>
               {col.toUpperCase()}
             </span>
             <button
@@ -95,7 +95,7 @@ export default function PalettePanel({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '9px',
+                fontSize: '10px',
                 cursor: 'pointer'
               }}
             >

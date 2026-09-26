@@ -58,7 +58,7 @@ export default function WallContextMenu({ x, y, entries, onClose }: Props) {
         left: `${pos.x}px`,
         top: `${pos.y}px`,
         width: `${WIDTH}px`,
-        zIndex: 9999,
+        zIndex: 'var(--z-float)',
         background: 'var(--color-surface-elevated)',
         border: '1px solid var(--color-surface-offset)',
         borderRadius: 'var(--radius-md)',
@@ -90,7 +90,7 @@ export default function WallContextMenu({ x, y, entries, onClose }: Props) {
                 padding: '6px var(--space-2)',
                 borderRadius: 'var(--radius-sm)',
                 cursor: entry.disabled ? 'not-allowed' : 'pointer',
-                opacity: entry.disabled ? 0.4 : 1,
+                opacity: entry.disabled ? 'var(--opacity-disabled)' : 1,
                 fontSize: 'var(--text-xs)',
                 color: entry.destructive ? 'var(--color-error)' : 'var(--color-text-base)'
               }}

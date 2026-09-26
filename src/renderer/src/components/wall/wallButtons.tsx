@@ -353,7 +353,7 @@ export const toolButton = (
       width: '30px', height: '30px',
       background: opts.active ? 'var(--color-secondary-muted)' : undefined,
       color: opts.active ? 'var(--color-secondary)' : undefined,
-      opacity: opts.disabled ? 0.4 : 1,
+      opacity: opts.disabled ? 'var(--opacity-disabled)' : 1,
       cursor: opts.disabled ? 'not-allowed' : 'pointer'
     }}
   >

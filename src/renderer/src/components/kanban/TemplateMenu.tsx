@@ -53,7 +53,7 @@ export default function TemplateMenu({ templates, open, setOpen, onPick }: Templ
             padding: '4px 0'
           }}
         >
-          <span style={{ display: 'block', fontSize: '9px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', padding: '6px 12px 4px' }}>
+          <span style={{ display: 'block', fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', padding: '6px 12px 4px' }}>
             Select Template
           </span>
           {templates.map(tc => (

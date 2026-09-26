@@ -168,7 +168,7 @@ export default function CollabPresenceRoster({
                   width: '8px',
                   height: '8px',
                   borderRadius: '50%',
-                  background: '#10b981',
+                  background: 'var(--color-success)',
                   border: '1.5px solid var(--color-surface-elevated, #24292e)'
                 }}
                 title="Currently Auto-Following"

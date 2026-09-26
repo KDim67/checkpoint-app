@@ -741,7 +741,7 @@ export default function BacklogTable({
                       </div>
                       <span
                         style={{
-                          fontSize: '9px',
+                          fontSize: '10px',
                           color: 'var(--color-text-faint)',
                           fontWeight: 'var(--weight-normal)',
                           textTransform: 'none',

@@ -201,7 +201,7 @@ export function ToggleSwitch({
         position: 'relative',
         transition: 'background 150ms ease',
         flexShrink: 0,
-        opacity: disabled ? 0.5 : 1
+        opacity: disabled ? 'var(--opacity-disabled)' : 1
       }}
     >
       <div style={{

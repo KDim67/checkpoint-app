@@ -182,7 +182,7 @@ export default function TrayPanel(): React.JSX.Element {
 
       <div style={{ padding: '0 var(--space-3-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <span style={{
-          fontSize: '9px', fontWeight: 'var(--weight-bold)',
+          fontSize: '10px', fontWeight: 'var(--weight-bold)',
           color: 'var(--color-text-faint)', textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wider)'
         }}>
@@ -197,7 +197,7 @@ export default function TrayPanel(): React.JSX.Element {
               key={key}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: 'var(--space-3)', opacity: disabled ? 0.45 : 1
+                gap: 'var(--space-3)', opacity: disabled ? 'var(--opacity-disabled)' : 1
               }}
             >
               <div className="min-w-0">

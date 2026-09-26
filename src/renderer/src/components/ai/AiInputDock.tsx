@@ -143,16 +143,16 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
             marginLeft: 'auto', flexShrink: 0
           }}
         >
-          <Gauge size={11} style={{ color: tokenUsage.ratio > 0.85 ? '#ef4444' : tokenUsage.ratio > 0.6 ? '#eab308' : 'var(--color-text-faint)' }} />
+          <Gauge size={11} style={{ color: tokenUsage.ratio > 0.85 ? 'var(--color-error)' : tokenUsage.ratio > 0.6 ? 'var(--color-warning)' : 'var(--color-text-faint)' }} />
           <div style={{ width: '56px', height: '4px', borderRadius: '2px', background: 'var(--color-surface-offset)', overflow: 'hidden' }}>
             <div style={{
               width: `${Math.max(2, tokenUsage.ratio * 100)}%`,
               height: '100%',
-              background: tokenUsage.ratio > 0.85 ? '#ef4444' : tokenUsage.ratio > 0.6 ? '#eab308' : 'var(--color-secondary)',
+              background: tokenUsage.ratio > 0.85 ? 'var(--color-error)' : tokenUsage.ratio > 0.6 ? 'var(--color-warning)' : 'var(--color-secondary)',
               transition: 'width 200ms ease'
             }} />
           </div>
-          <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
             {Math.round(tokenUsage.ratio * 100)}%
           </span>
         </div>

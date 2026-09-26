@@ -845,7 +845,7 @@ export default function CheatsheetsView() {
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <FileType2 size={12} className="icon-accent" />
                         <span className="truncate">{hit.name.replace(/\.pdf$/i, '')}</span>
-                        <span style={{ fontSize: '9px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)', flexShrink: 0 }}>
+                        <span style={{ fontSize: '10px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)', flexShrink: 0 }}>
                           {hit.matchCount} match{hit.matchCount > 1 ? 'es' : ''}
                         </span>
                       </span>

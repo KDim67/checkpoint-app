@@ -151,8 +151,8 @@ export default function FocusRetro({ focusView }: { focusView: FocusViewState })
               title="Save this session and start a 5-minute break"
               style={{
                 fontSize: 'var(--text-xs)',
-                borderColor: longBreakDue ? 'var(--color-surface-offset)' : '#10b981',
-                color: longBreakDue ? 'var(--color-text-muted)' : '#10b981'
+                borderColor: longBreakDue ? 'var(--color-surface-offset)' : 'var(--color-success)',
+                color: longBreakDue ? 'var(--color-text-muted)' : 'var(--color-success)'
               }}
             >
               <Coffee size={14} /> Short Break · 5m

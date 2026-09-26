@@ -294,7 +294,7 @@ export default function BackupSettings() {
                               background: 'var(--color-surface-2)',
                               color: 'var(--color-text-muted)',
                               fontFamily: 'var(--font-sans)',
-                              fontSize: '9px',
+                              fontSize: '10px',
                               whiteSpace: 'nowrap'
                             }}
                           >

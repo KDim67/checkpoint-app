@@ -39,7 +39,7 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
       gap: '6px'
     }}>
       <span style={{
-        fontSize: '9px',
+        fontSize: '10px',
         fontWeight: 'var(--weight-bold)',
         color: 'var(--color-text-faint)',
         textTransform: 'uppercase'

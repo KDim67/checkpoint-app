@@ -104,11 +104,11 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
               <span style={{
-                fontSize: '9px', background: 'rgba(168,85,247,0.2)',
+                fontSize: '10px', background: 'rgba(168,85,247,0.2)',
                 border: '1px solid rgba(168,85,247,0.4)', color: 'var(--color-accent-ai-soft)',
                 padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold'
               }}>{n.speaker || 'NPC'}</span>
-              <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>id: {n.id}</span>
+              <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>id: {n.id}</span>
             </div>
             <div style={{ fontSize: '11px', color: '#e4e4e7', lineHeight: 1.5, marginBottom: Array.isArray(n.choices) && n.choices.length > 0 ? '6px' : '0' }}>
               &ldquo;{n.text}&rdquo;
@@ -117,14 +117,14 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 {n.choices.map((c, ci) => (
                   <span key={ci} style={{
-                    fontSize: '9px', background: 'rgba(168,85,247,0.1)',
+                    fontSize: '10px', background: 'rgba(168,85,247,0.1)',
                     color: 'var(--color-accent-ai-soft)', padding: '2px 7px', borderRadius: '4px',
                     border: '1px solid rgba(168,85,247,0.25)',
                     display: 'flex', alignItems: 'center', gap: '4px'
                   }}>
                     <span>{c.text}</span>
                     <ArrowRight size={8} style={{ opacity: 0.6 }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', color: '#a78bfa', fontSize: '8px' }}>{c.target}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: '#a78bfa', fontSize: '10px' }}>{c.target}</span>
                   </span>
                 ))}
               </div>

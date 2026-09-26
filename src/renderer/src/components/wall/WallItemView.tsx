@@ -127,7 +127,7 @@ function WallImageItem({
         <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)' }}>
           {item.text || 'Syncing image...'}
         </span>
-        <span style={{ fontSize: '9px', opacity: 0.7 }}>Transferring via WebRTC</span>
+        <span style={{ fontSize: '10px', opacity: 0.7 }}>Transferring via WebRTC</span>
       </div>
     )
   }
@@ -524,14 +524,14 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: 'auto' }}>
         <span style={{
-          fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em',
+          fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em',
           color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)'
         }}>
           {card.status}
         </span>
         {card.priority > 0 && (
           <span style={{
-            fontSize: '9px', padding: '1px 5px', borderRadius: '3px',
+            fontSize: '10px', padding: '1px 5px', borderRadius: '3px',
             background: 'var(--color-surface-offset)', color: 'var(--color-text-muted)'
           }}>
             {PRIORITY_LABEL[card.priority]}
@@ -539,7 +539,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         )}
         {(card.tags ?? []).slice(0, 2).map(t => (
           <span key={t.id} style={{
-            fontSize: '9px', padding: '1px 5px', borderRadius: '3px',
+            fontSize: '10px', padding: '1px 5px', borderRadius: '3px',
             background: `${t.color}22`, color: t.color
           }}>
             {t.name}

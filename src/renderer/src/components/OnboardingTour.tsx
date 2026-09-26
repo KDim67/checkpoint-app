@@ -200,7 +200,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
     : step.body
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9997 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-tour)' }}>
 
       {/* blocks clicks on the app, the box-shadow scrim paints but gets no pointer events */}
       <div aria-hidden="true" style={{ position: 'fixed', inset: 0 }} />

@@ -45,7 +45,7 @@ export default function StartupSettings(): React.JSX.Element {
         const disabled = option.needsTray && !settings.showTrayIcon
         return (
           <RowBetween key={option.key}>
-            <div style={{ opacity: disabled ? 0.5 : 1 }}>
+            <div style={{ opacity: disabled ? 'var(--opacity-disabled)' : 1 }}>
               <div className="text-item">
                 {option.label}
               </div>

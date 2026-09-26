@@ -225,7 +225,7 @@ function ActionButton({
         fontWeight: 'var(--weight-semibold)',
         cursor: disabled ? 'default' : 'pointer',
         transition: 'all 100ms ease',
-        opacity: disabled ? 0.5 : 1
+        opacity: disabled ? 'var(--opacity-disabled)' : 1
       }}
     >
       {children}

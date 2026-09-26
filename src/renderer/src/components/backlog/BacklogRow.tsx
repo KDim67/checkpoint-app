@@ -288,7 +288,7 @@ export default function BacklogRow({
               <span
                 key={t.id}
                 style={{
-                  fontSize: '9px',
+                  fontSize: '10px',
                   fontWeight: 'var(--weight-semibold)',
                   color: t.color,
                   background: `${t.color}15`,

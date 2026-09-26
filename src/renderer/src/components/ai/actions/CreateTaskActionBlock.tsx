@@ -190,7 +190,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
   }
 
 
-  const priorityColor = data.priority === 3 ? '#ef4444' : data.priority === 2 ? '#eab308' : 'var(--color-text-muted)'
+  const priorityColor = data.priority === 3 ? 'var(--color-priority-high)' : data.priority === 2 ? 'var(--color-priority-med)' : 'var(--color-text-muted)'
   const priorityLabel = data.priority === 3 ? 'High' : data.priority === 2 ? 'Medium' : 'Low'
 
   return (
@@ -268,7 +268,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
               <span
                 key={idx}
                 style={{
-                  fontSize: '9px',
+                  fontSize: '10px',
                   padding: '2px 6px',
                   borderRadius: '4px',
                   fontWeight: 'bold',

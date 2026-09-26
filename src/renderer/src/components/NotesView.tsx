@@ -399,7 +399,7 @@ export default function NotesView(): React.JSX.Element {
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 9998,
+            zIndex: 'var(--z-overlay)',
             background: 'rgba(0, 0, 0, 0.55)',
             display: 'flex',
             alignItems: 'center',
@@ -605,7 +605,7 @@ export default function NotesView(): React.JSX.Element {
                       <button key={link} onClick={() => handleOpenWikiLink(link)} className="notes-link-chip">
                         {!exists && <FileWarning size={11} className="icon-warning" />}
                         <span className="truncate">{link}</span>
-                        {!exists && <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>new</span>}
+                        {!exists && <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>new</span>}
                       </button>
                     )
                   })

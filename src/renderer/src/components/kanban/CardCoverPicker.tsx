@@ -96,7 +96,7 @@ export default function CardCoverPicker({ cover, onChange }: { cover: CardCover 
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--color-text-base)',
-                  fontSize: '9px'
+                  fontSize: '10px'
                 }}
                 title={color === 'none' ? 'No Cover' : color}
               >

@@ -195,7 +195,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }} ref={sortRef}>
-          <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
+          <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
             {searchQuery ? 'Search results' : 'Sorted by'}
           </span>
           {!searchQuery && (
@@ -294,7 +294,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
                   {note.tags.length > 0 && (
                     <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', overflow: 'hidden' }}>
                       {note.tags.slice(0, 3).map(tag => (
-                        <span key={tag} style={{ fontSize: '9px', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', padding: '0 5px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap' }}>
+                        <span key={tag} style={{ fontSize: '10px', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', padding: '0 5px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap' }}>
                           {tag.replace(/^#/, '')}
                         </span>
                       ))}
@@ -310,11 +310,11 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
       {allTags.length > 0 && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--color-surface-offset)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '180px', overflowY: 'auto', flexShrink: 0 }}>
           <div className="row-between">
-            <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
+            <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
               Filter by tag
             </span>
             {selectedTag && (
-              <button onClick={() => onSelectTag(null)} style={{ fontSize: '9px', background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 0 }}>
+              <button onClick={() => onSelectTag(null)} style={{ fontSize: '10px', background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 0 }}>
                 Clear
               </button>
             )}

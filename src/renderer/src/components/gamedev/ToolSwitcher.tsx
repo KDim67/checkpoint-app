@@ -131,7 +131,7 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
             {GAMEDEV_TOOLS.map(section => (
               <div key={section.group} style={{ marginBottom: 'var(--space-2)' }}>
                 <div style={{
-                  fontSize: '9px', fontWeight: 'var(--weight-bold)',
+                  fontSize: '10px', fontWeight: 'var(--weight-bold)',
                   textTransform: 'uppercase', letterSpacing: '0.07em',
                   color: 'var(--color-text-faint)', padding: '4px 10px'
                 }}>

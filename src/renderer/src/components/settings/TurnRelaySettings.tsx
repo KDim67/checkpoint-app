@@ -82,7 +82,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
           <span style={{
             padding: '1px 6px', borderRadius: 'var(--radius-full)',
             background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)',
-            fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em'
+            fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em'
           }}>
             in use
           </span>

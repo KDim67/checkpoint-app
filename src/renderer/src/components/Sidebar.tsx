@@ -645,7 +645,7 @@ export function Sidebar() {
             color: 'var(--color-text-base)',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
-            zIndex: 9999,
+            zIndex: 'var(--z-float)',
             boxShadow: 'var(--shadow-sm)',
             animation: 'tooltip-in 100ms var(--ease-enter)'
           }}

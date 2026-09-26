@@ -123,7 +123,7 @@ export default function CardAttachments({
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--color-secondary)',
-                      fontSize: '9px',
+                      fontSize: '10px',
                       cursor: 'pointer',
                       padding: '2px'
                     }}

@@ -48,7 +48,7 @@ export default function WallExportMenu({ open, setOpen, hasItems, hasSelection, 
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', width: '100%',
                 textAlign: 'left', border: 'none', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
-                cursor: option.disabled ? 'default' : 'pointer', opacity: option.disabled ? 0.5 : 1
+                cursor: option.disabled ? 'default' : 'pointer', opacity: option.disabled ? 'var(--opacity-disabled)' : 1
               }}
             >
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{option.label}</span>

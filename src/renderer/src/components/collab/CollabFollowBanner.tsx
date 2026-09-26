@@ -29,7 +29,7 @@ export default function CollabFollowBanner({ followingPeer, onStop }: CollabFoll
         top: '36px',
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 9999,
+        zIndex: 'var(--z-float)',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',

@@ -93,7 +93,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('presets')}
               style={{
                 padding: '4px 0',
-                fontSize: '9px',
+                fontSize: '10px',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -108,7 +108,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('solid')}
               style={{
                 padding: '4px 0',
-                fontSize: '9px',
+                fontSize: '10px',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -123,7 +123,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('gradient')}
               style={{
                 padding: '4px 0',
-                fontSize: '9px',
+                fontSize: '10px',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -138,7 +138,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('image')}
               style={{
                 padding: '4px 0',
-                fontSize: '9px',
+                fontSize: '10px',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -387,7 +387,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                               onClick={() => setCustomGradAngle(ang)}
                               style={{
                                 padding: '2px 0',
-                                fontSize: '9px',
+                                fontSize: '10px',
                                 borderRadius: '3px',
                                 border: '1px solid var(--color-surface-offset)',
                                 background: customGradAngle === ang ? 'var(--color-surface-offset)' : 'transparent',
@@ -463,12 +463,12 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               >
                 <Upload size={18} className="text-accent" />
                 <span>Upload Image from Computer</span>
-                <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>PNG, JPG, WEBP, GIF (Max 8MB)</span>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>PNG, JPG, WEBP, GIF (Max 8MB)</span>
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
                 <div className="rule-fill" />
-                <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>OR PASTE LINK</span>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>OR PASTE LINK</span>
                 <div className="rule-fill" />
               </div>
 
@@ -498,7 +498,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   overflow: 'hidden'
                 }}>
                   {/* white on its own black scrim, outside the theme */}
-                  <span style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '9px', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>Preview</span>
+                  <span style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '10px', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>Preview</span>
                 </div>
               )}
 

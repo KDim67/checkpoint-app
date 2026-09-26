@@ -187,7 +187,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         position: 'fixed',
         inset: 0,
         // above the right panel and every popover
-        zIndex: 9999,
+        zIndex: 'var(--z-float)',
         background: 'rgba(0, 0, 0, 0.45)',
         display: 'flex',
         alignItems: 'flex-start',

@@ -218,7 +218,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
           </div>
         ))}
         {showCards.map((c, i) => {
-          const pc = c.priority === 3 ? '#ef4444' : c.priority === 2 ? '#eab308' : '#3b82f6'
+          const pc = c.priority === 3 ? 'var(--color-priority-high)' : c.priority === 2 ? 'var(--color-priority-med)' : 'var(--color-priority-low)'
           const tags = asArray(c.tags)
           return (
             <div key={`k-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', paddingLeft: '2px', minWidth: 0 }}>
@@ -230,7 +230,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
                   if (!tn) return null
                   const tcol = tagColorOf(t, '#64748b')
                   return (
-                    <span key={ti} style={{ fontSize: '8px', color: tcol, border: `1px solid ${tcol}55`, background: `${tcol}18`, borderRadius: '6px', padding: '0 5px', whiteSpace: 'nowrap' }}>
+                    <span key={ti} style={{ fontSize: '10px', color: tcol, border: `1px solid ${tcol}55`, background: `${tcol}18`, borderRadius: '6px', padding: '0 5px', whiteSpace: 'nowrap' }}>
                       {tn.replace(/^#/, '')}
                     </span>
                   )

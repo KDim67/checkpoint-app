@@ -83,7 +83,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: 99999,
+        zIndex: 'var(--z-top)',
         background: 'rgba(7, 8, 10, 0.85)',
         backdropFilter: 'blur(8px)',
         display: 'flex',
@@ -111,7 +111,7 @@ export default function Lightbox({ src, onClose }: LightboxProps) {
           justifyContent: 'center',
           transition: 'all var(--duration-fast) var(--ease-default)',
           boxShadow: 'var(--shadow-lg)',
-          zIndex: 100000
+          zIndex: 'calc(var(--z-top) + 1)'
         }}
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

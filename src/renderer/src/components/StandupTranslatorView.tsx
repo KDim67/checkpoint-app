@@ -405,7 +405,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
         bottom: 0,
         background: 'rgba(7, 8, 12, 0.85)',
         backdropFilter: 'blur(10px)',
-        zIndex: 10000,
+        zIndex: 'var(--z-modal)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -712,7 +712,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                             <span style={{ fontSize: '11px', lineHeight: '16px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {log.title}
                             </span>
-                            <span style={{ fontSize: '9px', lineHeight: '16px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                            <span style={{ fontSize: '10px', lineHeight: '16px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                               {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
@@ -791,13 +791,13 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
               <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 Report Output
                 {streamingText && !isStreaming && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '9px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#22c55e' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#22c55e' }}>
                     <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-success)' }} />
                     Ready
                   </span>
                 )}
                 {isStreaming && streamingText && (
-                  <span style={{ fontSize: '9px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-secondary)' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-secondary)' }}>
                     Streaming…
                   </span>
                 )}

@@ -92,7 +92,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                       Memory Vault
                     </span>
                     {memoryConsolidating && (
-                      <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <RefreshCw size={9} className="animate-spin" />
                         Consolidating…
                       </span>
@@ -106,8 +106,8 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <div className="row-6px">
-                    <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
-                      Context: {activeWorkspace}
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
+                      Workspace: {activeWorkspace}
                     </span>
                     <span style={{ fontSize: '10px', color: 'var(--color-accent-ai)', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
                       {memories.length} memories
@@ -311,7 +311,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden', minWidth: 0 }}>
                           <span style={{
-                            fontSize: '9px',
+                            fontSize: '10px',
                             fontWeight: 'var(--weight-bold)',
                             flexShrink: 0,
                             letterSpacing: '0.04em',
@@ -424,7 +424,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                         </div>
                       )}
 
-                      <div style={{ fontSize: '9px', color: 'var(--color-text-faint)', display: 'flex', gap: '8px', paddingLeft: '2px' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', display: 'flex', gap: '8px', paddingLeft: '2px' }}>
                         <span>Recalled {mem.access_count}×</span>
                         <span>·</span>
                         <span>Updated {new Date(mem.updated_at).toLocaleDateString()}</span>
@@ -450,7 +450,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                     <span className="text-nano">{label}</span>
                   </div>
                 ))}
-                <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>
                   Auto-extracted after each AI response
                 </span>
               </div>

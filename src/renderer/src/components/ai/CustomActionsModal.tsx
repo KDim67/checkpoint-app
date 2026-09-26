@@ -64,7 +64,7 @@ export default function CustomActionsModal({ actions }: Props) {
                       <div className="row-6px">
                         <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{a.label}</span>
                         <span style={{
-                          fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', padding: '1px 6px', borderRadius: '6px',
+                          fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', padding: '1px 6px', borderRadius: '6px',
                           background: a.intent === 'create' ? 'rgba(205,241,43,0.12)' : 'rgba(59,130,246,0.12)',
                           color: a.intent === 'create' ? 'var(--color-secondary)' : '#60a5fa'
                         }}>
@@ -90,7 +90,7 @@ export default function CustomActionsModal({ actions }: Props) {
                 borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-3)',
                 display: 'flex', flexDirection: 'column', gap: '6px'
               }}>
-                <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>New quick action</span>
+                <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>New quick action</span>
                 <input
                   type="text"
                   value={caLabel}

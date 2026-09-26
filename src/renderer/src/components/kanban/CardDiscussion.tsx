@@ -87,12 +87,12 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
               <div className="row-between">
                 <strong style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>{authorLabel(c.user)}</strong>
                 <div className="row-6px">
-                  <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
                     {new Date(c.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                   </span>
                   <button
                     onClick={() => onDelete(c.id)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', fontSize: '9px', padding: 0 }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', fontSize: '10px', padding: 0 }}
                   >
                     delete
                   </button>
@@ -120,7 +120,7 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
                 {changeSentence(act)}
               </span>
               {act.at > 0 && (
-                <span style={{ fontSize: '8px', color: 'var(--color-text-faint)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
                   {new Date(act.at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                 </span>
               )}

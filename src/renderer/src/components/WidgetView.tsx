@@ -194,7 +194,7 @@ export default function WidgetView() {
             </div>
           </div>
           <div style={{
-            fontSize: '8px',
+            fontSize: '10px',
             fontWeight: 700,
             color: 'var(--color-text-muted)',
             textTransform: 'uppercase',
@@ -242,7 +242,7 @@ export default function WidgetView() {
             minWidth: 0
           }}>
             <span style={{
-              fontSize: '8px',
+              fontSize: '10px',
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',

@@ -34,7 +34,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 placeholder="Choose a Folder..."
               />
               {tool.atlasFolderPath && (
-                <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', overflowWrap: 'break-word' }}>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', overflowWrap: 'break-word' }}>
                   Path: {tool.atlasFolderPath}
                 </span>
               )}

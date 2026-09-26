@@ -270,7 +270,7 @@ export default function AnalyticsView() {
             </div>
 
             <div className="flex-4px">
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '9px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '10px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
                 <span>Sun</span>
                 <span>Tue</span>
                 <span>Thu</span>
@@ -854,7 +854,7 @@ export default function AnalyticsView() {
                 style={{
                   position: 'absolute',
                   left: `${header.colIndex * 12}px`,
-                  fontSize: '9px',
+                  fontSize: '10px',
                   color: 'var(--color-text-muted)',
                   whiteSpace: 'nowrap'
                 }}
@@ -865,7 +865,7 @@ export default function AnalyticsView() {
           </div>
 
           <div className="flex-4px">
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '9px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '10px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
               <span>Sun</span>
               <span>Tue</span>
               <span>Thu</span>
@@ -1123,7 +1123,7 @@ export default function AnalyticsView() {
                         y={barHeight - 8}
                         textAnchor="middle"
                         fill="var(--color-text-muted)"
-                        style={{ fontSize: '9px', textTransform: 'capitalize' }}
+                        style={{ fontSize: '10px', textTransform: 'capitalize' }}
                       >
                         {formatColumnLabel(d.column)}
                       </text>
@@ -1268,7 +1268,7 @@ export default function AnalyticsView() {
                   </div>
                   {session.context && (
                     <div style={{ fontSize: '10px', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Context: {session.context}
+                      Workspace: {session.context}
                     </div>
                   )}
                   {session.notes && (

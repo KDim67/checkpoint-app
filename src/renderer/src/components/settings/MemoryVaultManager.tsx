@@ -83,7 +83,7 @@ export default function MemoryVaultManager() {
         {memories.map(mem => (
           <div key={mem.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: '11px' }}>
             <div className="col-2px">
-              <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{mem.memory_key} <span style={{ fontSize: '9px', opacity: 0.6, color: 'var(--color-text-muted)' }}>({mem.category})</span></div>
+              <div style={{ fontWeight: 'bold', color: 'var(--color-secondary)' }}>{mem.memory_key} <span style={{ fontSize: '10px', opacity: 0.6, color: 'var(--color-text-muted)' }}>({mem.category})</span></div>
               <div className="text-base">{mem.content}</div>
             </div>
             <button onClick={() => handleDeleteMemory(mem.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>

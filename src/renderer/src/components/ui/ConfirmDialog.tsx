@@ -58,7 +58,7 @@ export default function ConfirmDialog({
         bottom: 0,
         background: 'rgba(0, 0, 0, 0.7)',
         backdropFilter: 'blur(4px)',
-        zIndex: 10000,
+        zIndex: 'var(--z-modal)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

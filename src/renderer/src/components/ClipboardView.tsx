@@ -344,7 +344,7 @@ export default function ClipboardView() {
                     <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: meta.accent, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
                   )}
                   <span style={{
-                    fontSize: '9px',
+                    fontSize: '10px',
                     fontWeight: 'var(--weight-bold)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
@@ -440,7 +440,7 @@ export default function ClipboardView() {
           </pre>
 
           <div className="row-between-gap">
-            <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
               {item.content.length.toLocaleString()} chars{lineCount > 1 ? ` · ${lineCount} lines` : ''}
             </span>
             {isLong && (
@@ -685,7 +685,7 @@ export default function ClipboardView() {
                 }}
               />
               <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <span style={{ marginRight: 'auto', fontSize: '9px', color: 'var(--color-text-faint)' }}>⌘/Ctrl+Enter to save</span>
+                <span style={{ marginRight: 'auto', fontSize: '10px', color: 'var(--color-text-faint)' }}>⌘/Ctrl+Enter to save</span>
                 <button
                   type="button"
                   onClick={() => setIsAdding(false)}

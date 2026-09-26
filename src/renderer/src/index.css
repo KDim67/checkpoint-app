@@ -51,7 +51,7 @@
   /* code blocks on the wall, one colour per kind of piece */
   --color-code-keyword:     #c792ea;
   --color-code-string:      #c3e88d;
-  --color-code-comment:     #7a83a8;
+  --color-code-comment:     #838cb0;
   --color-code-number:      #f78c6c;
   --color-code-function:    #82aaff;
   --color-code-type:        #ffcb6b;
@@ -116,11 +116,22 @@
   --gamedev-launcher-max: 1180px;
 
   /* border radius */
+  /* one look for unavailable, it used to range from 0.3 to 0.8 */
+  --opacity-disabled: 0.5;
+
   --radius-sm:   4px;
   --radius-md:   8px;
   --radius-lg:   12px;
   --radius-xl:   16px;
   --radius-full: 9999px;
+
+  /* the top of the stacking ladder, in the order these layers cover each other;
+     values under 1000 stay local to one component */
+  --z-tour:    1800;
+  --z-overlay: 1900;
+  --z-float:   2000;
+  --z-modal:   2100;
+  --z-top:     2200;
 
   /* elevation and shadow */
   --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.4);
@@ -203,11 +214,11 @@ html[data-theme="light"] {
 
   /* code darkened to read on the pale panel */
   --color-code-keyword:     #7c3aed;
-  --color-code-string:      #15803d;
+  --color-code-string:      #13753a;
   --color-code-comment:     #646c7e;
   --color-code-number:      #c2410c;
   --color-code-function:    #1d4ed8;
-  --color-code-type:        #a16207;
+  --color-code-type:        #925906;
   --color-code-attr:        #0e7490;
 
   /* text scale */

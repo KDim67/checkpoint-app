@@ -777,7 +777,7 @@ export default function BacklogView() {
                 background: 'var(--color-secondary)',
                 color: 'var(--color-text-inverted)',
                 borderRadius: 'var(--radius-full)',
-                fontSize: '9px',
+                fontSize: '10px',
                 fontWeight: 'bold',
                 minWidth: '16px',
                 height: '16px',

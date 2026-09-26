@@ -500,7 +500,7 @@ export default function ChatInput({
             gap: '2px'
           }}
         >
-          <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Slash Commands (/)
           </div>
           {filteredSlashCommands.map(cmd => (
@@ -556,7 +556,7 @@ export default function ChatInput({
           }}
         >
           {filteredCheatsheets.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-primary-soft)', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-primary-soft)', textTransform: 'uppercase' }}>
               Cheatsheets
             </div>
           )}
@@ -581,7 +581,7 @@ export default function ChatInput({
           ))}
 
           {filteredNotes.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-success-soft)', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-success-soft)', textTransform: 'uppercase' }}>
               Notes
             </div>
           )}
@@ -606,7 +606,7 @@ export default function ChatInput({
           ))}
 
           {filteredFiles.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-info)', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-info)', textTransform: 'uppercase' }}>
               Workspace Files
             </div>
           )}
@@ -626,7 +626,7 @@ export default function ChatInput({
               <FileCode size={13} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
               <div className="col-fill">
                 <span className="truncate">{f.name}</span>
-                <span style={{ fontSize: '9px', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
               </div>
               {attachedFiles.includes(f.relativePath) && (
                 <span className="text-accent-nano">Attached</span>
@@ -692,7 +692,7 @@ export default function ChatInput({
                 gap: '2px'
               }}
             >
-              <div style={{ padding: '4px 8px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                 AI Actions & Tools
               </div>
 
@@ -822,14 +822,14 @@ export default function ChatInput({
                 <>
                   <div className="rule" />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 8px 4px' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       My prompts
                     </span>
                     {onManageCustomActions && (
                       <button
                         onClick={() => { setShowPlusMenu(false); onManageCustomActions() }}
                         title="Add, edit or delete your saved prompts"
-                        style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9px' }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}
                       >
                         <Settings2 size={11} />
                         <span>Manage</span>
@@ -851,7 +851,7 @@ export default function ChatInput({
               )}
 
               <div className="rule" />
-              <div style={{ padding: '2px 8px 4px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ padding: '2px 8px 4px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Create on the board
               </div>
               {CREATE_ACTIONS.map(a => {
@@ -869,7 +869,7 @@ export default function ChatInput({
               })}
 
               <div className="rule" />
-              <div style={{ padding: '2px 8px 4px', fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ padding: '2px 8px 4px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Analyze &amp; advise
               </div>
               {ANALYZE_ACTIONS.map(a => {
@@ -1123,8 +1123,8 @@ export default function ChatInput({
           disabled={isStreaming}
           style={{
             background: isListening ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
-            border: isListening ? '1px solid #ef4444' : 'none',
-            color: isListening ? '#ef4444' : 'var(--color-text-muted)',
+            border: isListening ? '1px solid var(--color-error)' : 'none',
+            color: isListening ? 'var(--color-error)' : 'var(--color-text-muted)',
             borderRadius: 'var(--radius-md)',
             width: '28px',
             height: '28px',
