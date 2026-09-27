@@ -7,7 +7,7 @@ import { onThemeUpdate } from '../data/theme'
 const STYLE_ELEMENT_ID = 'user-theme'
 
 /** injects or replaces */
-function injectCustomCss(css: string): void {
+export function injectCustomCss(css: string): void {
   let el = document.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null
   if (!el) {
     el = document.createElement('style')
@@ -15,14 +15,21 @@ function injectCustomCss(css: string): void {
     document.head.appendChild(el)
   }
   el.textContent = css
+  if (css && css.trim().length > 0) {
+    document.documentElement.setAttribute('data-theme-custom', 'true')
+  } else {
+    document.documentElement.removeAttribute('data-theme-custom')
+  }
+  window.dispatchEvent(new CustomEvent('theme-mode-changed'))
 }
 
 /** resolve 'system' here, index.css keys light off an explicit attribute */
 export async function applyStoredTheme(): Promise<void> {
   try {
-    const [stored, css] = await Promise.all([
+    const [stored, css, engineEnabled] = await Promise.all([
       getSetting('app_theme').catch(() => null),
-      customizerApi.getCss().catch(() => '')
+      customizerApi.getCss().catch(() => ''),
+      customizerApi.getEngineState().catch(() => false)
     ])
 
     const resolved =
@@ -33,7 +40,11 @@ export async function applyStoredTheme(): Promise<void> {
           : 'dark'
     document.documentElement.setAttribute('data-theme', resolved)
 
-    if (css) injectCustomCss(css)
+    if (engineEnabled && css) {
+      injectCustomCss(css)
+    } else {
+      injectCustomCss('')
+    }
   } catch (err) {
     console.error('[theme] Could not apply the stored theme:', err)
   }

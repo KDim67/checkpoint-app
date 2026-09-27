@@ -67,6 +67,13 @@ export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
   }
 }
 
+export function buildCssVariablesString(vars: Record<string, string>): string {
+  const entries = Object.entries(vars)
+  if (entries.length === 0) return ''
+  const declarations = entries.map(([k, v]) => `  ${k}: ${v};`).join('\n')
+  return `:root {\n${declarations}\n}`
+}
+
 /** eight light, eight dark; Ink for OLED; tests hold 7:1 body, 4.5:1 accents */
 export const BUILT_IN_PRESETS: ThemePreset[] = [
   {

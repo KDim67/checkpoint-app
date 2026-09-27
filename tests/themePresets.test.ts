@@ -3,6 +3,7 @@ import {
   BUILT_IN_PRESETS,
   DEFAULT_THEME,
   THEME_VAR_NAMES,
+  buildCssVariablesString,
   createPreset,
   deriveThemeVars,
   normalizePreset,
@@ -229,5 +230,21 @@ describe('the shipped presets', () => {
       // icons are marks, 3:1 is their bar
       expect(worst('--color-balance'), `${p.name} idle icons`).toBeGreaterThanOrEqual(3)
     }
+  })
+})
+
+describe('buildCssVariablesString', () => {
+  it('returns empty string for empty vars', () => {
+    expect(buildCssVariablesString({})).toBe('')
+  })
+
+  it('formats CSS variables declarations under :root', () => {
+    const css = buildCssVariablesString({
+      '--color-background': '#112233',
+      '--color-text-base': '#ffffff'
+    })
+    expect(css).toContain(':root {')
+    expect(css).toContain('--color-background: #112233;')
+    expect(css).toContain('--color-text-base: #ffffff;')
   })
 })

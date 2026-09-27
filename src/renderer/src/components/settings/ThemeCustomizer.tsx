@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { ToggleSwitch, Divider } from './SettingsSection'
-import { useToast } from '../ui/Toast'
+import { useToast, useFailureReport } from '../ui/Toast'
 import ColorPicker from '../ui/ColorPicker'
 import ThemePresets from './ThemePresets'
 import {
@@ -35,6 +35,7 @@ const FONTS_OPTIONS = [
 
 export default function ThemeCustomizer() {
   const { toast } = useToast()
+  const report = useFailureReport()
   const [engineEnabled, setEngineEnabled] = useState(false)
   const [themeVars, setThemeVars] = useState<ThemeVariables>(DEFAULT_THEME)
 
@@ -54,16 +55,30 @@ export default function ThemeCustomizer() {
           setThemeVars(next)
         }
       } catch (err) {
-        console.error('Failed to load customizer state:', err)
+        report('load the theme customizer', err)
       }
     }
     load()
+  }, [report])
+
+  useEffect(() => {
+    const handleEngineChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ enabled: boolean }>).detail
+      if (typeof detail?.enabled === 'boolean') {
+        setEngineEnabled(detail.enabled)
+      } else {
+        customizerApi.getEngineState().then(setEngineEnabled).catch(() => {})
+      }
+    }
+    window.addEventListener('customizer-engine-changed', handleEngineChange)
+    return () => window.removeEventListener('customizer-engine-changed', handleEngineChange)
   }, [])
 
   const handleEngineToggle = async (checked: boolean) => {
     try {
       setEngineEnabled(checked)
       await customizerApi.toggleEngine(checked)
+      window.dispatchEvent(new CustomEvent('customizer-engine-changed', { detail: { enabled: checked } }))
       toast(checked ? 'Customization Engine activated' : 'Customization Engine deactivated')
     } catch (err) {
       console.error(err)
@@ -78,7 +93,7 @@ export default function ThemeCustomizer() {
     try {
       await customizerApi.updateTheme(deriveThemeVars(next))
     } catch (err) {
-      console.error(err)
+      report('apply the colours', err)
     }
   }
 
@@ -100,7 +115,7 @@ export default function ThemeCustomizer() {
         await customizerApi.updateTheme({})
         toast('Custom theme colors reset to default')
       } catch (err) {
-        console.error(err)
+        report('reset the colours', err)
       }
     } else {
       toast('Defaults restored (enable customization engine to apply)')

@@ -8,7 +8,8 @@ import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { CollabProvider } from './context/CollabContext'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
 import { applyFontSize } from './lib/fontScale'
-import { applyStoredTheme, watchTheme } from './lib/themeBoot'
+import { applyStoredTheme, watchTheme, injectCustomCss } from './lib/themeBoot'
+import { DEFAULT_THEME, deriveThemeVars, buildCssVariablesString } from '../../shared/themePresets'
 import Lightbox from './components/ui/Lightbox'
 import UpdateIndicator from './components/ui/UpdateIndicator'
 import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
@@ -80,35 +81,135 @@ function ViewSkeleton() {
   )
 }
 
+type ThemeMode = 'dark' | 'light' | 'custom'
+
 function ThemeToggle() {
-  const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
-    return (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+  const [mode, setMode] = React.useState<ThemeMode>(() => {
+    if (document.documentElement.getAttribute('data-theme-custom') === 'true') {
+      return 'custom'
+    }
+    const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+    return current
   })
 
-  // follow external theme changes so the icon never goes stale
+  // Follow external theme changes and engine state so the icon never goes stale
   React.useEffect(() => {
+    let cancelled = false
+
+    const checkMode = async () => {
+      try {
+        const engineEnabled = await customizerApi.getEngineState()
+        const userThemeEl = document.getElementById('user-theme')
+        const hasCustomCss = Boolean(
+          userThemeEl && userThemeEl.textContent && userThemeEl.textContent.trim().length > 0
+        )
+
+        if (cancelled) return
+
+        if (engineEnabled && hasCustomCss) {
+          document.documentElement.setAttribute('data-theme-custom', 'true')
+          setMode('custom')
+        } else {
+          document.documentElement.removeAttribute('data-theme-custom')
+          const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+          setMode(current)
+        }
+      } catch {
+        if (!cancelled) {
+          const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+          setMode(current)
+        }
+      }
+    }
+
+    checkMode()
+
     const observer = new MutationObserver(() => {
-      const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
-      setTheme(current)
+      if (document.documentElement.getAttribute('data-theme-custom') === 'true') {
+        setMode('custom')
+      } else {
+        const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+        setMode(current)
+      }
     })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    return () => observer.disconnect()
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-theme-custom']
+    })
+
+    const handleThemeModeChanged = () => {
+      checkMode()
+    }
+    window.addEventListener('theme-mode-changed', handleThemeModeChanged)
+    window.addEventListener('customizer-engine-changed', handleThemeModeChanged)
+
+    return () => {
+      cancelled = true
+      observer.disconnect()
+      window.removeEventListener('theme-mode-changed', handleThemeModeChanged)
+      window.removeEventListener('customizer-engine-changed', handleThemeModeChanged)
+    }
   }, [])
 
-  const toggleTheme = () => {
-    // read the live attribute, not state, so a double toggle can't desync
-    const current = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
-    const nextTheme = current === 'dark' ? 'light' : 'dark'
-    setTheme(nextTheme)
-    document.documentElement.setAttribute('data-theme', nextTheme)
-    // same key as the Settings page
-    setStringSetting('app_theme', nextTheme).catch(console.error)
+  /** one step at a time: a second click mid-switch used to run two cycles over each other */
+  const [switching, setSwitching] = React.useState(false)
+
+  const toggleTheme = async () => {
+    if (switching) return
+    const isCustom = document.documentElement.getAttribute('data-theme-custom') === 'true'
+    const currentAttr = (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark'
+    const currentMode: ThemeMode = isCustom ? 'custom' : currentAttr
+    setSwitching(true)
+
+    try {
+      if (currentMode === 'light') {
+        // the engine's own theme, made from the defaults the first time round
+        const stored = await customizerApi.getTheme().catch(() => ({}))
+        const hasStoredVars = stored && Object.keys(stored).length > 0
+        if (!hasStoredVars) await customizerApi.updateTheme(deriveThemeVars(DEFAULT_THEME))
+        await customizerApi.toggleEngine(true)
+
+        const saved = await customizerApi.getCss().catch(() => '')
+        const css = saved || buildCssVariablesString(hasStoredVars ? stored : deriveThemeVars(DEFAULT_THEME))
+        // a custom palette replaces the tokens, so it sits on the dark base; stored too, or a restart disagrees
+        document.documentElement.setAttribute('data-theme', 'dark')
+        await setStringSetting('app_theme', 'dark')
+        // sets data-theme-custom and announces the change itself
+        injectCustomCss(css)
+        setMode('custom')
+        window.dispatchEvent(new CustomEvent('customizer-engine-changed', { detail: { enabled: true } }))
+        return
+      }
+
+      const next: ThemeMode = currentMode === 'dark' ? 'light' : 'dark'
+      await customizerApi.toggleEngine(false)
+      injectCustomCss('')
+      document.documentElement.setAttribute('data-theme', next)
+      await setStringSetting('app_theme', next)
+      setMode(next)
+      window.dispatchEvent(new CustomEvent('customizer-engine-changed', { detail: { enabled: false } }))
+    } catch (err) {
+      // the engine state and the stored mode go together, so a failure leaves the theme as it was
+      console.error('[theme] Could not switch the theme:', err)
+    } finally {
+      setSwitching(false)
+    }
   }
+
+  const label =
+    mode === 'dark'
+      ? 'Night mode (click for Day mode)'
+      : mode === 'light'
+        ? 'Day mode (click for Custom theme)'
+        : 'Custom theme (click for Night mode)'
 
   return (
     <button
       onClick={toggleTheme}
-      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      aria-label={label}
+      title={label}
+      disabled={switching}
+      aria-busy={switching}
       className="bg-clear hover-bg-offset"
       style={{
         width: '28px',
@@ -117,21 +218,29 @@ function ThemeToggle() {
         alignItems: 'center',
         justifyContent: 'center',
         border: 'none',
-        cursor: 'pointer',
-        color: 'var(--color-text-muted)',
+        cursor: switching ? 'default' : 'pointer',
+        color: mode === 'custom' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
         borderRadius: 'var(--radius-sm)',
         transition: 'background var(--duration-fast) var(--ease-default), color var(--duration-fast) var(--ease-default)',
         WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion']
       }}
     >
-      {theme === 'dark' ? (
+      {mode === 'dark' ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        </svg>
+      ) : mode === 'light' ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
         </svg>
       ) : (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="4"/>
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+          <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+          <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+          <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+          <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
         </svg>
       )}
     </button>
