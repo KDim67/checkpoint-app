@@ -7,8 +7,9 @@ type ShortcutAction =
   | { kind: 'view'; view: ActiveView }
   | { kind: 'toggleAiPanel' }
   | { kind: 'openSettings' }
+  | { kind: 'openPalette' }
 
-interface AppShortcut {
+export interface AppShortcut {
   id: string
   label: string
   defaultCombo: string
@@ -30,7 +31,9 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   // eleventh view, out of digits: the key after 0 on the same row
   { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+-', action: { kind: 'view', view: 'gamedev' } },
   { id: 'toggle_ai_panel',  label: 'Toggle AI panel',   defaultCombo: 'Ctrl+L', action: { kind: 'toggleAiPanel' } },
-  { id: 'open_settings',    label: 'Open Settings',     defaultCombo: 'Ctrl+,', action: { kind: 'openSettings' } }
+  { id: 'open_settings',    label: 'Open Settings',     defaultCombo: 'Ctrl+,', action: { kind: 'openSettings' } },
+  // listed so the binder sees it taken; it was wired apart and the wall's link key fired with it
+  { id: 'open_palette',     label: 'Open the command palette', defaultCombo: 'Ctrl+K', action: { kind: 'openPalette' } }
 ]
 
 /** views never share the screen, so D can mean different things per view */
@@ -58,12 +61,12 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   { id: 'wall_tool_highlight',   label: 'Highlighter',             scope: 'wall',   defaultCombo: 'H' },
   { id: 'wall_tool_erase',       label: 'Eraser',                  scope: 'wall',   defaultCombo: 'E' },
   { id: 'wall_tool_lasso',       label: 'Lasso select',            scope: 'wall',   defaultCombo: 'L' },
-  // Delete took Ctrl+D, duplicate shifts one modifier; either slip is one undo away
-  { id: 'wall_duplicate',        label: 'Duplicate the selection', scope: 'wall',   defaultCombo: 'Ctrl+Shift+D' },
-  // Delete and Backspace still work, this is for people who'd rather not reach
-  { id: 'wall_delete',           label: 'Delete the selection',    scope: 'wall',   defaultCombo: 'Ctrl+D' },
-  // K for link, as in most editors
-  { id: 'wall_link',             label: 'Link the selected item',  scope: 'wall',   defaultCombo: 'Ctrl+K' },
+  // Ctrl+D duplicates in every other canvas app, so it does here
+  { id: 'wall_duplicate',        label: 'Duplicate the selection', scope: 'wall',   defaultCombo: 'Ctrl+D' },
+  // Delete and Backspace already remove; a second key is there for whoever wants one
+  { id: 'wall_delete',           label: 'Delete the selection',    scope: 'wall',   defaultCombo: '' },
+  // K for link as in most editors, with Shift since Ctrl+K is the palette everywhere
+  { id: 'wall_link',             label: 'Link the selected item',  scope: 'wall',   defaultCombo: 'Ctrl+Shift+K' },
   // Alt beside copy and paste, their styled cousins
   { id: 'wall_copy_style',       label: 'Copy style',              scope: 'wall',   defaultCombo: 'Ctrl+Alt+C' },
   { id: 'wall_paste_style',      label: 'Paste style',             scope: 'wall',   defaultCombo: 'Ctrl+Alt+V' },
@@ -187,6 +190,19 @@ export function shortcutClash(
 export async function saveBindings(bindings: ShortcutBindings): Promise<void> {
   await setStringSetting(SETTING_KEY, JSON.stringify(bindings))
   window.dispatchEvent(new CustomEvent('settings-update-shortcuts'))
+}
+
+/** the global a press means, if any; the palette opens from a text field too, unless the field took the key first */
+export function globalShortcutFor(e: KeyboardEvent, bindings: ShortcutBindings): AppShortcut | null {
+  const combo = comboFromEvent(e)
+  if (!combo) return null
+  // Cmd on a Mac reaches the palette the way Ctrl does elsewhere
+  const shortcut = APP_SHORTCUTS.find(s => bindings[s.id] && (bindings[s.id] === combo ||
+    (s.action.kind === 'openPalette' && bindings[s.id] === combo.replace(/^Cmd\+/, 'Ctrl+'))))
+  if (!shortcut) return null
+  // a note's editor makes Ctrl+K a link; any other field lets the palette have it
+  if (shortcut.action.kind === 'openPalette' ? e.defaultPrevented : isTypingTarget(e.target)) return null
+  return shortcut
 }
 
 /** same "Ctrl+Shift+V" format as the global binder */

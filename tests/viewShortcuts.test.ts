@@ -5,7 +5,9 @@ import {
   RESERVED_COMBOS,
   SCOPE_LABELS,
   commandForEvent,
+  defaultBindings,
   defaultViewBindings,
+  globalShortcutFor,
   isReservedCombo,
   shortcutClash,
   type ShortcutScope
@@ -19,8 +21,10 @@ const keyEvent = (init: Partial<KeyboardEvent> & { key: string }): KeyboardEvent
   ({ ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...init }) as KeyboardEvent
 
 describe('the view shortcut list', () => {
-  it('gives every command a binding', () => {
-    for (const shortcut of VIEW_SHORTCUTS) {
+  it('gives every command a binding, apart from a delete the Delete key already does', () => {
+    // unbound on purpose: a second delete key only tripped people expecting Ctrl+D to duplicate
+    const coveredByDelete = new Set(['wall_delete'])
+    for (const shortcut of VIEW_SHORTCUTS.filter(s => !coveredByDelete.has(s.id))) {
       expect(shortcut.defaultCombo, `${shortcut.label} has no default`).not.toBe('')
     }
   })
@@ -80,14 +84,18 @@ describe('the view shortcut list', () => {
     }
   })
 
-  it('does not put duplicate and delete on the same keys', () => {
+  it('duplicates on Ctrl+D as other canvas apps do, and never deletes on it', () => {
     // same selection, one is destructive
     const wall = Object.fromEntries(
       VIEW_SHORTCUTS.filter(s => s.scope === 'wall').map(s => [s.id, s.defaultCombo])
     )
-    expect(wall.wall_delete).toBeTruthy()
-    expect(wall.wall_duplicate).toBeTruthy()
-    expect(wall.wall_delete).not.toBe(wall.wall_duplicate)
+    expect(wall.wall_duplicate).toBe('Ctrl+D')
+    expect(wall.wall_delete).not.toBe('Ctrl+D')
+  })
+
+  it('leaves Ctrl+K to the command palette, which works from every view', () => {
+    expect(APP_SHORTCUTS.find(s => s.id === 'open_palette')?.defaultCombo).toBe('Ctrl+K')
+    expect(VIEW_SHORTCUTS.some(s => s.defaultCombo === 'Ctrl+K')).toBe(false)
   })
 
   it('hands back a binding for every id', () => {
@@ -178,5 +186,27 @@ describe('shortcutClash', () => {
 
   it('lets a global keep its own binding', () => {
     expect(shortcutClash('Ctrl+6', { id: 'view_wall', scope: 'global' }, app, view)).toBeNull()
+  })
+})
+
+describe('globalShortcutFor', () => {
+  const app = defaultBindings()
+  const press = (init: Partial<KeyboardEvent> & { key: string }, target?: Partial<HTMLElement>): KeyboardEvent =>
+    ({ ...keyEvent(init), target: target ?? null, defaultPrevented: false, ...init }) as KeyboardEvent
+  const field = { tagName: 'TEXTAREA', isContentEditable: false }
+
+  it('opens the palette on Ctrl+K anywhere, and on Cmd+K for a Mac', () => {
+    expect(globalShortcutFor(press({ key: 'k', ctrlKey: true }), app)?.id).toBe('open_palette')
+    expect(globalShortcutFor(press({ key: 'k', ctrlKey: true }, field), app)?.id).toBe('open_palette')
+    expect(globalShortcutFor(press({ key: 'k', metaKey: true }), app)?.id).toBe('open_palette')
+  })
+
+  it('leaves Ctrl+K to a field that took it first, the way a note makes it a link', () => {
+    expect(globalShortcutFor(press({ key: 'k', ctrlKey: true, defaultPrevented: true }, field), app)).toBeNull()
+  })
+
+  it('keeps the other globals out of text fields', () => {
+    expect(globalShortcutFor(press({ key: '2', ctrlKey: true }), app)?.id).toBe('view_kanban')
+    expect(globalShortcutFor(press({ key: '2', ctrlKey: true }, field), app)).toBeNull()
   })
 })

@@ -28,11 +28,9 @@ const ONBOARDING_SEEN_KEY = 'onboarding_seen'
 /** same palette as the workspace manager */
 const ONBOARDING_COLORS = ['#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 import {
-  APP_SHORTCUTS,
   loadBindings,
   defaultBindings,
-  comboFromEvent,
-  isTypingTarget,
+  globalShortcutFor,
   type ShortcutBindings
 } from './lib/shortcuts'
 import { readWorkspaceList, writeWorkspaceList } from './lib/workspaceList'
@@ -689,20 +687,9 @@ export default function App() {
     setWorkspace(slug)
   }, [setWorkspaceList, setAvailableWorkspaces, setWorkspace])
 
-  // renderer-bound, a global shortcut would steal Ctrl+K from other apps
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const isK = (typeof e.key === 'string' && e.key.toLowerCase() === 'k') || e.code === 'KeyK'
-      if ((e.ctrlKey || e.metaKey) && isK) {
-        e.preventDefault()
-        // not during the tour: it opened over the tour and one Escape closed both for good
-        if (showOnboarding) return
-        setPaletteOpen(open => !open)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [showOnboarding])
+  // read by the shortcut handler, which registers once
+  const showOnboardingRef = useRef(showOnboarding)
+  showOnboardingRef.current = showOnboarding
 
   // capture phase and swallows the click, so skip images standing in for a card, button or link
   useEffect(() => {
@@ -851,12 +838,7 @@ export default function App() {
 
     // matched against the user's bindings
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return
-      const combo = comboFromEvent(e)
-      if (!combo) return
-
-      const bindings = shortcutBindingsRef.current
-      const shortcut = APP_SHORTCUTS.find(s => bindings[s.id] && bindings[s.id] === combo)
+      const shortcut = globalShortcutFor(e, shortcutBindingsRef.current)
       if (!shortcut) return
 
       e.preventDefault()
@@ -869,6 +851,10 @@ export default function App() {
           break
         case 'openSettings':
           setView('settings')
+          break
+        case 'openPalette':
+          // not during the tour: it opened over the tour and one Escape closed both for good
+          if (!showOnboardingRef.current) setPaletteOpen(open => !open)
           break
       }
     }

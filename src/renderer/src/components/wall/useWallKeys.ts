@@ -58,6 +58,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // a global shortcut already acted on this press
+      if (e.defaultPrevented) return
       const el = document.activeElement
       // bare letters arm tools, typing "a" mustn't switch to arrow
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return

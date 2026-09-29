@@ -33,9 +33,9 @@ describe('the default shortcut scheme', () => {
     }
   })
 
-  it('keeps the two non-view shortcuts off the digit run', () => {
+  it('keeps the non-view shortcuts off the digit run', () => {
     const nonViews = APP_SHORTCUTS.filter(s => s.action.kind !== 'view')
-    expect(nonViews.map(s => s.defaultCombo)).toEqual(['Ctrl+L', 'Ctrl+,'])
+    expect(nonViews.map(s => s.defaultCombo)).toEqual(['Ctrl+L', 'Ctrl+,', 'Ctrl+K'])
   })
 
   it('hands back a binding for every id', () => {
