@@ -57,7 +57,7 @@ describe('CardDetailModal', () => {
     expect(screen.getByTitle('Close')).toBeTruthy()
 
     fireEvent.change(titleField(), { target: { value: '  Publish the release notes  ' } })
-    expect(screen.getByTitle('Close and discard the unsaved changes')).toBeTruthy()
+    expect(screen.getByTitle('Save and close')).toBeTruthy()
     await act(async () => { fireEvent.click(screen.getByTitle('Save changes (Ctrl+S)')) })
 
     expect(onUpdate).toHaveBeenCalledTimes(1)
@@ -131,6 +131,42 @@ describe('CardDetailModal', () => {
 
     expect(readItems).toHaveBeenCalledWith('default', 'card')
     expect(titleField().value).toBe('Draft the release notes')
+  })
+
+  it('keeps what was typed when it is closed with Escape, a click outside, or the close button', async () => {
+    for (const close of [
+      () => fireEvent.keyDown(document, { key: 'Escape' }),
+      () => fireEvent.click(screen.getByRole('dialog').parentElement as HTMLElement),
+      () => fireEvent.click(screen.getByTitle('Save and close'))
+    ]) {
+      const { onUpdate, onClose } = await openCard()
+      fireEvent.change(titleField(), { target: { value: 'Ship it' } })
+
+      await act(async () => { close() })
+
+      expect(onUpdate).toHaveBeenCalledTimes(1)
+      expect(onUpdate.mock.calls[0][1].title).toBe('Ship it')
+      expect(onClose).toHaveBeenCalledTimes(1)
+      cleanup()
+    }
+  })
+
+  it('stays open with the words still there when the save fails', async () => {
+    const onUpdate = vi.fn<Props['onUpdate']>(async () => { throw new Error('disk full') })
+    const { onClose } = await openCard({ onUpdate })
+    fireEvent.change(titleField(), { target: { value: 'Ship it' } })
+
+    await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(titleField().value).toBe('Ship it')
+  })
+
+  it('closes straight away when nothing changed', async () => {
+    const { onUpdate, onClose } = await openCard()
+    await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('closes when the card is no longer there', async () => {

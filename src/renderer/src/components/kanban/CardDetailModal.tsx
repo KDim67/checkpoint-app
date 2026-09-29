@@ -89,7 +89,9 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
 
   const titleInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useFocusTrap(!loading, titleInputRef)
-  useEscapeKey(onClose, true)
+  /** set below once the save exists; Escape, the backdrop and the close button all keep what was typed */
+  const closeRef = useRef<() => Promise<void>>(async () => onClose())
+  useEscapeKey(() => { void closeRef.current() }, true)
 
   const onCloseRef = useRef(onClose)
   useEffect(() => {
@@ -212,11 +214,13 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const handleSave = async () => {
+  /** true once nothing is left unwritten, false when the write failed or one is still running */
+  const handleSave = async (): Promise<boolean> => {
     const snapshot = current
     const baseline = savedRef.current
     // a real guard: the drawer blocks the mouse, not the keyboard
-    if (isReadOnly || !card || !edit || !edit.dirty || saving || !snapshot || !baseline) return
+    if (saving) return false
+    if (isReadOnly || !card || !edit || !edit.dirty || !snapshot || !baseline) return true
     setSaving(true)
     try {
       // history rides in the same metadata write, so an entry never describes a change that didn't land
@@ -243,13 +247,23 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
       savedRef.current = { ...written, title: write.patch.title ?? baseline.title }
       setCard(prev => prev ? { ...prev, ...write.patch } : null)
       if (write.patch.title) setTitle(write.patch.title)
+      return true
     } catch (err) {
+      // the board has already said why; staying open keeps the words on screen
       console.error('Failed to save the card:', err)
+      return false
     } finally {
       setSaving(false)
     }
   }
-  saveRef.current = handleSave
+  saveRef.current = async () => { await handleSave() }
+
+  /** closing saves first, the way the backlog and notes keep what was typed; a failed save keeps it open */
+  const requestClose = async (): Promise<void> => {
+    if (dirty && !isReadOnly && !(await handleSave())) return
+    onClose()
+  }
+  closeRef.current = requestClose
 
   /** tracked twice: savedMetaRef is disk, latestMetaRef adds drafts; one ref let a comment save an unsaved cover */
   const savedMetaRef = useRef<Record<string, unknown>>({})
@@ -485,7 +499,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
       justifyContent: 'flex-end',
       backdropFilter: 'blur(2px)'
     }}
-    onClick={onClose}
+    onClick={() => { void requestClose() }}
     >
       <div
         ref={containerRef}
@@ -546,7 +560,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             {/* only when there's something to write */}
             {!isReadOnly && dirty && (
               <button
-                onClick={handleSave}
+                onClick={() => { void handleSave() }}
                 disabled={saving}
                 title="Save changes (Ctrl+S)"
                 style={{
@@ -569,7 +583,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               </button>
             )}
 
-            <DrawerCloseButton onClick={onClose} title={dirty ? 'Close and discard the unsaved changes' : 'Close'} />
+            <DrawerCloseButton onClick={() => { void requestClose() }} title={dirty ? 'Save and close' : 'Close'} />
           </div>
         </div>
 
