@@ -27,7 +27,7 @@ export {
   getContextSlugs,
   rebalancePositions
 } from './items'
-export { recordTombstone } from './tombstones'
+export { clearTombstone, recordTombstone } from './tombstones'
 export { applyBoardBaselineTx, applyRemoteMutationTx } from './remote'
 export { getAllTags, createTag, updateTag, deleteTag } from './tags'
 export { deleteSetting, getSetting, setSetting } from './settings'

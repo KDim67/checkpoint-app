@@ -16,6 +16,7 @@ import {
 import type { NoteMetadata, NoteSearchResult } from '../../../shared/types'
 import { useAppStore } from '../store/appStore'
 import * as notesApi from '../data/notes'
+import { errorMessage } from '../../../shared/errors'
 import * as appApi from '../data/app'
 
 export default function NotesView(): React.JSX.Element {
@@ -277,16 +278,38 @@ export default function NotesView(): React.JSX.Element {
     const title = pendingDeleteTitle
     setPendingDeleteTitle(null)
     try {
+      // kept in hand first: the file goes for good, so this copy is the only way back
+      const content = activeNoteTitle === title ? activeNoteContent : await notesApi.readNote(title)
+      const wasPinned = pins.includes(title)
+      // a pending autosave would write the file straight back
+      if (activeNoteTitle === title) setIsDirty(false)
       await notesApi.deleteNote(title)
       setPins(p => p.filter(t => t !== title))
-      toast('Note deleted', { type: 'success' })
       if (activeNoteTitle === title) setActiveNoteTitle(null)
       await loadNotesList()
+      toast(`Deleted “${title}”`, {
+        type: 'success',
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void (async () => {
+              try {
+                await notesApi.writeNote(title, content)
+                if (wasPinned) setPins(p => (p.includes(title) ? p : [...p, title]))
+                await loadNotesList()
+                setActiveNoteTitle(title)
+              } catch (err) {
+                toast(`Could not bring “${title}” back: ${errorMessage(err)}`, { type: 'error' })
+              }
+            })()
+          }
+        }
+      })
     } catch (err) {
       console.error('Failed to delete note:', err)
-      toast('Failed to delete note', { type: 'error' })
+      toast(`Could not delete “${title}”: ${errorMessage(err)}`, { type: 'error' })
     }
-  }, [pendingDeleteTitle, activeNoteTitle, loadNotesList, toast])
+  }, [pendingDeleteTitle, activeNoteTitle, activeNoteContent, pins, loadNotesList, toast])
 
   const handleExport = useCallback(async () => {
     if (!activeNoteTitle) return

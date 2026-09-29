@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { NoteMetadata, NoteSearchResult } from '../shared/types'
-import { recordTombstone } from './db'
+import { clearTombstone, recordTombstone } from './db'
 import { getConfigDir, getNotesDir, ensureDir, resolveSafePath as resolveInDir } from './paths'
 
 /** idempotent, fast after the first call */
@@ -134,6 +134,7 @@ export async function writeNote(title: string, content: string, oldTitle?: strin
     }
 
     await fs.promises.writeFile(newPath, content, 'utf-8')
+    clearTombstone(trimmedTitle.endsWith('.md') ? trimmedTitle : `${trimmedTitle}.md`, 'notes')
   } catch (err) {
     console.error(`Failed to write note "${title}":`, err)
     throw err
