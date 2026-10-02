@@ -1,6 +1,7 @@
 /** parsing only, writes go through ordinary paths; nothing silently dropped */
 
 import type { ItemPriority } from './types'
+import { dueFromText } from './dueDate'
 
 type ImportSource = 'trello' | 'todoist'
 
@@ -152,15 +153,14 @@ export function parseTrelloBoard(parsed: unknown): ImportedBoard | null {
     const seen = perColumn.get(status) ?? 0
     perColumn.set(status, seen + 1)
 
-    const dueRaw = str(card.due)
-    const due = dueRaw ? Date.parse(dueRaw) : NaN
+    const due = dueFromText(str(card.due))
 
     cards.push({
       title,
       body: str(card.desc),
       status,
       position: (seen + 1) * 1000,
-      due_at: Number.isFinite(due) ? due : null,
+      due_at: due,
       // Trello has no priority, don't invent one
       priority: 0,
       labels: asArray(card.labels)
@@ -243,8 +243,8 @@ function todoistDue(raw: unknown): number | null {
   const o = asObject(raw)
   const text = str(o ? (o.date ?? o.datetime) : raw).trim()
   if (!text) return null
-  const parsed = Date.parse(text)
-  return Number.isFinite(parsed) ? parsed : null
+  // a date alone is a whole day, the way Todoist means it
+  return dueFromText(text)
 }
 
 function todoistTasks(o: Record<string, unknown>): Record<string, unknown>[] {
@@ -492,8 +492,7 @@ export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): 
       // no parent, lands as a card
     }
 
-    const due = at(row, 'DATE').trim()
-    const parsedDue = due ? Date.parse(due) : NaN
+    const parsedDue = dueFromText(at(row, 'DATE'))
 
     const seen = perColumn.get(current) ?? 0
     perColumn.set(current, seen + 1)
@@ -503,7 +502,7 @@ export function parseTodoistCsv(text: string, fallbackName = 'Imported board'): 
       body: at(row, 'DESCRIPTION'),
       status: current,
       position: (seen + 1) * 1000,
-      due_at: Number.isFinite(parsedDue) ? parsedDue : null,
+      due_at: parsedDue,
       priority: todoistPriorityFromCsv(at(row, 'PRIORITY')),
       // no labels in the template CSV
       labels: [],

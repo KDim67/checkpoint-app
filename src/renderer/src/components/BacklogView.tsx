@@ -26,6 +26,7 @@ import { getJsonSetting, getStringSetting, setJsonSetting } from '../lib/setting
 import { listTags } from '../data/tags'
 import { bulkDeleteItems, bulkUpdateItems, createItem, queryTasks, updateItem } from '../data/items'
 import * as appApi from '../data/app'
+import { dayEnd, dayStart, formatDueDate } from '../../../shared/dueDate'
 
 interface WorkflowColumn {
   id: string
@@ -228,8 +229,9 @@ export default function BacklogView() {
             status: selectedStatuses,
             priority: selectedPriorities,
             tagIds: selectedTagIds,
-            dueStart: dueStart ? new Date(dueStart).getTime() : null,
-            dueEnd: dueEnd ? new Date(dueEnd).getTime() : null,
+            // whole days here: the old reading made the end the start of its day, in UTC
+            dueStart: dayStart(dueStart),
+            dueEnd: dayEnd(dueEnd),
             hasRelations:
               hasRelations === 'all' ? null : hasRelations === 'yes',
             sortBy,
@@ -477,7 +479,7 @@ export default function BacklogView() {
       content += `  - Status: ${statusLabel}\n`
       content += `  - Priority: ${priorityLabel}\n`
       if (item.due_at) {
-        content += `  - Due Date: ${new Date(item.due_at).toLocaleDateString()}\n`
+        content += `  - Due Date: ${formatDueDate(item.due_at)}\n`
       }
       if (item.tags && item.tags.length > 0) {
         content += `  - Tags: ${item.tags.map(t => t.name).join(', ')}\n`

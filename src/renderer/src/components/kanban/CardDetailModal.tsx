@@ -32,6 +32,7 @@ import CardTextureTools from './CardTextureTools'
 import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
+import DueDateField from '../ui/DueDateField'
 import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
 import * as appApi from '../../data/app'
@@ -438,10 +439,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     setCard(prev => prev ? { ...prev, status } : null)
   }
 
-  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDueDateChange = (due_at: number | null) => {
     if (!card) return
-    const dateVal = e.target.value
-    const due_at = dateVal ? new Date(dateVal).getTime() : null
     setCard(prev => prev ? { ...prev, due_at } : null)
   }
 
@@ -692,21 +691,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 Due Date
               </span>
               <div className="row-8px">
-                <input
-                  type="date"
-                  value={card.due_at ? new Date(card.due_at).toISOString().substring(0, 10) : ''}
-                  onChange={handleDueDateChange}
-                  style={{
-                    flex: 1,
-                    background: 'var(--color-surface-1)',
-                    border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 'var(--space-2) var(--space-3)',
-                    fontSize: 'var(--text-sm)',
-                    outline: 'none'
-                  }}
-                />
+                <DueDateField id="card-due" value={card.due_at} onChange={handleDueDateChange} disabled={isReadOnly} />
                 {card.due_at && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                     <input

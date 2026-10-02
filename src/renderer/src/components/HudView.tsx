@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { parseNaturalDate, describeDue } from '../../../shared/naturalDate'
+import { parseNaturalDate } from '../../../shared/naturalDate'
+import { formatDue } from '../../../shared/dueDate'
 import { readWorkspaceList } from '../lib/workspaceList'
 import { resolveTagIds } from '../data/tags'
 import { createItem } from '../data/items'
@@ -350,7 +351,7 @@ export default function HudView() {
                     border: '1px solid var(--color-primary)'
                   }}
                 >
-                  {describeDue(parsed.dueAt)}
+                  {formatDue(parsed.dueAt)}
                 </div>
               )}
 

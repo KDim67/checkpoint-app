@@ -1,6 +1,7 @@
 /** pure and tested, since broken CSV fails quietly */
 
 import type { Item } from './types'
+import { formatDueDate } from './dueDate'
 
 export type ExportFormat = 'markdown' | 'csv' | 'json'
 
@@ -73,7 +74,7 @@ export function itemsToMarkdown(items: Item[], title = 'Checkpoint export'): str
 
       const meta: string[] = []
       if (item.priority) meta.push(PRIORITY_LABELS[item.priority] ?? String(item.priority))
-      if (item.due_at) meta.push(`due ${new Date(item.due_at).toLocaleDateString()}`)
+      if (item.due_at) meta.push(`due ${formatDueDate(item.due_at)}`)
       const tags = (item.tags ?? []).map(t => t.name)
       if (tags.length > 0) meta.push(tags.map(t => `\`${t}\``).join(' '))
       if (meta.length > 0) out.push(`  ${meta.join(' · ')}`)

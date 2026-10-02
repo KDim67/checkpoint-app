@@ -7,6 +7,7 @@ import { checkDueItems } from '../src/main/dueReminders'
 import { resetNotificationDedupe, POLICY_SETTING_KEY } from '../src/main/notificationService'
 import { DEFAULT_POLICY } from '../src/shared/notificationPolicy'
 import { shown } from './stubs/electron'
+import { allDay, localDayOf } from '../src/shared/dueDate'
 
 // the sweep repeats every 15 minutes, what it declines to repeat matters
 
@@ -127,5 +128,23 @@ describe('checkDueItems', () => {
     item('Two', Date.now() - 2000)
     item('Three', Date.now() - 3000)
     expect(checkDueItems()).toBe(3)
+  })
+
+  it('reminds about a whole day in its morning, not at the midnight it is stored as', () => {
+    const today = localDayOf(Date.now())
+    const day = allDay(today)
+    item('Send the invoices', day)
+    const at = (hour: number) => new Date(today.year, today.month, today.day, hour).getTime()
+
+    expect(checkDueItems(at(7))).toBe(0)
+    expect(checkDueItems(at(10))).toBe(1)
+    expect(shown[0].body).toMatch(/^Due today/)
+  })
+
+  it('counts a whole day late by the calendar', () => {
+    const today = localDayOf(Date.now())
+    item('Overdue by two', allDay(today) - 2 * DAY)
+    checkDueItems(new Date(today.year, today.month, today.day, 10).getTime())
+    expect(shown[0].body).toMatch(/^2 days overdue/)
   })
 })

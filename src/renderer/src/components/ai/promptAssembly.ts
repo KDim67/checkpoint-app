@@ -6,6 +6,7 @@ import type { ColumnConfig } from '../../../../shared/boardModel'
 import type { Item, Tag } from '../../../../shared/types'
 import type { IntentType, WorkspaceFileInfo } from './types'
 import { detectSkill, estimateTokens } from './aiHelpers'
+import { dueIso, todayIso } from '../../../../shared/dueDate'
 
 /** terse for small models, they lose the long form */
 export function buildBasePrompt(isSmallModel: boolean): string {
@@ -51,7 +52,7 @@ FORMAT (only when creating):
 
 /** models have no clock */
 export function buildDateBlock(now: Date): string {
-  return `CURRENT DATE & TIME: ${now.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (ISO date: ${now.toISOString().slice(0, 10)}). Resolve every relative date ("Friday", "next week", "overdue", "this sprint") against this moment. Cards may carry a deadline shown as (Due: …) in the board state below.`
+  return `CURRENT DATE & TIME: ${now.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (ISO date: ${todayIso(now.getTime())}). Resolve every relative date ("Friday", "next week", "overdue", "this sprint") against this moment. Cards may carry a deadline shown as (Due: …) in the board state below.`
 }
 
 /** legal column ids, what's in each, titles not to duplicate */
@@ -70,7 +71,7 @@ export function buildBoardState(
       cardListText = colCards.map(c => {
         const bodySnippet = c.body ? `, "${c.body.slice(0, 120).replace(/\n/g, ' ')}"` : ''
         const tagsText = c.tags && c.tags.length > 0 ? ` [Tags: ${c.tags.map((t: Tag) => t.name).join(', ')}]` : ''
-        const dueText = c.due_at ? ` (Due: ${new Date(c.due_at).toISOString().slice(0, 10)})` : ''
+        const dueText = c.due_at ? ` (Due: ${dueIso(c.due_at)})` : ''
         return `    • "${c.title}" (Priority: ${c.priority === 3 ? 'High' : c.priority === 2 ? 'Med' : 'Low'})${dueText}${tagsText}${bodySnippet}`
       }).join('\n')
     } else {

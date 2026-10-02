@@ -15,6 +15,7 @@ import { tagResolver } from '../../../data/tags'
 import { createItem, readItems } from '../../../data/items'
 import { executedActionSignaturesSet, errorText, type ShownColumn } from './shared'
 import ViewOnKanbanButton from './ViewOnKanbanButton'
+import { dueFromText } from '../../../../../shared/dueDate'
 
 export default function BatchBoardActionBlock({ jsonString }: { jsonString: string }) {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
@@ -118,7 +119,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
 
             const tagIds = await resolveTagIds(card.tags)
             // ISO date, validated upstream
-            const dueMs = card.due && !Number.isNaN(Date.parse(card.due)) ? Date.parse(card.due) : null
+            const dueMs = card.due ? dueFromText(card.due) : null
             const createdCard = await createItem({
               context: validContext, type: 'card',
               title: card.title, body: card.body,

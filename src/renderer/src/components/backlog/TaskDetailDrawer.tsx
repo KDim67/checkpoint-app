@@ -23,6 +23,7 @@ import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
 import * as subtasksApi from '../../data/subtasks'
 import { useFailureReport } from '../ui/Toast'
+import DueDateField from '../ui/DueDateField'
 
 interface TaskDetailDrawerProps {
   taskId: string
@@ -170,10 +171,8 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
     setTask(prev => prev ? { ...prev, status } : null)
   }
 
-  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDueDateChange = (due_at: number | null) => {
     if (!task) return
-    const dateVal = e.target.value
-    const due_at = dateVal ? new Date(dateVal).getTime() : null
     onUpdate(task.id, { due_at })
     setTask(prev => prev ? { ...prev, due_at } : null)
   }
@@ -392,12 +391,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               <span className="label-caps">
                 Due Date
               </span>
-              <input
-                type="date"
-                value={task.due_at ? new Date(task.due_at).toISOString().substring(0, 10) : ''}
-                onChange={handleDueDateChange}
-                className="input-md"
-              />
+              <DueDateField id="task-due" value={task.due_at} onChange={handleDueDateChange} />
             </div>
 
             <div className="col-sm">

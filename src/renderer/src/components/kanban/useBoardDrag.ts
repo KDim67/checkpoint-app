@@ -7,6 +7,7 @@ import { rebalancePositions, updateItem } from '../../data/items'
 import { canAimAtSlot } from './dropSlots'
 import type { BoardState } from './useBoardState'
 import { useFailureReport } from '../ui/Toast'
+import { dueSortKey } from '../../../../shared/dueDate'
 
 /** columns, cards and each card's column, from board state: a col:: sortable read as a card sent drops to the end */
 interface DropGeometry {
@@ -51,7 +52,8 @@ export function useBoardDrag(boardState: BoardState) {
       if (!a.due_at && !b.due_at) return a.position - b.position
       if (!a.due_at) return 1
       if (!b.due_at) return -1
-      return a.due_at - b.due_at || a.position - b.position
+      // a whole day sorts after the moments on it
+      return dueSortKey(a.due_at) - dueSortKey(b.due_at) || a.position - b.position
     }
 
     const sortModes = new Map(columns.map(c => [c.id, c.sort ?? 'manual']))

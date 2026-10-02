@@ -2,6 +2,7 @@
 
 import type { CardSnapshot } from './cardDraft'
 import { authorLabel } from './identity'
+import { formatDueDate } from './dueDate'
 
 export interface CardChange {
   id: string
@@ -20,9 +21,8 @@ function priorityLabel(value: number): string {
   return PRIORITY_LABELS[value] ?? String(value)
 }
 
-function dateLabel(at: number): string {
-  return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
+/** read later, so the full date; a whole day without a time */
+const dateLabel = (at: number): string => formatDueDate(at)
 
 function parseMeta(raw: string): Record<string, unknown> {
   try {

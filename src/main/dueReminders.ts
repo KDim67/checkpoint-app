@@ -3,6 +3,7 @@
 import { getDb } from './db'
 import { notify } from './notificationService'
 import { emitPluginEvent } from './pluginEvents'
+import { DAY_MS, daysLate, isAllDay, remindAt } from '../shared/dueDate'
 
 const CHECK_INTERVAL_MS = 15 * 60 * 1000
 const STARTUP_DELAY_MS = 12_000
@@ -28,7 +29,8 @@ interface DueRow {
 export function checkDueItems(now = Date.now()): number {
   let fired = 0
   try {
-    const rows = getDb()
+    // a day wider each way, since a whole day is reminded of hours from its stored midnight; then narrowed exactly
+    const rows = (getDb()
       .prepare(
         `SELECT id, title, context, due_at, status
          FROM items
@@ -38,15 +40,16 @@ export function checkDueItems(now = Date.now()): number {
            AND status NOT IN ('done', 'archived')
          ORDER BY due_at`
       )
-      .all(now, now - LOOKBACK_MS) as DueRow[]
+      .all(now + DAY_MS, now - LOOKBACK_MS - DAY_MS) as DueRow[])
+      // a whole day is reminded of in its morning, a moment when it comes
+      .filter(row => remindAt(row.due_at) <= now && remindAt(row.due_at) >= now - LOOKBACK_MS)
 
     for (const row of rows) {
-      const overdueMs = now - row.due_at
-      const overdueDays = Math.floor(overdueMs / 86_400_000)
+      const late = daysLate(row.due_at, now)
       const body =
-        overdueDays >= 1
-          ? `${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue · ${row.context}`
-          : `Due now · ${row.context}`
+        late >= 1
+          ? `${late} day${late === 1 ? '' : 's'} overdue · ${row.context}`
+          : `${isAllDay(row.due_at) ? 'Due today' : 'Due now'} · ${row.context}`
 
       const delivered = notify({
         category: 'due',

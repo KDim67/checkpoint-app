@@ -8,6 +8,7 @@ import { getTextColorForBackground } from '../../lib/contrast'
 import { PRIORITY_COLORS } from '../../lib/priority'
 import { DEFAULT_CARD_DISPLAY, type CardDisplay } from '../../lib/boardConfig'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
+import { formatDue, isOverdue as isDueOverdue } from '../../../../shared/dueDate'
 
 export interface RemoteCardDragInfo {
   peerId: string
@@ -135,10 +136,9 @@ function CardFace({
     ? `${plainText.substring(0, 100)}...`
     : plainText
 
-  const isOverdue = card.due_at && card.due_at < Date.now() && card.status !== 'done' && !dueDateCompleted
-  const dueDateStr = card.due_at
-    ? new Date(card.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    : null
+  // a day stays on time until it is over, a moment is late once it passes
+  const isOverdue = card.due_at !== null && isDueOverdue(card.due_at) && card.status !== 'done' && !dueDateCompleted
+  const dueDateStr = card.due_at !== null ? formatDue(card.due_at) : null
 
   // worked out once, an empty footer is still 20px
   const showDue = display.due && Boolean(dueDateStr)

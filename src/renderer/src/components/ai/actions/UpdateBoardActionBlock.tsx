@@ -10,6 +10,7 @@ import type { Item } from '@shared/types'
 import { faultTolerantParseJSON } from '../aiActionParse'
 import { readItems, updateItem } from '../../../data/items'
 import { executedActionSignaturesSet, type UpdateOutcome, executedUpdateOutcomesMap, errorText } from './shared'
+import { dueFromText, formatDueDate } from '../../../../../shared/dueDate'
 
 // the one field that tells two same-op edits on a card apart; the rest collapse to ''
 function opSignatureValue(o: UpdateOperation): string | number {
@@ -152,13 +153,14 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
                 inverse.push({ id: item.id, patch: { body: item.body || '' } })
                 applied.push(`Updated description of "${item.title}"`)
               } else if (op.op === 'set_due_date') {
-                const dueMs = op.due ? Date.parse(op.due) : null
-                if (op.due && Number.isNaN(dueMs)) { failed.push(`set due date "${item.title}": unparseable date "${op.due}"`); continue }
+                // a bare date is a whole day, the way the prompt asks for it
+                const dueMs = op.due ? dueFromText(op.due) : null
+                if (op.due && dueMs === null) { failed.push(`set due date "${item.title}": unparseable date "${op.due}"`); continue }
                 if ((item.due_at ?? null) === dueMs) { noops++; continue }
                 await updateItem(item.id, { due_at: dueMs })
                 inverse.push({ id: item.id, patch: { due_at: item.due_at ?? null } })
                 applied.push(dueMs
-                  ? `"${item.title}" due → ${new Date(dueMs).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`
+                  ? `"${item.title}" due → ${formatDueDate(dueMs)}`
                   : `Cleared due date of "${item.title}"`)
                 item.due_at = dueMs
               } else if (op.op === 'archive') {

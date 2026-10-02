@@ -3,6 +3,7 @@ import { Check, Calendar, Link2 } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item } from '../../../../shared/types'
 import { PRIORITY_ICONS, PRIORITY_LABELS, PRIORITY_LEVELS } from '../../lib/priority'
+import { formatDue, isOverdue as isDueOverdue } from '../../../../shared/dueDate'
 
 interface BacklogRowProps {
   item: Item
@@ -40,8 +41,9 @@ export default function BacklogRow({
     setShowPriorityMenu(false)
   }
 
-  const isOverdue = item.due_at && item.due_at < Date.now() && item.status !== 'done'
-  const dueDateStr = item.due_at ? new Date(item.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '-'
+  // a day stays on time until it is over, a moment is late once it passes
+  const isOverdue = item.due_at !== null && isDueOverdue(item.due_at) && item.status !== 'done'
+  const dueDateStr = item.due_at !== null ? formatDue(item.due_at) : '-'
   const createdDateStr = new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
   const relationsCount = (item as Item & { relations_count?: number }).relations_count ?? 0

@@ -74,7 +74,7 @@ export function registerItemTools(mcp: McpServer): void {
         body: z.string().optional(),
         status: z.string().optional().describe('Column id for cards. Defaults to the first column.'),
         priority: z.number().int().min(0).max(3).optional().describe(PRIORITY_SCALE),
-        due_at: z.number().nullable().optional().describe('Epoch milliseconds.')
+        due_at: z.number().nullable().optional().describe('Epoch milliseconds. A due date with no time of day is midnight UTC of that date, Date.UTC(year, month, day); any other value is a moment.')
       }
     },
     async ({ context: ctx, type, title, body, status, priority, due_at }) => {
@@ -118,7 +118,7 @@ export function registerItemTools(mcp: McpServer): void {
           .optional()
           .describe('Move to this column id. get_board lists them; this is how a card changes column.'),
         priority: z.number().int().min(0).max(3).optional().describe(PRIORITY_SCALE),
-        due_at: z.number().nullable().optional().describe('Epoch milliseconds, or null to clear.')
+        due_at: z.number().nullable().optional().describe('Epoch milliseconds, or null to clear. A due date with no time of day is midnight UTC of that date, Date.UTC(year, month, day); any other value is a moment.')
       }
     },
     async ({ id, ...patch }) => {

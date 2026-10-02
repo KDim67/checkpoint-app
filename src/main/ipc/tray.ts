@@ -4,31 +4,28 @@ import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
 import { beginQuit } from '../windows'
 import { app } from 'electron'
+import { isDueToday, isOverdue } from '../../shared/dueDate'
 
 export function registerTrayHandlers(): void {
   ipcMain.handle(IpcChannels.TRAY_SUMMARY, async () => {
     const { getDb, getSetting } = await import('../db')
     try {
       const now = Date.now()
-      const endOfDay = new Date(now)
-      endOfDay.setHours(23, 59, 59, 999)
-
-      const counts = getDb()
+      // read out and counted here: a whole day is late only once that day is over in this timezone
+      const rows = getDb()
         .prepare(
-          `SELECT
-             SUM(CASE WHEN due_at IS NOT NULL AND due_at < ? THEN 1 ELSE 0 END) AS overdue,
-             SUM(CASE WHEN due_at IS NOT NULL AND due_at >= ? AND due_at <= ? THEN 1 ELSE 0 END) AS today,
-             COUNT(*) AS open
-           FROM items
+          `SELECT due_at FROM items
            WHERE status NOT IN ('done', 'archived') AND type IN ('card', 'task')`
         )
-        .get(now, now, endOfDay.getTime()) as { overdue: number | null; today: number | null; open: number | null }
+        .all() as { due_at: number | null }[]
+      const dated = rows.flatMap(r => (r.due_at === null ? [] : [r.due_at]))
 
       return {
         context: getSetting<string>('active_context', 'default'),
-        overdue: counts.overdue ?? 0,
-        dueToday: counts.today ?? 0,
-        open: counts.open ?? 0
+        overdue: dated.filter(due => isOverdue(due, now)).length,
+        // still to do today, the late ones are counted above
+        dueToday: dated.filter(due => isDueToday(due, now) && !isOverdue(due, now)).length,
+        open: rows.length
       }
     } catch (err) {
       console.error('[tray] Could not build the summary:', err)

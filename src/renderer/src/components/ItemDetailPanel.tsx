@@ -22,6 +22,7 @@ import TagRow from './ui/TagRow'
 import TagCreator from './ui/TagCreator'
 import { listTags } from '../data/tags'
 import { searchItems, updateItem } from '../data/items'
+import DueDateField from './ui/DueDateField'
 
 export default function ItemDetailPanel() {
   const selectedItemId = useAppStore(s => s.selectedItemId)
@@ -36,7 +37,7 @@ export default function ItemDetailPanel() {
   const [body, setBody] = useState('')
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState<0 | 1 | 2 | 3>(0)
-  const [dueDate, setDueDate] = useState<string>('')
+  const [dueAt, setDueAt] = useState<number | null>(null)
   const [isEditingBody, setIsEditingBody] = useState(false)
 
   const [allTags, setAllTags] = useState<TagType[]>([])
@@ -94,14 +95,10 @@ export default function ItemDetailPanel() {
           setStatus(found.status)
           setPriority(found.priority)
           
-          if (found.due_at) {
-            const d = new Date(found.due_at)
-            const yyyy = d.getFullYear()
-            const mm = String(d.getMonth() + 1).padStart(2, '0')
-            const dd = String(d.getDate()).padStart(2, '0')
-            setDueDate(`${yyyy}-${mm}-${dd}`)
+          if (found.due_at !== null) {
+            setDueAt(found.due_at)
           } else {
-            setDueDate('')
+            setDueAt(null)
           }
 
           setSelectedTagIds(found.tags?.map(t => t.id) ?? [])
@@ -276,28 +273,13 @@ export default function ItemDetailPanel() {
             <span className="row-hint">
               <Calendar size={12} /> Due Date
             </span>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={e => {
-                setDueDate(e.target.value)
-                if (e.target.value) {
-                  const ms = new Date(e.target.value).getTime()
-                  handleUpdateField({ due_at: ms })
-                } else {
-                  handleUpdateField({ due_at: null })
-                }
-              }}
-              style={{
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-base)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '2px 6px',
-                fontSize: 'var(--text-xs)',
-                outline: 'none',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-sans)'
+            {/* the same field as the card and the task: typed words, a calendar, a day or a time */}
+            <DueDateField
+              id="detail-due"
+              value={dueAt}
+              onChange={next => {
+                setDueAt(next)
+                handleUpdateField({ due_at: next })
               }}
             />
           </div>

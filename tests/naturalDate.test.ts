@@ -1,10 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { parseNaturalDate, describeDue } from '../src/shared/naturalDate'
+import { parseNaturalDate, parseDueText } from '../src/shared/naturalDate'
+import { allDay, dueDay, formatDue, isAllDay } from '../src/shared/dueDate'
 import { defined } from './helpers/defined'
 
 // a Wednesday, room both ways
 const WED_10AM = new Date(2026, 5, 17, 10, 0, 0, 0).getTime()
-const at = (ms: number | null) => (ms === null ? null : new Date(ms))
+/** a whole day as that local date, a moment as itself; reading a day with new Date() is a day off west of UTC */
+const at = (ms: number | null) => {
+  if (ms === null) return null
+  if (!isAllDay(ms)) return new Date(ms)
+  const d = dueDay(ms)
+  return new Date(d.year, d.month, d.day)
+}
 
 const parse = (text: string, now = WED_10AM) => parseNaturalDate(text, now)
 
@@ -35,11 +42,10 @@ describe('no date present', () => {
 })
 
 describe('days', () => {
-  it('understands today and defaults the hour', () => {
+  it('reads a day said without a time as the whole day, not a made-up hour', () => {
     const out = parse('write it up today')
-    const due = defined(at(out.dueAt))
-    expect(due.getDate()).toBe(17)
-    expect(due.getHours()).toBe(9)
+    expect(isAllDay(out.dueAt as number)).toBe(true)
+    expect(defined(at(out.dueAt)).getDate()).toBe(17)
     expect(out.cleanedText).toBe('write it up')
   })
 
@@ -166,17 +172,40 @@ describe('cleaned text', () => {
   })
 })
 
-describe('describeDue', () => {
-  it('names today and tomorrow', () => {
-    expect(describeDue(new Date(2026, 5, 17, 15, 0).getTime(), WED_10AM)).toContain('today')
-    expect(describeDue(new Date(2026, 5, 18, 15, 0).getTime(), WED_10AM)).toContain('tomorrow')
+describe('the label while typing', () => {
+  it('names today and tomorrow, with the time when one was given', () => {
+    expect(formatDue(new Date(2026, 5, 17, 15, 0).getTime(), WED_10AM)).toMatch(/^Today \d/)
+    expect(formatDue(allDay({ year: 2026, month: 5, day: 18 }), WED_10AM)).toBe('Tomorrow')
   })
 
   it('uses the weekday within the week', () => {
-    expect(describeDue(new Date(2026, 5, 19, 15, 0).getTime(), WED_10AM)).toContain('Friday')
+    expect(formatDue(allDay({ year: 2026, month: 5, day: 19 }), WED_10AM)).toBe(new Date(2026, 5, 19).toLocaleDateString(undefined, { weekday: 'short' }))
   })
 
   it('falls back to a date further out', () => {
-    expect(describeDue(new Date(2026, 6, 30, 15, 0).getTime(), WED_10AM)).toMatch(/\d/)
+    expect(formatDue(new Date(2026, 6, 30, 15, 0).getTime(), WED_10AM)).toMatch(/\d/)
+  })
+})
+
+describe('a due-date field', () => {
+  const due = (text: string) => parseDueText(text, WED_10AM)
+  const local = (ms: number | null | undefined) => (typeof ms === 'number' ? new Date(ms) : ms)
+
+  it('takes the same words as quick capture', () => {
+    expect(local(due('tomorrow 5pm'))).toStrictEqual(new Date(2026, 5, 18, 17, 0, 0, 0))
+    expect(due('friday')).toBe(allDay({ year: 2026, month: 5, day: 19 }))
+  })
+
+  it('takes a plain date, by number or by the name of the month, with a time if there is one', () => {
+    expect(due('2026-07-04')).toBe(allDay({ year: 2026, month: 6, day: 4 }))
+    expect(due('20 oct')).toBe(allDay({ year: 2026, month: 9, day: 20 }))
+    expect(local(due('Oct 20, 2027 14:30'))).toStrictEqual(new Date(2027, 9, 20, 14, 30, 0, 0))
+    expect(due('3 may')).toBe(allDay({ year: 2027, month: 4, day: 3 }))
+  })
+
+  it('clears on nothing, and refuses what is not a date rather than guessing', () => {
+    expect(due('   ')).toBeNull()
+    expect(due('soonish')).toBeUndefined()
+    expect(due('31 feb')).toBeUndefined()
   })
 })

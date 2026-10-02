@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3'
 import type { Item, PaginatedResult, SearchQuery, TaskQueryParams } from '../../shared/types'
 import { getDb, prepareOnce } from './connection'
 import { getItemById, rowToItem } from './items'
+import { allDayRange, DAY_MS } from '../../shared/dueDate'
 
 export function searchItems(query: SearchQuery): PaginatedResult<Item> {
   const page = query.page ?? 1
@@ -98,13 +99,15 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
     args.push(...params.priority)
   }
 
+  // a whole day is in the range when its day is over by the end of it; a moment by the clock
+  const days = allDayRange(params.dueStart, params.dueEnd)
   if (params.dueStart !== undefined && params.dueStart !== null) {
-    sql += ` AND i.due_at >= ?`
-    args.push(params.dueStart)
+    sql += ` AND ((i.due_at % ${DAY_MS} = 0 AND i.due_at >= ?) OR (i.due_at % ${DAY_MS} <> 0 AND i.due_at >= ?))`
+    args.push(days.from, params.dueStart)
   }
   if (params.dueEnd !== undefined && params.dueEnd !== null) {
-    sql += ` AND i.due_at <= ?`
-    args.push(params.dueEnd)
+    sql += ` AND ((i.due_at % ${DAY_MS} = 0 AND i.due_at <= ?) OR (i.due_at % ${DAY_MS} <> 0 AND i.due_at <= ?))`
+    args.push(days.to, params.dueEnd)
   }
 
   // no due date matches no range, so it needs its own clause
@@ -149,6 +152,10 @@ export function queryTasks(db: Database.Database, context: string, params: TaskQ
   
   if (sortBy === 'relations_count') {
     sql += ` ORDER BY relations_count ${sortDirection}`
+  } else if (sortBy === 'due_at') {
+    // a whole day sorts at the end of its day here, after the moments on it; near enough across a clock change
+    sql += ` ORDER BY CASE WHEN i.due_at % ${DAY_MS} = 0 THEN i.due_at + ? ELSE i.due_at END ${sortDirection}`
+    args.push(DAY_MS - 1 + new Date().getTimezoneOffset() * 60_000)
   } else {
     sql += ` ORDER BY i.${sortBy} ${sortDirection}`
   }

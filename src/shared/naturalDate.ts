@@ -1,4 +1,6 @@
-/** a small grammar, not a library: overmatching silently dates things; local time */
+/** a small grammar, not a library: overmatching silently dates things; a date alone is a whole day, with a time a moment */
+
+import { allDay, moment } from './dueDate'
 
 interface ParsedDate {
   /** null when no date */
@@ -8,9 +10,6 @@ interface ParsedDate {
   /** shown back to the user */
   matched: string | null
 }
-
-/** when a day has no time */
-const DEFAULT_HOUR = 9
 
 const WEEKDAYS: Record<string, number> = {
   sunday: 0, sun: 0,
@@ -136,10 +135,11 @@ export function parseNaturalDate(input: string, now: number = Date.now()): Parse
   const time = findTime(day ? text.replace(day.source, ' ') : text)
 
   let due: Date
+  let wholeDay = false
   if (day) {
     due = new Date(day.date)
     if (time) due.setHours(time.hours, time.minutes, 0, 0)
-    else if (!day.impliedTime) due.setHours(DEFAULT_HOUR, 0, 0, 0)
+    else wholeDay = !day.impliedTime
   } else if (time) {
     due = startOfDay(reference)
     due.setHours(time.hours, time.minutes, 0, 0)
@@ -160,19 +160,54 @@ export function parseNaturalDate(input: string, now: number = Date.now()): Parse
     parts.push(time.source.trim())
   }
 
-  return { dueAt: due.getTime(), cleanedText: tidy(cleaned), matched: parts.join(' ') }
+  const dueAt = wholeDay
+    ? allDay({ year: due.getFullYear(), month: due.getMonth(), day: due.getDate() })
+    : moment(due)
+  return { dueAt, cleanedText: tidy(cleaned), matched: parts.join(' ') }
 }
 
-/** for the pill while typing */
-export function describeDue(dueAt: number, now: number = Date.now()): string {
-  const due = new Date(dueAt)
-  const days = Math.round((startOfDay(due).getTime() - startOfDay(new Date(now)).getTime()) / 86_400_000)
-  const time = due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+const MONTHS: Record<string, number> = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4,
+  jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11
+}
 
-  if (days === 0) return `today ${time}`
-  if (days === 1) return `tomorrow ${time}`
-  if (days > 1 && days < 7) {
-    return `${due.toLocaleDateString(undefined, { weekday: 'long' })} ${time}`
+/**
+ * what a due-date field holds: the words above, an ISO date, or a day and a month name, with a time if given;
+ * null clears it and undefined is text that isn't a date. Month names are safe here and nowhere else,
+ * since "may" in a task title is a word
+ */
+export function parseDueText(input: string, now: number = Date.now()): number | null | undefined {
+  const text = (input ?? '').trim()
+  if (!text) return null
+
+  const time = findTime(text)
+  const rest = (time ? text.replace(time.source, ' ') : text).replace(/\s{2,}/g, ' ').trim()
+  const at = (year: number, month: number, day: number): number | undefined => {
+    const date = new Date(year, month, day, time?.hours ?? 0, time?.minutes ?? 0, 0, 0)
+    // 31 feb would roll into march; that's a typo, not a date
+    if (date.getMonth() !== month || date.getDate() !== day) return undefined
+    return time ? moment(date) : allDay({ year, month, day })
   }
-  return `${due.toLocaleDateString()} ${time}`
+
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(rest)
+  if (iso) return at(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+
+  const names = Object.keys(MONTHS).join('|')
+  const dayFirst = new RegExp(`^(\\d{1,2})\\s+(${names})\\.?(?:\\s+(\\d{4}))?$`, 'i').exec(rest)
+  const monthFirst = new RegExp(`^(${names})\\.?\\s+(\\d{1,2})(?:,?\\s+(\\d{4}))?$`, 'i').exec(rest)
+  const named = dayFirst
+    ? { day: Number(dayFirst[1]), month: MONTHS[dayFirst[2].toLowerCase()], year: dayFirst[3] }
+    : monthFirst
+      ? { day: Number(monthFirst[2]), month: MONTHS[monthFirst[1].toLowerCase()], year: monthFirst[3] }
+      : null
+  if (named) {
+    const reference = new Date(now)
+    if (named.year) return at(Number(named.year), named.month, named.day)
+    // no year and the day has passed: the next one
+    const passed = new Date(reference.getFullYear(), named.month, named.day) < startOfDay(reference)
+    return at(reference.getFullYear() + (passed ? 1 : 0), named.month, named.day)
+  }
+
+  return parseNaturalDate(text, now).dueAt ?? undefined
 }
