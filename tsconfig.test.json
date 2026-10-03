@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.node.json",
-  // bridge types, since tests import renderer modules that call window.electronAPI
-  "include": ["tests/**/*.ts", "tests/**/*.tsx", "vitest.config.ts", "src/renderer/src/electron.d.ts"],
+  // bridge types, since tests import renderer modules that call window.electronAPI; asset imports like the logo
+  "include": ["tests/**/*.ts", "tests/**/*.tsx", "vitest.config.ts", "src/renderer/src/electron.d.ts", "src/renderer/src/vite-env.d.ts"],
   // DOM types for the renderer code tests pull in; JSX left as the renderer has it
   "compilerOptions": {
     "composite": false,

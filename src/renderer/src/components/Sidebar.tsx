@@ -6,6 +6,7 @@ import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
 import MenuItem, { MenuDivider } from './ui/MenuItem'
 import * as syncApi from '../data/sync'
+import { defaultBindings, loadBindings, type ShortcutBindings } from '../lib/shortcuts'
 
 // inline SVG, no icon lib
 
@@ -344,12 +345,24 @@ export function Sidebar() {
     setContextOpen(false)
     contextTriggerRef.current?.focus()
   }, [])
-  const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
+  const [tooltip, setTooltip] = useState<{ label: string; y: number; keys?: string } | null>(null)
+  /** the label teaches the key: Wall, Ctrl+6 */
+  const [bindings, setBindings] = useState<ShortcutBindings>(defaultBindings)
+  useEffect(() => {
+    const load = (): void => { loadBindings().then(setBindings).catch(() => {}) }
+    load()
+    window.addEventListener('settings-update-shortcuts', load)
+    return () => window.removeEventListener('settings-update-shortcuts', load)
+  }, [])
   const [enabledViews, setEnabledViews] = useState<ViewEnabledMap>(defaultViewEnabledMap)
   const [syncEnabled, setSyncEnabled] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState('Idle')
   const sidebarRef = useRef<HTMLDivElement>(null)
+  const showTooltip = (el: HTMLElement, label: string, keys?: string): void => {
+    const rect = el.getBoundingClientRect()
+    setTooltip({ label, y: rect.top + rect.height / 2, keys: keys || undefined })
+  }
 
   const checkFeatures = async () => {
     try {
@@ -514,11 +527,10 @@ export function Sidebar() {
                 aria-label={label}
                 aria-current={isActive ? 'page' : undefined}
                 onClick={() => handleNavClick(view)}
-                onMouseEnter={e => {
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  setTooltip({ label, y: rect.top + rect.height / 2 })
-                }}
+                onMouseEnter={e => showTooltip(e.currentTarget, label, bindings[`view_${view}`])}
                 onMouseLeave={() => setTooltip(null)}
+                onFocus={e => showTooltip(e.currentTarget, label, bindings[`view_${view}`])}
+                onBlur={() => setTooltip(null)}
                 style={{
                   width: '40px',
                   height: '40px',
@@ -606,11 +618,10 @@ export function Sidebar() {
             aria-label="Settings"
             aria-current={activeView === 'settings' ? 'page' : undefined}
             onClick={() => handleNavClick('settings')}
-            onMouseEnter={e => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              setTooltip({ label: 'Settings', y: rect.top + rect.height / 2 })
-            }}
+            onMouseEnter={e => showTooltip(e.currentTarget, 'Settings', bindings.open_settings)}
             onMouseLeave={() => setTooltip(null)}
+            onFocus={e => showTooltip(e.currentTarget, 'Settings', bindings.open_settings)}
+            onBlur={() => setTooltip(null)}
             style={{
               width: '40px',
               height: '40px',
@@ -651,6 +662,11 @@ export function Sidebar() {
           }}
         >
           {tooltip.label}
+          {tooltip.keys && (
+            <span className="text-mono-micro" style={{ marginLeft: 'var(--space-2)', color: 'var(--color-text-faint)' }}>
+              {tooltip.keys}
+            </span>
+          )}
         </div>
       )}
 
