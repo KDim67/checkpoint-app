@@ -178,7 +178,8 @@ export function useBoardActions(boardState: BoardState) {
     }
   }, [cards, setCards, toast, report])
 
-  const handleAddCardToColumn = useCallback(async (columnId: string) => {
+  /** made from the title typed in the column; nothing is saved until there is one */
+  const handleAddCardToColumn = useCallback(async (columnId: string, title: string): Promise<boolean> => {
     try {
       const colCards = cards.filter(c => c.status === columnId)
       const defaultPos = colCards.length > 0
@@ -187,7 +188,7 @@ export function useBoardActions(boardState: BoardState) {
       const created = await createItem({
         type: 'card',
         context: activeWorkspace,
-        title: 'New card',
+        title,
         body: '',
         status: columnId,
         priority: 0,
@@ -196,11 +197,12 @@ export function useBoardActions(boardState: BoardState) {
         metadata: '{}'
       })
       setCards(prev => [...prev, created])
-      setActiveCardId(created.id)
+      return true
     } catch (err) {
-      console.error('Failed to create card:', err)
+      report('add the card', err)
+      return false
     }
-  }, [cards, activeWorkspace, setCards, setActiveCardId])
+  }, [cards, activeWorkspace, setCards, report])
 
   const handleCreateCardFromTemplate = async (templateCard: Item) => {
     setShowTemplateSelector(false)

@@ -22,7 +22,8 @@ interface KanbanColumnProps {
   onCardClick: (id: string) => void
   onCardDelete: (id: string) => void
   onCardConvertToTask: (id: string) => void
-  onAddCard?: (columnId: string) => void
+  /** true once the card is made, so the box can clear for the next one */
+  onAddCard?: (columnId: string, title: string) => Promise<boolean>
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>
   onCardUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
   onClearColumn?: (columnId: string) => void
@@ -799,7 +800,7 @@ function ColumnBody({
       </div>
 
       {onAddCard && !isReadOnly && (
-        <AddCardFooter onAdd={() => onAddCard(id)} accentColor={accentColor} colTextColor={isFullCol ? colTextColor : undefined} isFullCol={isFullCol} />
+        <AddCardFooter columnId={id} onAdd={title => onAddCard(id, title)} accentColor={accentColor} colTextColor={isFullCol ? colTextColor : undefined} isFullCol={isFullCol} />
       )}
     </div>
   )
@@ -843,8 +844,75 @@ function HeaderBtn({
   )
 }
 
-function AddCardFooter({ onAdd, accentColor, colTextColor, isFullCol }: { onAdd: () => void; accentColor: string; colTextColor?: string; isFullCol?: boolean }) {
+/** opens one column's add box from outside the board */
+export const KANBAN_COMPOSE_EVENT = 'kanban-compose'
+
+/** typed in place: Enter adds the card and leaves the box open for the next, Esc puts it away */
+function AddCardFooter({ columnId, onAdd, accentColor, colTextColor, isFullCol }: { columnId: string; onAdd: (title: string) => Promise<boolean>; accentColor: string; colTextColor?: string; isFullCol?: boolean }) {
   const [hover, setHover] = useState(false)
+  const [composing, setComposing] = useState(false)
+
+  // asked for from outside, the palette's New card
+  useEffect(() => {
+    const open = (e: Event): void => {
+      if ((e as CustomEvent<{ columnId: string }>).detail?.columnId === columnId) setComposing(true)
+    }
+    window.addEventListener(KANBAN_COMPOSE_EVENT, open)
+    return () => window.removeEventListener(KANBAN_COMPOSE_EVENT, open)
+  }, [columnId])
+  const [draft, setDraft] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  const submit = async (): Promise<void> => {
+    const title = draft.trim()
+    if (!title || adding) return
+    setAdding(true)
+    try {
+      if (await onAdd(title)) setDraft('')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  if (composing) {
+    return (
+      <div style={{ margin: 'var(--space-2) var(--space-3) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)', flexShrink: 0 }}>
+        <textarea
+          autoFocus
+          value={draft}
+          rows={2}
+          placeholder="Card title"
+          aria-label="New card title"
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit() }
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setComposing(false); setDraft('') }
+          }}
+          // clicking away from an empty box puts it away; typed words stay put
+          onBlur={() => { if (!draft.trim()) setComposing(false) }}
+          style={{
+            resize: 'none', padding: 'var(--space-2)',
+            background: 'var(--color-surface-1)', color: 'var(--color-text-base)',
+            border: '1px solid var(--color-secondary)', borderRadius: 'var(--radius-md)',
+            fontFamily: 'inherit', fontSize: 'var(--text-sm)', lineHeight: 1.4
+          }}
+        />
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <span className="text-micro-dim">Enter to add, Esc to stop</span>
+          <button
+            type="button"
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => { void submit() }}
+            disabled={!draft.trim() || adding}
+            className="btn-primary"
+            style={{ padding: 'var(--space-1) var(--space-3)', fontSize: 'var(--text-xs)' }}
+          >
+            {adding ? 'Adding…' : 'Add card'}
+          </button>
+        </div>
+      </div>
+    )
+  }
   const textColor = isFullCol ? colTextColor : (hover ? 'var(--color-text-muted)' : 'var(--color-text-faint)')
   const borderColor = isFullCol
     ? (colTextColor === '#ffffff' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)')
@@ -855,7 +923,7 @@ function AddCardFooter({ onAdd, accentColor, colTextColor, isFullCol }: { onAdd:
 
   return (
     <button
-      onClick={onAdd}
+      onClick={() => setComposing(true)}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{

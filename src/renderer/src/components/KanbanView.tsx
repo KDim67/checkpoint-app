@@ -46,7 +46,7 @@ interface SortableColumnProps {
   onCardClick: (id: string) => void
   onCardDelete: (id: string) => void
   onCardConvertToTask: (id: string) => void
-  onAddCard: (colId: string) => void
+  onAddCard: (colId: string, title: string) => Promise<boolean>
   onCardUpdate?: (id: string, patch: Partial<Item>) => Promise<void>
   onClearColumn?: (columnId: string) => void
   onArchiveColumn?: (columnId: string) => void

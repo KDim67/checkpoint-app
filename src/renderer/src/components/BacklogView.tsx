@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import useFocusTrap from './ui/useFocusTrap'
 import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2, Repeat } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
@@ -15,6 +15,7 @@ import { loadBoardConfig } from '../lib/boardConfig'
 import StandupTranslatorView from './StandupTranslatorView'
 import ConfirmDialog from './ui/ConfirmDialog'
 import RecurringPanel from './backlog/RecurringPanel'
+import QuickAddTask from './backlog/QuickAddTask'
 import {
   BUILT_IN_VIEWS,
   normalizeSavedViews,
@@ -56,6 +57,8 @@ export default function BacklogView() {
     return () => { cancelled = true }
   }, [pendingViewId])
   const { toast } = useToast()
+  /** New Task and the empty state both lead here, so nothing is made before it has a name */
+  const quickAddRef = useRef<HTMLInputElement>(null)
   const report = useFailureReport()
 
   const [tasks, setTasks] = useState<Item[]>([])
@@ -504,26 +507,29 @@ export default function BacklogView() {
     }
   }
 
-  const handleCreateTask = async () => {
+  /** from the title typed in the box; nothing is saved until there is one */
+  const handleCreateTask = async (title: string, dueAt: number | null): Promise<boolean> => {
     try {
-      const newTask = await createItem({
+      await createItem({
         type: 'task',
         context: activeWorkspace,
-        title: 'New Task',
+        title,
         body: '',
         status: workflowColumns[0]?.id || 'open',
         priority: 0,
         position: Date.now(),
-        due_at: null,
+        due_at: dueAt,
         metadata: '{}'
       })
       await loadTasks()
-      setActiveTaskId(newTask.id)
-      toast('Task created')
+      return true
     } catch (err) {
-      console.error('Failed to create new backlog task:', err)
+      report('add the task', err)
+      return false
     }
   }
+
+  const focusQuickAdd = (): void => quickAddRef.current?.focus()
 
   const handleColumnWidthChange = (colKey: string, width: number) => {
     const nextWidths = { ...columnWidths, [colKey]: width }
@@ -656,7 +662,8 @@ export default function BacklogView() {
           </button>
 
           <button
-            onClick={handleCreateTask}
+            onClick={focusQuickAdd}
+            title="Type the task in the box below and press Enter"
             className="hover-brighten hover-lift"
             style={{
               background: 'var(--color-secondary)',
@@ -680,6 +687,8 @@ export default function BacklogView() {
           </button>
         </div>
       </div>
+
+      <QuickAddTask ref={quickAddRef} onAdd={handleCreateTask} />
 
       <div
         style={{
@@ -931,7 +940,7 @@ export default function BacklogView() {
             title="No Tasks Found"
             description="Your backlog is clear. Add structured tasks or adjust filters to see existing items."
             actionLabel="Create Task"
-            onActionClick={handleCreateTask}
+            onActionClick={focusQuickAdd}
           />
         ) : (
           <BacklogTable
