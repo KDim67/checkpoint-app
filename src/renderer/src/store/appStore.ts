@@ -8,6 +8,9 @@ import {
   type FocusSettings
 } from '../components/focus/pomodoroTimer'
 
+/** what the palette can make, each in the view that owns it */
+export type CreateIntent = 'card' | 'task' | 'note' | 'sticky' | 'wall'
+
 export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
 /** type-only, so no runtime cycle back into lib */
@@ -46,6 +49,10 @@ interface AppState {
   pendingNoteTitle: string | null
   /** consumed and cleared by BacklogView */
   pendingViewId: string | null
+  /** something to make on arrival, asked for from the palette; the view it belongs to clears it */
+  pendingCreate: CreateIntent | null
+  /** a wall, or an item on one, to open on arrival; the Wall clears it */
+  pendingWallLink: string | null
   // PBR generator preload
   gamedevPreloadTexturePath: string | null
   gamedevSourceCardId: string | null
@@ -78,6 +85,8 @@ interface AppState {
   setPreselectedTaskId: (id: string | null) => void
   setPendingNoteTitle: (title: string | null) => void
   setPendingViewId: (id: string | null) => void
+  setPendingCreate: (intent: CreateIntent | null) => void
+  setPendingWallLink: (link: string | null) => void
   setGamedevPreloadTexture: (path: string | null, cardId?: string | null) => void
   setGamedevPreloadSeamless: (path: string | null, cardId?: string | null) => void
 
@@ -110,6 +119,8 @@ export const useAppStore = create<AppState>()(
     preselectedTaskId: null,
     pendingNoteTitle: null,
     pendingViewId: null,
+    pendingCreate: null,
+    pendingWallLink: null,
     gamedevPreloadTexturePath: null,
     gamedevSourceCardId: null,
     gamedevPreloadSeamlessPath: null,
@@ -211,6 +222,16 @@ export const useAppStore = create<AppState>()(
     setPendingNoteTitle: (title: string | null) =>
       set(state => {
         state.pendingNoteTitle = title
+      }),
+
+    setPendingCreate: (intent: CreateIntent | null) =>
+      set(state => {
+        state.pendingCreate = intent
+      }),
+
+    setPendingWallLink: (link: string | null) =>
+      set(state => {
+        state.pendingWallLink = link
       }),
 
     setPendingViewId: (id: string | null) =>

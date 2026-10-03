@@ -37,6 +37,8 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const selectItem = useAppStore(s => s.selectItem)
   const setRightPanel = useAppStore(s => s.setRightPanelContent)
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
+  const setPendingCreate = useAppStore(s => s.setPendingCreate)
+  const setPendingWallLink = useAppStore(s => s.setPendingWallLink)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -92,9 +94,14 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
           // parked in the store, BacklogView reads it on arrival
           setPendingViewId(id)
           setView('backlog')
+        },
+        create: intent => {
+          // parked like the saved view: the view may not be mounted yet to hear an event
+          setPendingCreate(intent)
+          setView(intent === 'card' ? 'kanban' : intent === 'task' ? 'backlog' : intent === 'note' ? 'notes' : 'wall')
         }
       }),
-    [setView, setWorkspace, setSettingsTab, setRightPanelContent, toggleRightPanel, availableWorkspaces, activeWorkspace, enabledViews, savedViews, setPendingViewId, aiEnabled]
+    [setView, setWorkspace, setSettingsTab, setRightPanelContent, toggleRightPanel, availableWorkspaces, activeWorkspace, enabledViews, savedViews, setPendingViewId, setPendingCreate, aiEnabled]
   )
 
   const results = useMemo(() => rankCommands(commands, query), [commands, query])
@@ -139,6 +146,10 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         break
       case 'cheatsheet':
         setView('cheatsheets')
+        break
+      case 'wall':
+        setPendingWallLink(hit.target)
+        setView('wall')
         break
       case 'log':
         setView('log')

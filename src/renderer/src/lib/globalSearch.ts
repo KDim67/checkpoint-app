@@ -1,10 +1,13 @@
-/** the four searches in parallel, merged by mergeSearchHits; each source can fail alone */
+/** the searches in parallel, merged by mergeSearchHits; each source can fail alone */
 
 import { mergeSearchHits, snippet, type SearchHit } from '../../../shared/searchResults'
 import type { Item, NoteSearchResult } from '../../../shared/types'
 import { searchItems } from '../data/items'
 import * as notesApi from '../data/notes'
 import * as cheatsheetsApi from '../data/cheatsheets'
+import { loadWallDoc, loadWallIndex } from './wallDoc'
+import { wallDocKey, type WallItem, type WallRef } from '../../../shared/wallModel'
+import { wallSearchHits } from '../../../shared/wallSearch'
 
 /** FTS on one character matches everything */
 export const MIN_QUERY_LENGTH = 2
@@ -21,11 +24,17 @@ async function settled<T>(label: string, work: Promise<T>, fallback: T): Promise
   }
 }
 
+/** every wall of the workspace with what is on it, read fresh each search */
+async function wallsOf(context: string): Promise<{ ref: WallRef; items: WallItem[] }[]> {
+  const index = await loadWallIndex(context)
+  return Promise.all(index.walls.map(async ref => ({ ref, items: (await loadWallDoc(wallDocKey(context, ref.id))).items })))
+}
+
 export async function searchEverything(query: string, context: string): Promise<SearchHit[]> {
   const q = query.trim()
   if (q.length < MIN_QUERY_LENGTH) return []
 
-  const [items, notes, cheatsheets] = await Promise.all([
+  const [items, notes, cheatsheets, walls] = await Promise.all([
     settled(
       'items',
       searchItems({ query: q, context, pageSize: 8 }),
@@ -36,7 +45,8 @@ export async function searchEverything(query: string, context: string): Promise<
       'cheatsheets',
       cheatsheetsApi.search(q),
       [] as Array<{ name: string; matchCount: number; snippets: string[] }>
-    )
+    ),
+    settled('walls', wallsOf(context), [] as { ref: WallRef; items: WallItem[] }[])
   ])
 
   const itemHits: SearchHit[] = items.items.map(item => ({
@@ -63,5 +73,5 @@ export async function searchEverything(query: string, context: string): Promise<
     target: sheet.name
   }))
 
-  return mergeSearchHits([itemHits, noteHits, sheetHits])
+  return mergeSearchHits([itemHits, noteHits, sheetHits, wallSearchHits(walls, q)])
 }

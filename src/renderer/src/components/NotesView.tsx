@@ -177,6 +177,9 @@ export default function NotesView(): React.JSX.Element {
 
   // parked in the store since this view isn't mounted when the palette acts; cleared on arrival
   const pendingNoteTitle = useAppStore(s => s.pendingNoteTitle)
+  /** New note from the palette, once the list is in so the title doesn't clash */
+  const pendingCreate = useAppStore(s => s.pendingCreate)
+  const setPendingCreate = useAppStore(s => s.setPendingCreate)
   useEffect(() => {
     if (!pendingNoteTitle) return
     useAppStore.getState().setPendingNoteTitle(null)
@@ -272,6 +275,12 @@ export default function NotesView(): React.JSX.Element {
       })()
     }
   }, [notes, handleSelectNote, flushPending, createNote, toast])
+
+  useEffect(() => {
+    if (loading || pendingCreate !== 'note') return
+    setPendingCreate(null)
+    void handleCreate()
+  }, [loading, pendingCreate, setPendingCreate, handleCreate])
 
   const confirmDeleteNote = useCallback(async () => {
     if (!pendingDeleteTitle) return

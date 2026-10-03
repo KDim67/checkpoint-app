@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { useAppStore } from '../store/appStore'
 import {
   DndContext,
   DragOverlay,
@@ -10,7 +11,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import KanbanColumn from './kanban/KanbanColumn'
+import KanbanColumn, { KANBAN_COMPOSE_EVENT } from './kanban/KanbanColumn'
 import KanbanCard from './kanban/KanbanCard'
 import CardDetailModal from './kanban/CardDetailModal'
 import AddColumnModal from './kanban/AddColumnModal'
@@ -191,6 +192,16 @@ export default function KanbanView() {
   } = kanbanBoard
 
   const remoteCardDrags = useRemoteCardDrags()
+
+  /** New card from the palette opens the first column's box, where the title is typed */
+  const pendingCreate = useAppStore(s => s.pendingCreate)
+  const setPendingCreate = useAppStore(s => s.setPendingCreate)
+  const firstColumnId = columns[0]?.id ?? null
+  useEffect(() => {
+    if (loading || pendingCreate !== 'card') return
+    setPendingCreate(null)
+    if (firstColumnId) window.dispatchEvent(new CustomEvent(KANBAN_COMPOSE_EVENT, { detail: { columnId: firstColumnId } }))
+  }, [loading, pendingCreate, setPendingCreate, firstColumnId])
 
   if (loading) {
     return (

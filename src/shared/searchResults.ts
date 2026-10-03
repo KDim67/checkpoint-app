@@ -1,6 +1,6 @@
 /** round-robin across sources, FTS only ranks within a source */
 
-type SearchHitKind = 'card' | 'task' | 'log' | 'note' | 'cheatsheet'
+type SearchHitKind = 'card' | 'task' | 'log' | 'note' | 'cheatsheet' | 'wall'
 
 export interface SearchHit {
   /** stable per result set, React key and dedupe */
@@ -56,6 +56,7 @@ export function kindLabel(kind: SearchHitKind): string {
     case 'log': return 'Log'
     case 'note': return 'Note'
     case 'cheatsheet': return 'Cheatsheet'
+    case 'wall': return 'Wall'
   }
 }
 

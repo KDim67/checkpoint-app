@@ -22,6 +22,7 @@ const context = (over: Partial<CommandContext> = {}): CommandContext => ({
   enabledViews: allOn() as Partial<Record<ActiveView, boolean>>,
   savedViews: [],
   applyView: vi.fn(),
+  create: vi.fn(),
   aiEnabled: true,
   ...over
 })

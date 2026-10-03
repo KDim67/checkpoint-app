@@ -531,6 +531,15 @@ export default function BacklogView() {
 
   const focusQuickAdd = (): void => quickAddRef.current?.focus()
 
+  /** New task from the palette lands in the box, ready to type */
+  const pendingCreate = useAppStore(s => s.pendingCreate)
+  const setPendingCreate = useAppStore(s => s.setPendingCreate)
+  useEffect(() => {
+    if (pendingCreate !== 'task') return
+    setPendingCreate(null)
+    quickAddRef.current?.focus()
+  }, [pendingCreate, setPendingCreate])
+
   const handleColumnWidthChange = (colKey: string, width: number) => {
     const nextWidths = { ...columnWidths, [colKey]: width }
     setColumnWidths(nextWidths)

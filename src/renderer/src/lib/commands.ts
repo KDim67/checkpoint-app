@@ -1,7 +1,7 @@
 /** one authored list, not a registry views push into (they unmount); order matters for an empty query */
 
 import type { CommandLike } from '../../../shared/commandMatch'
-import type { ActiveView, SettingsTab } from '../store/appStore'
+import type { ActiveView, CreateIntent, SettingsTab } from '../store/appStore'
 import type { SavedView } from '../../../shared/savedViews'
 import { setSetting } from '../data/settings'
 
@@ -27,6 +27,8 @@ export interface CommandContext {
   /** so a view is one keystroke away */
   savedViews: SavedView[]
   applyView: (id: string) => void
+  /** goes to the view that owns it and makes one there */
+  create: (intent: CreateIntent) => void
 }
 
 const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
@@ -64,8 +66,22 @@ async function applyTheme(theme: 'dark' | 'light'): Promise<void> {
   await setSetting('app_theme', theme)
 }
 
+/** the palette makes things as well as going places; each lands in its own view */
+const CREATE: { intent: CreateIntent; view: ActiveView; label: string; keywords: string[] }[] = [
+  { intent: 'card', view: 'kanban', label: 'New card', keywords: ['add', 'create', 'kanban', 'board'] },
+  { intent: 'task', view: 'backlog', label: 'New task', keywords: ['add', 'create', 'todo', 'backlog'] },
+  { intent: 'note', view: 'notes', label: 'New note', keywords: ['add', 'create', 'write', 'markdown'] },
+  { intent: 'sticky', view: 'wall', label: 'New sticky note', keywords: ['add', 'create', 'wall', 'canvas'] },
+  { intent: 'wall', view: 'wall', label: 'New wall', keywords: ['add', 'create', 'canvas', 'board', 'whiteboard'] }
+]
+
 export function buildCommands(ctx: CommandContext): Command[] {
   const commands: Command[] = []
+
+  for (const { intent, view, label, keywords } of CREATE) {
+    if (ctx.enabledViews[view] === false) continue
+    commands.push({ id: `create:${intent}`, label, group: 'Create', keywords, run: () => ctx.create(intent) })
+  }
 
   for (const { view, label, keywords } of VIEWS) {
     // no target for a disabled view
