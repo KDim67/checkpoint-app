@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { continueList, hasWrap, indentLines, takesIndent, toggleWrap } from '../../../../shared/wallText'
+import { fitTextSize } from '../../lib/fitText'
 
 interface Props {
   value: string
@@ -15,6 +16,11 @@ interface Props {
   /** a mind map topic: Tab adds one under it and Enter one beside it, Shift+Enter still breaks the line */
   onChild?: () => void
   onSibling?: () => void
+  /** the size the words read at; with a floor they shrink to fit the box as they are typed */
+  fitBase?: number
+  fitMin?: number
+  /** they shrink no further and still overflow: the pixels the box is short by */
+  onNeedRoom?: (extra: number) => void
 }
 
 // under ctrl or cmd; strikethrough takes shift too
@@ -72,7 +78,9 @@ function FormatButton({
 }
 
 /** a plain textarea with list-aware Enter, Tab indents and formatting keys */
-export default function WallTextEditor({ value, onChange, onFinish, style, onHeight, onNext, code, onChild, onSibling }: Props) {
+export default function WallTextEditor({
+  value, onChange, onFinish, style, onHeight, onNext, code, onChild, onSibling, fitBase, fitMin, onNeedRoom
+}: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
   /** set once the new value has rendered, or React leaves the caret at the end */
   const pendingSelection = useRef<[number, number] | null>(null)
@@ -89,6 +97,14 @@ export default function WallTextEditor({ value, onChange, onFinish, style, onHei
       setSelection(null)
     }
   }
+
+  // opened to write in, it picks up where the words end; the browser leaves it in front of the first one
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.setSelectionRange(el.value.length, el.value.length)
+    el.scrollTop = el.scrollHeight
+  }, [])
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -107,7 +123,12 @@ export default function WallTextEditor({ value, onChange, onFinish, style, onHei
       onHeight(el.scrollHeight)
       el.style.height = previous
     }
-  }, [value, onHeight])
+
+    if (fitBase) {
+      const { over } = fitTextSize(el, fitBase, fitMin ?? fitBase)
+      if (over > 0) onNeedRoom?.(over)
+    }
+  }, [value, onHeight, fitBase, fitMin, onNeedRoom])
 
   const apply = (edit: { value: string; start: number; end: number }): void => {
     pendingSelection.current = [edit.start, edit.end]

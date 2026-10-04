@@ -1,7 +1,7 @@
 import React from 'react'
 import {
   ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, TEXT_ALIGNS,
-  WALL_FONTS, WALL_FONT_NAMES,
+  WALL_FONTS, WALL_FONT_NAMES, WALL_FONT_SIZES,
   type ArrowShape, type ArrowLine, type ArrowHeads, type ShapeType, type TextAlign, type WallFont
 } from '../../../../shared/wallModel'
 import { SHAPE_NAMES } from '../../../../shared/wallShape'
@@ -305,6 +305,71 @@ export function FontPickerMenu({ current = 'sans', onPick, onClose }: FontPicker
           </button>
         )
       })}
+    </div>
+  )
+}
+
+export interface TextSizeMenuProps {
+  /** the size in use, and whether it was chosen or taken from the box */
+  current: number
+  chosen: boolean
+  onPick: (size: number | undefined) => void
+  onClose?: () => void
+}
+
+/** a size to read at, or back to sizing itself to the box */
+export function TextSizeMenu({ current, chosen, onPick, onClose }: TextSizeMenuProps): React.JSX.Element {
+  const row = (label: string, selected: boolean, size: number, value: number | undefined): React.JSX.Element => (
+    <button
+      key={label}
+      type="button"
+      role="menuitem"
+      aria-label={label}
+      aria-selected={selected}
+      onClick={() => { onPick(value); onClose?.() }}
+      className="hover-bg-offset"
+      style={{
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)',
+        width: '100%', padding: '5px 10px',
+        border: 'none', borderRadius: 'var(--radius-sm)',
+        background: selected ? 'var(--color-primary-muted)' : 'transparent',
+        color: selected ? 'var(--color-primary)' : 'var(--color-text-base)',
+        cursor: 'pointer', textAlign: 'left'
+      }}
+    >
+      {/* each row is set at its own size, so the list shows what it means */}
+      <span style={{ fontSize: `${size}px`, lineHeight: 1.2, fontWeight: selected ? 600 : 400 }}>{label}</span>
+      {selected && (
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)' }}>Active</span>
+      )}
+    </button>
+  )
+
+  return (
+    <div
+      role="menu"
+      aria-label="Pick a text size"
+      data-wall-ui
+      onPointerDown={e => e.stopPropagation()}
+      onKeyDown={e => { if (e.key === 'Escape') onClose?.() }}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: '2px', padding: '4px',
+        maxHeight: '280px', overflowY: 'auto',
+        background: 'var(--color-surface-elevated)',
+        border: '1px solid var(--color-surface-offset)',
+        borderRadius: 'var(--radius-md)',
+        boxShadow: 'var(--shadow-lg)',
+        minWidth: '150px'
+      }}
+    >
+      <div style={{
+        padding: '4px 8px 3px', fontSize: '10px', fontWeight: 600,
+        color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em'
+      }}>
+        Text size
+      </div>
+      {row('Fit to the box', !chosen, 13, undefined)}
+      {WALL_FONT_SIZES.map(size => row(`${size}`, chosen && current === size, Math.min(size, 24), size))}
     </div>
   )
 }

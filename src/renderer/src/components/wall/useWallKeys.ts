@@ -13,8 +13,20 @@ import { toggleGroup, ungroupItems } from '../../../../shared/wallGroup'
 import { findItems, isSearching } from '../../../../shared/wallFind'
 import { framesInOrder, presentKey } from '../../../../shared/wallFrames'
 import { restorable } from '../../../../shared/wallBin'
+import { nearestToward, stepThrough } from '../../../../shared/wallNavigate'
 import type { WallDocument } from './useWallDocument'
 import type { WallPointer } from './useWallPointer'
+
+/** an arrow key as a direction, for stepping the selection and for Alt duplicates */
+const TOWARD: Record<string, Direction> = {
+  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down'
+}
+
+/** how the keyboard names what it just landed on */
+const SPOKEN: Record<WallItem['kind'], string> = {
+  note: 'Sticky', text: 'Text', shape: 'Shape', code: 'Code block', frame: 'Frame', card: 'Card',
+  doc: 'Note', image: 'Image', bookmark: 'Link', ink: 'Drawing', arrow: 'Arrow'
+}
 
 export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer) {
   const {
@@ -26,7 +38,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, setLinkPickFor, setLinkOpen,
     setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
     copyStyle, pasteStyle, makeCards, pasteCells, searchKind, presenting, stepPresenting, frameSelection,
-    startPresenting, setFramesOpen, setExportOpen, setBinOpen
+    startPresenting, setFramesOpen, setExportOpen, setBinOpen, openItem, showItem, gatherTags,
+    addMindMap, tidyMap, cropping, setCropping, turnSelection, setAlignOpen
   } = wallDocument
   const {
     fitToContent, zoomBy, zoomReset, zoomToSelection, exportWall
@@ -130,6 +143,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         setExportOpen(false)
         setBinOpen(false)
         setPicker(null)
+        setCropping(null)
+        setAlignOpen(false)
         setTool('select')
         setArrowFrom(null)
         setArrowDrag(null)
@@ -140,6 +155,41 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         setLinkOpen(false)
         return
       }
+      // the wall's own keys, unless something on the chrome has focus and owns them
+      const onWall = !(el instanceof HTMLElement) || el === document.body ||
+        !el.closest('button, a, select, [role="button"], [role="menu"], [role="dialog"]')
+      const spokenFor = (item: WallItem): string =>
+        `${SPOKEN[item.kind]}: ${(labelRef.current(item) ?? '').trim() || 'empty'}`
+      const onlyPicked = (): WallItem | null => {
+        if (selectedRef.current.size !== 1) return null
+        return docRef.current.items.find(i => selectedRef.current.has(i.id)) ?? null
+      }
+
+      // through the wall in reading order, so everything is reachable without a mouse
+      if (onWall && e.key === 'Tab' && !mod && !e.altKey) {
+        const next = stepThrough(docRef.current.items, onlyPicked()?.id ?? null, e.shiftKey)
+        if (!next) return
+        e.preventDefault()
+        showItem(next, spokenFor(next))
+        return
+      }
+      if (onWall && mod && TOWARD[e.key]) {
+        const items = docRef.current.items
+        const from = onlyPicked()
+        const next = from ? nearestToward(items, from.id, TOWARD[e.key]) : stepThrough(items, null, false)
+        if (!next) return
+        e.preventDefault()
+        showItem(next, spokenFor(next))
+        return
+      }
+      if (onWall && e.key === 'Enter' && !mod && !e.shiftKey) {
+        const target = onlyPicked()
+        if (!target || target.locked) return
+        e.preventDefault()
+        openItem(target)
+        return
+      }
+
       if (selectedRef.current.size === 0) return
 
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); return }
@@ -151,8 +201,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       const delta = deltas[e.key]
       if (delta && e.altKey) {
         e.preventDefault()
-        const directions: Record<string, Direction> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
-        const copies = duplicateToward(docRef.current.items, selectedRef.current, directions[e.key])
+        const copies = duplicateToward(docRef.current.items, selectedRef.current, TOWARD[e.key])
         if (copies.length > 0) {
           setItems([...docRef.current.items, ...copies])
           // the copies are picked, so another press lays the next one beside them
@@ -173,7 +222,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [applyHistory, copyStyle, docRef, duplicateSelected, fitToContent, historyRef, matchKey, pasteStyle, presenting, removeSelected, selectedRef, setArrowDrag, setArrowFrom, setBgOpen, setBinOpen, setEditingId, setExportOpen, setFramesOpen, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen, stepPresenting, zoomBy, zoomReset, zoomToSelection])
+  }, [applyHistory, copyStyle, docRef, duplicateSelected, fitToContent, historyRef, labelRef, matchKey, openItem, pasteStyle, presenting, removeSelected, selectedRef, setAlignOpen, setArrowDrag, setArrowFrom, setBgOpen, setBinOpen, setCropping, setEditingId, setExportOpen, setFramesOpen, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen, showItem, stepPresenting, zoomBy, zoomReset, zoomToSelection])
 
   /** this app's private format beside plain words for any other; text selected on the page stays the page's to copy */
   useEffect(() => {
@@ -287,7 +336,13 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     makeCards,
     frameSelection,
     presentFrom: frameId => startPresenting(Math.max(0, framesInOrder(docRef.current.items, docRef.current.frameOrder).findIndex(f => f.id === frameId))),
-    exportFrame: frame => void exportWall({ kind: 'frame', frame })
+    exportFrame: frame => void exportWall({ kind: 'frame', frame }),
+    gatherTags,
+    addMindMap,
+    tidyMap,
+    startCrop: setCropping,
+    turnSelection,
+    openAlign: () => setAlignOpen(true)
   })
 
   // live camera from the ref mid-pan, so a stray render agrees with what's painted
@@ -336,7 +391,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
   const floatingRef = useRef<HTMLDivElement>(null)
   const [floatingWidth, setFloatingWidth] = useState(220)
   const floatingPos = ((): { left: number; top: number } | null => {
-    if (!selectionBounds || editingId) return null
+    if (!selectionBounds || editingId || cropping) return null
 
     const centreX = (selectionBounds.minX + (selectionBounds.maxX - selectionBounds.minX) / 2) * camera.zoom + camera.x
     const above = selectionBounds.minY * camera.zoom + camera.y - 44
@@ -358,7 +413,12 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
   }, [floatingWidth, selectedIds, arrowsSelected, single?.locked, single?.text])
 
   /** belongs to the selection that opened it */
-  useEffect(() => { setSwatchOpen(false); setLinkOpen(false) }, [selectedIds, setSwatchOpen, setLinkOpen])
+  useEffect(() => {
+    setSwatchOpen(false)
+    setLinkOpen(false)
+    setAlignOpen(false)
+    setCropping(null)
+  }, [selectedIds, setSwatchOpen, setLinkOpen, setAlignOpen, setCropping])
 
   return {
     menuEntries,

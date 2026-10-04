@@ -11,6 +11,10 @@ interface Props {
   /** undefined for the default */
   value?: string
   onChange: (color: string) => void
+  /** the end of the gesture: onChange paints as it goes, this records one undo step */
+  onCommit?: (color: string) => void
+  /** a swatch was picked, so a caller that opened this can close it; dragging a colour never does */
+  onDone?: () => void
   /** 1 gives the ink palette's vertical strip */
   columns?: number
   /** follow-the-theme option */
@@ -25,7 +29,7 @@ const TARGET = 26
 const DOT = 18
 
 export default function WallColorPicker({
-  colors, value, onChange, columns = 4, defaultLabel, onDefault, allowCustom = true
+  colors, value, onChange, onCommit, onDone, columns = 4, defaultLabel, onDefault, allowCustom = true
 }: Props): React.JSX.Element {
   const isCustom = !!value && !colors.includes(value)
   /** portal on body: the palette's centring transform trapped fixed panels in a clipping scroller */
@@ -105,7 +109,12 @@ export default function WallColorPicker({
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, ${TARGET}px)`, gap: '4px', justifyContent: 'center' }}>
-        {colors.map(color => swatch(color, value === color, color, () => onChange(color)))}
+        {/* a swatch is the whole gesture: paint it, record it, and let the caller close */}
+        {colors.map(color => swatch(color, value === color, color, () => {
+          onChange(color)
+          onCommit?.(color)
+          onDone?.()
+        }))}
 
         {allowCustom && (
           <div ref={customRef} className="relative">
@@ -148,6 +157,9 @@ export default function WallColorPicker({
               <div
                 ref={panelRef}
                 data-wall-ui
+                // a press here is the picker's own; outside-click closers above would shut it mid-drag
+                onPointerDown={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
                 style={{
                   position: 'fixed', left: `${customAt.left}px`, top: `${customAt.top}px`, zIndex: 60,
                   padding: 'var(--space-3)',
@@ -157,7 +169,11 @@ export default function WallColorPicker({
                   boxShadow: 'var(--shadow-lg)'
                 }}
               >
-                <ColorField value={isCustom && value ? value : colors[0]} onChange={onChange} />
+                <ColorField
+                  value={isCustom && value ? value : colors[0]}
+                  onChange={onChange}
+                  onCommit={onCommit ?? onChange}
+                />
               </div>,
               document.body
             )}

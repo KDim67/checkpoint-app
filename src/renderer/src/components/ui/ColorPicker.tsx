@@ -111,6 +111,9 @@ export default function ColorPicker({
         {openAt && createPortal(
           <div
             ref={panelRef}
+            // a press here is the picker's own; the menu or panel hosting it would close mid-drag
+            onPointerDown={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
             style={{
               position: 'fixed', left: `${openAt.left}px`, top: `${openAt.top}px`, zIndex: 60,
               padding: 'var(--space-3)',

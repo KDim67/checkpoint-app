@@ -1,6 +1,6 @@
 import React, { useCallback, useLayoutEffect, useRef } from 'react'
 import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Point, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
-import { arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedSize, rotationAngle, rotationStart, snapMoving, type WallDrag } from '../../../../shared/wallPointer'
+import { CORNERS, arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedBox, rotationAngle, rotationStart, snapMoving, type WallDrag } from '../../../../shared/wallPointer'
 import { pushHistory, replacePresent } from '../../../../shared/history'
 import { clipSelection, placeClip } from '../../../../shared/wallClipboard'
 import { canvasToJpeg, exportWallToPng, imageDataUris, renderWallCanvas, textMeasurer, type ExportContext } from '../../lib/wallExport'
@@ -309,7 +309,11 @@ export function useWallPointer(wallDocument: WallDocument) {
           start: rotationStart({ x: e.clientX, y: e.clientY }, { x: cx, y: cy }, single.rotation ?? 0)
         }
       } else {
-        dragRef.current = { mode: 'resize', id: single.id, startX: e.clientX, startY: e.clientY, w: single.width, h: single.height }
+        const corner = CORNERS.find(c => c === handle.dataset.wallHandle) ?? 'se'
+        dragRef.current = {
+          mode: 'resize', id: single.id, startX: e.clientX, startY: e.clientY,
+          x: single.x, y: single.y, w: single.width, h: single.height, corner
+        }
       }
       return
     }
@@ -589,11 +593,16 @@ export function useWallPointer(wallDocument: WallDocument) {
         )
       }
     } else {
-      const size = resizedSize(drag.w, drag.h, dx, dy, snapping)
+      const target = docRef.current.items.find(i => i.id === drag.id)
+      // a picture keeps its shape unless Shift frees it; anything else keeps it while Shift is held
+      const keepShape = target?.kind === 'image' ? !e.shiftKey : e.shiftKey
+      const box = resizedBox({ x: drag.x, y: drag.y, width: drag.w, height: drag.h }, drag.corner, dx, dy, {
+        snapping, keepShape: keepShape && target?.kind !== 'text'
+      })
       setItems(
         docRef.current.items.map(i =>
           // a text box's height follows its words, the drag only sets how wide they run
-          i.id === drag.id ? { ...i, ...(i.kind === 'text' ? { width: size.width } : size) } : i
+          i.id === drag.id ? { ...i, ...(i.kind === 'text' ? { x: box.x, width: box.width } : box) } : i
         ),
         { record: false }
       )

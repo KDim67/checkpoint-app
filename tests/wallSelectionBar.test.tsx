@@ -10,7 +10,7 @@ import { ungroupItems } from '../src/shared/wallGroup'
 afterEach(cleanup)
 
 type Props = Parameters<typeof WallSelectionBar>[0]
-type Given = Omit<Props, 'swatchOpen' | 'setSwatchOpen' | 'linkOpen' | 'setLinkOpen'>
+type Given = Omit<Props, 'swatchOpen' | 'setSwatchOpen' | 'linkOpen' | 'setLinkOpen' | 'alignOpen' | 'setAlignOpen'>
 
 const item = (id: string, over: Partial<WallItem> = {}): WallItem => ({ id, kind: 'note', z: 0, ...over } as WallItem)
 const notes = [item('a', { z: 1 }), item('b', { z: 2 }), item('c', { z: 3 })]
@@ -19,6 +19,7 @@ const notes = [item('a', { z: 1 }), item('b', { z: 2 }), item('c', { z: 3 })]
 function Bar(props: Given) {
   const [swatchOpen, setSwatchOpen] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
+  const [alignOpen, setAlignOpen] = useState(false)
   return (
     <WallSelectionBar
       {...props}
@@ -26,6 +27,8 @@ function Bar(props: Given) {
       setSwatchOpen={setSwatchOpen}
       linkOpen={linkOpen}
       setLinkOpen={setLinkOpen}
+      alignOpen={alignOpen}
+      setAlignOpen={setAlignOpen}
     />
   )
 }
@@ -39,7 +42,12 @@ const renderBar = (over: Partial<Given> = {}) => {
     removeSelected: vi.fn<Props['removeSelected']>(),
     setItemLink: vi.fn<Props['setItemLink']>(),
     startLinkPick: vi.fn<Props['startLinkPick']>(),
-    followLink: vi.fn<Props['followLink']>()
+    followLink: vi.fn<Props['followLink']>(),
+    onAddTag: vi.fn<Props['onAddTag']>(),
+    onRemoveTag: vi.fn<Props['onRemoveTag']>(),
+    onGatherTags: vi.fn<Props['onGatherTags']>(),
+    onCropImage: vi.fn<Props['onCropImage']>(),
+    onTurn: vi.fn<Props['onTurn']>()
   }
   render(
     <Bar
@@ -49,6 +57,8 @@ const renderBar = (over: Partial<Given> = {}) => {
       arrowsSelected={false}
       items={notes}
       selectedIds={new Set(['a', 'b'])}
+      tagNames={['Bug', 'UI']}
+      tagColors={new Map([['bug', '#f28b82']])}
       {...handlers}
       {...over}
     />
@@ -259,6 +269,94 @@ describe('WallSelectionBar', () => {
 
     fireEvent.change(screen.getByLabelText('Fill opacity'), { target: { value: '40' } })
     expect(setItems).toHaveBeenLastCalledWith(patchItems(shapes, one, { opacity: 0.4 }), { record: false })
+  })
+
+  it('tags stickies from the board\'s own names, takes a tag off, and gathers by tag', () => {
+    const tagged = [item('a', { tags: ['Bug'] }), item('b')]
+    const { onAddTag, onRemoveTag, onGatherTags } = renderBar({ items: tagged, selectedIds: new Set(['a', 'b']) })
+
+    fireEvent.click(button('Tags'))
+    // the board's other tag is offered, the one already on isn't
+    fireEvent.click(screen.getByRole('button', { name: 'UI' }))
+    expect(onAddTag).toHaveBeenCalledWith('UI')
+
+    fireEvent.change(screen.getByLabelText('Add a tag'), { target: { value: 'bug' } })
+    fireEvent.keyDown(screen.getByLabelText('Add a tag'), { key: 'Enter' })
+    // typed in any case, the board's spelling is what goes on
+    expect(onAddTag).toHaveBeenLastCalledWith('Bug')
+
+    fireEvent.click(button('Remove the tag Bug'))
+    expect(onRemoveTag).toHaveBeenCalledWith('Bug')
+
+    fireEvent.click(screen.getByRole('button', { name: /Gather by tag/ }))
+    expect(onGatherTags).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers tags for stickies only, and a language for code blocks only', () => {
+    renderBar({ items: [item('a', { kind: 'shape' })], selectedIds: new Set(['a']) })
+    expect(screen.queryByLabelText('Tags')).toBeNull()
+    expect(screen.queryByLabelText('Code language')).toBeNull()
+    cleanup()
+
+    const code = [item('a', { kind: 'code', language: 'python' })]
+    const { setItems } = renderBar({ items: code, selectedIds: new Set(['a']), single: code[0] })
+    expect(screen.queryByLabelText('Tags')).toBeNull()
+    const picker = screen.getByLabelText('Code language') as HTMLSelectElement
+    expect(picker.value).toBe('python')
+
+    fireEvent.change(picker, { target: { value: 'rust' } })
+    expect(setItems).toHaveBeenLastCalledWith(patchItems(code, new Set(['a']), { language: 'rust' }))
+
+    fireEvent.change(picker, { target: { value: '' } })
+    expect(setItems).toHaveBeenLastCalledWith(patchItems(code, new Set(['a']), { language: undefined }))
+  })
+
+  it('sets a text size on everything picked, and goes back to fitting the box', () => {
+    const { setItems } = renderBar()
+    expect(button('Text size: fits the box')).toBeTruthy()
+
+    fireEvent.click(button('Text size: fits the box'))
+    fireEvent.click(button('24'))
+    expect(setItems.mock.calls[0][0].filter(i => i.id !== 'c').every(i => i.fontSize === 24)).toBe(true)
+    expect(setItems.mock.calls[0][0].find(i => i.id === 'c')?.fontSize).toBeUndefined()
+    cleanup()
+
+    const sized = [item('a', { fontSize: 24 })]
+    const { setItems: again } = renderBar({ items: sized, selectedIds: new Set(['a']), single: sized[0] })
+    fireEvent.click(button('Text size: 24'))
+    fireEvent.click(button('Fit to the box'))
+    expect(again.mock.calls[0][0][0].fontSize).toBeUndefined()
+  })
+
+  it('tells the wall the colour picked for stickies, so the next one takes it', () => {
+    const onStickyColor = vi.fn()
+    renderBar({ onStickyColor })
+    fireEvent.click(button('Colour'))
+    fireEvent.click(button('#f28b82'))
+    expect(onStickyColor).toHaveBeenCalledWith('#f28b82')
+    cleanup()
+
+    const shapes = [item('a', { kind: 'shape' })]
+    const shapeColor = vi.fn()
+    renderBar({ items: shapes, selectedIds: new Set(['a']), onStickyColor: shapeColor })
+    fireEvent.click(button('Colour'))
+    fireEvent.click(button('#f28b82'))
+    expect(shapeColor).not.toHaveBeenCalled()
+  })
+
+  it('offers cropping and a quarter turn on a single picture', () => {
+    const picture = [item('a', { kind: 'image', ref: 'p.png' })]
+    const { onCropImage, onTurn } = renderBar({ items: picture, selectedIds: new Set(['a']), single: picture[0] })
+
+    fireEvent.click(button('Crop this picture'))
+    expect(onCropImage).toHaveBeenCalledWith('a')
+
+    fireEvent.click(button('Rotate a quarter turn'))
+    expect(onTurn).toHaveBeenCalledWith(90)
+    cleanup()
+
+    renderBar({ items: picture, selectedIds: new Set(['a']), single: { ...picture[0], locked: true } })
+    expect(screen.queryByLabelText('Crop this picture')).toBeNull()
   })
 
   it('groups loose items, and ungroups a group', () => {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { StickyNote, Type, Shapes, Square, Layers, Image as ImageIcon, Maximize2, Undo2, Redo2, Grid3x3, FileText, PanelRight, PenLine, Spline, MousePointer2 } from 'lucide-react'
+import { StickyNote, Type, Shapes, Square, Layers, Image as ImageIcon, Maximize2, Undo2, Redo2, Grid3x3, FileText, PanelRight, PenLine, Spline, MousePointer2, Code, Network } from 'lucide-react'
 import { redo, undo } from '../../../../shared/history'
 import WallSwitcher from './WallSwitcher'
 import { panHintLabel } from '../../lib/wallInput'
@@ -36,7 +36,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
     toggleRail, applyHistory, addItem, placeImageFiles, jumpTo, exportWall, fitToContent, zoomReset,
     camera, custom, pickerRows, labelOf, matches, undoable, redoable, linkPickFor, selectedIds,
     framesOpen, setFramesOpen, exportOpen, setExportOpen, binOpen, setBinOpen, frames, binEntries,
-    restoreDeleted, showFrame, startPresenting, setFrameOrder, collab, isReadOnly
+    restoreDeleted, showFrame, startPresenting, setFrameOrder, collab, isReadOnly, addMindMap
   } = wallView
   const atFullSize = Math.round(camera.zoom * 100) === 100
   const [shapePickerOpen, setShapePickerOpen] = useState(false)
@@ -89,7 +89,9 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
           </div>
         )}
       </div>
+      {toolButton('Code block', <Code size={14} />, () => addItem('code'))}
       {toolButton('Frame', <Square size={14} />, () => addItem('frame'))}
+      {toolButton('Mind map', <Network size={14} />, () => addMindMap())}
       {toolButton('Place a card', <Layers size={14} />, () => setPicker(p => (p === 'card' ? null : 'card')))}
       {toolButton('Place a note', <FileText size={14} />, () => setPicker(p => (p === 'doc' ? null : 'doc')))}
       {toolButton('Image', <ImageIcon size={14} />, () => fileInputRef.current?.click())}

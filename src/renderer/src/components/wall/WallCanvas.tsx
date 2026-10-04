@@ -17,18 +17,20 @@ import type { WallViewState } from './useWallView'
 
 export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
   const {
-    setView, setPendingNoteTitle, doc, loading, selectedIds, setSelectedIds, editingId,
+    doc, loading, selectedIds, setSelectedIds, editingId,
     setEditingId, picker, setPicker, tool, penColor, penWidth, smoothing,
     setSmoothing, drawing, arrowFrom, arrowDrag, arrowEndHover, arrowShape, setArrowShape, arrowLine,
     setArrowLine, arrowHeads, setArrowHeads, marquee, busy, spaceHeld, swatchOpen, setSwatchOpen,
     viewportRef, marqueeRectRef, docRef, cardsById, itemsById, notesByTitle, selectedItems, single,
-    arrowsSelected, setItems, setCamera, onItemTextChange, onItemFinishEditing, onItemAutoSize, addItem,
-    removeSelected, duplicateSelected, toggleLock, openCard, placeImageFiles, screenPoint, onWheel,
+    arrowsSelected, setItems, setCamera, onItemTextChange, onItemFinishEditing, onItemAutoSize, growItemRoom, rememberStickyColor, cropping, applyCrop, addItem,
+    removeSelected, duplicateSelected, toggleLock, placeImageFiles, screenPoint, onWheel,
     arrowAt, onPointerDown, onPointerMove, onPointerLeave, endDrag, camera, canvasBackground, dotColor, floatingRef,
     floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
     wallIndex, activeWall, labelOf, previewing, addBookmark, growFrom, searching, matchIds, presenting,
     frames, stepPresenting, stopPresenting, setTool, eraserMode, setEraserMode, penPresets, choosePenColor,
-    choosePenWidth, pickPreset, isReadOnly, collab, commitIndex, panCameraRef
+    choosePenWidth, pickPreset, isReadOnly, collab, commitIndex, panCameraRef, tagColors, tagNames,
+    tagSelection, untagSelection, gatherTags, addMapTopic, openItem, announcement, alignOpen, setAlignOpen,
+    setCropping, turnSelection
   } = wallView
 
   const myName = collab?.displayName || collab?.osUserName || 'Anonymous'
@@ -152,17 +154,8 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           addItem('note', {}, at)
           return
         }
-        if (hit.locked) return
-        if (hit.kind === 'card') openCard(hit)
-        else if (hit.kind === 'doc') {
-          // Notes opens the title on arrival
-          if (hit.ref) {
-            setPendingNoteTitle(hit.ref)
-            setView('notes')
-          }
-        }
-        else if (hit.kind === 'bookmark') { if (hit.link) followLink(hit.link) }
-        else if (hit.kind !== 'image') setEditingId(hit.id)
+        // the same thing Enter does on the selection
+        openItem(hit)
       }}
       onDragOver={e => {
         e.preventDefault()
@@ -211,7 +204,12 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-text-muted)' }}>An empty wall</span>
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-faint)', maxWidth: '440px', lineHeight: 1.6 }}>
             Double-click anywhere for a sticky note, drop images straight on, or place cards
-            from the board. Nothing snaps and nothing sorts. Put things where you want them.
+            from the board. Nothing sorts itself. Put things where you want them, and guides
+            show up only when one comes close to another.
+          </span>
+          {/* a new wall is the thing people miss; this is where they are looking */}
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', maxWidth: '440px', lineHeight: 1.6 }}>
+            The name at the top left switches walls, renames this one, or starts another.
           </span>
         </div>
       )}
@@ -348,6 +346,11 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               previewing={previewing.has(item.id)}
               dimmed={searching && !matchIds.has(item.id)}
               remoteSelectedBy={peerSelectedMap.get(item.id)}
+              tagColors={tagColors}
+              onMapTopic={addMapTopic}
+              onNeedRoom={growItemRoom}
+              cropping={cropping === item.id}
+              onCrop={applyCrop}
             />
           )
         })}
@@ -496,6 +499,11 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           floatingRef={floatingRef}
           swatchOpen={swatchOpen}
           setSwatchOpen={setSwatchOpen}
+          alignOpen={alignOpen}
+          setAlignOpen={setAlignOpen}
+          onCropImage={setCropping}
+          onStickyColor={rememberStickyColor}
+          onTurn={turnSelection}
           single={single}
           arrowsSelected={arrowsSelected}
           items={doc.items}
@@ -511,6 +519,11 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           setItemLink={setItemLink}
           startLinkPick={startLinkPick}
           followLink={followLink}
+          tagNames={tagNames}
+          tagColors={tagColors}
+          onAddTag={tagSelection}
+          onRemoveTag={untagSelection}
+          onGatherTags={gatherTags}
         />
       )}
 
@@ -619,6 +632,9 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           </button>
         </div>
       )}
+
+      {/* what the keyboard just selected, for a screen reader; never seen */}
+      <div className="wall-announcer" role="status" aria-live="polite">{announcement}</div>
 
     {busy && (
         <div

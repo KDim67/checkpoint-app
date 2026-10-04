@@ -1,0 +1,163 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ComponentProps } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import WallItemView from '../src/renderer/src/components/wall/WallItemView'
+import { fontSizeOf, type WallItem } from '../src/shared/wallModel'
+
+afterEach(cleanup)
+
+type Props = ComponentProps<typeof WallItemView>
+
+const item = (over: Partial<WallItem> = {}): WallItem =>
+  ({ id: 'i', kind: 'note', x: 0, y: 0, width: 300, height: 200, z: 0, ...over } as WallItem)
+
+const view = (over: Partial<WallItem>, props: Partial<Props> = {}) =>
+  render(
+    <WallItemView
+      item={item(over)}
+      editing={false}
+      onTextChange={() => {}}
+      onFinishEditing={() => {}}
+      {...props}
+    />
+  )
+
+describe('a code block on the wall', () => {
+  it('draws the source coloured piece by piece, with its language named', () => {
+    const { container } = view({ kind: 'code', text: 'const x = 1', language: 'typescript' })
+
+    expect(container.textContent).toContain('const x = 1')
+    expect(container.textContent).toContain('JavaScript / TypeScript')
+    expect(container.querySelector('.wall-code-keyword')?.textContent).toBe('const')
+  })
+
+  it('writes in a plain box where Tab indents instead of leaving', () => {
+    const onTextChange = vi.fn()
+    view({ kind: 'code', text: 'x' }, { editing: true, onTextChange })
+
+    const box = screen.getByRole('textbox') as HTMLTextAreaElement
+    box.setSelectionRange(1, 1)
+    fireEvent.keyDown(box, { key: 'Tab' })
+
+    expect(onTextChange).toHaveBeenCalledWith('i', 'x  ')
+  })
+})
+
+describe('tags on a sticky', () => {
+  it('shows each tag, wearing the board\'s colour where it has one', () => {
+    const { container } = view({ tags: ['Bug', 'UI'] }, { tagColors: new Map([['bug', '#f28b82']]) })
+
+    const chips = [...container.querySelectorAll('.wall-tag-chip')]
+    expect(chips.map(c => c.textContent)).toStrictEqual(['Bug', 'UI'])
+    const dot = chips[0].querySelector('.wall-tag-dot') as HTMLElement
+    expect(dot.style.background.toLowerCase()).toMatch(/#f28b82|242, *139, *130/)
+  })
+
+  it('leaves the row out when a sticky has no tags', () => {
+    expect(view({}).container.querySelector('.wall-tag-row')).toBeNull()
+  })
+})
+
+describe('opening a sticky to write in', () => {
+  it('puts the caret after the last word, so a new line goes below the others', () => {
+    view({ text: 'first line\nsecond line' }, { editing: true })
+    const box = screen.getByRole('textbox') as HTMLTextAreaElement
+    expect(box.selectionStart).toBe(box.value.length)
+    expect(box.selectionEnd).toBe(box.value.length)
+  })
+})
+
+describe('a chosen text size', () => {
+  it('sets the words at it, and writing in them starts there too', () => {
+    const { container } = view({ text: 'Hello', fontSize: 28 })
+    expect((container.querySelector('.wall-paper > div > div') as HTMLElement).style.fontSize).toBe('28px')
+    cleanup()
+
+    view({ text: 'Hello', fontSize: 28 }, { editing: true })
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).style.fontSize).toBe('28px')
+  })
+
+  it('falls back to the size the kind reads at', () => {
+    expect(fontSizeOf(item({ kind: 'note' }))).toBe(13)
+    expect(fontSizeOf(item({ kind: 'shape' }))).toBe(14)
+    expect(fontSizeOf(item({ kind: 'text' }))).toBe(20)
+  })
+})
+
+describe('a cropped picture', () => {
+  const crop = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }
+
+  it('shows the kept part through a window, laid out bigger behind it', () => {
+    const { container } = view({ kind: 'image', ref: 'p.png', crop })
+
+    const picture = container.querySelector('img') as HTMLImageElement
+    expect(picture.style.width).toBe('200%')
+    expect(picture.style.left).toBe('-50%')
+    expect((picture.parentElement as HTMLElement).style.overflow).toBe('hidden')
+  })
+
+  it('fills its box as before when it has never been cropped', () => {
+    const { container } = view({ kind: 'image', ref: 'p.png' })
+    const picture = container.querySelector('img') as HTMLImageElement
+    expect(picture.style.objectFit).toBe('cover')
+    expect(picture.style.width).toBe('100%')
+  })
+
+  it('hands back the window and the picture\'s own size when the crop is kept', () => {
+    const onCrop = vi.fn()
+    const { container } = view({ kind: 'image', ref: 'p.png', crop }, { cropping: true, onCrop })
+
+    const measuring = container.querySelector('img.is-hidden') as HTMLImageElement
+    Object.defineProperty(measuring, 'naturalWidth', { value: 800 })
+    Object.defineProperty(measuring, 'naturalHeight', { value: 600 })
+    fireEvent.load(measuring)
+
+    fireEvent.click(screen.getByLabelText('Keep this part'))
+    expect(onCrop).toHaveBeenCalledWith('i', crop, { width: 800, height: 600 })
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onCrop).toHaveBeenCalledTimes(2)
+  })
+
+  it('goes back to the whole picture, and leaves it alone on cancel', () => {
+    const onCrop = vi.fn()
+    const { container } = view({ kind: 'image', ref: 'p.png', crop }, { cropping: true, onCrop })
+
+    const measuring = container.querySelector('img.is-hidden') as HTMLImageElement
+    Object.defineProperty(measuring, 'naturalWidth', { value: 800 })
+    Object.defineProperty(measuring, 'naturalHeight', { value: 600 })
+    fireEvent.load(measuring)
+
+    fireEvent.click(screen.getByLabelText('Whole picture'))
+    fireEvent.click(screen.getByLabelText('Keep this part'))
+    expect(onCrop).toHaveBeenLastCalledWith('i', { x: 0, y: 0, w: 1, h: 1 }, { width: 800, height: 600 })
+
+    fireEvent.click(screen.getByLabelText('Cancel'))
+    expect(onCrop).toHaveBeenLastCalledWith('i', null)
+  })
+})
+
+describe('a mind map topic', () => {
+  it('adds one under it on Tab and one beside it on Enter, while writing', () => {
+    const onMapTopic = vi.fn()
+    view({ kind: 'shape', map: 'm', text: 'Root' }, { editing: true, onMapTopic })
+
+    const box = screen.getByRole('textbox')
+    fireEvent.keyDown(box, { key: 'Tab' })
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    expect(onMapTopic.mock.calls).toStrictEqual([['i', 'child'], ['i', 'sibling']])
+  })
+
+  it('leaves Tab to the next item when it is not a topic', () => {
+    const onGrow = vi.fn()
+    const onMapTopic = vi.fn()
+    view({ text: 'plain' }, { editing: true, onGrow, onMapTopic })
+
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' })
+
+    expect(onGrow).toHaveBeenCalledWith('i', 'right')
+    expect(onMapTopic).not.toHaveBeenCalled()
+  })
+})

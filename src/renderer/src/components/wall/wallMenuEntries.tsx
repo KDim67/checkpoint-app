@@ -1,9 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket, Shapes, KanbanSquare, Group, Ungroup, Frame, Presentation, ImageDown } from 'lucide-react'
+import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket, Shapes, KanbanSquare, Group, Ungroup, Frame, Presentation, ImageDown, Code, Network, Tags, ListTree, Crop, RotateCw, RotateCcw, Minus, AlignStartVertical } from 'lucide-react'
 import { bringToFront, createWallItem, sendToBack, type WallDoc, type WallItem, type WallItemKind } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { isWritable, switchKinds, type WritableKind } from '../../../../shared/wallShape'
 import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
+import { alignableUnits } from '../../../../shared/wallAlign'
 
 const TURN_INTO: { kind: WritableKind; label: string }[] = [
   { kind: 'note', label: 'Turn into a sticky note' },
@@ -53,6 +54,16 @@ export interface WallMenuContext {
   frameSelection: () => void
   presentFrom: (frameId: string) => void
   exportFrame: (frame: WallItem) => void
+  /** tagged stickies into a frame a tag */
+  gatherTags: () => void
+  addMindMap: (at: { x: number; y: number }) => void
+  tidyMap: (mapId: string) => void
+  /** the crop window over one picture */
+  startCrop: (id: string) => void
+  /** quarter turns on the selection, clockwise for a positive number */
+  turnSelection: (degrees: number) => void
+  /** the align and space panel on the selection bar */
+  openAlign: () => void
 }
 
 /** item menu for an item, canvas menu for a spot */
@@ -61,7 +72,8 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
     menu, doc, docRef, selectedIds, setSelectedIds, setItems, addItem, openCard,
     duplicateSelected, toggleLock, removeSelected, fitToContent, runImageOp, placeDerived, toast,
     followLink, copyItemLink, setItemLink, refreshPreview, openLinkEditor, copyItems, cutItems,
-    copyStyle, pasteStyle, canPasteStyle, pasteHere, canPaste, makeCards, frameSelection, presentFrom, exportFrame
+    copyStyle, pasteStyle, canPasteStyle, pasteHere, canPaste, makeCards, frameSelection, presentFrom, exportFrame,
+    gatherTags, addMindMap, tidyMap, startCrop, turnSelection, openAlign
   } = ctx
   if (!menu) return []
 
@@ -73,6 +85,9 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
     // single image only, these read source pixels
     const imageOps: MenuEntry[] = item.kind === 'image' && item.ref && !many
       ? [
+          ...(item.locked
+            ? []
+            : [{ label: 'Crop this picture', icon: <Crop size={13} />, onClick: () => startCrop(item.id) }]),
           {
             label: 'Generate PBR maps',
             icon: <Wand2 size={13} />,
@@ -168,6 +183,38 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
         : [])
     ]
 
+    // a topic lays its branches out again after they have been dragged about
+    const mapId = item.map
+    const mapEntries: MenuEntry[] = mapId
+      ? [{ label: 'Tidy up the mind map', icon: <ListTree size={13} />, onClick: () => tidyMap(mapId) }]
+      : []
+
+    // an arrow is drawn between its ends, so there is nothing to turn
+    const turnable = chosen.length > 0 && chosen.every(i => i.kind !== 'arrow' && !i.locked)
+    const turnEntries: MenuEntry[] = turnable
+      ? [
+          { label: 'Rotate left', icon: <RotateCcw size={13} />, onClick: () => turnSelection(-90) },
+          { label: 'Rotate right', icon: <RotateCw size={13} />, onClick: () => turnSelection(90) },
+          ...(chosen.some(i => i.rotation)
+            ? [{ label: 'Straighten', icon: <Minus size={13} />, onClick: () => turnSelection(-(chosen[0].rotation ?? 0)) }]
+            : [])
+        ]
+      : []
+
+    // the same panel the bar's align button opens, where right-clicking looks for it
+    const alignEntries: MenuEntry[] = alignableUnits(doc.items, selectedIds) >= 2
+      ? [{ label: 'Line up and space out', icon: <AlignStartVertical size={13} />, onClick: openAlign }]
+      : []
+
+    const tagged = chosen.filter(i => (i.tags?.length ?? 0) > 0)
+    const tagEntries: MenuEntry[] = tagged.length > 0
+      ? [{
+          label: many ? 'Gather these by tag' : 'Gather stickies by tag',
+          icon: <Tags size={13} />,
+          onClick: gatherTags
+        }]
+      : []
+
     return [
       ...imageOps,
       ...(item.kind === 'card' && !many
@@ -175,8 +222,12 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
         : []),
       ...linkEntries,
       ...kindEntries,
+      ...alignEntries,
+      ...turnEntries,
       ...groupEntries,
       ...frameEntries,
+      ...mapEntries,
+      ...tagEntries,
       { label: many ? `Copy ${selectedIds.size} items` : 'Copy', icon: <ClipboardCopy size={13} />, hint: 'Ctrl C', onClick: copyItems },
       { label: many ? `Cut ${selectedIds.size} items` : 'Cut', icon: <Scissors size={13} />, hint: 'Ctrl X', onClick: cutItems },
       ...(many ? [] : [{ label: 'Copy style', icon: <Paintbrush size={13} />, onClick: copyStyle }]),
@@ -197,7 +248,15 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
     { label: 'Sticky note here', icon: <StickyNote size={13} />, onClick: () => addItem('note', {}, menu.at) },
     { label: 'Text here', icon: <Type size={13} />, onClick: () => addItem('text', {}, menu.at) },
     { label: 'Shape here', icon: <Shapes size={13} />, onClick: () => addItem('shape', {}, menu.at) },
+    { label: 'Code block here', icon: <Code size={13} />, onClick: () => addItem('code', {}, menu.at) },
     { label: 'Frame here', icon: <Square size={13} />, onClick: () => addItem('frame', {}, menu.at) },
+    { label: 'Mind map here', icon: <Network size={13} />, onClick: () => addMindMap(menu.at) },
+    {
+      label: 'Gather stickies by tag',
+      icon: <Tags size={13} />,
+      onClick: gatherTags,
+      disabled: !doc.items.some(i => (i.tags?.length ?? 0) > 0)
+    },
     { label: 'Paste here', icon: <ClipboardPaste size={13} />, hint: 'Ctrl V', onClick: () => pasteHere(menu.at), disabled: !canPaste },
     { label: 'Select all', icon: <Layers size={13} />, hint: 'Ctrl A', onClick: () => setSelectedIds(new Set(doc.items.filter(i => !i.locked).map(i => i.id))) },
     { label: 'Fit to content', icon: <Maximize2 size={13} />, onClick: fitToContent, disabled: doc.items.length === 0 }

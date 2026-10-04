@@ -16,17 +16,18 @@ export function useWallView() {
     setArrowHeads, marquee, busy, query, setQuery, wallMenuOpen, setWallMenuOpen, renaming,
     setRenaming, pendingDelete, setPendingDelete, railOpen, railWidth, setRailWidth, railTab,
     setRailTab, railQuery, setRailQuery, columns, dropColumnId, bgOpen, setBgOpen, shortcutsOpen,
-    setShortcutsOpen, spaceHeld, swatchOpen, setSwatchOpen, keys, panButtons, menuButton,
+    setShortcutsOpen, spaceHeld, swatchOpen, setSwatchOpen, alignOpen, setAlignOpen, keys, panButtons, menuButton,
     viewportRef, marqueeRectRef, fileInputRef, docRef, historyRef, cardsById, itemsById,
     notesByTitle, selectedItems, single, arrowsSelected, wallIndex, activeWall, commitIndex, addWall,
     setBackground, toggleRail, confirmDeleteWall, setItems, setCamera, onItemTextChange,
-    onItemFinishEditing, onItemAutoSize, applyHistory, addItem, removeSelected, duplicateSelected, toggleLock,
+    onItemFinishEditing, onItemAutoSize, growItemRoom, rememberStickyColor, cropping, setCropping, applyCrop, turnSelection, applyHistory, addItem, removeSelected, duplicateSelected, toggleLock,
     openCard, placeImageFiles, linkOpen, setLinkOpen, linkPickFor, setLinkPickFor, followLink,
     setItemLink, copyItemLink, startLinkPick, previewing, refreshPreview, addBookmark, growFrom,
     searchKind, setSearchKind, framesOpen, setFramesOpen, exportOpen, setExportOpen, binOpen, setBinOpen,
     presenting, restoreDeleted, frameSelection, showFrame, startPresenting, stopPresenting, stepPresenting,
     setFrameOrder, eraserMode, setEraserMode, penPresets, choosePenColor, choosePenWidth, pickPreset,
-    collab, isReadOnly, panCameraRef
+    collab, isReadOnly, panCameraRef, tagNames, tagColors, tagSelection, untagSelection, gatherTags,
+    addMindMap, addMapTopic, tidyMap, openItem, showItem, announcement
   } = wallDocument
   const {
     screenPoint, onWheel, jumpTo, exportWall, zoomBy, zoomReset, zoomToSelection, fitToContent, arrowAt,
@@ -99,6 +100,8 @@ export function useWallView() {
     spaceHeld,
     swatchOpen,
     setSwatchOpen,
+    alignOpen,
+    setAlignOpen,
     keys,
     panButtons,
     menuButton,
@@ -125,6 +128,12 @@ export function useWallView() {
     onItemTextChange,
     onItemFinishEditing,
     onItemAutoSize,
+    growItemRoom,
+    rememberStickyColor,
+    cropping,
+    setCropping,
+    applyCrop,
+    turnSelection,
     applyHistory,
     addItem,
     removeSelected,
@@ -198,7 +207,18 @@ export function useWallView() {
     pickPreset,
     collab,
     isReadOnly,
-    panCameraRef
+    panCameraRef,
+    tagNames,
+    tagColors,
+    tagSelection,
+    untagSelection,
+    gatherTags,
+    addMindMap,
+    addMapTopic,
+    tidyMap,
+    openItem,
+    showItem,
+    announcement
   }
 }
 

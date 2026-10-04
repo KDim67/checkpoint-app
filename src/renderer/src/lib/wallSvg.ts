@@ -1,10 +1,11 @@
 /** the wall as an SVG: the PNG's drawing as shapes and text that stay sharp at any size */
 
 import {
-  arrowAnchors, arrowDash, arrowGeometry, arrowHeadInset, arrowHeadPoints, boundsOf, inkNaturalSize, inkPath,
+  arrowAnchors, arrowDash, arrowGeometry, arrowHeadInset, arrowHeadPoints, boundsOf, fontSizeOf, inkNaturalSize, inkPath,
   inPaintOrder, ARROW_HEAD_MODES, ARROW_LINES, ARROW_SHAPES, SHAPE_TYPES, type TextAlign, type WallItem
 } from '../../../shared/wallModel'
 import { plainWallText } from '../../../shared/wallText'
+import { cropFrame } from '../../../shared/wallCrop'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../shared/wallShape'
 import { HIGHLIGHT_OPACITY } from '../../../shared/wallInk'
 import { languageLabel } from '../../../shared/wallCode'
@@ -93,6 +94,11 @@ function drawItem(item: WallItem, byId: Map<string, WallItem>, ctx: SvgContext):
 
   if (item.kind === 'image') {
     const data = item.ref ? ctx.imageData(item.ref) : undefined
+    if (data && item.crop) {
+      const part = cropFrame(item.crop)
+      const inner = `<image href="${esc(data)}" xlink:href="${esc(data)}" x="${part.left}" y="${part.top}" width="${part.width}" height="${part.height}" preserveAspectRatio="none"/>`
+      return `<svg x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" viewBox="0 0 100 100" preserveAspectRatio="none">${inner}</svg>`
+    }
     if (data) {
       return `<image href="${esc(data)}" xlink:href="${esc(data)}" x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" preserveAspectRatio="none"/>`
     }
@@ -103,12 +109,15 @@ function drawItem(item: WallItem, byId: Map<string, WallItem>, ctx: SvgContext):
     const side = textAlignOf(item)
     const rect = `<rect x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" fill="${esc(item.color || '#f6c453')}"/>`
     const inner = item.width - 24
-    return rect + lines(wrap(plainWallText(item.text ?? ''), inner, 13), anchorX(side, item.x + 12, inner), item.y + 26, 18, 13, '#1a1a1a', { side })
+    const size = fontSizeOf(item)
+    const step = Math.round(size * 1.45)
+    return rect + lines(wrap(plainWallText(item.text ?? ''), inner, size), anchorX(side, item.x + 12, inner), item.y + 12 + size, step, size, '#1a1a1a', { side })
   }
 
   if (item.kind === 'text') {
     const side = textAlignOf(item)
-    return lines(wrap(plainWallText(item.text ?? ''), item.width, 20), anchorX(side, item.x, item.width), item.y + 20, 26, 20, item.color || ctx.textColor, { weight: 600, side })
+    const size = fontSizeOf(item)
+    return lines(wrap(plainWallText(item.text ?? ''), item.width, size), anchorX(side, item.x, item.width), item.y + size, Math.round(size * 1.3), size, item.color || ctx.textColor, { weight: 600, side })
   }
 
   if (item.kind === 'shape') {
@@ -121,11 +130,13 @@ function drawItem(item: WallItem, byId: Map<string, WallItem>, ctx: SvgContext):
     const innerWidth = (item.width * (100 - room.left - room.right)) / 100
     const top = item.y + (item.height * room.top) / 100
     const innerHeight = (item.height * (100 - room.top - room.bottom)) / 100
-    const words = wrap(plainWallText(item.text ?? ''), innerWidth, 14)
-    const firstBaseline = top + innerHeight / 2 - ((words.length - 1) * 20) / 2 + 5
+    const size = fontSizeOf(item)
+    const step = Math.round(size * 1.45)
+    const words = wrap(plainWallText(item.text ?? ''), innerWidth, size)
+    const firstBaseline = top + innerHeight / 2 - ((words.length - 1) * step) / 2 + Math.round(size / 3)
     const fill = item.color ? getTextColorForBackground(item.color) : ctx.textColor
     const side = textAlignOf(item)
-    return path + lines(words, anchorX(side, left, innerWidth), firstBaseline, 20, 14, fill, { side })
+    return path + lines(words, anchorX(side, left, innerWidth), firstBaseline, step, size, fill, { side })
   }
 
   if (item.kind === 'code') {

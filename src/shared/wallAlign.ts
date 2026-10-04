@@ -6,7 +6,7 @@ export type AlignEdge = 'left' | 'centre' | 'right' | 'top' | 'middle' | 'bottom
 export type DistributeAxis = 'horizontal' | 'vertical'
 
 /** screen pixels a dragged edge has to come within before it snaps */
-export const GUIDE_SNAP_PX = 6
+export const GUIDE_SNAP_PX = 8
 
 /** what lines up as one piece, and every item that moves with it */
 interface Unit { bounds: Bounds; moves: Set<string> }

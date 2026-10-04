@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Layers2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { renameWall, setActiveWall, type WallIndex, type WallRef } from '../../../../shared/wallModel'
 
 type Renaming = { id: string; draft: string } | null
@@ -23,13 +23,14 @@ export default function WallSwitcher({
     <div data-wall-popover="wall" className="relative">
       <button
         onClick={() => { setWallMenuOpen(v => !v); setRenaming(null) }}
-        title="Switch wall"
+        title="Walls: switch between them, rename one, or start another"
+        aria-label={`Wall: ${activeWall?.name ?? 'loading'}. Switch, rename or add a wall`}
         aria-haspopup="menu"
         aria-expanded={wallMenuOpen}
         disabled={!wallIndex}
         style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-          maxWidth: '170px', height: '30px', padding: '0 var(--space-2)',
+          maxWidth: '190px', height: '30px', padding: '0 var(--space-2)',
           background: wallMenuOpen ? 'var(--color-surface-offset)' : 'transparent',
           border: '1px solid var(--color-surface-offset)',
           borderRadius: 'var(--radius-md)',
@@ -37,6 +38,8 @@ export default function WallSwitcher({
           fontWeight: 500, cursor: wallIndex ? 'pointer' : 'default'
         }}
       >
+        {/* the icon says these are walls, the name alone read as a label */}
+        <Layers2 size={13} className="icon-faint" style={{ flexShrink: 0 }} />
         <span className="truncate">
           {activeWall?.name ?? '…'}
         </span>

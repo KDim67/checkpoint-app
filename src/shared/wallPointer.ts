@@ -17,7 +17,11 @@ export type WallDrag =
       /** a still click on one member of a group picked whole picks just that member */
       narrowTo?: string
     }
-  | { mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number }
+  | {
+      mode: 'resize'; id: string; startX: number; startY: number; w: number; h: number
+      /** where the box was and which corner is pulled; the opposite one stays put */
+      x: number; y: number; corner: Corner
+    }
   | {
       mode: 'arrow'
       fromId: string
@@ -66,6 +70,43 @@ export function rotationStart(pointer: Point, centre: Point, rotation: number): 
 export function rotationAngle(pointer: Point, centre: Point, start: number, snapped: boolean): number {
   const angle = Math.atan2(pointer.y - centre.y, pointer.x - centre.x) * (180 / Math.PI) - start
   return snapped ? Math.round(angle / 15) * 15 : Math.round(angle)
+}
+
+export type Corner = 'nw' | 'ne' | 'sw' | 'se'
+export const CORNERS: readonly Corner[] = ['nw', 'ne', 'sw', 'se']
+
+/**
+ * the box a corner drag gives, from the box at the press: the opposite corner stays where it was,
+ * and keepShape holds its proportions, the way a photo is resized in any other app
+ */
+export function resizedBox(
+  start: { x: number; y: number; width: number; height: number },
+  corner: Corner,
+  dx: number,
+  dy: number,
+  { snapping, keepShape }: { snapping: boolean; keepShape: boolean }
+): { x: number; y: number; width: number; height: number } {
+  const across = corner.includes('w') ? -1 : 1
+  const down = corner.includes('n') ? -1 : 1
+  let width = start.width + across * dx
+  let height = start.height + down * dy
+
+  if (keepShape && start.width > 0 && start.height > 0) {
+    // the side pulled further leads, and the floors hold the shape too
+    const scale = Math.max(width / start.width, height / start.height, 40 / start.width, 32 / start.height)
+    width = snapping ? Math.max(40, snap(start.width * scale, SNAP_GRID)) : start.width * scale
+    height = width * (start.height / start.width)
+  } else {
+    width = Math.max(40, snapping ? snap(width, SNAP_GRID) : width)
+    height = Math.max(32, snapping ? snap(height, SNAP_GRID) : height)
+  }
+
+  return {
+    x: across < 0 ? start.x + start.width - width : start.x,
+    y: down < 0 ? start.y + start.height - height : start.y,
+    width,
+    height
+  }
 }
 
 /** from the size at the press */

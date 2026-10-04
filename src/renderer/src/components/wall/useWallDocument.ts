@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type ImageCrop, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
 import { errorMessage } from '../../../../shared/errors'
-import type { Item, NoteMetadata } from '../../../../shared/types'
+import { isHex } from '../../../../shared/color'
+import type { Item, NoteMetadata, Tag } from '../../../../shared/types'
 import type { RailTab } from './WallBoardRail'
 import { appendPosition, planHandoff } from '../../../../shared/wallBoard'
 import { cardFromText, isWritable } from '../../../../shared/wallShape'
 import { loadBoardConfig } from '../../lib/boardConfig'
-import { getBoolSetting, getNumberSetting, getEnumSetting, getJsonSetting, setBoolSetting, setJsonSetting, setStringSetting } from '../../lib/settings'
+import { getBoolSetting, getNumberSetting, getEnumSetting, getJsonSetting, getStringSetting, setBoolSetting, setJsonSetting, setStringSetting } from '../../lib/settings'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
 import { PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES, type PanButtons, type MenuButton } from '../../lib/wallInput'
 import { DEFAULT_COLUMNS, type ColumnConfig } from '../../../../shared/boardModel'
 import { createItem, deleteItem, updateItem, itemPage } from '../../data/items'
-import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, ERASER_MODE_KEY, PEN_PRESETS_KEY, clampRail } from './wallPreferences'
+import { RAIL_OPEN_KEY, RAIL_WIDTH_KEY, SMOOTHING_KEY, ARROW_SHAPE_KEY, ARROW_LINE_KEY, ARROW_HEADS_KEY, ERASER_MODE_KEY, PEN_PRESETS_KEY, STICKY_COLOR_KEY, clampRail } from './wallPreferences'
 import { DEFAULT_PEN_PRESETS, normalizePenPresets, presetFor, withActivePreset, withPresetChange, type PenPresets } from './wallPenPresets'
 import * as notesApi from '../../data/notes'
 import * as mediaApi from '../../data/media'
@@ -31,6 +32,13 @@ import { binRemoved, restoreEntry } from '../../../../shared/wallBin'
 import { frameAround, framesInOrder, type PresentAction } from '../../../../shared/wallFrames'
 import type { SearchKind } from '../../../../shared/wallFind'
 import { ERASER_MODES, type EraserMode, type WallTool } from './wallTools'
+import { addTag, gatherByTag, removeTag, taggable } from '../../../../shared/wallTags'
+import { addTopic, layoutMap, mapRoot, mapsOf, withBranches, type TopicPlace } from '../../../../shared/wallMindMap'
+import { listTags, resolveTagIds } from '../../data/tags'
+import { cropHeight, isFullCrop } from '../../../../shared/wallCrop'
+import { fitImageBox, rowCentres } from '../../../../shared/wallImage'
+import { readImageSize } from '../../lib/imageSize'
+import { wallIdOf } from '../../../../shared/wallSearch'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
 
@@ -48,6 +56,10 @@ export function useWallDocument() {
   const selectItem = useAppStore(s => s.selectItem)
   const setView = useAppStore(s => s.setView)
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
+  const pendingCreate = useAppStore(s => s.pendingCreate)
+  const setPendingCreate = useAppStore(s => s.setPendingCreate)
+  const pendingWallLink = useAppStore(s => s.pendingWallLink)
+  const setPendingWallLink = useAppStore(s => s.setPendingWallLink)
   const { toast } = useToast()
   const collab = useCollab()
   const isReadOnly = collab.active && collab.isReadOnly && collab.workspace === activeWorkspace
@@ -90,6 +102,10 @@ export function useWallDocument() {
   const [query, setQuery] = useState('')
   /** Find narrowed to one kind of item */
   const [searchKind, setSearchKind] = useState<SearchKind>('all')
+  /** the board's tags, so a sticky's labels match them by name and wear their colour */
+  const [boardTags, setBoardTags] = useState<Tag[]>([])
+  /** what the keyboard just did, for a screen reader to read out */
+  const [announcement, setAnnouncement] = useState('')
   /** re-renders the buttons for the ref-held history */
   const [historyTick, setHistoryTick] = useState(0)
 
@@ -112,6 +128,12 @@ export function useWallDocument() {
   /** space pans without putting the tool down */
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [swatchOpen, setSwatchOpen] = useState(false)
+  /** the align and space panel, opened from the bar or the menu */
+  const [alignOpen, setAlignOpen] = useState(false)
+  /** the image whose crop window is open */
+  const [cropping, setCropping] = useState<string | null>(null)
+  /** the colour the next sticky takes, the last one picked for a sticky */
+  const stickyColorRef = useRef(WALL_COLORS[0])
   const [framesOpen, setFramesOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [binOpen, setBinOpen] = useState(false)
@@ -173,6 +195,9 @@ export function useWallDocument() {
   const cardsById = useMemo(() => new Map(cards.map(c => [c.id, c])), [cards])
   const itemsById = useMemo(() => new Map(doc.items.map(i => [i.id, i])), [doc.items])
   const notesByTitle = useMemo(() => new Map(notes.map(n => [n.title, n])), [notes])
+  /** by lowercased name, since a sticky stores the name and the board owns the colour */
+  const tagColors = useMemo(() => new Map(boardTags.map(t => [t.name.toLowerCase(), t.color])), [boardTags])
+  const tagNames = useMemo(() => boardTags.map(t => t.name), [boardTags])
   const selectedItems = doc.items.filter(i => selectedIds.has(i.id))
   const single = selectedItems.length === 1 ? selectedItems[0] : null
   /** restyling needs every selected item to be a connector */
@@ -218,6 +243,24 @@ export function useWallDocument() {
     }
   }, [activeWorkspace])
 
+  /** the board's own tag list, so stickies offer the same names and colours */
+  useEffect(() => {
+    let cancelled = false
+    const read = (): void => {
+      void listTags().then(list => { if (!cancelled) setBoardTags(list) }).catch(() => {})
+    }
+    read()
+    const onMutation = (e: Event): void => {
+      const type = (e as CustomEvent<{ type?: string }>).detail?.type ?? ''
+      if (type === 'createTag' || type === 'updateTag' || type === 'deleteTag') read()
+    }
+    window.addEventListener('db-mutation', onMutation)
+    return () => {
+      cancelled = true
+      window.removeEventListener('db-mutation', onMutation)
+    }
+  }, [])
+
   /** matching the popover's subtree lets the dismissing click through; a backdrop ate it */
   useEffect(() => {
     if (!wallMenuOpen && !bgOpen && !shortcutsOpen && !framesOpen && !exportOpen && !binOpen) return
@@ -249,9 +292,11 @@ export function useWallDocument() {
       getEnumSetting(PAN_BUTTONS_KEY, PAN_BUTTON_MODES, PAN_BUTTON_MODES[0]),
       getEnumSetting(MENU_BUTTON_KEY, MENU_BUTTON_MODES, MENU_BUTTON_MODES[0]),
       getEnumSetting(ERASER_MODE_KEY, ERASER_MODES, ERASER_MODES[0]),
-      getJsonSetting<unknown>(PEN_PRESETS_KEY, null)
-    ]).then(([open, width, smooth, shape, line, heads, pan, menuOn, eraser, presets]) => {
+      getJsonSetting<unknown>(PEN_PRESETS_KEY, null),
+      getStringSetting(STICKY_COLOR_KEY, '')
+    ]).then(([open, width, smooth, shape, line, heads, pan, menuOn, eraser, presets, sticky]) => {
       if (cancelled) return
+      if (isHex(sticky)) stickyColorRef.current = sticky
       setEraserModeState(eraser)
       setPenPresets(normalizePenPresets(presets))
       setRailOpen(open)
@@ -479,6 +524,52 @@ export function useWallDocument() {
     setItems(items.map(i => (i.id === id ? { ...i, height: next } : i)), { record: false })
   }, [setItems])
 
+  /** a sticky grows as it is written in rather than hiding the last lines; part of that edit, not a step */
+  const growItemRoom = useCallback((id: string, extra: number) => {
+    const items = docRef.current.items
+    const target = items.find(i => i.id === id)
+    if (!target || target.locked || extra < 1) return
+    const next = Math.ceil(target.height + extra)
+    setItems(items.map(i => (i.id === id ? { ...i, height: next } : i)), { record: false })
+  }, [setItems])
+
+  /** the kept window, with the item reshaped so those pixels sit square-on; null leaves the picture alone */
+  const applyCrop = useCallback((
+    id: string,
+    crop: ImageCrop | null,
+    natural?: { width: number; height: number }
+  ) => {
+    setCropping(null)
+    if (!crop) return
+    const items = docRef.current.items
+    const target = items.find(i => i.id === id)
+    if (!target || target.locked) return
+    const height = natural ? cropHeight(crop, target.width, natural) : target.height
+    setItems(items.map(i => {
+      if (i.id !== id) return i
+      const next = { ...i, height }
+      if (isFullCrop(crop)) delete next.crop
+      else next.crop = crop
+      return next
+    }))
+  }, [setItems])
+
+  /** quarter turns, the way an upright photo is put right; a locked item stays as it is */
+  const turnSelection = useCallback((degrees: number) => {
+    const items = docRef.current.items
+    const chosen = items.filter(i => selectedRef.current.has(i.id) && !i.locked && i.kind !== 'arrow')
+    if (chosen.length === 0) return
+    const picked = new Set(chosen.map(i => i.id))
+    setItems(items.map(i => {
+      if (!picked.has(i.id)) return i
+      const turned = (((i.rotation ?? 0) + degrees) % 360 + 360) % 360
+      const next = { ...i }
+      if (turned === 0) delete next.rotation
+      else next.rotation = turned
+      return next
+    }))
+  }, [setItems, selectedRef])
+
   const applyHistory = useCallback((next: History<WallStep>) => {
     historyRef.current = next
     setHistoryTick(t => t + 1)
@@ -500,15 +591,22 @@ export function useWallDocument() {
     return toWallPoint({ x: rect.width / 2, y: rect.height / 2 }, docRef.current.camera)
   }, [])
 
+  /** a new sticky takes the colour last picked for one; a colour that changed with every sticky read as random */
+  const rememberStickyColor = useCallback((color: string) => {
+    if (!isHex(color) || color === stickyColorRef.current) return
+    stickyColorRef.current = color
+    void setStringSetting(STICKY_COLOR_KEY, color)
+  }, [])
+
   const addItem = useCallback((kind: WallItemKind, extra: Partial<WallItem> = {}, at?: { x: number; y: number }) => {
     const items = docRef.current.items
     const created = createWallItem(kind, at ?? centreOfView(), items, {
-      ...(kind === 'note' ? { color: WALL_COLORS[items.length % WALL_COLORS.length] } : {}),
+      ...(kind === 'note' ? { color: stickyColorRef.current } : {}),
       ...extra
     })
     setItems([...items, created])
     setSelectedIds(new Set([created.id]))
-    if (kind === 'note' || kind === 'text' || kind === 'frame' || kind === 'shape') setEditingId(created.id)
+    if (kind === 'note' || kind === 'text' || kind === 'frame' || kind === 'shape' || kind === 'code') setEditingId(created.id)
   }, [centreOfView, setItems])
 
   /** joined to the source when given an arrow's style; panned into view first, the editor's focus would scroll the wall */
@@ -529,16 +627,79 @@ export function useWallDocument() {
     setEditingId(grown.id)
   }, [setItems])
 
+  /** the name onto every picked sticky, or off it; nothing to change isn't an undo step */
+  const tagSelection = useCallback((name: string) => {
+    const items = docRef.current.items
+    const next = addTag(items, selectedRef.current, name)
+    if (next !== items) setItems(next)
+  }, [setItems])
+
+  const untagSelection = useCallback((name: string) => {
+    const items = docRef.current.items
+    const next = removeTag(items, selectedRef.current, name)
+    if (next !== items) setItems(next)
+  }, [setItems])
+
+  /** the picked stickies into a frame a tag, or every tagged sticky when nothing is picked */
+  const gatherTags = useCallback(() => {
+    const items = docRef.current.items
+    const picked = new Set(
+      [...selectedRef.current].filter(id => {
+        const item = items.find(i => i.id === id)
+        return !!item && taggable(item) && (item.tags?.length ?? 0) > 0
+      })
+    )
+    const result = gatherByTag(items, picked)
+    if (result.clusters === 0) {
+      toast('Tag some stickies first, then gather them.')
+      return
+    }
+    setItems(result.items)
+    toast(`Gathered ${result.clusters} tag${result.clusters === 1 ? '' : 's'} into frames.`)
+  }, [setItems, toast])
+
+  /** the centre topic of a new map, named straight away */
+  const addMindMap = useCallback((at?: { x: number; y: number }) => {
+    const items = docRef.current.items
+    const root = mapRoot(items, at ?? centreOfView())
+    setItems([...items, root])
+    setSelectedIds(new Set([root.id]))
+    setEditingId(root.id)
+  }, [centreOfView, setItems])
+
+  /** Tab or Enter in a topic: the next one under it or beside it, laid out and ready to type in */
+  const addMapTopic = useCallback((fromId: string, place: TopicPlace) => {
+    const result = addTopic(docRef.current.items, fromId, place)
+    if (!result) return
+    const rect = viewportRef.current?.getBoundingClientRect()
+    const camera = panCameraRef.current ?? docRef.current.camera
+    const shown = rect ? cameraShowing(camera, { width: rect.width, height: rect.height }, result.topic) : camera
+    setItems(result.items, { camera: shown === docRef.current.camera ? undefined : shown })
+    setSelectedIds(new Set([result.topic.id]))
+    setEditingId(result.topic.id)
+  }, [setItems])
+
+  /** after dragging topics about, the tree again */
+  const tidyMap = useCallback((mapId: string) => {
+    const items = docRef.current.items
+    const next = layoutMap(items, mapId)
+    if (next !== items) setItems(next)
+  }, [setItems])
+
   const removeSelected = useCallback(() => {
     const ids = selectedRef.current
     if (ids.size === 0) return
     const items = docRef.current.items
-    const gone = items.filter(i => ids.has(i.id))
+    // a topic takes the branch under it, or its children would hang from nothing
+    const wanted = withBranches(items, ids)
+    const gone = items.filter(i => wanted.has(i.id))
     // prune arrows too, or a dangling one stays invisible and unselectable
-    const kept = pruneArrows(items.filter(i => !ids.has(i.id)))
+    const kept = pruneArrows(items.filter(i => !wanted.has(i.id)))
     const keptIds = new Set(kept.map(i => i.id))
+    // the maps a branch left close the gap
+    const tidied = mapsOf(gone).reduce((list, mapId) => layoutMap(list, mapId), kept)
     // the pruned arrows go in the bin too, so they come back with their items
-    setItems(kept, { removed: items.filter(i => !keptIds.has(i.id)) })
+    setItems(tidied, { removed: items.filter(i => !keptIds.has(i.id)) })
     setSelectedIds(new Set())
     toast(`Removed ${gone.length} item${gone.length === 1 ? '' : 's'}.`, {
       action: { label: 'Undo', onClick: () => setItems([...docRef.current.items, ...gone]) }
@@ -627,6 +788,39 @@ export function useWallDocument() {
     setCamera(cameraCentredOn(target, { width: rect.width, height: rect.height }, docRef.current.camera.zoom))
     setSelectedIds(new Set([target.id]))
   }, [wallIndex, commitIndex, setCamera, toast])
+
+  /** what a double-click or Enter does: open what leads somewhere, write in what holds words */
+  const openItem = useCallback((item: WallItem) => {
+    if (item.locked) return
+    if (item.kind === 'card') { openCard(item); return }
+    if (item.kind === 'doc') {
+      // Notes opens the title on arrival
+      if (item.ref) {
+        setPendingNoteTitle(item.ref)
+        setView('notes')
+      }
+      return
+    }
+    if (item.kind === 'bookmark') {
+      if (item.link) followLink(item.link)
+      return
+    }
+    // a picture holds no words, so opening it is the crop window
+    if (item.kind === 'image') { setCropping(item.id); return }
+    setEditingId(item.id)
+  }, [openCard, followLink, setPendingNoteTitle, setView])
+
+  /** picked and panned into view by the least amount, with a word for the screen reader */
+  const showItem = useCallback((item: WallItem, spoken?: string) => {
+    setSelectedIds(new Set([item.id]))
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (rect) {
+      const camera = panCameraRef.current ?? docRef.current.camera
+      const shown = cameraShowing(camera, { width: rect.width, height: rect.height }, item)
+      if (shown !== camera) setCamera(shown)
+    }
+    if (spoken) setAnnouncement(spoken)
+  }, [setCamera])
 
   /** one undo step; undefined removes it; a locked item keeps its link like its text */
   const setItemLink = useCallback((id: string, link: string | undefined) => {
@@ -800,10 +994,15 @@ export function useWallDocument() {
     try {
       for (const source of sources) {
         const { title, body } = cardFromText(source.text ?? '')
+        // a sticky's tags become the card's by name, reusing the board's own and making what it hasn't got
+        const tagIds = await resolveTagIds((source.tags ?? []).map(name => ({
+          name,
+          color: tagColors.get(name.toLowerCase()) ?? '#535e85'
+        })))
         const card = await createItem({
           type: 'card', context: activeWorkspace, title, body, status: column.id,
           priority: 0, position, due_at: null, metadata: '{}'
-        })
+        }, tagIds)
         made.push({ source, card })
         // the board's gap, so the cards keep the order they were picked in
         position += 1000
@@ -848,7 +1047,7 @@ export function useWallDocument() {
         }
       }
     })
-  }, [columns, cards, activeWorkspace, setItems, toast])
+  }, [columns, cards, activeWorkspace, setItems, tagColors, toast])
 
   /** back above everything and selected, so it's plain what came back */
   const restoreDeleted = useCallback((entryId: string) => {
@@ -984,22 +1183,52 @@ export function useWallDocument() {
   const placeImageFiles = useCallback(async (files: File[], at?: { x: number; y: number }) => {
     const images = files.filter(f => f.type.startsWith('image/'))
     if (images.length === 0) return
+    const saved: { filename: string; name: string; size: { width: number; height: number } }[] = []
     for (const file of images) {
       try {
         const buffer = await file.arrayBuffer()
         const ext = (file.type.split('/')[1] || 'png').replace('+xml', '')
         const filename = await mediaApi.saveFromBuffer(buffer, ext)
-        addItem('image', { ref: filename, text: file.name }, at)
+        // its own shape, or the old box when it can't be read
+        const size = fitImageBox(await readImageSize(file)) ?? DEFAULT_SIZES.image
+        saved.push({ filename, name: file.name, size })
         window.dispatchEvent(
           new CustomEvent('collab-broadcast-asset', {
             detail: { filename, buffer, mimeType: file.type }
           })
         )
       } catch (err) {
-        toast(`Could not add image: ${errorMessage(err)}`, { type: 'error' })
+        toast(`Could not add ${file.name || 'an image'}: ${errorMessage(err)}`, { type: 'error' })
       }
     }
-  }, [addItem, toast])
+    if (saved.length === 0) return
+
+    // side by side, one undo step for the whole drop; one after another they landed in a pile
+    const items = docRef.current.items
+    const centres = rowCentres(saved.map(s => s.size), at ?? centreOfView())
+    const placed = saved.reduce<WallItem[]>((made, picture, i) => [
+      ...made,
+      createWallItem('image', centres[i], [...items, ...made], {
+        ref: picture.filename, text: picture.name, ...picture.size
+      })
+    ], [])
+    setItems([...items, ...placed])
+    setSelectedIds(new Set(placed.map(p => p.id)))
+  }, [centreOfView, setItems, toast])
+
+  /** what the palette asked for on the way here: a wall or an item to open, or something to make */
+  useEffect(() => {
+    if (loading || !wallIndex) return
+    if (pendingWallLink) {
+      setPendingWallLink(null)
+      const wallId = wallIdOf(pendingWallLink)
+      if (!wallId) followLink(pendingWallLink)
+      else if (!wallIndex.walls.some(w => w.id === wallId)) toast('That wall was deleted.')
+      else if (wallId !== wallIndex.activeId) commitIndex(setActiveWall(wallIndex, wallId))
+    }
+    if (pendingCreate === 'sticky') { setPendingCreate(null); addItem('note') }
+    if (pendingCreate === 'wall') { setPendingCreate(null); addWall() }
+  }, [loading, wallIndex, pendingWallLink, pendingCreate, setPendingWallLink, setPendingCreate, followLink, commitIndex, addItem, addWall, toast])
 
 
   return {
@@ -1075,6 +1304,8 @@ export function useWallDocument() {
     setSpaceHeld,
     swatchOpen,
     setSwatchOpen,
+    alignOpen,
+    setAlignOpen,
     keys,
     matchKey,
     panButtons,
@@ -1117,6 +1348,12 @@ export function useWallDocument() {
     onItemTextChange,
     onItemFinishEditing,
     onItemAutoSize,
+    growItemRoom,
+    rememberStickyColor,
+    cropping,
+    setCropping,
+    applyCrop,
+    turnSelection,
     growFrom,
     pasteCells,
     applyHistory,
@@ -1168,7 +1405,18 @@ export function useWallDocument() {
     choosePenWidth,
     pickPreset,
     collab,
-    isReadOnly
+    isReadOnly,
+    tagNames,
+    tagColors,
+    tagSelection,
+    untagSelection,
+    gatherTags,
+    addMindMap,
+    addMapTopic,
+    tidyMap,
+    openItem,
+    showItem,
+    announcement
   }
 }
 

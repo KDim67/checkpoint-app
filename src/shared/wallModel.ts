@@ -30,6 +30,10 @@ export interface WallItem {
   align?: TextAlign
   /** typography font family for items with words, absent for default sans */
   font?: WallFont
+  /** chosen text size in pixels, absent while the words size themselves to the box */
+  fontSize?: number
+  /** the part of an image that shows, as fractions of the whole; absent for all of it */
+  crop?: ImageCrop
   /** a shape's outline colour, absent for the default */
   borderColor?: string
   /** a rounded shape's corners in pixels, absent for the default curve */
@@ -135,6 +139,30 @@ export const WALL_FONT_NAMES: Record<WallFont, string> = {
   typewriter: 'Typewriter',
   comic: 'Comic'
 }
+
+/** the part of an image that shows: fractions of the whole picture, left, top, width and height */
+export interface ImageCrop {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** the size words take when nobody has chosen one, by the kind that holds them */
+export const OWN_FONT_SIZES: Partial<Record<WallItemKind, number>> = {
+  note: 13,
+  shape: 14,
+  text: 20
+}
+
+/** offered sizes; any number in range is still valid, these are the ones worth a click */
+export const WALL_FONT_SIZES = [10, 12, 14, 16, 20, 24, 32, 40, 56, 72] as const
+export const MIN_FONT_SIZE = 8
+export const MAX_FONT_SIZE = 200
+
+/** what the words actually measure, chosen or the kind's own */
+export const fontSizeOf = (item: WallItem): number =>
+  item.fontSize ?? OWN_FONT_SIZES[item.kind] ?? 13
 
 export const MIN_ZOOM = 0.2
 export const MAX_ZOOM = 3
@@ -246,6 +274,21 @@ function readPoint(raw: unknown): { x: number; y: number } | null {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
 }
 
+/** null for anything that isn't a readable slice of a picture, including the whole of one */
+function readCrop(raw: unknown): ImageCrop | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const o = raw as Record<string, unknown>
+  const x = num(o.x, NaN)
+  const y = num(o.y, NaN)
+  const w = num(o.w, NaN)
+  const h = num(o.h, NaN)
+  if (![x, y, w, h].every(Number.isFinite)) return null
+  if (w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > 1.0001 || y + h > 1.0001) return null
+  // the whole picture is no crop at all
+  if (x === 0 && y === 0 && w >= 1 && h >= 1) return null
+  return { x, y, w: Math.min(w, 1 - x), h: Math.min(h, 1 - y) }
+}
+
 /** two points minimum; odd length means truncated */
 function normalizePoints(raw: unknown): number[] | null {
   if (!Array.isArray(raw) || raw.length < 4 || raw.length % 2 !== 0) return null
@@ -296,6 +339,8 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const align = kind === 'note' || kind === 'text' || kind === 'shape' ? oneOf(o.align, TEXT_ALIGNS) : null
   const font = kind === 'note' || kind === 'text' || kind === 'shape' ? oneOf(o.font, WALL_FONTS) : null
   const ownAlign: TextAlign = kind === 'shape' ? 'center' : 'left'
+  const fontSize = kind === 'note' || kind === 'text' || kind === 'shape' ? num(o.fontSize, NaN) : NaN
+  const crop = kind === 'image' ? readCrop(o.crop) : null
   const radius = kind === 'shape' ? num(o.radius, NaN) : NaN
   const opacity = kind === 'shape' ? num(o.opacity, NaN) : NaN
   const tags = kind === 'note' ? cleanTags(o.tags) : []
@@ -335,6 +380,8 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(shape && shape !== SHAPE_TYPES[0] ? { shape } : {}),
     ...(align && align !== ownAlign ? { align } : {}),
     ...(font && font !== 'sans' ? { font } : {}),
+    ...(Number.isFinite(fontSize) ? { fontSize: Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fontSize)) } : {}),
+    ...(crop ? { crop } : {}),
     ...(kind === 'shape' && str(o.borderColor) ? { borderColor: str(o.borderColor) } : {}),
     ...(Number.isFinite(radius) ? { radius: Math.min(200, Math.max(0, radius)) } : {}),
     // a fill too faint to see can't be found to click

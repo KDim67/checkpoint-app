@@ -2,10 +2,11 @@
 
 import {
   arrowAnchors, arrowGeometry, arrowDash, arrowHeadPoints, arrowHeadInset,
-  boundsOf, inkNaturalSize, inPaintOrder,
+  boundsOf, fontSizeOf, inkNaturalSize, inPaintOrder,
   ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type TextAlign, type WallItem
 } from '../../../shared/wallModel'
 import { plainWallText } from '../../../shared/wallText'
+import { cropPixels } from '../../../shared/wallCrop'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../shared/wallShape'
 import { HIGHLIGHT_OPACITY } from '../../../shared/wallInk'
 import { languageLabel } from '../../../shared/wallCode'
@@ -167,29 +168,38 @@ export async function renderWallCanvas(
       ctx.stroke()
     } else if (item.kind === 'image' && item.ref) {
       const img = await loadImage(item.ref)
-      if (img) ctx.drawImage(img, item.x, item.y, item.width, item.height)
+      if (img && item.crop) {
+        const { sx, sy, sw, sh } = cropPixels(item.crop, { width: img.naturalWidth, height: img.naturalHeight })
+        ctx.drawImage(img, sx, sy, sw, sh, item.x, item.y, item.width, item.height)
+      } else if (img) {
+        ctx.drawImage(img, item.x, item.y, item.width, item.height)
+      }
     } else if (item.kind === 'note') {
       ctx.fillStyle = item.color || '#f6c453'
       ctx.fillRect(item.x, item.y, item.width, item.height)
+      const size = fontSizeOf(item)
+      const step = Math.round(size * 1.45)
       ctx.fillStyle = '#1a1a1a'
-      ctx.font = '13px sans-serif'
+      ctx.font = `${size}px sans-serif`
       const side = textAlignOf(item)
       const anchor = anchorX(side, item.x + 12, item.width - 24)
       ctx.textAlign = side
       wrapLines(plainWallText(item.text ?? ''), item.width - 24, measure).forEach((line, i) => {
-        ctx.fillText(line, anchor, item.y + 26 + i * 18)
-        record(line, anchor, item.y + 26 + i * 18, 13, side)
+        ctx.fillText(line, anchor, item.y + 12 + size + i * step)
+        record(line, anchor, item.y + 12 + size + i * step, size, side)
       })
     } else if (item.kind === 'text') {
       ctx.fillStyle = item.color || ctxInfo.textColor
-      ctx.font = '600 20px sans-serif'
+      const size = fontSizeOf(item)
+      const step = Math.round(size * 1.3)
+      ctx.font = `600 ${size}px sans-serif`
       const side = textAlignOf(item)
       const anchor = anchorX(side, item.x, item.width)
       ctx.textAlign = side
       // styles don't survive the canvas, the words and their lines do
       wrapLines(plainWallText(item.text ?? ''), item.width, measure).forEach((line, i) => {
-        ctx.fillText(line, anchor, item.y + 20 + i * 26)
-        record(line, anchor, item.y + 20 + i * 26, 20, side)
+        ctx.fillText(line, anchor, item.y + size + i * step)
+        record(line, anchor, item.y + size + i * step, size, side)
       })
     } else if (item.kind === 'shape') {
       const outline = item.shape ?? SHAPE_TYPES[0]
@@ -210,12 +220,13 @@ export async function renderWallCanvas(
       const innerWidth = (item.width * (100 - room.left - room.right)) / 100
       const top = (item.height * room.top) / 100
       const innerHeight = (item.height * (100 - room.top - room.bottom)) / 100
-      const lineHeight = 20
+      const size = fontSizeOf(item)
+      const lineHeight = Math.round(size * 1.45)
       const side = textAlignOf(item)
       const anchor = anchorX(side, left, innerWidth)
 
       ctx.fillStyle = item.color ? getTextColorForBackground(item.color) : ctxInfo.textColor
-      ctx.font = '14px sans-serif'
+      ctx.font = `${size}px sans-serif`
       ctx.textAlign = side
       ctx.textBaseline = 'middle'
       const lines = wrapLines(plainWallText(item.text ?? ''), innerWidth, measure)
@@ -223,7 +234,7 @@ export async function renderWallCanvas(
       lines.forEach((line, i) => {
         ctx.fillText(line, anchor, firstY + i * lineHeight)
         // a middle baseline sits about a third of the size above the alphabetic one
-        record(line, item.x + anchor, item.y + firstY + i * lineHeight + 5, 14, side)
+        record(line, item.x + anchor, item.y + firstY + i * lineHeight + Math.round(size / 3), size, side)
       })
     } else if (item.kind === 'code') {
       ctx.fillStyle = ctxInfo.surfaceColor

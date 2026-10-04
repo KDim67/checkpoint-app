@@ -2,7 +2,7 @@
 
 import {
   boundsOf, inPaintOrder, normalizeWallItem, pruneArrows, topZ, withFrameContents,
-  type ArrowHeads, type ArrowLine, type ArrowShape, type Point, type TextAlign, type WallItem
+  type ArrowHeads, type ArrowLine, type ArrowShape, type Point, type TextAlign, type WallFont, type WallItem
 } from './wallModel'
 import { parseWallLink } from './wallLink'
 import { plainWallText } from './wallText'
@@ -150,6 +150,9 @@ export interface WallStyle {
   arrowHeads?: ArrowHeads
   /** the side the words sit on as it looks, since each kind has its own default */
   align?: TextAlign
+  font?: WallFont
+  /** absent means the words size themselves to the box */
+  fontSize?: number
   borderColor?: string
   radius?: number
   opacity?: number
@@ -163,7 +166,7 @@ export function styleOf(item: WallItem): WallStyle {
     color: item.color,
     ...(drawsLines(item) ? { strokeWidth: item.strokeWidth } : {}),
     ...(item.kind === 'arrow' ? { arrowShape: item.arrowShape, arrowLine: item.arrowLine, arrowHeads: item.arrowHeads } : {}),
-    ...(isWritable(item.kind) ? { align: textAlignOf(item) } : {}),
+    ...(isWritable(item.kind) ? { align: textAlignOf(item), font: item.font, fontSize: item.fontSize } : {}),
     ...(item.kind === 'shape' ? { borderColor: item.borderColor, radius: item.radius, opacity: item.opacity } : {})
   }
 }
@@ -186,10 +189,14 @@ export function applyStyle(items: WallItem[], ids: Set<string>, style: WallStyle
       take(next, 'arrowLine')
       take(next, 'arrowHeads')
     }
-    if (isWritable(item.kind) && style.align) {
-      // stored only off the kind's own side, the way a load keeps it
-      if (style.align === (item.kind === 'shape' ? 'center' : 'left')) delete next.align
-      else next.align = style.align
+    if (isWritable(item.kind)) {
+      if (style.align) {
+        // stored only off the kind's own side, the way a load keeps it
+        if (style.align === (item.kind === 'shape' ? 'center' : 'left')) delete next.align
+        else next.align = style.align
+      }
+      take(next, 'font')
+      take(next, 'fontSize')
     }
     if (item.kind === 'shape') {
       take(next, 'borderColor')

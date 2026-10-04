@@ -1,7 +1,9 @@
 import React from 'react'
 import { ExternalLink, Link2, Lock, RotateCw } from 'lucide-react'
-import type { WallItem } from '../../../../shared/wallModel'
+import type { ImageCrop, WallItem } from '../../../../shared/wallModel'
 import type { Side } from '../../../../shared/wallGrow'
+import type { TopicPlace } from '../../../../shared/wallMindMap'
+import type { Corner } from '../../../../shared/wallPointer'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import WallItemView from './WallItemView'
 
@@ -33,10 +35,27 @@ interface Props {
   dimmed?: boolean
   /** peers who currently have this item selected */
   remoteSelectedBy?: { peerId: string; name: string; color: string }[]
+  /** board tag colours by lowercased name, held in the hook so the memo holds */
+  tagColors?: Map<string, string>
+  /** Tab and Enter in a mind map topic */
+  onMapTopic?: (id: string, place: TopicPlace) => void
+  /** a sticky being written in has run out of room for its words */
+  onNeedRoom?: (id: string, extra: number) => void
+  /** this image is being cropped */
+  cropping?: boolean
+  onCrop?: (id: string, crop: ImageCrop | null, natural?: { width: number; height: number }) => void
 }
 
+/** a grip on each corner, and the resize cursor that points along its diagonal */
+const CORNER_HANDLES: { corner: Corner; place: React.CSSProperties; cursor: string }[] = [
+  { corner: 'nw', place: { left: '-11px', top: '-11px' }, cursor: 'nwse-resize' },
+  { corner: 'ne', place: { right: '-11px', top: '-11px' }, cursor: 'nesw-resize' },
+  { corner: 'sw', place: { left: '-11px', bottom: '-11px' }, cursor: 'nesw-resize' },
+  { corner: 'se', place: { right: '-11px', bottom: '-11px' }, cursor: 'nwse-resize' }
+]
+
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
-function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow, dimmed, remoteSelectedBy }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow, dimmed, remoteSelectedBy, tagColors, onMapTopic, onNeedRoom, cropping, onCrop }: Props) {
   const link = item.link
   const linkTitle = linkMissing
     ? `${linkLabel}. Edit the link to point somewhere else.`
@@ -107,6 +126,11 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         previewing={previewing}
         onAutoSize={onAutoSize}
         onGrow={onGrow}
+        tagColors={tagColors}
+        onMapTopic={onMapTopic}
+        onNeedRoom={onNeedRoom}
+        cropping={cropping}
+        onCrop={onCrop}
       />
 
       {/* under the item, a frame's label already owns the top edge */}
@@ -180,21 +204,25 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
       {/* single unlocked selection only */}
       {showHandles && (
         <>
-          {/* 22px grab area around a 12px dot */}
-          <div
-            data-wall-handle="se"
-            style={{
-              position: 'absolute', right: '-11px', bottom: '-11px', width: '22px', height: '22px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'nwse-resize'
-            }}
-          >
-            <span style={{
-              width: '12px', height: '12px',
-              background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
-              borderRadius: '2px'
-            }} />
-          </div>
+          {/* every corner pulls, the opposite one stays; 22px grab area around a 12px dot */}
+          {CORNER_HANDLES.map(({ corner, place, cursor }) => (
+            <div
+              key={corner}
+              data-wall-handle={corner}
+              title={item.kind === 'image' ? 'Drag to resize, hold Shift to stretch' : 'Drag to resize, hold Shift to keep the shape'}
+              style={{
+                position: 'absolute', ...place, width: '22px', height: '22px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor
+              }}
+            >
+              <span style={{
+                width: '12px', height: '12px',
+                background: 'var(--color-secondary)', border: '2px solid var(--color-surface-1)',
+                borderRadius: '2px'
+              }} />
+            </div>
+          ))}
           <div
             data-wall-handle="rotate"
             title="Drag to rotate, hold Shift for 15° steps"

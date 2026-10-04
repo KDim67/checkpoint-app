@@ -39,10 +39,35 @@ const labelsFor = (items: WallItem[], selected: string[], itemId: string | null 
     makeCards: vi.fn(async () => {}),
     frameSelection: vi.fn(),
     presentFrom: vi.fn(),
-    exportFrame: vi.fn()
+    exportFrame: vi.fn(),
+    gatherTags: vi.fn(),
+    addMindMap: vi.fn(),
+    tidyMap: vi.fn(),
+    startCrop: vi.fn(),
+    turnSelection: vi.fn(),
+    openAlign: vi.fn()
   }
   return wallMenuEntries(ctx).map(e => e.label)
 }
+
+describe('code blocks, mind maps and tags in the menus', () => {
+  it('offers a code block, a mind map and gathering by tag on the canvas', () => {
+    const labels = labelsFor([item('a', { tags: ['Bug'] })], [], null)
+    expect(labels).toContain('Code block here')
+    expect(labels).toContain('Mind map here')
+    expect(labels).toContain('Gather stickies by tag')
+  })
+
+  it('offers tidying the map only on a topic', () => {
+    expect(labelsFor([item('t', { kind: 'shape', map: 'm' })], ['t'])).toContain('Tidy up the mind map')
+    expect(labelsFor([item('a')], ['a'])).not.toContain('Tidy up the mind map')
+  })
+
+  it('offers gathering from a tagged sticky, and not from an untagged one', () => {
+    expect(labelsFor([item('a', { tags: ['Bug'] })], ['a'])).toContain('Gather stickies by tag')
+    expect(labelsFor([item('a')], ['a'])).not.toContain('Gather stickies by tag')
+  })
+})
 
 describe('wall item menu', () => {
   it('offers a sticky its other kinds and a card', () => {
@@ -73,6 +98,29 @@ describe('wall item menu', () => {
     expect(frameLabels).not.toContain('Frame this selection')
 
     expect(labelsFor([item('a')], ['a'])).not.toContain('Present from this frame')
+  })
+
+  it('crops a single unlocked picture, and nothing else', () => {
+    const picture = item('p', { kind: 'image', ref: 'p.png' })
+    expect(labelsFor([picture], ['p'])).toContain('Crop this picture')
+    expect(labelsFor([{ ...picture, locked: true }], ['p'])).not.toContain('Crop this picture')
+    expect(labelsFor([picture, item('a', { x: 400 })], ['p', 'a'])).not.toContain('Crop this picture')
+    expect(labelsFor([item('a')], ['a'])).not.toContain('Crop this picture')
+  })
+
+  it('turns what can be turned, and offers to straighten only what is crooked', () => {
+    const labels = labelsFor([item('a')], ['a'])
+    expect(labels).toContain('Rotate left')
+    expect(labels).toContain('Rotate right')
+    expect(labels).not.toContain('Straighten')
+
+    expect(labelsFor([item('a', { rotation: 30 })], ['a'])).toContain('Straighten')
+    expect(labelsFor([item('a', { locked: true })], ['a'])).not.toContain('Rotate left')
+  })
+
+  it('opens the align panel from the menu once two pieces are picked', () => {
+    expect(labelsFor([item('a'), item('b', { x: 300 })], ['a', 'b'])).toContain('Line up and space out')
+    expect(labelsFor([item('a')], ['a'])).not.toContain('Line up and space out')
   })
 
   it('groups loose items and ungroups a group', () => {

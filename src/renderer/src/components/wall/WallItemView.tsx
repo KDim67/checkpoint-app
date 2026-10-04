@@ -2,48 +2,50 @@
 
 import React, { useLayoutEffect, useRef, useState, useEffect } from 'react'
 import { FileQuestion, FileText, Globe } from 'lucide-react'
-import { inkNaturalSize, inkPath, SHAPE_TYPES, type TextAlign, type WallItem } from '../../../../shared/wallModel'
+import { fontSizeOf, inkNaturalSize, inkPath, SHAPE_TYPES, type ImageCrop, type TextAlign, type WallItem } from '../../../../shared/wallModel'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../../shared/wallShape'
+import { cropFrame } from '../../../../shared/wallCrop'
+import { fitTextSize } from '../../lib/fitText'
 import { getTextColorForBackground } from '../../lib/contrast'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import { parseWallLink } from '../../../../shared/wallLink'
 import WallRichText from './WallRichText'
 import WallTextEditor from './WallTextEditor'
+import WallCodeBlock from './WallCodeBlock'
+import WallImageCrop from './WallImageCrop'
 import type { Side } from '../../../../shared/wallGrow'
+import type { TopicPlace } from '../../../../shared/wallMindMap'
 import { HIGHLIGHT_OPACITY } from '../../../../shared/wallInk'
 import { fontCssFamily } from './wallButtons'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
-const NOTE_FONT = 13
-const SHAPE_FONT = 14
 const FIT_FONT_MIN = 8
 
 /** shrinks to fit instead of clipping the last lines, never past its size; set on the element, no re-render */
-function FittedText({ text, width, height, base, color, align = 'left', middle = false, fontFamily }: {
+function FittedText({ text, width, height, base, min = FIT_FONT_MIN, color, align = 'left', middle = false, fontFamily, onNeedRoom }: {
   text?: string
   width: number
   height: number
   base: number
+  /** how small the words may go; the same as base when a size has been chosen, so it holds */
+  min?: number
   color: string
   align?: TextAlign
   /** down the middle as well, the way a shape holds its words */
   middle?: boolean
   fontFamily?: string
+  /** they will not shrink any further and still overflow: the pixels the box is short by */
+  onNeedRoom?: (extra: number) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    let size = base
-    el.style.fontSize = `${size}px`
-    // one measure for words that fit, which is most of them
-    while (size > FIT_FONT_MIN && el.scrollHeight > el.clientHeight + 1) {
-      size -= 1
-      el.style.fontSize = `${size}px`
-    }
-  }, [text, width, height, base])
+    const { over } = fitTextSize(el, base, min)
+    if (over > 0) onNeedRoom?.(over)
+  }, [text, width, height, base, min, onNeedRoom])
 
   return (
     <div ref={ref} style={{
@@ -132,7 +134,7 @@ function WallImageItem({
     )
   }
 
-  return (
+  const picture = (
     <img
       key={reloadKey}
       className="wall-paper"
@@ -142,15 +144,34 @@ function WallImageItem({
       decoding="async"
       onError={() => setLoadError(true)}
       onLoad={() => setLoadError(false)}
-      style={{
-        ...base,
-        objectFit: 'cover',
-        borderRadius: 'var(--radius-sm)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-        display: 'block'
-      }}
+      style={item.crop
+        ? { position: 'absolute', ...cropFrame(item.crop), objectFit: 'fill', display: 'block' }
+        : {
+            ...base,
+            objectFit: 'cover',
+            borderRadius: 'var(--radius-sm)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            display: 'block'
+          }}
     />
   )
+
+  // the crop is a window: the picture is laid out bigger behind it and the box shows one part
+  if (item.crop) {
+    return (
+      <div style={{
+        ...base,
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: 'var(--radius-sm)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+      }}>
+        {picture}
+      </div>
+    )
+  }
+
+  return picture
 }
 
 interface Props {
@@ -169,10 +190,24 @@ interface Props {
   onAutoSize?: (id: string, height: number) => void
   /** Tab while writing, the next item beside this one */
   onGrow?: (id: string, side: Side) => void
+  /** board tag colours by lowercased name, for the chips on a sticky */
+  tagColors?: Map<string, string>
+  /** Tab and Enter in a mind map topic */
+  onMapTopic?: (id: string, place: TopicPlace) => void
+  /** a sticky being written in has run out of room for its words */
+  onNeedRoom?: (id: string, extra: number) => void
+  /** this image is being cropped */
+  cropping?: boolean
+  /** the window to keep, or null to leave the picture as it was */
+  onCrop?: (id: string, crop: ImageCrop | null, natural?: { width: number; height: number }) => void
 }
 
-function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize, onGrow }: Props) {
+function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize, onGrow, tagColors, onMapTopic, onNeedRoom, cropping, onCrop }: Props) {
   const onNext = onGrow && ((side: Side) => onGrow(item.id, side))
+  // a topic grows its map from the keyboard instead, Tab under it and Enter beside it
+  const topicKeys = item.map && onMapTopic
+    ? { onChild: () => onMapTopic(item.id, 'child'), onSibling: () => onMapTopic(item.id, 'sibling') }
+    : {}
   const itemFont = fontCssFamily(item.font)
   const base: React.CSSProperties = {
     width: '100%',
@@ -181,8 +216,16 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     overflow: editing ? 'visible' : 'hidden'
   }
 
+  if (item.kind === 'code') {
+    return <WallCodeBlock item={item} editing={editing} onTextChange={onTextChange} onFinishEditing={onFinishEditing} />
+  }
+
   if (item.kind === 'note') {
     const bg = item.color || '#f6c453'
+    const tags = item.tags ?? []
+    const noteFont = fontSizeOf(item)
+    // a size that was chosen holds and the sticky grows to it; left to fit the box, the words shrink instead
+    const noteFloor = item.fontSize === undefined ? FIT_FONT_MIN : noteFont
     return (
       <div className="wall-paper" style={{
         ...base,
@@ -191,22 +234,52 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         borderRadius: '2px',
         // the shadow makes it read as paper, not the colour
         boxShadow: '0 2px 6px rgba(0,0,0,0.28)',
-        padding: '12px'
+        padding: '12px',
+        // the words take the room the tags leave
+        display: 'flex',
+        flexDirection: 'column',
+        gap: tags.length > 0 ? '6px' : undefined
       }}>
-        {editing ? (
-          <WallTextEditor
-            value={item.text ?? ''}
-            onChange={text => onTextChange(item.id, text)}
-            onFinish={onFinishEditing}
-            onNext={onNext}
-            style={{
-              width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
-              outline: 'none', background: 'transparent', color: '#1a1a1a', textAlign: textAlignOf(item),
-              fontFamily: itemFont, fontSize: `${NOTE_FONT}px`, lineHeight: 1.45
-            }}
-          />
-        ) : (
-          <FittedText text={item.text} width={item.width} height={item.height} base={NOTE_FONT} color="#1a1a1a" align={textAlignOf(item)} fontFamily={itemFont} />
+        <div style={{ flex: 1, minHeight: 0 }}>
+          {editing ? (
+            <WallTextEditor
+              value={item.text ?? ''}
+              onChange={text => onTextChange(item.id, text)}
+              onFinish={onFinishEditing}
+              onNext={item.map ? undefined : onNext}
+              {...topicKeys}
+              fitBase={noteFont}
+              fitMin={noteFloor}
+              onNeedRoom={extra => onNeedRoom?.(item.id, extra)}
+              style={{
+                width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
+                outline: 'none', background: 'transparent', color: '#1a1a1a', textAlign: textAlignOf(item),
+                fontFamily: itemFont, fontSize: `${noteFont}px`, lineHeight: 1.45
+              }}
+            />
+          ) : (
+            <FittedText
+              text={item.text}
+              width={item.width}
+              height={item.height - (tags.length > 0 ? 28 : 0)}
+              base={noteFont}
+              min={noteFloor}
+              onNeedRoom={item.fontSize === undefined ? undefined : extra => onNeedRoom?.(item.id, extra)}
+              color="#1a1a1a"
+              align={textAlignOf(item)}
+              fontFamily={itemFont}
+            />
+          )}
+        </div>
+        {tags.length > 0 && (
+          <div className="wall-tag-row">
+            {tags.map(tag => (
+              <span key={tag} className="wall-tag-chip" title={tag}>
+                <span className="wall-tag-dot" style={{ background: tagColors?.get(tag.toLowerCase()) ?? 'rgba(0, 0, 0, 0.35)' }} />
+                {tag}
+              </span>
+            ))}
+          </div>
         )}
       </div>
     )
@@ -216,7 +289,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     // one style for writing and reading, or the box jumps when editing ends
     const textStyle: React.CSSProperties = {
       color: item.color || 'var(--color-text-base)', textAlign: textAlignOf(item),
-      fontFamily: itemFont, fontSize: '20px', fontWeight: 600, lineHeight: 1.3
+      fontFamily: itemFont, fontSize: `${fontSizeOf(item)}px`, fontWeight: 600, lineHeight: 1.3
     }
     return (
       <div style={base}>
@@ -225,7 +298,8 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             value={item.text ?? ''}
             onChange={text => onTextChange(item.id, text)}
             onFinish={onFinishEditing}
-            onNext={onNext}
+            onNext={item.map ? undefined : onNext}
+            {...topicKeys}
             onHeight={height => onAutoSize?.(item.id, height)}
             style={{
               ...textStyle, display: 'block', width: '100%', height: '100%', padding: 0,
@@ -245,6 +319,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     const fill = item.color
     const color = fill ? getTextColorForBackground(fill) : 'var(--color-text-base)'
     const room = shapeTextBox(outline)
+    const shapeFont = fontSizeOf(item)
     return (
       <div style={{ ...base, position: 'relative', overflow: 'visible' }}>
         {/* the item's own box as viewBox, so rounded corners stay round when it's stretched */}
@@ -274,15 +349,18 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
               value={item.text ?? ''}
               onChange={text => onTextChange(item.id, text)}
               onFinish={onFinishEditing}
-              onNext={onNext}
+              onNext={item.map ? undefined : onNext}
+              {...topicKeys}
+              fitBase={shapeFont}
+              fitMin={FIT_FONT_MIN}
               style={{
                 width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
                 outline: 'none', background: 'transparent', color, textAlign: textAlignOf(item),
-                fontFamily: itemFont, fontSize: `${SHAPE_FONT}px`, lineHeight: 1.45
+                fontFamily: itemFont, fontSize: `${shapeFont}px`, lineHeight: 1.45
               }}
             />
           ) : (
-            <FittedText text={item.text} width={item.width} height={item.height} base={SHAPE_FONT} color={color} align={textAlignOf(item)} middle fontFamily={itemFont} />
+            <FittedText text={item.text} width={item.width} height={item.height} base={shapeFont} color={color} align={textAlignOf(item)} middle fontFamily={itemFont} />
           )}
         </div>
       </div>
@@ -482,7 +560,18 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
   }
 
   if (item.kind === 'image') {
-    return <WallImageItem item={item} base={base} />
+    return (
+      <>
+        <WallImageItem item={item} base={base} />
+        {cropping && onCrop && (
+          <WallImageCrop
+            item={item}
+            onApply={(crop, natural) => onCrop(item.id, crop, natural)}
+            onCancel={() => onCrop(item.id, null)}
+          />
+        )}
+      </>
+    )
   }
 
   // referenced, never copied: a deleted card leaves a marker

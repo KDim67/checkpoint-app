@@ -7,6 +7,7 @@ import {
   LOOSE_END_SLOP,
   pressSelection,
   recordsHistory,
+  resizedBox,
   resizedSize,
   rotationAngle,
   rotationStart,
@@ -210,7 +211,7 @@ describe('arrowRelease', () => {
 describe('recordsHistory', () => {
   it('takes a step for a move, resize, rotation or re-aimed end', () => {
     expect(recordsHistory({ mode: 'move', startX: 0, startY: 0, origin: [], moved: true })).toBe(true)
-    expect(recordsHistory({ mode: 'resize', id: 'a', startX: 0, startY: 0, w: 1, h: 1 })).toBe(true)
+    expect(recordsHistory({ mode: 'resize', id: 'a', startX: 0, startY: 0, x: 0, y: 0, w: 1, h: 1, corner: 'se' })).toBe(true)
     expect(recordsHistory({ mode: 'rotate', id: 'a', cx: 0, cy: 0, start: 0 })).toBe(true)
     expect(recordsHistory({ mode: 'arrowEnd', id: 'a', end: 'end' })).toBe(true)
   })
@@ -225,5 +226,39 @@ describe('recordsHistory', () => {
     expect(recordsHistory({ mode: 'draw' })).toBe(false)
     expect(recordsHistory({ mode: 'arrow', fromId: 'a', startX: 0, startY: 0, moved: true, overId: 'b' })).toBe(false)
     expect(recordsHistory(null)).toBe(false)
+  })
+})
+
+describe('resizedBox', () => {
+  const box = { x: 100, y: 100, width: 200, height: 100 }
+
+  it('grows from the bottom right as before, the top left staying put', () => {
+    expect(resizedBox(box, 'se', 20, 10, { snapping: false, keepShape: false })).toEqual({ x: 100, y: 100, width: 220, height: 110 })
+  })
+
+  it('pulls the top left corner out and leaves the bottom right where it was', () => {
+    const pulled = resizedBox(box, 'nw', -20, -10, { snapping: false, keepShape: false })
+    expect(pulled).toEqual({ x: 80, y: 90, width: 220, height: 110 })
+    expect(pulled.x + pulled.width).toBe(300)
+    expect(pulled.y + pulled.height).toBe(200)
+  })
+
+  it('holds the proportions when asked, led by the side pulled further', () => {
+    const kept = resizedBox(box, 'se', 100, 0, { snapping: false, keepShape: true })
+    expect(kept.width).toBe(300)
+    expect(kept.height).toBe(150)
+
+    const fromCorner = resizedBox(box, 'ne', 0, -50, { snapping: false, keepShape: true })
+    expect(fromCorner.height).toBe(150)
+    expect(fromCorner.width).toBe(300)
+    // the bottom left stays where it was
+    expect(fromCorner.x).toBe(100)
+    expect(fromCorner.y + fromCorner.height).toBe(200)
+  })
+
+  it('keeps the shape at the floor instead of squashing it', () => {
+    const tiny = resizedBox(box, 'se', -500, -500, { snapping: false, keepShape: true })
+    expect(tiny.width / tiny.height).toBeCloseTo(2)
+    expect(tiny.height).toBeGreaterThanOrEqual(32)
   })
 })

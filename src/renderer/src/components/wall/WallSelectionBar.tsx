@@ -3,22 +3,28 @@ import {
   Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Link2, Group, Ungroup, SlidersHorizontal,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
-  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter
+  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw
 } from 'lucide-react'
-import { bringToFront, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, WALL_FONT_NAMES, type WallItem } from '../../../../shared/wallModel'
+import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, WALL_FONT_NAMES, type WallItem } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { alignableUnits, alignItems, distributeItems, type AlignEdge } from '../../../../shared/wallAlign'
 import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
 import { isWritable, textAlignOf } from '../../../../shared/wallShape'
+import { tagsOn } from '../../../../shared/wallTags'
+import { CODE_LANGUAGES } from '../../../../shared/wallCode'
 import WallColorPicker from './WallColorPicker'
 import WallLinkEditor from './WallLinkEditor'
-import { toolButton, arrowStyleButtons, textAlignButton, shapeGlyph, ShapePickerMenu, FontPickerMenu } from './wallButtons'
+import WallTagEditor from './WallTagEditor'
+import { toolButton, arrowStyleButtons, textAlignButton, shapeGlyph, ShapePickerMenu, FontPickerMenu, TextSizeMenu } from './wallButtons'
 
 interface WallSelectionBarProps {
   floatingPos: { left: number; top: number }
   floatingRef: Ref<HTMLDivElement>
   swatchOpen: boolean
   setSwatchOpen: Dispatch<SetStateAction<boolean>>
+  /** shared with the menu, so "line up and space out" there opens this panel */
+  alignOpen: boolean
+  setAlignOpen: Dispatch<SetStateAction<boolean>>
   linkOpen: boolean
   setLinkOpen: Dispatch<SetStateAction<boolean>>
   single: WallItem | null
@@ -36,6 +42,18 @@ interface WallSelectionBarProps {
   setItemLink: (id: string, link: string | undefined) => void
   startLinkPick: (id: string) => void
   followLink: (link: string) => void
+  /** the board's tag names, and their colours by lowercased name */
+  tagNames: string[]
+  tagColors: Map<string, string>
+  onAddTag: (name: string) => void
+  onRemoveTag: (name: string) => void
+  onGatherTags: () => void
+  /** opens the crop window over a single picture */
+  onCropImage: (id: string) => void
+  /** a quarter turn, clockwise for a positive number */
+  onTurn: (degrees: number) => void
+  /** a colour picked for stickies, which the next new one takes */
+  onStickyColor?: (color: string) => void
 }
 
 const popover = {
@@ -61,34 +79,42 @@ const ALIGN: { edge: AlignEdge; label: string; icon: ReactNode }[] = [
 ]
 
 export default function WallSelectionBar({
-  floatingPos, floatingRef, swatchOpen, setSwatchOpen, linkOpen, setLinkOpen, single, linkLabel,
+  floatingPos, floatingRef, swatchOpen, setSwatchOpen, alignOpen, setAlignOpen, linkOpen, setLinkOpen, single, linkLabel,
   arrowsSelected, items, selectedIds, setItems, setEditingId, duplicateSelected, toggleLock,
-  removeSelected, setItemLink, startLinkPick, followLink
+  removeSelected, setItemLink, startLinkPick, followLink, tagNames, tagColors, onAddTag, onRemoveTag,
+  onGatherTags, onCropImage, onTurn, onStickyColor
 }: WallSelectionBarProps) {
   // restyling an outline needs every selected item to be a shape, like the arrow styles
   const chosen = items.filter(i => selectedIds.has(i.id))
   const shapesSelected = chosen.length > 0 && chosen.every(i => i.kind === 'shape')
   const wordsSelected = chosen.length > 0 && chosen.every(i => isWritable(i.kind))
+  // tags belong to stickies, and a language to code blocks
+  const stickiesSelected = chosen.length > 0 && chosen.every(i => i.kind === 'note')
+  const codeSelected = chosen.length > 0 && chosen.every(i => i.kind === 'code')
   const roundedSelected = chosen.some(i => i.kind === 'shape' && i.shape === 'rounded')
   // a group is one piece; a single item has nothing to line up with, so skip the count
   const pieces = chosen.length >= 2 ? alignableUnits(items, selectedIds) : chosen.length
   const { canGroup, canUngroup } = groupState(items, selectedIds)
   // tied to the selection that opened them, a new pick closes them without an effect
-  const [alignFor, setAlignFor] = useState<Set<string> | null>(null)
   const [styleFor, setStyleFor] = useState<Set<string> | null>(null)
   const [shapePickerFor, setShapePickerFor] = useState<Set<string> | null>(null)
   const [fontPickerFor, setFontPickerFor] = useState<Set<string> | null>(null)
-  const alignOpen = alignFor === selectedIds
+  const [tagsFor, setTagsFor] = useState<Set<string> | null>(null)
+  const [sizeFor, setSizeFor] = useState<Set<string> | null>(null)
   const styleOpen = styleFor === selectedIds
   const shapePickerOpen = shapePickerFor === selectedIds
   const fontPickerOpen = fontPickerFor === selectedIds
+  const tagsOpen = tagsFor === selectedIds
+  const sizeOpen = sizeFor === selectedIds
   const closeOthers = (): void => {
     setSwatchOpen(false)
     setLinkOpen(false)
-    setAlignFor(null)
+    setAlignOpen(false)
     setStyleFor(null)
     setShapePickerFor(null)
     setFontPickerFor(null)
+    setTagsFor(null)
+    setSizeFor(null)
   }
   const first = chosen[0]
   // the drag was record: false, letting go makes it one undo step
@@ -139,10 +165,13 @@ export default function WallSelectionBar({
             <WallColorPicker
               colors={WALL_COLORS}
               value={single?.color}
-              onChange={c => {
+              // live while the custom picker is dragged, one undo step when it is let go
+              onChange={c => setItems(patchItems(items, selectedIds, { color: c }), { record: false })}
+              onCommit={c => {
                 setItems(patchItems(items, selectedIds, { color: c }))
-                setSwatchOpen(false)
+                if (chosen.some(i => i.kind === 'note')) onStickyColor?.(c)
               }}
+              onDone={() => setSwatchOpen(false)}
               columns={4}
             />
           </div>
@@ -218,6 +247,80 @@ export default function WallSelectionBar({
           )}
         </div>
       )}
+      {wordsSelected && first && (
+        <div className="relative" data-wall-popover="size">
+          {toolButton(
+            first.fontSize ? `Text size: ${first.fontSize}` : 'Text size: fits the box',
+            // the number is the readout, so the size in use needs no second click
+            <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+              {first.fontSize ?? 'A'}
+            </span>,
+            () => { const open = sizeOpen; closeOthers(); setSizeFor(open ? null : selectedIds) },
+            { active: sizeOpen }
+          )}
+          {sizeOpen && (
+            <div style={{ ...popover, top: 'calc(100% + 4px)', left: 0 }}>
+              <TextSizeMenu
+                current={fontSizeOf(first)}
+                chosen={first.fontSize !== undefined}
+                onPick={size => {
+                  setItems(items.map(i => {
+                    if (!selectedIds.has(i.id) || i.locked) return i
+                    const next = { ...i }
+                    if (size === undefined) delete next.fontSize
+                    else next.fontSize = size
+                    return next
+                  }))
+                  setSizeFor(null)
+                }}
+                onClose={() => setSizeFor(null)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      {stickiesSelected && (
+        <div className="relative" data-wall-popover="tags">
+          {toolButton(
+            'Tags',
+            <Tags size={13} />,
+            () => { const open = tagsOpen; closeOthers(); setTagsFor(open ? null : selectedIds) },
+            { active: tagsOpen }
+          )}
+          {tagsOpen && (
+            <div style={{ ...popover, padding: 'var(--space-3)', width: '220px' }}>
+              <WallTagEditor
+                tags={tagsOn(items, selectedIds)}
+                known={tagNames}
+                colors={tagColors}
+                onAdd={onAddTag}
+                onRemove={onRemoveTag}
+                onGather={onGatherTags}
+              />
+            </div>
+          )}
+        </div>
+      )}
+      {codeSelected && (
+        <select
+          aria-label="Code language"
+          title="Code language"
+          value={first?.language ?? ''}
+          onChange={e => setItems(patchItems(items, selectedIds, { language: e.target.value || undefined }))}
+          style={{
+            height: '26px', maxWidth: '140px',
+            background: 'var(--color-surface-2)',
+            border: '1px solid var(--color-surface-offset)',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--color-text-base)', fontSize: 'var(--text-xs)'
+          }}
+        >
+          <option value="">Plain text</option>
+          {CODE_LANGUAGES.map(language => (
+            <option key={language.id} value={language.id}>{language.label}</option>
+          ))}
+        </select>
+      )}
       {shapesSelected && (
         <div className="relative">
           {toolButton(
@@ -255,7 +358,8 @@ export default function WallSelectionBar({
                 <WallColorPicker
                   colors={WALL_COLORS}
                   value={first.borderColor}
-                  onChange={c => setItems(patchItems(items, selectedIds, { borderColor: c }))}
+                  onChange={c => setItems(patchItems(items, selectedIds, { borderColor: c }), { record: false })}
+                  onCommit={c => setItems(patchItems(items, selectedIds, { borderColor: c }))}
                   defaultLabel="Default"
                   onDefault={() => setItems(patchItems(items, selectedIds, { borderColor: undefined }))}
                   columns={4}
@@ -294,6 +398,13 @@ export default function WallSelectionBar({
           )}
         </div>
       )}
+      {/* a picture: keep part of it, and put an upright photo the right way up */}
+      {single && single.kind === 'image' && !single.locked && (
+        toolButton('Crop this picture', <Crop size={13} />, () => onCropImage(single.id))
+      )}
+      {single && single.kind !== 'arrow' && !single.locked && (
+        toolButton('Rotate a quarter turn', <RotateCw size={13} />, () => onTurn(90))
+      )}
       {arrowsSelected && single && toolButton(
         single.text ? 'Edit label' : 'Add a label',
         <Type size={13} />,
@@ -308,7 +419,7 @@ export default function WallSelectionBar({
           {toolButton(
             'Align',
             <AlignStartVertical size={13} />,
-            () => { const open = alignOpen; closeOthers(); setAlignFor(open ? null : selectedIds) },
+            () => { const open = alignOpen; closeOthers(); setAlignOpen(!open) },
             { active: alignOpen }
           )}
           {alignOpen && (

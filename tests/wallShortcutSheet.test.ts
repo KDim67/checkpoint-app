@@ -75,6 +75,13 @@ describe('wallShortcutSections', () => {
     expect(rowsOf('Editing')).toContainEqual(['Alt+Arrows', 'Duplicate beside the selection'])
   })
 
+  it('says what the guides do, how to crop, and that Enter breaks the line', () => {
+    expect(rowsOf('Mouse')).toContainEqual(['Drag near another item', 'Guides show where it lines up, and it snaps there'])
+    expect(rowsOf('Mouse')).toContainEqual(['Double-click a picture', 'Crop it'])
+    expect(rowsOf('Mouse').some(([key]) => key === 'Drag a corner')).toBe(true)
+    expect(rowsOf('Text')).toContainEqual(['Enter', 'Start a new line; the words shrink and the sticky grows to hold them'])
+  })
+
   it('lists the quick ways to add the next item', () => {
     expect(rowsOf('Mouse')).toContainEqual(['Click a connect dot', 'Add the next item on that side, joined by an arrow'])
     expect(rowsOf('Text')).toContainEqual(['Tab or Shift+Tab', 'Next item beside or below, outside a list'])
