@@ -14,6 +14,7 @@ import { registerOrganisationTools } from './mcp/tools/organisation'
 import { registerSubtaskTools } from './mcp/tools/subtasks'
 import { registerViewTools } from './mcp/tools/views'
 import { registerRecurrenceTools } from './mcp/tools/recurrences'
+import { registerRenewalTools } from './mcp/tools/renewals'
 import { registerReferenceTools } from './mcp/tools/reference'
 import { registerTrackingTools } from './mcp/tools/tracking'
 
@@ -91,6 +92,7 @@ function buildMcpServer(): McpServer {
   registerSubtaskTools(mcp)
   registerViewTools(mcp)
   registerRecurrenceTools(mcp)
+  registerRenewalTools(mcp)
   registerReferenceTools(mcp)
   registerTrackingTools(mcp)
 

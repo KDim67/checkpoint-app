@@ -6,6 +6,7 @@ import { restoreWallSnapshot } from '../shared/wallEdit'
 import {
   deleteItem,
   deleteRecurrence,
+  deleteRenewalRow,
   deleteSubtask,
   updateSubtask,
   deleteRelation,
@@ -85,6 +86,9 @@ function runUndoAction(action: McpUndoAction): void {
       break
     case 'delete_recurrence':
       deleteRecurrence(action.id)
+      break
+    case 'delete_renewal':
+      deleteRenewalRow(action.id)
       break
     case 'delete_subtask':
       deleteSubtask(action.id)

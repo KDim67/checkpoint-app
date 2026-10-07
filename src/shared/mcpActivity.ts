@@ -12,6 +12,7 @@ export type McpUndoAction =
   | { kind: 'delete_tag'; id: string }
   | { kind: 'delete_relation'; id: string }
   | { kind: 'delete_recurrence'; id: string }
+  | { kind: 'delete_renewal'; id: string }
   | { kind: 'delete_subtask'; id: string }
   | { kind: 'set_subtask_done'; id: string; done: boolean }
   /** by storage key, which survives wall renames */
@@ -64,6 +65,8 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
       return str(o.id) ? { kind: 'delete_relation', id: str(o.id) } : null
     case 'delete_recurrence':
       return str(o.id) ? { kind: 'delete_recurrence', id: str(o.id) } : null
+    case 'delete_renewal':
+      return str(o.id) ? { kind: 'delete_renewal', id: str(o.id) } : null
     case 'remove_wall_item':
       return str(o.key) && str(o.itemId)
         ? { kind: 'remove_wall_item', key: str(o.key), itemId: str(o.itemId) }
