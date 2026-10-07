@@ -4,6 +4,14 @@ import { IpcChannels } from '../shared/ipcChannels'
 import type { McpActivityEntry } from '../shared/mcpActivity'
 
 import type { RecurrenceSummary } from '../shared/recurrence'
+import type {
+  RenewalCreateInput,
+  RenewalPatch,
+  RenewalRecord,
+  RenewalResult,
+  RenewalSnapshot
+} from '../shared/renewalApi'
+import type { RenewalKind } from '../shared/renewalKinds'
 import type { NotificationCategory, NotificationPolicy } from '../shared/notificationPolicy'
 import type { Subtask } from '../shared/subtasks'
 import type { RemoteMutation } from '../shared/collabProtocol'
@@ -373,7 +381,7 @@ const api = {
   },
 
   tray: {
-    summary: (): Promise<{ context: string; overdue: number; dueToday: number; open: number }> =>
+    summary: (): Promise<{ context: string; overdue: number; dueToday: number; open: number; renewalsSoon: number }> =>
       ipcRenderer.invoke(IpcChannels.TRAY_SUMMARY),
     action: (action: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.TRAY_ACTION, action),
@@ -444,6 +452,32 @@ const api = {
       ipcRenderer.invoke(IpcChannels.RECURRENCE_DELETE, id),
     setActive: (id: string, active: boolean): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.RECURRENCE_SET_ACTIVE, id, active)
+  },
+
+  renewals: {
+    list: (context?: string): Promise<RenewalResult<RenewalRecord[]>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_LIST, context),
+    create: (input: RenewalCreateInput): Promise<RenewalResult<RenewalRecord>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_CREATE, input),
+    update: (id: string, patch: RenewalPatch): Promise<RenewalResult<RenewalRecord>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_UPDATE, id, patch),
+    renewed: (id: string, to?: number | null): Promise<RenewalResult<{ record: RenewalRecord; previous: RenewalSnapshot }>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_RENEWED, id, to ?? null),
+    restore: (snapshot: RenewalSnapshot): Promise<RenewalResult<RenewalRecord>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_RESTORE, snapshot),
+    remove: (id: string): Promise<RenewalResult<RenewalSnapshot>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_DELETE, id),
+    snooze: (id: string, until: number | null): Promise<RenewalResult<RenewalRecord>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_SNOOZE, id, until),
+    checkNow: (id: string): Promise<RenewalResult<RenewalRecord>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_CHECK_NOW, id),
+    kinds: (): Promise<RenewalResult<RenewalKind[]>> => ipcRenderer.invoke(IpcChannels.RENEWALS_KINDS_GET),
+    saveKinds: (kinds: RenewalKind[]): Promise<RenewalResult<RenewalKind[]>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_KINDS_SET, kinds),
+    renameField: (kindId: string, fieldId: string, label: string, alsoEntries: boolean): Promise<RenewalResult<{ kinds: RenewalKind[]; renamed: number }>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_KINDS_RENAME, kindId, fieldId, label, alsoEntries),
+    fieldUses: (fieldId: string): Promise<RenewalResult<number>> =>
+      ipcRenderer.invoke(IpcChannels.RENEWALS_FIELD_USES, fieldId)
   },
 
   mcp: {

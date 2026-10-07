@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { LayoutGrid, Zap, Power } from 'lucide-react'
+import { CalendarClock, LayoutGrid, Zap, Power } from 'lucide-react'
 import { ToggleSwitch } from './settings/SettingsSection'
 import { applyStoredTheme, watchTheme } from '../lib/themeBoot'
 import {
@@ -14,6 +14,7 @@ interface Summary {
   context: string
   overdue: number
   dueToday: number
+  renewalsSoon: number
   open: number
 }
 
@@ -22,7 +23,7 @@ const TRAY_PANEL_OPTIONS = STARTUP_OPTIONS.filter(o => o.key !== 'showTrayIcon')
 
 /** themed window, not a native menu; measures itself since font size grows it and a fixed height clipped Quit */
 export default function TrayPanel(): React.JSX.Element {
-  const [summary, setSummary] = useState<Summary>({ context: '', overdue: 0, dueToday: 0, open: 0 })
+  const [summary, setSummary] = useState<Summary>({ context: '', overdue: 0, dueToday: 0, open: 0, renewalsSoon: 0 })
   const [startup, setStartup] = useState<StartupSettings>(DEFAULT_STARTUP_SETTINGS)
   const [ready, setReady] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -176,6 +177,13 @@ export default function TrayPanel(): React.JSX.Element {
           <Zap size={14} className="icon-muted" />
           Quick capture
         </button>
+        {/* only when there is something to see, a standing zero would be noise */}
+        {summary.renewalsSoon > 0 && (
+          <button className="bg-clear hover-bg-surface-2" style={actionRow} onClick={() => act('renewals')}>
+            <CalendarClock size={14} className="icon-warning" />
+            {summary.renewalsSoon === 1 ? '1 renewal needs a look' : `${summary.renewalsSoon} renewals need a look`}
+          </button>
+        )}
       </div>
 
       <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: 'var(--space-2) var(--space-3)' }} />

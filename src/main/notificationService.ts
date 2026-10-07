@@ -3,6 +3,7 @@
 import { Notification, BrowserWindow, nativeImage } from 'electron'
 import { join } from 'path'
 import { getSetting, setSetting } from './db'
+import { IpcChannels } from '../shared/ipcChannels'
 import {
   normalizePolicy,
   pruneDedupe,
@@ -30,6 +31,8 @@ interface NotifyInput {
   dedupeWindowMs?: number
   /** opened on click */
   itemId?: string
+  /** the view a click goes to */
+  view?: string
   /** defaults to now; sweeps pass the instant they queried with so both use one clock */
   now?: number
 }
@@ -94,6 +97,7 @@ export function notify(input: NotifyInput): boolean {
       if (win.isMinimized()) win.restore()
       win.show()
       win.focus()
+      if (input.view) win.webContents.send(IpcChannels.APP_NAVIGATE_TO_VIEW, input.view)
     })
 
     notification.show()

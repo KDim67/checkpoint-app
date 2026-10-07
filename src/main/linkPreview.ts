@@ -2,13 +2,13 @@
 
 import { decodeHtmlBytes, iconExtension, parseLinkPreview, type PagePreview } from '../shared/linkPreview'
 import { isPublicHost } from './publicAddress'
+import { guardedFetch, readCapped } from './guardedFetch'
 
 /** a head fits many times over; past this we'd only be reading a body we ignore */
 const PAGE_BYTES = 512 * 1024
 const ICON_BYTES = 256 * 1024
 const IMAGE_BYTES = 2 * 1024 * 1024
 const TIMEOUT_MS = 8000
-const MAX_REDIRECTS = 5
 // some sites refuse a request with no agent
 const USER_AGENT = 'Mozilla/5.0 (compatible; CheckpointLinkPreview/1.0)'
 
@@ -29,72 +29,6 @@ const defaultDeps: Deps = {
   isAllowed: url => isPublicHost(url.hostname)
 }
 
-interface RequestInit {
-  signal: AbortSignal
-  headers: Record<string, string>
-}
-
-/** walked by hand: fetch's own redirects would skip the address check on every hop after the first */
-async function guardedFetch(url: string, init: RequestInit, deps: Deps): Promise<{ response: Response; finalUrl: string } | null> {
-  let current: URL
-  try {
-    current = new URL(url)
-  } catch {
-    return null
-  }
-
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    if (current.protocol !== 'http:' && current.protocol !== 'https:') return null
-    if (!(await deps.isAllowed(current))) {
-      console.warn('[linkPreview] Refusing to fetch a local or private address:', current.host)
-      return null
-    }
-
-    const response = await deps.fetch(current.href, { ...init, redirect: 'manual' })
-    if (response.status < 300 || response.status >= 400) return { response, finalUrl: current.href }
-
-    response.body?.cancel().catch(() => {})
-    const location = response.headers.get('location')
-    if (!location) return null
-    try {
-      current = new URL(location, current)
-    } catch {
-      return null
-    }
-  }
-  return null
-}
-
-/** stops at the cap, so a huge page or an endless stream can't fill memory */
-async function readCapped(response: Response, cap: number): Promise<Uint8Array> {
-  const reader = response.body?.getReader()
-  if (!reader) return new Uint8Array()
-
-  const chunks: Uint8Array[] = []
-  let total = 0
-  try {
-    while (total < cap) {
-      const { done, value } = await reader.read()
-      if (done) break
-      chunks.push(value)
-      total += value.byteLength
-    }
-  } finally {
-    // lets the socket go once we have enough
-    reader.cancel().catch(() => {})
-  }
-
-  const out = new Uint8Array(Math.min(total, cap))
-  let offset = 0
-  for (const chunk of chunks) {
-    const take = Math.min(chunk.byteLength, out.length - offset)
-    out.set(chunk.subarray(0, take), offset)
-    offset += take
-    if (offset >= out.length) break
-  }
-  return out
-}
-
 /** undefined for anything short of a whole, real image */
 async function fetchIcon(iconUrl: string, deps: Deps): Promise<string | undefined> {
   try {
@@ -102,7 +36,7 @@ async function fetchIcon(iconUrl: string, deps: Deps): Promise<string | undefine
     // an inline icon is decoded, not requested
     const response = iconUrl.startsWith('data:')
       ? await deps.fetch(iconUrl, init)
-      : (await guardedFetch(iconUrl, init, deps))?.response
+      : (await guardedFetch(iconUrl, init, deps, 'linkPreview'))?.response
     if (!response) return undefined
     if (!response.ok) {
       response.body?.cancel().catch(() => {})
@@ -124,7 +58,7 @@ async function fetchImage(imageUrl: string, deps: Deps): Promise<string | undefi
     const init = { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': USER_AGENT } }
     const response = imageUrl.startsWith('data:')
       ? await deps.fetch(imageUrl, init)
-      : (await guardedFetch(imageUrl, init, deps))?.response
+      : (await guardedFetch(imageUrl, init, deps, 'linkPreview'))?.response
     if (!response || !response.ok) {
       response?.body?.cancel().catch(() => {})
       return undefined
@@ -146,7 +80,7 @@ export async function fetchLinkPreview(url: string, deps: Deps = defaultDeps): P
       // one budget for the redirects and the body together
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5' }
-    }, deps)
+    }, deps, 'linkPreview')
   } catch (err) {
     console.warn('[linkPreview] Could not reach', url, err)
     return null

@@ -131,6 +131,20 @@ export const enum IpcChannels {
   RECURRENCE_CREATE      = 'recurrence:create',
   RECURRENCE_DELETE      = 'recurrence:delete',
   RECURRENCE_SET_ACTIVE  = 'recurrence:setActive',
+
+  // renewals
+  RENEWALS_LIST              = 'renewals:list',
+  RENEWALS_CREATE            = 'renewals:create',
+  RENEWALS_UPDATE            = 'renewals:update',
+  RENEWALS_RENEWED           = 'renewals:renewed',
+  RENEWALS_RESTORE           = 'renewals:restore',
+  RENEWALS_DELETE            = 'renewals:delete',
+  RENEWALS_SNOOZE            = 'renewals:snooze',
+  RENEWALS_CHECK_NOW         = 'renewals:checkNow',
+  RENEWALS_KINDS_GET         = 'renewals:kindsGet',
+  RENEWALS_KINDS_SET         = 'renewals:kindsSet',
+  RENEWALS_KINDS_RENAME      = 'renewals:kindsRenameField',
+  RENEWALS_FIELD_USES        = 'renewals:fieldUses',
   MCP_ACTIVITY_UNDO      = 'mcp:activityUndo',
 
   // backup

@@ -1,6 +1,6 @@
 /** judgement split from delivery; dedupe stops an overdue task alerting every sweep */
 
-export type NotificationCategory = 'due' | 'focus' | 'webhook' | 'recurrence' | 'agent'
+export type NotificationCategory = 'due' | 'renewal' | 'focus' | 'webhook' | 'recurrence' | 'agent'
 
 export const NOTIFICATION_CATEGORIES: {
   id: NotificationCategory
@@ -9,6 +9,7 @@ export const NOTIFICATION_CATEGORIES: {
   defaultOn: boolean
 }[] = [
   { id: 'due', label: 'Due dates', description: 'When a card or task reaches its due date.', defaultOn: true },
+  { id: 'renewal', label: 'Renewals and expiry', description: 'Before a key, subscription, domain or certificate expires.', defaultOn: true },
   { id: 'focus', label: 'Focus timer', description: 'When a focus interval or break ends.', defaultOn: true },
   { id: 'webhook', label: 'Webhook events', description: 'Events delivered by external tools.', defaultOn: true },
   { id: 'recurrence', label: 'Repeating work', description: 'When a repeating task creates its next occurrence.', defaultOn: false },

@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS mcp_activity (
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_mcp_activity_created ON mcp_activity(created_at DESC);
+-- its own table: items carry a CHECK on type that an older version's sync would trip on; no CHECKs here for the same reason
+CREATE TABLE IF NOT EXISTS renewals (
+  id          TEXT PRIMARY KEY,
+  context     TEXT NOT NULL,
+  title       TEXT NOT NULL DEFAULT '',
+  body        TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'active',
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  metadata    TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_renewals_context ON renewals(context);
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
   id UNINDEXED,
   title,

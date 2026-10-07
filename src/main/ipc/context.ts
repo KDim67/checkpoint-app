@@ -100,6 +100,7 @@ export function registerContextHandlers(db: Database.Database): void {
           db.prepare('UPDATE focus_sessions SET context = ? WHERE context = ?').run(newSlug, oldSlug)
           db.prepare('UPDATE ai_memories SET context = ? WHERE context = ?').run(newSlug, oldSlug)
           db.prepare('UPDATE activity_tracking_logs SET context = ? WHERE context = ?').run(newSlug, oldSlug)
+          db.prepare('UPDATE renewals SET context = ?, updated_at = ? WHERE context = ?').run(newSlug, Date.now(), oldSlug)
         })()
         return { success: true }
       } catch (err) {

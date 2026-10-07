@@ -344,6 +344,7 @@ import { registerSubtasksHandlers } from './ipc/subtasks'
 import { registerExportsHandlers } from './ipc/exports'
 import { registerNotificationsHandlers } from './ipc/notifications'
 import { registerRecurrenceHandlers } from './ipc/recurrence'
+import { registerRenewalsHandlers } from './ipc/renewals'
 import { registerMcpHandlers } from './ipc/mcp'
 import { registerHudHandlers } from './ipc/hud'
 import { registerBackupHandlers } from './ipc/backup'
@@ -371,6 +372,7 @@ function registerIpcHandlers(): void {
   registerExportsHandlers()
   registerNotificationsHandlers()
   registerRecurrenceHandlers()
+  registerRenewalsHandlers()
   registerMcpHandlers()
   registerHudHandlers()
   registerBackupHandlers()
@@ -578,6 +580,13 @@ app.whenReady().then(async () => {
     initializeDueReminders()
   } catch (err) {
     console.error('Failed to start due-date reminders:', err)
+  }
+
+  try {
+    const { initializeRenewalReminders } = await import('./renewalReminders')
+    initializeRenewalReminders()
+  } catch (err) {
+    console.error('Failed to start renewal reminders:', err)
   }
 
   // startup sweep then hourly; completing an instance advances its rule right away

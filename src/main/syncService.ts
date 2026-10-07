@@ -246,6 +246,7 @@ export class SyncService {
     const focus_sessions = db.prepare('SELECT * FROM focus_sessions').all() as SyncPayload['focus_sessions']
     const clipboard_items = db.prepare('SELECT * FROM clipboard_items').all() as SyncPayload['clipboard_items']
     const tombstones = db.prepare('SELECT * FROM sync_tombstones').all() as SyncPayload['tombstones']
+    const renewals = db.prepare('SELECT * FROM renewals').all() as NonNullable<SyncPayload['renewals']>
 
     return {
       items,
@@ -255,7 +256,8 @@ export class SyncService {
       app_settings,
       focus_sessions,
       clipboard_items,
-      tombstones
+      tombstones,
+      renewals
     }
   }
 
@@ -279,6 +281,8 @@ export class SyncService {
           db.prepare('DELETE FROM tags WHERE id = ?').run(tomb.id)
         } else if (tomb.table_name === 'relations') {
           db.prepare('DELETE FROM relations WHERE id = ?').run(tomb.id)
+        } else if (tomb.table_name === 'renewals') {
+          db.prepare('DELETE FROM renewals WHERE id = ?').run(tomb.id)
         }
       }
 
@@ -313,6 +317,32 @@ export class SyncService {
           stmtUpdateItem.run(item)
           pulledNewerCount++
         }
+      }
+
+      // renewals: last write wins, as items; an older peer sends none and that changes nothing here
+      const stmtGetRenewal = db.prepare('SELECT updated_at FROM renewals WHERE id = ?')
+      const stmtUpsertRenewal = db.prepare(`
+        INSERT INTO renewals (id, context, title, body, status, created_at, updated_at, metadata)
+        VALUES (@id, @context, @title, @body, @status, @created_at, @updated_at, @metadata)
+        ON CONFLICT(id) DO UPDATE SET
+          context = excluded.context, title = excluded.title, body = excluded.body, status = excluded.status,
+          created_at = excluded.created_at, updated_at = excluded.updated_at, metadata = excluded.metadata
+      `)
+      for (const renewal of payload.renewals || []) {
+        if (!renewal || typeof renewal.id !== 'string' || localTombstones.has(renewal.id)) continue
+        const local = stmtGetRenewal.get(renewal.id) as { updated_at: number } | undefined
+        if (local && !(renewal.updated_at > local.updated_at)) continue
+        stmtUpsertRenewal.run({
+          id: renewal.id,
+          context: String(renewal.context ?? ''),
+          title: String(renewal.title ?? ''),
+          body: String(renewal.body ?? ''),
+          status: renewal.status === 'cancelled' ? 'cancelled' : 'active',
+          created_at: Number(renewal.created_at) || Date.now(),
+          updated_at: Number(renewal.updated_at) || Date.now(),
+          metadata: String(renewal.metadata ?? '{}')
+        })
+        pulledNewerCount++
       }
 
       // tags: insert or update color

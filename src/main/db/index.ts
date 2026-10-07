@@ -65,6 +65,7 @@ export {
 } from './clipboard'
 export { insertActivityLog, getActivityStats } from './activity'
 export { exportContextData, importContextData } from './contextTransfer'
+export { deleteRenewalRow, getRenewalRow, insertRenewalRow, listRenewalRows, updateRenewalRow } from './renewals'
 
 /** re-exported: the renderer needs it and can't import from main */
 export type { RemoteMutation } from '../../shared/collabProtocol'

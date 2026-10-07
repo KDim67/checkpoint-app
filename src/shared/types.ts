@@ -1,5 +1,7 @@
 /** imported by main and renderer, no Node types */
 
+import type { RenewalRow } from './renewalApi'
+
 export type ItemType = 'log' | 'card' | 'task'
 type ItemStatus = string
 export type ItemPriority = 0 | 1 | 2 | 3 // 0=none, 1=low, 2=med, 3=high
@@ -80,6 +82,8 @@ export interface ContextExport {
   relations: Relation[]
   /** board, backlog and walls, as stored; missing in v1 exports */
   settings?: Record<string, string>
+  /** missing from exports made before renewals */
+  renewals?: RenewalRow[]
 }
 
 /** a deletion peers can replay */
@@ -99,6 +103,8 @@ export interface SyncPayload {
   focus_sessions: FocusSession[]
   clipboard_items: ClipboardItem[]
   tombstones: SyncTombstone[]
+  /** absent from older versions, which ignore it when it comes from newer ones */
+  renewals?: RenewalRow[]
 }
 
 export interface Context {

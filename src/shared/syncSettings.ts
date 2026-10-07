@@ -42,6 +42,8 @@ const SYNCABLE_KEY_NAMES = [
 
   // misc preferences
   'cheatsheet_pins',
+  // renewal kinds and their field templates; what each machine has warned about stays home
+  'renewal_kinds',
   'saved_views',
   'unitySafeMode',
   'widget_enabled',

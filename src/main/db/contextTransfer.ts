@@ -1,5 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { Item, Tag, Relation, ContextExport } from '../../shared/types'
+import type { RenewalRow } from '../../shared/renewalApi'
+import { normalizeRenewal } from '../../shared/renewal'
 import { contextSettingKeys, remapContextSettings } from '../../shared/contextSettings'
 import { wallIndexKey } from '../../shared/wallModel'
 import { isSecretSetting } from '../secureSettings'
@@ -46,6 +48,8 @@ export function exportContextData(db: Database.Database, context: string): Conte
   const storedIndex = (readSetting.get(wallIndexKey(context)) as { value: string } | undefined)?.value
   contextSettingKeys(context, storedIndex ?? null).forEach(collect)
 
+  const renewals = db.prepare(`SELECT * FROM renewals WHERE context = ?`).all(context) as RenewalRow[]
+
   return {
     version: 2,
     context,
@@ -53,7 +57,8 @@ export function exportContextData(db: Database.Database, context: string): Conte
     tags,
     item_tags,
     relations,
-    settings
+    settings,
+    renewals
   }
 }
 
@@ -91,6 +96,28 @@ export function importContextData(db: Database.Database, newContextSlug: string,
     if (Array.isArray(data.relations)) {
       for (const rel of data.relations) {
         stmtRelation.run(rel)
+      }
+    }
+
+    // through the normaliser like any write, a file is only as trustworthy as whoever handed it over
+    const stmtRenewal = db.prepare(`
+      INSERT OR REPLACE INTO renewals (id, context, title, body, status, created_at, updated_at, metadata)
+      VALUES (@id, @context, @title, @body, @status, @created_at, @updated_at, @metadata)
+    `)
+    if (Array.isArray(data.renewals)) {
+      const now = Date.now()
+      for (const r of data.renewals) {
+        if (!r || typeof r.id !== 'string' || !r.id) continue
+        stmtRenewal.run({
+          id: r.id,
+          context: newContextSlug,
+          title: typeof r.title === 'string' ? r.title.slice(0, 200) : '',
+          body: typeof r.body === 'string' ? r.body : '',
+          status: r.status === 'cancelled' ? 'cancelled' : 'active',
+          created_at: typeof r.created_at === 'number' ? r.created_at : now,
+          updated_at: now,
+          metadata: JSON.stringify(normalizeRenewal(r.metadata).meta)
+        })
       }
     }
 

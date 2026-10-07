@@ -19,17 +19,20 @@ export function registerTrayHandlers(): void {
         )
         .all() as { due_at: number | null }[]
       const dated = rows.flatMap(r => (r.due_at === null ? [] : [r.due_at]))
+      const { listRenewals } = await import('../renewals')
+      const { needsAttention } = await import('../../shared/renewal')
 
       return {
         context: getSetting<string>('active_context', 'default'),
         overdue: dated.filter(due => isOverdue(due, now)).length,
         // still to do today, the late ones are counted above
         dueToday: dated.filter(due => isDueToday(due, now) && !isOverdue(due, now)).length,
-        open: rows.length
+        open: rows.length,
+        renewalsSoon: listRenewals(undefined, now).filter(r => needsAttention(r.status, r.meta, now)).length
       }
     } catch (err) {
       console.error('[tray] Could not build the summary:', err)
-      return { context: '', overdue: 0, dueToday: 0, open: 0 }
+      return { context: '', overdue: 0, dueToday: 0, open: 0, renewalsSoon: 0 }
     }
   })
 
@@ -45,6 +48,12 @@ export function registerTrayHandlers(): void {
       case 'open':
         showMainWindow()
         break
+      case 'renewals': {
+        showMainWindow()
+        const { sendToWindow } = await import('../windows')
+        sendToWindow(IpcChannels.APP_NAVIGATE_TO_VIEW, 'renewals')
+        break
+      }
       case 'capture': {
         hidePanel()
         // showHud not enableHud, the latter only registers the hotkey so the button did nothing
