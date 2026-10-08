@@ -2505,3 +2505,166 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   letter-spacing: var(--tracking-wide);
   white-space: nowrap;
 }
+
+/* renewals: severity is a stripe and words, never colour alone */
+.renewal-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.renewal-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.renewal-row {
+  display: grid;
+  grid-template-columns: 3px 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.renewal-row:hover,
+.renewal-row[data-selected="true"] {
+  background: var(--color-surface-2);
+}
+
+.renewal-row:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.renewal-stripe {
+  align-self: stretch;
+  border-radius: var(--radius-full);
+  background: transparent;
+}
+
+.renewal-row[data-severity="expired"] .renewal-stripe {
+  background: var(--color-error);
+}
+
+.renewal-row[data-severity="warning"] .renewal-stripe {
+  background: var(--color-warning);
+}
+
+.renewal-kind-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+.renewal-when {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.renewal-row[data-severity="expired"] .renewal-when {
+  color: var(--color-error);
+  font-weight: var(--weight-semibold);
+}
+
+.renewal-row[data-severity="warning"] .renewal-when {
+  color: var(--color-warning);
+  font-weight: var(--weight-semibold);
+}
+
+.renewal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.renewal-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.renewal-filter {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.renewal-filter[aria-pressed="true"] {
+  background: var(--color-primary-muted);
+  border-color: var(--color-primary);
+  color: var(--color-text-base);
+}
+
+.renewal-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.renewal-totals strong {
+  color: var(--color-text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.renewal-editor {
+  width: 380px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-surface-offset);
+  background: var(--color-surface-1);
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.renewal-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-1) var(--space-2);
+}
+
+.renewal-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-muted);
+  color: var(--color-text-base);
+  font-size: var(--text-xs);
+}
+
+.renewal-note-info {
+  background: var(--color-surface-2);
+}

@@ -35,6 +35,7 @@ const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
   { view: 'kanban', label: 'Kanban', keywords: ['board', 'cards', 'columns'] },
   { view: 'log', label: 'Log', keywords: ['journal', 'timeline', 'entries'] },
   { view: 'backlog', label: 'Backlog', keywords: ['tasks', 'todo'] },
+  { view: 'renewals', label: 'Renewals', keywords: ['expiry', 'expires', 'subscription', 'domain', 'api key', 'certificate', 'licence'] },
   { view: 'focus', label: 'Focus', keywords: ['pomodoro', 'timer', 'session'] },
   { view: 'notes', label: 'Notes', keywords: ['markdown', 'scratchpad', 'writing'] },
   { view: 'wall', label: 'Wall', keywords: ['canvas', 'freeform', 'moodboard', 'sticky', 'whiteboard'] },
@@ -72,7 +73,8 @@ const CREATE: { intent: CreateIntent; view: ActiveView; label: string; keywords:
   { intent: 'task', view: 'backlog', label: 'New task', keywords: ['add', 'create', 'todo', 'backlog'] },
   { intent: 'note', view: 'notes', label: 'New note', keywords: ['add', 'create', 'write', 'markdown'] },
   { intent: 'sticky', view: 'wall', label: 'New sticky note', keywords: ['add', 'create', 'wall', 'canvas'] },
-  { intent: 'wall', view: 'wall', label: 'New wall', keywords: ['add', 'create', 'canvas', 'board', 'whiteboard'] }
+  { intent: 'wall', view: 'wall', label: 'New wall', keywords: ['add', 'create', 'canvas', 'board', 'whiteboard'] },
+  { intent: 'renewal', view: 'renewals', label: 'New renewal', keywords: ['add', 'expiry', 'subscription', 'domain', 'api key', 'certificate'] }
 ]
 
 export function buildCommands(ctx: CommandContext): Command[] {

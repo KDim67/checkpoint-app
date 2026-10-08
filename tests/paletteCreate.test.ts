@@ -23,11 +23,11 @@ const context = (over: Partial<CommandContext> = {}): CommandContext => ({
 })
 
 describe('making things from the palette', () => {
-  it('offers a new card, task, note, sticky and wall, each handed to its view', () => {
+  it('offers a new card, task, note, sticky, wall and renewal, each handed to its view', () => {
     const ctx = context()
     const made = buildCommands(ctx).filter(c => c.group === 'Create')
 
-    expect(made.map(c => c.label)).toStrictEqual(['New card', 'New task', 'New note', 'New sticky note', 'New wall'])
+    expect(made.map(c => c.label)).toStrictEqual(['New card', 'New task', 'New note', 'New sticky note', 'New wall', 'New renewal'])
     made.find(c => c.label === 'New wall')?.run()
     expect(ctx.create).toHaveBeenCalledWith('wall')
   })

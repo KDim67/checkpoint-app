@@ -10,8 +10,13 @@ vi.mock('../src/renderer/src/lib/settings', () => ({
 vi.mock('../src/renderer/src/data/sync', () => ({
   onSyncProgress: () => () => {}, getStatus: vi.fn(async () => ({ syncing: false })), triggerSync: vi.fn(async () => {})
 }))
+const renewals = vi.hoisted(() => ({ list: vi.fn(async () => ({ ok: true, value: [] as unknown[] })) }))
+vi.mock('../src/renderer/src/data/renewals', () => renewals)
+vi.mock('../src/renderer/src/data/mcp', () => ({ onDataChanged: () => () => {} }))
 
 import { Sidebar } from '../src/renderer/src/components/Sidebar'
+import { normalizeRenewal } from '../src/shared/renewal'
+import { allDay, localDayOf } from '../src/shared/dueDate'
 
 afterEach(cleanup)
 
@@ -27,5 +32,14 @@ describe('the sidebar labels', () => {
 
     fireEvent.focus(wall)
     expect(screen.getByText('Ctrl+6')).toBeTruthy()
+  })
+
+  it('counts the renewals that need a look on their tab', async () => {
+    const today = localDayOf(Date.now())
+    const soon = normalizeRenewal({ expiresAt: allDay({ ...today, day: today.day + 3 }) }).meta
+    const later = normalizeRenewal({ expiresAt: allDay({ ...today, day: today.day + 90 }) }).meta
+    renewals.list.mockResolvedValueOnce({ ok: true, value: [{ status: 'active', meta: soon }, { status: 'active', meta: later }] })
+    await act(async () => { render(<Sidebar />) })
+    expect(screen.getByLabelText('Renewals, 1 need a look')).toBeTruthy()
   })
 })

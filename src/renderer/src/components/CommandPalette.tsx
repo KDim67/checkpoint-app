@@ -39,6 +39,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
   const setPendingCreate = useAppStore(s => s.setPendingCreate)
   const setPendingWallLink = useAppStore(s => s.setPendingWallLink)
+  const setPendingRenewalId = useAppStore(s => s.setPendingRenewalId)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -98,7 +99,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         create: intent => {
           // parked like the saved view: the view may not be mounted yet to hear an event
           setPendingCreate(intent)
-          setView(intent === 'card' ? 'kanban' : intent === 'task' ? 'backlog' : intent === 'note' ? 'notes' : 'wall')
+          setView(intent === 'card' ? 'kanban' : intent === 'task' ? 'backlog' : intent === 'note' ? 'notes' : intent === 'renewal' ? 'renewals' : 'wall')
         }
       }),
     [setView, setWorkspace, setSettingsTab, setRightPanelContent, toggleRightPanel, availableWorkspaces, activeWorkspace, enabledViews, savedViews, setPendingViewId, setPendingCreate, aiEnabled]
@@ -150,6 +151,10 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
       case 'wall':
         setPendingWallLink(hit.target)
         setView('wall')
+        break
+      case 'renewal':
+        setPendingRenewalId(hit.target)
+        setView('renewals')
         break
       case 'log':
         setView('log')

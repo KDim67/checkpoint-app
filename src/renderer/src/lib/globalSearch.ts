@@ -8,6 +8,9 @@ import * as cheatsheetsApi from '../data/cheatsheets'
 import { loadWallDoc, loadWallIndex } from './wallDoc'
 import { wallDocKey, type WallItem, type WallRef } from '../../../shared/wallModel'
 import { wallSearchHits } from '../../../shared/wallSearch'
+import * as renewalsApi from '../data/renewals'
+import { expiryPhrase } from '../../../shared/renewal'
+import type { RenewalRecord } from '../../../shared/renewalApi'
 
 /** FTS on one character matches everything */
 export const MIN_QUERY_LENGTH = 2
@@ -34,7 +37,7 @@ export async function searchEverything(query: string, context: string): Promise<
   const q = query.trim()
   if (q.length < MIN_QUERY_LENGTH) return []
 
-  const [items, notes, cheatsheets, walls] = await Promise.all([
+  const [items, notes, cheatsheets, walls, renewals] = await Promise.all([
     settled(
       'items',
       searchItems({ query: q, context, pageSize: 8 }),
@@ -46,7 +49,9 @@ export async function searchEverything(query: string, context: string): Promise<
       cheatsheetsApi.search(q),
       [] as Array<{ name: string; matchCount: number; snippets: string[] }>
     ),
-    settled('walls', wallsOf(context), [] as { ref: WallRef; items: WallItem[] }[])
+    settled('walls', wallsOf(context), [] as { ref: WallRef; items: WallItem[] }[]),
+    // every workspace, as the Renewals screen shows them; few enough to match here
+    settled('renewals', renewalsApi.list().then(r => (r.ok ? r.value : [])), [] as RenewalRecord[])
   ])
 
   const itemHits: SearchHit[] = items.items.map(item => ({
@@ -73,5 +78,17 @@ export async function searchEverything(query: string, context: string): Promise<
     target: sheet.name
   }))
 
-  return mergeSearchHits([itemHits, noteHits, sheetHits, wallSearchHits(walls, q)])
+  const needle = q.toLowerCase()
+  const now = Date.now()
+  const renewalHits: SearchHit[] = renewals
+    .filter(r => `${r.title} ${r.body}`.toLowerCase().includes(needle))
+    .map(r => ({
+      id: `renewal:${r.id}`,
+      kind: 'renewal',
+      title: r.title,
+      subtitle: r.meta.expiresAt === null ? undefined : expiryPhrase(r.meta.expiresAt, now),
+      target: r.id
+    }))
+
+  return mergeSearchHits([itemHits, noteHits, sheetHits, wallSearchHits(walls, q), renewalHits])
 }

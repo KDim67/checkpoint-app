@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid } from 'lucide-react'
+import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid, CalendarClock } from 'lucide-react'
 import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature, readLayoutProfile, applyLayoutProfile, type LayoutProfile } from '../../lib/features'
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
@@ -182,6 +182,12 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
     icon: <ListTodo size={16} />,
     description: 'Detailed, sortable grid for tracking and prioritizing project tasks.',
     warning: 'Disabling hides the Backlog tab on the left navigation bar.'
+  },
+  'feature_view_renewals': {
+    key: 'view_renewals',
+    icon: <CalendarClock size={16} />,
+    description: 'Keys, subscriptions, domains and certificates that expire, with warnings before they do.',
+    warning: 'Disabling hides the Renewals tab. Warnings for what is already tracked keep coming; turn them off under Notifications.'
   },
   'feature_view_focus': {
     key: 'view_focus',

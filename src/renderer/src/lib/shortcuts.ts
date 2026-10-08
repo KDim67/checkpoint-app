@@ -30,6 +30,8 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_cheatsheets', label: 'Go to Cheatsheets', defaultCombo: 'Ctrl+0', action: { kind: 'view', view: 'cheatsheets' } },
   // eleventh view, out of digits: the key after 0 on the same row
   { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+-', action: { kind: 'view', view: 'gamedev' } },
+  // twelfth, the next key along; the app has no menu, so Ctrl+= is nobody's zoom
+  { id: 'view_renewals',    label: 'Go to Renewals',    defaultCombo: 'Ctrl+=', action: { kind: 'view', view: 'renewals' } },
   { id: 'toggle_ai_panel',  label: 'Toggle AI panel',   defaultCombo: 'Ctrl+L', action: { kind: 'toggleAiPanel' } },
   { id: 'open_settings',    label: 'Open Settings',     defaultCombo: 'Ctrl+,', action: { kind: 'openSettings' } },
   // listed so the binder sees it taken; it was wired apart and the wall's link key fired with it

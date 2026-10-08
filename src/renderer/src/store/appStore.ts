@@ -9,9 +9,9 @@ import {
 } from '../components/focus/pomodoroTimer'
 
 /** what the palette can make, each in the view that owns it */
-export type CreateIntent = 'card' | 'task' | 'note' | 'sticky' | 'wall'
+export type CreateIntent = 'card' | 'task' | 'note' | 'sticky' | 'wall' | 'renewal'
 
-export type ActiveView = 'log' | 'kanban' | 'backlog' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
+export type ActiveView = 'log' | 'kanban' | 'backlog' | 'renewals' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
 
 /** type-only, so no runtime cycle back into lib */
 export type { WorkspaceEntry } from '../lib/createWorkspace'
@@ -53,6 +53,8 @@ interface AppState {
   pendingCreate: CreateIntent | null
   /** a wall, or an item on one, to open on arrival; the Wall clears it */
   pendingWallLink: string | null
+  /** a renewal to open on arrival, from search; the Renewals screen clears it */
+  pendingRenewalId: string | null
   // PBR generator preload
   gamedevPreloadTexturePath: string | null
   gamedevSourceCardId: string | null
@@ -87,6 +89,7 @@ interface AppState {
   setPendingViewId: (id: string | null) => void
   setPendingCreate: (intent: CreateIntent | null) => void
   setPendingWallLink: (link: string | null) => void
+  setPendingRenewalId: (id: string | null) => void
   setGamedevPreloadTexture: (path: string | null, cardId?: string | null) => void
   setGamedevPreloadSeamless: (path: string | null, cardId?: string | null) => void
 
@@ -121,6 +124,7 @@ export const useAppStore = create<AppState>()(
     pendingViewId: null,
     pendingCreate: null,
     pendingWallLink: null,
+    pendingRenewalId: null,
     gamedevPreloadTexturePath: null,
     gamedevSourceCardId: null,
     gamedevPreloadSeamlessPath: null,
@@ -232,6 +236,11 @@ export const useAppStore = create<AppState>()(
     setPendingWallLink: (link: string | null) =>
       set(state => {
         state.pendingWallLink = link
+      }),
+
+    setPendingRenewalId: (id: string | null) =>
+      set(state => {
+        state.pendingRenewalId = id
       }),
 
     setPendingViewId: (id: string | null) =>

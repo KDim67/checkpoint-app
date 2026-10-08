@@ -7,6 +7,7 @@ import Logo from './ui/Logo'
 import MenuItem, { MenuDivider } from './ui/MenuItem'
 import * as syncApi from '../data/sync'
 import { defaultBindings, loadBindings, type ShortcutBindings } from '../lib/shortcuts'
+import { useRenewalAttention } from './renewals/useRenewalAttention'
 
 // inline SVG, no icon lib
 
@@ -157,6 +158,19 @@ function IconSync(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
+function IconRenewals(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/>
+      <path d="M16 2v4"/>
+      <path d="M8 2v4"/>
+      <path d="M3 10h5"/>
+      <circle cx="16" cy="16" r="6"/>
+      <path d="M16 14v2l1 1"/>
+    </svg>
+  )
+}
+
 const NAV_ITEMS: Array<{
   view: ActiveView
   label: string
@@ -165,6 +179,7 @@ const NAV_ITEMS: Array<{
   { view: 'kanban',      label: 'Kanban',      Icon: IconKanban },
   { view: 'log',         label: 'Log',         Icon: IconLog },
   { view: 'backlog',     label: 'Backlog',     Icon: IconBacklog },
+  { view: 'renewals',    label: 'Renewals',    Icon: IconRenewals },
   { view: 'focus',       label: 'Focus',       Icon: IconFocus },
   { view: 'notes',       label: 'Notes',       Icon: IconNotes },
   { view: 'wall',        label: 'Wall',        Icon: IconWall },
@@ -355,6 +370,7 @@ export function Sidebar() {
     return () => window.removeEventListener('settings-update-shortcuts', load)
   }, [])
   const [enabledViews, setEnabledViews] = useState<ViewEnabledMap>(defaultViewEnabledMap)
+  const renewalsDue = useRenewalAttention(enabledViews.renewals)
   const [syncEnabled, setSyncEnabled] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState('Idle')
@@ -524,7 +540,7 @@ export function Sidebar() {
               <button
                 key={view}
                 id={`nav-${view}`}
-                aria-label={label}
+                aria-label={view === 'renewals' && renewalsDue > 0 ? `${label}, ${renewalsDue} need a look` : label}
                 aria-current={isActive ? 'page' : undefined}
                 onClick={() => handleNavClick(view)}
                 onMouseEnter={e => showTooltip(e.currentTarget, label, bindings[`view_${view}`])}
@@ -559,6 +575,29 @@ export function Sidebar() {
                   }} />
                 )}
                 <Icon />
+
+                {view === 'renewals' && renewalsDue > 0 && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      top: '2px',
+                      right: '2px',
+                      minWidth: '16px',
+                      height: '16px',
+                      padding: '0 var(--space-1)',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'var(--color-warning)',
+                      color: 'var(--color-text-inverted)',
+                      fontSize: 'var(--text-xxs)',
+                      fontWeight: 'var(--weight-bold)',
+                      lineHeight: '16px',
+                      boxShadow: '0 0 0 2px var(--color-surface-1)'
+                    }}
+                  >
+                    {renewalsDue > 9 ? '9+' : renewalsDue}
+                  </span>
+                )}
 
                 {/* running-timer dot, visible from any view */}
                 {view === 'focus' && focusIsRunning && !isActive && (
