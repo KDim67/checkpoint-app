@@ -95,13 +95,12 @@ export function registerContextHandlers(db: Database.Database): void {
 
     ipcMain.handle(IpcChannels.DB_RENAME_CONTEXT, async (_event, oldSlug: string, newSlug: string) => {
       try {
-        db.transaction(() => {
-          db.prepare('UPDATE items SET context = ? WHERE context = ?').run(newSlug, oldSlug)
-          db.prepare('UPDATE focus_sessions SET context = ? WHERE context = ?').run(newSlug, oldSlug)
-          db.prepare('UPDATE ai_memories SET context = ? WHERE context = ?').run(newSlug, oldSlug)
-          db.prepare('UPDATE activity_tracking_logs SET context = ? WHERE context = ?').run(newSlug, oldSlug)
-          db.prepare('UPDATE renewals SET context = ?, updated_at = ? WHERE context = ?').run(newSlug, Date.now(), oldSlug)
-        })()
+        if (typeof oldSlug !== 'string' || typeof newSlug !== 'string' || !oldSlug || !newSlug) {
+          return { success: false, error: 'A workspace needs a name to be renamed to.' }
+        }
+        if (oldSlug === newSlug) return { success: true }
+        const { renameContextData } = await import('../db')
+        renameContextData(db, oldSlug, newSlug)
         return { success: true }
       } catch (err) {
         console.error('Failed to rename context:', err)

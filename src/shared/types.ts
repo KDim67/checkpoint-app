@@ -105,6 +105,16 @@ export interface SyncPayload {
   tombstones: SyncTombstone[]
   /** absent from older versions, which ignore it when it comes from newer ones */
   renewals?: RenewalRow[]
+  /** absent from older versions too; each machine replays the ones it hasn't made */
+  context_renames?: ContextRename[]
+}
+
+/** a workspace renamed on one machine, for the others to rename too */
+export interface ContextRename {
+  id: string
+  from_slug: string
+  to_slug: string
+  renamed_at: number
 }
 
 export interface Context {

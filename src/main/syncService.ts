@@ -4,7 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import crypto from 'crypto'
-import { getDb } from './db'
+import { followContextRenames, getDb, liveContextSlugs, readContextList, replayContextRenames } from './db'
 import type { SyncPayload } from '../shared/types'
 import { filterSyncableSettings, isSyncableSettingKey } from '../shared/syncSettings'
 import { SYNC_TCP_PORT } from '../shared/ports'
@@ -247,6 +247,7 @@ export class SyncService {
     const clipboard_items = db.prepare('SELECT * FROM clipboard_items').all() as SyncPayload['clipboard_items']
     const tombstones = db.prepare('SELECT * FROM sync_tombstones').all() as SyncPayload['tombstones']
     const renewals = db.prepare('SELECT * FROM renewals').all() as NonNullable<SyncPayload['renewals']>
+    const context_renames = db.prepare('SELECT * FROM context_renames').all() as NonNullable<SyncPayload['context_renames']>
 
     return {
       items,
@@ -257,7 +258,8 @@ export class SyncService {
       focus_sessions,
       clipboard_items,
       tombstones,
-      renewals
+      renewals,
+      context_renames
     }
   }
 
@@ -267,6 +269,13 @@ export class SyncService {
     let pulledNewerCount = 0
 
     db.transaction(() => {
+      // what this machine had before anything lands, so a stale name coming in can be told from a live one
+      const liveBefore = liveContextSlugs(db)
+      const listBefore = readContextList(db)
+
+      // renames first, so this machine's own rows carry the new name before the other side's arrive
+      replayContextRenames(db, payload.context_renames)
+
       const tombstones = payload.tombstones || []
       const insertTombstoneStmt = db.prepare(
         'INSERT OR REPLACE INTO sync_tombstones (id, table_name, deleted_at) VALUES (?, ?, ?)'
@@ -418,6 +427,8 @@ export class SyncService {
         stmtInsertClip.run(c)
       }
 
+      // a machine that hadn't heard of a rename sent its rows, settings and list under the old name
+      followContextRenames(db, liveBefore, listBefore)
     })()
 
     return { pulledNewerCount }

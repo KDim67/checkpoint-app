@@ -92,6 +92,13 @@ CREATE TABLE IF NOT EXISTS renewals (
   metadata    TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS idx_renewals_context ON renewals(context);
+-- workspace renames, kept so every synced machine makes each one too
+CREATE TABLE IF NOT EXISTS context_renames (
+  id          TEXT PRIMARY KEY,
+  from_slug   TEXT NOT NULL,
+  to_slug     TEXT NOT NULL,
+  renamed_at  INTEGER NOT NULL
+);
 CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
   id UNINDEXED,
   title,

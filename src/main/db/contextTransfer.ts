@@ -1,8 +1,9 @@
 import type Database from 'better-sqlite3'
-import type { Item, Tag, Relation, ContextExport } from '../../shared/types'
+import { v4 as uuidv4 } from 'uuid'
+import type { Item, Tag, Relation, ContextExport, ContextRename } from '../../shared/types'
 import type { RenewalRow } from '../../shared/renewalApi'
 import { normalizeRenewal } from '../../shared/renewal'
-import { contextSettingKeys, remapContextSettings } from '../../shared/contextSettings'
+import { contextSettingKeys, directContextSettingKeys, remapContextSettings } from '../../shared/contextSettings'
 import { wallIndexKey } from '../../shared/wallModel'
 import { isSecretSetting } from '../secureSettings'
 
@@ -138,3 +139,131 @@ export function importContextData(db: Database.Database, newContextSlug: string,
     }
   })()
 }
+
+/** tables whose rows say which workspace they belong to */
+const CONTEXT_TABLES = ['items', 'focus_sessions', 'ai_memories', 'activity_tracking_logs', 'recurrences']
+
+const LIST_KEY = 'contexts_list'
+/** settings that hold one workspace's name as their whole value */
+const SLUG_KEYS = ['active_context', 'default_context']
+
+type ListEntry = { slug: string } & Record<string, unknown>
+
+/** stored as the renderer writes it, a JSON string inside the JSON value */
+export function readContextList(db: Database.Database): ListEntry[] | null {
+  const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(LIST_KEY) as { value: string } | undefined
+  if (!row) return null
+  try {
+    let parsed: unknown = JSON.parse(row.value)
+    if (typeof parsed === 'string') parsed = JSON.parse(parsed)
+    return Array.isArray(parsed) ? parsed.filter((e): e is ListEntry => !!e && typeof e.slug === 'string') : null
+  } catch {
+    return null
+  }
+}
+
+const writeList = (db: Database.Database, list: ListEntry[]): void => {
+  db.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(LIST_KEY, JSON.stringify(JSON.stringify(list)))
+}
+
+/** the workspaces this machine has right now, the ones a rename must never fold into another */
+export function liveContextSlugs(db: Database.Database): Set<string> {
+  return new Set((readContextList(db) ?? []).map(e => e.slug))
+}
+
+/** rows, settings, the list and the agent log follow the name; keepNewer keeps what is already under the new one */
+function moveContext(db: Database.Database, oldSlug: string, newSlug: string, keepNewer: boolean, known: ListEntry[] | null = null): void {
+  const from = directContextSettingKeys(oldSlug)
+  const to = directContextSettingKeys(newSlug)
+  const movedKey = (key: string): string => {
+    const i = from.indexOf(key)
+    return i < 0 ? key : to[i]
+  }
+
+  for (const table of CONTEXT_TABLES) {
+    db.prepare(`UPDATE ${table} SET context = ? WHERE context = ?`).run(newSlug, oldSlug)
+  }
+  // renewals sync by updated_at, so the move has to count as a change
+  db.prepare('UPDATE renewals SET context = ?, updated_at = ? WHERE context = ?').run(newSlug, Date.now(), oldSlug)
+
+  // later walls are keyed by their own id and stay where they are; the board, layout and first wall move
+  const read = db.prepare('SELECT value FROM app_settings WHERE key = ?')
+  const write = db.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+  const remove = db.prepare('DELETE FROM app_settings WHERE key = ?')
+  from.forEach((key, i) => {
+    const row = read.get(key) as { value: string } | undefined
+    if (!row) return
+    // a deleted workspace of the same name leaves its settings behind; the live one wins
+    if (!keepNewer || !read.get(to[i])) write.run(to[i], row.value)
+    remove.run(key)
+  })
+  for (const key of SLUG_KEYS) {
+    const row = read.get(key) as { value: string } | undefined
+    if (row && row.value === JSON.stringify(oldSlug)) write.run(key, JSON.stringify(newSlug))
+  }
+
+  const list = readContextList(db)
+  if (list?.some(e => e.slug === oldSlug)) {
+    const hasNew = list.some(e => e.slug === newSlug)
+    // this machine's own entry for the new name beats a stale one renamed in place
+    const own = known?.find(e => e.slug === newSlug)
+    writeList(db, list.flatMap(e => (e.slug !== oldSlug ? [e] : hasNew ? [] : [own ?? { ...e, slug: newSlug }])))
+  }
+
+  const entries = db.prepare('SELECT id, undo FROM mcp_activity WHERE context = ?').all(oldSlug) as { id: string; undo: string | null }[]
+  const update = db.prepare('UPDATE mcp_activity SET context = ?, undo = ? WHERE id = ?')
+  for (const entry of entries) {
+    let undo = entry.undo
+    try {
+      const actions = undo ? (JSON.parse(undo) as Record<string, unknown>[]) : null
+      if (Array.isArray(actions)) {
+        undo = JSON.stringify(actions.map(a => ({
+          ...a,
+          ...(a.context === oldSlug ? { context: newSlug } : {}),
+          ...(typeof a.key === 'string' ? { key: movedKey(a.key) } : {})
+        })))
+      }
+    } catch {
+      // an unreadable undo can't be replayed anyway, so it stays as it was
+    }
+    update.run(newSlug, undo, entry.id)
+  }
+}
+
+/** a rename made here: everything moves, and the rename is kept so other machines can make it too */
+export function renameContextData(db: Database.Database, oldSlug: string, newSlug: string, now = Date.now()): void {
+  db.transaction(() => {
+    moveContext(db, oldSlug, newSlug, false)
+    db.prepare('INSERT INTO context_renames (id, from_slug, to_slug, renamed_at) VALUES (?, ?, ?, ?)').run(uuidv4(), oldSlug, newSlug, now)
+  })()
+}
+
+const validRename = (r: unknown): r is ContextRename => {
+  const o = r as Record<string, unknown>
+  return !!o && typeof o.id === 'string' && typeof o.from_slug === 'string' && typeof o.to_slug === 'string' &&
+    !!o.from_slug && !!o.to_slug && o.from_slug !== o.to_slug && Number.isFinite(o.renamed_at)
+}
+
+/** renames another machine made, each once and in the order they happened; inside the sync's own transaction */
+export function replayContextRenames(db: Database.Database, incoming: unknown): number {
+  if (!Array.isArray(incoming)) return 0
+  const known = db.prepare('SELECT 1 FROM context_renames WHERE id = ?')
+  const insert = db.prepare('INSERT INTO context_renames (id, from_slug, to_slug, renamed_at) VALUES (?, ?, ?, ?)')
+  const fresh = incoming.filter(validRename).filter(r => !known.get(r.id)).sort((a, b) => a.renamed_at - b.renamed_at)
+  for (const r of fresh) {
+    insert.run(r.id, r.from_slug, r.to_slug, r.renamed_at)
+    moveContext(db, r.from_slug, r.to_slug, false)
+  }
+  return fresh.length
+}
+
+/** what a machine that hadn't heard sent under an old name follows it; a name still live here is a new workspace */
+export function followContextRenames(db: Database.Database, liveBefore: Set<string>, listBefore: ListEntry[] | null): void {
+  const renames = db.prepare('SELECT * FROM context_renames ORDER BY renamed_at, rowid').all() as ContextRename[]
+  for (const r of renames) {
+    if (liveBefore.has(r.from_slug)) continue
+    moveContext(db, r.from_slug, r.to_slug, true, listBefore)
+  }
+}
+
