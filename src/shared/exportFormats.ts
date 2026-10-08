@@ -1,7 +1,9 @@
 /** pure and tested, since broken CSV fails quietly */
 
 import type { Item } from './types'
+import type { RenewalRow } from './renewalApi'
 import { formatDueDate } from './dueDate'
+import { describeCycle, normalizeRenewal } from './renewal'
 
 export type ExportFormat = 'markdown' | 'csv' | 'json'
 
@@ -94,17 +96,39 @@ interface JsonExport {
   context: string | null
   itemCount: number
   items: Item[]
+  renewals?: RenewalRow[]
 }
 
 /** lossless, as stored */
-export function toJsonExport(items: Item[], context: string | null, exportedAt: number): string {
+export function toJsonExport(items: Item[], context: string | null, exportedAt: number, renewals: RenewalRow[] = []): string {
   const payload: JsonExport = {
     exportedAt: new Date(exportedAt).toISOString(),
     context,
     itemCount: items.length,
-    items
+    items,
+    ...(renewals.length ? { renewals } : {})
   }
   return JSON.stringify(payload, null, 2)
+}
+
+/** their own section, they're dates to keep, not work to tick off */
+export function renewalsToMarkdown(rows: RenewalRow[]): string {
+  if (rows.length === 0) return ''
+  const out = ['## Renewals', '']
+  for (const row of rows) {
+    const { meta } = normalizeRenewal(row.metadata)
+    const parts = [
+      meta.expiresAt === null ? 'no date' : `expires ${formatDueDate(meta.expiresAt)}`,
+      meta.renews === 'auto' ? 'renews by itself' : 'renew by hand',
+      describeCycle(meta.cycle).toLowerCase()
+    ]
+    if (row.status === 'cancelled') parts.push('cancelled')
+    out.push(`- **${row.title || '(untitled)'}**`, `  ${parts.join(' · ')}`)
+    if (meta.url) out.push(`  ${meta.url}`)
+    if (row.body.trim()) for (const line of row.body.trim().split('\n')) out.push(`  ${line}`)
+  }
+  out.push('')
+  return out.join('\n')
 }
 
 /** safe on every platform */

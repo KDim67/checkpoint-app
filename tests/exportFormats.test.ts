@@ -5,6 +5,7 @@ import {
   itemsToCsv,
   itemsToMarkdown,
   toJsonExport,
+  renewalsToMarkdown,
   exportFilename,
   EXPORT_FORMATS
 } from '../src/shared/exportFormats'
@@ -179,5 +180,26 @@ describe('exportFilename', () => {
     for (const format of EXPORT_FORMATS) {
       expect(exportFilename('x', format.id, 0).endsWith(`.${format.extension}`), format.id).toBe(true)
     }
+  })
+})
+
+describe('renewals in exports', () => {
+  const row = (title: string, meta: object, status = 'active') => ({
+    id: title, context: 'work', title, body: 'ask Maria', status, created_at: 1, updated_at: 1, metadata: JSON.stringify(meta)
+  })
+
+  it('gets its own Markdown section, with how and when it renews', () => {
+    const md = renewalsToMarkdown([row('acme.dev', { expiresAt: Date.UTC(2027, 9, 20), renews: 'auto', cycle: { every: 1, unit: 'year' }, url: 'https://registrar.example/acme' })])
+    expect(md).toMatch(/^## Renewals/)
+    expect(md).toContain('- **acme.dev**')
+    expect(md).toContain('renews by itself · yearly')
+    expect(md).toContain('https://registrar.example/acme')
+    expect(md).toContain('  ask Maria')
+  })
+
+  it('adds nothing when there are none, and keeps JSON as it was', () => {
+    expect(renewalsToMarkdown([])).toBe('')
+    expect('renewals' in JSON.parse(toJsonExport([], null, 0))).toBe(false)
+    expect(JSON.parse(toJsonExport([], null, 0, [row('x', {})])).renewals).toHaveLength(1)
   })
 })
