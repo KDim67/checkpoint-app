@@ -170,10 +170,34 @@ reported back to you.
 
 ### Plugins and theming
 
-Drop a `.js` file into `.config/checkpoint/plugins/` and enable it in Settings →
-Extensions. **Plugins are not sandboxed.** One runs in the main process with
-the same access the app has, so only install one you'd be happy running as a
-plain script.
+Drop a `.js` file into `.config/checkpoint/plugins/` and turn it on in Settings →
+Extensions. Each plugin runs in its own sandboxed process with no Node, no file
+access and no network of its own. It can only do what it asks for in its
+metadata, and you approve that list when you turn it on, on that computer only:
+
+| Permission | What it allows |
+| --- | --- |
+| `read` | See cards, tasks and log entries in the workspaces you pick, and hear when they're created, finished or due |
+| `write` | Create and change them in those workspaces; never delete |
+| `notify` | Show notifications; quiet hours still apply |
+| `hosts` | Send HTTPS requests to the sites listed, and nowhere else |
+
+```js
+module.exports = {
+  metadata: {
+    name: "Hello",
+    version: "1.0.0",
+    permissions: ["read", "notify"]
+  },
+  onLoad(api) {
+    api.events.on("item:completed", ({ item }) => api.notify("Done", item.title))
+  }
+}
+```
+
+Every `api` call returns a promise. A plugin that changes its file to ask for
+more is stopped until you approve it again. Settings → Extensions installs four
+examples that between them use the whole API.
 
 Theming is CSS custom properties, live-editable in Settings → Appearance, or
 edit `.config/checkpoint/theme.css` directly.

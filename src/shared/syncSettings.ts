@@ -15,8 +15,7 @@ const SYNCABLE_KEY_NAMES = [
   'appearance_font_size',
   'right_panel_width',
 
-  // theme customizer and plugins
-  'customizer_active_plugins',
+  // theme customizer; which plugins you approved is per machine, so it stays home
   'customizer_enabled',
   'customizer_shortcuts',
   'customizer_theme_vars',

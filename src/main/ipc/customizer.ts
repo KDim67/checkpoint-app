@@ -54,43 +54,26 @@ export function registerCustomizerHandlers(): void {
 
   ipcMain.handle(IpcChannels.CUSTOMIZER_GET_PLUGINS, async () => {
     const { scanPlugins } = await import('../pluginRegistry')
-    const { getSetting } = await import('../db')
-    const rawPlugins = getSetting('customizer_active_plugins', '[]')
-    let activePlugins: string[] = []
-    try {
-      activePlugins = JSON.parse(rawPlugins as string)
-    } catch {
-      // ignore
-    }
-    return scanPlugins(activePlugins)
+    return scanPlugins()
   })
 
-  ipcMain.handle(IpcChannels.CUSTOMIZER_TOGGLE_PLUGIN, async (_event, filename: string, active: boolean) => {
-    const { getSetting, setSetting } = await import('../db')
-    const { loadPlugin, unloadPlugin } = await import('../pluginRegistry')
-    
-    const rawPlugins = getSetting('customizer_active_plugins', '[]')
-    let activePlugins: string[] = []
-    try {
-      activePlugins = JSON.parse(rawPlugins as string)
-    } catch {
-      // ignore
+  ipcMain.handle(IpcChannels.CUSTOMIZER_APPROVE_PLUGIN, async (_event, filename: unknown, approval: unknown) => {
+    const { approvePlugin } = await import('../pluginRegistry')
+    if (typeof filename !== 'string' || !approval || typeof approval !== 'object') {
+      return { ok: false as const, error: 'That plugin approval was malformed.' }
     }
+    const { permissions, hosts, workspaces } = approval as Record<string, unknown>
+    return approvePlugin(filename, { permissions, hosts, workspaces })
+  })
 
-    if (active) {
-      // load before recording; a throwing plugin used to stay stored as enabled
-      const result = loadPlugin(filename)
-      if (!result.ok) return result
-      if (!activePlugins.includes(filename)) {
-        activePlugins.push(filename)
-      }
-    } else {
-      activePlugins = activePlugins.filter(name => name !== filename)
-      unloadPlugin(filename)
-    }
+  ipcMain.handle(IpcChannels.CUSTOMIZER_GET_PLUGIN_LOG, async (_event, filename: unknown) => {
+    const { pluginLog } = await import('../pluginRegistry')
+    return typeof filename === 'string' ? pluginLog(filename) : []
+  })
 
-    setSetting('customizer_active_plugins', JSON.stringify(activePlugins))
-    return { ok: true as const }
+  ipcMain.handle(IpcChannels.CUSTOMIZER_DISABLE_PLUGIN, async (_event, filename: unknown) => {
+    const { disablePlugin } = await import('../pluginRegistry')
+    if (typeof filename === 'string') await disablePlugin(filename)
   })
 
   ipcMain.handle(IpcChannels.CUSTOMIZER_INSTALL_EXAMPLE, async (_event, filename: string) => {

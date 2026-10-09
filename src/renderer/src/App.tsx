@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense, useCallback } from 'react'
-import { useAppStore, type ActiveView } from './store/appStore'
+import { useAppStore, type ActiveView, type SettingsTab } from './store/appStore'
 import { useAiEnabled } from './lib/useAiEnabled'
 import { Sidebar } from './components/Sidebar'
 import { ToastProvider } from './components/ui/Toast'
@@ -827,7 +827,10 @@ export default function App() {
       .catch(console.error)
 
     const unsubNavigate = appApi.onNavigateToView((view: string) => {
-      setView(view as ActiveView)
+      // settings:<tab> opens one tab, so a notice can point at the screen that answers it
+      const [base, tab] = view.split(':')
+      if (base === 'settings' && tab) useAppStore.getState().setSettingsTab(tab as SettingsTab)
+      setView(base as ActiveView)
     })
 
     // MCP writes skip the IPC views refresh on; re-dispatch the DOM events they already listen for

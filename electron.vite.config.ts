@@ -18,6 +18,20 @@ function signalingHostPolicy(): Plugin {
   }
 }
 
+/** the plugin window's preload runs sandboxed as a plain script; an import in it would only fail at runtime, so fail the build */
+function sandboxedPreloadGuard(): Plugin {
+  return {
+    name: 'checkpoint-sandboxed-preload',
+    generateBundle(_options, bundle) {
+      const chunk = Object.values(bundle).find(c => c.type === 'chunk' && c.name === 'pluginHost')
+      if (!chunk || chunk.type !== 'chunk') throw new Error('the pluginHost preload is missing from the build')
+      if (chunk.imports.length > 0 || /^\s*(import|export)\b/m.test(chunk.code)) {
+        throw new Error('the pluginHost preload must build to a plain script with no import or export')
+      }
+    }
+  }
+}
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
@@ -28,10 +42,19 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), sandboxedPreloadGuard()],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')
+      }
+    },
+    build: {
+      rollupOptions: {
+        // pluginHost imports nothing, so it never shares a chunk the sandbox couldn't load
+        input: {
+          index: resolve('src/preload/index.ts'),
+          pluginHost: resolve('src/preload/pluginHost.ts')
+        }
       }
     }
   },

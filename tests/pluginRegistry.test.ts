@@ -2,8 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { approvePlugin, disablePlugin, scanPlugins, runningPluginCount, startApprovedPlugins, stopAllPlugins } from '../src/main/pluginRegistry'
+import { POLICY_SETTING_KEY, resetNotificationDedupe } from '../src/main/notificationService'
+import { DEFAULT_POLICY } from '../src/shared/notificationPolicy'
+import { shown } from './stubs/electron'
+import { closeDb, getSetting, initDb, setSetting } from '../src/main/db'
+import { PLUGIN_GRANTS_KEY } from '../src/shared/pluginPermissions'
+import { defined } from './helpers/defined'
 
-// the stub points home at a throwaway dir; require, metadata, load and unload are all real
+// the stub points home at a throwaway dir; metadata, approvals and statuses are real, the sandbox never starts
 
 let home: string
 
@@ -25,162 +32,187 @@ const writePlugin = (filename: string, source: string): void => {
   writeFileSync(join(pluginsDir(), filename), source, 'utf8')
 }
 
-/** records what ran */
-const recordingPlugin = (marker: string) => `
-globalThis.__pluginMarks = globalThis.__pluginMarks || []
-globalThis.__pluginMarks.push('${marker}:toplevel')
+/** records whether it ever ran */
+const asker = (permissions: string[], hosts: string[] = []) => `
+globalThis.__pluginRan = true
 module.exports = {
-  metadata: { name: '${marker}', description: 'test', version: '2.0.0' },
-  onLoad(api) { globalThis.__pluginMarks.push('${marker}:onLoad'); api.log('hi') },
-  onUnload() { globalThis.__pluginMarks.push('${marker}:onUnload') }
+  metadata: { name: 'Asker', description: 'test', version: '2.0.0', permissions: ${JSON.stringify(permissions)}, hosts: ${JSON.stringify(hosts)} },
+  onLoad(api) {}
 }
 `
 
-const marks = (): string[] => (globalThis as { __pluginMarks?: string[] }).__pluginMarks ?? []
+const ran = (): boolean => (globalThis as { __pluginRan?: boolean }).__pluginRan === true
+const one = (filename = 'one.js') => defined(scanPlugins().find(p => p.filename === filename))
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'checkpoint-plugins-'))
-  ;(globalThis as { __pluginMarks?: string[] }).__pluginMarks = []
-  vi.resetModules()
+  initDb(home)
+  setSetting('contexts_list', JSON.stringify([{ slug: 'work', name: 'Work', color: '#535e85' }, { slug: 'home', name: 'Home', color: '#535e85' }]))
+  ;(globalThis as { __pluginRan?: boolean }).__pluginRan = false
 })
 
 afterEach(() => {
+  closeDb()
   rmSync(home, { recursive: true, force: true })
 })
 
-describe('scanPlugins', () => {
-  it('finds a plugin and reads its metadata', async () => {
-    writePlugin('one.js', recordingPlugin('one'))
-    const { scanPlugins } = await import('../src/main/pluginRegistry')
-
-    const found = scanPlugins([])
-    expect(found).toHaveLength(1)
-    expect(found[0]).toMatchObject({ filename: 'one.js', name: 'one', version: '2.0.0', active: false })
+describe('listing plugins', () => {
+  it('reads what a plugin asks for without running it', () => {
+    writePlugin('one.js', asker(['read', 'notify'], ['hooks.example.com']))
+    expect(one()).toMatchObject({
+      name: 'Asker',
+      version: '2.0.0',
+      active: false,
+      status: 'off',
+      grant: null,
+      request: { permissions: ['read', 'notify', 'network'], hosts: ['hooks.example.com'], ignored: [] }
+    })
+    expect(ran()).toBe(false)
   })
 
-  it('marks the plugins listed as active', async () => {
-    writePlugin('one.js', recordingPlugin('one'))
-    const { scanPlugins } = await import('../src/main/pluginRegistry')
-    expect(scanPlugins(['one.js'])[0].active).toBe(true)
-  })
-
-  it('still lists a file it cannot make sense of, by filename', async () => {
-    // not executing means syntax errors surface at load instead
+  it('still lists a file it cannot make sense of, by filename', () => {
     writePlugin('broken.js', 'this is not javascript {{{')
-    const { scanPlugins } = await import('../src/main/pluginRegistry')
-
-    const found = scanPlugins([])
-    expect(found).toHaveLength(1)
-    expect(found[0].filename).toBe('broken.js')
-    expect(found[0].name).toBe('broken.js')
+    expect(one('broken.js')).toMatchObject({ name: 'broken.js', request: { permissions: [] } })
   })
 
-  it('ignores files that are not javascript', async () => {
+  it('says why a file with an unusable name can never run', () => {
+    writePlugin('my plugin.js', asker([]))
+    expect(one('my plugin.js')).toMatchObject({ status: 'stopped', statusDetail: expect.stringContaining('not a plain .js filename') })
+  })
+
+  it('ignores files that are not javascript, and returns nothing for an empty folder', () => {
+    expect(scanPlugins()).toStrictEqual([])
     writePlugin('notes.txt', 'hello')
-    writePlugin('one.js', recordingPlugin('one'))
-    const { scanPlugins } = await import('../src/main/pluginRegistry')
-    expect(scanPlugins([])).toHaveLength(1)
-  })
-
-  it('returns nothing when the directory is empty', async () => {
-    const { scanPlugins } = await import('../src/main/pluginRegistry')
-    expect(scanPlugins([])).toEqual([])
-  })
-
-  it('does NOT execute a disabled plugin merely to list it', async () => {
-    // listing is a read, disabled plugins mustn't run
-    writePlugin('one.js', recordingPlugin('one'))
-    const { scanPlugins } = await import('../src/main/pluginRegistry')
-
-    scanPlugins([])
-    expect(marks()).not.toContain('one:toplevel')
+    expect(scanPlugins()).toStrictEqual([])
   })
 })
 
-describe('loadPlugin', () => {
-  it('runs onLoad and reports success', async () => {
-    writePlugin('one.js', recordingPlugin('one'))
-    const { loadPlugin } = await import('../src/main/pluginRegistry')
-
-    expect(loadPlugin('one.js')).toMatchObject({ ok: true })
-    expect(marks()).toContain('one:onLoad')
+describe('plugins that were on before the sandbox', () => {
+  it('wait for your approval, with nothing granted on their behalf', () => {
+    writePlugin('one.js', asker(['read']))
+    setSetting('customizer_active_plugins', JSON.stringify(['one.js', '../escape.js']))
+    expect(one()).toMatchObject({ active: true, status: 'needs-approval', grant: null })
+    expect(Object.keys(getSetting<Record<string, unknown>>(PLUGIN_GRANTS_KEY, {}))).toStrictEqual(['one.js'])
   })
 
-  it('reports why a broken plugin failed instead of failing silently', async () => {
-    writePlugin('broken.js', 'module.exports = { onLoad() { throw new Error("boom") } }')
-    const { loadPlugin } = await import('../src/main/pluginRegistry')
-
-    const result = loadPlugin('broken.js')
-    expect(result.ok).toBe(false)
-    expect('error' in result && result.error).toContain('boom')
-  })
-
-  it('reports a missing file rather than doing nothing', async () => {
-    const { loadPlugin } = await import('../src/main/pluginRegistry')
-    const result = loadPlugin('nope.js')
-    expect(result.ok).toBe(false)
-  })
-
-  it('refuses a filename that escapes the plugins directory', async () => {
-    // the name arrives over IPC, untrusted
-    const { loadPlugin } = await import('../src/main/pluginRegistry')
-    const result = loadPlugin('../../../evil.js')
-    expect(result.ok).toBe(false)
-  })
-
-  it('does not load the same plugin twice', async () => {
-    writePlugin('one.js', recordingPlugin('one'))
-    const { loadPlugin } = await import('../src/main/pluginRegistry')
-
-    loadPlugin('one.js')
-    loadPlugin('one.js')
-    expect(marks().filter(m => m === 'one:onLoad')).toHaveLength(1)
+  it('are carried over once, so the old list never turns one back on later', async () => {
+    writePlugin('one.js', asker([]))
+    setSetting('customizer_active_plugins', JSON.stringify(['one.js']))
+    scanPlugins()
+    await disablePlugin('one.js')
+    // an older version on another machine could still write the old list
+    setSetting('customizer_active_plugins', JSON.stringify(['one.js']))
+    expect(one()).toMatchObject({ active: false, status: 'off' })
   })
 })
 
-describe('unloadPlugin', () => {
-  it('calls onUnload', async () => {
-    writePlugin('one.js', recordingPlugin('one'))
-    const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
-
-    loadPlugin('one.js')
-    unloadPlugin('one.js')
-    expect(marks()).toContain('one:onUnload')
+describe('the notice that plugins are paused', () => {
+  beforeEach(() => {
+    shown.length = 0
+    setSetting(POLICY_SETTING_KEY, { ...DEFAULT_POLICY, quietEnabled: false })
+    resetNotificationDedupe()
   })
 
-  it('survives a plugin that throws on the way out', async () => {
-    writePlugin('rude.js', 'module.exports = { onUnload() { throw new Error("no") } }')
-    const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
-
-    loadPlugin('rude.js')
-    expect(() => unloadPlugin('rude.js')).not.toThrow()
+  afterEach(async () => {
+    await stopAllPlugins()
   })
 
-  it('lets a plugin be loaded again after unloading', async () => {
-    writePlugin('one.js', recordingPlugin('one'))
-    const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
-
-    loadPlugin('one.js')
-    unloadPlugin('one.js')
-    loadPlugin('one.js')
-    expect(marks().filter(m => m === 'one:onLoad')).toHaveLength(2)
+  it('comes once, on the first start after the update, for the plugins that were on', async () => {
+    writePlugin('one.js', asker([]))
+    writePlugin('two.js', asker([]))
+    setSetting('customizer_active_plugins', JSON.stringify(['one.js', 'two.js']))
+    startApprovedPlugins()
+    await stopAllPlugins()
+    startApprovedPlugins()
+    expect(shown).toStrictEqual([{ title: '2 plugins are paused', body: expect.stringContaining('needs your OK') }])
+    expect(runningPluginCount()).toBe(0)
   })
 
-  it('picks up edits to a plugin file between loads', async () => {
-    // the cache is purged on unload, or re-enabling runs old code
-    writePlugin('one.js', recordingPlugin('first'))
-    const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
+  it('stays quiet when nothing was on', () => {
+    startApprovedPlugins()
+    expect(shown).toStrictEqual([])
+  })
+})
 
-    loadPlugin('one.js')
-    unloadPlugin('one.js')
-    writePlugin('one.js', recordingPlugin('second'))
-    loadPlugin('one.js')
-
-    expect(marks()).toContain('second:onLoad')
+describe('approving a plugin', () => {
+  it('grants exactly what it asks for, in the workspaces you picked that exist', async () => {
+    writePlugin('one.js', asker(['read', 'write']))
+    const result = await approvePlugin('one.js', { permissions: ['read', 'write'], hosts: [], workspaces: ['work', 'gone', 'work'] })
+    expect(result).toStrictEqual({ ok: true })
+    expect(one()).toMatchObject({ active: true, grant: { permissions: ['read', 'write'], hosts: [], workspaces: ['work'] } })
   })
 
-  it('does nothing for a plugin that was never loaded', async () => {
-    const { unloadPlugin } = await import('../src/main/pluginRegistry')
-    expect(() => unloadPlugin('ghost.js')).not.toThrow()
+  it('refuses when the file changed after you were shown it', async () => {
+    writePlugin('one.js', asker(['read', 'write']))
+    const result = await approvePlugin('one.js', { permissions: ['read'], hosts: [], workspaces: ['work'] })
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('changed while you were looking') })
+    expect(one().grant).toBeNull()
+  })
+
+  it('refuses a name that escapes the plugins folder, or a file that is not there', async () => {
+    expect(await approvePlugin('../../evil.js', { permissions: [], hosts: [], workspaces: [] })).toMatchObject({ ok: false })
+    expect(await approvePlugin('nope.js', { permissions: [], hosts: [], workspaces: [] })).toMatchObject({ ok: false })
+  })
+
+  it('waits for the Customization Engine before anything runs', async () => {
+    writePlugin('one.js', asker([]))
+    await approvePlugin('one.js', { permissions: [], hosts: [], workspaces: [] })
+    expect(runningPluginCount()).toBe(0)
+    expect(one()).toMatchObject({ status: 'stopped', statusDetail: expect.stringContaining('Customization Engine') })
+  })
+
+  it('needs you again when the file later asks for more, and not when it asks for less', async () => {
+    writePlugin('one.js', asker(['read', 'notify']))
+    await approvePlugin('one.js', { permissions: ['read', 'notify'], hosts: [], workspaces: ['work'] })
+    writePlugin('one.js', asker(['read']))
+    expect(one().status).not.toBe('needs-approval')
+    writePlugin('one.js', asker(['read'], ['hooks.example.com']))
+    expect(one()).toMatchObject({ status: 'needs-approval', statusDetail: expect.stringContaining('more than you approved') })
+  })
+})
+
+describe('turning a plugin off', () => {
+  it('keeps what you picked, so turning it back on starts from there', async () => {
+    writePlugin('one.js', asker(['read']))
+    await approvePlugin('one.js', { permissions: ['read'], hosts: [], workspaces: ['home'] })
+    await disablePlugin('one.js')
+    expect(one()).toMatchObject({ active: false, status: 'off', grant: { workspaces: ['home'] } })
+  })
+})
+
+describe('pluginEvents', () => {
+  it('delivers to every subscriber', async () => {
+    const { onPluginEvent, emitPluginEvent, clearPluginEvents } = await import('../src/main/pluginEvents')
+    clearPluginEvents()
+
+    const seen: string[] = []
+    onPluginEvent('item:created', () => seen.push('a'))
+    onPluginEvent('item:created', () => seen.push('b'))
+    emitPluginEvent('item:created', { item: { id: 'x' } as never })
+
+    expect(seen).toEqual(['a', 'b'])
+  })
+
+  it('keeps going when one handler throws', async () => {
+    // fired inside a db write, a throwing listener mustn't fail card creation
+    const { onPluginEvent, emitPluginEvent, clearPluginEvents } = await import('../src/main/pluginEvents')
+    clearPluginEvents()
+
+    const seen: string[] = []
+    onPluginEvent('item:created', () => { throw new Error('rude') })
+    onPluginEvent('item:created', () => seen.push('still ran'))
+
+    expect(() => emitPluginEvent('item:created', { item: { id: 'x' } as never })).not.toThrow()
+    expect(seen).toEqual(['still ran'])
+  })
+
+  it('stops delivering after unsubscribe', async () => {
+    const { onPluginEvent, clearPluginEvents, pluginEventListenerCount } = await import('../src/main/pluginEvents')
+    clearPluginEvents()
+
+    const off = onPluginEvent('item:completed', () => {})
+    expect(pluginEventListenerCount('item:completed')).toBe(1)
+    off()
+    expect(pluginEventListenerCount('item:completed')).toBe(0)
   })
 })

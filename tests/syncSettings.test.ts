@@ -166,12 +166,19 @@ describe('a key nobody has thought about', () => {
   })
 })
 
+describe('plugin approvals', () => {
+  // turning a plugin on here must never turn it on on another machine
+  it.each(['plugin_grants', 'customizer_active_plugins', 'plugin:daily-summary.js:today'])('stay home: %s', key => {
+    expect(isSyncableSettingKey(key)).toBe(false)
+  })
+})
+
 describe('the settings that were syncing before the allowlist', () => {
   // pinned so the conversion didn't stop anything travelling
   it.each([
     'active_context', 'app_theme', 'appearance_compact', 'appearance_font_size',
     'backup_interval', 'backup_max_count', 'cheatsheet_pins', 'contexts_list',
-    'customizer_active_plugins', 'customizer_enabled', 'customizer_shortcuts',
+    'customizer_enabled', 'customizer_shortcuts',
     'customizer_theme_vars', 'default_context', 'feature_backup', 'feature_hud',
     'feature_mcp', 'feature_tracker', 'feature_webhook', 'focus_auto_start_next',
     'focus_chime_enabled', 'focus_chime_volume', 'focus_long_break_interval',

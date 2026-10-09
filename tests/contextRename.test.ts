@@ -84,6 +84,17 @@ describe('renaming a workspace', () => {
     ])
   })
 
+  it('keeps the plugins you let into it let in', () => {
+    setSetting('plugin_grants', {
+      'a.js': { on: true, permissions: ['read'], hosts: [], workspaces: ['work', 'home'], grantedAt: 1 },
+      'b.js': { on: true, permissions: ['read'], hosts: [], workspaces: ['home'], grantedAt: 1 }
+    })
+    rename()
+    const grants = getSetting<Record<string, { workspaces: string[] }>>('plugin_grants', {})
+    expect(grants['a.js'].workspaces).toStrictEqual(['job', 'home'])
+    expect(grants['b.js'].workspaces).toStrictEqual(['home'])
+  })
+
   it('changes nothing at all when it fails partway', () => {
     createRecurrence({ context: 'work', title: 'Standup notes', rule: { freq: 'daily', startAt: Date.now() + 3_600_000 } })
     setSetting(boardConfigKey('work'), { columns: [] })

@@ -27,8 +27,14 @@ export const registerShortcuts = (...args: Parameters<Bridge['registerShortcuts'
 export const toggleEngine = (...args: Parameters<Bridge['toggleEngine']>): ReturnType<Bridge['toggleEngine']> =>
   window.electronAPI.customizer.toggleEngine(...args)
 
-export const togglePlugin = (...args: Parameters<Bridge['togglePlugin']>): ReturnType<Bridge['togglePlugin']> =>
-  window.electronAPI.customizer.togglePlugin(...args)
+export const approvePlugin = (...args: Parameters<Bridge['approvePlugin']>): ReturnType<Bridge['approvePlugin']> =>
+  window.electronAPI.customizer.approvePlugin(...args)
+
+export const disablePlugin = (...args: Parameters<Bridge['disablePlugin']>): ReturnType<Bridge['disablePlugin']> =>
+  window.electronAPI.customizer.disablePlugin(...args)
+
+export const getPluginLog = (...args: Parameters<Bridge['getPluginLog']>): ReturnType<Bridge['getPluginLog']> =>
+  window.electronAPI.customizer.getPluginLog(...args)
 
 export const updateTheme = (...args: Parameters<Bridge['updateTheme']>): ReturnType<Bridge['updateTheme']> =>
   window.electronAPI.customizer.updateTheme(...args)

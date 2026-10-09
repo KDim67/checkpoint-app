@@ -173,7 +173,11 @@ export const enum IpcChannels {
 
   // customizer and extensions
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
-  CUSTOMIZER_TOGGLE_PLUGIN       = 'customizer:togglePlugin',
+  /** grants exactly what the dialog showed, then starts it */
+  CUSTOMIZER_APPROVE_PLUGIN      = 'customizer:approvePlugin',
+  CUSTOMIZER_DISABLE_PLUGIN      = 'customizer:disablePlugin',
+  /** the last lines a plugin logged since the app started */
+  CUSTOMIZER_GET_PLUGIN_LOG      = 'customizer:getPluginLog',
   CUSTOMIZER_OPEN_PLUGINS_FOLDER = 'customizer:openPluginsFolder',
   /** writes a shipped example into the plugins folder */
   CUSTOMIZER_INSTALL_EXAMPLE     = 'customizer:installExample',

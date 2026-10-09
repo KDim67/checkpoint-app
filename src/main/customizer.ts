@@ -3,10 +3,10 @@ import { join } from 'path'
 import { existsSync, readFileSync } from 'fs'
 import { IpcChannels } from '../shared/ipcChannels'
 import {
-  unloadAllPlugins,
-  unloadPlugin,
-  loadPlugin,
-  ensurePluginsDir
+  ensurePluginsDir,
+  reloadPlugin,
+  startApprovedPlugins,
+  stopAllPlugins
 } from './pluginRegistry'
 import { getConfigDir, getPluginsDir } from './paths'
 import { getSetting } from './db'
@@ -87,18 +87,9 @@ export async function enableCustomizer(): Promise<void> {
   }
 
   try {
-    const rawPlugins = getSetting<string>('customizer_active_plugins', '[]')
-    const activePlugins: string[] = JSON.parse(rawPlugins)
-    console.log(`[customizer] Loading active plugins:`, activePlugins)
-    for (const pluginFile of activePlugins) {
-      const result = loadPlugin(pluginFile)
-      // logged not thrown, one bad plugin mustn't stop the rest
-      if (!result.ok) {
-        console.error(`[customizer] Plugin "${pluginFile}" failed to load: ${result.error}`)
-      }
-    }
+    startApprovedPlugins()
   } catch (err) {
-    console.error('[customizer] Failed to load active plugins:', err)
+    console.error('[customizer] Failed to start approved plugins:', err)
   }
 
   try {
@@ -116,6 +107,7 @@ export async function enableCustomizer(): Promise<void> {
     watcher
       .on('add', (filePath: string) => handleFileChange(filePath))
       .on('change', (filePath: string) => handleFileChange(filePath))
+      .on('unlink', (filePath: string) => handleFileChange(filePath))
 
     console.log(`[customizer] Started file watcher on ${configDir}`)
   } catch (err) {
@@ -134,7 +126,7 @@ export async function disableCustomizer(): Promise<void> {
     console.log('[customizer] Chokidar watcher stopped.')
   }
 
-  unloadAllPlugins()
+  await stopAllPlugins()
 
   broadcastTheme('')
   try {
@@ -165,16 +157,7 @@ function handleFileChange(filePath: string): void {
   const pluginsDir = getPluginsDir()
   if (filePath.startsWith(pluginsDir) && filePath.endsWith('.js')) {
     const filename = filePath.slice(pluginsDir.length + 1)
-    try {
-      const rawPlugins = getSetting<string>('customizer_active_plugins', '[]')
-      const activePlugins: string[] = JSON.parse(rawPlugins)
-      if (activePlugins.includes(filename)) {
-        console.log(`[customizer] Active plugin file changed: reloading: ${filename}`)
-        unloadPlugin(filename)
-        loadPlugin(filename)
-      }
-    } catch (err) {
-      console.error('[customizer] Error handling plugin file change:', err)
-    }
+    // a deleted file stops, a changed one restarts unless it now asks for more
+    reloadPlugin(filename).catch(err => console.error('[customizer] Error handling plugin file change:', err))
   }
 }

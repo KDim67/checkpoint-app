@@ -12,54 +12,48 @@ export const EXAMPLE_PLUGINS: ExamplePlugin[] = [
     filename: 'daily-summary.js',
     name: 'Daily Summary',
     description: 'Writes a log entry each day listing what you finished, and notifies you.',
-    source: `// Daily Summary: records what you completed, once per day.
+    source: `// Daily Summary: records what you finished, once per day.
 //
-// Shows: events, items.create, storage (for the "once per day" guard) and notify.
+// Shows: events, items.create, storage and notify. Every api call returns a
+// promise, so await it.
 
 module.exports = {
   metadata: {
     name: "Daily Summary",
     description: "Writes a log entry each day listing what you finished, and notifies you.",
-    version: "1.0.0"
+    version: "2.0.0",
+    permissions: ["read", "write", "notify"]
   },
 
   onLoad(api) {
     const today = () => new Date().toISOString().slice(0, 10)
 
-    api.events.on('item:completed', ({ item }) => {
+    api.events.on('item:completed', async ({ item }) => {
       const day = today()
-      // Storage is scoped to this plugin, so this key cannot collide with
-      // another plugin's or with an app setting.
-      const done = api.storage.get('completed:' + day, [])
-      done.push(item.title)
-      api.storage.set('completed:' + day, done)
+      // Storage is private to this plugin, so this key can't collide with
+      // another plugin's or with an app setting. One key that starts over each
+      // day, so it never grows past what a day holds.
+      const record = await api.storage.get('today', { day, titles: [], summarised: false })
+      if (record.day !== day) Object.assign(record, { day, titles: [], summarised: false })
+      record.titles.push(item.title)
 
       // One summary per day: the guard is what stops this becoming a log entry
-      // per completed card.
-      if (api.storage.get('summarised', '') === day) return
-      if (done.length < 5) return
+      // per finished card.
+      const due = !record.summarised && record.titles.length >= 5
+      if (due) record.summarised = true
+      await api.storage.set('today', record)
+      if (!due) return
 
-      api.storage.set('summarised', day)
-      api.items.create({
-        type: 'log',
+      await api.items.create({
         context: item.context,
-        title: 'Finished ' + done.length + ' things today',
-        body: done.map(t => '- ' + t).join('\\n'),
-        status: 'open',
-        priority: 0,
-        position: Date.now(),
-        due_at: null,
-        metadata: '{}'
+        type: 'log',
+        title: 'Finished ' + record.titles.length + ' things today',
+        body: record.titles.map(t => '- ' + t).join('\\n')
       })
-      api.notify('Nice run', 'You have finished ' + done.length + ' things today.')
+      await api.notify('Nice run', 'You have finished ' + record.titles.length + ' things today.')
     })
 
-    api.log('watching for completed work')
-  },
-
-  onUnload() {
-    // Subscriptions made through api.events are torn down automatically, so
-    // there is nothing to undo here.
+    api.log('watching for finished work')
   }
 }
 `
@@ -79,18 +73,19 @@ module.exports = {
   metadata: {
     name: "Auto Tagger",
     description: "Raises the priority of new cards whose title reads as urgent.",
-    version: "1.0.0"
+    version: "2.0.0",
+    permissions: ["read", "write"]
   },
 
   onLoad(api) {
-    api.events.on('item:created', ({ item }) => {
+    api.events.on('item:created', async ({ item }) => {
       if (item.type !== 'card') return
       // Only ever raises. Lowering a priority someone set deliberately would be
       // the plugin overruling the user.
       if (item.priority >= 3) return
       if (!URGENT.some(pattern => pattern.test(item.title))) return
 
-      api.items.update(item.id, { priority: 3 })
+      await api.items.update(item.id, { priority: 3 })
       api.log('raised priority on', item.title)
     })
   }
@@ -104,47 +99,88 @@ module.exports = {
     description: 'Reminds you once each weekday morning, listing what is still open.',
     source: `// Standup Reminder: a weekday nudge with your open count.
 //
-// Shows: items.query, notify, storage and a plain interval with cleanup.
+// Shows: workspaces, items.query, notify, storage and a plain interval.
 
 module.exports = {
   metadata: {
     name: "Standup Reminder",
     description: "Reminds you each weekday morning, with a count of what is still open.",
-    version: "1.0.0"
+    version: "2.0.0",
+    permissions: ["read", "notify"]
   },
 
   onLoad(api) {
     const HOUR = 9
 
-    const check = () => {
+    const check = async () => {
       const now = new Date()
       const day = now.getDay()
       if (day === 0 || day === 6) return          // weekends off
       if (now.getHours() !== HOUR) return
 
       const today = now.toISOString().slice(0, 10)
-      if (api.storage.get('lastReminded', '') === today) return
-      api.storage.set('lastReminded', today)
+      if (await api.storage.get('lastReminded', '') === today) return
+      await api.storage.set('lastReminded', today)
 
-      const open = api.items
-        .query('default', 'task', 100)
-        .filter(t => t.status !== 'done' && t.status !== 'archived')
+      // Only the workspaces you picked when you turned it on.
+      let open = 0
+      for (const context of await api.workspaces()) {
+        const tasks = await api.items.query({ context, type: 'task', limit: 200 })
+        open += tasks.filter(t => t.status !== 'done' && t.status !== 'archived').length
+      }
 
-      api.notify('Standup', open.length + ' task(s) still open.')
+      await api.notify('Standup', open + ' task(s) still open.')
     }
 
     // Checked every ten minutes rather than scheduled to the minute: the app is
     // not always running at 9am, and a missed exact moment would mean no
     // reminder at all that day.
-    this._timer = setInterval(check, 10 * 60 * 1000)
-    check()
+    const run = () => check().catch(err => api.log('check failed:', err))
+    setInterval(run, 10 * 60 * 1000)
+    run()
     api.log('standup reminder armed')
+  }
+
+  // No onUnload needed: turning a plugin off ends its sandbox, and its timers
+  // with it.
+}
+`
   },
 
-  onUnload() {
-    // A timer is not tracked by the host. This one has to clean up after
-    // itself, or it would keep firing after the plugin is disabled.
-    if (this._timer) clearInterval(this._timer)
+  {
+    filename: 'finished-webhook.js',
+    name: 'Finished Webhook',
+    description: 'Posts the title of each card you finish to a webhook, such as a Slack channel.',
+    source: `// Finished Webhook: tells a chat channel what you finished.
+//
+// Shows: api.fetch and the hosts list. Put your own webhook address below. Its
+// host has to be listed in metadata.hosts, or the request is refused; listing
+// a host is what asks you for the network when you turn the plugin on.
+
+const WEBHOOK = 'https://hooks.slack.com/services/REPLACE/WITH/YOURS'
+
+module.exports = {
+  metadata: {
+    name: "Finished Webhook",
+    description: "Posts the title of each card you finish to a webhook, such as a Slack channel.",
+    version: "1.0.0",
+    permissions: ["read"],
+    hosts: ["hooks.slack.com"]
+  },
+
+  onLoad(api) {
+    api.events.on('item:completed', async ({ item }) => {
+      if (WEBHOOK.includes('REPLACE')) {
+        api.log('put your webhook address at the top of the file first')
+        return
+      }
+      const response = await api.fetch(WEBHOOK, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: 'Finished: ' + item.title })
+      })
+      if (response.status >= 300) api.log('the webhook answered', response.status, response.text)
+    })
   }
 }
 `

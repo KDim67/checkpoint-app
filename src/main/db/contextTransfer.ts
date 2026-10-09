@@ -6,6 +6,7 @@ import { normalizeRenewal } from '../../shared/renewal'
 import { contextSettingKeys, directContextSettingKeys, remapContextSettings } from '../../shared/contextSettings'
 import { wallIndexKey } from '../../shared/wallModel'
 import { isSecretSetting } from '../secureSettings'
+import { PLUGIN_GRANTS_KEY, readGrants, renameGrantWorkspaces } from '../../shared/pluginPermissions'
 
 export function exportContextData(db: Database.Database, context: string): ContextExport {
   const items = db.prepare(`SELECT * FROM items WHERE context = ?`).all(context) as Item[]
@@ -228,6 +229,16 @@ function moveContext(db: Database.Database, oldSlug: string, newSlug: string, ke
       // an unreadable undo can't be replayed anyway, so it stays as it was
     }
     update.run(newSlug, undo, entry.id)
+  }
+
+  // the plugins you let into it stay let in; approvals are per machine, and every machine replays the rename
+  const grants = read.get(PLUGIN_GRANTS_KEY) as { value: string } | undefined
+  if (grants) {
+    try {
+      write.run(PLUGIN_GRANTS_KEY, JSON.stringify(renameGrantWorkspaces(readGrants(JSON.parse(grants.value)), oldSlug, newSlug)))
+    } catch {
+      // unreadable approvals read as none anyway
+    }
   }
 }
 

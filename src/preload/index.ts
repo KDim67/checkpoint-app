@@ -49,6 +49,7 @@ import type {
   ClipboardItem,
   AnalyticsData,
   PluginInfo,
+  PluginLogLine,
   ShortcutMap,
   AiMemory,
   CreateMemoryPayload,
@@ -659,9 +660,16 @@ const api = {
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_THEME),
     getPlugins: (): Promise<PluginInfo[]> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_PLUGINS),
-    /** resolves with the error so a broken plugin doesn't silently stay off */
-    togglePlugin: (filename: string, active: boolean): Promise<{ ok: boolean; error?: string }> =>
-      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_TOGGLE_PLUGIN, filename, active),
+    /** resolves with the error so a plugin that fails to start doesn't look on */
+    approvePlugin: (
+      filename: string,
+      approval: { permissions: string[]; hosts: string[]; workspaces: string[] }
+    ): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_APPROVE_PLUGIN, filename, approval),
+    disablePlugin: (filename: string): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_DISABLE_PLUGIN, filename),
+    getPluginLog: (filename: string): Promise<PluginLogLine[]> =>
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_PLUGIN_LOG, filename),
     openPluginsFolder: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER),
     /** installs only, doesn't enable */

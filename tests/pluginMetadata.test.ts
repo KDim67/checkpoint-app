@@ -13,7 +13,9 @@ describe('parsePluginMetadata', () => {
     expect(parsePluginMetadata(source)).toEqual({
       name: 'Console Greeter',
       description: 'Logs a welcoming message on startup.',
-      version: '1.0.0'
+      version: '1.0.0',
+      permissions: null,
+      hosts: null
     })
   })
 
@@ -24,7 +26,7 @@ describe('parsePluginMetadata', () => {
 
   it('returns nulls when there is no metadata block', () => {
     expect(parsePluginMetadata('module.exports = { onLoad() {} }')).toEqual({
-      name: null, description: null, version: null
+      name: null, description: null, version: null, permissions: null, hosts: null
     })
   })
 
@@ -59,6 +61,40 @@ describe('parsePluginMetadata', () => {
   it('ignores a name outside the metadata block', () => {
     const source = `const name = "decoy"\n${plugin(`{ version: "1.0" }`)}`
     expect(parsePluginMetadata(source).name).toBeNull()
+  })
+
+  it('reads the permissions and hosts lists', () => {
+    const source = plugin(`{
+      name: "Asker",
+      permissions: ["read", 'notify'],
+      hosts: [ "hooks.slack.com" ]
+    }`)
+    expect(parsePluginMetadata(source)).toMatchObject({ permissions: ['read', 'notify'], hosts: ['hooks.slack.com'] })
+  })
+
+  it('takes only string literals from a list, never anything that would have to run', () => {
+    const source = plugin(`{ permissions: ["read", someVariable, getMore(), 'write'] }`)
+    expect(parsePluginMetadata(source).permissions).toStrictEqual(['read', 'write'])
+  })
+
+  it('is not cut short by a brace or bracket inside a string or a comment', () => {
+    const source = plugin(`{
+      description: "uses } and ] freely",
+      // a comment with } in it
+      /* and ] here */
+      permissions: ["read"],
+      version: "1.2.3"
+    }`)
+    expect(parsePluginMetadata(source)).toMatchObject({ description: 'uses } and ] freely', permissions: ['read'], version: '1.2.3' })
+  })
+
+  it('never takes a value that only reads like a key, or a key from a nested object', () => {
+    const source = plugin(`{
+      description: "name: Impostor",
+      extra: { permissions: ["network"], name: "Nested" },
+      name: "Real"
+    }`)
+    expect(parsePluginMetadata(source)).toMatchObject({ name: 'Real', permissions: null })
   })
 
   it('does not execute what it reads', () => {

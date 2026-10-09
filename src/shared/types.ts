@@ -1,6 +1,7 @@
 /** imported by main and renderer, no Node types */
 
 import type { RenewalRow } from './renewalApi'
+import type { PluginGrant, PluginRequest, PluginStatus } from './pluginPermissions'
 
 export type ItemType = 'log' | 'card' | 'task'
 type ItemStatus = string
@@ -377,7 +378,21 @@ export interface PluginInfo {
   name: string
   description: string
   version: string
+  /** you switched it on here; it may still be waiting on you or stopped */
   active: boolean
+  /** read from the file, never by running it */
+  request: PluginRequest
+  /** what you approved on this machine, null if never */
+  grant: Pick<PluginGrant, 'permissions' | 'hosts' | 'workspaces'> | null
+  status: PluginStatus
+  /** why it stopped or needs you, in words for the settings row */
+  statusDetail: string | null
+}
+
+export interface PluginLogLine {
+  at: number
+  level: 'info' | 'error'
+  text: string
 }
 
 export type ShortcutMap = Record<string, string>;

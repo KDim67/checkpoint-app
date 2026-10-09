@@ -1,32 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { describe, it, expect } from 'vitest'
 import { EXAMPLE_PLUGINS, findExamplePlugin } from '../src/shared/examplePlugins'
 import { parsePluginMetadata, isSafePluginFilename } from '../src/shared/pluginMetadata'
 
-// they double as docs: must load, metadata readable without running
-
-let home: string
-
-vi.mock('electron', async () => {
-  const actual = await vi.importActual<typeof import('./stubs/electron')>('./stubs/electron')
-  return {
-    ...actual,
-    app: { ...actual.app, getPath: (n: string) => (n === 'home' ? home : `${home}/${n}`) }
-  }
-})
-
-const pluginsDir = (): string => join(home, '.config', 'checkpoint', 'plugins')
-
-beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), 'checkpoint-examples-'))
-  vi.resetModules()
-})
-
-afterEach(() => {
-  rmSync(home, { recursive: true, force: true })
-})
+// they double as docs: metadata readable without running
 
 describe('the shipped examples', () => {
   it('ships more than one', () => {
@@ -60,70 +36,10 @@ describe('the shipped examples', () => {
     expect(findExamplePlugin('nope.js')).toBeNull()
   })
 
-  it('every one of them actually loads', async () => {
-    // the real registry, require and API
-    const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
-    mkdirSync(pluginsDir(), { recursive: true })
-
+  it('say what they need, so turning one on shows you something true', () => {
+    // running them with exactly that is pluginWorker.test.ts
     for (const example of EXAMPLE_PLUGINS) {
-      writeFileSync(join(pluginsDir(), example.filename), example.source, 'utf8')
-      const result = loadPlugin(example.filename)
-      expect(result, example.filename).toMatchObject({ ok: true })
-      unloadPlugin(example.filename)
+      expect(parsePluginMetadata(example.source).permissions, example.filename).not.toBeNull()
     }
-  })
-
-  it('unload without leaving event subscriptions behind', async () => {
-    const { loadPlugin, unloadPlugin } = await import('../src/main/pluginRegistry')
-    const { pluginEventListenerCount } = await import('../src/main/pluginEvents')
-    mkdirSync(pluginsDir(), { recursive: true })
-
-    for (const example of EXAMPLE_PLUGINS) {
-      writeFileSync(join(pluginsDir(), example.filename), example.source, 'utf8')
-      loadPlugin(example.filename)
-    }
-    for (const example of EXAMPLE_PLUGINS) unloadPlugin(example.filename)
-
-    // enable/disable cycles would leak a listener
-    expect(pluginEventListenerCount('item:created')).toBe(0)
-    expect(pluginEventListenerCount('item:completed')).toBe(0)
-  })
-})
-
-describe('pluginEvents', () => {
-  it('delivers to every subscriber', async () => {
-    const { onPluginEvent, emitPluginEvent, clearPluginEvents } = await import('../src/main/pluginEvents')
-    clearPluginEvents()
-
-    const seen: string[] = []
-    onPluginEvent('item:created', () => seen.push('a'))
-    onPluginEvent('item:created', () => seen.push('b'))
-    emitPluginEvent('item:created', { item: { id: 'x' } as never })
-
-    expect(seen).toEqual(['a', 'b'])
-  })
-
-  it('keeps going when one handler throws', async () => {
-    // fired inside a db write, a throwing plugin mustn't fail card creation
-    const { onPluginEvent, emitPluginEvent, clearPluginEvents } = await import('../src/main/pluginEvents')
-    clearPluginEvents()
-
-    const seen: string[] = []
-    onPluginEvent('item:created', () => { throw new Error('rude') })
-    onPluginEvent('item:created', () => seen.push('still ran'))
-
-    expect(() => emitPluginEvent('item:created', { item: { id: 'x' } as never })).not.toThrow()
-    expect(seen).toEqual(['still ran'])
-  })
-
-  it('stops delivering after unsubscribe', async () => {
-    const { onPluginEvent, clearPluginEvents, pluginEventListenerCount } =
-      await import('../src/main/pluginEvents')
-    clearPluginEvents()
-
-    const off = onPluginEvent('item:completed', () => {})
-    expect(pluginEventListenerCount('item:completed')).toBe(1)
-    off()
-    expect(pluginEventListenerCount('item:completed')).toBe(0)
   })
 })

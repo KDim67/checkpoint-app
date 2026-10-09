@@ -1,53 +1,122 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Divider, ToggleSwitch } from './SettingsSection'
 import { useToast } from '../ui/Toast'
-import { FolderOpen, Sparkles, AlertTriangle, Terminal, ShieldAlert, X } from 'lucide-react'
-import { PluginInfo } from '../../../../shared/types'
+import { FolderOpen, Sparkles, AlertTriangle, Terminal, ShieldCheck, X } from 'lucide-react'
+import type { PluginInfo, PluginLogLine } from '../../../../shared/types'
+import { PERMISSION_TEXT, type PluginStatus } from '../../../../shared/pluginPermissions'
 import { EXAMPLE_PLUGINS } from '../../../../shared/examplePlugins'
 import * as customizerApi from '../../data/customizer'
+import { useAppStore } from '../../store/appStore'
+import PluginConsentModal from './PluginConsentModal'
+
+const STATUS_LABEL: Record<PluginStatus, string> = {
+  off: 'Off',
+  starting: 'Starting',
+  running: 'Running',
+  'needs-approval': 'Needs your OK',
+  stopped: 'Stopped',
+  crashed: 'Crashed'
+}
+
+// a plugin can stop or crash while the tab is open
+const REFRESH_MS = 5000
+
+const TEMPLATE = `module.exports = {
+  metadata: {
+    name: "Hello",
+    description: "Says hello when something is finished.",
+    version: "1.0.0",
+    permissions: ["read", "notify"]
+  },
+  onLoad(api) {
+    api.events.on("item:completed", ({ item }) => {
+      api.notify("Done", item.title)
+    })
+  }
+}`
+
+/** granted when there is a grant, otherwise what it asks for */
+function permissionSummary(plugin: PluginInfo): string {
+  const list = plugin.grant?.permissions ?? plugin.request.permissions
+  if (list.length === 0) return 'Asks for nothing'
+  return list.map(p => PERMISSION_TEXT[p].label).join(', ')
+}
 
 export default function ExtensionsTab() {
   const { toast } = useToast()
+  const workspaceList = useAppStore(s => s.workspaceList)
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [engineEnabled, setEngineEnabled] = useState(false)
   const [plugins, setPlugins] = useState<PluginInfo[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<{ filename: string; message: string } | null>(null)
+  const [loadError, setLoadError] = useState<{ name: string; message: string } | null>(null)
+  const [reviewing, setReviewing] = useState<PluginInfo | null>(null)
+  const [openLog, setOpenLog] = useState<string | null>(null)
+  const [logLines, setLogLines] = useState<PluginLogLine[]>([])
 
-  const loadPluginsList = async () => {
+  const loadPluginsList = useCallback(async () => {
     try {
-      const enabled = await customizerApi.getEngineState()
-      setEngineEnabled(enabled)
-
-      const list = await customizerApi.getPlugins()
-      setPlugins(list)
+      setEngineEnabled(await customizerApi.getEngineState())
+      setPlugins(await customizerApi.getPlugins())
     } catch (err) {
       console.error('Failed to load plugins:', err)
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => {
-    loadPluginsList()
   }, [])
 
-  const handleTogglePlugin = async (filename: string, checked: boolean) => {
+  useEffect(() => {
+    void loadPluginsList()
+    const timer = setInterval(() => void loadPluginsList(), REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [loadPluginsList])
+
+  // refreshed with the list, so a plugin's output shows up while you watch
+  useEffect(() => {
+    if (!openLog) return
+    const load = () => customizerApi.getPluginLog(openLog).then(setLogLines).catch(console.error)
+    void load()
+    const timer = setInterval(() => void load(), REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [openLog])
+
+  const handleToggle = async (plugin: PluginInfo, checked: boolean) => {
+    if (checked) {
+      // never on without seeing what it asks for
+      setReviewing(plugin)
+      return
+    }
     try {
-      const result = await customizerApi.togglePlugin(filename, checked)
-      if (!result.ok) {
-        // the switch stays off with the reason; failed loads used to look enabled
-        setLoadError({ filename, message: result.error ?? 'The plugin failed to load.' })
-        toast(`${filename} could not be enabled`)
-        return
-      }
-      setLoadError(current => (current?.filename === filename ? null : current))
-      setPlugins(prev =>
-        prev.map(p => p.filename === filename ? { ...p, active: checked } : p)
-      )
-      toast(checked ? `Enabled plugin: ${filename}` : `Disabled plugin: ${filename}`)
+      await customizerApi.disablePlugin(plugin.filename)
+      setLoadError(current => (current?.name === plugin.name ? null : current))
+      await loadPluginsList()
+      toast(`Turned off ${plugin.name}`)
     } catch (err) {
       console.error(err)
-      toast(`Failed to toggle plugin: ${filename}`)
+      toast(`Couldn't turn off ${plugin.name}`)
+    }
+  }
+
+  const handleApprove = async (plugin: PluginInfo, workspaces: string[]): Promise<boolean> => {
+    try {
+      const result = await customizerApi.approvePlugin(plugin.filename, {
+        permissions: plugin.request.permissions,
+        hosts: plugin.request.hosts,
+        workspaces
+      })
+      await loadPluginsList()
+      if (!result.ok) {
+        // the switch stays where it is with the reason; a plugin that failed to start never looks on
+        setLoadError({ name: plugin.name, message: result.error ?? 'It failed to start.' })
+        return true
+      }
+      setLoadError(current => (current?.name === plugin.name ? null : current))
+      toast(engineEnabled ? `${plugin.name} is on` : `${plugin.name} will run once the Customization Engine is on`)
+      return true
+    } catch (err) {
+      console.error(err)
+      toast(`Couldn't turn on ${plugin.name}`)
+      return false
     }
   }
 
@@ -60,7 +129,7 @@ export default function ExtensionsTab() {
       }
       // rescan so the file shows with metadata from disk
       await loadPluginsList()
-      toast(`Installed ${filename}. Read it, then enable it below.`)
+      toast(`Installed ${filename}. Read it, then turn it on below.`)
     } catch (err) {
       console.error(err)
       toast('Could not install that example')
@@ -80,98 +149,60 @@ export default function ExtensionsTab() {
     return <div className="text-sm-faint">Scanning plugins…</div>
   }
 
+  // on before plugins were sandboxed; main hides that grant, so it shows as on with none
+  const paused = plugins.filter(p => p.active && p.status === 'needs-approval' && p.grant === null)
+
   return (
     <div className="col-xl">
-      {/* plugins run in main with full privileges; the old copy wrongly said sandboxed */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 'var(--space-3)',
-        padding: 'var(--space-3) var(--space-4)',
-        background: 'var(--color-surface-2)',
-        border: '1px solid var(--color-surface-offset)',
-        borderRadius: 'var(--radius-lg)'
-      }}>
-        <ShieldAlert size={16} style={{ color: 'var(--color-warning)', flexShrink: 0, marginTop: '1px' }} />
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 'var(--leading-relaxed)' }}>
-          A plugin runs inside Checkpoint with the same access the app has. Your
-          files, your database and the network. Only enable code you have read or
-          trust. Nothing here is sandboxed.
+      <div className="plugin-notice">
+        <ShieldCheck size={16} className="plugin-notice-icon" />
+        <div>
+          Each plugin runs in its own sandbox and can only do what you allow when you turn it on: see or
+          change cards in the workspaces you pick, notify you, or reach the sites it lists. Approvals are
+          for this computer only.
         </div>
       </div>
 
-      {loadError && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 'var(--space-3)',
-          padding: 'var(--space-3) var(--space-4)',
-          background: 'var(--color-error-muted)',
-          border: '1px solid var(--color-error)',
-          borderRadius: 'var(--radius-lg)'
-        }}>
-          <AlertTriangle size={16} style={{ color: 'var(--color-error)', flexShrink: 0, marginTop: '1px' }} />
-          <div className="fill">
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)', fontWeight: 'var(--weight-semibold)' }}>
-              {loadError.filename} could not be enabled
-            </div>
-            <code style={{
-              display: 'block',
-              marginTop: 'var(--space-1)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '11px',
-              color: 'var(--color-text-muted)',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word'
-            }}>
-              {loadError.message}
-            </code>
+      {paused.length > 0 && (
+        <div className="plugin-notice plugin-notice-warning">
+          <AlertTriangle size={16} className="plugin-notice-icon" />
+          <div>
+            {paused.length === 1 ? `${paused[0].name} is` : `${paused.length} plugins you had on are`} paused.
+            Plugins now run in a sandbox, so each needs your OK for what it asks for.
           </div>
-          <button
-            className="btn-secondary"
-            onClick={() => setLoadError(null)}
-            aria-label="Dismiss the plugin error"
-          >
+        </div>
+      )}
+
+      {loadError && (
+        <div className="plugin-notice plugin-notice-error" role="alert">
+          <AlertTriangle size={16} className="plugin-notice-icon" />
+          <div className="fill">
+            <div className="plugin-notice-title">{loadError.name} didn't start</div>
+            <code className="plugin-error-text">{loadError.message}</code>
+          </div>
+          <button className="btn-secondary" onClick={() => setLoadError(null)} aria-label="Dismiss the plugin error">
             <X size={12} />
           </button>
         </div>
       )}
 
       {!engineEnabled && (
-        <div style={{
-          background: 'var(--color-warning-muted)',
-          border: '1px solid var(--color-warning)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-3) var(--space-4)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-3)'
-        }}>
-          <AlertTriangle size={18} className="icon-warning" />
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', flex: 1 }}>
-            The Customization Engine is disabled, so plugin hooks are inactive. It also powers the Theme Builder in <strong>Appearance &amp; Theme</strong>.
+        <div className="plugin-notice plugin-notice-warning">
+          <AlertTriangle size={16} className="plugin-notice-icon" />
+          <div className="fill">
+            The Customization Engine is off, so no plugin runs. It also powers the Theme Builder in <strong>Appearance &amp; Theme</strong>.
           </div>
           <button
+            className="plugin-engine-button"
             onClick={async () => {
               try {
                 await customizerApi.toggleEngine(true)
-                setEngineEnabled(true)
+                await loadPluginsList()
                 toast('Customization Engine activated')
               } catch (err) {
                 console.error(err)
                 toast('Failed to enable the Customization Engine')
               }
-            }}
-            style={{
-              flexShrink: 0,
-              background: 'var(--color-warning)',
-              border: 'none',
-              color: '#0b0c10',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2) var(--space-3)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--weight-bold)',
-              cursor: 'pointer'
             }}
           >
             Enable now
@@ -181,31 +212,10 @@ export default function ExtensionsTab() {
 
       <div className="row-between">
         <div>
-          <h3 className="heading-sm-strong">
-            User Plugins
-          </h3>
-          <p style={{ margin: '2px 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            Hot-load custom javascript plugins to expand Checkpoint's backend.
-          </p>
+          <h3 className="heading-sm-strong">User Plugins</h3>
+          <p className="text-sub">JavaScript files from your plugins folder, each in its own sandbox.</p>
         </div>
-
-        <button
-          onClick={handleOpenFolder}
-          className="extensions-tab-open-folder border-offset"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            background: 'var(--color-surface-2)',
-            color: 'var(--color-text-base)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-2) var(--space-3)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--weight-semibold)',
-            cursor: 'pointer',
-            transition: 'all 100ms ease'
-          }}
-        >
+        <button onClick={handleOpenFolder} className="extensions-tab-open-folder">
           <FolderOpen size={12} />
           Open Plugins Folder
         </button>
@@ -213,11 +223,9 @@ export default function ExtensionsTab() {
 
       <div className="col">
         <div>
-          <div className="text-item">
-            Example plugins
-          </div>
+          <div className="text-item">Example plugins</div>
           <div className="text-sub">
-            Written into your plugins folder so you can read them before enabling anything.
+            Written into your plugins folder so you can read them before turning anything on.
             Installing does not switch a plugin on.
           </div>
         </div>
@@ -225,30 +233,12 @@ export default function ExtensionsTab() {
         {EXAMPLE_PLUGINS.map(example => {
           const installed = plugins.some(plugin => plugin.filename === example.filename)
           return (
-            <div
-              key={example.filename}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-3)',
-                padding: 'var(--space-2) var(--space-3)',
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)'
-              }}
-            >
+            <div key={example.filename} className="plugin-example">
               <div className="fill">
                 <div className="text-xs-base">{example.name}</div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', marginTop: '1px' }}>
-                  {example.description}
-                </div>
+                <div className="plugin-example-description">{example.description}</div>
               </div>
-              <button
-                className="btn-secondary"
-                disabled={installed}
-                onClick={() => handleInstallExample(example.filename)}
-                style={{ flexShrink: 0, opacity: installed ? 0.5 : 1 }}
-              >
+              <button className="btn-secondary" disabled={installed} onClick={() => handleInstallExample(example.filename)}>
                 {installed ? 'Installed' : 'Install'}
               </button>
             </div>
@@ -258,118 +248,93 @@ export default function ExtensionsTab() {
 
       <Divider />
 
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-4)',
-        opacity: engineEnabled ? 1 : 0.6,
-        pointerEvents: engineEnabled ? 'auto' : 'none',
-        transition: 'opacity 200ms ease'
-      }}>
+      <div className="plugin-list" data-engine={engineEnabled ? 'on' : 'off'}>
         {plugins.length === 0 ? (
-          <div style={{
-            background: 'var(--color-surface-2)',
-            border: '1px dashed var(--color-surface-offset)',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-6)',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 'var(--space-3)'
-          }}>
+          <div className="plugin-empty">
             <Sparkles size={24} className="text-faint" />
-            <div className="text-item">
-              No plugins found in the plugins directory
+            <div className="text-item">No plugins found in the plugins directory</div>
+            <div className="text-sub">
+              Create a JavaScript file (for example <code>hello.js</code>) in the plugins folder. A plugin lists
+              what it needs in <code>permissions</code>, and the sites it talks to in <code>hosts</code>.
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', maxWidth: '440px', lineHeight: 'var(--leading-relaxed)' }}>
-              Create a javascript file (e.g., <code>hello.js</code>) inside the plugins folder.
-              Here is a template you can use to start developing:
-            </div>
-            <pre style={{
-              background: 'var(--color-background)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-3)',
-              fontSize: '11px',
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--color-text-muted)',
-              textAlign: 'left',
-              width: '100%',
-              maxWidth: '520px',
-              overflowX: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '2px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-secondary)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: '4px', marginBottom: '6px' }}>
+            <pre className="plugin-template">
+              <div className="plugin-template-name">
                 <Terminal size={12} />
-                <span>plugin-template.js</span>
+                <span>hello.js</span>
               </div>
-              {`module.exports = {
-  metadata: {
-    name: "Console Greeter",
-    description: "Logs a welcoming message on startup.",
-    version: "1.0.0"
-  },
-  onLoad(api) {
-    api.log("Custom plugin loaded successfully!");
-  },
-  onUnload() {
-    console.log("Custom plugin unloaded!");
-  }
-};`}
+              {TEMPLATE}
             </pre>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-3)' }}>
-            {plugins.map(p => (
-              <div
-                key={p.filename}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 'var(--space-3) var(--space-4)',
-                  background: 'var(--color-surface-1)',
-                  border: '1px solid var(--color-surface-offset)',
-                  borderRadius: 'var(--radius-md)'
-                }}
-              >
-                <div className="flex-1-mr">
-                  <div className="row">
-                    <span className="text-item-strong">
-                      {p.name}
-                    </span>
-                    <span style={{
-                      fontSize: '10px',
-                      background: 'var(--color-surface-2)',
-                      color: 'var(--color-text-muted)',
-                      padding: '2px 6px',
-                      borderRadius: 'var(--radius-full)',
-                      border: '1px solid var(--color-surface-offset)'
-                    }}>
-                      v{p.version}
-                    </span>
-                  </div>
-                  <p style={{ margin: '4px 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    {p.description}
-                  </p>
-                  <code style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', display: 'block', marginTop: '6px' }}>
-                    File: {p.filename}
-                  </code>
+          plugins.map(p => (
+            <div key={p.filename} className="plugin-row">
+              <div className="fill">
+                <div className="row">
+                  <span className="text-item-strong">{p.name}</span>
+                  <span className="plugin-version">v{p.version}</span>
+                  <span className="plugin-status" data-status={p.status}>{STATUS_LABEL[p.status]}</span>
                 </div>
+                <p className="plugin-description">{p.description}</p>
+                {p.statusDetail && <p className="plugin-status-detail" data-status={p.status}>{p.statusDetail}</p>}
+                <div className="plugin-meta">
+                  <span>{permissionSummary(p)}</span>
+                  {(p.grant?.hosts ?? p.request.hosts).length > 0 && (
+                    <span>Sites: {(p.grant?.hosts ?? p.request.hosts).join(', ')}</span>
+                  )}
+                  <code>{p.filename}</code>
+                </div>
+              </div>
 
+              <div className="plugin-row-actions">
+                <button
+                  className="btn-ghost"
+                  aria-expanded={openLog === p.filename}
+                  onClick={() => {
+                    setLogLines([])
+                    setOpenLog(current => (current === p.filename ? null : p.filename))
+                  }}
+                >
+                  Log
+                </button>
+                {p.active && (
+                  <button className="btn-ghost" onClick={() => setReviewing(p)}>
+                    {p.status === 'needs-approval' ? 'Review' : 'Permissions'}
+                  </button>
+                )}
+                {/* you want it on; the pill says whether it actually runs, so a paused one can still be switched off */}
                 <ToggleSwitch
                   checked={p.active}
-                  onChange={checked => handleTogglePlugin(p.filename, checked)}
-                  label={`Enable plugin ${p.name || p.filename}`}
+                  onChange={checked => void handleToggle(p, checked)}
+                  label={`Turn on ${p.name}`}
                 />
               </div>
-            ))}
-          </div>
+
+              {openLog === p.filename && (
+                <div className="plugin-log" role="log" aria-label={`What ${p.name} logged`}>
+                  {logLines.length === 0
+                    ? <div className="plugin-log-empty">Nothing logged since Checkpoint started. Lines from api.log and its errors show here.</div>
+                    : logLines.map((line, i) => (
+                      <div key={`${line.at}-${i}`} className="plugin-log-line" data-level={line.level}>
+                        <time>{new Date(line.at).toLocaleTimeString()}</time>
+                        <span>{line.text}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
+
+      {reviewing && (
+        <PluginConsentModal
+          plugin={reviewing}
+          workspaces={workspaceList}
+          activeWorkspace={activeWorkspace}
+          onClose={() => setReviewing(null)}
+          onApprove={workspaces => handleApprove(reviewing, workspaces)}
+        />
+      )}
     </div>
   )
 }
