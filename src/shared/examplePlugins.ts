@@ -17,6 +17,7 @@ export const EXAMPLE_PLUGINS: ExamplePlugin[] = [
 // Shows: events, items.create, storage and notify. Every api call returns a
 // promise, so await it.
 
+/** @type {import('./checkpoint-plugin').Plugin} */
 module.exports = {
   metadata: {
     name: "Daily Summary",
@@ -69,6 +70,7 @@ module.exports = {
 
 const URGENT = [/\\bbug\\b/i, /\\bcrash\\b/i, /\\bbroken\\b/i, /\\bregression\\b/i, /\\bhotfix\\b/i]
 
+/** @type {import('./checkpoint-plugin').Plugin} */
 module.exports = {
   metadata: {
     name: "Auto Tagger",
@@ -101,6 +103,7 @@ module.exports = {
 //
 // Shows: workspaces, items.query, notify, storage and a plain interval.
 
+/** @type {import('./checkpoint-plugin').Plugin} */
 module.exports = {
   metadata: {
     name: "Standup Reminder",
@@ -158,6 +161,7 @@ module.exports = {
 // Its host has to be listed in metadata.hosts, or the request is refused;
 // listing a host is what asks you for the network when you turn it on.
 
+/** @type {import('./checkpoint-plugin').Plugin} */
 module.exports = {
   metadata: {
     name: "Finished Webhook",

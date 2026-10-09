@@ -2,7 +2,7 @@
 
 import { app, ipcMain, type IpcMainEvent } from 'electron'
 import { join } from 'path'
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import type { PluginInfo, PluginLogLine } from '../shared/types'
 import { getPluginsDir, ensureDir } from './paths'
 import { isSafePluginFilename, parsePluginMetadata } from '../shared/pluginMetadata'
@@ -32,6 +32,7 @@ import { getGrant, loadGrants, saveGrant } from './plugins/grants'
 import { HOST_OUT, PLUGIN_LINE_OFFSET, workerSource } from './plugins/hostPage'
 import { openSandbox, type Sandbox } from './plugins/sandbox'
 import { PluginLog } from './plugins/log'
+import pluginTypes from './plugins/checkpoint-plugin.d.ts?raw'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -77,8 +78,19 @@ let heartbeat: ReturnType<typeof setInterval> | null = null
 let ticks = 0
 let wired = false
 
+/** beside the plugins, so an editor can autocomplete the api; ours, so it is replaced whenever it differs */
+export const PLUGIN_TYPES_FILE = 'checkpoint-plugin.d.ts'
+
 export function ensurePluginsDir(): void {
-  ensureDir(getPluginsDir())
+  const dir = getPluginsDir()
+  ensureDir(dir)
+  const target = join(dir, PLUGIN_TYPES_FILE)
+  try {
+    if (!existsSync(target) || readFileSync(target, 'utf8') !== pluginTypes) writeFileSync(target, pluginTypes, 'utf8')
+  } catch (err) {
+    // autocomplete is a convenience; a read-only folder must not stop plugins
+    console.error('[PluginRegistry] Could not write the plugin types file:', err)
+  }
 }
 
 interface OnDisk {

@@ -22,7 +22,8 @@ const STATUS_LABEL: Record<PluginStatus, string> = {
 // a plugin can stop or crash while the tab is open
 const REFRESH_MS = 5000
 
-const TEMPLATE = `module.exports = {
+const TEMPLATE = `/** @type {import('./checkpoint-plugin').Plugin} */
+module.exports = {
   metadata: {
     name: "Hello",
     description: "Says hello when something is finished.",

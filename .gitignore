@@ -54,6 +54,8 @@ src/**/*.d.ts
 !src/renderer/src/electron.d.ts
 !src/renderer/src/vite-env.d.ts
 !src/shared/**/*.d.ts
+!src/main/env.d.ts
+!src/main/plugins/checkpoint-plugin.d.ts
 
 # snapshots and doc twins live in ../checkpoint-archive; kept so they can't creep back
 checkpoint-app*.zip
