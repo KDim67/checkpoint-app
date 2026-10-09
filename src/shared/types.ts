@@ -2,6 +2,7 @@
 
 import type { RenewalRow } from './renewalApi'
 import type { PluginGrant, PluginRequest, PluginStatus } from './pluginPermissions'
+import type { PluginSettingField } from './pluginSettings'
 
 export type ItemType = 'log' | 'card' | 'task'
 type ItemStatus = string
@@ -387,6 +388,8 @@ export interface PluginInfo {
   status: PluginStatus
   /** why it stopped or needs you, in words for the settings row */
   statusDetail: string | null
+  /** fields it asks you to fill in */
+  settings: PluginSettingField[]
 }
 
 export interface PluginLogLine {

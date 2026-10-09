@@ -136,10 +136,16 @@ describe('the shipped examples', () => {
     expect(kit.items.get('calm')?.priority).toBe(0)
   })
 
-  it('Finished Webhook posts to the host it lists once its address is filled in', async () => {
+  it('Finished Webhook waits for its address, then posts to the host it lists', async () => {
     const example = defined(findExamplePlugin('finished-webhook.js'))
-    const source = example.source.replace('REPLACE/WITH/YOURS', 'T000/B000/xyz')
-    const kit = fakeDeps()
+    const unset = start(example.source, () => declaredGrant(example.source), fakeDeps({ settings: { webhook: null } }).deps)
+    await unset.started
+    await settled()
+    await unset.emit('item:completed', { item: itemOf() })
+    expect(unset.logs.map(l => l.text)).toContain('fill in the webhook address in the plugin settings first')
+
+    const source = example.source
+    const kit = fakeDeps({ settings: { webhook: 'https://hooks.slack.com/services/T000/B000/xyz' } })
     const worker = start(source, () => declaredGrant(source), kit.deps)
     await worker.started
     await settled()

@@ -15,7 +15,8 @@ describe('parsePluginMetadata', () => {
       description: 'Logs a welcoming message on startup.',
       version: '1.0.0',
       permissions: null,
-      hosts: null
+      hosts: null,
+      settings: null
     })
   })
 
@@ -26,7 +27,7 @@ describe('parsePluginMetadata', () => {
 
   it('returns nulls when there is no metadata block', () => {
     expect(parsePluginMetadata('module.exports = { onLoad() {} }')).toEqual({
-      name: null, description: null, version: null, permissions: null, hosts: null
+      name: null, description: null, version: null, permissions: null, hosts: null, settings: null
     })
   })
 
@@ -95,6 +96,22 @@ describe('parsePluginMetadata', () => {
       name: "Real"
     }`)
     expect(parsePluginMetadata(source)).toMatchObject({ name: 'Real', permissions: null })
+  })
+
+  it('reads settings fields as literals, leaving anything that would have to run', () => {
+    const source = plugin(`{
+      settings: [
+        { key: "webhook", label: "Webhook, with a } in it", type: "secret" },
+        { key: 'count', type: 'number', default: 3 },
+        { key: "on", type: "boolean", default: false, description: compute() },
+        notAnObject
+      ]
+    }`)
+    expect(parsePluginMetadata(source).settings).toStrictEqual([
+      { key: 'webhook', label: 'Webhook, with a } in it', type: 'secret' },
+      { key: 'count', type: 'number', default: 3 },
+      { key: 'on', type: 'boolean', default: false }
+    ])
   })
 
   it('does not execute what it reads', () => {

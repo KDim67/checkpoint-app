@@ -153,28 +153,37 @@ module.exports = {
     description: 'Posts the title of each card you finish to a webhook, such as a Slack channel.',
     source: `// Finished Webhook: tells a chat channel what you finished.
 //
-// Shows: api.fetch and the hosts list. Put your own webhook address below. Its
-// host has to be listed in metadata.hosts, or the request is refused; listing
-// a host is what asks you for the network when you turn the plugin on.
-
-const WEBHOOK = 'https://hooks.slack.com/services/REPLACE/WITH/YOURS'
+// Shows: api.fetch, the hosts list and settings. The webhook address is a
+// secret, so it is a setting you fill in from Settings, never part of this file.
+// Its host has to be listed in metadata.hosts, or the request is refused;
+// listing a host is what asks you for the network when you turn it on.
 
 module.exports = {
   metadata: {
     name: "Finished Webhook",
     description: "Posts the title of each card you finish to a webhook, such as a Slack channel.",
-    version: "1.0.0",
+    version: "1.1.0",
     permissions: ["read"],
-    hosts: ["hooks.slack.com"]
+    hosts: ["hooks.slack.com"],
+    settings: [
+      {
+        key: "webhook",
+        label: "Webhook address",
+        type: "secret",
+        description: "The incoming webhook address from Slack. It has to start with https://hooks.slack.com/."
+      }
+    ]
   },
 
   onLoad(api) {
     api.events.on('item:completed', async ({ item }) => {
-      if (WEBHOOK.includes('REPLACE')) {
-        api.log('put your webhook address at the top of the file first')
+      // Read when needed, so a change in Settings applies straight away.
+      const webhook = await api.settings.get('webhook')
+      if (!webhook) {
+        api.log('fill in the webhook address in the plugin settings first')
         return
       }
-      const response = await api.fetch(WEBHOOK, {
+      const response = await api.fetch(webhook, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text: 'Finished: ' + item.title })

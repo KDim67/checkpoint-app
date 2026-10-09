@@ -15,6 +15,14 @@ import {
   type PluginStatus
 } from '../shared/pluginPermissions'
 import { onPluginEvent, type PluginEventName } from './pluginEvents'
+import {
+  checkValue,
+  normalizeSettingFields,
+  pluginSettingsKey,
+  type PluginSettingField,
+  type PluginSettingState,
+  type PluginSettingValue
+} from '../shared/pluginSettings'
 import { createItem, getDb, getItemById, getItemsPaginated, getSetting, readContextList, setSetting, deleteSetting, updateItem } from './db'
 import { notify } from './notificationService'
 import { notifyRenderer, readBoardConfig } from './mcp/toolKit'
@@ -55,6 +63,8 @@ interface Running {
   unloaded: (() => void) | null
   /** what was checked against your approval is what runs, even if the file changes before the page asks */
   source: string
+  /** as that same copy declares them */
+  settings: PluginSettingField[]
 }
 
 const running = new Map<string, Running>()
@@ -76,6 +86,7 @@ interface OnDisk {
   description: string
   version: string
   request: PluginRequest
+  settings: PluginSettingField[]
   source: string
 }
 
@@ -93,6 +104,7 @@ function readPlugin(filename: string): OnDisk | { error: string } {
       description: metadata.description || 'No description provided.',
       version: metadata.version || '1.0.0',
       request: normalizeRequest(metadata.permissions ?? [], metadata.hosts ?? []),
+      settings: normalizeSettingFields(metadata.settings),
       source
     }
   } catch (err) {
@@ -129,6 +141,7 @@ export function scanPlugins(): PluginInfo[] {
           filename, name: filename, description: read.error, version: '1.0.0',
           active: grant?.on === true,
           request: { permissions: [], hosts: [], ignored: [] },
+          settings: [],
           grant: grant && !grant.legacy ? { permissions: grant.permissions, hosts: grant.hosts, workspaces: grant.workspaces } : null,
           status: 'stopped' as const,
           statusDetail: read.error
@@ -144,7 +157,8 @@ export function scanPlugins(): PluginInfo[] {
         request: read.request,
         grant: grant && !grant.legacy ? { permissions: grant.permissions, hosts: grant.hosts, workspaces: grant.workspaces } : null,
         status,
-        statusDetail: detail
+        statusDetail: detail,
+        settings: read.settings
       }
     })
 }
@@ -152,9 +166,55 @@ export function scanPlugins(): PluginInfo[] {
 const MISSING = Symbol('missing')
 const storagePrefix = (filename: string): string => `plugin:${filename}:`
 
-function realDeps(filename: string): BridgeDeps {
+/** what you filled in; hand edits or a damaged row read as nothing filled in */
+function storedSettings(filename: string): Record<string, PluginSettingValue> {
+  const raw = getSetting<unknown>(pluginSettingsKey(filename), null)
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, PluginSettingValue>) : {}
+}
+
+/** fields as the file declares them now; a secret only says whether it is set */
+export function getPluginSettings(filename: string): { ok: true; fields: PluginSettingState[] } | { ok: false; error: string } {
+  const read = readPlugin(filename)
+  if ('error' in read) return { ok: false, error: read.error }
+  const stored = storedSettings(filename)
+  return {
+    ok: true,
+    fields: read.settings.map(field => {
+      const value = stored[field.key]
+      const isSet = value !== undefined && value !== null
+      return { ...field, isSet, value: field.type === 'secret' || !isSet ? null : value }
+    })
+  }
+}
+
+/** only fields it declares, each checked against its type; null clears one, a key left out stays as it was */
+export function savePluginSettings(filename: string, changes: unknown): Result {
+  const read = readPlugin(filename)
+  if ('error' in read) return { ok: false, error: read.error }
+  if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return { ok: false, error: 'Those settings were malformed.' }
+  const next = storedSettings(filename)
+  for (const [key, value] of Object.entries(changes as Record<string, unknown>)) {
+    const field = read.settings.find(f => f.key === key)
+    if (!field) return { ok: false, error: `${read.name} has no setting named "${key}".` }
+    const checked = checkValue(field.type, value)
+    if (!checked.ok) return { ok: false, error: `${field.label} ${checked.error}.` }
+    if (checked.value === null) delete next[key]
+    else next[key] = checked.value
+  }
+  // a field the file no longer declares has nobody left to read it
+  for (const key of Object.keys(next)) if (!read.settings.some(f => f.key === key)) delete next[key]
+  setSetting(pluginSettingsKey(filename), next)
+  return { ok: true }
+}
+
+function realDeps(filename: string, fields: PluginSettingField[]): BridgeDeps {
   const prefix = storagePrefix(filename)
   return {
+    setting: key => {
+      const field = fields.find(f => f.key === key)
+      if (!field) return { declared: false, value: null }
+      return { declared: true, value: storedSettings(filename)[key] ?? field.default ?? null }
+    },
     liveWorkspaces: () => (readContextList(getDb()) ?? []).map(entry => entry.slug),
     getItem: id => getItemById(id),
     queryItems: (context, type, limit) => getItemsPaginated(context, type, 1, limit).items,
@@ -213,7 +273,7 @@ async function answer(entry: Running, id: unknown, method: unknown, args: unknow
   }
   entry.inFlight++
   try {
-    const value = await dispatch(context(entry), realDeps(entry.filename), method, args)
+    const value = await dispatch(context(entry), realDeps(entry.filename, entry.settings), method, args)
     entry.sandbox.send({ t: 'result', id, ok: true, value: value ?? null })
   } catch (err) {
     // our own wording goes back as is; anything else is an internal failure, not the plugin's business
@@ -380,7 +440,8 @@ function start(filename: string): Promise<Result> {
       startTimer: null,
       started: resolve,
       unloaded: null,
-      source: read.source
+      source: read.source,
+      settings: read.settings
     }
     running.set(filename, entry)
     byContents.set(entry.sandbox.contents.id, entry)

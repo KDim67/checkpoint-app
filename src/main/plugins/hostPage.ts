@@ -89,6 +89,9 @@ const BOOT = `const __checkpoint = (() => {
       get: (key, fallback) => call('storage.get', key).then(r => (r && r.found ? r.value : fallback)),
       set: (key, value) => call('storage.set', key, value)
     }),
+    settings: Object.freeze({
+      get: key => call('settings.get', key)
+    }),
     log: (...args) => post({ t: 'log', level: 'info', text: args.map(show).join(' ') })
   })
   const module = { exports: {} }

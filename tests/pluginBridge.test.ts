@@ -181,6 +181,15 @@ describe('storage', () => {
   })
 })
 
+describe('settings', () => {
+  it('reads a field it declares, with no permission needed, and refuses one it does not', async () => {
+    const kit = fakeDeps({ settings: { webhook: 'https://hooks.example.com/abc' } })
+    const ctx = contextOf(() => grantOf([]))
+    expect(await call(ctx, kit.deps, 'settings.get', 'webhook')).toStrictEqual({ ok: true, value: 'https://hooks.example.com/abc' })
+    expect(await call(ctx, kit.deps, 'settings.get', 'other')).toMatchObject({ ok: false, error: expect.stringContaining('Declare it in metadata.settings') })
+  })
+})
+
 describe('events', () => {
   it('subscribes only to events that exist, and only with read', async () => {
     const { ctx, deps } = setup(grantOf(['read']))

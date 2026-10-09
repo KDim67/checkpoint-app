@@ -8,6 +8,7 @@ import { EXAMPLE_PLUGINS } from '../../../../shared/examplePlugins'
 import * as customizerApi from '../../data/customizer'
 import { useAppStore } from '../../store/appStore'
 import PluginConsentModal from './PluginConsentModal'
+import PluginSettingsModal from './PluginSettingsModal'
 
 const STATUS_LABEL: Record<PluginStatus, string> = {
   off: 'Off',
@@ -52,6 +53,7 @@ export default function ExtensionsTab() {
   const [loadError, setLoadError] = useState<{ name: string; message: string } | null>(null)
   const [reviewing, setReviewing] = useState<PluginInfo | null>(null)
   const [openLog, setOpenLog] = useState<string | null>(null)
+  const [configuring, setConfiguring] = useState<PluginInfo | null>(null)
   const [logLines, setLogLines] = useState<PluginLogLine[]>([])
 
   const loadPluginsList = useCallback(async () => {
@@ -286,6 +288,9 @@ export default function ExtensionsTab() {
               </div>
 
               <div className="plugin-row-actions">
+                {p.settings.length > 0 && (
+                  <button className="btn-ghost" onClick={() => setConfiguring(p)}>Settings</button>
+                )}
                 <button
                   className="btn-ghost"
                   aria-expanded={openLog === p.filename}
@@ -325,6 +330,14 @@ export default function ExtensionsTab() {
           ))
         )}
       </div>
+
+      {configuring && (
+        <PluginSettingsModal
+          plugin={configuring}
+          onClose={() => setConfiguring(null)}
+          onSaved={() => toast(`Saved the settings for ${configuring.name}`)}
+        />
+      )}
 
       {reviewing && (
         <PluginConsentModal

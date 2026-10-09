@@ -178,6 +178,9 @@ export const enum IpcChannels {
   CUSTOMIZER_DISABLE_PLUGIN      = 'customizer:disablePlugin',
   /** the last lines a plugin logged since the app started */
   CUSTOMIZER_GET_PLUGIN_LOG      = 'customizer:getPluginLog',
+  /** a secret comes back as set or not, never as its value */
+  CUSTOMIZER_GET_PLUGIN_SETTINGS = 'customizer:getPluginSettings',
+  CUSTOMIZER_SAVE_PLUGIN_SETTINGS = 'customizer:savePluginSettings',
   CUSTOMIZER_OPEN_PLUGINS_FOLDER = 'customizer:openPluginsFolder',
   /** writes a shipped example into the plugins folder */
   CUSTOMIZER_INSTALL_EXAMPLE     = 'customizer:installExample',

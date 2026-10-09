@@ -36,5 +36,11 @@ export const disablePlugin = (...args: Parameters<Bridge['disablePlugin']>): Ret
 export const getPluginLog = (...args: Parameters<Bridge['getPluginLog']>): ReturnType<Bridge['getPluginLog']> =>
   window.electronAPI.customizer.getPluginLog(...args)
 
+export const getPluginSettings = (...args: Parameters<Bridge['getPluginSettings']>): ReturnType<Bridge['getPluginSettings']> =>
+  window.electronAPI.customizer.getPluginSettings(...args)
+
+export const savePluginSettings = (...args: Parameters<Bridge['savePluginSettings']>): ReturnType<Bridge['savePluginSettings']> =>
+  window.electronAPI.customizer.savePluginSettings(...args)
+
 export const updateTheme = (...args: Parameters<Bridge['updateTheme']>): ReturnType<Bridge['updateTheme']> =>
   window.electronAPI.customizer.updateTheme(...args)

@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { approvePlugin, disablePlugin, scanPlugins, runningPluginCount, startApprovedPlugins, stopAllPlugins } from '../src/main/pluginRegistry'
+import { approvePlugin, disablePlugin, getPluginSettings, savePluginSettings, scanPlugins, runningPluginCount, startApprovedPlugins, stopAllPlugins } from '../src/main/pluginRegistry'
+import { isSecretSetting } from '../src/main/secureSettings'
 import { POLICY_SETTING_KEY, resetNotificationDedupe } from '../src/main/notificationService'
 import { DEFAULT_POLICY } from '../src/shared/notificationPolicy'
 import { shown } from './stubs/electron'
@@ -168,6 +169,42 @@ describe('approving a plugin', () => {
     expect(one().status).not.toBe('needs-approval')
     writePlugin('one.js', asker(['read'], ['hooks.example.com']))
     expect(one()).toMatchObject({ status: 'needs-approval', statusDetail: expect.stringContaining('more than you approved') })
+  })
+})
+
+describe('plugin settings', () => {
+  const withSettings = `module.exports = { metadata: { name: 'Configured', version: '1.0.0', settings: [
+    { key: 'token', label: 'Token', type: 'secret' },
+    { key: 'limit', label: 'Limit', type: 'number', default: 5 },
+    { key: 'loud', label: 'Loud', type: 'boolean' }
+  ] } }`
+
+  it('lists the fields it declares, and never hands back a saved secret', () => {
+    writePlugin('one.js', withSettings)
+    expect(one().settings.map(s => s.key)).toStrictEqual(['token', 'limit', 'loud'])
+    expect(savePluginSettings('one.js', { token: 's3cret', limit: '7', loud: true })).toStrictEqual({ ok: true })
+    const result = getPluginSettings('one.js')
+    expect(result).toMatchObject({ ok: true, fields: [
+      { key: 'token', isSet: true, value: null },
+      { key: 'limit', isSet: true, value: 7 },
+      { key: 'loud', isSet: true, value: true }
+    ] })
+    expect(JSON.stringify(result)).not.toContain('s3cret')
+  })
+
+  it('keeps a secret it is not given, clears one set to null, and checks each type', () => {
+    writePlugin('one.js', withSettings)
+    savePluginSettings('one.js', { token: 's3cret' })
+    savePluginSettings('one.js', { limit: 9 })
+    expect(getSetting<Record<string, unknown>>('plugin_settings:one.js', {})).toMatchObject({ token: 's3cret', limit: 9 })
+    savePluginSettings('one.js', { token: null })
+    expect(getSetting<Record<string, unknown>>('plugin_settings:one.js', {})).not.toHaveProperty('token')
+    expect(savePluginSettings('one.js', { limit: 'lots' })).toMatchObject({ ok: false, error: 'Limit has to be a number.' })
+    expect(savePluginSettings('one.js', { stranger: 'x' })).toMatchObject({ ok: false, error: expect.stringContaining('no setting named "stranger"') })
+  })
+
+  it('are stored as a secret, so the whole set is encrypted at rest', () => {
+    expect(isSecretSetting('plugin_settings:one.js')).toBe(true)
   })
 })
 

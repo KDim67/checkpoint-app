@@ -16,8 +16,11 @@ const SECRET_SETTING_KEYS = new Set([
 /** deliberately not JSON: plaintext rows are JSON, so no prefix means a pre-encryption row */
 const ENVELOPE_PREFIX = 'enc.v1:'
 
+/** a plugin's fields hold what its file mustn't, a webhook address or a token, so each plugin's set is encrypted whole */
+const SECRET_SETTING_PREFIXES = ['plugin_settings:']
+
 export function isSecretSetting(key: string): boolean {
-  return SECRET_SETTING_KEYS.has(key)
+  return SECRET_SETTING_KEYS.has(key) || SECRET_SETTING_PREFIXES.some(prefix => key.startsWith(prefix))
 }
 
 export function isEncrypted(stored: string): boolean {

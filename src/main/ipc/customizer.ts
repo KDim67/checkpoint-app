@@ -71,6 +71,16 @@ export function registerCustomizerHandlers(): void {
     return typeof filename === 'string' ? pluginLog(filename) : []
   })
 
+  ipcMain.handle(IpcChannels.CUSTOMIZER_GET_PLUGIN_SETTINGS, async (_event, filename: unknown) => {
+    const { getPluginSettings } = await import('../pluginRegistry')
+    return typeof filename === 'string' ? getPluginSettings(filename) : { ok: false as const, error: 'No plugin named.' }
+  })
+
+  ipcMain.handle(IpcChannels.CUSTOMIZER_SAVE_PLUGIN_SETTINGS, async (_event, filename: unknown, changes: unknown) => {
+    const { savePluginSettings } = await import('../pluginRegistry')
+    return typeof filename === 'string' ? savePluginSettings(filename, changes) : { ok: false as const, error: 'No plugin named.' }
+  })
+
   ipcMain.handle(IpcChannels.CUSTOMIZER_DISABLE_PLUGIN, async (_event, filename: unknown) => {
     const { disablePlugin } = await import('../pluginRegistry')
     if (typeof filename === 'string') await disablePlugin(filename)

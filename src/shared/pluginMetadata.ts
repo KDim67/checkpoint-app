@@ -7,6 +7,8 @@ interface PluginMetadata {
   /** null when the file doesn't say, which asks for nothing */
   permissions: string[] | null
   hosts: string[] | null
+  /** each field as a flat object of literals; shaped by normalizeSettingFields */
+  settings: Record<string, unknown>[] | null
 }
 
 /** the escapes that actually appear */
@@ -108,8 +110,58 @@ function list(block: string, key: string): string[] | null {
   return out
 }
 
+/** a string, number, true, false or null; anything else is code and is left alone */
+function scalar(block: string, key: string): unknown {
+  const at = valueStart(block, key)
+  if (at === -1) return undefined
+  const text = /(["'])((?:\\.|(?!\1).)*)\1/y
+  text.lastIndex = at
+  const quoted = text.exec(block)
+  if (quoted) return unescape(quoted[2])
+  const literal = /(-?\d+(?:\.\d+)?|true|false|null)(?=\s*[,}\n]|\s*$)/y
+  literal.lastIndex = at
+  const found = literal.exec(block)
+  if (!found) return undefined
+  if (found[1] === 'true') return true
+  if (found[1] === 'false') return false
+  if (found[1] === 'null') return null
+  return Number(found[1])
+}
+
+/** a list of flat objects, each read field by field */
+function objects(block: string, key: string): Record<string, unknown>[] | null {
+  const at = valueStart(block, key)
+  if (at === -1 || block[at] !== '[') return null
+  const end = closing(block, at, '[', ']')
+  if (end === -1) return null
+  const out: Record<string, unknown>[] = []
+  let i = at + 1
+  while (i < end) {
+    const skipped = skipLiteral(block, i)
+    if (skipped !== i) {
+      i = skipped
+      continue
+    }
+    if (block[i] === '{') {
+      const close = closing(block, i, '{', '}')
+      if (close === -1 || close > end) break
+      const inner = block.slice(i, close + 1)
+      const entry: Record<string, unknown> = {}
+      for (const name of ['key', 'label', 'type', 'description', 'default']) {
+        const value = scalar(inner, name)
+        if (value !== undefined) entry[name] = value
+      }
+      out.push(entry)
+      i = close + 1
+      continue
+    }
+    i++
+  }
+  return out
+}
+
 export function parsePluginMetadata(source: string): PluginMetadata {
-  const empty: PluginMetadata = { name: null, description: null, version: null, permissions: null, hosts: null }
+  const empty: PluginMetadata = { name: null, description: null, version: null, permissions: null, hosts: null, settings: null }
   if (!source) return empty
 
   const start = /["']?metadata["']?\s*:\s*\{/.exec(source)
@@ -125,7 +177,8 @@ export function parsePluginMetadata(source: string): PluginMetadata {
     description: field(block, 'description'),
     version: field(block, 'version'),
     permissions: list(block, 'permissions'),
-    hosts: list(block, 'hosts')
+    hosts: list(block, 'hosts'),
+    settings: objects(block, 'settings')
   }
 }
 

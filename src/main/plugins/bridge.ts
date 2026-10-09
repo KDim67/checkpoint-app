@@ -35,6 +35,8 @@ export type ItemPatch = Partial<Pick<Item, 'title' | 'body' | 'status' | 'priori
 
 /** what the bridge may touch, handed in so it can be tested without a database or a network */
 export interface BridgeDeps {
+  /** a field the plugin declares, as you filled it in or its default */
+  setting(key: string): { declared: boolean; value: unknown }
   liveWorkspaces(): string[]
   getItem(id: string): Item | null
   queryItems(context: string, type: ItemType, limit: number): Item[]
@@ -282,6 +284,14 @@ const HANDLERS: Record<string, Handler> = {
     const headers = Object.fromEntries(Object.entries(options.headers ?? {}).filter(([k]) => !FORBIDDEN_HEADERS.test(k)))
     limit(ctx, deps, 'fetch')
     return deps.fetch(url, { method, headers, ...(options.body !== undefined ? { body: options.body } : {}) }, grant.hosts)
+  },
+
+  // no permission: the value was put there for this plugin by you
+  'settings.get': (ctx, deps, [key]) => {
+    const k = parse(storageKey, key, 'api.settings.get')
+    const found = deps.setting(k)
+    if (!found.declared) throw new PluginCallError(`${ctx.name} has no setting named "${k}". Declare it in metadata.settings.`)
+    return found.value
   },
 
   'storage.get': (_ctx, deps, [key]) => deps.storageGet(parse(storageKey, key, 'api.storage.get')),

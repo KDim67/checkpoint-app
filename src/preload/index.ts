@@ -4,6 +4,7 @@ import { IpcChannels } from '../shared/ipcChannels'
 import type { McpActivityEntry } from '../shared/mcpActivity'
 
 import type { RecurrenceSummary } from '../shared/recurrence'
+import type { PluginSettingState, PluginSettingValue } from '../shared/pluginSettings'
 import type {
   RenewalCreateInput,
   RenewalPatch,
@@ -670,6 +671,11 @@ const api = {
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_DISABLE_PLUGIN, filename),
     getPluginLog: (filename: string): Promise<PluginLogLine[]> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_PLUGIN_LOG, filename),
+    getPluginSettings: (filename: string): Promise<{ ok: true; fields: PluginSettingState[] } | { ok: false; error: string }> =>
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_GET_PLUGIN_SETTINGS, filename),
+    /** null clears a field, a key left out stays as it is */
+    savePluginSettings: (filename: string, changes: Record<string, PluginSettingValue | null>): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.CUSTOMIZER_SAVE_PLUGIN_SETTINGS, filename, changes),
     openPluginsFolder: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.CUSTOMIZER_OPEN_PLUGINS_FOLDER),
     /** installs only, doesn't enable */

@@ -168,7 +168,7 @@ describe('a key nobody has thought about', () => {
 
 describe('plugin approvals', () => {
   // turning a plugin on here must never turn it on on another machine
-  it.each(['plugin_grants', 'customizer_active_plugins', 'plugin:daily-summary.js:today'])('stay home: %s', key => {
+  it.each(['plugin_grants', 'customizer_active_plugins', 'plugin:daily-summary.js:today', 'plugin_settings:finished-webhook.js'])('stay home: %s', key => {
     expect(isSyncableSettingKey(key)).toBe(false)
   })
 })

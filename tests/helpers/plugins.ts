@@ -19,7 +19,7 @@ export function itemOf(overrides: Partial<Item> = {}): Item {
   }
 }
 
-export function fakeDeps(init: { workspaces?: string[]; items?: Item[]; fetch?: BridgeDeps['fetch'] } = {}) {
+export function fakeDeps(init: { workspaces?: string[]; items?: Item[]; fetch?: BridgeDeps['fetch']; settings?: Record<string, unknown> } = {}) {
   const items = new Map((init.items ?? []).map(i => [i.id, i]))
   const storage = new Map<string, string>()
   const notified: { title: string; body: string; key: string }[] = []
@@ -27,6 +27,7 @@ export function fakeDeps(init: { workspaces?: string[]; items?: Item[]; fetch?: 
   let clock = 1_000_000
   let changes = 0
   const deps: BridgeDeps = {
+    setting: key => (init.settings && key in init.settings ? { declared: true, value: init.settings[key] } : { declared: false, value: null }),
     liveWorkspaces: () => init.workspaces ?? ['work', 'home'],
     getItem: id => items.get(id) ?? null,
     queryItems: (context, type, limit) => [...items.values()].filter(i => i.context === context && i.type === type).slice(0, limit),
