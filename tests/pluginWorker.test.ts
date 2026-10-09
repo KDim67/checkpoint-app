@@ -159,6 +159,24 @@ describe('the shipped examples', () => {
   })
 })
 
+describe('the types file plugin authors get', () => {
+  it('describes exactly the api the worker hands a plugin', async () => {
+    const worker = start(`module.exports = { onLoad(api) {
+      const walk = (o, at) => Object.entries(o).flatMap(([k, v]) => typeof v === 'function' ? [at + k] : walk(v, at + k + '.'))
+      api.log(JSON.stringify(walk(api, '').sort()))
+    } }`, () => grantOf([]), fakeDeps().deps)
+    await worker.started
+    const calls = JSON.parse(worker.logs[0].text) as string[]
+    expect(calls).toStrictEqual(['events.on', 'fetch', 'items.create', 'items.get', 'items.query', 'items.update', 'log', 'notify', 'settings.get', 'storage.get', 'storage.set', 'workspaces'])
+    const types = readFileSync('src/main/plugins/checkpoint-plugin.d.ts', 'utf8')
+    for (const name of calls) {
+      const parts = name.split('.')
+      if (parts.length === 2) expect(types, name).toMatch(new RegExp(`\\b${parts[0]}: \\{[\\s\\S]*?\\b${parts[1]}[<(]`))
+      else expect(types, name).toMatch(new RegExp(`\\b${parts[0]}\\(`))
+    }
+  })
+})
+
 describe('the host page', () => {
   it('shares its channel names with the sandboxed preload, which cannot import them', () => {
     const preload = readFileSync('src/preload/pluginHost.ts', 'utf8')

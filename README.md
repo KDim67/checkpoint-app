@@ -197,7 +197,8 @@ module.exports = {
 
 Every `api` call returns a promise. A plugin that changes its file to ask for
 more is stopped until you approve it again. Settings → Extensions installs four
-examples that between them use the whole API.
+examples that between them use the whole API, and [docs/plugins.md](docs/plugins.md)
+is the full reference.
 
 Theming is CSS custom properties, live-editable in Settings → Appearance, or
 edit `.config/checkpoint/theme.css` directly.

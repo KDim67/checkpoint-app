@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { approvePlugin, disablePlugin, getPluginSettings, savePluginSettings, scanPlugins, runningPluginCount, startApprovedPlugins, stopAllPlugins } from '../src/main/pluginRegistry'
@@ -79,6 +79,15 @@ describe('listing plugins', () => {
   it('says why a file with an unusable name can never run', () => {
     writePlugin('my plugin.js', asker([]))
     expect(one('my plugin.js')).toMatchObject({ status: 'stopped', statusDetail: expect.stringContaining('not a plain .js filename') })
+  })
+
+  it('keeps the types file beside the plugins up to date, and never lists it', () => {
+    scanPlugins()
+    const target = join(pluginsDir(), 'checkpoint-plugin.d.ts')
+    expect(readFileSync(target, 'utf8')).toContain('export interface Api')
+    writeFileSync(target, 'stale', 'utf8')
+    expect(scanPlugins()).toStrictEqual([])
+    expect(readFileSync(target, 'utf8')).toContain('export interface Api')
   })
 
   it('ignores files that are not javascript, and returns nothing for an empty folder', () => {
