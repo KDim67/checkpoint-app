@@ -29,7 +29,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "check:sandbox": "electron-vite build && node scripts/check-sandbox.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

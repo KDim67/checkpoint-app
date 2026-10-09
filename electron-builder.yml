@@ -16,6 +16,8 @@ directories:
 
 files:
   - out/**/*
+  # the sandbox check removes its bundle when it finishes; this keeps an interrupted run out of the installer
+  - "!out/sandbox-check/**"
   - resources/**/*
   - "!**/*.map"
   - "!**/*.d.ts"
