@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS activity_tracking_logs (
 
 CREATE INDEX IF NOT EXISTS idx_items_context   ON items(context);
 CREATE INDEX IF NOT EXISTS idx_items_type      ON items(type);
+-- the calendar asks for a range of due dates on every screen
+CREATE INDEX IF NOT EXISTS idx_items_due       ON items(due_at);
 CREATE INDEX IF NOT EXISTS idx_items_status    ON items(status);
 CREATE INDEX IF NOT EXISTS idx_items_position  ON items(position);
 CREATE INDEX IF NOT EXISTS idx_items_created   ON items(created_at DESC);

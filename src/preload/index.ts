@@ -5,6 +5,8 @@ import type { McpActivityEntry } from '../shared/mcpActivity'
 
 import type { RecurrenceSummary } from '../shared/recurrence'
 import type { PluginSettingState, PluginSettingValue } from '../shared/pluginSettings'
+import type { CalendarAnswer, CalendarQuery } from '../shared/calendar'
+import type { CalendarBridge, CalendarResult, CalendarSubscription, QuickAddInput, SubscriptionInput } from '../shared/calendarApi'
 import type {
   RenewalCreateInput,
   RenewalPatch,
@@ -455,6 +457,30 @@ const api = {
     setActive: (id: string, active: boolean): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.RECURRENCE_SET_ACTIVE, id, active)
   },
+
+  calendar: {
+    entries: (query: CalendarQuery): Promise<CalendarResult<CalendarAnswer>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_ENTRIES, query),
+    move: (itemId: string, due: number): Promise<CalendarResult<{ item: Item; previous: number | null }>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_MOVE, itemId, due),
+    quickAdd: (input: QuickAddInput): Promise<CalendarResult<Item>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_QUICK_ADD, input),
+    subscriptions: (): Promise<CalendarResult<CalendarSubscription[]>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_SUBSCRIPTIONS),
+    subscribe: (input: SubscriptionInput): Promise<CalendarResult<{ subscription: CalendarSubscription; events: number }>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_SUBSCRIBE, input),
+    updateSubscription: (id: string, patch: Partial<Pick<SubscriptionInput, 'name' | 'color' | 'workspace'>>): Promise<CalendarResult<true>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_UPDATE_SUBSCRIPTION, id, patch),
+    unsubscribe: (id: string): Promise<CalendarResult<true>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_UNSUBSCRIBE, id),
+    refresh: (force: boolean, olderThanMs?: number): Promise<CalendarResult<boolean>> =>
+      ipcRenderer.invoke(IpcChannels.CALENDAR_REFRESH, force, olderThanMs),
+    onChanged: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on(IpcChannels.CALENDAR_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IpcChannels.CALENDAR_CHANGED, handler)
+    }
+  } satisfies CalendarBridge,
 
   renewals: {
     list: (context?: string): Promise<RenewalResult<RenewalRecord[]>> =>

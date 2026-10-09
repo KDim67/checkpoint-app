@@ -61,6 +61,11 @@ export function getPreviewCacheDir(): string {
   return join(getConfigDir(), 'cache', 'previews')
 }
 
+/** downloaded calendars, for offline; derived and deletable like the previews */
+export function getCalendarCacheDir(): string {
+  return join(getConfigDir(), 'cache', 'calendars')
+}
+
 export function getPluginsDir(): string {
   return join(getConfigDir(), 'plugins')
 }

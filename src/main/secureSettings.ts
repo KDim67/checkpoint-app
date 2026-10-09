@@ -10,7 +10,9 @@ const SECRET_SETTING_KEYS = new Set([
   'mcp_auth_token',
   'webhook_token',
   // TURN relay password, someone else's bandwidth billed to the user
-  'turn_credential'
+  'turn_credential',
+  // private calendar links, each a password to someone's calendar
+  'calendar_subscriptions'
 ])
 
 /** deliberately not JSON: plaintext rows are JSON, so no prefix means a pre-encryption row */

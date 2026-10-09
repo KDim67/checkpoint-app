@@ -345,6 +345,7 @@ import { registerExportsHandlers } from './ipc/exports'
 import { registerNotificationsHandlers } from './ipc/notifications'
 import { registerRecurrenceHandlers } from './ipc/recurrence'
 import { registerRenewalsHandlers } from './ipc/renewals'
+import { registerCalendarHandlers, startCalendarRefresh } from './ipc/calendar'
 import { registerMcpHandlers } from './ipc/mcp'
 import { registerHudHandlers } from './ipc/hud'
 import { registerBackupHandlers } from './ipc/backup'
@@ -373,6 +374,8 @@ function registerIpcHandlers(): void {
   registerNotificationsHandlers()
   registerRecurrenceHandlers()
   registerRenewalsHandlers()
+  registerCalendarHandlers()
+  startCalendarRefresh()
   registerMcpHandlers()
   registerHudHandlers()
   registerBackupHandlers()

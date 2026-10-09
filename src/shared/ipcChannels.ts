@@ -171,6 +171,18 @@ export const enum IpcChannels {
   APP_UPDATE_STATE        = 'app:updateState',
   APP_INSTALL_UPDATE      = 'app:installUpdate',
 
+  // calendar
+  CALENDAR_ENTRIES             = 'calendar:entries',
+  CALENDAR_MOVE                = 'calendar:move',
+  CALENDAR_QUICK_ADD           = 'calendar:quickAdd',
+  CALENDAR_SUBSCRIPTIONS       = 'calendar:subscriptions',
+  CALENDAR_SUBSCRIBE           = 'calendar:subscribe',
+  CALENDAR_UPDATE_SUBSCRIPTION = 'calendar:updateSubscription',
+  CALENDAR_UNSUBSCRIBE         = 'calendar:unsubscribe',
+  CALENDAR_REFRESH             = 'calendar:refresh',
+  /** main to renderer: a subscribed calendar changed */
+  CALENDAR_CHANGED             = 'calendar:changed',
+
   // customizer and extensions
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
   /** grants exactly what the dialog showed, then starts it */
