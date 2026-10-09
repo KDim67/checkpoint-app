@@ -40,6 +40,7 @@ export function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
         CREATE INDEX IF NOT EXISTS idx_items_status    ON items(status);
         CREATE INDEX IF NOT EXISTS idx_items_position  ON items(position);
         CREATE INDEX IF NOT EXISTS idx_items_created   ON items(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_items_due       ON items(due_at);
         ${ITEMS_FTS_TRIGGERS_SQL}
       `)
     })()
