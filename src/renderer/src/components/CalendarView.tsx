@@ -9,22 +9,27 @@ import QuickAdd from './calendar/QuickAdd'
 import ShowMenu from './calendar/ShowMenu'
 import CalendarsModal from './calendar/CalendarsModal'
 import { DayList, EntryDetails } from './calendar/EntryDetails'
-import { CalendarActionsContext, DRAG_TYPE, type CalendarActions } from './calendar/actions'
+import { CalendarActionsContext, DRAG_TYPE, isEntryDrag, type CalendarActions } from './calendar/actions'
 import { byDay, rangeOf, step, titleOf, visibleDays, type CalendarViewKind } from './calendar/layout'
 import { useToast } from './ui/Toast'
 import { useAppStore } from '../store/appStore'
 import { getBoolSetting, getEnumSetting, getJsonSetting, setBoolSetting, setJsonSetting, setStringSetting } from '../lib/settings'
+import { CALENDAR_NUDGE_SETTLE_MS } from '../lib/timings'
 import * as calendarApi from '../data/calendar'
 import {
   CALENDAR_LAYERS,
   dayKey,
   dueForDrop,
   dueForNew,
+  entryDay,
   firstDayOfWeek,
+  nudgedDue,
+  sameDay,
   type CalendarAnswer,
   type CalendarEntry,
   type CalendarLayer,
-  type DropTarget
+  type DropTarget,
+  type Nudge
 } from '../../../shared/calendar'
 import { isAllDay, localDayOf, type CalendarDay } from '../../../shared/dueDate'
 import type { CalendarSubscription } from '../../../shared/calendarApi'
@@ -36,6 +41,8 @@ const ALL_SETTING = 'calendar_all_workspaces'
 // a calendar older than this is fetched again when the tab opens
 const STALE_ON_OPEN_MS = 15 * 60_000
 const MINUTE = 60_000
+// a moved chip gets focus back once it is drawn in its new place, unless that takes this long
+const REFOCUS_MS = 5000
 
 const VIEWS: { id: CalendarViewKind; label: string; key: string }[] = [
   { id: 'month', label: 'Month', key: 'M' },
@@ -92,7 +99,12 @@ export default function CalendarView(): React.JSX.Element {
   const [subscriptions, setSubscriptions] = useState<CalendarSubscription[]>([])
   const [open, setOpen] = useState<Open | null>(null)
   const [managing, setManaging] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const request = useRef(0)
+  // the entry as it was when the key presses began, and where they have taken it so far
+  const nudging = useRef<{ entry: CalendarEntry; due: number; timer: ReturnType<typeof setTimeout> } | null>(null)
+  const settleRef = useRef<() => void>(() => {})
+  const refocus = useRef<{ id: string; until: number } | null>(null)
 
   const weekStart = useMemo(() => firstDayOfWeek(navigator.language), [])
   const days = useMemo(() => visibleDays(view, anchor, weekStart), [view, anchor, weekStart])
@@ -227,6 +239,48 @@ export default function CalendarView(): React.JSX.Element {
     void load()
   }, [load, toast])
 
+  const settleNudge = useCallback(() => {
+    const run = nudging.current
+    if (!run) return
+    clearTimeout(run.timer)
+    nudging.current = null
+    if (run.due !== run.entry.start) void move(run.entry, run.due)
+  }, [move])
+
+  // the timer always settles with the latest move, which reloads the page on screen now
+  useEffect(() => { settleRef.current = settleNudge }, [settleNudge])
+  useEffect(() => () => settleRef.current(), [])
+
+  const nudge = useCallback((entry: CalendarEntry, direction: Nudge, inGrid: boolean) => {
+    if (nudging.current && nudging.current.entry.id !== entry.id) settleRef.current()
+    const run = nudging.current
+    const due = nudgedDue(run?.due ?? entry.start, direction, inGrid)
+    if (run) clearTimeout(run.timer)
+    nudging.current = { entry: run?.entry ?? entry, due, timer: setTimeout(() => settleRef.current(), CALENDAR_NUDGE_SETTLE_MS) }
+    setAnswer(a => ({ ...a, entries: a.entries.map(e => (e.id === entry.id ? { ...e, start: due, allDay: isAllDay(due) } : e)) }))
+    refocus.current = { id: entry.id, until: Date.now() + REFOCUS_MS }
+    // off the page: saved now, then the page follows it there
+    const day = entryDay({ start: due, allDay: isAllDay(due) })
+    if (!days.some(d => sameDay(d, day))) {
+      settleRef.current()
+      setAnchor(day)
+    }
+  }, [days])
+
+  // the chip was drawn again in its new cell; focus goes with it
+  useEffect(() => {
+    const target = refocus.current
+    if (!target) return
+    if (Date.now() > target.until) {
+      refocus.current = null
+      return
+    }
+    const chip = [...document.querySelectorAll<HTMLElement>('.cal-view [data-entry-id]')].find(el => el.dataset.entryId === target.id)
+    if (!chip) return
+    refocus.current = null
+    if (document.activeElement !== chip) chip.focus()
+  }, [answer, days])
+
   const actions: CalendarActions = useMemo(() => ({
     open: (entry, anchorEl) => {
       if (entry.ref.kind === 'item') {
@@ -249,13 +303,14 @@ export default function CalendarView(): React.JSX.Element {
       const due = dueForDrop(entry.start, target)
       if (due !== entry.start) void move(entry, due)
     },
+    nudge,
     colorOf: entry => {
       if (entry.layer === 'events' && entry.color) return entry.color
       if (allWorkspaces && entry.workspace) return workspaceColor.get(entry.workspace) ?? `var(--cal-layer-${entry.layer})`
       return `var(--cal-layer-${entry.layer})`
     },
     workspaceLabel: entry => (allWorkspaces && entry.workspace ? workspaceName.get(entry.workspace) ?? entry.workspace : null)
-  }), [answer.entries, allWorkspaces, move, selectItem, setPendingRenewalId, setRightPanelContent, setView, workspaceColor, workspaceName])
+  }), [answer.entries, allWorkspaces, move, nudge, selectItem, setPendingRenewalId, setRightPanelContent, setView, workspaceColor, workspaceName])
 
   const addFromCalendar = async (target: DropTarget, input: { title: string; type: 'task' | 'card'; context: string }): Promise<boolean> => {
     const result = await calendarApi.quickAdd({ ...input, due: dueForNew(target) })
@@ -284,7 +339,13 @@ export default function CalendarView(): React.JSX.Element {
 
   return (
     <CalendarActionsContext.Provider value={actions}>
-      <div className="cal-view">
+      <div
+        className="cal-view"
+        data-dragging={dragging ? 'true' : undefined}
+        onDragStart={e => { if (isEntryDrag(e)) setDragging(true) }}
+        onDragEnd={() => setDragging(false)}
+        onDrop={() => setDragging(false)}
+      >
         <div className="cal-toolbar">
           <div className="cal-toolbar-group">
             <button type="button" className="btn-secondary" onClick={goToday} title="Today (T)">Today</button>

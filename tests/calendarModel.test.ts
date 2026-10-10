@@ -7,10 +7,11 @@ import {
   firstDayOfWeek,
   formatDuration,
   monthGrid,
+  nudgedDue,
   weekOf,
   type CalendarEntry
 } from '../src/shared/calendar'
-import { allDay, isAllDay } from '../src/shared/dueDate'
+import { allDay, isAllDay, moment } from '../src/shared/dueDate'
 
 const entry = (over: Partial<CalendarEntry>): CalendarEntry => ({
   id: 'x', layer: 'due', title: 't', start: 0, end: null, allDay: false, days: 1, workspace: 'work',
@@ -93,5 +94,24 @@ describe('focus totals', () => {
     expect(formatDuration(25 * 60_000)).toBe('25m')
     expect(formatDuration(2 * 3_600_000)).toBe('2h')
     expect(formatDuration(130 * 60_000)).toBe('2h 10m')
+  })
+})
+
+describe('moving from the keyboard', () => {
+  const at = (d: number, h: number, m = 0) => moment(new Date(2026, 9, d, h, m))
+
+  it('goes a day sideways and a week up or down, keeping a time or a whole day', () => {
+    expect(nudgedDue(at(14, 9, 30), 'right', false)).toBe(at(15, 9, 30))
+    expect(nudgedDue(at(14, 9, 30), 'up', false)).toBe(at(7, 9, 30))
+    expect(nudgedDue(allDay({ year: 2026, month: 9, day: 31 }), 'right', false)).toBe(allDay({ year: 2026, month: 10, day: 1 }))
+    expect(nudgedDue(allDay({ year: 2026, month: 9, day: 14 }), 'down', false)).toBe(allDay({ year: 2026, month: 9, day: 21 }))
+  })
+
+  it('in the time grid goes a quarter hour up or down, onto the grid first', () => {
+    expect(nudgedDue(at(14, 9), 'up', true)).toBe(at(14, 8, 45))
+    expect(nudgedDue(at(14, 9, 7), 'up', true)).toBe(at(14, 9))
+    expect(nudgedDue(at(14, 9, 7), 'down', true)).toBe(at(14, 9, 15))
+    expect(nudgedDue(at(14, 0), 'up', true)).toBe(at(13, 23, 45))
+    expect(nudgedDue(at(14, 9), 'left', true)).toBe(at(13, 9))
   })
 })
