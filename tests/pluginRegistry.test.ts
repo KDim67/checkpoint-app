@@ -26,6 +26,12 @@ vi.mock('electron', async () => {
   }
 })
 
+// the stub has no windows to sandbox in; a started plugin gets this and never runs
+vi.mock('../src/main/plugins/sandbox', () => {
+  let next = 1
+  return { openSandbox: () => ({ contents: { id: next++ }, send: () => {}, memoryKb: () => null, close: () => {} }) }
+})
+
 const pluginsDir = (): string => join(home, '.config', 'checkpoint', 'plugins')
 
 const writePlugin = (filename: string, source: string): void => {
@@ -178,6 +184,52 @@ describe('approving a plugin', () => {
     expect(one().status).not.toBe('needs-approval')
     writePlugin('one.js', asker(['read'], ['hooks.example.com']))
     expect(one()).toMatchObject({ status: 'needs-approval', statusDetail: expect.stringContaining('more than you approved') })
+  })
+})
+
+describe('a plugin whose code changed', () => {
+  const approve = () => approvePlugin('one.js', { permissions: ['read'], hosts: [], workspaces: ['work'] })
+  const tweaked = asker(['read']) + '\n// a tweak\n'
+
+  it('is marked when it asks for nothing more, until you approve it again', async () => {
+    writePlugin('one.js', asker(['read']))
+    await approve()
+    expect(one().changed).toBe(false)
+    writePlugin('one.js', tweaked)
+    expect(one()).toMatchObject({ changed: true, active: true })
+    expect(one().status).not.toBe('needs-approval')
+    await approve()
+    expect(one().changed).toBe(false)
+  })
+
+  it('only says it needs you when the change asks for more', async () => {
+    writePlugin('one.js', asker(['read']))
+    await approve()
+    writePlugin('one.js', asker(['read', 'notify']))
+    expect(one()).toMatchObject({ changed: false, status: 'needs-approval' })
+  })
+
+  it('is not marked when it is off, since turning it on shows it to you again', async () => {
+    writePlugin('one.js', asker(['read']))
+    await approve()
+    await disablePlugin('one.js')
+    writePlugin('one.js', tweaked)
+    expect(one().changed).toBe(false)
+  })
+
+  it('takes its first fingerprint from the code it next starts with, when approved before fingerprints', async () => {
+    writePlugin('one.js', asker(['read']))
+    setSetting(PLUGIN_GRANTS_KEY, { 'one.js': { on: true, permissions: ['read'], hosts: [], workspaces: ['work'], grantedAt: 1 } })
+    expect(one().changed).toBe(false)
+    startApprovedPlugins()
+    try {
+      expect(getSetting<Record<string, { sourceHash?: string }>>(PLUGIN_GRANTS_KEY, {})['one.js'].sourceHash).toMatch(/^[0-9a-f]{64}$/)
+      expect(one().changed).toBe(false)
+      writePlugin('one.js', tweaked)
+      expect(one().changed).toBe(true)
+    } finally {
+      await stopAllPlugins()
+    }
   })
 })
 

@@ -77,10 +77,11 @@ npm run dev
 Other scripts:
 
 ```bash
-npm run verify    # typecheck, lint, tests, build. Run this before a PR
-npm test          # tests on their own
-npm run build     # compile without packaging
-npm run package   # build an installer into dist/
+npm run verify         # typecheck, lint, tests, build. Run this before a PR
+npm test               # tests on their own
+npm run build          # compile without packaging
+npm run check:sandbox  # try to break out of the plugin sandbox in a real Electron
+npm run package        # verify, the sandbox check, then an installer into dist/
 ```
 
 The first `npm install` takes a few minutes: it downloads Electron itself and

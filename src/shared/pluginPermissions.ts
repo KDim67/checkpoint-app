@@ -43,6 +43,8 @@ export interface PluginGrant {
   grantedAt: number
   /** switched on before plugins ran sandboxed; never runs until approved again */
   legacy?: boolean
+  /** sha-256 of the file you approved, so a change that asks for nothing more still shows */
+  sourceHash?: string
 }
 
 export type PluginStatus = 'off' | 'starting' | 'running' | 'needs-approval' | 'stopped' | 'crashed'
@@ -110,7 +112,8 @@ export function readGrants(raw: unknown): Record<string, PluginGrant> {
       hosts: strings(g.hosts).map(normalizeHost).filter((h): h is string => h !== null),
       workspaces: [...new Set(strings(g.workspaces))],
       grantedAt: typeof g.grantedAt === 'number' ? g.grantedAt : 0,
-      ...(g.legacy === true ? { legacy: true } : {})
+      ...(g.legacy === true ? { legacy: true } : {}),
+      ...(typeof g.sourceHash === 'string' && /^[0-9a-f]{64}$/.test(g.sourceHash) ? { sourceHash: g.sourceHash } : {})
     }
   }
   return out

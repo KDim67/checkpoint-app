@@ -44,6 +44,9 @@ function permissionSummary(plugin: PluginInfo): string {
   return list.map(p => PERMISSION_TEXT[p].label).join(', ')
 }
 
+const approvedOn = (p: PluginInfo): string =>
+  p.grant && p.grant.grantedAt > 0 ? ` on ${new Date(p.grant.grantedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''
+
 export default function ExtensionsTab() {
   const { toast } = useToast()
   const workspaceList = useAppStore(s => s.workspaceList)
@@ -279,6 +282,11 @@ export default function ExtensionsTab() {
                 </div>
                 <p className="plugin-description">{p.description}</p>
                 {p.statusDetail && <p className="plugin-status-detail" data-status={p.status}>{p.statusDetail}</p>}
+                {p.changed && (
+                  <p className="plugin-status-detail" data-status="changed">
+                    Its code changed since you approved it{approvedOn(p)}. It asks for nothing more, so it still runs. Review it to accept the change.
+                  </p>
+                )}
                 <div className="plugin-meta">
                   <span>{permissionSummary(p)}</span>
                   {(p.grant?.hosts ?? p.request.hosts).length > 0 && (
@@ -304,7 +312,7 @@ export default function ExtensionsTab() {
                 </button>
                 {p.active && (
                   <button className="btn-ghost" onClick={() => setReviewing(p)}>
-                    {p.status === 'needs-approval' ? 'Review' : 'Permissions'}
+                    {p.status === 'needs-approval' || p.changed ? 'Review' : 'Permissions'}
                   </button>
                 )}
                 {/* you want it on; the pill says whether it actually runs, so a paused one can still be switched off */}

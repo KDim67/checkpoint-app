@@ -1,4 +1,4 @@
-/** runs tests/electron/sandboxCheck.ts in electron, headless; needs a fresh build for the plugin preload, which npm run check:sandbox makes */
+/** runs tests/electron/sandboxCheck.ts in electron, headless; needs a fresh build for the plugin preload, which check:sandbox makes and prepackage gets from verify */
 
 import { spawn } from 'child_process'
 import fs from 'fs'
