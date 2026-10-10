@@ -10,7 +10,6 @@ import {
 } from './pluginRegistry'
 import { getConfigDir, getPluginsDir } from './paths'
 import { getSetting } from './db'
-import { updateNativeTitleBarFromSettings, paintTitleBarOverlay } from './titleBarSync'
 
 let watcher: import('chokidar').FSWatcher | null = null
 let isEngineRunning = false
@@ -44,24 +43,6 @@ export function broadcastTheme(css: string): void {
   })
 }
 
-function parseVarsFromCss(css: string): Record<string, string> {
-  const vars: Record<string, string> = {}
-  const regex = /(--[\w-]+)\s*:\s*([^;}\n]+)/g
-  let match
-  while ((match = regex.exec(css)) !== null) {
-    vars[match[1]] = match[2].trim()
-  }
-  return vars
-}
-
-/** windows title bar overlay only */
-export function updateTitleBarOverlay(vars: Record<string, string>): void {
-  paintTitleBarOverlay(
-    vars['--color-background'] || '#0b0c10',
-    vars['--color-text-base'] || '#f1f5f9'
-  )
-}
-
 export function buildCssVariablesString(vars: Record<string, string>): string {
   const entries = Object.entries(vars)
   if (entries.length === 0) return ''
@@ -78,10 +59,8 @@ export async function enableCustomizer(): Promise<void> {
   // broadcast covers open windows, later ones fetch on mount
   try {
     const css = resolveThemeCss()
-    if (css) {
-      broadcastTheme(css)
-      updateTitleBarOverlay(parseVarsFromCss(css))
-    }
+    // the page reports the colours it draws, and the window's buttons follow them
+    if (css) broadcastTheme(css)
   } catch (err) {
     console.error('[customizer] Failed to load initial custom theme variables:', err)
   }
@@ -129,12 +108,6 @@ export async function disableCustomizer(): Promise<void> {
   await stopAllPlugins()
 
   broadcastTheme('')
-  try {
-    const appTheme = getSetting<string>('app_theme', 'dark')
-    updateNativeTitleBarFromSettings(appTheme)
-  } catch (err) {
-    console.error('[customizer] Failed to reset titlebar colors:', err)
-  }
 
   isEngineRunning = false
   console.log('[customizer] Customization engine deactivated cleanly.')
@@ -147,7 +120,6 @@ function handleFileChange(filePath: string): void {
       const css = readFileSync(filePath, 'utf8')
       console.log(`[customizer] theme.css file changed: broadcasting ${css.length} bytes`)
       broadcastTheme(css)
-      updateTitleBarOverlay(parseVarsFromCss(css))
     } catch (err) {
       console.error('[customizer] Failed to read theme.css file:', err)
     }

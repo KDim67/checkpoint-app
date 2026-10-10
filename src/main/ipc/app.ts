@@ -1,9 +1,11 @@
 /** window controls, file dialogs, updater */
 
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
 import { openExternalSafely } from '../openExternal'
 import { getMainWindow } from '../windows'
+import { setSetting } from '../db'
+import { paintTitleBar, readTitleBarColors, TITLE_BAR_SETTING } from '../titleBarSync'
 import { app, dialog, shell } from 'electron'
 import { writeFileSync } from 'fs'
 
@@ -26,6 +28,15 @@ export function registerAppHandlers(): void {
     }
   })
   ipcMain.on(IpcChannels.APP_CLOSE, () => getMainWindow()?.close())
+
+  // the page is the one that knows what it drew, whichever way the theme changed
+  ipcMain.on(IpcChannels.APP_TITLE_BAR_COLORS, (event, raw: unknown) => {
+    const colors = readTitleBarColors(raw)
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!colors || !win) return
+    paintTitleBar(win, colors)
+    setSetting(TITLE_BAR_SETTING, colors)
+  })
 
   ipcMain.handle(IpcChannels.APP_SAVE_FILE, async (_event, defaultName: string, content: string) => {
     const win = getMainWindow()
