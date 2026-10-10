@@ -35,7 +35,7 @@ import { ERASER_MODES, type EraserMode, type WallTool } from './wallTools'
 import { addTag, gatherByTag, removeTag, taggable } from '../../../../shared/wallTags'
 import { addTopic, layoutMap, mapRoot, mapsOf, withBranches, type TopicPlace } from '../../../../shared/wallMindMap'
 import { listTags, resolveTagIds } from '../../data/tags'
-import { cropHeight, isFullCrop } from '../../../../shared/wallCrop'
+import { cropInPlace, isFullCrop } from '../../../../shared/wallCrop'
 import { fitImageBox, rowCentres } from '../../../../shared/wallImage'
 import { readImageSize } from '../../lib/imageSize'
 import { wallIdOf } from '../../../../shared/wallSearch'
@@ -408,6 +408,8 @@ export function useWallDocument() {
       toast('This workspace is shared read-only', { type: 'warning' })
       return
     }
+    // read at once, so a press that has just kept a crop starts its drag from the kept picture
+    docRef.current = next
     setDoc(next)
     if (docKey && activeWall) {
       saveWallDoc(docKey, next, { context: activeWorkspace, wallId: activeWall.id })
@@ -533,21 +535,18 @@ export function useWallDocument() {
     setItems(items.map(i => (i.id === id ? { ...i, height: next } : i)), { record: false })
   }, [setItems])
 
-  /** the kept window, with the item reshaped so those pixels sit square-on; null leaves the picture alone */
-  const applyCrop = useCallback((
-    id: string,
-    crop: ImageCrop | null,
-    natural?: { width: number; height: number }
-  ) => {
-    setCropping(null)
+  /** the kept part stays where it showed, at the same size; null leaves the picture alone */
+  const applyCrop = useCallback((id: string, crop: ImageCrop | null) => {
+    // a crop kept on the way to cropping another picture leaves that one open
+    setCropping(open => (open === id ? null : open))
     if (!crop) return
     const items = docRef.current.items
     const target = items.find(i => i.id === id)
     if (!target || target.locked) return
-    const height = natural ? cropHeight(crop, target.width, natural) : target.height
+    const box = cropInPlace(target, crop)
     setItems(items.map(i => {
       if (i.id !== id) return i
-      const next = { ...i, height }
+      const next = { ...i, ...box }
       if (isFullCrop(crop)) delete next.crop
       else next.crop = crop
       return next

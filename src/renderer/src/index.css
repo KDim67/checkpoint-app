@@ -166,6 +166,18 @@
   --wall-tb-link-width: 18rem;
   --wall-tb-z:          60;
 
+  /* cropping a picture: the grips keep one size on screen whatever the zoom, and the cropped item rises over its neighbours */
+  --wall-crop-hit:         1.75rem;
+  --wall-crop-arm:         1rem;
+  --wall-crop-edge:        1.25rem;
+  --wall-crop-thick:       0.25rem;
+  --wall-crop-z:           50;
+  --wall-crop-scrim:       rgba(0, 0, 0, 0.55);
+  --wall-crop-handle:      #ffffff;
+  --wall-crop-handle-edge: rgba(0, 0, 0, 0.5);
+  --wall-crop-line:        rgba(255, 255, 255, 0.9);
+  --wall-crop-grid:        rgba(255, 255, 255, 0.45);
+
   /* each service's mark in its brand colour; the black marks take the text's, and the darkest brand hues lighten as their own apps do on dark */
   --logo-github:   var(--color-text-base);
   --logo-notion:   var(--color-text-base);
@@ -1795,6 +1807,168 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   box-shadow: none;
 }
 
+/* the crop draws its own frame */
+[data-wall-item][data-wall-cropping] {
+  z-index: var(--wall-crop-z);
+  outline: none;
+}
+
+/* the whole picture where it lies, sized and placed by the component around the item, over the item's own chips */
+.wall-crop {
+  position: absolute;
+  z-index: var(--wall-crop-z);
+  touch-action: none;
+  user-select: none;
+}
+
+.wall-crop-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.wall-crop-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+/* the dimming is the window's shadow, clipped by the stage to the picture */
+.wall-crop-window {
+  position: absolute;
+  box-shadow: 0 0 0 100000px var(--wall-crop-scrim);
+  outline: calc(1px * var(--crop-inv)) solid var(--wall-crop-line);
+}
+
+.wall-crop-grid,
+.wall-crop-grid::before,
+.wall-crop-grid::after {
+  position: absolute;
+  inset: 0;
+}
+
+.wall-crop-grid::before,
+.wall-crop-grid::after {
+  content: "";
+  border: 0 solid var(--wall-crop-grid);
+}
+
+.wall-crop-grid::before {
+  left: 33.333%;
+  right: 33.333%;
+  border-left-width: calc(1px * var(--crop-inv));
+  border-right-width: calc(1px * var(--crop-inv));
+}
+
+.wall-crop-grid::after {
+  top: 33.333%;
+  bottom: 33.333%;
+  border-top-width: calc(1px * var(--crop-inv));
+  border-bottom-width: calc(1px * var(--crop-inv));
+}
+
+.wall-crop-move {
+  position: absolute;
+  cursor: move;
+}
+
+/* a generous target centred on the corner or edge, its mark drawn just outside the window */
+.wall-crop-grip {
+  position: absolute;
+  width: var(--wall-crop-hit);
+  height: var(--wall-crop-hit);
+  transform: translate(-50%, -50%) scale(var(--crop-inv));
+}
+
+.wall-crop-mark {
+  position: absolute;
+  box-sizing: border-box;
+  border: 0 solid var(--wall-crop-handle);
+  filter: drop-shadow(0 0 1px var(--wall-crop-handle-edge));
+}
+
+.wall-crop-grip[data-grip="nw"] .wall-crop-mark,
+.wall-crop-grip[data-grip="ne"] .wall-crop-mark,
+.wall-crop-grip[data-grip="se"] .wall-crop-mark,
+.wall-crop-grip[data-grip="sw"] .wall-crop-mark {
+  width: var(--wall-crop-arm);
+  height: var(--wall-crop-arm);
+}
+
+.wall-crop-grip[data-grip="nw"] .wall-crop-mark { left: calc(50% - var(--wall-crop-thick)); top: calc(50% - var(--wall-crop-thick)); border-left-width: var(--wall-crop-thick); border-top-width: var(--wall-crop-thick); }
+.wall-crop-grip[data-grip="ne"] .wall-crop-mark { right: calc(50% - var(--wall-crop-thick)); top: calc(50% - var(--wall-crop-thick)); border-right-width: var(--wall-crop-thick); border-top-width: var(--wall-crop-thick); }
+.wall-crop-grip[data-grip="se"] .wall-crop-mark { right: calc(50% - var(--wall-crop-thick)); bottom: calc(50% - var(--wall-crop-thick)); border-right-width: var(--wall-crop-thick); border-bottom-width: var(--wall-crop-thick); }
+.wall-crop-grip[data-grip="sw"] .wall-crop-mark { left: calc(50% - var(--wall-crop-thick)); bottom: calc(50% - var(--wall-crop-thick)); border-left-width: var(--wall-crop-thick); border-bottom-width: var(--wall-crop-thick); }
+
+.wall-crop-grip[data-grip="n"] .wall-crop-mark,
+.wall-crop-grip[data-grip="s"] .wall-crop-mark {
+  left: 50%;
+  width: var(--wall-crop-edge);
+  height: var(--wall-crop-thick);
+  transform: translateX(-50%);
+  background: var(--wall-crop-handle);
+}
+
+.wall-crop-grip[data-grip="e"] .wall-crop-mark,
+.wall-crop-grip[data-grip="w"] .wall-crop-mark {
+  top: 50%;
+  width: var(--wall-crop-thick);
+  height: var(--wall-crop-edge);
+  transform: translateY(-50%);
+  background: var(--wall-crop-handle);
+}
+
+.wall-crop-grip[data-grip="n"] .wall-crop-mark { top: calc(50% - var(--wall-crop-thick)); }
+.wall-crop-grip[data-grip="s"] .wall-crop-mark { top: 50%; }
+.wall-crop-grip[data-grip="w"] .wall-crop-mark { left: calc(50% - var(--wall-crop-thick)); }
+.wall-crop-grip[data-grip="e"] .wall-crop-mark { left: 50%; }
+
+/* the kept size in the picture's own pixels, upright in the middle of the window while dragging */
+.wall-crop-size {
+  position: absolute;
+  transform-origin: 0 0;
+  padding: var(--space-0-5) var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--wall-crop-scrim);
+  color: var(--wall-crop-handle);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* placed under the picture as the screen sees it; the component turns it upright and keeps it one size */
+.wall-crop-bar {
+  left: 50%;
+  top: 50%;
+  transform-origin: 0 0;
+}
+
+.wall-crop-done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--wall-tb-control);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-on-accent);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.wall-crop-done:hover {
+  background: var(--color-primary-hover);
+}
+
+.wall-crop-done:focus-visible {
+  outline: var(--space-0-5) solid var(--color-primary);
+  outline-offset: 1px;
+}
+
 /* only on an item you've got hold of */
 .wall-lock-selected { display: none; }
 [data-wall-item][data-wall-selected] .wall-lock-selected { display: block; }
@@ -1877,11 +2051,9 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 }
 
 /* the text bar above a box while it's written in */
-.wall-tb {
+.wall-tb,
+.wall-crop-bar {
   position: absolute;
-  bottom: calc(100% + var(--space-2));
-  left: 50%;
-  transform: translateX(-50%);
   z-index: var(--wall-tb-z);
   display: flex;
   align-items: center;
@@ -1899,6 +2071,12 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   text-align: left;
   color: var(--color-text-base);
   line-height: 1;
+}
+
+.wall-tb {
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .wall-tb-button {
