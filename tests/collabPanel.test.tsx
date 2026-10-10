@@ -90,18 +90,21 @@ describe('CollabPanel', () => {
     expect(session.host).toHaveBeenNthCalledWith(2, 'readonly')
   })
 
-  it('keeps only digits in the passcode and joins once it is long enough', () => {
+  it('takes the code however it is typed, and joins only once it is a whole code', () => {
     const session = renderPanel()
-    const field = screen.getByPlaceholderText('Passcode (e.g. 123456)') as HTMLInputElement
+    const field = screen.getByLabelText('Code from the person sharing') as HTMLInputElement
     const join = screen.getByText('Join') as HTMLButtonElement
     expect(join.disabled).toBe(true)
 
-    fireEvent.change(field, { target: { value: '12a3-45' } })
+    // a code from before the room part was added is not enough
+    fireEvent.change(field, { target: { value: '482913' } })
+    expect(join.disabled).toBe(true)
 
-    expect(field.value).toBe('12345')
+    fireEvent.change(field, { target: { value: 'k7qd-482913' } })
+    expect(field.value).toBe('K7QD-482913')
     expect(join.disabled).toBe(false)
     fireEvent.click(join)
-    expect(session.join).toHaveBeenCalledWith('12345')
+    expect(session.join).toHaveBeenCalledWith('K7QD-482913')
   })
 
   it('gives the host its controls over the room', () => {

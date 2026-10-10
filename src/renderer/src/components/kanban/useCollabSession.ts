@@ -7,6 +7,7 @@ import { authorLabel, DISPLAY_NAME_KEY, normalizeDisplayName } from '@shared/ide
 import { errorMessage } from '@shared/errors'
 import { availableWorkspaceSlug, occupiedWorkspaces, setWorkspaceShared } from '../../lib/createWorkspace'
 import { WebRTCCollaborationCoordinator } from '../../lib/webrtcCollaboration'
+import { BAD_CODE_MESSAGE, newInternetCode, parseInternetCode } from '../../../../shared/internetPairing'
 import { writeWorkspaceList } from '../../lib/workspaceList'
 import { getStringSetting, setStringSetting } from '../../lib/settings'
 import * as appApi from '../../data/app'
@@ -132,7 +133,8 @@ export function useCollabSession() {
   }, [toast])
 
   const startCollabHosting = useCallback(async (mode: 'collaborative' | 'readonly') => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    // from a secure source: the last six digits are all that stand between the board and a stranger
+    const code = newInternetCode()
     setCollabActive(true)
     setCollabIsHost(true)
     setCollabCode(code)
@@ -182,7 +184,10 @@ export function useCollabSession() {
   }, [activeWorkspace, workspaceList, setWorkspaceList, displayName, considerMerge, toast])
 
   const joinCollabSession = useCallback(async (code: string) => {
-    if (!code || code.length < 5) return
+    if (!parseInternetCode(code)) {
+      toast(BAD_CODE_MESSAGE)
+      return
+    }
     setCollabActive(true)
     setCollabIsHost(false)
     // cleared: a leftover read-only mode locked users out of their own board

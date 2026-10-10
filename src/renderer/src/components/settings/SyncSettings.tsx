@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { Wifi, Globe, Play, Loader2, RefreshCw, Terminal } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import { WebRTCSyncCoordinator } from '../../lib/webrtcSync'
+import { BAD_CODE_MESSAGE, CODE_EXAMPLE, newInternetCode, parseInternetCode } from '../../../../shared/internetPairing'
 import ModalShell from '../ui/ModalShell'
 import TurnRelaySettings from './TurnRelaySettings'
 import { errorMessage } from '../../../../shared/errors'
@@ -171,18 +172,15 @@ export default function SyncSettings() {
 
   // WebRTC host: wait for a peer
   const handleStartWebRTCHost = async () => {
-    if (!hostStatus.pairingCode) {
-      toast('Please enable Sync Engine first')
-      return
-    }
-    
     handleStopWebRTC()
+    // its own code, not the local one: the first four characters are seen by the signalling server
+    const code = newInternetCode()
     setIsWebrtcActive(true)
-    setWebrtcCode(hostStatus.pairingCode)
-    addLog(`Starting WebRTC Host session with pairing code: ${hostStatus.pairingCode}`)
+    setWebrtcCode(code)
+    addLog('Waiting for the other computer in a new pairing room.')
 
     webrtcCoordinator.current = new WebRTCSyncCoordinator({
-      pairingCode: hostStatus.pairingCode,
+      pairingCode: code,
       isHost: true,
       onProgress: (p) => {
         setWebrtcProgress(p)
@@ -206,15 +204,15 @@ export default function SyncSettings() {
 
   // WebRTC client: connect to the host
   const handleStartWebRTCClient = () => {
-    if (!webrtcInputCode || webrtcInputCode.length !== 6) {
-      toast('Please enter a valid 6-digit passcode')
+    if (!parseInternetCode(webrtcInputCode)) {
+      toast(BAD_CODE_MESSAGE)
       return
     }
 
     handleStopWebRTC()
     setIsWebrtcActive(true)
-    setWebrtcCode(webrtcInputCode)
-    addLog(`Starting WebRTC Client session to passcode: ${webrtcInputCode}`)
+    setWebrtcCode(webrtcInputCode.toUpperCase())
+    addLog('Joining the other computer in its pairing room.')
 
     webrtcCoordinator.current = new WebRTCSyncCoordinator({
       pairingCode: webrtcInputCode,
@@ -355,6 +353,9 @@ export default function SyncSettings() {
                 <span>Host Port: <code className="text-base">{hostStatus.port}</code></span>
                 <span>LAN Passcode: <strong style={{ color: 'var(--color-secondary)', fontSize: 'var(--text-sm)' }}>{hostStatus.pairingCode}</strong></span>
               </div>
+              <p className="text-sub" style={{ marginBottom: 'var(--space-4)' }}>
+                Encrypted end to end, and the passcode itself never crosses the network. Both computers need this version of Checkpoint or later.
+              </p>
 
               <h4 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>
                 Available LAN Peers ({discoveredPeers.length})
@@ -461,14 +462,14 @@ export default function SyncSettings() {
                 </h3>
               </div>
               <p style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)', margin: 0 }}>
-                Direct peer-to-peer data channel. Bypasses local routers. Securely encrypted.
+                Direct and end-to-end encrypted. The last six digits of the code never leave either computer.
               </p>
 
               {isWebrtcActive ? (
                 <div style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   <div className="row-between">
                     <span className="text-accent-xs-bold">
-                      Active WebRTC Room: {webrtcCode}
+                      Code: {webrtcCode}
                     </span>
                     <button
                       onClick={handleStopWebRTC}
@@ -501,7 +502,7 @@ export default function SyncSettings() {
                       gap: 'var(--space-2)'
                     }}
                   >
-                    Generate Internet Share Link
+                    Show a code for the other computer
                   </button>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)' }}>
@@ -513,10 +514,13 @@ export default function SyncSettings() {
                   <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-2)' }}>
                     <input
                       type="text"
-                      placeholder="Enter 6-Digit Passcode"
+                      placeholder={`Code, e.g. ${CODE_EXAMPLE}`}
+                      aria-label="Code from the other computer"
                       value={webrtcInputCode}
-                      onChange={e => setWebrtcInputCode(e.target.value)}
-                      maxLength={6}
+                      onChange={e => setWebrtcInputCode(e.target.value.toUpperCase())}
+                      maxLength={13}
+                      spellCheck={false}
+                      autoComplete="off"
                       className="input-xs"
                     />
                     <button
