@@ -26,6 +26,7 @@ import type { ModelCapabilities } from '../shared/modelCapabilities'
 import type { ImportedBoard } from '../shared/foreignImport'
 import type { VaultImportResult } from '../shared/obsidianImport'
 import type { PagePreview } from '../shared/linkPreview'
+import type { ReleaseNotesState } from '../shared/releaseNotes'
 import type {
   Item,
   Tag,
@@ -117,6 +118,9 @@ const api = {
       ipcRenderer.invoke(IpcChannels.APP_UPDATE_STATE),
     installUpdate: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_INSTALL_UPDATE),
+    /** the patch notes from GitHub, kept for offline; force asks GitHub even when they're recent */
+    releaseNotes: (force?: boolean): Promise<ReleaseNotesState> =>
+      ipcRenderer.invoke(IpcChannels.APP_RELEASE_NOTES, force === true),
     /** the updater's log file, selected in its folder */
     showUpdateLog: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_SHOW_UPDATE_LOG),

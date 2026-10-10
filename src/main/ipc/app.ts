@@ -102,6 +102,11 @@ export function registerAppHandlers(): void {
     await installUpdateAndRestart()
   })
 
+  ipcMain.handle(IpcChannels.APP_RELEASE_NOTES, async (_event, force: unknown) => {
+    const { loadReleaseNotes } = await import('../releaseNotes')
+    return loadReleaseNotes(undefined, { force: force === true })
+  })
+
   // the file selected so it can be attached to a bug report; before any update has run, its empty folder
   ipcMain.handle(IpcChannels.APP_SHOW_UPDATE_LOG, async () => {
     const { updateLogPath } = await import('../updateLog')

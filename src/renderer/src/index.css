@@ -166,6 +166,11 @@
   --wall-tb-link-width: 18rem;
   --wall-tb-z:          60;
 
+  /* patch notes: the window after an update, its notes scrolling so Got it stays in view */
+  --whats-new-width:     36rem;
+  --whats-new-notes-max: 55vh;
+  --whats-new-refresh:   1.75rem;
+
   /* cropping a picture: the grips keep one size on screen whatever the zoom, and the cropped item rises over its neighbours */
   --wall-crop-hit:         1.75rem;
   --wall-crop-arm:         1rem;
@@ -1482,6 +1487,141 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   display: flex;
   gap: var(--space-1);
   -webkit-app-region: no-drag;
+}
+
+/* patch notes from GitHub: a section in About, and the window once after an update */
+.whats-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.whats-new-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.whats-new-heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-base);
+}
+
+.whats-new-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--whats-new-refresh);
+  height: var(--whats-new-refresh);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.whats-new-refresh:hover:not(:disabled) {
+  background: var(--color-surface-offset);
+  color: var(--color-text-base);
+}
+
+.whats-new-refresh:disabled {
+  cursor: default;
+}
+
+.whats-new-refresh:focus-visible {
+  outline: var(--space-0-5) solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.whats-new-status,
+.release-notes-empty {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.whats-new-release {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.whats-new-version {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-base);
+}
+
+.whats-new-date {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-muted);
+}
+
+.whats-new-badge {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-muted);
+}
+
+.whats-new-badge[data-newer] {
+  background: var(--color-primary-muted);
+  color: var(--color-text-base);
+}
+
+.whats-new-earlier > summary,
+.whats-new-earlier-release > summary {
+  padding: var(--space-1) 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.whats-new-earlier-release {
+  margin-left: var(--space-3);
+}
+
+.whats-new-earlier-release > summary .whats-new-version {
+  display: inline-flex;
+}
+
+.whats-new-earlier-release > .release-notes,
+.whats-new-earlier-release > .release-notes-empty {
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.whats-new-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-base);
+}
+
+.whats-new-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: var(--whats-new-notes-max);
+  overflow-y: auto;
+}
+
+.whats-new-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 /* update indicator, right of the titlebar while downloading */

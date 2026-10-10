@@ -37,6 +37,9 @@ export const osUserName = (): Bridge['osUserName'] => window.electronAPI.app.osU
 
 export const platform = (): Bridge['platform'] => window.electronAPI.app.platform
 
+export const releaseNotes = (...args: Parameters<Bridge['releaseNotes']>): ReturnType<Bridge['releaseNotes']> =>
+  window.electronAPI.app.releaseNotes(...args)
+
 export const saveBinaryFile = (...args: Parameters<Bridge['saveBinaryFile']>): ReturnType<Bridge['saveBinaryFile']> =>
   window.electronAPI.app.saveBinaryFile(...args)
 

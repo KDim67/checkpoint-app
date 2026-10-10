@@ -1,6 +1,7 @@
 /** a bad db used to throw before createWindow so nothing drew; move it aside, never delete the only copy */
 
 import { existsSync, renameSync } from 'fs'
+import { RELEASES_PAGE } from '../shared/releaseNotes'
 
 /** WAL and SHM live beside the db */
 const SIDECARS = ['', '-wal', '-shm']
@@ -48,7 +49,7 @@ export function recoveryMessage(movedTo: string, backupDir: string): string {
 }
 
 /** where the newest installer always is */
-export const RELEASES_URL = 'https://github.com/KDim67/checkpoint-app/releases/latest'
+export const RELEASES_URL = `${RELEASES_PAGE}/latest`
 
 /** the data is fine and untouched, only this copy of the app is too old for it, so the way out is updating */
 export function newerDatabaseNotice(appVersion: string): { title: string; message: string; detail: string; buttons: [string, string] } {

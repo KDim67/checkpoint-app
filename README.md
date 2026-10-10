@@ -61,7 +61,8 @@ Run anyway.
 
 Checkpoint updates itself quietly in the background from that same Releases
 page, and swaps the new version in the next time you close it, or straight
-away if you click Restart to update in the title bar.
+away if you click Restart to update in the title bar. What changed in each
+release is under Settings, About, and shows once after an update.
 
 ## Building it yourself
 

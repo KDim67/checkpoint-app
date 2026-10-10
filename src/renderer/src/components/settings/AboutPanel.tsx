@@ -4,6 +4,7 @@ import { errorMessage } from '../../../../shared/errors'
 import type { UpdateCheckResult } from '../../../../shared/types'
 import { describeUpdateProgress } from '../../../../shared/updateEta'
 import { useUpdateProgress } from '../../lib/useUpdateProgress'
+import WhatsNew from './WhatsNew'
 import { FileText, Info, PlayCircle, RefreshCw } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
@@ -251,6 +252,10 @@ export default function AboutPanel() {
           </div>
         )}
       </div>
+
+      <Divider />
+
+      <WhatsNew />
 
       <div style={{
         fontSize: '11px',
