@@ -3,7 +3,8 @@ import { CheckCircle, AlertCircle, RefreshCw, Plus, Trash2, Mail, ChevronDown, C
 import { FieldRow, SettingsInput, Divider } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import { getNumberSetting } from '../../lib/settings'
-import { loadProviders, persistProviders, activateProvider, providerFromPreset, isLocalUrl, PROVIDER_PRESETS, type AiProvider, type ProviderPreset } from '../ai/aiProviders'
+import { loadProviders, persistProviders, activateProvider, saveProviderKey, providerFromPreset, isLocalUrl, PROVIDER_PRESETS, type AiProvider, type ProviderPreset } from '../ai/aiProviders'
+import type { AiProviderInput } from '../../../../shared/aiProviders'
 import { loadEmailSamples, saveEmailSamples, type EmailSample } from '../../lib/emailSamples'
 import { MAX_EMAIL_SAMPLES } from '../../../../shared/emailSamples'
 import * as aiApi from '../../data/ai'
@@ -13,7 +14,8 @@ import MemoryVaultManager from './MemoryVaultManager'
 export default function AiSettings() {
   const { toast } = useToast()
   const [baseURL, setBaseURL] = useState('http://localhost:11434/v1')
-  const [apiKey, setApiKey] = useState('ollama')
+  // a key being typed; a saved one never comes back from main
+  const [keyDraft, setKeyDraft] = useState('')
   const [model, setModel] = useState('llama3')
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(2048)
@@ -39,7 +41,6 @@ export default function AiSettings() {
         const activeProv = provs.find(p => p.id === active)
         if (activeProv) {
           setBaseURL(activeProv.baseURL)
-          setApiKey(activeProv.apiKey)
           setModel(activeProv.model)
         }
 
@@ -68,20 +69,38 @@ export default function AiSettings() {
     window.dispatchEvent(new CustomEvent('checkpoint-ai-provider-changed'))
   }
 
-  const updateActiveProvider = (patch: Partial<AiProvider>) => {
+  const updateActiveProvider = (patch: Partial<AiProviderInput>) => {
     if (!activeId) return
     const next = providers.map(p => (p.id === activeId ? { ...p, ...patch } : p))
     setProviders(next)
-    persistProviders(next, activeId).then(notifyProviderChanged)
+    persistProviders(next, activeId).then(saved => {
+      // an address on another site forgets the key, and the field should say so
+      if (saved) setProviders(saved.providers)
+      notifyProviderChanged()
+    })
+  }
+
+  const handleKeyBlur = (): void => {
+    const key = keyDraft.trim()
+    if (!activeId || !key) return
+    saveProviderKey(activeId, key).then(saved => {
+      if (!saved) {
+        toast('Could not save the key. Try again.')
+        return
+      }
+      setProviders(saved.providers)
+      setKeyDraft('')
+      notifyProviderChanged()
+    })
   }
 
   const handleSwitchProvider = async (id: string) => {
     const p = providers.find(x => x.id === id)
     if (!p) return
     setActiveId(id)
-    setBaseURL(p.baseURL); setApiKey(p.apiKey); setModel(p.model)
+    setBaseURL(p.baseURL); setKeyDraft(''); setModel(p.model)
     setConnectionStatus('idle'); setConnectionError('')
-    await activateProvider(providers, id)
+    await activateProvider(id)
     notifyProviderChanged()
   }
 
@@ -90,10 +109,11 @@ export default function AiSettings() {
     const next = [...providers, p]
     setProviders(next)
     setActiveId(p.id)
-    setBaseURL(p.baseURL); setApiKey(p.apiKey); setModel(p.model)
+    setBaseURL(p.baseURL); setKeyDraft(''); setModel(p.model)
     setShowPresetMenu(false)
     setConnectionStatus('idle'); setConnectionError('')
-    await persistProviders(next, p.id)
+    const saved = await persistProviders(next, p.id)
+    if (saved) setProviders(saved.providers)
     notifyProviderChanged()
   }
 
@@ -103,9 +123,10 @@ export default function AiSettings() {
     const newActive = next[0].id
     setProviders(next)
     setActiveId(newActive)
-    setBaseURL(next[0].baseURL); setApiKey(next[0].apiKey); setModel(next[0].model)
+    setBaseURL(next[0].baseURL); setKeyDraft(''); setModel(next[0].model)
     setConnectionStatus('idle'); setConnectionError('')
-    await persistProviders(next, newActive)
+    const saved = await persistProviders(next, newActive)
+    if (saved) setProviders(saved.providers)
     notifyProviderChanged()
   }
 
@@ -142,7 +163,7 @@ export default function AiSettings() {
   const handleTest = async () => {
     setConnectionStatus('testing'); setConnectionError('')
     try {
-      const res = await aiApi.testConnection(baseURL, apiKey)
+      const res = await aiApi.testConnection(baseURL, activeId)
       if (res.success) {
         setConnectionStatus('success')
       } else {
@@ -232,13 +253,16 @@ export default function AiSettings() {
           placeholder="e.g. http://localhost:11434/v1"
         />
       </FieldRow>
-      <FieldRow label="API Key">
+      <FieldRow
+        label="API Key"
+        hint={activeProvider?.hasKey ? 'Kept encrypted on this computer and never shown again. Moving the address to another site forgets it.' : undefined}
+      >
         <SettingsInput
           type="password"
-          value={apiKey}
-          onChange={setApiKey}
-          onBlur={() => updateActiveProvider({ apiKey: apiKey.trim() })}
-          placeholder={isLocalUrl(baseURL) ? 'ollama' : 'cloud API key'}
+          value={keyDraft}
+          onChange={setKeyDraft}
+          onBlur={handleKeyBlur}
+          placeholder={activeProvider?.hasKey ? 'Saved. Type a new key to replace it' : isLocalUrl(baseURL) ? 'Not needed for a local server' : 'Cloud API key'}
         />
       </FieldRow>
       <FieldRow label="Model">

@@ -24,6 +24,12 @@ export const getDiscoveredPeers = (...args: Parameters<Bridge['getDiscoveredPeer
 export const getFileIndex = (...args: Parameters<Bridge['getFileIndex']>): ReturnType<Bridge['getFileIndex']> =>
   window.electronAPI.sync.getFileIndex(...args)
 
+export const getTurnRelay = (...args: Parameters<Bridge['getTurnRelay']>): ReturnType<Bridge['getTurnRelay']> =>
+  window.electronAPI.sync.getTurnRelay(...args)
+
+export const setTurnRelay = (...args: Parameters<Bridge['setTurnRelay']>): ReturnType<Bridge['setTurnRelay']> =>
+  window.electronAPI.sync.setTurnRelay(...args)
+
 export const getStatus = (...args: Parameters<Bridge['getStatus']>): ReturnType<Bridge['getStatus']> =>
   window.electronAPI.sync.getStatus(...args)
 

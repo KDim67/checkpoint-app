@@ -17,7 +17,8 @@ vi.mock('../src/renderer/src/data/settings', () => ({
 }))
 
 vi.mock('../src/renderer/src/data/webhook', () => ({
-  toggle: vi.fn()
+  toggle: vi.fn(),
+  getToken: vi.fn(async () => '')
 }))
 
 vi.mock('../src/renderer/src/data/sync', () => ({

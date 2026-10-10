@@ -25,6 +25,14 @@ export function isSecretSetting(key: string): boolean {
   return SECRET_SETTING_KEYS.has(key) || SECRET_SETTING_PREFIXES.some(prefix => key.startsWith(prefix))
 }
 
+// where the ai key is sent; whoever can change it can have the key sent to them
+const MAIN_ONLY_KEYS = new Set(['ai_base_url'])
+
+/** the screen's plain settings channel never reads or writes these; each has a handler in main that hands no secret back */
+export function isMainOnlySetting(key: string): boolean {
+  return isSecretSetting(key) || MAIN_ONLY_KEYS.has(key)
+}
+
 export function isEncrypted(stored: string): boolean {
   return stored.startsWith(ENVELOPE_PREFIX)
 }

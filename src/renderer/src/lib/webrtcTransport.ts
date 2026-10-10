@@ -2,12 +2,7 @@
 
 import { errorMessage } from '../../../shared/errors'
 import { STUN_SERVERS, turnIceServer, type IceServer } from '../../../shared/iceConfig'
-import { getStringSetting } from './settings'
-
-/** never synced, encrypted at rest */
-export const TURN_URL_KEY = 'turn_url'
-export const TURN_USERNAME_KEY = 'turn_username'
-export const TURN_CREDENTIAL_KEY = 'turn_credential'
+import * as syncApi from '../data/sync'
 
 /** well under 256 KB, room for the envelope, path and base64 */
 const FRAME_PAYLOAD_LIMIT = 48 * 1024
@@ -211,11 +206,7 @@ let relay: IceServer | null = null
 /** safe to call repeatedly */
 export async function refreshTurnServer(): Promise<void> {
   try {
-    relay = turnIceServer({
-      url: await getStringSetting(TURN_URL_KEY, ''),
-      username: await getStringSetting(TURN_USERNAME_KEY, ''),
-      credential: await getStringSetting(TURN_CREDENTIAL_KEY, '')
-    })
+    relay = turnIceServer(await syncApi.getTurnRelay())
   } catch (err) {
     // an unreadable relay is no relay, STUN still works for most
     console.error('[webrtc] Could not read the relay settings:', err)

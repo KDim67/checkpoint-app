@@ -13,4 +13,12 @@ export function registerWebhookHandlers(): void {
     }
     return actualPort
   })
+
+  // shown on purpose: you paste it into whatever calls the gateway
+  ipcMain.handle(IpcChannels.WEBHOOK_GET_TOKEN, async () => {
+    const { getSetting } = await import('../db')
+    const { WEBHOOK_TOKEN_KEY } = await import('../webhookAuth')
+    const token = getSetting<unknown>(WEBHOOK_TOKEN_KEY, '')
+    return typeof token === 'string' ? token : ''
+  })
 }

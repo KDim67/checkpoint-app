@@ -1,7 +1,9 @@
 /** streaming, structured generation and model capabilities */
 
 import { ipcMain } from 'electron'
+import { z } from 'zod'
 import { IpcChannels } from '../../shared/ipcChannels'
+import { activateAiProvider, loadAiProviders, saveAiProviders, savedKeyFor, setAiProviderKey } from '../aiProviders'
 
 // one live stream per channel; the legacy no-id call maps to ''
 const aiStreamControllers = new Map<string, AbortController>()
@@ -94,14 +96,21 @@ export function registerAiHandlers(): void {
     return true
   })
   
-  ipcMain.handle(IpcChannels.AI_TEST_CONNECTION, async (_event, baseURL: string, apiKey: string) => {
+  ipcMain.handle(IpcChannels.AI_PROVIDERS_LOAD, () => loadAiProviders())
+  ipcMain.handle(IpcChannels.AI_PROVIDERS_SAVE, (_event, input: unknown) => saveAiProviders(input))
+  ipcMain.handle(IpcChannels.AI_PROVIDERS_ACTIVATE, (_event, id: unknown) => activateAiProvider(id))
+  ipcMain.handle(IpcChannels.AI_PROVIDERS_SET_KEY, (_event, id: unknown, key: unknown) => setAiProviderKey(id, key))
+
+  ipcMain.handle(IpcChannels.AI_TEST_CONNECTION, async (_event, baseURL: unknown, providerId: unknown) => {
     try {
+      const url = z.string().max(2000).parse(baseURL)
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      const trimmedKey = apiKey.trim()
-      if (trimmedKey && trimmedKey !== 'ollama') {
-        headers['Authorization'] = `Bearer ${trimmedKey}`
+      // the connection's saved key, and only for the site it was saved for
+      const key = savedKeyFor(providerId, url)
+      if (key && key !== 'ollama') {
+        headers['Authorization'] = `Bearer ${key}`
       }
-      const res = await fetch(`${baseURL.replace(/\/+$/, '')}/models`, {
+      const res = await fetch(`${url.replace(/\/+$/, '')}/models`, {
         method: 'GET',
         headers,
         signal: AbortSignal.timeout(8000)

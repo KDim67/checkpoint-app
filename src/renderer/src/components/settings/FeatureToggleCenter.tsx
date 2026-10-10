@@ -4,7 +4,7 @@ import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
 import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature, readLayoutProfile, applyLayoutProfile, type LayoutProfile } from '../../lib/features'
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
-import { getBoolSetting, getNumberSetting, getStringSetting, setBoolSetting } from '../../lib/settings'
+import { getBoolSetting, getNumberSetting, setBoolSetting } from '../../lib/settings'
 import * as webhookApi from '../../data/webhook'
 import * as hudApi from '../../data/hud'
 import * as backupApi from '../../data/backup'
@@ -28,7 +28,7 @@ function WebhookToken(): React.JSX.Element | null {
 
   useEffect(() => {
     let cancelled = false
-    getStringSetting('webhook_token', '').then(value => {
+    webhookApi.getToken().then(value => {
       if (!cancelled) setToken(value)
     }).catch(() => {})
     return () => { cancelled = true }

@@ -126,7 +126,9 @@ Settings → AI. Point it at any OpenAI-compatible endpoint.
 
 For Ollama, use `http://localhost:11434/v1` and leave the key blank. For a
 cloud provider, paste the base URL and your key. Keys are encrypted with the OS
-keychain and never sync between machines.
+keychain, never sync between machines, and never go back to the screen once
+saved. Pointing a connection at a different site forgets its key, so a key is
+only ever sent where you first gave it.
 
 Don't want any of it? Settings → Features → AI Assistant, one switch, and every
 AI control disappears.

@@ -72,9 +72,9 @@ export function useModelConfig() {
 
   const handleSwitchProvider = useCallback(async (id: string) => {
     setActiveProviderId(id)
-    await activateProvider(providers, id)
+    await activateProvider(id)
     await loadAiConfig()
-  }, [providers, loadAiConfig])
+  }, [loadAiConfig])
 
   // keep the active profile, the source of truth, in sync
   const applyModel = useCallback(async (val: string) => {
