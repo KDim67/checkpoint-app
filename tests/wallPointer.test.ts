@@ -11,8 +11,10 @@ import {
   resizedSize,
   rotationAngle,
   rotationStart,
-  snapMoving
+  snapMoving,
+  turnedResize
 } from '../src/shared/wallPointer'
+import { toLocal, turnedBox } from '../src/shared/wallTurn'
 import type { WallItem } from '../src/shared/wallModel'
 
 const box = (over: Partial<WallItem>): WallItem => ({
@@ -260,5 +262,48 @@ describe('resizedBox', () => {
     const tiny = resizedBox(box, 'se', -500, -500, { snapping: false, keepShape: true })
     expect(tiny.width / tiny.height).toBeCloseTo(2)
     expect(tiny.height).toBeGreaterThanOrEqual(32)
+  })
+})
+
+describe('resizing a turned item', () => {
+  const plain = { snapping: false, keepShape: false }
+
+  /** a corner of the item where it sits on the wall, a fraction across and down its own sides */
+  const cornerOf = (b: { x: number; y: number; width: number; height: number; rotation?: number }, across: number, down: number): [number, number] => {
+    const [dx, dy] = toLocal((across - 0.5) * b.width, (down - 0.5) * b.height, -(b.rotation ?? 0))
+    return [b.x + b.width / 2 + dx, b.y + b.height / 2 + dy]
+  }
+
+  it('does just what resizing always did when the item is not turned', () => {
+    const start = { x: 100, y: 100, width: 200, height: 100 }
+    for (const corner of ['nw', 'ne', 'sw', 'se'] as const) {
+      expect(turnedResize(start, corner, 20, -10, plain)).toStrictEqual(resizedBox(start, corner, 20, -10, plain))
+      expect(turnedResize(start, corner, 30, 5, { snapping: false, keepShape: true })).toStrictEqual(resizedBox(start, corner, 30, 5, { snapping: false, keepShape: true }))
+    }
+  })
+
+  it('follows the pointer on a quarter-turned picture, the far corner staying put', () => {
+    // turned a quarter, its own bottom right shows at the bottom left of what you see
+    const turned = { x: 0, y: 0, width: 400, height: 200, rotation: 90 }
+    const pulled = turnedResize(turned, 'se', -20, 10, plain)
+    expect(turnedBox({ ...pulled, rotation: 90 })).toStrictEqual({ minX: 80, minY: -100, maxX: 300, maxY: 310 })
+  })
+
+  it('keeps the far corner where it is on the wall at any angle', () => {
+    const turned = { x: 50, y: 80, width: 300, height: 120, rotation: 30 }
+    const before = cornerOf(turned, 0, 0)
+    const pulled = { ...turnedResize(turned, 'se', 40, 25, plain), rotation: 30 }
+    const after = cornerOf(pulled, 0, 0)
+    expect(after[0]).toBeCloseTo(before[0])
+    expect(after[1]).toBeCloseTo(before[1])
+    // and the pulled corner went where the pointer did, along the item's own sides
+    const [along, down] = toLocal(40, 25, 30)
+    expect(pulled.width).toBeCloseTo(300 + along)
+    expect(pulled.height).toBeCloseTo(120 + down)
+  })
+
+  it('leaves the height of a text box to its words', () => {
+    const text = { x: 100, y: 100, width: 200, height: 60 }
+    expect(turnedResize(text, 'sw', -30, 40, { ...plain, keepHeight: true })).toStrictEqual({ x: 70, y: 100, width: 230, height: 60 })
   })
 })
