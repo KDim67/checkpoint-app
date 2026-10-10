@@ -1,8 +1,8 @@
-/** WAN sync: ntfy.sh signalling, db rows and note files over data channels */
+/** WAN sync: paired through an ntfy.sh room with CPace, then db rows and note files over a data channel */
 
-import { deriveKey, deriveTopic, encryptData, decryptData, base64ToBytes, bytesToBase64, SYNC_SALT } from './webrtcCrypto'
-import { readSignalingMessage, signalingPublishError } from '../../../shared/signalingPayload'
-import { signalingPublishUrl, signalingStreamUrl } from '../../../shared/signalingHost'
+import { base64ToBytes, bytesToBase64 } from './webrtcCrypto'
+import { GuestPairingRoom, HostPairing } from './pairingRoom'
+import { BAD_CODE_MESSAGE, MAX_PAIRING_FAILURES, newGuestId, parseInternetCode } from '../../../shared/internetPairing'
 import {
   sendFramed,
   FrameAssembler,
@@ -29,13 +29,20 @@ interface WebRTCSyncOptions {
   onError: (err: any) => void
 }
 
+/** the sdp out of sealed connection details; anything else is refused */
+function sdpOf(details: string): string {
+  const parsed: unknown = JSON.parse(details)
+  const sdp = parsed && typeof parsed === 'object' ? (parsed as { sdp?: unknown }).sdp : undefined
+  if (typeof sdp !== 'string' || !sdp) throw new Error('The other computer sent connection details Checkpoint could not read.')
+  return sdp
+}
+
 export class WebRTCSyncCoordinator {
   private pc: RTCPeerConnection | null = null
   private dataChannel: RTCDataChannel | null = null
-  private sse: EventSource | null = null
-  private key: CryptoKey | null = null
+  private pairing: HostPairing | GuestPairingRoom | null = null
   private options: WebRTCSyncOptions
-  
+
   private dbUpdatesCount = 0
   private filesSyncedCount = 0
 
@@ -50,17 +57,28 @@ export class WebRTCSyncCoordinator {
     try {
       this.cleanup()
       this.finished = false
-      this.options.onProgress('Deriving security key...')
-      this.key = await deriveKey(this.options.pairingCode, SYNC_SALT)
-
-      // hashed, the pairing code never appears in the public topic
-      const signalingRoom = `checkpoint-sync-${await deriveTopic(this.options.pairingCode, SYNC_SALT)}`
-      this.options.onProgress('Security key derived. Connecting signaling lobby...')
+      const code = parseInternetCode(this.options.pairingCode)
+      if (!code) throw new Error(BAD_CODE_MESSAGE)
+      this.options.onProgress('Opening the pairing room...')
 
       if (this.options.isHost) {
-        this.setupHostSignaling(signalingRoom)
+        const pairing = new HostPairing({
+          code,
+          purpose: 'sync',
+          onOffer: (_guest, details, answer) => {
+            this.answerOffer(details, answer).catch(err => this.options.onError(err))
+          },
+          onRefused: (failures, spent) => {
+            if (spent) this.options.onError(new Error(`${MAX_PAIRING_FAILURES} wrong codes were tried, so this code no longer works. Start again for a new one.`))
+            else this.options.onProgress(`Someone tried a wrong code (${failures} of ${MAX_PAIRING_FAILURES}). Still waiting.`)
+          },
+          onError: err => this.options.onError(err)
+        })
+        this.pairing = pairing
+        await pairing.start()
+        this.options.onProgress('Waiting in the pairing room. Enter this code on the other computer.')
       } else {
-        await this.setupClientConnection(signalingRoom)
+        await this.join(code)
       }
     } catch (err) {
       this.options.onError(err)
@@ -76,151 +94,60 @@ export class WebRTCSyncCoordinator {
     return pc
   }
 
-  // host: answer the client's offer
-  private setupHostSignaling(room: string): void {
-    const sseUrl = signalingStreamUrl(room)
-    this.sse = new EventSource(sseUrl)
+  // host: the guest proved the code, so answer its offer
+  private async answerOffer(details: string, answer: (details: string) => Promise<void>): Promise<void> {
+    // one guest per session; a second offer used to overwrite this.pc and orphan the handshake
+    if (this.pc) return
+    const sdp = sdpOf(details)
+    this.options.onProgress('The other computer has the code. Connecting directly...')
+    const pc = this.newPeerConnection()
+    this.pc = pc
 
-    this.options.onProgress(`Host active. Send passcode to peer...`)
-
-    this.sse.onmessage = async (e) => {
-      try {
-        if (!this.key) return
-        // skips our replies, keepalives and empty events
-        const signal = readSignalingMessage(e.data)
-        if (!signal || signal.title === 'host-reply') return
-
-        // a second offer used to overwrite this.pc and orphan the handshake
-        if (this.pc) return
-
-        this.options.onProgress('Received connection offer. Establishing tunnel...')
-
-        let sdp: string
-        try {
-          const decryptedOffer = await decryptData(signal.body, this.key)
-          sdp = JSON.parse(decryptedOffer).sdp
-        } catch {
-          // almost always a wrong passcode; it used to be swallowed and the host waited forever
-          this.options.onError(
-            new Error('Could not read the incoming offer: the peer entered a different passcode.')
-          )
-          return
-        }
-
-        this.pc = this.newPeerConnection()
-
-        this.pc.ondatachannel = (event) => {
-          this.dataChannel = event.channel
-          this.setupDataChannelHandlers()
-        }
-
-        await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }))
-        const answer = await this.pc.createAnswer()
-        await this.pc.setLocalDescription(answer)
-
-        // bounded wait, a null-candidate event may never come
-        await waitForIceGathering(this.pc)
-        await this.sendHostAnswer(room)
-      } catch (err) {
-        this.options.onError(err)
-      }
+    pc.ondatachannel = (event) => {
+      this.dataChannel = event.channel
+      this.setupDataChannelHandlers()
     }
+
+    await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }))
+    await pc.setLocalDescription(await pc.createAnswer())
+    // bounded wait, a null-candidate event may never come
+    await waitForIceGathering(pc)
+    await answer(JSON.stringify({ sdp: pc.localDescription?.sdp }))
+    this.pairing?.close()
+    this.pairing = null
+    this.options.onProgress('Paired. Activating the direct link...')
   }
 
-  private async sendHostAnswer(room: string): Promise<void> {
-    if (!this.key) return
-    try {
-      const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
-      const encryptedSdp = await encryptData(sdpData, this.key)
-
-      const res = await fetch(signalingPublishUrl(room), {
-        method: 'POST',
-        headers: { 'Title': 'host-reply' },
-        body: encryptedSdp
-      })
-      const failure = signalingPublishError(res.status)
-      if (failure) {
-        this.options.onError(new Error(failure))
-        return
-      }
-      this.options.onProgress('Signaling completed. Activating WebRTC data link...')
-      
-      if (this.sse) {
-        this.sse.close()
-        this.sse = null
-      }
-    } catch (err) {
-      this.options.onError(err)
-    }
-  }
-
-  // client: offer and wait for the answer
-  private async setupClientConnection(room: string): Promise<void> {
-    this.pc = this.newPeerConnection()
-
-    this.dataChannel = this.pc.createDataChannel('sync-channel', { ordered: true })
+  // guest: offer, sealed, once the host has answered the code
+  private async join(code: NonNullable<ReturnType<typeof parseInternetCode>>): Promise<void> {
+    const pc = this.newPeerConnection()
+    this.pc = pc
+    this.dataChannel = pc.createDataChannel('sync-channel', { ordered: true })
     this.setupDataChannelHandlers()
 
-    // subscribe before publishing, ntfy's SSE only carries later messages
-    this.sse = new EventSource(signalingStreamUrl(room))
-    this.sse.onmessage = async (e) => {
-      try {
-        if (!this.key) return
-        const signal = readSignalingMessage(e.data)
-        if (!signal || signal.title !== 'host-reply') return
-        // ignore a duplicate answer, setting it twice throws mid-connection
-        if (!this.pc || this.pc.signalingState === 'stable') return
+    // gathered while the pairing runs, so the offer is ready when the keys are
+    const offer = (async () => {
+      await pc.setLocalDescription(await pc.createOffer())
+      await waitForIceGathering(pc)
+      return JSON.stringify({ sdp: pc.localDescription?.sdp })
+    })()
+    offer.catch(() => {})
 
-        this.options.onProgress('Response answer received. Securing direct connection...')
-
-        let sdp: string
-        try {
-          const decryptedAnswer = await decryptData(signal.body, this.key)
-          sdp = JSON.parse(decryptedAnswer).sdp
-        } catch {
-          this.options.onError(
-            new Error('Could not read the host reply: check that both sides use the same passcode.')
-          )
-          return
-        }
-
-        await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
-
-        if (this.sse) {
-          this.sse.close()
-          this.sse = null
-        }
-      } catch (err) {
-        this.options.onError(err)
-      }
-    }
-
-    const offer = await this.pc.createOffer()
-    await this.pc.setLocalDescription(offer)
-    await waitForIceGathering(this.pc)
-    await this.publishClientOffer(room)
-  }
-
-  private async publishClientOffer(room: string): Promise<void> {
-    if (!this.key) return
-    try {
-      const sdpData = JSON.stringify({ sdp: this.pc?.localDescription?.sdp })
-      const encryptedSdp = await encryptData(sdpData, this.key)
-
-      const res = await fetch(signalingPublishUrl(room), {
-        method: 'POST',
-        headers: { 'Title': 'client-offer' },
-        body: encryptedSdp
-      })
-      const failure = signalingPublishError(res.status)
-      if (failure) {
-        this.options.onError(new Error(failure))
-        return
-      }
-      this.options.onProgress('Offer sent. Waiting for peer authorization...')
-    } catch (err) {
-      this.options.onError(err)
-    }
+    const pairing = new GuestPairingRoom({
+      code,
+      purpose: 'sync',
+      guest: newGuestId(),
+      offer,
+      onAnswer: details => {
+        this.options.onProgress('Paired. Securing the direct connection...')
+        pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: sdpOf(details) }))
+          .catch(err => this.options.onError(err))
+      },
+      onError: err => this.options.onError(err)
+    })
+    this.pairing = pairing
+    await pairing.start()
+    this.options.onProgress('Code sent. Waiting for the other computer...')
   }
 
   private setupDataChannelHandlers(): void {
@@ -413,10 +340,8 @@ export class WebRTCSyncCoordinator {
   }
 
   public cleanup(): void {
-    if (this.sse) {
-      this.sse.close()
-      this.sse = null
-    }
+    this.pairing?.close()
+    this.pairing = null
     if (this.pc) {
       this.pc.close()
       this.pc = null

@@ -1,7 +1,8 @@
 /** P2P board sharing: ntfy.sh signalling lobby, baseline on connect, live edits after */
 
 import { useAppStore } from '../store/appStore'
-import { deriveKey, deriveTopic, encryptData, decryptData, COLLAB_SALT } from './webrtcCrypto'
+import { GuestPairingRoom, HostPairing } from './pairingRoom'
+import { BAD_CODE_MESSAGE, MAX_PAIRING_FAILURES, parseInternetCode, roomTopic, type InternetCode } from '../../../shared/internetPairing'
 import {
   sendFramed,
   closeGracefully,
@@ -30,8 +31,6 @@ import {
 import { describeMerge, mergeBoards, mergeImpact, type MergeImpact } from '../../../shared/boardMerge'
 import type { Item } from '../../../shared/types'
 import { INSTALL_ID_KEY, newInstallId, readInstallId } from '../../../shared/identity'
-import { readSignalingMessage, signalingPublishError } from '../../../shared/signalingPayload'
-import { signalingPublishUrl, signalingStreamUrl } from '../../../shared/signalingHost'
 import { registerSharedWorkspace } from './createWorkspace'
 import { BOARD_CONFIG_EVENT, loadBoardConfig, saveBoardConfig } from './boardConfig'
 import { normalizeBoardConfig } from '../../../shared/boardModel'
@@ -190,8 +189,7 @@ export class WebRTCCollaborationCoordinator {
   /** published with the offer so answers can be addressed */
   private myPeerId = newPeerId()
 
-  private sse: EventSource | null = null
-  private key: CryptoKey | null = null
+  private pairing: HostPairing | GuestPairingRoom | null = null
   private options: CollabOptions
 
   private isApplyingRemote = false
@@ -244,17 +242,30 @@ export class WebRTCCollaborationCoordinator {
       // after cleanup sets it, or the new session's close events are silenced
       this.ended = false
       this.installId = await loadInstallId()
-      this.key = await deriveKey(this.options.pairingCode, COLLAB_SALT)
-      this.options.onProgress('Deriving security key...')
-
-      // hashed, the pairing code never appears in the public topic
-      const signalingRoom = `checkpoint-collab-${await deriveTopic(this.options.pairingCode, COLLAB_SALT)}`
-      this.signalingRoom = signalingRoom
+      const code = parseInternetCode(this.options.pairingCode)
+      if (!code) throw new Error(BAD_CODE_MESSAGE)
+      this.options.onProgress('Opening the pairing room...')
 
       if (this.options.isHost) {
-        this.setupHostSignaling(signalingRoom)
+        // kept so the host stays open to reconnects
+        this.signalingRoom = roomTopic('collab', code.room)
+        const pairing = new HostPairing({
+          code,
+          purpose: 'collab',
+          onOffer: (guest, details, answer) => {
+            this.acceptGuest(guest, details, answer).catch(err => this.options.onError(err))
+          },
+          // whoever is already here stays; only joining with this code ends
+          onRefused: (failures, spent) => this.options.onProgress(spent
+            ? `${MAX_PAIRING_FAILURES} wrong codes were tried, so nobody else can join with this one. Share again for a new code.`
+            : `Someone tried a wrong code (${failures} of ${MAX_PAIRING_FAILURES}).`),
+          onError: err => this.options.onError(err)
+        })
+        this.pairing = pairing
+        await pairing.start()
+        this.options.onProgress('Waiting for someone to join...')
       } else {
-        await this.setupClientConnection(signalingRoom)
+        await this.setupClientConnection(code)
       }
     } catch (err) {
       this.options.onError(err)
@@ -307,173 +318,82 @@ export class WebRTCCollaborationCoordinator {
     })
   }
 
-  /** offer:<id> / answer:<id> so guests share a room without reading each other; bare titles still answered */
-  private static offerIdFrom(title: string): string | null {
-    if (title.startsWith('offer:')) return title.slice('offer:'.length) || null
-    return title === 'client-offer' ? 'legacy' : null
-  }
+  /** a guest who proved the code; the room stays open, closing after one answer limited it to two people */
+  private async acceptGuest(guest: string, details: string, answer: (details: string) => Promise<void>): Promise<void> {
+    // removed earlier this session, already connected, or a duplicate delivery
+    if (this.blocked.has(guest) || this.links.has(guest)) return
 
-  private setupHostSignaling(room: string): void {
-    // close the previous stream on reopen, or each guest leaks one and handlers race
-    this.sse?.close()
-    this.sse = new EventSource(signalingStreamUrl(room))
-    this.options.onProgress('Waiting for someone to join...')
-
-    this.sse.onmessage = async (e) => {
-      try {
-        if (!this.key) return
-        const signal = readSignalingMessage(e.data)
-        if (!signal) return
-
-        const peerId = WebRTCCollaborationCoordinator.offerIdFrom(signal.title)
-        // this room also carries the host's own answers
-        if (!peerId) return
-        // removed earlier this session
-        if (this.blocked.has(peerId)) return
-        // already connected, or a duplicate delivery
-        if (this.links.has(peerId)) return
-
-        this.options.onProgress('Connecting with someone...')
-
-        // claimed before the first await, or a duplicate offer builds a second connection
-        const link = this.openLink(peerId)
-
-        const release = (): void => {
-          this.links.delete(peerId)
-          link.pc.close()
-        }
-
-        let sdp: string
-        try {
-          const decryptedOffer = await decryptData(signal.body, this.key)
-          const offer = JSON.parse(decryptedOffer)
-          sdp = offer.sdp
-          link.install = readInstallId(offer.install)
-        } catch {
-          release()
-          this.options.onError(
-            new Error('Could not read the incoming offer: the peer entered a different passcode.')
-          )
-          return
-        }
-
-        // checked here so a removed guest is turned away before getting the board
-        if (link.install && this.blocked.has(link.install)) {
-          release()
-          return
-        }
-
-        link.pc.ondatachannel = (event) => {
-          link.channel = event.channel
-          this.setupDataChannelHandlers(link)
-        }
-
-        await link.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }))
-        const answer = await link.pc.createAnswer()
-        await link.pc.setLocalDescription(answer)
-        await waitForIceGathering(link.pc)
-        await this.sendHostAnswer(room, link, peerId === 'legacy')
-      } catch (err) {
-        this.options.onError(err)
-      }
-    }
-  }
-
-  private async sendHostAnswer(room: string, link: PeerLink, legacy: boolean): Promise<void> {
-    if (!this.key) return
+    let offer: { sdp?: unknown; install?: unknown }
     try {
-      const sdpData = JSON.stringify({ sdp: link.pc.localDescription?.sdp })
-      const encryptedSdp = await encryptData(sdpData, this.key)
+      offer = JSON.parse(details)
+    } catch {
+      offer = {}
+    }
+    if (typeof offer.sdp !== 'string' || !offer.sdp) {
+      this.options.onError(new Error('Someone joining sent connection details Checkpoint could not read.'))
+      return
+    }
+    const install = readInstallId(offer.install)
+    // checked here so a removed guest is turned away before getting the board
+    if (install && this.blocked.has(install)) return
 
-      const res = await fetch(signalingPublishUrl(room), {
-        method: 'POST',
-        headers: { 'Title': legacy ? 'host-reply' : `answer:${link.id}` },
-        body: encryptedSdp
-      })
-      const failure = signalingPublishError(res.status)
-      if (failure) {
-        this.options.onError(new Error(failure))
-        return
+    this.options.onProgress('Connecting with someone...')
+    // claimed before the first await, or a duplicate offer builds a second connection
+    const link = this.openLink(guest, install)
+    try {
+      link.pc.ondatachannel = (event) => {
+        link.channel = event.channel
+        this.setupDataChannelHandlers(link)
       }
-
-      // the stream stays open, closing after one answer limited it to two people
+      await link.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: offer.sdp }))
+      await link.pc.setLocalDescription(await link.pc.createAnswer())
+      await waitForIceGathering(link.pc)
+      await answer(JSON.stringify({ sdp: link.pc.localDescription?.sdp }))
     } catch (err) {
-      this.options.onError(err)
+      this.links.delete(guest)
+      link.pc.close()
+      throw err
     }
   }
 
-  private async setupClientConnection(room: string): Promise<void> {
+  private async setupClientConnection(code: InternetCode): Promise<void> {
     const link = this.openLink(HOST_LINK)
     link.channel = link.pc.createDataChannel('collab-channel', { ordered: true })
     this.setupDataChannelHandlers(link)
 
-    // subscribe before publishing, ntfy's SSE only carries later messages
-    this.sse = new EventSource(signalingStreamUrl(room))
-    this.sse.onmessage = async (e) => {
-      try {
-        if (!this.key) return
-        const signal = readSignalingMessage(e.data)
-        if (!signal) return
-        // ours, or from an old host answering everyone
-        if (signal.title !== `answer:${this.myPeerId}` && signal.title !== 'host-reply') return
-        if (link.pc.signalingState === 'stable') return
+    // gathered while the pairing runs; the install id rides inside the sealed offer, never in the room
+    const offer = (async () => {
+      await link.pc.setLocalDescription(await link.pc.createOffer())
+      await waitForIceGathering(link.pc)
+      return JSON.stringify({ sdp: link.pc.localDescription?.sdp, install: this.installId })
+    })()
+    offer.catch(() => {})
 
+    const pairing = new GuestPairingRoom({
+      code,
+      purpose: 'collab',
+      guest: this.myPeerId,
+      offer,
+      onAnswer: details => {
         this.options.onProgress('Securing collab link...')
-
-        let sdp: string
+        let sdp: unknown
         try {
-          const decryptedAnswer = await decryptData(signal.body, this.key)
-          sdp = JSON.parse(decryptedAnswer).sdp
+          sdp = JSON.parse(details).sdp
         } catch {
-          this.options.onError(
-            new Error('Could not read the host reply: check that both sides use the same passcode.')
-          )
+          sdp = null
+        }
+        if (typeof sdp !== 'string' || !sdp) {
+          this.options.onError(new Error('The host sent connection details Checkpoint could not read.'))
           return
         }
-
-        await link.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
-
-        // a guest has one handshake, only the host keeps listening
-        if (this.sse) {
-          this.sse.close()
-          this.sse = null
-        }
-      } catch (err) {
-        this.options.onError(err)
-      }
-    }
-
-    const offer = await link.pc.createOffer()
-    await link.pc.setLocalDescription(offer)
-    await waitForIceGathering(link.pc)
-    await this.publishClientOffer(room, link)
-  }
-
-  private async publishClientOffer(room: string, link: PeerLink): Promise<void> {
-    if (!this.key) return
-    try {
-      // install id inside the encrypted body, not the public title
-      const sdpData = JSON.stringify({
-        sdp: link.pc.localDescription?.sdp,
-        install: this.installId
-      })
-      const encryptedSdp = await encryptData(sdpData, this.key)
-
-      const res = await fetch(signalingPublishUrl(room), {
-        method: 'POST',
-        // named so the answer comes back to this guest
-        headers: { 'Title': `offer:${this.myPeerId}` },
-        body: encryptedSdp
-      })
-      const failure = signalingPublishError(res.status)
-      if (failure) {
-        this.options.onError(new Error(failure))
-        return
-      }
-      this.options.onProgress('Offer sent. Awaiting host pairing...')
-    } catch (err) {
-      this.options.onError(err)
-    }
+        link.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
+          .catch(err => this.options.onError(err))
+      },
+      onError: err => this.options.onError(err)
+    })
+    this.pairing = pairing
+    await pairing.start()
+    this.options.onProgress('Code sent. Awaiting host pairing...')
   }
 
   private setupDataChannelHandlers(link: PeerLink): void {
@@ -1767,9 +1687,7 @@ export class WebRTCCollaborationCoordinator {
     this.decidingMerge = false
     this.offeredMerge = false
 
-    if (this.sse) {
-      this.sse.close()
-      this.sse = null
-    }
+    this.pairing?.close()
+    this.pairing = null
   }
 }

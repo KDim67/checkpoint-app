@@ -8,6 +8,8 @@ import { followContextRenames, getDb, liveContextSlugs, readContextList, replayC
 import type { SyncPayload } from '../shared/types'
 import { filterSyncableSettings, isSyncableSettingKey } from '../shared/syncSettings'
 import { SYNC_TCP_PORT } from '../shared/ports'
+import { acceptSecure, connectSecure, HandshakeError } from './sync/secureChannel'
+import { forgetSubscription, mergeSyncedSubscriptions, subscriptionsForSync, SUBSCRIPTIONS_TABLE } from './calendar/icalStore'
 
 const DEFAULT_TCP_PORT = SYNC_TCP_PORT
 const DEFAULT_UDP_PORT = 5740
@@ -33,12 +35,9 @@ type DatabasePayload = SyncPayload
 /** low enough that guessing six digits is hopeless, high enough for a typo */
 const MAX_AUTH_ATTEMPTS = 5
 
-/** === on a secret leaks how much matched through timing; constant-time is free */
-export function sameSecret(a: string, b: string): boolean {
-  const left = Buffer.from(a, 'hex')
-  const right = Buffer.from(b, 'hex')
-  // timingSafeEqual throws on length mismatch, so check length first
-  return left.length === right.length && crypto.timingSafeEqual(left, right)
+/** secrets go only over local-network sync, main to main inside its encrypted channel; the screen relays internet sync */
+export interface PayloadOptions {
+  withSecrets?: boolean
 }
 
 export class SyncService {
@@ -230,7 +229,7 @@ export class SyncService {
     return list
   }
 
-  public getDatabasePayload(): DatabasePayload {
+  public getDatabasePayload(options: PayloadOptions = {}): DatabasePayload {
     const db = getDb()
     
     // cast at the query, the only place the row shape is known
@@ -259,12 +258,13 @@ export class SyncService {
       clipboard_items,
       tombstones,
       renewals,
-      context_renames
+      context_renames,
+      ...(options.withSecrets ? { calendar_subscriptions: subscriptionsForSync() } : {})
     }
   }
 
   // one transaction
-  public applyDatabasePayload(payload: DatabasePayload): { pulledNewerCount: number } {
+  public applyDatabasePayload(payload: DatabasePayload, options: PayloadOptions = {}): { pulledNewerCount: number } {
     const db = getDb()
     let pulledNewerCount = 0
 
@@ -292,6 +292,8 @@ export class SyncService {
           db.prepare('DELETE FROM relations WHERE id = ?').run(tomb.id)
         } else if (tomb.table_name === 'renewals') {
           db.prepare('DELETE FROM renewals WHERE id = ?').run(tomb.id)
+        } else if (tomb.table_name === SUBSCRIPTIONS_TABLE) {
+          forgetSubscription(tomb.id)
         }
       }
 
@@ -353,6 +355,9 @@ export class SyncService {
         })
         pulledNewerCount++
       }
+
+      // links arrive only over the encrypted local channel; one handed in any other way is ignored
+      if (options.withSecrets) pulledNewerCount += mergeSyncedSubscriptions(payload.calendar_subscriptions, localTombstones)
 
       // tags: insert or update color
       const tags = payload.tags || []
@@ -437,7 +442,7 @@ export class SyncService {
   private handleClientConnection(socket: net.Socket): void {
     console.log(`[SyncService] Client connected from ${socket.remoteAddress}`)
 
-    // six digits is an afternoon of guessing, so an address is ignored after a few misses until a new code
+    // each connection is one guess at six digits, so an address is ignored after a few misses until a new code
     const origin = socket.remoteAddress ?? 'unknown'
     if ((this.failedAttempts.get(origin) ?? 0) >= MAX_AUTH_ATTEMPTS) {
       this.syncProgress = `Refused ${origin}: too many failed codes.`
@@ -449,87 +454,57 @@ export class SyncService {
     this.clientSockets.add(socket)
     socket.once('close', () => this.clientSockets.delete(socket))
 
-    let authenticated = false
-    const salt = crypto.randomBytes(16).toString('hex')
     this.isSyncing = true
-    this.syncProgress = 'Client connected. Exchanging security challenge...'
+    this.syncProgress = 'Computer connected. Checking the pairing code...'
 
-    socket.write(`auth-challenge:${salt}\n`)
-
-    let buffer = ''
-    socket.on('data', (data) => {
-      buffer += data.toString()
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (!line.trim()) continue
-
-        if (!authenticated) {
-          if (line.startsWith('auth-response:')) {
-            const clientHash = line.substring('auth-response:'.length).trim()
-            const expectedHash = crypto
-              .createHmac('sha256', this.pairingCode)
-              .update(salt)
-              .digest('hex')
-
-            if (sameSecret(clientHash, expectedHash)) {
-              authenticated = true
-              this.failedAttempts.delete(origin)
-              socket.write('auth-success\n')
-              this.syncProgress = 'Authenticated successfully. Exchanging index...'
-            } else {
-              const failures = (this.failedAttempts.get(origin) ?? 0) + 1
-              this.failedAttempts.set(origin, failures)
-              socket.write('auth-failed\n')
-              socket.destroy()
-              this.syncProgress = failures >= MAX_AUTH_ATTEMPTS
-                ? `Authentication failed. ${origin} is now blocked until the host restarts.`
-                : 'Authentication failed: invalid code.'
-              this.isSyncing = false
-            }
-          }
-          continue
-        }
-
+    acceptSecure(socket, this.pairingCode).then(channel => {
+      this.failedAttempts.delete(origin)
+      this.syncProgress = 'Pairing code confirmed. Exchanging data over an encrypted connection...'
+      channel.onClose(error => {
+        this.isSyncing = false
+        if (error) this.syncProgress = `Sync error: ${error.message}`
+      })
+      channel.onLine(line => {
         if (line.startsWith('sync-request')) {
           this.syncProgress = 'Syncing database payload...'
-          const dbPayload = this.getDatabasePayload()
-          socket.write(`sync-db-payload:${JSON.stringify(dbPayload)}\n`)
+          channel.send(`sync-db-payload:${JSON.stringify(this.getDatabasePayload({ withSecrets: true }))}`)
         } else if (line.startsWith('sync-db-payload:')) {
-          const rawPayload = line.substring('sync-db-payload:'.length)
           try {
-            const payload = JSON.parse(rawPayload)
-            const result = this.applyDatabasePayload(payload)
-            socket.write(`sync-db-applied:${result.pulledNewerCount}\n`)
+            const payload = JSON.parse(line.substring('sync-db-payload:'.length))
+            const result = this.applyDatabasePayload(payload, { withSecrets: true })
+            channel.send(`sync-db-applied:${result.pulledNewerCount}`)
             this.syncProgress = 'Database merged successfully. Syncing files...'
           } catch {
-            socket.write('sync-error:failed to merge database\n')
-            socket.destroy()
+            channel.send('sync-error:failed to merge database')
+            channel.end()
             this.isSyncing = false
           }
         } else if (line.startsWith('sync-db-applied:')) {
           // db done, host asks for notes next
           this.syncProgress = 'Database sync completed. Syncing notes...'
-          socket.write('notes-sync-done\n')
+          channel.send('notes-sync-done')
         } else if (line === 'notes-sync-done') {
           this.syncProgress = 'Sync complete!'
           this.isSyncing = false
-          socket.write('sync-complete\n')
-          socket.end()
+          channel.send('sync-complete')
+          channel.end()
         }
+      })
+    }).catch((error: unknown) => {
+      this.isSyncing = false
+      const reason = error instanceof HandshakeError ? error.reason : 'closed'
+      if (reason === 'wrong-code') {
+        const failures = (this.failedAttempts.get(origin) ?? 0) + 1
+        this.failedAttempts.set(origin, failures)
+        this.syncProgress = failures >= MAX_AUTH_ATTEMPTS
+          ? `Authentication failed. ${origin} is now blocked until the host restarts.`
+          : 'Authentication failed: invalid code.'
+      } else if (reason === 'timeout') {
+        // an older version waits for a challenge this one no longer sends
+        this.syncProgress = "A computer connected but didn't finish pairing. If it runs an older Checkpoint, update it to sync."
+      } else {
+        this.syncProgress = `Sync stopped: ${error instanceof Error ? error.message : String(error)}`
       }
-    })
-
-    socket.on('error', (err) => {
-      console.error('[SyncService] Client socket error:', err)
-      this.isSyncing = false
-      this.syncProgress = `Sync error: ${err.message}`
-    })
-
-    socket.on('close', () => {
-      console.log('[SyncService] Socket connection closed')
-      this.isSyncing = false
     })
   }
 
@@ -537,92 +512,77 @@ export class SyncService {
     return new Promise((resolve, reject) => {
       this.isSyncing = true
       this.syncProgress = `Connecting to peer at ${hostIp}:${port}...`
-      
+
       const socket = net.createConnection(port, hostIp)
       let dbUpdates = 0
-      let salt = ''
-
-      let buffer = ''
-      socket.on('data', async (data) => {
-        buffer += data.toString()
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.trim()) continue
-
-          if (line.startsWith('auth-challenge:')) {
-            salt = line.substring('auth-challenge:'.length).trim()
-            const responseHash = crypto
-              .createHmac('sha256', pairingCode)
-              .update(salt)
-              .digest('hex')
-            socket.write(`auth-response:${responseHash}\n`)
-          } else if (line === 'auth-success') {
-            this.syncProgress = 'Authenticated successfully. Fetching host database...'
-            socket.write('sync-request\n')
-          } else if (line === 'auth-failed') {
-            socket.destroy()
-            this.isSyncing = false
-            this.syncProgress = 'Authentication failed. Please verify pairing code.'
-            reject(new Error('Authentication failed'))
-          } else if (line.startsWith('sync-db-payload:')) {
-            const rawPayload = line.substring('sync-db-payload:'.length)
-            try {
-              const payload = JSON.parse(rawPayload)
-              
-              // bidirectional: apply theirs, then send ours back
-              const result = this.applyDatabasePayload(payload)
-              dbUpdates += result.pulledNewerCount
-              
-              const clientPayload = this.getDatabasePayload()
-              socket.write(`sync-db-payload:${JSON.stringify(clientPayload)}\n`)
-              
-              this.syncProgress = `Database merge: integrated ${result.pulledNewerCount} updates.`
-            } catch (err) {
-              console.error('[SyncService] Client merge failed:', err)
-              socket.destroy()
-              this.isSyncing = false
-              reject(err)
-            }
-          } else if (line.startsWith('sync-db-applied:')) {
-            this.syncProgress = 'Notes sync in progress...'
-            
-            try {
-              await this.syncNotesFiles(socket, dataPath)
-            } catch (err) {
-              console.error('[SyncService] Notes folder sync failed:', err)
-            }
-            
-            socket.write('notes-sync-done\n')
-          } else if (line === 'sync-complete') {
-            this.syncProgress = 'Sync completed successfully!'
-            this.isSyncing = false
-            socket.destroy()
-            resolve({ dbUpdates, filesSynced: 0 })
-          }
-        }
-      })
-
-      socket.on('error', (err) => {
+      let done = false
+      const finish = (error: Error | null): void => {
+        if (done) return
+        done = true
         this.isSyncing = false
-        this.syncProgress = `Connection error: ${err.message}`
-        socket.destroy()   // release the OS handle now
-        reject(err)
-      })
-
-      socket.on('close', () => {
-        // closed on error/timeout before resolving
-        this.isSyncing = false
-      })
+        if (error) reject(error)
+        else resolve({ dbUpdates, filesSynced: 0 })
+      }
 
       // give up if the peer goes silent for 30s
       socket.setTimeout(30000)
       socket.on('timeout', () => {
         console.warn('[SyncService] Sync socket timed out after 30s')
+        this.syncProgress = 'Sync connection timed out.'
         socket.destroy()
-        this.isSyncing = false
-        reject(new Error('Sync connection timed out'))
+        finish(new Error('Sync connection timed out'))
+      })
+
+      connectSecure(socket, pairingCode).then(channel => {
+        this.syncProgress = 'Pairing code confirmed. Fetching host database over an encrypted connection...'
+        channel.onClose(error => {
+          if (error) this.syncProgress = `Sync error: ${error.message}`
+          finish(error ?? new Error('The other computer closed the connection before the sync finished.'))
+        })
+        channel.onLine(async line => {
+          if (line.startsWith('sync-db-payload:')) {
+            try {
+              const payload = JSON.parse(line.substring('sync-db-payload:'.length))
+
+              // bidirectional: apply theirs, then send ours back
+              const result = this.applyDatabasePayload(payload, { withSecrets: true })
+              dbUpdates += result.pulledNewerCount
+              channel.send(`sync-db-payload:${JSON.stringify(this.getDatabasePayload({ withSecrets: true }))}`)
+
+              this.syncProgress = `Database merge: integrated ${result.pulledNewerCount} updates.`
+            } catch (err) {
+              console.error('[SyncService] Client merge failed:', err)
+              socket.destroy()
+              finish(err instanceof Error ? err : new Error(String(err)))
+            }
+          } else if (line.startsWith('sync-db-applied:')) {
+            this.syncProgress = 'Notes sync in progress...'
+
+            try {
+              await this.syncNotesFiles(socket, dataPath)
+            } catch (err) {
+              console.error('[SyncService] Notes folder sync failed:', err)
+            }
+
+            channel.send('notes-sync-done')
+          } else if (line === 'sync-complete') {
+            this.syncProgress = 'Sync completed successfully!'
+            finish(null)
+            socket.destroy()
+          } else if (line.startsWith('sync-error:')) {
+            this.syncProgress = "The other computer couldn't merge this one's data."
+            socket.destroy()
+            finish(new Error(line.substring('sync-error:'.length)))
+          }
+        })
+        channel.send('sync-request')
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        const reason = error instanceof HandshakeError ? error.reason : 'closed'
+        this.syncProgress = reason === 'wrong-code'
+          ? 'Authentication failed. Please verify pairing code.'
+          : reason === 'closed' ? `Connection error: ${message}` : message
+        finish(error instanceof Error ? error : new Error(message))
       })
     })
   }

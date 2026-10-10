@@ -3,13 +3,14 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { v4 as uuidv4 } from 'uuid'
-import { getSetting, setSetting } from '../db'
+import { getSetting, recordTombstone, setSetting } from '../db'
 import { ensureDir, getCalendarCacheDir } from '../paths'
 import { guardedFetch, readCapped } from '../guardedFetch'
 import { isPublicHost } from '../publicAddress'
 import { eventsBetween, parseCalendar, type ParsedCalendar } from './ical'
 import type { CalendarEntry } from '../../shared/calendar'
 import type { CalendarSubscription, SubscriptionInput } from '../../shared/calendarApi'
+import type { SyncedCalendarSubscription } from '../../shared/types'
 
 /** secret: the link is all anyone needs to read the calendar */
 export const SUBSCRIPTIONS_KEY = 'calendar_subscriptions'
@@ -20,15 +21,12 @@ const MAX_BYTES = 5 * 1024 * 1024
 export const REFRESH_EVERY_MS = 30 * 60_000
 const MAX_BACKOFF_MS = 6 * 60 * 60_000
 const MAX_SUBSCRIPTIONS = 30
+/** the table name removals are recorded under, for sync */
+export const SUBSCRIPTIONS_TABLE = 'calendar_subscriptions'
+// an id names its cache file, so one from another computer must be exactly the shape this one makes
+const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-interface Stored {
-  id: string
-  name: string
-  url: string
-  color: string
-  workspace: string | null
-  addedAt: number
-}
+type Stored = SyncedCalendarSubscription
 
 interface FetchState {
   lastOk: number | null
@@ -55,7 +53,17 @@ function readStored(): Stored[] {
   if (!Array.isArray(raw)) return []
   return raw.filter((s): s is Stored =>
     !!s && typeof s === 'object' && typeof s.id === 'string' && typeof s.url === 'string' && typeof s.name === 'string')
-    .map(s => ({ ...s, color: HEX.test(s.color) ? s.color : '#535e85', workspace: typeof s.workspace === 'string' ? s.workspace : null }))
+    .map(s => {
+      const addedAt = typeof s.addedAt === 'number' ? s.addedAt : 0
+      return {
+        ...s,
+        color: HEX.test(s.color) ? s.color : '#535e85',
+        workspace: typeof s.workspace === 'string' ? s.workspace : null,
+        addedAt,
+        // saved before sync carried calendars: as new as when it was added
+        updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : addedAt
+      }
+    })
 }
 
 const writeStored = (list: Stored[]): void => setSetting(SUBSCRIPTIONS_KEY, list)
@@ -186,7 +194,8 @@ export async function addSubscription(input: SubscriptionInput, deps: StoreDeps 
     url: url.href,
     color: typeof input.color === 'string' && HEX.test(input.color) ? input.color : '#535e85',
     workspace: typeof input.workspace === 'string' && input.workspace ? input.workspace : null,
-    addedAt: now
+    addedAt: now,
+    updatedAt: now
   }
   ensureDir(getCalendarCacheDir())
   writeFileSync(cacheFile(subscription.id), got.text, 'utf8')
@@ -204,12 +213,12 @@ export function updateSubscription(id: string, patch: Partial<Pick<SubscriptionI
   if (typeof patch.name === 'string' && patch.name.trim()) s.name = patch.name.trim().slice(0, 60)
   if (typeof patch.color === 'string' && HEX.test(patch.color)) s.color = patch.color
   if (patch.workspace !== undefined) s.workspace = typeof patch.workspace === 'string' && patch.workspace ? patch.workspace : null
+  s.updatedAt = Date.now()
   writeStored(stored)
   return { ok: true }
 }
 
-export function removeSubscription(id: string): void {
-  writeStored(readStored().filter(s => s.id !== id))
+function dropCached(id: string): void {
   writeState(id, null)
   parsed.delete(id)
   try {
@@ -217,6 +226,70 @@ export function removeSubscription(id: string): void {
   } catch {
     // a cache file left behind is never read without its subscription
   }
+}
+
+/** gone here, and from your other computers when they next sync */
+export function removeSubscription(id: string): void {
+  const stored = readStored()
+  if (!stored.some(s => s.id === id)) return
+  writeStored(stored.filter(s => s.id !== id))
+  dropCached(id)
+  recordTombstone(id, SUBSCRIPTIONS_TABLE)
+}
+
+/** a removal synced from another computer; only ever one this computer has, so the id never reaches the disk unchecked */
+export function forgetSubscription(id: string): void {
+  const stored = readStored()
+  if (!stored.some(s => s.id === id)) return
+  writeStored(stored.filter(s => s.id !== id))
+  dropCached(id)
+}
+
+/** links and all, for local-network sync only */
+export const subscriptionsForSync = (): SyncedCalendarSubscription[] => readStored()
+
+/** what another computer sent, checked as strictly as a link pasted here */
+function syncedFrom(raw: unknown): Stored | null {
+  if (!raw || typeof raw !== 'object') return null
+  const s = raw as Record<string, unknown>
+  const name = typeof s.name === 'string' ? s.name.trim().slice(0, 60) : ''
+  const url = typeof s.url === 'string' ? normalizeLink(s.url) : null
+  if (typeof s.id !== 'string' || !ID.test(s.id) || !name || !url) return null
+  if (typeof s.updatedAt !== 'number' || !Number.isFinite(s.updatedAt)) return null
+  return {
+    id: s.id,
+    name,
+    url: url.href,
+    color: typeof s.color === 'string' && HEX.test(s.color) ? s.color : '#535e85',
+    workspace: typeof s.workspace === 'string' && s.workspace ? s.workspace : null,
+    addedAt: typeof s.addedAt === 'number' && Number.isFinite(s.addedAt) ? s.addedAt : s.updatedAt,
+    updatedAt: s.updatedAt
+  }
+}
+
+/** newest wins per calendar; one removed here stays removed; how many changed */
+export function mergeSyncedSubscriptions(incoming: unknown, removed: ReadonlySet<string>): number {
+  if (!Array.isArray(incoming)) return 0
+  const stored = readStored()
+  let changed = 0
+  for (const raw of incoming) {
+    const s = syncedFrom(raw)
+    if (!s || removed.has(s.id)) continue
+    const index = stored.findIndex(x => x.id === s.id)
+    if (index === -1) {
+      // the same link added on both computers before they synced stays as each one's own
+      if (stored.length >= MAX_SUBSCRIPTIONS || stored.some(x => normalizeLink(x.url)?.href === s.url)) continue
+      stored.push(s)
+      changed++
+    } else if (s.updatedAt > stored[index].updatedAt) {
+      // a new link is a different calendar, so what was downloaded for the old one goes
+      if (stored[index].url !== s.url) dropCached(s.id)
+      stored[index] = s
+      changed++
+    }
+  }
+  if (changed > 0) writeStored(stored)
+  return changed
 }
 
 /** refreshes what is due, or everything when forced; true when any calendar changed */

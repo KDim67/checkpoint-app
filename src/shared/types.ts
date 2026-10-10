@@ -109,6 +109,19 @@ export interface SyncPayload {
   renewals?: RenewalRow[]
   /** absent from older versions too; each machine replays the ones it hasn't made */
   context_renames?: ContextRename[]
+  /** links included, so only local-network sync carries these, main to main inside its encrypted channel */
+  calendar_subscriptions?: SyncedCalendarSubscription[]
+}
+
+/** a calendar you subscribe to, as stored: the link is a password to it */
+export interface SyncedCalendarSubscription {
+  id: string
+  name: string
+  url: string
+  color: string
+  workspace: string | null
+  addedAt: number
+  updatedAt: number
 }
 
 /** a workspace renamed on one machine, for the others to rename too */

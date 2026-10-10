@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
 import { authorLabel, DISPLAY_NAME_MAX } from '@shared/identity'
+import { CODE_EXAMPLE, parseInternetCode } from '@shared/internetPairing'
 import HeaderBtn from './HeaderBtn'
 import type { CollabSession } from './useCollabSession'
 
@@ -10,6 +11,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const { toast } = useToast()
+  const joinable = parseInternetCode(session.joinCode) !== null
 
   const collabPopoverRef = useRef<HTMLDivElement>(null)
   const { setPopoverOpen } = session
@@ -218,10 +220,13 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                 <div className="flex-4px">
                   <input
                     type="text"
-                    maxLength={6}
-                    placeholder="Passcode (e.g. 123456)"
+                    maxLength={13}
+                    placeholder={`Code, e.g. ${CODE_EXAMPLE}`}
+                    aria-label="Code from the person sharing"
+                    spellCheck={false}
+                    autoComplete="off"
                     value={session.joinCode}
-                    onChange={e => session.setJoinCode(e.target.value.replace(/\D/g, ''))}
+                    onChange={e => session.setJoinCode(e.target.value.toUpperCase())}
                     style={{
                       flex: 1,
                       background: 'var(--color-surface-offset)',
@@ -237,16 +242,16 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                     onClick={() => {
                       session.join(session.joinCode)
                     }}
-                    disabled={session.joinCode.length < 5}
+                    disabled={!joinable}
                     style={{
                       fontSize: 'var(--text-xs)',
                       fontWeight: 'var(--weight-semibold)',
-                      background: session.joinCode.length < 5 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
-                      color: session.joinCode.length < 5 ? 'var(--color-text-muted)' : '#fff',
+                      background: !joinable ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
+                      color: !joinable ? 'var(--color-text-muted)' : '#fff',
                       border: 'none',
                       padding: '0 var(--space-3)',
                       borderRadius: 'var(--radius-md)',
-                      cursor: session.joinCode.length < 5 ? 'not-allowed' : 'pointer'
+                      cursor: !joinable ? 'not-allowed' : 'pointer'
                     }}
                   >
                     Join

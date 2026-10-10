@@ -138,13 +138,22 @@ AI control disappears.
 Two ways, both direct, neither goes through a server of mine.
 
 **Same network:** one machine hosts, the other joins with a six-digit pairing
-code. Fastest and needs no setup.
+code. Fastest and needs no setup. The code never crosses the network: the two
+machines turn it into a key with CPace, so someone listening can't work it out,
+and everything after is encrypted. Both machines need this version or later.
+This is also the only way the calendars you subscribe to travel, links and all;
+over the internet they stay on each machine.
 
-**Over the internet:** peer-to-peer via WebRTC, end-to-end encrypted. If both
-machines are behind a strict NAT (mobile tethering, some office networks) they
-can't find each other directly and you'll need a relay. There's a field for
-your own TURN server in Settings → P2P Network Sync; Checkpoint doesn't ship
-one.
+**Over the internet:** peer-to-peer via WebRTC, end-to-end encrypted, with a
+code like K7QD-482913. The first four characters name a public room on ntfy.sh
+where the two machines meet; the six digits never leave either one. They pair
+with CPace through that room, so whoever runs or watches it can neither learn
+the digits nor step in between, and after five wrong tries the code stops
+working. Sharing a board live works the same way. Both machines need this
+version or later. If both machines are behind a strict NAT (mobile tethering,
+some office networks) they can't find each other directly and you'll need a
+relay. There's a field for your own TURN server in Settings → P2P Network Sync;
+Checkpoint doesn't ship one.
 
 ### Webhooks
 
