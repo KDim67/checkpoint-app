@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { quarantineDatabase, recoveryMessage, stampFor } from '../src/main/dbRecovery'
+import { newerDatabaseNotice, quarantineDatabase, recoveryMessage, RELEASES_URL, stampFor } from '../src/main/dbRecovery'
 
 // the only copy of everything, so be precise
 
@@ -88,5 +88,16 @@ describe('what the user is told', () => {
     expect(message).toContain('C:/x/backups')
     // keeping the file is pointless if the message implies it's gone
     expect(message).toContain('kept, not deleted')
+  })
+})
+
+describe('data saved by a newer version', () => {
+  it('says nothing was changed and offers the latest version, with quitting as the way out', () => {
+    const notice = newerDatabaseNotice('1.1.1')
+    expect(notice.message).toBe('Your data was saved by a newer version of Checkpoint')
+    expect(notice.detail).toContain('1.1.1')
+    expect(notice.detail).toContain('nothing was changed')
+    expect(notice.buttons).toStrictEqual(['Get the latest version', 'Quit'])
+    expect(RELEASES_URL).toBe('https://github.com/KDim67/checkpoint-app/releases/latest')
   })
 })

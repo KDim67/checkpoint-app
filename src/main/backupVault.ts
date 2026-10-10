@@ -4,7 +4,7 @@ import zlib from 'zlib'
 import { pipeline } from 'stream/promises'
 import { app } from 'electron'
 import Database from 'better-sqlite3'
-import { getDb, getSetting, setSetting, initDb, discardDb } from './db'
+import { getDb, getSetting, setSetting, initDb, discardDb, SCHEMA_VERSION } from './db'
 
 let backupTimer: NodeJS.Timeout | null = null
 let initialCheckTimer: NodeJS.Timeout | null = null
@@ -37,7 +37,11 @@ async function decompressFile(sourcePath: string, destinationPath: string): Prom
 }
 
 export function getBackupDir(): string {
-  const customPath = getSetting<string>('backup_path', '')
+  return backupDirFor(getSetting<string>('backup_path', ''))
+}
+
+/** the chosen folder when it can be written to, the app's own otherwise */
+function backupDirFor(customPath: string): string {
   if (customPath && customPath.trim() !== '') {
     const resolved = customPath.trim()
     try {
@@ -61,33 +65,35 @@ export function getBackupDir(): string {
   return defaultDir
 }
 
-/** preRestore: live db copied before a restore, so a mistaken restore can be undone */
-type BackupKind = 'scheduled' | 'preRestore'
+/** preRestore: live db copied before a restore, so a mistaken restore can be undone; preUpdate: copied before a new version changed it */
+type BackupKind = 'scheduled' | 'preRestore' | 'preUpdate'
 
 const PREFIXES: Record<BackupKind, string> = {
   scheduled: 'backup_',
-  preRestore: 'pre_restore_'
+  preRestore: 'pre_restore_',
+  preUpdate: 'pre_update_'
 }
 
-/** null when not one of ours */
-export function parseBackupName(filename: string): { kind: BackupKind; timestamp: number } | null {
+/** null when not one of ours; a copy before an update also names the version it was made for */
+export function parseBackupName(filename: string): { kind: BackupKind; timestamp: number; version?: string } | null {
   if (!filename.endsWith('.db.gz')) return null
   for (const [kind, prefix] of Object.entries(PREFIXES) as [BackupKind, string][]) {
     if (!filename.startsWith(prefix)) continue
-    const digits = filename.slice(prefix.length, -'.db.gz'.length)
-    if (!/^\d+$/.test(digits)) return null
-    return { kind, timestamp: parseInt(digits, 10) }
+    const rest = filename.slice(prefix.length, -'.db.gz'.length)
+    const match = (kind === 'preUpdate' ? /^(\d+)_([0-9A-Za-z.-]+)$/ : /^(\d+)$/).exec(rest)
+    if (!match) return null
+    return { kind, timestamp: parseInt(match[1], 10), ...(match[2] ? { version: match[2] } : {}) }
   }
   return null
 }
 
-/** trims each kind separately; pre-restore copies used to pile up forever */
-async function pruneBackups(backupDir: string, maxCount: number): Promise<void> {
+/** trims each kind separately, or just one; pre-restore copies used to pile up forever */
+function pruneBackups(backupDir: string, maxCount: number, only?: BackupKind): void {
   try {
     const byKind = new Map<BackupKind, { filename: string; timestamp: number }[]>()
     for (const filename of fs.readdirSync(backupDir)) {
       const parsed = parseBackupName(filename)
-      if (!parsed) continue
+      if (!parsed || (only && parsed.kind !== only)) continue
       const list = byKind.get(parsed.kind) ?? []
       list.push({ filename, timestamp: parsed.timestamp })
       byKind.set(parsed.kind, list)
@@ -125,7 +131,7 @@ export async function runBackup(): Promise<string> {
 
     const maxCountStr = getSetting<string>('backup_max_count', '10')
     const maxCount = parseInt(maxCountStr, 10) || 10
-    await pruneBackups(backupDir, maxCount)
+    pruneBackups(backupDir, maxCount)
 
     return compressedFile
   } finally {
@@ -167,6 +173,10 @@ export async function runRestore(filename: string): Promise<void> {
       }
       if (checkVal.toLowerCase() !== 'ok') {
         throw new Error(`Restored database is corrupted: ${checkVal}`)
+      }
+      // read by code that doesn't know it, it could be misread or overwritten; nothing is swapped yet, so nothing is lost
+      if ((tempDb.pragma('user_version', { simple: true }) as number) > SCHEMA_VERSION) {
+        throw new Error('This backup was made by a newer version of Checkpoint. Update Checkpoint, then restore it.')
       }
     } finally {
       if (tempDb) {
@@ -215,12 +225,16 @@ export async function runRestore(filename: string): Promise<void> {
   }
 }
 
-export function listCompletedBackups(): {
+export interface CompletedBackup {
   filename: string
   timestamp: number
   size: number
   kind: BackupKind
-}[] {
+  /** the version a copy before an update was made for */
+  version?: string
+}
+
+export function listCompletedBackups(): CompletedBackup[] {
   const backupDir = getBackupDir()
   try {
     if (!fs.existsSync(backupDir)) return []
@@ -235,15 +249,56 @@ export function listCompletedBackups(): {
           filename,
           timestamp: parsed.timestamp || stats.mtimeMs,
           size: stats.size,
-          kind: parsed.kind
+          kind: parsed.kind,
+          ...(parsed.version ? { version: parsed.version } : {})
         }
       })
-      .filter((b): b is { filename: string; timestamp: number; size: number; kind: BackupKind } => b !== null)
+      .filter((b): b is CompletedBackup => b !== null)
       .sort((a, b) => b.timestamp - a.timestamp) // newest first
   } catch (err) {
     console.error('Failed to list backups:', err)
     return []
   }
+}
+
+/** copies before an update kept; each is a whole database, and the newest matters most */
+const KEEP_BEFORE_UPDATE = 2
+
+/** read straight from the table, the settings statements aren't prepared until after the update */
+function storedBackupPath(db: Database.Database): string {
+  try {
+    const row = db.prepare(`SELECT value FROM app_settings WHERE key = ?`).get('backup_path') as { value?: string } | undefined
+    const value: unknown = row?.value ? JSON.parse(row.value) : ''
+    return typeof value === 'string' ? value : ''
+  } catch {
+    return ''
+  }
+}
+
+/** the database as the last version left it, before this one changes it; restorable from Settings like any backup */
+export function snapshotBeforeUpdate(db: Database.Database, fromSchema: number): void {
+  const backupDir = backupDirFor(storedBackupPath(db))
+  const timestamp = Date.now()
+  const version = app.getVersion().replace(/[^0-9A-Za-z.-]/g, '-')
+  const temp = join(backupDir, `temp_pre_update_${timestamp}.db`)
+  const file = join(backupDir, `${PREFIXES.preUpdate}${timestamp}_${version}.db.gz`)
+  const partial = `${file}.partial`
+  try {
+    // synchronous on purpose: nothing may change the database until it's copied
+    db.exec(`VACUUM INTO '${temp.replace(/'/g, "''")}'`)
+    fs.writeFileSync(partial, zlib.gzipSync(fs.readFileSync(temp)))
+    fs.renameSync(partial, file)
+  } finally {
+    for (const leftover of [temp, partial]) {
+      try {
+        if (fs.existsSync(leftover)) fs.unlinkSync(leftover)
+      } catch (err) {
+        console.error('Failed to clean up after the copy before updating:', err)
+      }
+    }
+  }
+  pruneBackups(backupDir, KEEP_BEFORE_UPDATE, 'preUpdate')
+  console.log(`[backup] Copied the database at schema ${fromSchema} before updating it: ${file}`)
 }
 
 export function deleteBackup(filename: string): void {

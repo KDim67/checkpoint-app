@@ -398,8 +398,21 @@ app.whenReady().then(async () => {
   let db: Awaited<ReturnType<typeof initDb>>
   const userData = app.getPath('userData')
   try {
-    db = initDb(userData)
+    const { snapshotBeforeUpdate } = await import('./backupVault')
+    db = initDb(userData, { beforeMigrating: snapshotBeforeUpdate })
   } catch (err) {
+    const { NewerDatabaseError, discardDb: release } = await import('./db')
+    // the data is fine, this copy is just too old for it; moving it aside as broken would hide it from the newer one
+    if (err instanceof NewerDatabaseError) {
+      console.error('[main] The database is newer than this version:', err)
+      release()
+      const { newerDatabaseNotice, RELEASES_URL } = await import('./dbRecovery')
+      const notice = newerDatabaseNotice(app.getVersion())
+      const { response } = await dialog.showMessageBox({ type: 'warning', ...notice, defaultId: 0, cancelId: 1, noLink: true })
+      if (response === 0) openExternalSafely(RELEASES_URL)
+      app.quit()
+      return
+    }
     console.error('[main] The database would not open:', err)
     const { quarantineDatabase, recoveryMessage, stampFor } = await import('./dbRecovery')
     const { getBackupDir } = await import('./backupVault')
