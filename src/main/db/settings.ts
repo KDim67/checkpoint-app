@@ -1,6 +1,5 @@
 import type Database from 'better-sqlite3'
 import { isSecretSetting, encryptSecret, decryptSecret } from '../secureSettings'
-import { updateNativeTitleBarFromSettings } from '../titleBarSync'
 import { dbInstance } from './connection'
 
 let stmtGetSetting: Database.Statement
@@ -46,13 +45,6 @@ export function setSetting(key: string, value: unknown): void {
   }
   const serialized = JSON.stringify(value)
   stmtSetSetting.run(key, isSecretSetting(key) ? encryptSecret(serialized) : serialized)
-  if (key === 'app_theme') {
-    try {
-      updateNativeTitleBarFromSettings(value as string)
-    } catch (err) {
-      console.error('[db] Failed to sync titlebar overlay:', err)
-    }
-  }
   if (key === 'feature_view_clipboard') {
     // lazy like the entry point, so settings don't pull the watcher in at startup
     import('../clipboardWatcher')

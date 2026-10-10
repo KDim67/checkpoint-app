@@ -35,11 +35,10 @@ export function registerCustomizerHandlers(): void {
 
   ipcMain.handle(IpcChannels.CUSTOMIZER_UPDATE_THEME, async (_event, vars: Record<string, string>) => {
     const { setSetting } = await import('../db')
-    const { buildCssVariablesString, broadcastTheme, updateTitleBarOverlay } = await import('../customizer')
+    const { buildCssVariablesString, broadcastTheme } = await import('../customizer')
     setSetting('customizer_theme_vars', JSON.stringify(vars))
     const css = buildCssVariablesString(vars)
     broadcastTheme(css)
-    updateTitleBarOverlay(vars)
   })
 
   ipcMain.handle(IpcChannels.CUSTOMIZER_GET_THEME, async () => {

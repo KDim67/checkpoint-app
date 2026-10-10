@@ -100,6 +100,9 @@ const api = {
     minimize: (): void => ipcRenderer.send(IpcChannels.APP_MINIMIZE),
     maximize: (): void => ipcRenderer.send(IpcChannels.APP_MAXIMIZE),
     close: (): void => ipcRenderer.send(IpcChannels.APP_CLOSE),
+    /** the colours the title bar was drawn in, for the window's own buttons */
+    setTitleBarColors: (colors: { color: string; symbolColor: string }): void =>
+      ipcRenderer.send(IpcChannels.APP_TITLE_BAR_COLORS, colors),
     saveFile: (defaultName: string, content: string): Promise<boolean> =>
       ipcRenderer.invoke(IpcChannels.APP_SAVE_FILE, defaultName, content),
     saveBinaryFile: (defaultName: string, data: ArrayBuffer, extension: string): Promise<boolean> =>

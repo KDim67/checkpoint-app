@@ -36,6 +36,7 @@ import {
 import { readWorkspaceList, writeWorkspaceList } from './lib/workspaceList'
 import { getContexts } from './data/workspaces'
 import * as appApi from './data/app'
+import { useTitleBarColors } from './lib/titleBarColors'
 import * as customizerApi from './data/customizer'
 import * as mcpApi from './data/mcp'
 import { onThemeUpdate } from './data/theme'
@@ -253,9 +254,13 @@ function Titlebar() {
   const platform = appApi.platform()
   const isWindows = platform === 'win32'
   const isMac = platform === 'darwin'
+  const barRef = React.useRef<HTMLDivElement>(null)
+  // a mac draws its own traffic lights, and they follow the system
+  useTitleBarColors(barRef, !isMac)
 
   return (
     <div
+      ref={barRef}
       className="titlebar"
       style={{
         paddingLeft: isMac ? '76px' : undefined,

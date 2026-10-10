@@ -4,7 +4,7 @@ import { existsSync } from 'fs'
 import { pathToFileURL } from 'url'
 import { IpcChannels } from '../shared/ipcChannels'
 import { getSetting, setSetting, closeDb } from './db'
-import { initTitleBarSync, updateNativeTitleBarFromSettings } from './titleBarSync'
+import { DEFAULT_TITLE_BAR, readTitleBarColors, TITLE_BAR_SETTING } from './titleBarSync'
 import { initCheatsheets, getCheatsheetsDir } from './cheatsheetService'
 import { beginQuit, getMainWindow, isQuitting, sendToWindow, setMainWindow } from './windows'
 import { registerAppShortcuts } from './appShortcuts'
@@ -199,6 +199,7 @@ function createWindow(): void {
   const bounds = loadWindowBounds()
   const profileName = getCustomProfileName()
   const windowTitle = profileName ? `Checkpoint (${profileName})` : 'Checkpoint'
+  const titleBar = readTitleBarColors(getSetting<unknown>(TITLE_BAR_SETTING, null)) ?? DEFAULT_TITLE_BAR
 
   const win = new BrowserWindow({
     title: windowTitle,
@@ -212,12 +213,9 @@ function createWindow(): void {
     show: false,                    // hidden until ready, avoids a white flash
     frame: false,                   // custom titlebar
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0b0c10',
-      symbolColor: '#f1f5f9',
-      height: 32
-    },
-    backgroundColor: '#0b0c10',    // matches --color-background, prevents flash
+    // the colours the page last drew its title bar in, so the buttons and the backdrop match from the first frame
+    titleBarOverlay: { ...titleBar, height: 32 },
+    backgroundColor: titleBar.color,
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -533,14 +531,6 @@ app.whenReady().then(async () => {
     initWorkspaceIpc()
   } catch (err) {
     console.error('Failed to initialize AI Memory or Workspace IPC:', err)
-  }
-
-  try {
-    initTitleBarSync(() => getSetting<string>('app_theme', 'dark'))
-    const appTheme = getSetting<string>('app_theme', 'dark')
-    updateNativeTitleBarFromSettings(appTheme)
-  } catch (err) {
-    console.error('Failed to initialize titlebar synchronization:', err)
   }
 
   try {

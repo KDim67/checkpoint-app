@@ -43,6 +43,9 @@ export const saveBinaryFile = (...args: Parameters<Bridge['saveBinaryFile']>): R
 export const saveFile = (...args: Parameters<Bridge['saveFile']>): ReturnType<Bridge['saveFile']> =>
   window.electronAPI.app.saveFile(...args)
 
+export const setTitleBarColors = (...args: Parameters<Bridge['setTitleBarColors']>): ReturnType<Bridge['setTitleBarColors']> =>
+  window.electronAPI.app.setTitleBarColors(...args)
+
 export const showItemInFolder = (...args: Parameters<Bridge['showItemInFolder']>): ReturnType<Bridge['showItemInFolder']> =>
   window.electronAPI.app.showItemInFolder(...args)
 
