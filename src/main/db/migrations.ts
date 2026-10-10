@@ -2,7 +2,13 @@ import type Database from 'better-sqlite3'
 import { isEncrypted, encryptSecret, secretSettingKeys } from '../secureSettings'
 import { ITEMS_FTS_TRIGGERS_SQL } from './schema'
 
-const CURRENT_VERSION = 9
+/** the newest schema this build understands; a database past it was saved by a newer Checkpoint */
+export const SCHEMA_VERSION = 9
+
+/** what the last version to write the database left it at; 0 for a new file or one from before versions */
+export function storedSchemaVersion(db: Database.Database): number {
+  return (db.pragma('user_version', { simple: true }) as number) ?? 0
+}
 
 /** early dbs had a CHECK on items.status that broke custom columns; SQLite can't drop a CHECK, so rebuild once */
 export function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
@@ -51,8 +57,8 @@ export function rebuildItemsTableIfLegacyCheck(db: Database.Database): void {
 }
 
 export function runMigrations(db: Database.Database): void {
-  const userVersion = (db.pragma('user_version', { simple: true }) as number) ?? 0
-  if (userVersion >= CURRENT_VERSION) return
+  const userVersion = storedSchemaVersion(db)
+  if (userVersion >= SCHEMA_VERSION) return
 
   db.transaction(() => {
     if (userVersion < 2) {
@@ -187,7 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_recurrences_due ON recurrences(active, next_due);
 );
 CREATE INDEX IF NOT EXISTS idx_subtasks_item ON subtasks(item_id, position);`)
     }
-    db.pragma(`user_version = ${CURRENT_VERSION}`)
+    db.pragma(`user_version = ${SCHEMA_VERSION}`)
   })()
 }
 

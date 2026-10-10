@@ -17,7 +17,9 @@ export default function BackupSettings() {
     filename: string
     timestamp: number
     size: number
-    kind?: 'scheduled' | 'preRestore'
+    kind?: 'scheduled' | 'preRestore' | 'preUpdate'
+    /** the version a copy before an update was made for */
+    version?: string
   }[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -286,9 +288,11 @@ export default function BackupSettings() {
                     <tr key={b.filename} style={{ borderBottom: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)' }}>
                       <td style={{ padding: 'var(--space-2.5) var(--space-4)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
                         {b.filename}
-                        {b.kind === 'preRestore' && (
+                        {(b.kind === 'preRestore' || b.kind === 'preUpdate') && (
                           <span
-                            title="Taken automatically just before a restore, so the restore can be undone."
+                            title={b.kind === 'preRestore'
+                              ? 'Taken automatically just before a restore, so the restore can be undone.'
+                              : 'Taken automatically just before a new version of Checkpoint changed your data, so the update can be undone.'}
                             style={{
                               marginLeft: 'var(--space-2)',
                               padding: '1px 6px',
@@ -300,7 +304,7 @@ export default function BackupSettings() {
                               whiteSpace: 'nowrap'
                             }}
                           >
-                            before a restore
+                            {b.kind === 'preRestore' ? 'before a restore' : b.version ? `before updating to ${b.version}` : 'before an update'}
                           </span>
                         )}
                       </td>

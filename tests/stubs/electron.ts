@@ -14,7 +14,8 @@ export const app = {
   /** not packaged, so the updater stays off */
   isPackaged: false,
   getPath(name: string): string {
-    return `/tmp/checkpoint-test/${name}`
+    // one folder per test worker, files that write there run side by side
+    return `/tmp/checkpoint-test-${process.pid}/${name}`
   },
   getName(): string {
     return 'checkpoint-test'

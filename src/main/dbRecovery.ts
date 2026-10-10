@@ -47,6 +47,23 @@ export function recoveryMessage(movedTo: string, backupDir: string): string {
   ].join('\n')
 }
 
+/** where the newest installer always is */
+export const RELEASES_URL = 'https://github.com/KDim67/checkpoint-app/releases/latest'
+
+/** the data is fine and untouched, only this copy of the app is too old for it, so the way out is updating */
+export function newerDatabaseNotice(appVersion: string): { title: string; message: string; detail: string; buttons: [string, string] } {
+  return {
+    title: 'Checkpoint needs updating',
+    message: 'Your data was saved by a newer version of Checkpoint',
+    detail: [
+      `This copy of Checkpoint (${appVersion}) is older than your data, so it stopped before opening it and nothing was changed.`,
+      '',
+      'Install the latest version and everything will be as you left it.'
+    ].join('\n'),
+    buttons: ['Get the latest version', 'Quit']
+  }
+}
+
 /** colons aren't legal in paths on windows or macOS */
 export function stampFor(now: number): string {
   return new Date(now).toISOString().replace(/[:.]/g, '-')

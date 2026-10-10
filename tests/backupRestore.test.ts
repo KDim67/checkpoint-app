@@ -3,10 +3,11 @@ import { rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { initDb, discardDb, getDb, createItem, searchItems, getSetting, setSetting } from '../src/main/db'
 import { runBackup, runRestore, listCompletedBackups, getBackupDir, parseBackupName } from '../src/main/backupVault'
+import { app } from 'electron'
 
 // the corrupt-db dialog points here; the electron stub pins userData to a throwaway path
 
-const dataPath = '/tmp/checkpoint-test/userData'
+const dataPath = app.getPath('userData')
 
 const search = (term: string): number => searchItems({ query: term, page: 1, pageSize: 10 }).total
 
