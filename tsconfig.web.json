@@ -3,6 +3,8 @@
   "include": ["src/renderer/src/**/*", "src/shared/**/*"],
   "compilerOptions": {
     "composite": true,
+    // vite bundles the renderer, and some packages publish their types only through package exports
+    "moduleResolution": "bundler",
     "strict": true,
     "baseUrl": ".",
     "paths": {

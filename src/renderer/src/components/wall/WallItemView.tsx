@@ -10,7 +10,7 @@ import { getTextColorForBackground } from '../../lib/contrast'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import { parseWallLink } from '../../../../shared/wallLink'
 import WallRichText from './WallRichText'
-import WallTextEditor from './WallTextEditor'
+import WallRichEditor from './WallRichEditor'
 import WallCodeBlock from './WallCodeBlock'
 import WallImageCrop from './WallImageCrop'
 import type { Side } from '../../../../shared/wallGrow'
@@ -242,7 +242,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
       }}>
         <div style={{ flex: 1, minHeight: 0 }}>
           {editing ? (
-            <WallTextEditor
+            <WallRichEditor
               value={item.text ?? ''}
               onChange={text => onTextChange(item.id, text)}
               onFinish={onFinishEditing}
@@ -251,9 +251,11 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
               fitBase={noteFont}
               fitMin={noteFloor}
               onNeedRoom={extra => onNeedRoom?.(item.id, extra)}
+              boxSize={noteFont}
+              boxAlign={textAlignOf(item)}
               style={{
-                width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
-                outline: 'none', background: 'transparent', color: '#1a1a1a', textAlign: textAlignOf(item),
+                width: '100%', height: '100%', overflow: 'hidden',
+                color: '#1a1a1a', textAlign: textAlignOf(item),
                 fontFamily: itemFont, fontSize: `${noteFont}px`, lineHeight: 1.45
               }}
             />
@@ -294,17 +296,16 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     return (
       <div style={base}>
         {editing ? (
-          <WallTextEditor
+          <WallRichEditor
             value={item.text ?? ''}
             onChange={text => onTextChange(item.id, text)}
             onFinish={onFinishEditing}
             onNext={item.map ? undefined : onNext}
             {...topicKeys}
             onHeight={height => onAutoSize?.(item.id, height)}
-            style={{
-              ...textStyle, display: 'block', width: '100%', height: '100%', padding: 0,
-              resize: 'none', border: 'none', outline: 'none', background: 'transparent', overflow: 'hidden'
-            }}
+            boxSize={fontSizeOf(item)}
+            boxAlign={textAlignOf(item)}
+            style={{ ...textStyle, display: 'block', width: '100%', height: '100%', overflow: 'hidden' }}
           />
         ) : (
           <TextBox item={item} style={textStyle} onAutoSize={onAutoSize} />
@@ -345,7 +346,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         </svg>
         <div style={{ position: 'absolute', top: `${room.top}%`, right: `${room.right}%`, bottom: `${room.bottom}%`, left: `${room.left}%`, overflow: editing ? 'visible' : 'hidden' }}>
           {editing ? (
-            <WallTextEditor
+            <WallRichEditor
               value={item.text ?? ''}
               onChange={text => onTextChange(item.id, text)}
               onFinish={onFinishEditing}
@@ -353,9 +354,11 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
               {...topicKeys}
               fitBase={shapeFont}
               fitMin={FIT_FONT_MIN}
+              boxSize={shapeFont}
+              boxAlign={textAlignOf(item)}
               style={{
-                width: '100%', height: '100%', resize: 'none', border: 'none', padding: 0,
-                outline: 'none', background: 'transparent', color, textAlign: textAlignOf(item),
+                width: '100%', height: '100%', overflow: 'hidden',
+                color, textAlign: textAlignOf(item),
                 fontFamily: itemFont, fontSize: `${shapeFont}px`, lineHeight: 1.45
               }}
             />

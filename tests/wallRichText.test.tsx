@@ -25,3 +25,21 @@ describe('WallRichText', () => {
     expect(container.querySelectorAll('[data-wall-line]')).toHaveLength(3)
   })
 })
+
+describe('words styled on their own', () => {
+  it('draws a word\'s colour, size and font, and a link Ctrl+click opens', () => {
+    const { container } = render(<WallRichText text={'Plain [big red]{color=#e44332 size=1.5 font=serif} and [docs](https://example.com/docs)'} />)
+    const styled = [...container.querySelectorAll('span')].find(s => s.textContent === 'big red' && s.style.color) as HTMLElement
+    expect(styled.style.color).toMatch(/#e44332|228, 67, 50/)
+    expect(styled.style.fontSize).toBe('1.5em')
+    expect(styled.style.fontFamily).toContain('Georgia')
+    expect(container.querySelector('[data-wall-url="https://example.com/docs"]')?.textContent).toBe('docs')
+  })
+
+  it('aligns a line on its own, leaving the others to the box', () => {
+    const { container } = render(<WallRichText text={'{align=center}Title\nbody'} />)
+    const [title, body] = [...container.querySelectorAll('[data-wall-line]')] as HTMLElement[]
+    expect(title.style.textAlign).toBe('center')
+    expect(body.style.textAlign).toBe('')
+  })
+})

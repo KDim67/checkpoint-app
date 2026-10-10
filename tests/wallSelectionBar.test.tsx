@@ -311,11 +311,12 @@ describe('WallSelectionBar', () => {
     expect(setItems).toHaveBeenLastCalledWith(patchItems(code, new Set(['a']), { language: undefined }))
   })
 
-  it('sets a text size on everything picked, and goes back to fitting the box', () => {
+  it('sets a text size on everything picked, from the list, typed or a point at a time, and goes back to fitting the box', () => {
     const { setItems } = renderBar()
-    expect(button('Text size: fits the box')).toBeTruthy()
+    const size = screen.getByRole('combobox', { name: 'Size' }) as HTMLInputElement
+    expect(size.placeholder).toBe('Fit')
 
-    fireEvent.click(button('Text size: fits the box'))
+    fireEvent.focus(size)
     fireEvent.click(button('24'))
     expect(setItems.mock.calls[0][0].filter(i => i.id !== 'c').every(i => i.fontSize === 24)).toBe(true)
     expect(setItems.mock.calls[0][0].find(i => i.id === 'c')?.fontSize).toBeUndefined()
@@ -323,9 +324,25 @@ describe('WallSelectionBar', () => {
 
     const sized = [item('a', { fontSize: 24 })]
     const { setItems: again } = renderBar({ items: sized, selectedIds: new Set(['a']), single: sized[0] })
-    fireEvent.click(button('Text size: 24'))
+    const field = screen.getByRole('combobox', { name: 'Size' }) as HTMLInputElement
+    expect(field.value).toBe('24')
+    fireEvent.click(button('Bigger'))
+    expect(again.mock.calls[0][0][0].fontSize).toBe(25)
+    fireEvent.focus(field)
+    fireEvent.change(field, { target: { value: '40' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    expect(again.mock.calls[1][0][0].fontSize).toBe(40)
+    fireEvent.focus(field)
     fireEvent.click(button('Fit to the box'))
-    expect(again.mock.calls[0][0][0].fontSize).toBeUndefined()
+    expect(again.mock.calls[2][0][0].fontSize).toBeUndefined()
+  })
+
+  it('shows the font by its name and sets it on every box, clearing fonts set on single words', () => {
+    const boxes = [item('a', { kind: 'text', text: '[x]{font=mono}' })]
+    const { setItems } = renderBar({ items: boxes, selectedIds: new Set(['a']), single: boxes[0] })
+    fireEvent.click(button('Font: Sans'))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Serif' }))
+    expect(setItems.mock.calls[0][0][0]).toMatchObject({ font: 'serif', text: 'x' })
   })
 
   it('tells the wall the colour picked for stickies, so the next one takes it', () => {

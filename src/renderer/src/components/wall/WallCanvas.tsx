@@ -4,6 +4,7 @@ import WallItemLayer from './WallItemLayer'
 import WallMinimap from './WallMinimap'
 import { decodeWallDrag, WALL_DRAG_MIME } from '../../../../shared/wallBoard'
 import WallSelectionBar from './WallSelectionBar'
+import { isWritable } from '../../../../shared/wallShape'
 import { WALL_GAP_SLOTS, WALL_GUIDE_SLOTS, paintWallItems } from './wallPaint'
 import WallPresenter from './WallPresenter'
 import { frameLabel } from '../../../../shared/wallFrames'
@@ -492,8 +493,8 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         )
       })()}
 
-      {/* floated above the selection */}
-      {floatingPos && selectedItems.length > 0 && presenting === null && !isReadOnly && (
+      {/* floated above the selection; words being written in have their own bar */}
+      {floatingPos && selectedItems.length > 0 && presenting === null && !isReadOnly && !(editingId !== null && isWritable(itemsById.get(editingId)?.kind ?? '')) && (
         <WallSelectionBar
           floatingPos={floatingPos}
           floatingRef={floatingRef}
