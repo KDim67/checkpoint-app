@@ -41,6 +41,8 @@ export interface CalendarEntry {
   color: string | null
   /** only due cards and tasks; everything else is changed where it lives */
   movable: boolean
+  /** why a due card can't be moved here, when its date belongs to a connected service */
+  locked?: string
   state: 'open' | 'done' | 'late' | 'ghost' | 'warning' | null
   ref: CalendarRef
   /** a line under the title: a column, a renewal kind, a commit author, a place */

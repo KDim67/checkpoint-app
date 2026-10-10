@@ -9,6 +9,8 @@ import { PRIORITY_COLORS } from '../../lib/priority'
 import { DEFAULT_CARD_DISPLAY, type CardDisplay } from '../../lib/boardConfig'
 import { useViewShortcuts } from '../../lib/useViewShortcuts'
 import { formatDue, isOverdue as isDueOverdue } from '../../../../shared/dueDate'
+import { linkOf } from '../../../../shared/connections'
+import LinkBadge from './LinkBadge'
 
 export interface RemoteCardDragInfo {
   peerId: string
@@ -99,6 +101,7 @@ function CardFace({
 
   const checklist = meta.checklist || []
   const isTemplate = meta.isTemplate === true
+  const link = linkOf(card.metadata)
   const dueDateCompleted = meta.dueDateCompleted === true
 
   const totalChecklist = checklist.length
@@ -445,7 +448,7 @@ function CardFace({
             </div>
           )}
 
-          {(showDue || showChecklist || showTemplate) && (
+          {(showDue || showChecklist || showTemplate || link) && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -455,6 +458,8 @@ function CardFace({
               gap: '6px',
               flexWrap: 'wrap'
             }}>
+              {link && <LinkBadge link={link} />}
+
               {showDue && (
                 <span style={{
                   display: 'inline-flex',

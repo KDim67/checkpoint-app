@@ -5,6 +5,7 @@ import { notifyRenderer, readBoardConfig } from '../mcp/toolKit'
 import { CALENDAR_LAYERS, type CalendarAnswer, type CalendarEntry, type CalendarLayer, type CalendarProblem, type CalendarQuery } from '../../shared/calendar'
 import type { CalendarResult, QuickAddInput } from '../../shared/calendarApi'
 import type { Item } from '../../shared/types'
+import { dueLockOf } from '../../shared/connections'
 import { dueEntries, focusEntries, linkedRepositories, logEntries, renewalEntries, repeatEntries, type Range } from './sources'
 import { commitEntries } from './commits'
 import { subscribedEntries } from './icalStore'
@@ -74,6 +75,8 @@ export function moveDue(itemId: unknown, due: unknown): CalendarResult<{ item: I
   if (typeof itemId !== 'string' || !validDue(due)) return { ok: false, reason: 'That move was malformed.' }
   const before = getItemById(itemId)
   if (!movable(before)) return { ok: false, reason: 'That card or task can\'t be moved from the calendar.' }
+  const locked = dueLockOf(before.metadata)
+  if (locked) return { ok: false, reason: locked }
   const item = updateItem(getDb(), itemId, { due_at: due })
   notifyRenderer()
   return { ok: true, value: { item, previous: before.due_at } }

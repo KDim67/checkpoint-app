@@ -161,13 +161,15 @@ export function getItemById(id: string): Item | null {
   return row ? rowToItem(row) : null
 }
 
+/** id only from main: a connected card takes one derived from its outside item, so every computer makes the same card */
 export function createItem(
   db: Database.Database,
   payload: CreateItemPayload,
-  tagIds: string[] = []
+  tagIds: string[] = [],
+  options: { id?: string } = {}
 ): Item {
   const now = Date.now()
-  const id = uuidv4()
+  const id = options.id ?? uuidv4()
   const item = {
     id,
     type: payload.type,

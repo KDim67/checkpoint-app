@@ -178,3 +178,34 @@ describe('CardDetailModal', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 })
+
+describe('a card that follows an outside item', () => {
+  const linked = (service: string, url: string, extra: Record<string, unknown> = {}) =>
+    card(JSON.stringify({ link: { service, id: '10042', url, state: 'open', labels: [] }, ...extra }))
+  const descriptionField = () => screen.getByPlaceholderText('Enter details...') as HTMLTextAreaElement
+
+  it('keeps what the service owns read-only: all the text for GitHub, only the description for Jira', async () => {
+    await openCard({ initialCard: linked('github', 'https://github.com/octo/repo/issues/1') })
+    expect(titleField().readOnly).toBe(true)
+    expect(descriptionField().readOnly).toBe(true)
+    expect(screen.getByText(/The title and description come from GitHub/)).toBeTruthy()
+    cleanup()
+
+    await openCard({ initialCard: linked('jira', 'https://acme.atlassian.net/browse/ENG-1') })
+    expect(titleField().readOnly).toBe(false)
+    expect(descriptionField().readOnly).toBe(true)
+    expect(screen.getByText(/The description comes from Jira, so change it there/)).toBeTruthy()
+    cleanup()
+
+    await openCard({ initialCard: linked('todoist', 'https://app.todoist.com/app/task/10042') })
+    expect(titleField().readOnly).toBe(false)
+    expect(descriptionField().readOnly).toBe(false)
+  })
+
+  it('says why a date that belongs to the service can\'t be changed here', async () => {
+    const lock = 'This task repeats in Todoist (every monday), so change its date there.'
+    await openCard({ initialCard: linked('todoist', 'https://app.todoist.com/app/task/10042', { dueLocked: lock }) })
+    expect((document.getElementById('card-due') as HTMLInputElement).disabled).toBe(true)
+    expect(screen.getByText(lock)).toBeTruthy()
+  })
+})

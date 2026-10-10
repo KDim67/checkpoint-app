@@ -126,6 +126,18 @@ describe('the Calendar screen', () => {
     expect(bars.some(b => Number(b.dataset.span) >= 2)).toBe(true)
   })
 
+  it('says on hover why a date that belongs to a connected service can\'t be picked up, and leaves it where it is', async () => {
+    const lock = 'This task repeats in Todoist (every monday), so change its date there.'
+    fake.entries = [due('Water plants', allDay(tenth), { movable: false, locked: lock })]
+    await show()
+    const chip = screen.getByRole('button', { name: /^Water plants/ })
+    expect(chip.getAttribute('title')).toContain(lock)
+    expect(chip.getAttribute('draggable')).toBe('false')
+    await act(async () => { fireEvent.keyDown(chip, { key: 'ArrowRight', altKey: true }) })
+    expect(within(screen.getByRole('gridcell', { name: label(tenth) })).getByRole('button', { name: /^Water plants/ })).toBeTruthy()
+    expect(fake.moved).toStrictEqual([])
+  })
+
   it('moves a due date with Alt and the arrow keys, as one move once the presses stop, and keeps focus on it', async () => {
     fake.entries = [due('Ship the report', allDay(tenth))]
     await show()

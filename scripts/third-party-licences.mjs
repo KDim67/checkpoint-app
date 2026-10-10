@@ -10,7 +10,7 @@ const RENDERER_BUNDLED = [
   '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities',
   '@fontsource/inter', '@fontsource/jetbrains-mono',
   'date-fns', 'immer', 'lucide-react', 'mermaid',
-  'react', 'react-dom', 'react-markdown', 'remark-gfm', 'three', 'zustand'
+  'react', 'react-dom', 'react-markdown', 'remark-gfm', 'simple-icons', 'three', 'zustand'
 ]
 
 const LICENCE_FILENAMES = [

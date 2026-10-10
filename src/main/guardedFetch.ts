@@ -39,7 +39,8 @@ export async function guardedFetch(
     }
 
     const response = await deps.fetch(current.href, { ...request, redirect: 'manual' })
-    if (response.status < 300 || response.status >= 400) return { response, finalUrl: current.href }
+    // 304 answers a conditional request and is final, not a redirect
+    if (response.status < 300 || response.status >= 400 || response.status === 304) return { response, finalUrl: current.href }
 
     response.body?.cancel().catch(() => {})
     const location = response.headers.get('location')

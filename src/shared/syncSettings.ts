@@ -41,9 +41,19 @@ const SYNCABLE_KEY_NAMES = [
 
   // misc preferences
   'cheatsheet_pins',
+  // which repository each workspace follows on GitHub; the key itself stays on each computer
+  'github_repos',
+  // which team each workspace follows in Linear, and whose issues
+  'linear_teams',
+  // which project each workspace follows in Jira, and whose issues
+  'jira_projects',
+  // which database each workspace follows in Notion, and any columns picked for it
+  'notion_databases',
   // renewal kinds and their field templates; what each machine has warned about stays home
   'renewal_kinds',
   'saved_views',
+  // which project each workspace follows in Todoist; the token stays on each computer
+  'todoist_projects',
   'unitySafeMode',
   'widget_enabled',
   'widget_opacity'

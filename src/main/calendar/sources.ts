@@ -10,6 +10,7 @@ import { nextOccurrence } from '../../shared/recurrence'
 import { warnTime } from '../../shared/renewal'
 import { isAllDay, isOverdue } from '../../shared/dueDate'
 import { paddedRange, type CalendarEntry } from '../../shared/calendar'
+import { dueLockOf } from '../../shared/connections'
 
 export interface Range {
   from: number
@@ -50,6 +51,7 @@ export function dueEntries(range: Range, workspaces: string[] | null, now: numbe
   return rows.map(rowToItem).map(item => {
     const due = item.due_at as number
     const done = isDone(item.status)
+    const locked = dueLockOf(item.metadata)
     return {
       id: `item:${item.id}`,
       layer: 'due',
@@ -60,7 +62,8 @@ export function dueEntries(range: Range, workspaces: string[] | null, now: numbe
       days: 1,
       workspace: item.context,
       color: null,
-      movable: true,
+      movable: locked === null,
+      ...(locked ? { locked } : {}),
       state: done ? 'done' : isOverdue(due, now) ? 'late' : 'open',
       ref: { kind: 'item', id: item.id },
       detail: item.type === 'card' ? column(item.context, item.status) : 'Task'

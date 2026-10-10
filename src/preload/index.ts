@@ -8,6 +8,7 @@ import type { PluginSettingState, PluginSettingValue } from '../shared/pluginSet
 import type { AiProviderInput, AiProviderSet } from '../shared/aiProviders'
 import type { TurnSettings } from '../shared/iceConfig'
 import type { CalendarAnswer, CalendarQuery } from '../shared/calendar'
+import type { ConnectionResult, ConnectionService, ServiceStatusView } from '../shared/connections'
 import type { CalendarBridge, CalendarResult, CalendarSubscription, QuickAddInput, SubscriptionInput } from '../shared/calendarApi'
 import type {
   RenewalCreateInput,
@@ -470,6 +471,37 @@ const api = {
       ipcRenderer.invoke(IpcChannels.RECURRENCE_DELETE, id),
     setActive: (id: string, active: boolean): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IpcChannels.RECURRENCE_SET_ACTIVE, id, active)
+  },
+
+  connections: {
+    list: (): Promise<ServiceStatusView[]> => ipcRenderer.invoke(IpcChannels.CONNECTIONS_LIST),
+    /** the key is checked with the service, then kept in main; it never comes back */
+    connect: (service: ConnectionService, key: string | Record<string, string>): Promise<ConnectionResult<ServiceStatusView>> =>
+      ipcRenderer.invoke(IpcChannels.CONNECTIONS_CONNECT, service, key),
+    disconnect: (service: ConnectionService): Promise<ServiceStatusView> => ipcRenderer.invoke(IpcChannels.CONNECTIONS_DISCONNECT, service),
+    syncNow: (service: ConnectionService): Promise<ServiceStatusView> => ipcRenderer.invoke(IpcChannels.CONNECTIONS_SYNC_NOW, service),
+    setRepo: (slug: string, repo: string | null, scope: 'assigned' | 'all'): Promise<ConnectionResult<ServiceStatusView>> =>
+      ipcRenderer.invoke(IpcChannels.CONNECTIONS_SET_REPO, { slug, repo, scope }),
+    /** the Todoist project a workspace follows, or null to stop */
+    setProject: (slug: string, project: string | null): Promise<ConnectionResult<ServiceStatusView>> =>
+      ipcRenderer.invoke(IpcChannels.CONNECTIONS_SET_PROJECT, { slug, project }),
+    /** the Linear team a workspace follows, or null to stop, and whose issues */
+    setTeam: (slug: string, team: string | null, scope: 'assigned' | 'all'): Promise<ConnectionResult<ServiceStatusView>> =>
+      ipcRenderer.invoke(IpcChannels.CONNECTIONS_SET_TEAM, { slug, team, scope }),
+    /** the Jira project a workspace follows, or null to stop, and whose issues */
+    setJiraProject: (slug: string, project: string | null, scope: 'assigned' | 'all'): Promise<ConnectionResult<ServiceStatusView>> =>
+      ipcRenderer.invoke(IpcChannels.CONNECTIONS_SET_JIRA_PROJECT, { slug, project, scope }),
+    /** the Notion database a workspace follows, or null to stop, and any columns picked for it */
+    setNotionDatabase: (slug: string, source: string | null, done?: string | null, date?: string | null): Promise<ConnectionResult<ServiceStatusView>> =>
+      ipcRenderer.invoke(IpcChannels.CONNECTIONS_SET_NOTION_DATABASE, { slug, source, done, date }),
+    /** asks for a folder for the workspace to follow in Obsidian; the path is chosen in the system's own dialog */
+    pickFolder: (slug: string): Promise<ConnectionResult<ServiceStatusView>> => ipcRenderer.invoke(IpcChannels.CONNECTIONS_PICK_FOLDER, slug),
+    clearFolder: (slug: string): Promise<ServiceStatusView> => ipcRenderer.invoke(IpcChannels.CONNECTIONS_CLEAR_FOLDER, slug),
+    onChanged: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on(IpcChannels.CONNECTIONS_CHANGED, handler)
+      return () => ipcRenderer.removeListener(IpcChannels.CONNECTIONS_CHANGED, handler)
+    }
   },
 
   calendar: {
