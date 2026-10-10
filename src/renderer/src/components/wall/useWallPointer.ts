@@ -1,6 +1,6 @@
 import React, { useCallback, useLayoutEffect, useRef } from 'react'
 import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Point, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
-import { CORNERS, arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, resizedBox, rotationAngle, rotationStart, snapMoving, type WallDrag } from '../../../../shared/wallPointer'
+import { CORNERS, arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, rotationAngle, rotationStart, snapMoving, turnedResize, type WallDrag } from '../../../../shared/wallPointer'
 import { pushHistory, replacePresent } from '../../../../shared/history'
 import { clipSelection, placeClip } from '../../../../shared/wallClipboard'
 import { canvasToJpeg, exportWallToPng, imageDataUris, renderWallCanvas, textMeasurer, type ExportContext } from '../../lib/wallExport'
@@ -8,7 +8,7 @@ import { wallToSvg } from '../../lib/wallSvg'
 import { buildPdf, type PdfPage, type PdfText } from '../../lib/pdfImages'
 import { itemLink } from '../../../../shared/wallLink'
 import { SIDES } from '../../../../shared/wallGrow'
-import { alignGuides, GUIDE_SNAP_PX, type GapMark, type Guide } from '../../../../shared/wallAlign'
+import { alignGuides, resizeGuides, type GapMark, type Guide } from '../../../../shared/wallAlign'
 import { groupOf, withGroups } from '../../../../shared/wallGroup'
 import { eraseAlong, eraseParts, joinStrokes, lassoPick, HIGHLIGHT_SCALE } from '../../../../shared/wallInk'
 import { wallToCsv } from '../../lib/wallCsv'
@@ -564,7 +564,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       const moving = movingRef.current
       const moved = moveItems(drag.origin, moving, dx, dy)
       // the grid wins when it's on, and Ctrl moves freely
-      const guided = snapping || e.ctrlKey ? null : alignGuides(moved, moving, GUIDE_SNAP_PX / cam.zoom, viewRect(cam))
+      const guided = snapping || e.ctrlKey ? null : alignGuides(moved, moving, { zoom: cam.zoom, view: viewRect(cam) })
       const live = guided && (guided.dx || guided.dy)
         ? moveItems(moved, moving, guided.dx, guided.dy)
         : snapMoving(moved, moving, snapping)
@@ -596,13 +596,19 @@ export function useWallPointer(wallDocument: WallDocument) {
       const target = docRef.current.items.find(i => i.id === drag.id)
       // a picture keeps its shape unless Shift frees it; anything else keeps it while Shift is held
       const keepShape = target?.kind === 'image' ? !e.shiftKey : e.shiftKey
-      const box = resizedBox({ x: drag.x, y: drag.y, width: drag.w, height: drag.h }, drag.corner, dx, dy, {
-        snapping, keepShape: keepShape && target?.kind !== 'text'
-      })
+      // a text box's height follows its words, the drag only sets how wide they run
+      const shape = { keepShape: keepShape && target?.kind !== 'text', keepHeight: target?.kind === 'text' }
+      const start = target && { ...target, x: drag.x, y: drag.y, width: drag.w, height: drag.h }
+      // the grid wins when it's on, and Ctrl resizes freely, as when moving
+      const guided = start && !snapping && !e.ctrlKey
+        ? resizeGuides(docRef.current.items, start, drag.corner, dx, dy, shape, { zoom: cam.zoom, view: viewRect(cam) })
+        : null
+      const box = guided?.box ?? turnedResize({ x: drag.x, y: drag.y, width: drag.w, height: drag.h, rotation: target?.rotation }, drag.corner, dx, dy, { snapping, ...shape })
+      paintGuides(guided?.guides ?? [], cam.zoom)
+      paintGaps(guided?.gaps ?? [], cam.zoom)
       setItems(
         docRef.current.items.map(i =>
-          // a text box's height follows its words, the drag only sets how wide they run
-          i.id === drag.id ? { ...i, ...(i.kind === 'text' ? { x: box.x, width: box.width } : box) } : i
+          i.id === drag.id ? { ...i, ...(i.kind === 'text' ? { x: box.x, y: box.y, width: box.width } : box) } : i
         ),
         { record: false }
       )

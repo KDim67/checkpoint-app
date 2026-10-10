@@ -31,8 +31,8 @@ export function paintWallGuides(viewport: HTMLElement, guides: Guide[], zoom: nu
   }
 }
 
-/** a row of three equal gaps is the most a drag shows at once, each way */
-export const WALL_GAP_SLOTS = ['gap0', 'gap1', 'gap2', 'gap3', 'gap4', 'gap5'] as const
+/** four equal gaps or sizes along a row and four down a column, the most a drag shows at once */
+export const WALL_GAP_SLOTS = ['gap0', 'gap1', 'gap2', 'gap3', 'gap4', 'gap5', 'gap6', 'gap7'] as const
 
 /** a bar across each equal gap with a tick at either end, so it reads as a measurement and not an edge */
 export function paintWallGaps(viewport: HTMLElement, gaps: GapMark[], zoom: number): void {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { paintWallCamera, paintWallItems, paintWallSelection } from '../src/renderer/src/components/wall/wallPaint'
+import { paintWallCamera, paintWallGaps, paintWallItems, paintWallSelection, WALL_GAP_SLOTS } from '../src/renderer/src/components/wall/wallPaint'
+import { MARKS_EACH_WAY, type GapMark } from '../src/shared/wallAlign'
 import { createWallItem, gridSpacing } from '../src/shared/wallModel'
 import { defined } from './helpers/defined'
 
@@ -100,5 +101,17 @@ describe('paintWallItems', () => {
     const viewport = viewportWith('')
 
     expect(() => paintWallItems(viewport, [note], new Set([note.id, 'missing']))).not.toThrow()
+  })
+})
+
+describe('paintWallGaps', () => {
+  it('has a slot for every gap a drag can mark along a row and down a column, and hides the rest', () => {
+    expect(WALL_GAP_SLOTS.length).toBe(MARKS_EACH_WAY * 2)
+    const viewport = viewportWith(WALL_GAP_SLOTS.map(slot => `<div data-wall-gap="${slot}"></div>`).join(''))
+    const full: GapMark[] = Array.from({ length: MARKS_EACH_WAY * 2 }, (_, i) => ({ axis: i < MARKS_EACH_WAY ? 'x' : 'y', from: i * 10, to: i * 10 + 5, at: 0 }))
+    paintWallGaps(viewport, full, 1)
+    expect([...viewport.querySelectorAll<HTMLElement>('[data-wall-gap]')].every(el => el.style.display === 'block')).toBe(true)
+    paintWallGaps(viewport, full.slice(0, 1), 1)
+    expect([...viewport.querySelectorAll<HTMLElement>('[data-wall-gap]')].filter(el => el.style.display === 'block').length).toBe(1)
   })
 })

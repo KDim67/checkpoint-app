@@ -2,6 +2,7 @@
 
 import { itemAtPoint, snap, SNAP_GRID, type Point, type WallItem } from './wallModel'
 import type { Side } from './wallGrow'
+import { toLocal } from './wallTurn'
 
 /** held until release */
 export type WallDrag =
@@ -107,6 +108,47 @@ export function resizedBox(
     width,
     height
   }
+}
+
+/** how a resize may change the box: grid sizes, the shape held, or the height left to a text box's words */
+export interface ResizeRules { snapping: boolean; keepShape: boolean; keepHeight?: boolean }
+
+/**
+ * a corner pulled this far along the item's own width and height; the opposite corner stays put on the wall,
+ * which a turned item needs because it turns about its middle and the middle moves
+ */
+export function pulledBox(
+  start: { x: number; y: number; width: number; height: number; rotation?: number },
+  corner: Corner,
+  along: number,
+  down: number,
+  rules: ResizeRules
+): { x: number; y: number; width: number; height: number } {
+  // not turned, the numbers are exactly what resizing always gave
+  if ((start.rotation ?? 0) % 360 === 0) {
+    const box = resizedBox(start, corner, along, rules.keepHeight ? 0 : down, rules)
+    return rules.keepHeight ? { ...box, y: start.y, height: start.height } : box
+  }
+  const own = resizedBox({ x: 0, y: 0, width: start.width, height: start.height }, corner, along, rules.keepHeight ? 0 : down, rules)
+  const height = rules.keepHeight ? start.height : own.height
+  const top = rules.keepHeight ? 0 : own.y
+  // from the old middle to the new one in the item's own directions, then on the wall
+  const [shiftX, shiftY] = toLocal(own.x + (own.width - start.width) / 2, top + (height - start.height) / 2, -(start.rotation ?? 0))
+  const middleX = start.x + start.width / 2 + shiftX
+  const middleY = start.y + start.height / 2 + shiftY
+  return { x: middleX - own.width / 2, y: middleY - height / 2, width: own.width, height }
+}
+
+/** a pointer's travel on the wall pulling a corner, read along a turned item's own sides */
+export function turnedResize(
+  start: { x: number; y: number; width: number; height: number; rotation?: number },
+  corner: Corner,
+  dx: number,
+  dy: number,
+  rules: ResizeRules
+): { x: number; y: number; width: number; height: number } {
+  const [along, down] = toLocal(dx, dy, start.rotation ?? 0)
+  return pulledBox(start, corner, along, down, rules)
 }
 
 /** from the size at the press */
