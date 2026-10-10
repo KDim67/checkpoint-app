@@ -28,6 +28,7 @@ import {
   updateItem,
   updateTag
 } from '../db'
+import { isMainOnlySetting } from '../secureSettings'
 import {
   BulkUpdateSchema,
   CreateFocusSessionSchema,
@@ -38,6 +39,13 @@ import {
   TaskQueryParamsSchema,
   UpdateItemSchema
 } from '../validation'
+
+/** a decrypted secret in the screen is one script away from being sent anywhere */
+function screenSettingKey(key: unknown): string {
+  const parsed = z.string().parse(key)
+  if (isMainOnlySetting(parsed)) throw new Error(`The setting "${parsed}" is kept in the main process.`)
+  return parsed
+}
 
 export function registerDbHandlers(db: Database.Database): void {
   ipcMain.handle(IpcChannels.DB_GET_ITEMS, (_event, context: unknown, type: unknown, page: unknown, pageSize: unknown) => {
@@ -102,21 +110,21 @@ export function registerDbHandlers(db: Database.Database): void {
 
   ipcMain.handle(IpcChannels.DB_GET_SETTING, (_event, key: unknown) => {
     return handleSafe(() => {
-      const parsedKey = z.string().parse(key)
+      const parsedKey = screenSettingKey(key)
       return getSetting(parsedKey, null)
     })
   })
 
   ipcMain.handle(IpcChannels.DB_SET_SETTING, (_event, key: unknown, value: unknown) => {
     return handleSafe(() => {
-      const parsedKey = z.string().parse(key)
+      const parsedKey = screenSettingKey(key)
       setSetting(parsedKey, value)
     })
   })
 
   ipcMain.handle(IpcChannels.DB_DELETE_SETTING, (_event, key: unknown) => {
     return handleSafe(() => {
-      const parsedKey = z.string().parse(key)
+      const parsedKey = screenSettingKey(key)
       deleteSetting(parsedKey)
     })
   })

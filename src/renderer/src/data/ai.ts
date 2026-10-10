@@ -24,5 +24,12 @@ export const onError = (...args: Parameters<Bridge['onError']>): ReturnType<Brid
 export const startStream = (...args: Parameters<Bridge['startStream']>): ReturnType<Bridge['startStream']> =>
   window.electronAPI.ai.startStream(...args)
 
+export const providers: Bridge['providers'] = {
+  load: () => window.electronAPI.ai.providers.load(),
+  save: (...args) => window.electronAPI.ai.providers.save(...args),
+  activate: (...args) => window.electronAPI.ai.providers.activate(...args),
+  setKey: (...args) => window.electronAPI.ai.providers.setKey(...args)
+}
+
 export const testConnection = (...args: Parameters<Bridge['testConnection']>): ReturnType<Bridge['testConnection']> =>
   window.electronAPI.ai.testConnection(...args)

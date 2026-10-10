@@ -58,6 +58,11 @@ export const enum IpcChannels {
   AI_STREAM_START        = 'ai:streamStart',
   AI_STREAM_ABORT        = 'ai:streamAbort',
   AI_TEST_CONNECTION     = 'ai:testConnection',
+  AI_PROVIDERS_LOAD      = 'ai:providersLoad',
+  AI_PROVIDERS_SAVE      = 'ai:providersSave',
+  AI_PROVIDERS_ACTIVATE  = 'ai:providersActivate',
+  /** a key goes in, never comes back out */
+  AI_PROVIDERS_SET_KEY   = 'ai:providersSetKey',
   AI_GENERATE_STRUCTURED = 'ai:generateStructured',
   AI_GENERATE_ABORT      = 'ai:generateAbort',
   AI_GET_CAPABILITIES    = 'ai:getCapabilities',
@@ -94,6 +99,7 @@ export const enum IpcChannels {
 
   // webhook
   WEBHOOK_TOGGLE         = 'webhook:toggle',
+  WEBHOOK_GET_TOKEN      = 'webhook:getToken',
 
   // MCP server
   MCP_TOGGLE             = 'mcp:toggle',
@@ -262,5 +268,7 @@ export const enum IpcChannels {
   SYNC_WRITE_FILE_CHUNK         = 'sync:writeFileChunk',
   SYNC_DELETE_FILE              = 'sync:deleteFile',
   SYNC_APPLY_BOARD_BASELINE     = 'sync:applyBoardBaseline',
-  SYNC_APPLY_REMOTE_MUTATION    = 'sync:applyRemoteMutation'
+  SYNC_APPLY_REMOTE_MUTATION    = 'sync:applyRemoteMutation',
+  SYNC_GET_TURN_RELAY           = 'sync:getTurnRelay',
+  SYNC_SET_TURN_RELAY           = 'sync:setTurnRelay'
 }

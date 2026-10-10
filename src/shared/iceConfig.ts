@@ -12,11 +12,14 @@ export const STUN_SERVERS: IceServer[] = [
   { urls: 'stun:stun1.l.google.com:19302' }
 ]
 
-interface TurnSettings {
+export interface TurnSettings {
   url?: string
   username?: string
   credential?: string
 }
+
+/** read and written in main; the credential is a secret, kept off the plain settings channel */
+export const TURN_SETTING_KEYS = { url: 'turn_url', username: 'turn_username', credential: 'turn_credential' } as const
 
 /** only turn: and turns:, a stun: URL here is useless */
 export function turnIceServer(settings: TurnSettings): IceServer | null {

@@ -2,10 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import { Route, Check } from 'lucide-react'
-import { getStringSetting, setStringSetting } from '../../lib/settings'
-import {
-  refreshTurnServer, TURN_URL_KEY, TURN_USERNAME_KEY, TURN_CREDENTIAL_KEY
-} from '../../lib/webrtcTransport'
+import * as syncApi from '../../data/sync'
+import { refreshTurnServer } from '../../lib/webrtcTransport'
 import { describeTurnSettings, turnIceServer } from '../../../../shared/iceConfig'
 import { SAVED_FEEDBACK_MS } from '../../lib/timings'
 
@@ -39,15 +37,11 @@ export default function TurnRelaySettings(): React.JSX.Element {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([
-      getStringSetting(TURN_URL_KEY, ''),
-      getStringSetting(TURN_USERNAME_KEY, ''),
-      getStringSetting(TURN_CREDENTIAL_KEY, '')
-    ]).then(([u, n, c]) => {
+    syncApi.getTurnRelay().then(relay => {
       if (cancelled) return
-      setUrl(u)
-      setUsername(n)
-      setCredential(c)
+      setUrl(relay.url)
+      setUsername(relay.username)
+      setCredential(relay.credential)
     }).catch(() => {})
     return () => { cancelled = true }
   }, [])
@@ -56,9 +50,7 @@ export default function TurnRelaySettings(): React.JSX.Element {
   const active = !!turnIceServer({ url, username, credential })
 
   const save = async (): Promise<void> => {
-    await setStringSetting(TURN_URL_KEY, url.trim())
-    await setStringSetting(TURN_USERNAME_KEY, username.trim())
-    await setStringSetting(TURN_CREDENTIAL_KEY, credential.trim())
+    await syncApi.setTurnRelay({ url, username, credential })
     // the transport caches it, peer connections are built synchronously
     await refreshTurnServer()
     setSaved(true)

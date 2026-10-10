@@ -5,6 +5,8 @@ import type { McpActivityEntry } from '../shared/mcpActivity'
 
 import type { RecurrenceSummary } from '../shared/recurrence'
 import type { PluginSettingState, PluginSettingValue } from '../shared/pluginSettings'
+import type { AiProviderInput, AiProviderSet } from '../shared/aiProviders'
+import type { TurnSettings } from '../shared/iceConfig'
 import type { CalendarAnswer, CalendarQuery } from '../shared/calendar'
 import type { CalendarBridge, CalendarResult, CalendarSubscription, QuickAddInput, SubscriptionInput } from '../shared/calendarApi'
 import type {
@@ -316,8 +318,18 @@ const api = {
     abortStream: (streamId?: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.AI_STREAM_ABORT, streamId),
 
-    testConnection: (baseURL: string, apiKey: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke(IpcChannels.AI_TEST_CONNECTION, baseURL, apiKey),
+    /** uses the connection's saved key, and only if baseURL is still on the site it was saved for */
+    testConnection: (baseURL: string, providerId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(IpcChannels.AI_TEST_CONNECTION, baseURL, providerId),
+
+    providers: {
+      load: (): Promise<AiProviderSet> => ipcRenderer.invoke(IpcChannels.AI_PROVIDERS_LOAD),
+      save: (providers: AiProviderInput[], activeId: string): Promise<AiProviderSet> =>
+        ipcRenderer.invoke(IpcChannels.AI_PROVIDERS_SAVE, { providers, activeId }),
+      activate: (id: string): Promise<AiProviderSet> => ipcRenderer.invoke(IpcChannels.AI_PROVIDERS_ACTIVATE, id),
+      /** an empty key clears it */
+      setKey: (id: string, key: string): Promise<AiProviderSet> => ipcRenderer.invoke(IpcChannels.AI_PROVIDERS_SET_KEY, id, key)
+    },
 
     generateStructured: (params: AiStructuredParams): Promise<AiStructuredResult> =>
       ipcRenderer.invoke(IpcChannels.AI_GENERATE_STRUCTURED, params),
@@ -381,7 +393,9 @@ const api = {
 
   webhook: {
     toggle: (active: boolean, port: number): Promise<void> =>
-      ipcRenderer.invoke(IpcChannels.WEBHOOK_TOGGLE, active, port)
+      ipcRenderer.invoke(IpcChannels.WEBHOOK_TOGGLE, active, port),
+    getToken: (): Promise<string> =>
+      ipcRenderer.invoke(IpcChannels.WEBHOOK_GET_TOKEN)
   },
 
   tray: {
@@ -807,6 +821,10 @@ const api = {
       ipcRenderer.invoke(IpcChannels.MEDIA_READ_BUFFER, filename)
   },
   sync: {
+    getTurnRelay: (): Promise<Required<TurnSettings>> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_GET_TURN_RELAY),
+    setTurnRelay: (relay: Required<TurnSettings>): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.SYNC_SET_TURN_RELAY, relay),
     startHost: (port?: number): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.SYNC_START_HOST, port),
     stopHost: (): Promise<void> =>

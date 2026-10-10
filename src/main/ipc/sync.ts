@@ -3,6 +3,9 @@
 import { ipcMain } from 'electron'
 import { IpcChannels } from '../../shared/ipcChannels'
 import { SyncService } from '../syncService'
+import { z } from 'zod'
+import { getSetting, setSetting } from '../db'
+import { TURN_SETTING_KEYS, type TurnSettings } from '../../shared/iceConfig'
 
 const syncService = new SyncService()
 
@@ -15,7 +18,28 @@ import type { SyncPayload } from '../../shared/types'
 import path from 'path'
 import fs from 'fs'
 
+const TurnInput = z.object({ url: z.string().max(2000), username: z.string().max(500), credential: z.string().max(2000) })
+
+const textSetting = (key: string): string => {
+  const value = getSetting<unknown>(key, '')
+  return typeof value === 'string' ? value : ''
+}
+
 export function registerSyncHandlers(): void {
+  // the one secret the screen holds: webrtc runs there and needs the relay password to connect
+  ipcMain.handle(IpcChannels.SYNC_GET_TURN_RELAY, (): Required<TurnSettings> => ({
+    url: textSetting(TURN_SETTING_KEYS.url),
+    username: textSetting(TURN_SETTING_KEYS.username),
+    credential: textSetting(TURN_SETTING_KEYS.credential)
+  }))
+
+  ipcMain.handle(IpcChannels.SYNC_SET_TURN_RELAY, (_event, relay: unknown) => {
+    const { url, username, credential } = TurnInput.parse(relay)
+    setSetting(TURN_SETTING_KEYS.url, url.trim())
+    setSetting(TURN_SETTING_KEYS.username, username.trim())
+    setSetting(TURN_SETTING_KEYS.credential, credential.trim())
+  })
+
   ipcMain.handle(IpcChannels.SYNC_START_HOST, (_event, port?: number) => {
     syncService.startHost(port)
   })
