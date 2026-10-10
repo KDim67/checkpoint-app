@@ -24,7 +24,6 @@ import {
 } from './lib/settings'
 import { createWorkspace, slugifyWorkspace, type WorkspaceEntry } from './lib/createWorkspace'
 
-const ONBOARDING_SEEN_KEY = 'onboarding_seen'
 /** same palette as the workspace manager */
 const ONBOARDING_COLORS = ['#1e45fc', '#cdf12b', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
 import {
@@ -37,6 +36,8 @@ import { readWorkspaceList, writeWorkspaceList } from './lib/workspaceList'
 import { getContexts } from './data/workspaces'
 import * as appApi from './data/app'
 import { useTitleBarColors } from './lib/titleBarColors'
+import { ONBOARDING_SEEN_KEY } from './lib/firstRun'
+import { useWhatsNew } from './lib/whatsNew'
 import * as customizerApi from './data/customizer'
 import * as mcpApi from './data/mcp'
 import { onThemeUpdate } from './data/theme'
@@ -45,6 +46,7 @@ import CollabFollowBanner from './components/collab/CollabFollowBanner'
 
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
 const OnboardingTour = lazy(() => import('./components/OnboardingTour'))
+const WhatsNewDialog = lazy(() => import('./components/WhatsNewDialog'))
 const TrayPanel      = lazy(() => import('./components/TrayPanel'))
 const LogView      = lazy(() => import('./components/LogView'))
 const KanbanView   = lazy(() => import('./components/KanbanView'))
@@ -652,6 +654,8 @@ export default function App() {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  // once after an update; a first install gets the tour instead
+  const whatsNew = useWhatsNew()
 
   // shown once; read, not pushed, so a slow first paint can't race it
   useEffect(() => {
@@ -933,6 +937,9 @@ export default function App() {
                 onCreateWorkspace={createOnboardingWorkspace}
                 onClose={closeOnboarding}
               />
+            )}
+            {whatsNew && !showOnboarding && (
+              <WhatsNewDialog version={whatsNew.version} releases={whatsNew.releases} onClose={whatsNew.dismiss} />
             )}
           </Suspense>
           <div className="app-shell">
