@@ -138,14 +138,16 @@ function WallImageItem({
     <img
       key={reloadKey}
       className="wall-paper"
-      src={`checkpoint-media://${item.ref}?w=${Math.round(item.width * 2)}&k=${reloadKey}`}
+      // a cropped picture is drawn wider than its box, so its copy is fetched for that width
+      src={`checkpoint-media://${item.ref}?w=${Math.round((item.width / (item.crop?.w ?? 1)) * 2)}&k=${reloadKey}`}
       alt={item.text || 'Wall image'}
       draggable={false}
       decoding="async"
       onError={() => setLoadError(true)}
       onLoad={() => setLoadError(false)}
       style={item.crop
-        ? { position: 'absolute', ...cropFrame(item.crop), objectFit: 'fill', display: 'block' }
+        // preflight caps images at their box, which squeezed the whole picture in instead of cropping it
+        ? { position: 'absolute', ...cropFrame(item.crop), maxWidth: 'none', objectFit: 'fill', display: 'block' }
         : {
             ...base,
             objectFit: 'cover',
@@ -198,11 +200,13 @@ interface Props {
   onNeedRoom?: (id: string, extra: number) => void
   /** this image is being cropped */
   cropping?: boolean
+  /** the camera's zoom, given only to the picture being cropped */
+  zoom?: number
   /** the window to keep, or null to leave the picture as it was */
-  onCrop?: (id: string, crop: ImageCrop | null, natural?: { width: number; height: number }) => void
+  onCrop?: (id: string, crop: ImageCrop | null) => void
 }
 
-function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize, onGrow, tagColors, onMapTopic, onNeedRoom, cropping, onCrop }: Props) {
+function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing, previewing, onAutoSize, onGrow, tagColors, onMapTopic, onNeedRoom, cropping, zoom, onCrop }: Props) {
   const onNext = onGrow && ((side: Side) => onGrow(item.id, side))
   // a topic grows its map from the keyboard instead, Tab under it and Enter beside it
   const topicKeys = item.map && onMapTopic
@@ -569,7 +573,8 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
         {cropping && onCrop && (
           <WallImageCrop
             item={item}
-            onApply={(crop, natural) => onCrop(item.id, crop, natural)}
+            zoom={zoom ?? 1}
+            onApply={crop => onCrop(item.id, crop)}
             onCancel={() => onCrop(item.id, null)}
           />
         )}

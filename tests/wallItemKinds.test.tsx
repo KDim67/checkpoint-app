@@ -99,6 +99,17 @@ describe('a cropped picture', () => {
     expect((picture.parentElement as HTMLElement).style.overflow).toBe('hidden')
   })
 
+  it('runs the picture past its box, which the image reset would otherwise squeeze back into it', () => {
+    // preflight caps every image at its box's width: a crop kept on the left looked resized, one on the right was empty
+    const { container } = view({ kind: 'image', ref: 'p.png', crop: { x: 0.5, y: 0, w: 0.5, h: 1 } })
+    const picture = container.querySelector('img') as HTMLImageElement
+    expect(picture.style.width).toBe('200%')
+    expect(picture.style.left).toBe('-100%')
+    expect(picture.style.maxWidth).toBe('none')
+    // drawn twice the box's width, so the copy loaded is sharp enough for that, not just for the box
+    expect(picture.getAttribute('src')).toContain('?w=1200&')
+  })
+
   it('fills its box as before when it has never been cropped', () => {
     const { container } = view({ kind: 'image', ref: 'p.png' })
     const picture = container.querySelector('img') as HTMLImageElement
@@ -106,37 +117,14 @@ describe('a cropped picture', () => {
     expect(picture.style.width).toBe('100%')
   })
 
-  it('hands back the window and the picture\'s own size when the crop is kept', () => {
+  it('opens the crop window over the picture and hands back the part kept', () => {
     const onCrop = vi.fn()
-    const { container } = view({ kind: 'image', ref: 'p.png', crop }, { cropping: true, onCrop })
+    const { container } = view({ kind: 'image', ref: 'p.png', crop }, { cropping: true, zoom: 2, onCrop })
 
-    const measuring = container.querySelector('img.is-hidden') as HTMLImageElement
-    Object.defineProperty(measuring, 'naturalWidth', { value: 800 })
-    Object.defineProperty(measuring, 'naturalHeight', { value: 600 })
-    fireEvent.load(measuring)
-
-    fireEvent.click(screen.getByLabelText('Keep this part'))
-    expect(onCrop).toHaveBeenCalledWith('i', crop, { width: 800, height: 600 })
-
-    fireEvent.keyDown(window, { key: 'Enter' })
-    expect(onCrop).toHaveBeenCalledTimes(2)
-  })
-
-  it('goes back to the whole picture, and leaves it alone on cancel', () => {
-    const onCrop = vi.fn()
-    const { container } = view({ kind: 'image', ref: 'p.png', crop }, { cropping: true, onCrop })
-
-    const measuring = container.querySelector('img.is-hidden') as HTMLImageElement
-    Object.defineProperty(measuring, 'naturalWidth', { value: 800 })
-    Object.defineProperty(measuring, 'naturalHeight', { value: 600 })
-    fireEvent.load(measuring)
-
+    expect((container.querySelector('.wall-crop') as HTMLElement).style.getPropertyValue('--crop-inv')).toBe('0.5')
     fireEvent.click(screen.getByLabelText('Whole picture'))
-    fireEvent.click(screen.getByLabelText('Keep this part'))
-    expect(onCrop).toHaveBeenLastCalledWith('i', { x: 0, y: 0, w: 1, h: 1 }, { width: 800, height: 600 })
-
-    fireEvent.click(screen.getByLabelText('Cancel'))
-    expect(onCrop).toHaveBeenLastCalledWith('i', null)
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(onCrop).toHaveBeenCalledWith('i', { x: 0, y: 0, w: 1, h: 1 })
   })
 })
 

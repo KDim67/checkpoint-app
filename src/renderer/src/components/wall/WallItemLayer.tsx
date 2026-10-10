@@ -43,7 +43,9 @@ interface Props {
   onNeedRoom?: (id: string, extra: number) => void
   /** this image is being cropped */
   cropping?: boolean
-  onCrop?: (id: string, crop: ImageCrop | null, natural?: { width: number; height: number }) => void
+  /** the camera's zoom, given only to the picture being cropped so the others' memo holds */
+  zoom?: number
+  onCrop?: (id: string, crop: ImageCrop | null) => void
 }
 
 /** a grip on each corner, and the resize cursor that points along its diagonal */
@@ -55,7 +57,7 @@ const CORNER_HANDLES: { corner: Corner; place: React.CSSProperties; cursor: stri
 ]
 
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
-function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow, dimmed, remoteSelectedBy, tagColors, onMapTopic, onNeedRoom, cropping, onCrop }: Props) {
+function WallItemLayer({ item, card, note, editing, connectable, showHandles, arrowTarget, arrowFrom, onTextChange, onFinishEditing, linkLabel, linkMissing, linkExternal, onFollowLink, previewing, onAutoSize, onGrow, dimmed, remoteSelectedBy, tagColors, onMapTopic, onNeedRoom, cropping, zoom, onCrop }: Props) {
   const link = item.link
   const linkTitle = linkMissing
     ? `${linkLabel}. Edit the link to point somewhere else.`
@@ -67,6 +69,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
       data-wall-arrow-target={arrowTarget || undefined}
       data-wall-arrow-from={arrowFrom || undefined}
       data-wall-dimmed={dimmed || undefined}
+      data-wall-cropping={cropping || undefined}
       style={{
         position: 'absolute',
         left: 0, top: 0,
@@ -130,6 +133,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         onMapTopic={onMapTopic}
         onNeedRoom={onNeedRoom}
         cropping={cropping}
+        zoom={zoom}
         onCrop={onCrop}
       />
 
@@ -201,8 +205,8 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         </>
       )}
 
-      {/* single unlocked selection only */}
-      {showHandles && (
+      {/* single unlocked selection only; while cropping they'd sit on the crop's own corners and resize instead */}
+      {showHandles && !cropping && (
         <>
           {/* every corner pulls, the opposite one stays; 22px grab area around a 12px dot */}
           {CORNER_HANDLES.map(({ corner, place, cursor }) => (
