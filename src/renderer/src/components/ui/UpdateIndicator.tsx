@@ -13,7 +13,8 @@ export default function UpdateIndicator({ onOpen }: { onOpen: () => void }) {
   // clamped, the fill width comes straight from it
   const percent = downloading ? Math.min(100, Math.max(0, downloading.percent)) : 0
   const eta = downloading ? etaShort(etaSeconds(downloading)) : ''
-  const label = downloading ? `${percent}%${eta ? ` · ${eta}` : ''}` : 'Restarting…'
+  // waits for the click; it also installs by itself on the next quit
+  const label = downloading ? `${percent}%${eta ? ` · ${eta}` : ''}` : 'Restart to update'
   const description = describeUpdateProgress(progress)
 
   const handleClick = () => {

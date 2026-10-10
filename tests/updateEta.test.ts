@@ -102,7 +102,7 @@ describe('formatBytes', () => {
 describe('describeUpdateProgress', () => {
   it('says what a finished download is waiting for', () => {
     expect(describeUpdateProgress({ phase: 'ready', version: '1.0.2' }))
-      .toBe('Version 1.0.2 is ready. Restarting to install…')
+      .toBe('Version 1.0.2 is ready. Restart to install it now, or it installs when you quit.')
   })
 
   it('gives the version, the percentage, the size and the time left', () => {

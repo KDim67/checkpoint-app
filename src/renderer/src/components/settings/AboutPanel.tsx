@@ -4,7 +4,7 @@ import { errorMessage } from '../../../../shared/errors'
 import type { UpdateCheckResult } from '../../../../shared/types'
 import { describeUpdateProgress } from '../../../../shared/updateEta'
 import { useUpdateProgress } from '../../lib/useUpdateProgress'
-import { Info, PlayCircle, RefreshCw } from 'lucide-react'
+import { FileText, Info, PlayCircle, RefreshCw } from 'lucide-react'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
 import PathRow from './PathRow'
@@ -180,6 +180,15 @@ export default function AboutPanel() {
           >
             <Info size={13} />
             GitHub Repository
+          </button>
+          {/* for a bug report: every check, download, install and error, with times */}
+          <button
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
+            onClick={() => void appApi.showUpdateLog().catch(err => console.error('Could not show the update log:', err))}
+          >
+            <FileText size={13} />
+            Show Update Log
           </button>
         </div>
 

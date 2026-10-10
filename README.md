@@ -60,7 +60,8 @@ It isn't code-signed, so SmartScreen will warn you the first time. More info →
 Run anyway.
 
 Checkpoint updates itself quietly in the background from that same Releases
-page, and swaps the new version in the next time you close it.
+page, and swaps the new version in the next time you close it, or straight
+away if you click Restart to update in the title bar.
 
 ## Building it yourself
 
