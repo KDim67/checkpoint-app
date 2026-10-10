@@ -2933,7 +2933,9 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   padding: var(--space-1);
   border-right: 1px solid var(--color-surface-offset);
   border-bottom: 1px solid var(--color-surface-offset);
-  overflow: hidden;
+  /* a bar runs on into the cells beside it; a busy day is still cut at the bottom */
+  overflow-x: visible;
+  overflow-y: clip;
 }
 
 .cal-month-cell:nth-child(7n) {
@@ -3031,6 +3033,35 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 
 .cal-chip[data-state="late"] {
   border-left-color: var(--color-error);
+}
+
+/* room kept in a lane a bar from the left passes over, so every lane stays on one line */
+.cal-slot {
+  height: var(--cal-chip-height);
+  flex-shrink: 0;
+}
+
+/* as wide as the days it covers: each cell's content, plus the padding and border between them */
+.cal-chip[data-span] {
+  position: relative;
+  z-index: 1;
+  width: calc(var(--cal-span) * 100% + (var(--cal-span) - 1) * (2 * var(--space-1) + 1px));
+}
+
+.cal-chip[data-continues-before="true"] {
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.cal-chip[data-continues-after="true"] {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* while something is dragged a bar lets it through, or the drop would land on the day the bar starts */
+.cal-view[data-dragging="true"] .cal-chip[data-span] {
+  pointer-events: none;
 }
 
 .cal-chip svg {

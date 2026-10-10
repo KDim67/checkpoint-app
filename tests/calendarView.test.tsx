@@ -44,6 +44,7 @@ import CalendarView from '../src/renderer/src/components/CalendarView'
 import { ToastProvider } from '../src/renderer/src/components/ui/Toast'
 import { useAppStore } from '../src/renderer/src/store/appStore'
 import { allDay, localDayOf } from '../src/shared/dueDate'
+import { CALENDAR_NUDGE_SETTLE_MS } from '../src/renderer/src/lib/timings'
 
 const today = localDayOf(Date.now())
 const label = (d: { year: number; month: number; day: number }): string =>
@@ -112,5 +113,34 @@ describe('the Calendar screen', () => {
     await show()
     const cell = screen.getByRole('gridcell', { name: label(today) })
     expect(within(cell).getByRole('button', { name: /^Overdue form.*late$/ })).toBeTruthy()
+  })
+
+  // mid-month, so a couple of days either way stay on the page whatever today is
+  const tenth = { year: today.year, month: today.month, day: 10 }
+
+  it('draws an event over several days as a bar, not a chip on every day', async () => {
+    fake.entries = [due('Trip', allDay(tenth), { id: 'event:trip', layer: 'events', days: 3, movable: false, ref: { kind: 'event', calendarId: 'c', uid: 'u' } })]
+    await show()
+    const bars = screen.getAllByRole('button', { name: /^Trip/ })
+    expect(bars.length).toBeLessThan(3)
+    expect(bars.some(b => Number(b.dataset.span) >= 2)).toBe(true)
+  })
+
+  it('moves a due date with Alt and the arrow keys, as one move once the presses stop, and keeps focus on it', async () => {
+    fake.entries = [due('Ship the report', allDay(tenth))]
+    await show()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const chip = () => screen.getByRole('button', { name: /^Ship the report/ })
+      chip().focus()
+      await act(async () => { fireEvent.keyDown(chip(), { key: 'ArrowRight', altKey: true }) })
+      await act(async () => { fireEvent.keyDown(chip(), { key: 'ArrowRight', altKey: true }) })
+      expect(within(screen.getByRole('gridcell', { name: label({ ...tenth, day: 12 }) })).getByRole('button', { name: /^Ship the report/ })).toBe(document.activeElement)
+      expect(fake.moved).toStrictEqual([])
+      await act(async () => { vi.advanceTimersByTime(CALENDAR_NUDGE_SETTLE_MS) })
+      expect(fake.moved).toStrictEqual([['Ship the report', allDay({ ...tenth, day: 12 })]])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

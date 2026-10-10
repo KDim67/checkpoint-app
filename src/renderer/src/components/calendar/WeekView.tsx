@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
-import EntryChip from './EntryChip'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import EntryChip, { SlotView } from './EntryChip'
 import { cssVars, isEntryDrag, useCalendarActions } from './actions'
-import { inTimeGrid, placeTimed, weekdayNames, type DayContents } from './layout'
+import { cellSlots, inTimeGrid, laneRow, placeTimed, weekdayNames, type DayContents } from './layout'
 import { dayKey, minutesOf, sameDay, type CalendarEntry, type DropTarget } from '../../../../shared/calendar'
 import type { CalendarDay } from '../../../../shared/dueDate'
 
@@ -33,6 +33,10 @@ export default function WeekView({ days, today, weekStart, contents, entries, no
   const [dropKey, setDropKey] = useState<string | null>(null)
   const names = weekdayNames(weekStart)
   const showsToday = days.some(d => sameDay(d, today))
+  const allDayLanes = useMemo(
+    () => laneRow(days, day => (contents.get(dayKey(day))?.entries ?? []).filter(e => !inTimeGrid(e))),
+    [days, contents]
+  )
 
   useEffect(() => {
     const el = scroller.current
@@ -72,10 +76,10 @@ export default function WeekView({ days, today, weekStart, contents, entries, no
 
       <div className="cal-week-allday" role="row">
         <div className="cal-gutter cal-gutter-label">All day</div>
-        {days.map(day => {
+        {days.map((day, column) => {
           const key = `allday:${dayKey(day)}`
           const cell = contents.get(dayKey(day))
-          const whole = (cell?.entries ?? []).filter(e => !inTimeGrid(e))
+          const { slots } = cellSlots(allDayLanes, column, Infinity)
           const logs = cell?.counts.log?.length ?? 0
           const commits = cell?.counts.commits?.length ?? 0
           return (
@@ -87,7 +91,9 @@ export default function WeekView({ days, today, weekStart, contents, entries, no
               onClick={e => actions.add({ day, minutes: null, allDayRow: true }, { x: e.clientX, y: e.clientY })}
               {...dropZone(key, () => ({ day, minutes: null, allDayRow: true }))}
             >
-              {whole.map(entry => <EntryChip key={`${entry.id}:${key}`} entry={entry} />)}
+              {slots.map((slot, lane) => (
+                <SlotView key={slot.kind === 'start' ? `${slot.segment.entry.id}:${key}` : `slot:${lane}`} slot={slot} />
+              ))}
               {logs > 0 && (
                 <button type="button" className="cal-count" data-layer="log" onClick={e => { e.stopPropagation(); actions.showDay(day, e.currentTarget) }}>
                   {logs === 1 ? '1 log entry' : `${logs} log entries`}

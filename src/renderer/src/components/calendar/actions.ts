@@ -1,7 +1,7 @@
 /** what every chip and cell can ask the calendar for, without threading it through each view */
 
 import { createContext, useContext, type CSSProperties, type DragEvent } from 'react'
-import type { CalendarEntry, DropTarget } from '../../../../shared/calendar'
+import type { CalendarEntry, DropTarget, Nudge } from '../../../../shared/calendar'
 import type { CalendarDay } from '../../../../shared/dueDate'
 
 export const DRAG_TYPE = 'application/x-checkpoint-calendar-entry'
@@ -12,6 +12,8 @@ export interface CalendarActions {
   showDay(day: CalendarDay, anchor: HTMLElement): void
   add(target: DropTarget, at: { x: number; y: number }): void
   drop(target: DropTarget, event: DragEvent): void
+  /** Alt and an arrow key on a movable chip; inTimeGrid moves a timed one by quarter hours up and down */
+  nudge(entry: CalendarEntry, nudge: Nudge, inTimeGrid: boolean): void
   colorOf(entry: CalendarEntry): string
   /** the workspace's name, shown on a chip only while every workspace is on screen */
   workspaceLabel(entry: CalendarEntry): string | null

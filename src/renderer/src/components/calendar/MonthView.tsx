@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
-import EntryChip from './EntryChip'
+import React, { useMemo, useState } from 'react'
+import { SlotView } from './EntryChip'
 import { isEntryDrag, useCalendarActions } from './actions'
-import { weekdayNames, type DayContents } from './layout'
+import { cellSlots, laneRow, weekdayNames, type DayContents } from './layout'
 import { dayKey, formatDuration, sameDay } from '../../../../shared/calendar'
 import type { CalendarDay } from '../../../../shared/dueDate'
 
@@ -24,19 +24,21 @@ export default function MonthView({ days, month, today, weekStart, contents }: P
   const [dropKey, setDropKey] = useState<string | null>(null)
   const names = weekdayNames(weekStart)
 
+  // focus shows as one total here; the week draws each session
+  const rows = useMemo(() => Array.from({ length: Math.ceil(days.length / 7) }, (_, r) =>
+    laneRow(days.slice(r * 7, r * 7 + 7), day => (contents.get(dayKey(day))?.entries ?? []).filter(e => e.layer !== 'focus'))
+  ), [days, contents])
+
   return (
     <div className="cal-month" role="grid" aria-label="Month">
       <div className="cal-month-head" role="row">
         {names.map(name => <div key={name} className="cal-weekday" role="columnheader">{name}</div>)}
       </div>
       <div className="cal-month-body">
-        {days.map(day => {
+        {days.map((day, i) => {
           const key = dayKey(day)
           const cell = contents.get(key)
-          // focus shows as one total here; the week draws each session
-          const chips = (cell?.entries ?? []).filter(e => e.layer !== 'focus')
-          const shown = chips.slice(0, CHIPS_PER_DAY)
-          const hidden = chips.length - shown.length
+          const { slots, hidden } = cellSlots(rows[Math.floor(i / 7)] ?? [], i % 7, CHIPS_PER_DAY)
           const logs = cell?.counts.log?.length ?? 0
           const commits = cell?.counts.commits?.length ?? 0
           const isToday = sameDay(day, today)
@@ -63,7 +65,9 @@ export default function MonthView({ days, month, today, weekStart, contents }: P
               }}
             >
               <span className="cal-day-number" aria-current={isToday ? 'date' : undefined}>{day.day}</span>
-              {shown.map(entry => <EntryChip key={`${entry.id}:${key}`} entry={entry} />)}
+              {slots.map((slot, lane) => (
+                <SlotView key={slot.kind === 'start' ? `${slot.segment.entry.id}:${key}` : `slot:${lane}`} slot={slot} />
+              ))}
               {cell && cell.focusMs > 0 && (
                 <button type="button" className="cal-count" data-layer="focus" onClick={e => { e.stopPropagation(); actions.showDay(day, e.currentTarget) }}>
                   {formatDuration(cell.focusMs)} focus

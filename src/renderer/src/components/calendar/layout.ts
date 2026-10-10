@@ -13,7 +13,7 @@ import {
   type CalendarEntry,
   type CalendarLayer
 } from '../../../../shared/calendar'
-import type { CalendarDay } from '../../../../shared/dueDate'
+import { DAY_MS, type CalendarDay } from '../../../../shared/dueDate'
 
 export type CalendarViewKind = 'month' | 'week' | 'agenda'
 
@@ -89,8 +89,73 @@ export function byDay(entries: CalendarEntry[], days: CalendarDay[], today: Cale
   return out
 }
 
-/** whether an entry sits in the week's time grid rather than its all-day row */
-export const inTimeGrid = (entry: CalendarEntry): boolean => !entry.allDay && !COUNTED_LAYERS.includes(entry.layer)
+/** whether an entry sits in the week's time grid rather than its all-day row; a day or longer reads better as a bar */
+export const inTimeGrid = (entry: CalendarEntry): boolean =>
+  !entry.allDay && !COUNTED_LAYERS.includes(entry.layer) && (entry.end === null || entry.end - entry.start < DAY_MS)
+
+/** one entry's stretch across a row of days; a bar when it covers more than one */
+export interface Segment {
+  entry: CalendarEntry
+  /** the column it starts on */
+  start: number
+  span: number
+  lane: number
+  /** it carries on from before the row, or past its end, so that edge is cut square */
+  continuesBefore: boolean
+  continuesAfter: boolean
+}
+
+/** lanes for one row: earlier and longer first, so a bar keeps one line across the row and single days fill the gaps */
+export function laneRow(row: CalendarDay[], entriesOn: (day: CalendarDay) => CalendarEntry[]): Segment[] {
+  const found: Omit<Segment, 'lane'>[] = []
+  const seen = new Set<string>()
+  row.forEach((day, column) => {
+    for (const entry of entriesOn(day)) {
+      // a late entry repeated on today stands alone there
+      if (!coversDay(entry, day)) {
+        found.push({ entry, start: column, span: 1, continuesBefore: false, continuesAfter: false })
+        continue
+      }
+      if (seen.has(entry.id)) continue
+      seen.add(entry.id)
+      let last = column
+      while (last + 1 < row.length && coversDay(entry, row[last + 1])) last++
+      found.push({
+        entry,
+        start: column,
+        span: last - column + 1,
+        continuesBefore: column === 0 && coversDay(entry, addDays(day, -1)),
+        continuesAfter: last === row.length - 1 && coversDay(entry, addDays(row[last], 1))
+      })
+    }
+  })
+  found.sort((a, b) => a.start - b.start || b.span - a.span || byPlacement(a.entry, b.entry))
+  const taken: boolean[][] = []
+  const free = (lane: number, from: number, span: number): boolean =>
+    Array.from({ length: span }, (_, i) => taken[lane]?.[from + i] !== true).every(Boolean)
+  return found.map(segment => {
+    let lane = 0
+    while (!free(lane, segment.start, segment.span)) lane++
+    taken[lane] ??= []
+    for (let i = 0; i < segment.span; i++) taken[lane][segment.start + i] = true
+    return { ...segment, lane }
+  })
+}
+
+/** what a cell draws in one lane: an entry starting there, a bar passing over from the left, or nothing */
+export type Slot = { kind: 'start'; segment: Segment } | { kind: 'under' } | { kind: 'empty' }
+
+/** a cell's lanes, up to maxLanes; whatever sits deeper is counted toward its More */
+export function cellSlots(segments: Segment[], column: number, maxLanes: number): { slots: Slot[]; hidden: number } {
+  const here = segments.filter(s => column >= s.start && column < s.start + s.span)
+  const lanes = Math.min(maxLanes, Math.max(-1, ...here.map(s => s.lane)) + 1)
+  const slots = Array.from({ length: lanes }, (_, lane): Slot => {
+    const segment = here.find(s => s.lane === lane)
+    if (!segment) return { kind: 'empty' }
+    return segment.start === column ? { kind: 'start', segment } : { kind: 'under' }
+  })
+  return { slots, hidden: here.filter(s => s.lane >= maxLanes).length }
+}
 
 /** a timed entry with no length still needs room to be read and clicked */
 export const MIN_BLOCK_MINUTES = 30

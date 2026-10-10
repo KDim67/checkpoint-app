@@ -162,6 +162,24 @@ export function dueForDrop(current: number, target: DropTarget): number {
   return moment(new Date(target.day.year, target.day.month, target.day.day, time.getHours(), time.getMinutes(), time.getSeconds()))
 }
 
+export type Nudge = 'left' | 'right' | 'up' | 'down'
+
+/** one key press of a keyboard move: a day sideways, a week up or down, or in the time grid a quarter hour */
+export function nudgedDue(current: number, nudge: Nudge, inTimeGrid: boolean): number {
+  if (inTimeGrid && !isAllDay(current) && (nudge === 'up' || nudge === 'down')) {
+    const t = new Date(current)
+    const minutes = t.getHours() * 60 + t.getMinutes()
+    // to the next quarter hour, so a time off the grid lands on it
+    const next = nudge === 'up'
+      ? Math.ceil(minutes / SNAP_MINUTES) * SNAP_MINUTES - SNAP_MINUTES
+      : Math.floor(minutes / SNAP_MINUTES) * SNAP_MINUTES + SNAP_MINUTES
+    return moment(new Date(t.getFullYear(), t.getMonth(), t.getDate(), 0, next))
+  }
+  const day = entryDay({ start: current, allDay: isAllDay(current) })
+  const by = nudge === 'left' ? -1 : nudge === 'right' ? 1 : nudge === 'up' ? -7 : 7
+  return dueForDrop(current, { day: addDays(day, by), minutes: null, allDayRow: false })
+}
+
 /** the due date a new item made on a day or a slot starts with */
 export function dueForNew(target: DropTarget): number {
   return target.minutes === null ? allDay(target.day) : dueForDrop(allDay(target.day), target)
