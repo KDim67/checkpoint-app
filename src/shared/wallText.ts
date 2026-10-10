@@ -1,6 +1,7 @@
 /** wall text stays plain with Notes' markers, so search, export and the assistant read it as written */
 
 import { linkSegments } from './wallLink'
+import { WALL_FONTS, type TextAlign, type WallFont, type WallItem } from './wallModel'
 
 export interface TextSpan {
   text: string
@@ -10,29 +11,50 @@ export interface TextSpan {
   code?: boolean
   underline?: boolean
   url?: string
+  /** six hex digits, lower case */
+  color?: string
+  /** a multiple of the box's own size, so a bigger word stays bigger when the box's size changes */
+  size?: number
+  font?: WallFont
 }
 
-export type TextBlock =
-  | { type: 'paragraph'; spans: TextSpan[] }
-  | { type: 'bullet'; depth: number; spans: TextSpan[] }
-  | { type: 'number'; depth: number; number: number; spans: TextSpan[] }
+type Aligned = { align?: TextAlign }
 
-type Style = Omit<TextSpan, 'text' | 'url'>
+export type TextBlock =
+  | ({ type: 'paragraph'; spans: TextSpan[] } & Aligned)
+  | ({ type: 'bullet'; depth: number; spans: TextSpan[] } & Aligned)
+  | ({ type: 'number'; depth: number; number: number; spans: TextSpan[] } & Aligned)
+
+/** a line as the editor holds it: list markers stay typed characters, words keep their styles */
+export interface WallLine {
+  align?: TextAlign
+  runs: TextSpan[]
+}
+
+type Style = Omit<TextSpan, 'text'>
 
 // code first so its contents stay literal; an underscore needs a non-word edge, snake_case isn't italic
 // ++underline++ is the one marker markdown lacks, so it borrows the common extension's
-const INLINE = /`([^`\n]+)`|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\+\+(?=\S)([\s\S]*?\S)\+\+|\*(?=[^\s*])([^*]*?[^\s*])\*|(?<!\w)_(?=[^\s_])([^_]*?[^\s_])_(?!\w)/g
+const INLINE = /`([^`\n]+)`|\*\*(?=\S)([\s\S]*?\S)\*\*|~~(?=\S)([\s\S]*?\S)~~|\+\+(?=\S)([\s\S]*?\S)\+\+|\*(?=[^\s*])([^*]*?[^\s*])\*|(?<!\w)_(?=[^\s_])([^_]*?[^\s_])_(?!\w)/
+const INLINE_AT = new RegExp(INLINE.source, 'y')
 
-function styled(text: string, style: Style): TextSpan[] {
+const COLOR = /^#[0-9a-f]{6}$/i
+const SIZE = /^\d+(\.\d+)?$/
+const MIN_SIZE = 0.25
+const MAX_SIZE = 8
+const LINK = /^(https?:\/\/|mailto:)[^\s()<>]+$/i
+const ALIGN_PREFIX = /^\{align=(left|center|right)\}/
+
+function styled(text: string, style: Style, autoLink: boolean): TextSpan[] {
   if (!text) return []
-  // an address in code is code, not a link
-  if (style.code) return [{ text, ...style }]
+  // an address in code, or already in a link, is what it is
+  if (style.code || style.url || !autoLink) return [{ text, ...style }]
   return linkSegments(text).map(s => (s.url ? { text: s.text, ...style, url: s.url } : { text: s.text, ...style }))
 }
 
 const sameStyle = (a: TextSpan, b: TextSpan): boolean =>
-  !a.url && !b.url && !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike &&
-  !!a.code === !!b.code && !!a.underline === !!b.underline
+  a.url === b.url && !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike &&
+  !!a.code === !!b.code && !!a.underline === !!b.underline && a.color === b.color && a.size === b.size && a.font === b.font
 
 /** neighbours with one style become one span, the renderer draws fewer nodes */
 function merge(spans: TextSpan[]): TextSpan[] {
@@ -45,40 +67,114 @@ function merge(spans: TextSpan[]): TextSpan[] {
   return out
 }
 
-function inline(text: string, style: Style = {}): TextSpan[] {
-  const out: TextSpan[] = []
-  let last = 0
+type SpanAttrs = Pick<TextSpan, 'url' | 'color' | 'size' | 'font'>
 
-  for (const m of text.matchAll(INLINE)) {
-    const start = m.index ?? 0
-    out.push(...styled(text.slice(last, start), style))
-    if (m[1] !== undefined) out.push(...styled(m[1], { ...style, code: true }))
-    else if (m[2] !== undefined) out.push(...inline(m[2], { ...style, bold: true }))
-    else if (m[3] !== undefined) out.push(...inline(m[3], { ...style, strike: true }))
-    else if (m[4] !== undefined) out.push(...inline(m[4], { ...style, underline: true }))
-    else out.push(...inline(m[5] ?? m[6], { ...style, italic: true }))
-    last = start + m[0].length
+function readAttrs(body: string): SpanAttrs | null {
+  const out: SpanAttrs = {}
+  for (const part of body.trim().split(/\s+/)) {
+    const [key, value = ''] = part.split('=')
+    if (key === 'color' && COLOR.test(value)) out.color = value.toLowerCase()
+    else if (key === 'size' && SIZE.test(value) && Number(value) >= MIN_SIZE && Number(value) <= MAX_SIZE) out.size = Number(value)
+    else if (key === 'font' && (WALL_FONTS as readonly string[]).includes(value)) out.font = value as WallFont
   }
+  return Object.keys(out).length > 0 ? out : null
+}
 
-  out.push(...styled(text.slice(last), style))
+/** [words](address){attrs}, [words](address) or [words]{attrs} from an opening bracket; null for anything else */
+function bracketAt(text: string, at: number): { inner: string; end: number; attrs: SpanAttrs } | null {
+  let depth = 0
+  let close = -1
+  for (let i = at; i < text.length; i++) {
+    if (text[i] === '[') depth++
+    else if (text[i] === ']' && --depth === 0) {
+      close = i
+      break
+    }
+  }
+  if (close <= at + 1) return null
+  const attrs: SpanAttrs = {}
+  let end = close + 1
+  if (text[end] === '(') {
+    const shut = text.indexOf(')', end)
+    const address = shut === -1 ? '' : text.slice(end + 1, shut)
+    if (!LINK.test(address)) return null
+    attrs.url = address
+    end = shut + 1
+  }
+  if (text[end] === '{') {
+    const shut = text.indexOf('}', end)
+    const read = shut === -1 ? null : readAttrs(text.slice(end + 1, shut))
+    if (read) {
+      Object.assign(attrs, read)
+      end = shut + 1
+    }
+  }
+  if (Object.keys(attrs).length === 0) return null
+  return { inner: text.slice(at + 1, close), end, attrs }
+}
+
+function inline(text: string, style: Style = {}, autoLink = true): TextSpan[] {
+  const out: TextSpan[] = []
+  let plain = 0
+  let i = 0
+  const flush = (end: number): void => {
+    out.push(...styled(text.slice(plain, end), style, autoLink))
+  }
+  while (i < text.length) {
+    if (text[i] === '[') {
+      const span = bracketAt(text, i)
+      if (span) {
+        flush(i)
+        out.push(...inline(span.inner, { ...style, ...span.attrs }, autoLink))
+        i = plain = span.end
+        continue
+      }
+    }
+    if ('`*~+_'.includes(text[i])) {
+      INLINE_AT.lastIndex = i
+      const m = INLINE_AT.exec(text)
+      if (m) {
+        flush(i)
+        if (m[1] !== undefined) out.push(...styled(m[1], { ...style, code: true }, autoLink))
+        else if (m[2] !== undefined) out.push(...inline(m[2], { ...style, bold: true }, autoLink))
+        else if (m[3] !== undefined) out.push(...inline(m[3], { ...style, strike: true }, autoLink))
+        else if (m[4] !== undefined) out.push(...inline(m[4], { ...style, underline: true }, autoLink))
+        else out.push(...inline(m[5] ?? m[6], { ...style, italic: true }, autoLink))
+        i = plain = i + m[0].length
+        continue
+      }
+    }
+    i++
+  }
+  flush(text.length)
   return merge(out)
 }
 
 const BULLET = /^(\s*)[-*•]\s+(.*)$/
 const NUMBERED = /^(\s*)(\d{1,3})[.)]\s+(.*)$/
+const LIST_PREFIX = /^\s*(?:[-*•]|\d{1,3}[.)])\s+/
 
 /** two spaces or a tab a level */
 const depthOf = (indent: string): number => Math.floor(indent.replace(/\t/g, '  ').length / 2)
 
+const linesOf = (text: string): string[] => text.replace(/\r\n?/g, '\n').split('\n')
+
+function splitAlign(line: string): { align?: TextAlign; rest: string } {
+  const m = ALIGN_PREFIX.exec(line)
+  return m ? { align: m[1] as TextAlign, rest: line.slice(m[0].length) } : { rest: line }
+}
+
 export function parseWallText(text: string): TextBlock[] {
-  return text.replace(/\r\n?/g, '\n').split('\n').map((line): TextBlock => {
-    const bullet = BULLET.exec(line)
-    if (bullet) return { type: 'bullet', depth: depthOf(bullet[1]), spans: inline(bullet[2]) }
-    const numbered = NUMBERED.exec(line)
+  return linesOf(text).map((line): TextBlock => {
+    const { align, rest } = splitAlign(line)
+    const aligned = align ? { align } : {}
+    const bullet = BULLET.exec(rest)
+    if (bullet) return { type: 'bullet', depth: depthOf(bullet[1]), spans: inline(bullet[2]), ...aligned }
+    const numbered = NUMBERED.exec(rest)
     if (numbered) {
-      return { type: 'number', depth: depthOf(numbered[1]), number: Number(numbered[2]), spans: inline(numbered[3]) }
+      return { type: 'number', depth: depthOf(numbered[1]), number: Number(numbered[2]), spans: inline(numbered[3]), ...aligned }
     }
-    return { type: 'paragraph', spans: inline(line) }
+    return { type: 'paragraph', spans: inline(rest), ...aligned }
   })
 }
 
@@ -90,6 +186,109 @@ export function plainWallText(text: string): string {
     const marker = block.type === 'bullet' ? '•' : `${block.number}.`
     return `${'  '.repeat(block.depth)}${marker} ${words}`
   }).join('\n')
+}
+
+/** lines for the editor: a list marker stays the characters typed, and a bare address stays words until drawn */
+export function parseWallLines(text: string): WallLine[] {
+  return linesOf(text).map(line => {
+    const { align, rest } = splitAlign(line)
+    const prefix = LIST_PREFIX.exec(rest)?.[0] ?? ''
+    const runs = merge([...(prefix ? [{ text: prefix }] : []), ...inline(rest.slice(prefix.length), {}, false)])
+    return align ? { align, runs } : { runs }
+  })
+}
+
+type MarkerKind = 'bold' | 'italic' | 'strike' | 'underline' | 'code'
+// outermost first, the order Ctrl+B and friends nest them in
+const MARKER_ORDER: MarkerKind[] = ['bold', 'italic', 'strike', 'underline', 'code']
+const MARKER_TEXT: Record<Exclude<MarkerKind, 'italic'>, string> = { bold: '**', strike: '~~', underline: '++', code: '`' }
+
+const isWord = (ch: string | undefined): boolean => ch !== undefined && /\w/.test(ch)
+
+interface Emission {
+  lead: string
+  kinds: MarkerKind[]
+  core: string
+  trail: string
+}
+
+/** each run's markers hug its words; spaces sit outside them, where markdown wants them */
+function emit(run: TextSpan): Emission {
+  const lead = /^\s*/.exec(run.text)?.[0] ?? ''
+  const core = run.text.slice(lead.length).trimEnd()
+  const trail = run.text.slice(lead.length + core.length)
+  if (!core) return { lead: run.text, kinds: [], core: '', trail: '' }
+  // code keeps its contents literal, so a backtick inside can't be code
+  const kinds = MARKER_ORDER.filter(k => run[k] && (k !== 'code' || !core.includes('`')))
+  return { lead, kinds, core, trail }
+}
+
+function markersFor(runs: TextSpan[]): string {
+  const emissions = merge(runs).map(emit)
+  let out = ''
+  emissions.forEach((e, i) => {
+    const next = emissions[i + 1]
+    const before = e.lead ? e.lead[e.lead.length - 1] : out[out.length - 1]
+    const after = e.trail ? e.trail[0] : next ? (next.lead || (next.kinds.length > 0 ? '*' : next.core))[0] : undefined
+    // an underscore beside a letter, or around words holding one, isn't italic; an asterisk is
+    const outerItalic = e.kinds[0] === 'italic'
+    const italic = e.core.includes('_') || (outerItalic && (isWord(before) || isWord(after))) ? '*' : '_'
+    const marker = (k: MarkerKind): string => (k === 'italic' ? italic : MARKER_TEXT[k])
+    const open = e.kinds.map(marker).join('')
+    const close = [...e.kinds].reverse().map(marker).join('')
+    out += `${e.lead}${open}${e.core}${close}${e.trail}`
+  })
+  return out
+}
+
+const attrsOf = (run: TextSpan): SpanAttrs => ({
+  ...(run.url ? { url: run.url } : {}),
+  ...(run.color ? { color: run.color } : {}),
+  ...(run.size !== undefined ? { size: run.size } : {}),
+  ...(run.font ? { font: run.font } : {})
+})
+
+const sameAttrs = (a: SpanAttrs, b: SpanAttrs): boolean => a.url === b.url && a.color === b.color && a.size === b.size && a.font === b.font
+
+function serializeRuns(runs: TextSpan[]): string {
+  const groups: { attrs: SpanAttrs; runs: TextSpan[] }[] = []
+  for (const run of runs) {
+    if (!run.text) continue
+    const attrs = attrsOf(run)
+    const last = groups[groups.length - 1]
+    if (last && sameAttrs(last.attrs, attrs)) last.runs.push(run)
+    else groups.push({ attrs, runs: [run] })
+  }
+  return groups.map(({ attrs, runs: inGroup }) => {
+    const plain = inGroup.map(r => ({ text: r.text, bold: r.bold, italic: r.italic, strike: r.strike, underline: r.underline, code: r.code }))
+    const body = markersFor(plain)
+    if (Object.keys(attrs).length === 0) return body
+    const named = [
+      attrs.color ? `color=${attrs.color}` : '',
+      attrs.size !== undefined ? `size=${Number(attrs.size.toFixed(2))}` : '',
+      attrs.font ? `font=${attrs.font}` : ''
+    ].filter(Boolean).join(' ')
+    return `[${body}]${attrs.url ? `(${attrs.url})` : ''}${named ? `{${named}}` : ''}`
+  }).join('')
+}
+
+/** the editor's lines as stored text */
+export function serializeWallLines(lines: WallLine[]): string {
+  return lines.map(line => `${line.align ? `{align=${line.align}}` : ''}${serializeRuns(line.runs)}`).join('\n')
+}
+
+/** one style off every word, for when the whole box takes it; text without it comes back as it was */
+export function stripWordStyle(text: string, key: 'color' | 'font'): string {
+  const lines = parseWallLines(text)
+  if (!lines.some(line => line.runs.some(run => run[key] !== undefined))) return text
+  return serializeWallLines(lines.map(line => ({
+    ...line,
+    runs: line.runs.map(run => {
+      const next = { ...run }
+      delete next[key]
+      return next
+    })
+  })))
 }
 
 interface Edit {
@@ -336,8 +535,33 @@ export function continueList(value: string, caret: number): { value: string; car
   return { value: value.slice(0, caret) + insert + value.slice(caret), caret: caret + insert.length }
 }
 
+/** Enter in one line, for an editor that holds lines apart: the marker the next item starts with, leave the list from an empty item, or null for a plain new line */
+export function listContinuation(line: string, caret: number): { prefix: string } | 'leave' | null {
+  const m = LIST_ITEM.exec(line)
+  if (!m) return null
+  const [, indent, marker, digits, closer, , content] = m
+  // a caret inside the marker is just a line break
+  if (caret < line.length - content.length) return null
+  if (!content.trim()) return 'leave'
+  return { prefix: `${indent}${digits ? `${Number(digits) + 1}${closer}` : marker} ` }
+}
+
 /** where Tab means a level: a list item, or a line already indented */
 export function takesIndent(value: string, at: number): boolean {
   const line = value.slice(lineStartOf(value, at), lineEndOf(value, at))
   return LIST_ITEM.test(line) || /^[ \t]/.test(line)
+}
+
+/**
+ * a change to whole boxes; a colour or font for the whole box takes over from the one single words wear,
+ * except a sticky's or a shape's colour, which is its paper and not its letters
+ */
+export function restyleBoxes(items: WallItem[], ids: Set<string>, patch: Partial<WallItem>, clearWords?: 'color' | 'font'): WallItem[] {
+  return items.map(item => {
+    if (!ids.has(item.id) || item.locked) return item
+    const next = { ...item, ...patch }
+    const clears = clearWords === 'font' || (clearWords === 'color' && item.kind === 'text')
+    if (clears && item.text) next.text = stripWordStyle(item.text, clearWords)
+    return next
+  })
 }

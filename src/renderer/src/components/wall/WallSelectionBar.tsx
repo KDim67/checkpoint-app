@@ -5,7 +5,7 @@ import {
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw
 } from 'lucide-react'
-import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, WALL_FONT_NAMES, type WallItem } from '../../../../shared/wallModel'
+import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { alignableUnits, alignItems, distributeItems, type AlignEdge } from '../../../../shared/wallAlign'
 import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
@@ -15,7 +15,9 @@ import { CODE_LANGUAGES } from '../../../../shared/wallCode'
 import WallColorPicker from './WallColorPicker'
 import WallLinkEditor from './WallLinkEditor'
 import WallTagEditor from './WallTagEditor'
-import { toolButton, arrowStyleButtons, textAlignButton, shapeGlyph, ShapePickerMenu, FontPickerMenu, TextSizeMenu } from './wallButtons'
+import { toolButton, arrowStyleButtons, textAlignButton, shapeGlyph, ShapePickerMenu } from './wallButtons'
+import { ColorA, FontSelect, SizeStepper } from './wallTextControls'
+import { restyleBoxes } from '../../../../shared/wallText'
 
 interface WallSelectionBarProps {
   floatingPos: { left: number; top: number }
@@ -68,6 +70,12 @@ const fieldLabel: CSSProperties = {
   fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)'
 }
 
+/** one value when every selected box agrees, null when they don't */
+function agreed<T>(values: T[]): T | null | undefined {
+  if (values.length === 0) return undefined
+  return values.every(v => v === values[0]) ? values[0] : null
+}
+
 /** a row across, a row down, laid out like the lines they make */
 const ALIGN: { edge: AlignEdge; label: string; icon: ReactNode }[] = [
   { edge: 'left', label: 'Align left edges', icon: <AlignStartVertical size={13} /> },
@@ -92,29 +100,24 @@ export default function WallSelectionBar({
   const stickiesSelected = chosen.length > 0 && chosen.every(i => i.kind === 'note')
   const codeSelected = chosen.length > 0 && chosen.every(i => i.kind === 'code')
   const roundedSelected = chosen.some(i => i.kind === 'shape' && i.shape === 'rounded')
+  const textOnly = chosen.length > 0 && chosen.every(i => i.kind === 'text')
   // a group is one piece; a single item has nothing to line up with, so skip the count
   const pieces = chosen.length >= 2 ? alignableUnits(items, selectedIds) : chosen.length
   const { canGroup, canUngroup } = groupState(items, selectedIds)
   // tied to the selection that opened them, a new pick closes them without an effect
   const [styleFor, setStyleFor] = useState<Set<string> | null>(null)
   const [shapePickerFor, setShapePickerFor] = useState<Set<string> | null>(null)
-  const [fontPickerFor, setFontPickerFor] = useState<Set<string> | null>(null)
   const [tagsFor, setTagsFor] = useState<Set<string> | null>(null)
-  const [sizeFor, setSizeFor] = useState<Set<string> | null>(null)
   const styleOpen = styleFor === selectedIds
   const shapePickerOpen = shapePickerFor === selectedIds
-  const fontPickerOpen = fontPickerFor === selectedIds
   const tagsOpen = tagsFor === selectedIds
-  const sizeOpen = sizeFor === selectedIds
   const closeOthers = (): void => {
     setSwatchOpen(false)
     setLinkOpen(false)
     setAlignOpen(false)
     setStyleFor(null)
     setShapePickerFor(null)
-    setFontPickerFor(null)
     setTagsFor(null)
-    setSizeFor(null)
   }
   const first = chosen[0]
   // the drag was record: false, letting go makes it one undo step
@@ -133,50 +136,59 @@ export default function WallSelectionBar({
       boxShadow: 'var(--shadow-lg)',
       zIndex: 15
     }}>
-      {/* one swatch, the full palette is one click in; laid out flat it covered the selection */}
-      <div data-wall-swatch className="relative">
-        <button
-          onClick={() => { const open = swatchOpen; closeOthers(); setSwatchOpen(!open) }}
-          title="Colour"
-          aria-label="Colour"
-          aria-expanded={swatchOpen}
-          className="btn-icon"
-          style={{
-            width: '30px', height: '30px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: swatchOpen ? 'var(--color-surface-offset)' : undefined
-          }}
-        >
-          <span
-            aria-hidden
+      {/* a text box's colour is its letters', so it's an A as in a document; anything else's is its paper, one swatch with the palette a click in */}
+      {textOnly ? (
+        <ColorA
+          value={agreed(chosen.map(i => i.color))}
+          fallback="var(--color-text-base)"
+          // live while the custom picker is dragged, one undo step when it is let go
+          onPick={(c, final) => setItems(restyleBoxes(items, selectedIds, { color: c ?? undefined }, 'color'), { record: final })}
+        />
+      ) : (
+        <div data-wall-swatch className="relative">
+          <button
+            onClick={() => { const open = swatchOpen; closeOthers(); setSwatchOpen(!open) }}
+            title="Colour"
+            aria-label="Colour"
+            aria-expanded={swatchOpen}
+            className="btn-icon"
             style={{
-              width: '16px', height: '16px', borderRadius: '50%',
-              background: single?.color ?? 'transparent',
-              // empty ring for none or mixed
-              border: single?.color
-                ? '1px solid rgba(0, 0, 0, 0.25)'
-                : '1px dashed var(--color-text-faint)'
+              width: '30px', height: '30px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: swatchOpen ? 'var(--color-surface-offset)' : undefined
             }}
-          />
-        </button>
-
-        {swatchOpen && (
-          <div style={{ ...popover, padding: 'var(--space-2)', width: '146px' }}>
-            <WallColorPicker
-              colors={WALL_COLORS}
-              value={single?.color}
-              // live while the custom picker is dragged, one undo step when it is let go
-              onChange={c => setItems(patchItems(items, selectedIds, { color: c }), { record: false })}
-              onCommit={c => {
-                setItems(patchItems(items, selectedIds, { color: c }))
-                if (chosen.some(i => i.kind === 'note')) onStickyColor?.(c)
+          >
+            <span
+              aria-hidden
+              style={{
+                width: '16px', height: '16px', borderRadius: '50%',
+                background: single?.color ?? 'transparent',
+                // empty ring for none or mixed
+                border: single?.color
+                  ? '1px solid rgba(0, 0, 0, 0.25)'
+                  : '1px dashed var(--color-text-faint)'
               }}
-              onDone={() => setSwatchOpen(false)}
-              columns={4}
             />
-          </div>
-        )}
-      </div>
+          </button>
+  
+          {swatchOpen && (
+            <div style={{ ...popover, padding: 'var(--space-2)', width: '146px' }}>
+              <WallColorPicker
+                colors={WALL_COLORS}
+                value={single?.color}
+                // live while the custom picker is dragged, one undo step when it is let go
+                onChange={c => setItems(restyleBoxes(items, selectedIds, { color: c }, 'color'), { record: false })}
+                onCommit={c => {
+                  setItems(restyleBoxes(items, selectedIds, { color: c }, 'color'))
+                  if (chosen.some(i => i.kind === 'note')) onStickyColor?.(c)
+                }}
+                onDone={() => setSwatchOpen(false)}
+                columns={4}
+              />
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px' }} />
       {/* one item, one link; locked items keep theirs like their text */}
       {single && isLinkable(single.kind) && (
@@ -215,69 +227,28 @@ export default function WallSelectionBar({
         textAlignOf(first),
         v => setItems(patchItems(items, selectedIds, { align: v }))
       )}
+      {/* a font by its name and a size to step or type, the way a document has them */}
       {wordsSelected && (
-        <div className="relative" data-wall-popover="font">
-          {toolButton(
-            `Font: ${WALL_FONT_NAMES[first?.font ?? 'sans']}`,
-            <span style={{
-              fontSize: '13px',
-              fontWeight: 700,
-              lineHeight: 1
-            }}>
-              T
-            </span>,
-            () => {
-              const open = fontPickerOpen
-              closeOthers()
-              setFontPickerFor(open ? null : selectedIds)
-            },
-            { active: fontPickerOpen }
-          )}
-          {fontPickerOpen && (
-            <div style={{ ...popover, top: 'calc(100% + 4px)', left: 0 }}>
-              <FontPickerMenu
-                current={first?.font ?? 'sans'}
-                onPick={v => {
-                  setItems(patchItems(items, selectedIds, { font: v }))
-                  setFontPickerFor(null)
-                }}
-                onClose={() => setFontPickerFor(null)}
-              />
-            </div>
-          )}
-        </div>
+        <FontSelect
+          value={agreed(chosen.map(i => i.font ?? 'sans')) ?? null}
+          onPick={v => setItems(restyleBoxes(items, selectedIds, { font: v }, 'font'))}
+        />
       )}
       {wordsSelected && first && (
-        <div className="relative" data-wall-popover="size">
-          {toolButton(
-            first.fontSize ? `Text size: ${first.fontSize}` : 'Text size: fits the box',
-            // the number is the readout, so the size in use needs no second click
-            <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-              {first.fontSize ?? 'A'}
-            </span>,
-            () => { const open = sizeOpen; closeOthers(); setSizeFor(open ? null : selectedIds) },
-            { active: sizeOpen }
-          )}
-          {sizeOpen && (
-            <div style={{ ...popover, top: 'calc(100% + 4px)', left: 0 }}>
-              <TextSizeMenu
-                current={fontSizeOf(first)}
-                chosen={first.fontSize !== undefined}
-                onPick={size => {
-                  setItems(items.map(i => {
-                    if (!selectedIds.has(i.id) || i.locked) return i
-                    const next = { ...i }
-                    if (size === undefined) delete next.fontSize
-                    else next.fontSize = size
-                    return next
-                  }))
-                  setSizeFor(null)
-                }}
-                onClose={() => setSizeFor(null)}
-              />
-            </div>
-          )}
-        </div>
+        <SizeStepper
+          value={agreed(chosen.map(fontSizeOf)) ?? null}
+          stepFrom={fontSizeOf(first)}
+          fit={{ active: chosen.every(i => i.fontSize === undefined) }}
+          onPick={size => {
+            setItems(items.map(i => {
+              if (!selectedIds.has(i.id) || i.locked) return i
+              const next = { ...i }
+              if (size === undefined) delete next.fontSize
+              else next.fontSize = size
+              return next
+            }))
+          }}
+        />
       )}
       {stickiesSelected && (
         <div className="relative" data-wall-popover="tags">

@@ -9,6 +9,8 @@ const OUT = path.join('resources', 'THIRD-PARTY-LICENSES.txt')
 const RENDERER_BUNDLED = [
   '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities',
   '@fontsource/inter', '@fontsource/jetbrains-mono',
+  '@lexical/clipboard', '@lexical/history', '@lexical/html', '@lexical/link', '@lexical/markdown',
+  '@lexical/react', '@lexical/rich-text', '@lexical/selection', '@lexical/utils', 'lexical',
   'date-fns', 'immer', 'lucide-react', 'mermaid',
   'react', 'react-dom', 'react-markdown', 'remark-gfm', 'simple-icons', 'three', 'zustand'
 ]

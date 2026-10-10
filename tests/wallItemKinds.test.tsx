@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import WallItemView from '../src/renderer/src/components/wall/WallItemView'
 import { fontSizeOf, type WallItem } from '../src/shared/wallModel'
+import { standInForRangeLayout } from './helpers/rangeLayout'
 
 afterEach(cleanup)
+beforeAll(standInForRangeLayout)
 
 type Props = ComponentProps<typeof WallItemView>
 
@@ -60,11 +62,11 @@ describe('tags on a sticky', () => {
 })
 
 describe('opening a sticky to write in', () => {
-  it('puts the caret after the last word, so a new line goes below the others', () => {
-    view({ text: 'first line\nsecond line' }, { editing: true })
-    const box = screen.getByRole('textbox') as HTMLTextAreaElement
-    expect(box.selectionStart).toBe(box.value.length)
-    expect(box.selectionEnd).toBe(box.value.length)
+  it('puts the caret after the last word, so a new line goes below the others', async () => {
+    const onTextChange = vi.fn()
+    await act(async () => { view({ text: 'first line\nsecond line' }, { editing: true, onTextChange }) })
+    await act(async () => { fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' }) })
+    expect(onTextChange).toHaveBeenLastCalledWith('i', 'first line\nsecond line\n')
   })
 })
 

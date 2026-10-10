@@ -5,6 +5,8 @@
   // DOM types for the renderer code tests pull in; JSX left as the renderer has it
   "compilerOptions": {
     "composite": false,
+    // tests import renderer modules, so they resolve packages the way the renderer does
+    "moduleResolution": "bundler",
     "noEmit": true,
     "types": ["node"],
     "lib": ["ESNext", "DOM", "DOM.Iterable"]

@@ -162,7 +162,7 @@ export function ShapePickerMenu({ current, onPick, onClose }: ShapePickerMenuPro
 export const shapeButton = (current: ShapeType, onPick: (next: ShapeType) => void): React.JSX.Element =>
   cycleButton('Shape', SHAPE_TYPES, current, shape => <svg {...glyphProps}>{OUTLINE_GLYPHS[shape]}</svg>, onPick, false, SHAPE_NAMES)
 
-const ALIGN_GLYPHS: Record<TextAlign, string> = {
+export const ALIGN_GLYPHS: Record<TextAlign, string> = {
   left: 'M2 4H13M2 7.5H9M2 11H11',
   center: 'M2 4H13M4 7.5H11M3 11H12',
   right: 'M2 4H13M6 7.5H13M4 11H13'
@@ -313,12 +313,14 @@ export interface TextSizeMenuProps {
   /** the size in use, and whether it was chosen or taken from the box */
   current: number
   chosen: boolean
+  /** offers going back to sizing itself to the box; a word has no box of its own */
+  fit?: boolean
   onPick: (size: number | undefined) => void
   onClose?: () => void
 }
 
 /** a size to read at, or back to sizing itself to the box */
-export function TextSizeMenu({ current, chosen, onPick, onClose }: TextSizeMenuProps): React.JSX.Element {
+export function TextSizeMenu({ current, chosen, fit = true, onPick, onClose }: TextSizeMenuProps): React.JSX.Element {
   const row = (label: string, selected: boolean, size: number, value: number | undefined): React.JSX.Element => (
     <button
       key={label}
@@ -368,7 +370,7 @@ export function TextSizeMenu({ current, chosen, onPick, onClose }: TextSizeMenuP
       }}>
         Text size
       </div>
-      {row('Fit to the box', !chosen, 13, undefined)}
+      {fit && row('Fit to the box', !chosen, 13, undefined)}
       {WALL_FONT_SIZES.map(size => row(`${size}`, chosen && current === size, Math.min(size, 24), size))}
     </div>
   )
