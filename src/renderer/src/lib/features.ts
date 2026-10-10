@@ -13,6 +13,7 @@ export const VIEW_FEATURES: ViewFeature[] = [
   { view: 'kanban',      key: 'feature_view_kanban',      label: 'Kanban Board View',        defaultOn: true },
   { view: 'log',         key: 'feature_view_log',         label: 'Daily Log View',           defaultOn: true },
   { view: 'backlog',     key: 'feature_view_backlog',     label: 'Structured Backlog View',  defaultOn: true },
+  { view: 'calendar',    key: 'feature_view_calendar',    label: 'Calendar',                 defaultOn: true },
   { view: 'renewals',    key: 'feature_view_renewals',    label: 'Renewals & Expiry Alerts', defaultOn: true },
   { view: 'focus',       key: 'feature_view_focus',       label: 'Focus Timer & Pomodoro',   defaultOn: true },
   { view: 'notes',       key: 'feature_view_notes',       label: 'Obsidian-Style Notes',     defaultOn: true },

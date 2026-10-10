@@ -35,6 +35,7 @@ const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
   { view: 'kanban', label: 'Kanban', keywords: ['board', 'cards', 'columns'] },
   { view: 'log', label: 'Log', keywords: ['journal', 'timeline', 'entries'] },
   { view: 'backlog', label: 'Backlog', keywords: ['tasks', 'todo'] },
+  { view: 'calendar', label: 'Calendar', keywords: ['schedule', 'month', 'week', 'agenda', 'due', 'plan', 'ical', 'events'] },
   { view: 'renewals', label: 'Renewals', keywords: ['expiry', 'expires', 'subscription', 'domain', 'api key', 'certificate', 'licence'] },
   { view: 'focus', label: 'Focus', keywords: ['pomodoro', 'timer', 'session'] },
   { view: 'notes', label: 'Notes', keywords: ['markdown', 'scratchpad', 'writing'] },

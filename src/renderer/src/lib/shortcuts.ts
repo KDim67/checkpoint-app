@@ -32,6 +32,8 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+-', action: { kind: 'view', view: 'gamedev' } },
   // twelfth, the next key along; the app has no menu, so Ctrl+= is nobody's zoom
   { id: 'view_renewals',    label: 'Go to Renewals',    defaultCombo: 'Ctrl+=', action: { kind: 'view', view: 'renewals' } },
+  // past the number row; C for calendar, as most apps' Go to Calendar
+  { id: 'view_calendar',    label: 'Go to Calendar',    defaultCombo: 'Ctrl+Shift+C', action: { kind: 'view', view: 'calendar' } },
   { id: 'toggle_ai_panel',  label: 'Toggle AI panel',   defaultCombo: 'Ctrl+L', action: { kind: 'toggleAiPanel' } },
   { id: 'open_settings',    label: 'Open Settings',     defaultCombo: 'Ctrl+,', action: { kind: 'openSettings' } },
   // listed so the binder sees it taken; it was wired apart and the wall's link key fired with it

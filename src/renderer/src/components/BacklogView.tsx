@@ -37,6 +37,14 @@ interface WorkflowColumn {
 export default function BacklogView() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const [showRecurring, setShowRecurring] = useState(false)
+  const pendingRecurring = useAppStore(s => s.pendingRecurring)
+  const setPendingRecurring = useAppStore(s => s.setPendingRecurring)
+  // from a repeat on the calendar
+  useEffect(() => {
+    if (!pendingRecurring) return
+    setPendingRecurring(false)
+    setShowRecurring(true)
+  }, [pendingRecurring, setPendingRecurring])
   const [activeView, setActiveView] = useState<SavedView | null>(null)
   const pendingViewId = useAppStore(s => s.pendingViewId)
 
