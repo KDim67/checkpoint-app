@@ -2680,7 +2680,8 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 }
 
 .plugin-status-detail[data-status="needs-approval"],
-.plugin-status-detail[data-status="stopped"] {
+.plugin-status-detail[data-status="stopped"],
+.plugin-status-detail[data-status="changed"] {
   color: var(--color-warning);
 }
 

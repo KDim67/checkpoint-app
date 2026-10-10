@@ -56,6 +56,10 @@ export default function PluginConsentModal({ plugin, workspaces, activeWorkspace
         </div>
       </div>
 
+      {plugin.changed && (
+        <div className="text-sub">Its code changed since you approved it, though it asks for nothing more. Turning it on accepts the new code.</div>
+      )}
+
       <ul className="plugin-consent-list">
         {permissions.map(permission => (
           <li key={permission} className="plugin-consent-item">

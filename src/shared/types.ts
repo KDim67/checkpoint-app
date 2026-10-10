@@ -384,7 +384,9 @@ export interface PluginInfo {
   /** read from the file, never by running it */
   request: PluginRequest
   /** what you approved on this machine, null if never */
-  grant: Pick<PluginGrant, 'permissions' | 'hosts' | 'workspaces'> | null
+  grant: Pick<PluginGrant, 'permissions' | 'hosts' | 'workspaces' | 'grantedAt'> | null
+  /** its code is no longer what you approved, though it asks for nothing more, so it still runs */
+  changed: boolean
   status: PluginStatus
   /** why it stopped or needs you, in words for the settings row */
   statusDetail: string | null

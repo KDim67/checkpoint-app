@@ -22,7 +22,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "prepackage": "npm run verify",
+    "prepackage": "npm run verify && node scripts/check-sandbox.mjs",
     "package": "electron-builder --config electron-builder.yml",
     "postinstall": "node node_modules/electron/install.js && electron-rebuild",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.test.json",

@@ -66,8 +66,9 @@ Every plugin also gets its own small private storage, with no permission.
 
 You approve the list as it stands. When the file is edited, Checkpoint restarts
 the plugin; if it now asks for more than you approved, it stops and shows
-**Needs your OK** until you review it. Asking for less needs nothing. Approvals
-are per computer and never sync.
+**Needs your OK** until you review it. Asking for less needs nothing, and a
+change that asks for nothing more keeps running, marked as changed in Settings
+until you review it. Approvals are per computer and never sync.
 
 ## The api
 

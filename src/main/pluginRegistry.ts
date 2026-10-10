@@ -2,6 +2,7 @@
 
 import { app, ipcMain, type IpcMainEvent } from 'electron'
 import { join } from 'path'
+import { createHash } from 'crypto'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import type { PluginInfo, PluginLogLine } from '../shared/types'
 import { getPluginsDir, ensureDir } from './paths'
@@ -124,6 +125,11 @@ function readPlugin(filename: string): OnDisk | { error: string } {
   }
 }
 
+const fingerprint = (source: string): string => createHash('sha256').update(source).digest('hex')
+
+const grantView = (grant: PluginGrant | null): PluginInfo['grant'] =>
+  grant && !grant.legacy ? { permissions: grant.permissions, hosts: grant.hosts, workspaces: grant.workspaces, grantedAt: grant.grantedAt } : null
+
 function statusFor(filename: string, request: PluginRequest, grant: PluginGrant | null): { status: PluginStatus; detail: string | null } {
   if (!grant || !grant.on) return { status: 'off', detail: null }
   if (grant.legacy) {
@@ -154,12 +160,16 @@ export function scanPlugins(): PluginInfo[] {
           active: grant?.on === true,
           request: { permissions: [], hosts: [], ignored: [] },
           settings: [],
-          grant: grant && !grant.legacy ? { permissions: grant.permissions, hosts: grant.hosts, workspaces: grant.workspaces } : null,
+          grant: grantView(grant),
+          changed: false,
           status: 'stopped' as const,
           statusDetail: read.error
         }
       }
       const { status, detail } = statusFor(filename, read.request, grant)
+      // one asking for more already says so; one that was never fingerprinted has nothing to compare with
+      const changed = grant !== null && grant.on && !grant.legacy && status !== 'needs-approval' &&
+        grant.sourceHash !== undefined && grant.sourceHash !== fingerprint(read.source)
       return {
         filename,
         name: read.name,
@@ -167,7 +177,8 @@ export function scanPlugins(): PluginInfo[] {
         version: read.version,
         active: grant?.on === true,
         request: read.request,
-        grant: grant && !grant.legacy ? { permissions: grant.permissions, hosts: grant.hosts, workspaces: grant.workspaces } : null,
+        grant: grantView(grant),
+        changed,
         status,
         statusDetail: detail,
         settings: read.settings
@@ -434,6 +445,8 @@ function start(filename: string): Promise<Result> {
   if (!grant || !grant.on || !grantCovers(grant, read.request)) {
     return Promise.resolve({ ok: false, error: `${read.name} needs your approval first.` })
   }
+  // approved before approvals kept a fingerprint: what it runs now is what you let run
+  if (grant.sourceHash === undefined) saveGrant(filename, { ...grant, sourceHash: fingerprint(read.source) })
   wire()
 
   return new Promise(resolve => {
@@ -521,7 +534,8 @@ export async function approvePlugin(
     permissions: read.request.permissions,
     hosts: read.request.hosts,
     workspaces,
-    grantedAt: Date.now()
+    grantedAt: Date.now(),
+    sourceHash: fingerprint(read.source)
   })
   outcomes.delete(filename)
   if (!engineRunning) return { ok: true }

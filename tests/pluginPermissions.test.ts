@@ -60,6 +60,12 @@ describe('stored approvals', () => {
     })
   })
 
+  it('keep the fingerprint of what you approved, and drop one that is not a sha-256', () => {
+    const hash = 'a'.repeat(64)
+    expect(readGrants({ 'a.js': { on: true, sourceHash: hash } })['a.js'].sourceHash).toBe(hash)
+    expect(readGrants({ 'a.js': { on: true, sourceHash: 'nope' } })['a.js']).not.toHaveProperty('sourceHash')
+  })
+
   it('follow a workspace rename', () => {
     const grants = { 'a.js': grantOf(['read'], { workspaces: ['work', 'home'] }), 'b.js': grantOf(['read'], { workspaces: ['home'] }) }
     const renamed = renameGrantWorkspaces(grants, 'work', 'job')
