@@ -7,7 +7,8 @@ import { getMainWindow } from '../windows'
 import { setSetting } from '../db'
 import { paintTitleBar, readTitleBarColors, TITLE_BAR_SETTING } from '../titleBarSync'
 import { app, dialog, shell } from 'electron'
-import { writeFileSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { dirname } from 'path'
 
 export function registerAppHandlers(): void {
   ipcMain.handle(IpcChannels.APP_GET_VERSION, () => app.getVersion())
@@ -99,5 +100,17 @@ export function registerAppHandlers(): void {
   ipcMain.handle(IpcChannels.APP_INSTALL_UPDATE, async () => {
     const { installUpdateAndRestart } = await import('../updater')
     await installUpdateAndRestart()
+  })
+
+  // the file selected so it can be attached to a bug report; before any update has run, its empty folder
+  ipcMain.handle(IpcChannels.APP_SHOW_UPDATE_LOG, async () => {
+    const { updateLogPath } = await import('../updateLog')
+    const file = updateLogPath()
+    if (existsSync(file)) {
+      shell.showItemInFolder(file)
+      return
+    }
+    mkdirSync(dirname(file), { recursive: true })
+    await shell.openPath(dirname(file))
   })
 }

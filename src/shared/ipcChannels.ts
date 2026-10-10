@@ -177,6 +177,7 @@ export const enum IpcChannels {
   APP_UPDATE_PROGRESS     = 'app:updateProgress',
   APP_UPDATE_STATE        = 'app:updateState',
   APP_INSTALL_UPDATE      = 'app:installUpdate',
+  APP_SHOW_UPDATE_LOG     = 'app:showUpdateLog',
 
   // calendar
   CALENDAR_ENTRIES             = 'calendar:entries',

@@ -117,8 +117,12 @@ const api = {
       ipcRenderer.invoke(IpcChannels.APP_UPDATE_STATE),
     installUpdate: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_INSTALL_UPDATE),
-    onUpdateProgress: (callback: (progress: UpdateProgress) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, progress: UpdateProgress) => callback(progress)
+    /** the updater's log file, selected in its folder */
+    showUpdateLog: (): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.APP_SHOW_UPDATE_LOG),
+    /** null when a failed download is cleared */
+    onUpdateProgress: (callback: (progress: UpdateProgress | null) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, progress: UpdateProgress | null) => callback(progress)
       ipcRenderer.on(IpcChannels.APP_UPDATE_PROGRESS, handler)
       return () => ipcRenderer.removeListener(IpcChannels.APP_UPDATE_PROGRESS, handler)
     },

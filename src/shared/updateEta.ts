@@ -46,7 +46,7 @@ export function formatBytes(bytes: number): string {
 /** version and estimate are both conditional early on */
 export function describeUpdateProgress(progress: UpdateProgress): string {
   if (progress.phase === 'ready') {
-    return `Version ${progress.version} is ready. Restarting to install…`
+    return `Version ${progress.version} is ready. Restart to install it now, or it installs when you quit.`
   }
   const named = progress.version ? ` version ${progress.version}` : ''
   const size = progress.total > 0
