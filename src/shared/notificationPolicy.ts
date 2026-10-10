@@ -1,6 +1,6 @@
 /** judgement split from delivery; dedupe stops an overdue task alerting every sweep */
 
-export type NotificationCategory = 'due' | 'renewal' | 'focus' | 'webhook' | 'recurrence' | 'agent' | 'plugin'
+export type NotificationCategory = 'due' | 'renewal' | 'focus' | 'webhook' | 'recurrence' | 'agent' | 'plugin' | 'connections'
 
 export const NOTIFICATION_CATEGORIES: {
   id: NotificationCategory
@@ -15,7 +15,9 @@ export const NOTIFICATION_CATEGORIES: {
   { id: 'recurrence', label: 'Repeating work', description: 'When a repeating task creates its next occurrence.', defaultOn: false },
   { id: 'agent', label: 'Agent activity', description: 'When an external agent changes something over MCP.', defaultOn: false },
   // on by default: you already said yes when you let the plugin notify you
-  { id: 'plugin', label: 'Plugins', description: 'When a plugin you allowed to notify you has something to say.', defaultOn: true }
+  { id: 'plugin', label: 'Plugins', description: 'When a plugin you allowed to notify you has something to say.', defaultOn: true },
+  // on: a key that lapses silently would stop the sync without anyone knowing
+  { id: 'connections', label: 'Connections', description: 'When a connected service needs you, such as a key about to expire.', defaultOn: true }
 ]
 
 export interface NotificationPolicy {

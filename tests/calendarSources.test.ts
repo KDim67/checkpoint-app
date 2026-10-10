@@ -134,6 +134,15 @@ describe('changing things from the calendar', () => {
     expect(getItemById(task.id)).toMatchObject({ due_at: allDay({ year: 2026, month: 9, day: 20 }), context: 'work', status: 'open' })
   })
 
+  it('can\'t pick up a date that belongs to a connected service, and says why', async () => {
+    const lock = 'This task repeats in Todoist (every monday), so change its date there.'
+    const card = make({ title: 'Water plants', type: 'card', status: 'todo', due_at: allDay({ year: 2026, month: 9, day: 12 }), metadata: JSON.stringify({ dueLocked: lock }) })
+    const { entries: found } = await entries(['due'])
+    expect(found.find(e => e.title === 'Water plants')).toMatchObject({ movable: false, locked: lock })
+    expect(moveDue(card.id, allDay({ year: 2026, month: 9, day: 20 }))).toStrictEqual({ ok: false, reason: lock })
+    expect(getItemById(card.id)?.due_at).toBe(allDay({ year: 2026, month: 9, day: 12 }))
+  })
+
   it('refuses to move a log entry, something put away, or a nonsense date', () => {
     const log = make({ type: 'log', title: 'Note' })
     const away = make({ title: 'Old', status: 'archived', due_at: 1 })

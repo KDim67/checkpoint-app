@@ -156,6 +156,17 @@
   --cal-agenda-width:   40rem;
   --cal-notes-max:      12rem;
 
+  /* connections: the narrowest a field asked for when connecting gets before the row wraps */
+  --connection-field-min: 10rem;
+
+  /* each service's mark in its brand colour; the black marks take the text's, and the darkest brand hues lighten as their own apps do on dark */
+  --logo-github:   var(--color-text-base);
+  --logo-notion:   var(--color-text-base);
+  --logo-todoist:  #e44332;
+  --logo-linear:   #5e6ad2;
+  --logo-jira:     #2684ff;
+  --logo-obsidian: #8b6cef;
+
   /* elevation and shadow */
   --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.3);
@@ -256,6 +267,10 @@ html[data-theme="light"] {
   --shadow-lg:   0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-xl:   0 12px 40px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-2xl:  0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 20px rgba(0, 0, 0, 0.12);
+
+  /* on a light ground the brands' own darker hues read */
+  --logo-jira:     #0052cc;
+  --logo-obsidian: #7c3aed;
 }
 }
 
@@ -2646,6 +2661,206 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
 
 .plugin-status {
   font-weight: var(--weight-semibold);
+}
+
+/* a connected card's badge: where it lives and its state, a warning colour when something needs a look */
+.link-badge-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-0-5) var(--space-1-5);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.link-badge:hover {
+  color: var(--color-text-base);
+}
+
+.link-badge:focus-visible {
+  outline: var(--space-0-5) solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.link-badge[data-state="gone"] {
+  text-decoration: line-through;
+}
+
+.link-badge[data-problem="true"] {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.link-label {
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: var(--space-0-5) var(--space-1-5);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-offset);
+  color: var(--color-text-muted);
+  font-size: var(--text-2xs);
+}
+
+.link-owned-note {
+  margin: var(--space-1) 0 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* connections: one row per service, shaped like a plugin's */
+.connection-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-surface-offset);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+}
+
+.connection-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.connection-steps {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.connection-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.connection-key {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.connection-key input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1-5) var(--space-2);
+}
+
+/* several details to connect, such as Jira's site, email and token, wrap onto as many lines as the width needs */
+.connection-key[data-fields="many"] {
+  flex-wrap: wrap;
+}
+
+.connection-key[data-fields="many"] input {
+  flex: 1 1 var(--connection-field-min);
+}
+
+.connection-problem {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+}
+
+.connection-repos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.connection-repo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.connection-repo-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-repo input,
+.connection-repo select {
+  padding: var(--space-1) var(--space-2);
+}
+
+.connection-repo-note {
+  grid-column: 2 / -1;
+}
+
+/* a connected service's own mark */
+.service-logo {
+  flex-shrink: 0;
+  fill: var(--logo-github);
+}
+
+.service-logo[data-service="todoist"] {
+  fill: var(--logo-todoist);
+}
+
+.service-logo[data-service="linear"] {
+  fill: var(--logo-linear);
+}
+
+.service-logo[data-service="jira"] {
+  fill: var(--logo-jira);
+}
+
+.service-logo[data-service="notion"] {
+  fill: var(--logo-notion);
+}
+
+.service-logo[data-service="obsidian"] {
+  fill: var(--logo-obsidian);
+}
+
+/* a project picked from a list takes the room a typed repository and its scope share */
+.connection-project-select {
+  grid-column: 2 / -1;
+}
+
+/* a long folder path loses its beginning rather than its end; the whole path is in its tooltip */
+.connection-folder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.connection-warning {
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+}
+
+.connection-actions {
+  display: flex;
+  gap: var(--space-2);
 }
 
 .plugin-status[data-status="running"],

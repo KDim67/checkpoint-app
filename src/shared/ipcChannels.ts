@@ -189,6 +189,21 @@ export const enum IpcChannels {
   /** main to renderer: a subscribed calendar changed */
   CALENDAR_CHANGED             = 'calendar:changed',
 
+  // connections to outside services; a key goes in, never comes back out
+  CONNECTIONS_LIST             = 'connections:list',
+  CONNECTIONS_CONNECT          = 'connections:connect',
+  CONNECTIONS_DISCONNECT       = 'connections:disconnect',
+  CONNECTIONS_SYNC_NOW         = 'connections:syncNow',
+  CONNECTIONS_SET_REPO         = 'connections:setRepo',
+  CONNECTIONS_SET_PROJECT      = 'connections:setProject',
+  CONNECTIONS_SET_TEAM         = 'connections:setTeam',
+  CONNECTIONS_SET_JIRA_PROJECT = 'connections:setJiraProject',
+  CONNECTIONS_SET_NOTION_DATABASE = 'connections:setNotionDatabase',
+  CONNECTIONS_PICK_FOLDER      = 'connections:pickFolder',
+  CONNECTIONS_CLEAR_FOLDER     = 'connections:clearFolder',
+  /** main to renderer: a check finished or a connection changed */
+  CONNECTIONS_CHANGED          = 'connections:changed',
+
   // customizer and extensions
   CUSTOMIZER_GET_PLUGINS        = 'customizer:getPlugins',
   /** grants exactly what the dialog showed, then starts it */

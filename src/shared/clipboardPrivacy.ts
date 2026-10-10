@@ -6,6 +6,9 @@ const KNOWN_SECRET_PATTERNS: RegExp[] = [
   /^sk-[A-Za-z0-9_-]{16,}$/,              // OpenAI and the APIs that copied it
   /^(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}$/, // GitHub
   /^github_pat_[A-Za-z0-9_]{20,}$/,
+  /^lin_api_[A-Za-z0-9]{20,}$/,          // Linear
+  /^ATATT[A-Za-z0-9_=-]{20,}$/,          // Atlassian API token
+  /^(ntn|secret)_[A-Za-z0-9]{30,}$/,      // Notion integration secret
   /^xox[baprs]-[A-Za-z0-9-]{10,}$/,       // Slack
   /^AKIA[0-9A-Z]{16}$/,                   // AWS access key id
   /^AIza[0-9A-Za-z_-]{35}$/,              // Google API key

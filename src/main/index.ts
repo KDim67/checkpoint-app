@@ -346,6 +346,8 @@ import { registerNotificationsHandlers } from './ipc/notifications'
 import { registerRecurrenceHandlers } from './ipc/recurrence'
 import { registerRenewalsHandlers } from './ipc/renewals'
 import { registerCalendarHandlers, startCalendarRefresh } from './ipc/calendar'
+import { registerConnectionsHandlers } from './ipc/connections'
+import { startConnections } from './connections/scheduler'
 import { registerMcpHandlers } from './ipc/mcp'
 import { registerHudHandlers } from './ipc/hud'
 import { registerBackupHandlers } from './ipc/backup'
@@ -376,6 +378,8 @@ function registerIpcHandlers(): void {
   registerRenewalsHandlers()
   registerCalendarHandlers()
   startCalendarRefresh()
+  registerConnectionsHandlers()
+  startConnections()
   registerMcpHandlers()
   registerHudHandlers()
   registerBackupHandlers()
@@ -683,6 +687,7 @@ app.on('will-quit', (e) => {
     import('./hud').then(({ disableHud }) => disableHud()).catch(() => {}),
     import('./backupVault').then(({ shutdownBackupScheduler }) => shutdownBackupScheduler()).catch(() => {}),
     import('./tracker').then(({ shutdownActivityTracker }) => shutdownActivityTracker()).catch(() => {}),
+    import('./connections/scheduler').then(({ stopConnections }) => stopConnections()).catch(() => {}),
     Promise.resolve().then(() => { try { stopSyncHost() } catch {} })
   ]).catch(() => {}).finally(() => {
     closeDb()  // checkpoint WAL and close SQLite cleanly before exit

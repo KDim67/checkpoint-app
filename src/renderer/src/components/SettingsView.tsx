@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react'
-import { Settings, Layers, Sparkles, Palette, Paintbrush, Monitor, Zap, Info, RefreshCw, Layout, Archive, Keyboard, Boxes, HardDrive, Plug, Bell, PanelTop } from 'lucide-react'
+import { Settings, Layers, Sparkles, Palette, Paintbrush, Monitor, Zap, Info, RefreshCw, Layout, Archive, Keyboard, Boxes, HardDrive, Plug, Bell, PanelTop, Link2 } from 'lucide-react'
 import SettingsSection, { Divider } from './settings/SettingsSection'
 import WorkspaceManager from './settings/WorkspaceManager'
 import SyncSettings from './settings/SyncSettings'
 import NotificationSettings from './settings/NotificationSettings'
 import StartupSettings from './settings/StartupSettings'
 import McpSettings from './settings/McpSettings'
+import ConnectionsSettings from './settings/ConnectionsSettings'
 import AppearanceSettings from './settings/AppearanceSettings'
 import FeatureToggleCenter from './settings/FeatureToggleCenter'
 import AboutPanel from './settings/AboutPanel'
@@ -43,7 +44,8 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
     group: 'Workspace',
     tabs: [
       { id: 'workspaces', label: 'Workspaces & Board', icon: <Layers size={14} />,   description: 'Manage workspaces and the Kanban columns of the active one.' },
-      { id: 'ai',       label: 'AI Assistant',       icon: <Sparkles size={14} />, description: 'Model providers, generation options, email voice and persistent memory.' }
+      { id: 'ai',       label: 'AI Assistant',       icon: <Sparkles size={14} />, description: 'Model providers, generation options, email voice and persistent memory.' },
+      { id: 'connections', label: 'Connections',      icon: <Link2 size={14} />,    description: 'Keep cards in step with services you use, such as GitHub issues.' }
     ]
   },
   {
@@ -115,6 +117,12 @@ export default function SettingsView() {
         return (
           <SettingsSection icon={<Sparkles size={14} />} title="AI Assistant" description="Connection, generation options, email voice and persistent memory.">
             <AiSettings />
+          </SettingsSection>
+        )
+      case 'connections':
+        return (
+          <SettingsSection icon={<Link2 size={14} />} title="Connections" description="Services whose work becomes cards here, each through a key you make in that service.">
+            <ConnectionsSettings />
           </SettingsSection>
         )
       case 'appearance':

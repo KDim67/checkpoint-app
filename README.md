@@ -155,6 +155,122 @@ some office networks) they can't find each other directly and you'll need a
 relay. There's a field for your own TURN server in Settings → P2P Network Sync;
 Checkpoint doesn't ship one.
 
+### Connections
+
+Settings → Connections brings work from services you already use onto your
+boards. Each connection uses a personal key you make in that service; nothing
+goes through a server, and nothing is registered on your behalf.
+
+**GitHub:** open issues in a workspace's repository become cards, either the
+ones assigned to you or all of them. Make a fine-grained key on GitHub with
+*Issues: Read and write* for the repositories you want, and paste it in. A
+workspace follows the repository its folder's `origin` remote points at, or one
+you type as `owner/repo`.
+
+- Closing or reopening an issue on GitHub moves its card; moving a card to Done
+  closes the issue, and moving it out reopens it. A key that can only read
+  leaves GitHub's state standing, and the card says so.
+- GitHub owns the title, description and milestone date, so change those
+  there. Your columns, priority, tags and checklist stay yours.
+- Deleting a card stops following its issue for good. An issue that's no
+  longer yours keeps its card, marked as no longer on GitHub.
+- Checkpoint checks every five minutes and when you come back to the window,
+  and tells you a week before the key expires.
+
+The key is encrypted on that computer, never shown again and never synced:
+paste it on each computer that should talk to GitHub. The cards themselves sync
+like any others, and the same issue becomes the same card everywhere.
+
+**Todoist:** each workspace follows one of your Todoist projects, and its open
+tasks become cards. Copy your API token from Todoist (Settings, Integrations,
+Developer), paste it in, and pick a project for each workspace.
+
+- Done goes both ways: moving a card to Done completes the task, and
+  completing or reopening it in Todoist moves the card.
+- So do the title, the description and the date. If both sides change before
+  Checkpoint checks, Todoist's version is kept and the card says so.
+- A repeating task comes back on its next date when you finish it, as it does
+  in Todoist. Its date stays Todoist's, so change the pattern there.
+- A task deleted in Todoist, or moved to a project no workspace follows, keeps
+  its card, marked as no longer in Todoist. Moving it to a project another
+  workspace follows moves the card too. Deleting a card stops following its
+  task; nothing is ever deleted in Todoist.
+
+The token is kept the same way as GitHub's key: encrypted, never shown again,
+and never synced.
+
+**Linear:** each workspace follows one of your teams, and its open issues
+become cards, either the ones assigned to you or all of them. Make a personal
+API key in Linear (Settings, Security & access), paste it in, and pick a team
+for each workspace.
+
+- Moving a card to Done moves the issue to its team's Done state, and moving it
+  out sends it back to Todo. A completed or canceled issue moves its card to
+  Done, and the badge shows Linear's own name for the state.
+- The title, the description and the due date go both ways, with Linear's
+  version kept if both sides change before a check. Linear's due dates are
+  whole days, so a time set on the card becomes that day.
+- A key that can only read leaves Linear's state standing, and the card says so.
+- An issue deleted, no longer yours, or moved to a team no workspace follows
+  keeps its card, marked as no longer in Linear. Moving it to a team another
+  workspace follows moves the card too.
+
+**Jira Cloud:** each workspace follows one of your projects, and its open
+issues become cards, either the ones assigned to you or all of them. Make an
+API token for your Atlassian account, then give Checkpoint your Jira address
+(`yourname.atlassian.net`), the email you sign in with, and the token.
+
+- Moving a card to Done runs your workflow's transition to Done, and moving it
+  out runs one back to To Do. If the workflow has no way there from where the
+  issue is, the card goes back and says why.
+- The title and the due date go both ways. The description comes from Jira and
+  is read-only on the card: Jira keeps it in its own format, so change it there.
+- Atlassian tokens expire after at most a year, and Jira doesn't say when in
+  advance; when one stops working, Checkpoint tells you.
+- Jira never reports deleted issues, so once an hour Checkpoint asks for every
+  issue that has a card, and marks the ones it no longer finds.
+- Jira Server and Data Center aren't supported.
+
+**Notion:** each workspace follows one of your databases, and its pages that
+aren't done become cards. Make an internal integration in Notion and copy its
+secret, then add the integration to each database you want under the page's
+••• menu, Connections; Notion only lets an integration see what it's added to.
+
+- Done is the database's first Status column, done when its option is in the
+  Complete group, or else its first checkbox. The date is its first Date column.
+  When a database has more than one of either, its row in Settings lets you
+  pick.
+- Moving a card to Done sets the status to the first Complete option, or ticks
+  the box; moving it out sets the first To-do option, or unticks it.
+- The title and the date go both ways, times included. The card's description
+  stays its own.
+- Once an hour Checkpoint looks in Notion's trash and marks cards whose pages
+  are there. A page moved to a database another workspace follows moves its
+  card; one moved to a database nobody follows isn't noticed.
+
+**Obsidian:** no account and no key. Each workspace follows a folder on this
+computer, a whole vault or a folder inside one, and the unticked tasks in its
+notes (`- [ ] Like this`) become cards. Checkpoint looks for changed notes every
+30 seconds.
+
+This one writes to your notes, so here is exactly what it changes:
+
+- When a task first comes in, a short block id goes on the end of its line
+  (`^cp-4f2a9c1e`). It's how the card keeps following the task through edits
+  and moves between notes, and Obsidian hides it in reading view. A task that
+  already has a block id keeps it.
+- Moving a card to Done ticks the box, and moving it out unticks it. Changing
+  the card's title or date rewrites that task's line, keeping its other fields;
+  dates are written the way the line already has them (`📅 2026-10-12`, or
+  Dataview's `[due:: 2026-10-12]`). Obsidian's dates are whole days.
+- Nothing else in a note is touched, nothing outside the chosen folder is ever
+  written, and a note that changed since Checkpoint read it is left until the
+  next look.
+- A repeating task (🔁) has to be ticked in Obsidian, so the Tasks plugin can
+  make the next one; its date stays Obsidian's too.
+- The folder is remembered on this computer only. Checkpoint's one-off vault
+  import, in the Notes sidebar, still never writes to your vault.
+
 ### Webhooks
 
 There's a small HTTP server for pushing things in from scripts and CI. It needs

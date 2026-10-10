@@ -68,7 +68,7 @@ export default function EntryChip({ entry, block = false, span = 1, continuesBef
       data-continues-before={continuesBefore ? 'true' : undefined}
       data-continues-after={continuesAfter ? 'true' : undefined}
       draggable={entry.movable}
-      title={entry.movable ? `${label}\nDrag it, or press Alt and an arrow key, to move it` : label}
+      title={entry.movable ? `${label}\nDrag it, or press Alt and an arrow key, to move it` : entry.locked ? `${label}\n${entry.locked}` : label}
       aria-label={label}
       aria-keyshortcuts={entry.movable ? 'Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown' : undefined}
       style={{ ...cssVars({ '--cal-chip-color': actions.colorOf(entry), '--cal-span': String(span) }), ...style }}

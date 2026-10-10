@@ -3,6 +3,7 @@
 import type Database from 'better-sqlite3'
 import { openDb } from './connection'
 import { SCHEMA_SQL } from './schema'
+import { ensureAgreedFieldsColumn } from './connectionLinks'
 import { encryptLegacyPlaintextSecrets, rebuildItemsTableIfLegacyCheck, runMigrations } from './migrations'
 import { prepareItemStatements } from './items'
 import { prepareTagStatements } from './tags'
@@ -28,6 +29,7 @@ export {
   rebalancePositions
 } from './items'
 export { clearTombstone, recordTombstone } from './tombstones'
+export { getAgreed, getAgreedFields, listAgreed, setAgreed, setAgreedFields, type Agreed, type AgreedFields, type AgreedRow } from './connectionLinks'
 export { applyBoardBaselineTx, applyRemoteMutationTx } from './remote'
 export { getAllTags, createTag, updateTag, deleteTag } from './tags'
 export { deleteSetting, getSetting, setSetting } from './settings'
@@ -82,6 +84,7 @@ export function initDb(dataPath: string): Database.Database {
   const db = openDb(dataPath)
 
   db.exec(SCHEMA_SQL)
+  ensureAgreedFieldsColumn(db)
   rebuildItemsTableIfLegacyCheck(db)
   runMigrations(db)
 

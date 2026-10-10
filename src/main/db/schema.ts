@@ -94,6 +94,15 @@ CREATE TABLE IF NOT EXISTS renewals (
   metadata    TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS idx_renewals_context ON renewals(context);
+-- what both sides of a connection last agreed on, per outside item; this computer only
+CREATE TABLE IF NOT EXISTS connection_links (
+  service    TEXT NOT NULL,
+  remote_id  TEXT NOT NULL,
+  item_id    TEXT NOT NULL,
+  agreed     TEXT NOT NULL,
+  fields     TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (service, remote_id)
+);
 -- workspace renames, kept so every synced machine makes each one too
 CREATE TABLE IF NOT EXISTS context_renames (
   id          TEXT PRIMARY KEY,

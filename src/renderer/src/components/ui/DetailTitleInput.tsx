@@ -7,9 +7,11 @@ interface DetailTitleInputProps {
   onChange: (value: string) => void
   onBlur?: FocusEventHandler<HTMLInputElement>
   placeholder: string
+  /** owned elsewhere, such as a GitHub issue's title */
+  readOnly?: boolean
 }
 
-export default function DetailTitleInput({ inputRef, id, value, onChange, onBlur, placeholder }: DetailTitleInputProps) {
+export default function DetailTitleInput({ inputRef, id, value, onChange, onBlur, placeholder, readOnly = false }: DetailTitleInputProps) {
   return (
     <input
       ref={inputRef}
@@ -19,6 +21,7 @@ export default function DetailTitleInput({ inputRef, id, value, onChange, onBlur
       onChange={e => onChange(e.target.value)}
       onBlur={onBlur}
       placeholder={placeholder}
+      readOnly={readOnly}
       className="detail-title-input"
       style={{
         width: '100%',

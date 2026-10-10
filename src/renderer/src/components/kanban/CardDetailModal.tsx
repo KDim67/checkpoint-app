@@ -32,6 +32,7 @@ import CardTextureTools from './CardTextureTools'
 import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
+import { dueLockOf, linkOf, SERVICES } from '../../../../shared/connections'
 import DueDateField from '../ui/DueDateField'
 import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
@@ -174,6 +175,12 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     loadDetails()
     return () => { active = false }
   }, [cardId, activeWorkspace, setRelations, report])
+
+  const link = card ? linkOf(card.metadata) : null
+  // what a service keeps, such as GitHub's title and description, the card only shows
+  const titleOwned = link !== null && SERVICES[link.service].owns.title
+  const bodyOwned = link !== null && SERVICES[link.service].owns.body
+  const dueLock = card ? dueLockOf(card.metadata) : null
 
   /** last written state, compared to decide what to save */
   const savedRef = useRef<CardSnapshot | null>(null)
@@ -621,7 +628,14 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               value={title}
               onChange={setTitle}
               placeholder="Enter card title..."
+              readOnly={titleOwned}
             />
+            {link && (titleOwned || bodyOwned) && (
+              <p className="link-owned-note">
+                {titleOwned && bodyOwned ? 'The title and description come' : titleOwned ? 'The title comes' : 'The description comes'} from {SERVICES[link.service].name}, so change {titleOwned && bodyOwned ? 'them' : 'it'} there.{' '}
+                <button type="button" className="connection-link" onClick={() => void appApi.openExternal(link.url)}>Edit {SERVICES[link.service].where}</button>
+              </p>
+            )}
           </div>
 
           {/* the board's own card component, inert at column width, so the preview can't drift */}
@@ -691,7 +705,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                 Due Date
               </span>
               <div className="row-8px">
-                <DueDateField id="card-due" value={card.due_at} onChange={handleDueDateChange} disabled={isReadOnly} />
+                <DueDateField id="card-due" value={card.due_at} onChange={handleDueDateChange} disabled={isReadOnly || dueLock !== null} />
                 {card.due_at && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                     <input
@@ -707,6 +721,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                   </label>
                 )}
               </div>
+              {dueLock && <p className="link-owned-note">{dueLock}</p>}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)', position: 'relative' }}>
@@ -852,12 +867,15 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               {(editorMode === 'edit' || editorMode === 'split') && (
                 <textarea
                   value={body}
+                  readOnly={bodyOwned}
                   onChange={e => setBody(e.target.value)}
                   onPaste={async (e) => {
+                    if (bodyOwned) return
                     const isImage = await handleImagePaste(e, body, setBody)
                     if (isImage) return
                   }}
                   onDrop={async (e) => {
+                    if (bodyOwned) return
                     await handleImageDrop(e, body, setBody)
                   }}
                   onDragOver={e => e.preventDefault()}

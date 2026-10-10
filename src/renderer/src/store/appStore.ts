@@ -23,6 +23,7 @@ export type SettingsTab =
   | 'general'
   | 'workspaces'
   | 'ai'
+  | 'connections'
   | 'appearance'
   | 'hotkeyBinder'
   | 'features'
