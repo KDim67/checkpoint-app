@@ -555,7 +555,7 @@ app.whenReady().then(async () => {
 
   try {
     const { initializeBackupScheduler } = await import('./backupVault')
-    initializeBackupScheduler()
+    initializeBackupScheduler({ atLaunch: true })
   } catch (err) {
     console.error('Failed to initialize Backup Vaulting:', err)
   }
