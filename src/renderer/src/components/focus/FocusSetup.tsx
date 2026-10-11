@@ -3,6 +3,7 @@ import { TIMER_PRESETS, type TimerPreset } from './pomodoroTimer'
 import { saveAutoStartNext, saveChimeEnabled, saveChimeVolume, saveNotificationsEnabled } from '../../lib/focusSettings'
 import { ToggleSwitch } from '../settings/SettingsSection'
 import type { FocusViewState } from './useFocusView'
+import { SkeletonBlocks } from '../ui/Skeleton'
 
 function FocusOptionToggle({
   label,
@@ -96,9 +97,7 @@ export default function FocusSetup({ focusView }: { focusView: FocusViewState })
 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', paddingRight: '4px' }}>
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '120px', color: 'var(--color-text-muted)' }}>
-              Loading uncompleted backlog and board items...
-            </div>
+            <SkeletonBlocks label="Loading your open tasks" count={4} height="3rem" gap="var(--space-2)" />
           ) : dbItems.length === 0 ? (
             <div style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px dashed var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-muted)' }}>
               <Award style={{ width: '32px', height: '32px', margin: '0 auto var(--space-3)', opacity: 0.5 }} />

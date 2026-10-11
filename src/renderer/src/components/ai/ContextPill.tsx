@@ -59,7 +59,7 @@ export default function ContextPill({ item, onClear }: ContextPillProps) {
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
-          fontSize: '10px',
+          fontSize: 'var(--text-2xs)',
           fontWeight: 'var(--weight-bold)',
           background: styles.bg,
           border: styles.border,

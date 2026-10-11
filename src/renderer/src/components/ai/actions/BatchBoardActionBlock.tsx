@@ -152,11 +152,11 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
 
   if (error) {
     return (
-      <div style={{ padding: '8px 10px', color: 'var(--color-error)', fontSize: '11px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ padding: '8px 10px', color: 'var(--color-error)', fontSize: 'var(--text-xs)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span>⚠ Failed to update board: {error}</span>
         <button
           onClick={() => { executedActionSignaturesSet.delete(signature); setError(null) }}
-          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', borderRadius: '4px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}
+          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', borderRadius: '4px', padding: '2px 8px', fontSize: 'var(--text-2xs)', cursor: 'pointer' }}
         >Retry</button>
       </div>
     )
@@ -193,28 +193,28 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
           </span>
         </div>
         {!nothingNew && (
-          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
             {[colsCount > 0 ? `${colsCount} col${colsCount > 1 ? 's' : ''}` : '', cardsCount > 0 ? `${cardsCount} card${cardsCount > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ') || 'no change'}
           </span>
         )}
       </div>
 
       {applied && (skipped > 0 || reused > 0) && (
-        <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginTop: '-2px' }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '-2px' }}>
           {[skipped > 0 ? `${skipped} card${skipped > 1 ? 's' : ''} already on the board` : '', reused > 0 ? `${reused} existing column${reused > 1 ? 's' : ''} reused` : ''].filter(Boolean).join(' · ')}
         </div>
       )}
 
       {nothingNew ? (
-        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
           Everything requested was already on the board. Nothing new to add.
         </div>
       ) : (
-      <div style={{ fontSize: '11px', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '200px', overflowY: 'auto', overflowX: 'hidden' }}>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text)', display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '200px', overflowY: 'auto', overflowX: 'hidden' }}>
         {showCols.map((c, i) => (
           <div key={`c-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: resolveColor(c.color), flexShrink: 0 }} />
-            <span style={{ color: 'var(--color-primary-soft)', flexShrink: 0, fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.03em' }}>Column</span>
+            <span style={{ color: 'var(--color-primary-soft)', flexShrink: 0, fontSize: 'var(--text-2xs)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.03em' }}>Column</span>
             <strong style={{ color: '#93c5fd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{c.name}</strong>
           </div>
         ))}
@@ -231,7 +231,7 @@ export default function BatchBoardActionBlock({ jsonString }: { jsonString: stri
                   if (!tn) return null
                   const tcol = tagColorOf(t, '#64748b')
                   return (
-                    <span key={ti} style={{ fontSize: '10px', color: tcol, border: `1px solid ${tcol}55`, background: `${tcol}18`, borderRadius: '6px', padding: '0 5px', whiteSpace: 'nowrap' }}>
+                    <span key={ti} style={{ fontSize: 'var(--text-xs)', color: tcol, border: `1px solid ${tcol}55`, background: `${tcol}18`, borderRadius: '6px', padding: '0 5px', whiteSpace: 'nowrap' }}>
                       {tn.replace(/^#/, '')}
                     </span>
                   )

@@ -47,7 +47,7 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
                   }}
                   style={{
                     padding: '4px 12px',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-bold)',
                     borderRadius: 'var(--radius-full)',
                     border: 'none',
@@ -115,7 +115,7 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <span style={{
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               fontWeight: 'var(--weight-bold)',
               textTransform: 'uppercase',
               letterSpacing: 'var(--tracking-widest)',
@@ -133,7 +133,7 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
             }}>
               {formatTime(timeLeftMs)}
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-medium)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 'var(--weight-medium)' }}>
               {isRunning
                 ? (projectedEnd ? `ends ~${projectedEnd} · Space to pause` : 'Space to pause')
                 : 'paused · Space to resume'}
@@ -236,7 +236,7 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-4)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
               <h4 style={{
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 'var(--weight-bold)',
                 color: 'var(--color-text-muted)',
                 textTransform: 'uppercase',
@@ -245,7 +245,7 @@ export default function FocusActive({ focusView }: { focusView: FocusViewState }
               }}>
                 Current Focus Targets
               </h4>
-              <span style={{ fontSize: '10px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)' }}>
                 {selectedTasks.filter(t => t.status === 'done').length} / {selectedTasks.length} Done
               </span>
             </div>

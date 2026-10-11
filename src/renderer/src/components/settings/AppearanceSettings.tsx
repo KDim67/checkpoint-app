@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
+import { FieldRow, ToggleRow, Divider } from './SettingsSection'
 
 // components only, or Fast Refresh reloads the page; import applyFontSize from lib/fontScale
 import { applyFontSize, type FontSize } from '../../lib/fontScale'
@@ -64,33 +64,18 @@ export default function AppearanceSettings() {
 
   return (
     <div className="col-xl">
-      <FieldRow label="Font Size" hint="Scales all text proportionally across the entire app.">
-        <div className="flex-gap">
+      <FieldRow label="Font size" hint="Every piece of text in Checkpoint grows or shrinks with it." group>
+        <div className="settings-choices">
           {FONT_OPTIONS.map(opt => (
             <button
               key={opt.value}
+              type="button"
+              className="settings-choice"
+              aria-pressed={fontSize === opt.value}
               onClick={() => handleFontSize(opt.value)}
-              style={{
-                flex: 1,
-                padding: 'var(--space-2) var(--space-3)',
-                background: fontSize === opt.value
-                  ? 'var(--color-secondary-muted)'
-                  : 'var(--color-surface-2)',
-                border: `1px solid ${fontSize === opt.value ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-                borderRadius: 'var(--radius-md)',
-                color: fontSize === opt.value ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '2px',
-                transition: 'all 100ms ease'
-              }}
             >
-              <span className="text-sm-semibold">
-                {opt.label}
-              </span>
-              <span className="text-micro-dim">{opt.desc}</span>
+              <span className="settings-choice-label">{opt.label}</span>
+              <span className="settings-choice-note">{opt.desc}</span>
             </button>
           ))}
         </div>
@@ -98,26 +83,22 @@ export default function AppearanceSettings() {
 
       <Divider />
 
-      <RowBetween>
-        <div>
-          <div className="text-item">
-            Compact Mode
-          </div>
-          <div className="text-sub">
-            Reduces card padding and row heights for denser information density.
-          </div>
-        </div>
-        <ToggleSwitch checked={compactMode} onChange={handleCompact} label="Compact Mode" />
-      </RowBetween>
+      <ToggleRow
+        label="Compact mode"
+        description="Tighter cards and rows, so more fits on screen."
+        checked={compactMode}
+        onChange={handleCompact}
+      />
 
       <Divider />
 
       <FieldRow
-        label="Custom Theme File"
-        hint="Drop a theme.css here to override CSS tokens. Changes are hot-reloaded instantly."
+        label="Custom theme file"
+        hint="A theme.css placed here sets the colours and sizes Checkpoint draws with, and changes show as you save it."
+        group
       >
         <PathRow
-          openTitle="Open folder in Explorer"
+          openTitle="Open the folder"
           onOpen={() => {
             const dir = themePath.replace(/[/\\][^/\\]+$/, '')
             appApi.openExternal(`file://${dir}`)

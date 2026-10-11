@@ -90,8 +90,7 @@ export default function WallSwitcher({
                       background: 'var(--color-surface-2)',
                       border: '1px solid var(--color-secondary)',
                       borderRadius: 'var(--radius-sm)',
-                      color: 'var(--color-text-base)', fontSize: 'var(--text-xs)',
-                      outline: 'none'
+                      color: 'var(--color-text-base)', fontSize: 'var(--text-xs)'
                     }}
                   />
                 )

@@ -34,6 +34,7 @@ import KanbanHeader from './kanban/KanbanHeader'
 import KanbanFilterBar from './kanban/KanbanFilterBar'
 import { canAimAtSlot } from './kanban/dropSlots'
 import { useRemoteCardDrags } from '../lib/useRemoteCardDrags'
+import Presence from './ui/Presence'
 
 
 // re-exported for existing importers, lib/boardConfig owns the shape
@@ -366,6 +367,7 @@ export default function KanbanView() {
         </DndContext>
       )}
 
+      <Presence show={showArchiveBin}>
       {showArchiveBin && (
         <ArchiveBin
           archivedColumns={archivedColumns}
@@ -381,8 +383,10 @@ export default function KanbanView() {
           onBulkDelete={handleBulkDeleteArchived}
         />
       )}
+      </Presence>
 
 
+      <Presence show={!!activeCardId}>
       {activeCardId && (
         <CardDetailModal
           cardId={activeCardId}
@@ -394,7 +398,9 @@ export default function KanbanView() {
           isReadOnly={isReadOnlyMode}
         />
       )}
+      </Presence>
 
+      <Presence show={showAddColModal}>
       {showAddColModal && (
         <AddColumnModal
           onClose={() => setShowAddColModal(false)}
@@ -402,6 +408,7 @@ export default function KanbanView() {
           existingNames={columns.map(c => c.name)}
         />
       )}
+      </Presence>
 
       <ConfirmDialog
         isOpen={pendingDeleteColId !== null}

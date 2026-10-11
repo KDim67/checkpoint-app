@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Download, FolderGit2, GitBranch, MoreHorizontal, Pencil, Trash2, UserMinus } from 'lucide-react'
 import RowMenu, { type RowMenuEntry } from '../ui/RowMenu'
 import ActivityStrip from './ActivityStrip'
+import WorkspaceTile from './WorkspaceTile'
 import { formatRelativeTime } from '../notes/notesUtils'
 import { laneLabel, type Lane, type LastChange } from '../../../../shared/workspaceLanes'
 import type { WorkspaceEntry } from '../../lib/createWorkspace'
@@ -67,9 +68,7 @@ export default function WorkspaceLane(props: Props): React.JSX.Element {
       onClick={onClick}
       {...listeners}
     >
-      <span className="ws-spine" style={{ '--ws-color': entry.color } as React.CSSProperties} aria-hidden="true">
-        {entry.name.trim().charAt(0).toUpperCase() || '#'}
-      </span>
+      <WorkspaceTile name={entry.name} color={entry.color} icon={entry.icon} />
 
       <div className="ws-lane-text">
         <div className="ws-lane-name">

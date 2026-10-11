@@ -430,7 +430,7 @@ function CardFace({
                 <span
                   key={tag.id}
                   style={{
-                    fontSize: '10px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-bold)',
                     color: tag.color,
                     backgroundColor: isFullCover ? (coverTextColor === '#ffffff' ? '#0f172a' : '#ffffff') : `${tag.color}18`,
@@ -465,7 +465,7 @@ function CardFace({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  fontSize: '10px',
+                  fontSize: 'var(--text-2xs)',
                   fontWeight: 'var(--weight-medium)',
                   color: isFullCover ? coverTextColor : (dueDateCompleted ? 'var(--color-text-inverted)' : (isOverdue ? 'white' : 'var(--color-text-faint)')),
                   backgroundColor: isFullCover 
@@ -485,7 +485,7 @@ function CardFace({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  fontSize: '10px',
+                  fontSize: 'var(--text-2xs)',
                   fontWeight: 'var(--weight-medium)',
                   color: isFullCover ? coverTextColor : (completedChecklist === totalChecklist ? 'var(--color-text-inverted)' : 'var(--color-text-faint)'),
                   backgroundColor: isFullCover
@@ -502,7 +502,7 @@ function CardFace({
 
               {showTemplate && (
                 <span style={{
-                  fontSize: '10px',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-bold)',
                   backgroundColor: isFullCover ? (coverTextColor === '#ffffff' ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.6)') : 'var(--color-surface-offset)',
                   border: isFullCover ? `1px solid ${coverTextColor === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}` : '1px solid var(--color-surface-offset)',
@@ -605,7 +605,7 @@ function KanbanCard({ isOverlay = false, remoteDrag, ...face }: KanbanCardProps)
             zIndex: 10,
             background: remoteDrag.color,
             color: '#ffffff',
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             fontWeight: 700,
             padding: '1px 6px',
             borderRadius: '4px',

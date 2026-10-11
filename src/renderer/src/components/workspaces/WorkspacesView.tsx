@@ -16,6 +16,8 @@ import { openItem } from '../../lib/openItem'
 import { workspaceActivity } from '../../data/workspaces'
 import { firstDayOfWeek } from '../../../../shared/calendar'
 import { laneOf, type ActivityBySlug, type LastChange } from '../../../../shared/workspaceLanes'
+import Presence from '../ui/Presence'
+import { SkeletonBlocks } from '../ui/Skeleton'
 
 type Dialog =
   | { kind: 'new'; name: string }
@@ -33,8 +35,7 @@ export default function WorkspacesView(): React.JSX.Element {
   const { list, loading } = workspaces
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setWorkspace = useAppStore(s => s.setWorkspace)
-  const setView = useAppStore(s => s.setView)
-  const returnView = useAppStore(s => s.returnView)
+  const goBack = useAppStore(s => s.goBack)
   const pendingCreate = useAppStore(s => s.pendingCreate)
   const setPendingCreate = useAppStore(s => s.setPendingCreate)
   const report = useFailureReport()
@@ -68,7 +69,6 @@ export default function WorkspacesView(): React.JSX.Element {
   const shown = useMemo(() => matching(list, query), [list, query])
   const filtered = query.trim() !== ''
 
-  const goBack = useCallback(() => setView(returnView === 'workspaces' ? 'kanban' : returnView), [returnView, setView])
   const switchTo = useCallback((slug: string) => {
     setWorkspace(slug)
     goBack()
@@ -197,7 +197,7 @@ export default function WorkspacesView(): React.JSX.Element {
       </header>
 
       {loading ? (
-        <p className="ws-empty" role="status">Reading your workspaces…</p>
+        <SkeletonBlocks label="Loading your workspaces" count={3} height="4.5rem" gap="var(--space-2)" style={{ padding: 'var(--space-2) 0' }} />
       ) : shown.length === 0 ? (
         <div className="ws-empty" role="status">
           <span>No workspace matches “{query.trim()}”.</span>
@@ -249,6 +249,7 @@ export default function WorkspacesView(): React.JSX.Element {
         <span className="ws-keys">Enter switches · Alt+↑↓ reorders · Esc goes back</span>
       </footer>
 
+      <Presence show={dialog?.kind === 'new'}>
       {dialog?.kind === 'new' && (
         <WorkspaceFormDialog
           mode="new"
@@ -261,11 +262,13 @@ export default function WorkspacesView(): React.JSX.Element {
           onClose={closeDialog}
         />
       )}
+      </Presence>
+      <Presence show={dialog?.kind === 'edit' && !!editing}>
       {dialog?.kind === 'edit' && editing && (
         <WorkspaceFormDialog
           mode="edit"
           focus={dialog.field}
-          initial={{ name: editing.name, color: editing.color, gitPath: editing.gitPath ?? '', slug: editing.slug }}
+          initial={{ name: editing.name, color: editing.color, gitPath: editing.gitPath ?? '', slug: editing.slug, icon: editing.icon }}
           onSubmit={async fields => {
             const outcome = await workspaces.update(editing.slug, fields)
             // a new short name moved its data, which is read again under it
@@ -275,6 +278,8 @@ export default function WorkspacesView(): React.JSX.Element {
           onClose={closeDialog}
         />
       )}
+      </Presence>
+      <Presence show={dialog?.kind === 'import'}>
       {dialog?.kind === 'import' && (
         <ImportWorkspaceDialog
           draft={dialog.draft}
@@ -287,6 +292,8 @@ export default function WorkspacesView(): React.JSX.Element {
           onClose={closeDialog}
         />
       )}
+      </Presence>
+      <Presence show={!!removing}>
       {removing && (
         <RemoveWorkspaceDialog
           entry={removing}
@@ -297,6 +304,7 @@ export default function WorkspacesView(): React.JSX.Element {
           onClose={closeDialog}
         />
       )}
+      </Presence>
     </div>
   )
 }

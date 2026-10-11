@@ -71,7 +71,7 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
   const iconBtn: React.CSSProperties = {
     border: '1px solid rgba(255,255,255,0.1)',
     color: 'var(--color-text-muted)', borderRadius: 'var(--radius-sm)', padding: '4px 10px',
-    fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+    fontSize: 'var(--text-xs)', fontWeight: 'bold', cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: '5px'
   }
 
@@ -89,7 +89,7 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
           <Sparkles size={14} />
           <span>Branching Dialogue &amp; Quest Flow</span>
         </div>
-        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', padding: '2px 8px', borderRadius: '10px' }}>
+        <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', padding: '2px 8px', borderRadius: '10px' }}>
           {nodes.length} node{nodes.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -104,27 +104,27 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
               <span style={{
-                fontSize: '10px', background: 'rgba(168,85,247,0.2)',
+                fontSize: 'var(--text-2xs)', background: 'rgba(168,85,247,0.2)',
                 border: '1px solid rgba(168,85,247,0.4)', color: 'var(--color-accent-ai-soft)',
                 padding: '1px 6px', borderRadius: '4px', fontWeight: 'bold'
               }}>{n.speaker || 'NPC'}</span>
-              <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>id: {n.id}</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)' }}>id: {n.id}</span>
             </div>
-            <div style={{ fontSize: '11px', color: '#e4e4e7', lineHeight: 1.5, marginBottom: Array.isArray(n.choices) && n.choices.length > 0 ? '6px' : '0' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: '#e4e4e7', lineHeight: 1.5, marginBottom: Array.isArray(n.choices) && n.choices.length > 0 ? '6px' : '0' }}>
               &ldquo;{n.text}&rdquo;
             </div>
             {Array.isArray(n.choices) && n.choices.length > 0 && (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                 {n.choices.map((c, ci) => (
                   <span key={ci} style={{
-                    fontSize: '10px', background: 'rgba(168,85,247,0.1)',
+                    fontSize: 'var(--text-2xs)', background: 'rgba(168,85,247,0.1)',
                     color: 'var(--color-accent-ai-soft)', padding: '2px 7px', borderRadius: '4px',
                     border: '1px solid rgba(168,85,247,0.25)',
                     display: 'flex', alignItems: 'center', gap: '4px'
                   }}>
                     <span>{c.text}</span>
                     <ArrowRight size={8} style={{ opacity: 0.6 }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', color: '#a78bfa', fontSize: '10px' }}>{c.target}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: '#a78bfa', fontSize: 'var(--text-xs)' }}>{c.target}</span>
                   </span>
                 ))}
               </div>
@@ -136,7 +136,7 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
       {nodes.length > PREVIEW_LIMIT && (
         <button
           onClick={() => setExpanded(prev => !prev)}
-          style={{ background: 'none', border: 'none', color: 'var(--color-accent-ai)', fontSize: '11px', cursor: 'pointer', padding: '2px 0', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          style={{ background: 'none', border: 'none', color: 'var(--color-accent-ai)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '2px 0', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
         >
           {expanded
             ? `▲ Collapse (${nodes.length} nodes total)`
@@ -175,7 +175,7 @@ export default function CreateDialogueTreeActionBlock({ jsonString }: { jsonStri
             // plain surface once loaded, the white veil vanished in light mode
             color: loaded ? 'var(--color-text-muted)' : 'var(--color-on-accent)',
             borderRadius: 'var(--radius-sm)',
-            padding: '4px 12px', fontSize: '10px', fontWeight: 'bold',
+            padding: '4px 12px', fontSize: 'var(--text-xs)', fontWeight: 'bold',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
           }}
         >

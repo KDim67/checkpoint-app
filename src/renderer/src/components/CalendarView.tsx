@@ -33,6 +33,7 @@ import {
 } from '../../../shared/calendar'
 import { isAllDay, localDayOf, type CalendarDay } from '../../../shared/dueDate'
 import type { CalendarSubscription } from '../../../shared/calendarApi'
+import Presence from './ui/Presence'
 
 // remembered per computer: none of these are in the synced list
 const VIEW_SETTING = 'calendar_view'
@@ -425,14 +426,16 @@ export default function CalendarView(): React.JSX.Element {
         {open?.kind === 'show' && (
           <ShowMenu at={open.at} layers={layers} problems={answer.problems} onToggle={toggleLayer} onClose={() => setOpen(null)} />
         )}
-        {managing && (
-          <CalendarsModal
-            subscriptions={subscriptions}
-            workspaces={workspaceList}
-            onChanged={() => { void loadSubscriptions(); void load() }}
-            onClose={() => setManaging(false)}
-          />
-        )}
+        <Presence show={managing}>
+          {managing && (
+            <CalendarsModal
+              subscriptions={subscriptions}
+              workspaces={workspaceList}
+              onChanged={() => { void loadSubscriptions(); void load() }}
+              onClose={() => setManaging(false)}
+            />
+          )}
+        </Presence>
       </div>
     </CalendarActionsContext.Provider>
   )

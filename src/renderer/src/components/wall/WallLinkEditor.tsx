@@ -35,7 +35,7 @@ export default function WallLinkEditor({ link, label, onSave, onRemove, onPick, 
       style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}
     >
       {label && (
-        <span className="truncate" style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>
+        <span className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
           Links to {label}
         </span>
       )}
@@ -63,7 +63,7 @@ export default function WallLinkEditor({ link, label, onSave, onRemove, onPick, 
       </div>
 
       {error && (
-        <span role="alert" style={{ fontSize: '11px', lineHeight: 1.4, color: 'var(--color-error)' }}>
+        <span role="alert" style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4, color: 'var(--color-error)' }}>
           {error}
         </span>
       )}

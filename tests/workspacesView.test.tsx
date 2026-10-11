@@ -35,13 +35,22 @@ vi.mock('../src/renderer/src/data/workspaces', () => ({
   renameContext: vi.fn(async (from: string, to: string) => { store.renamed.push([from, to]); return { success: true } })
 }))
 
+// a canvas isn't here to draw on, so the picture is "stored" by name; the cropping has tests of its own
+vi.mock('../src/renderer/src/lib/workspaceIcon', async importOriginal => ({
+  ...(await importOriginal<typeof import('../src/renderer/src/lib/workspaceIcon')>()),
+  storeWorkspaceIcon: vi.fn(async (file: File) => {
+    if (file.name === 'broken.png') throw new Error("That image couldn't be converted.")
+    return 'icon-1.webp'
+  })
+}))
+
 import WorkspacesView from '../src/renderer/src/components/workspaces/WorkspacesView'
 import { ToastProvider } from '../src/renderer/src/components/ui/Toast'
 import { useAppStore } from '../src/renderer/src/store/appStore'
 import { allDay } from '../src/shared/dueDate'
 
 const LIST = [
-  { slug: 'work', name: 'Work', color: '#1e45fc', gitPath: 'C:/code/checkpoint-app' },
+  { slug: 'work', name: 'Work', color: '#1e45fc', gitPath: 'C:/code/checkpoint-app', icon: 'work-logo.webp' },
   { slug: 'client', name: 'Client site', color: '#10b981', shared: true },
   { slug: 'thesis', name: 'Thesis', color: '#8b5cf6' }
 ]
@@ -76,7 +85,7 @@ beforeEach(() => {
   if (!window.requestAnimationFrame) window.requestAnimationFrame = (cb: FrameRequestCallback) => window.setTimeout(() => cb(0), 0)
   useAppStore.setState({
     activeView: 'workspaces',
-    returnView: 'backlog',
+    backTrail: ['backlog'],
     activeWorkspace: 'work',
     availableWorkspaces: LIST.map(e => e.slug),
     workspaceList: [],
@@ -166,6 +175,57 @@ describe('switching', () => {
     expect(useAppStore.getState().activeView).toBe('workspaces')
     fireEvent.keyDown(filter, { key: 'Escape' })
     expect(useAppStore.getState().activeView).toBe('backlog')
+  })
+})
+
+
+describe("a workspace's picture", () => {
+  const choose = (name: string): void => {
+    fireEvent.change(screen.getByTestId('ws-form-image-file'), { target: { files: [new File(['x'], name, { type: 'image/png' })] } })
+  }
+  const tileImage = (lane: HTMLElement): HTMLImageElement | null => lane.querySelector('.ws-spine img')
+
+  it('shows on its lane instead of the letter, and the letter comes back if the picture is missing', async () => {
+    await openPage()
+    const image = tileImage(lanes()[0]) as HTMLImageElement
+    expect(image.getAttribute('src')).toBe('checkpoint-media://work-logo.webp')
+    expect(tileImage(lanes()[1])).toBeNull()
+    expect(lanes()[1].querySelector('.ws-spine')?.textContent).toBe('C')
+    fireEvent.error(image)
+    expect(tileImage(lanes()[0])).toBeNull()
+    expect(lanes()[0].querySelector('.ws-spine')?.textContent).toBe('W')
+  })
+
+  it('is chosen in the new workspace form, previewed there, and kept with the workspace', async () => {
+    await openPage()
+    fireEvent.click(screen.getByRole('button', { name: 'New workspace' }))
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Garden' } })
+    choose('garden.png')
+    await waitFor(() => expect(screen.getByRole('dialog').querySelector('.ws-spine img')?.getAttribute('src')).toBe('checkpoint-media://icon-1.webp'))
+    expect(screen.getByRole('button', { name: 'Change image…' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }))
+    await waitFor(() => expect(savedList().find(e => e.slug === 'garden')).toMatchObject({ icon: 'icon-1.webp' }))
+  })
+
+  it('can be taken off in the edit form, leaving the letter', async () => {
+    await openPage()
+    fireEvent.click(within(lanes()[0]).getByRole('button', { name: 'More for Work' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename and colour' }))
+    await screen.findByLabelText('Name')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(screen.getByRole('dialog').querySelector('.ws-spine img')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(savedList()[0]).not.toHaveProperty('icon'))
+  })
+
+  it('says why a picture was refused, next to it, and the workspace can still be made without one', async () => {
+    await openPage()
+    fireEvent.click(screen.getByRole('button', { name: 'New workspace' }))
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Garden' } })
+    choose('broken.png')
+    expect((await screen.findByRole('alert')).textContent).toBe("That image couldn't be converted.")
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }))
+    await waitFor(() => expect(savedList().find(e => e.slug === 'garden')).not.toHaveProperty('icon'))
   })
 })
 

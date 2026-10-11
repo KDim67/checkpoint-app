@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid, CalendarClock } from 'lucide-react'
-import { ToggleSwitch, Divider, RowBetween } from './SettingsSection'
+import { Webhook, Crosshair, Archive, Activity, Gamepad, RefreshCw, Columns, FileText, ListTodo, Timer, BookOpen, Clipboard, BarChart2, Sparkles, Book, LayoutGrid, CalendarClock, Calendar, AlertTriangle, Info, Cpu, PanelLeft } from 'lucide-react'
+import SettingsSection, { ToggleSwitch, Divider, SettingsCardSkeleton } from './SettingsSection'
 import { AI_FEATURE_KEY, VIEW_FEATURES, readAiEnabled, setAiEnabled, setViewFeature, readLayoutProfile, applyLayoutProfile, type LayoutProfile } from '../../lib/features'
 import { WEBHOOK_DEFAULT_PORT } from '../../../../shared/ports'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
@@ -16,7 +16,10 @@ interface ToggleConfig {
   icon: React.ReactNode
   title: string
   description: string
-  warning: string
+  /** what being off means, said only while it is off */
+  offNote?: string
+  /** something to know before turning it on, said whichever way it is */
+  caution?: string
   getState: () => Promise<boolean>
   toggle: (active: boolean) => Promise<void>
 }
@@ -41,41 +44,42 @@ function WebhookToken(): React.JSX.Element | null {
 
   return (
     <div style={{
-      margin: '0 0 var(--space-2) 34px',
-      padding: 'var(--space-2) var(--space-3)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 'var(--space-2)',
+      margin: 'var(--space-2) 0 0 calc(var(--space-4) + var(--space-3))',
+      padding: 'var(--space-3)',
       background: 'var(--color-surface-2)',
       border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-sm)'
+      borderRadius: 'var(--radius-md)'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '4px' }}>
-        <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Required token
+      <div className="row-between-gap">
+        <span className="text-label-xs-semibold">
+          Token
         </span>
         <button
+          type="button"
+          className="btn-secondary btn-small"
           onClick={() => {
             navigator.clipboard.writeText(token).then(() => {
               setCopied(true)
               setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
             }).catch(() => {})
           }}
-          style={{
-            fontSize: '10px', padding: '1px 6px', cursor: 'pointer',
-            background: 'none', color: 'var(--color-secondary)',
-            border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-sm)'
-          }}
         >
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? 'Copied' : 'Copy the token'}
         </button>
       </div>
       <code style={{
-        display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10px',
-        color: 'var(--color-text-muted)', wordBreak: 'break-all', marginBottom: '6px'
+        display: 'block', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
+        color: 'var(--color-text-muted)', wordBreak: 'break-all'
       }}>
         {token}
       </code>
+      <span className="text-sub">For example:</span>
       <pre style={{
-        margin: 0, fontFamily: 'var(--font-mono)', fontSize: '10px',
-        color: 'var(--color-text-faint)', whiteSpace: 'pre-wrap', wordBreak: 'break-all'
+        margin: 0, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
+        color: 'var(--color-text-muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-all'
       }}>{example}</pre>
     </div>
   )
@@ -85,9 +89,8 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
   {
     key: 'webhook',
     icon: <Webhook size={16} />,
-    title: 'Local Webhook Gateway',
-    description: 'Receives events from external tools via a local HTTP port. Requires the token below.',
-    warning: 'Disabling closes the active socket immediately (server.close()).',
+    title: 'Webhooks',
+    description: 'Lets scripts and tools on this computer add entries through a local web address, using the token below.',
     getState: async () => {
       return getBoolSetting('feature_webhook', true)
     },
@@ -101,9 +104,9 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
   {
     key: 'hud',
     icon: <Crosshair size={16} />,
-    title: 'Global Quick-Capture HUD',
-    description: 'Borderless overlay launched via a global hotkey for rapid task capture.',
-    warning: 'Disabling unregisters the hotkey and destroys the HUD window.',
+    title: 'Quick capture',
+    description: 'A bar you open from anywhere with a shortcut, to jot down a task or a log entry.',
+    offNote: 'Its shortcut does nothing while this is off.',
     getState: async () => {
       return getBoolSetting('feature_hud', true)
     },
@@ -115,9 +118,9 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
   {
     key: 'backup',
     icon: <Archive size={16} />,
-    title: 'Zero-Config Backup Vaulting',
-    description: 'Automatically creates timestamped SQLite database snapshots.',
-    warning: 'Disabling clears all scheduled backup intervals immediately.',
+    title: 'Automatic backups',
+    description: 'Copies your data on a schedule. How often, and how many to keep, are under Database Backup.',
+    offNote: 'Backups already made are kept, and Back up now still works.',
     getState: async () => {
       return getBoolSetting('feature_backup', true)
     },
@@ -130,9 +133,8 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
   {
     key: 'tracker',
     icon: <Activity size={16} />,
-    title: 'Passive Activity Tracker',
-    description: 'Monitors active window focus to build a passive work timeline.',
-    warning: 'Disabling terminates the active window focus scanning loop.',
+    title: 'Activity tracking',
+    description: 'Notes which app is in front while you work, for the timeline in Analytics.',
     getState: async () => {
       try { return await trackerApi.getState() }
       catch { return false }
@@ -146,8 +148,8 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
     key: 'sync',
     icon: <RefreshCw size={16} />,
     title: 'Device Sync',
-    description: 'Keeps your own machines in step, over your network or the internet, with no cloud in between.',
-    warning: 'Disabling closes all active network listeners and WebRTC signaling tunnels.',
+    description: 'Keeps your own computers in step, over your network or the internet, with no cloud in between.',
+    offNote: 'Other computers can\'t find or reach this one while it is off.',
     getState: async () => {
       return getBoolSetting('sync_enabled', false)
     },
@@ -164,80 +166,74 @@ const BACKGROUND_CONFIGS: ToggleConfig[] = [
 ]
 
 /** keyed by settings key; key, label and default live in lib/features so nothing disagrees */
-const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; description: string; warning: string }> = {
+const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; description: string; offNote?: string; caution?: string }> = {
   'feature_view_kanban': {
     key: 'view_kanban',
     icon: <Columns size={16} />,
-    description: 'Visual status wall to track and organize workspace cards.',
-    warning: 'Disabling hides the Kanban tab on the left navigation bar.'
+    description: 'Cards in columns, moved along as the work moves.'
   },
   'feature_view_log': {
     key: 'view_log',
     icon: <FileText size={16} />,
-    description: 'Chronological activity stream for logging progress, screenshots, and daily context.',
-    warning: 'Disabling hides the Log tab on the left navigation bar.'
+    description: 'What you did each day, with notes and screenshots.'
   },
   'feature_view_backlog': {
     key: 'view_backlog',
     icon: <ListTodo size={16} />,
-    description: 'Detailed, sortable grid for tracking and prioritizing project tasks.',
-    warning: 'Disabling hides the Backlog tab on the left navigation bar.'
+    description: 'Every task in a table you can sort, filter and plan from.'
+  },
+  'feature_view_calendar': {
+    key: 'view_calendar',
+    icon: <Calendar size={16} />,
+    description: 'Due dates, repeating tasks, renewals and focus sessions by month, week or agenda.'
   },
   'feature_view_renewals': {
     key: 'view_renewals',
     icon: <CalendarClock size={16} />,
     description: 'Keys, subscriptions, domains and certificates that expire, with warnings before they do.',
-    warning: 'Disabling hides the Renewals tab. Warnings for what is already tracked keep coming; turn them off under Notifications.'
+    offNote: 'Warnings for what is already tracked keep coming. Turn those off under Notifications.'
   },
   'feature_view_focus': {
     key: 'view_focus',
     icon: <Timer size={16} />,
-    description: 'Interactive clock and interruption tracker to maintain high productivity.',
-    warning: 'Disabling hides the Focus tab on the left navigation bar.'
+    description: 'A focus timer with breaks, and a place to jot down what interrupted you.'
   },
   'feature_view_notes': {
     key: 'view_notes',
     icon: <BookOpen size={16} />,
-    description: 'Local file-based Markdown notes with wiki-link navigation and search.',
-    warning: 'Disabling hides the Notes tab on the left navigation bar.'
+    description: 'Markdown notes kept as files on this computer, with links between them and search.'
   },
   'feature_view_wall': {
     key: 'view_wall',
     icon: <LayoutGrid size={16} />,
-    description: 'Freeform canvas for arranging cards, notes, images and reference material.',
-    warning: 'Disabling hides the Wall tab on the left navigation bar.'
+    description: 'A canvas for arranging cards, notes, images and reference material freely.'
   },
   'feature_view_clipboard': {
     key: 'view_clipboard',
     icon: <Clipboard size={16} />,
-    description: 'Records every text copy you make, so you can search back through them.',
-    warning: 'Copies are stored as plain text in the local database and in backups. Anything a '
-      + 'password manager marks as private is skipped, and so is text that looks like a credential, '
-      + 'but browser extensions don\'t mark their copies. Disabling stops the recording and hides the tab.'
+    description: 'Keeps every piece of text you copy, so you can search back through them.',
+    caution: 'Copies are kept as plain text in Checkpoint and its backups. Anything a password manager marks as private is skipped, '
+      + 'and so is text that looks like a password or key, but browser extensions don\'t mark their copies.'
   },
   'feature_view_analytics': {
     key: 'view_analytics',
     icon: <BarChart2 size={16} />,
-    description: 'Interactive graphs showing active window usage, session durations, and categories.',
-    warning: 'Disabling hides the Analytics tab on the left navigation bar.'
+    description: 'Charts of the apps you used, your focus sessions and where the time went.'
   },
   'feature_view_cookbook': {
     key: 'view_cookbook',
     icon: <Sparkles size={16} />,
-    description: 'Interact with local Ollama models and context configurations.',
-    warning: 'Disabling hides the Cookbook tab on the left navigation bar.'
+    description: 'Ready-made prompts and the models you can run them with.'
   },
   'feature_view_cheatsheets': {
     key: 'view_cheatsheets',
     icon: <Book size={16} />,
-    description: 'Store, view, and read reference documentation/cheatsheets inside Checkpoint.',
-    warning: 'Disabling hides the Cheatsheets tab on the left navigation bar.'
+    description: 'Reference sheets and PDFs, kept and read inside Checkpoint.'
   },
   'feature_gamedev_helpers': {
     key: 'gamedev_helpers',
     icon: <Gamepad size={16} />,
-    description: 'Unlocks PBR/seamless generators, pixel-art upscaler, sprite atlas tools, batch renamer and dialogue editor.',
-    warning: 'Disabling hides the Game Dev tab on the left navigation bar.'
+    description: 'Texture and pixel-art tools, sprite atlases, a batch renamer and a dialogue editor.'
   }
 }
 
@@ -246,15 +242,15 @@ const SIDEBAR_VIEW_CONFIGS: ToggleConfig[] = VIEW_FEATURES.map(feature => {
   const copy = VIEW_COPY[feature.key] ?? {
     key: feature.key,
     icon: <Columns size={16} />,
-    description: '',
-    warning: `Disabling hides the ${feature.label} tab on the left navigation bar.`
+    description: ''
   }
   return {
     key: copy.key,
     icon: copy.icon,
     title: feature.label,
     description: copy.description,
-    warning: copy.warning,
+    offNote: copy.offNote,
+    caution: copy.caution,
     getState: () => getBoolSetting(feature.key, feature.defaultOn),
     toggle: (active: boolean) => setViewFeature(feature.key, active)
   }
@@ -265,8 +261,8 @@ const AI_CONFIG: ToggleConfig = {
   key: AI_FEATURE_KEY,
   icon: <Sparkles size={16} />,
   title: 'AI Assistant',
-  description: 'The assistant panel and every entry point into it: the Cookbook, AI Standup, AI Assist on a card, and Ask AI on a cheatsheet.',
-  warning: 'Disabled. No model is contacted and no AI controls are shown. Saved chats, memories and provider keys are kept.',
+  description: 'The assistant panel and every way into it: the Cookbook, AI Standup, AI Assist on a card, and Ask AI on a cheatsheet.',
+  offNote: 'No model is contacted and no AI buttons show. Saved chats, memories and keys are kept.',
   getState: () => readAiEnabled(),
   toggle: (active: boolean) => setAiEnabled(active)
 }
@@ -279,45 +275,51 @@ function FeatureRow({ cfg, on, busy, onChange }: {
   busy: boolean
   onChange: (value: boolean) => void
 }): React.JSX.Element {
+  const id = React.useId()
+  const note = !on && cfg.offNote
   return (
-    <RowBetween>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
-        <span style={{
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1, minWidth: 0 }}>
+        <span aria-hidden="true" style={{
+          display: 'flex',
           color: on ? 'var(--color-secondary)' : 'var(--color-text-faint)',
-          marginTop: '2px',
+          marginTop: 'var(--space-0-5)',
           flexShrink: 0,
-          transition: 'color 150ms ease'
+          transition: 'color var(--duration-normal) var(--ease-default)'
         }}>
           {cfg.icon}
         </span>
-        <div>
-          <div className="text-item">
+        <div className="min-w-0">
+          <label htmlFor={id} className="text-item" style={{ display: 'block', cursor: busy ? 'default' : 'pointer' }}>
             {cfg.title}
-          </div>
-          <div style={{
-            fontSize: 'var(--text-xs)',
-            color: 'var(--color-text-faint)',
-            marginTop: '2px',
-            lineHeight: 1.5
-          }}>
-            {cfg.description}
-          </div>
-          {!on && (
-            <div style={{
-              fontSize: '11px',
-              color: 'var(--color-warning)',
-              marginTop: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              ⚡ {cfg.warning}
+          </label>
+          {cfg.description && (
+            <div id={`${id}-description`} className="text-sub" style={{ lineHeight: 'var(--leading-normal)' }}>
+              {cfg.description}
+            </div>
+          )}
+          {cfg.caution && (
+            <div className="settings-note" data-tone="warning">
+              <AlertTriangle size={12} aria-hidden="true" />
+              {cfg.caution}
+            </div>
+          )}
+          {note && (
+            <div className="settings-note">
+              <Info size={12} aria-hidden="true" />
+              {note}
             </div>
           )}
         </div>
       </div>
-      <ToggleSwitch checked={on} onChange={onChange} disabled={busy} label={cfg.title} />
-    </RowBetween>
+      <ToggleSwitch
+        id={id}
+        checked={on}
+        onChange={onChange}
+        disabled={busy}
+        describedBy={cfg.description ? `${id}-description` : undefined}
+      />
+    </div>
   )
 }
 
@@ -371,185 +373,110 @@ export default function FeatureToggleCenter() {
   }
 
   if (loading) {
-    return (
-      <div className="text-sm-faint">
-        Loading feature states…
-      </div>
-    )
+    return <SettingsCardSkeleton label="Loading the features" rows={5} />
   }
 
-  return (
-    <div className="col-lg">
-      <div>
-        <div className="section-kicker">
-          Assistant
-        </div>
-        <FeatureRow
-          cfg={AI_CONFIG}
-          on={states[AI_CONFIG.key] ?? false}
-          busy={toggling === AI_CONFIG.key}
-          onChange={v => handleToggle(AI_CONFIG, v)}
-        />
-      </div>
-
-      <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: 'var(--space-2) 0' }} />
-
-      <div>
-        <div className="section-kicker">
-          Background Subsystems
-        </div>
-        <div className="col-xs">
-          {BACKGROUND_CONFIGS.map((cfg, i) => (
-            <React.Fragment key={cfg.key}>
-              {i > 0 && <Divider />}
-              <FeatureRow
-                cfg={cfg}
-                on={states[cfg.key] ?? false}
-                busy={toggling === cfg.key}
-                onChange={v => handleToggle(cfg, v)}
-              />
-              {cfg.key === 'webhook' && states.webhook && <WebhookToken />}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ height: '1px', background: 'var(--color-surface-offset)', margin: 'var(--space-2) 0' }} />
-
-      <div>
-        <div className="section-kicker">
-          Workspace Views & Sidebar Customization
-        </div>
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginBottom: 'var(--space-3)', lineHeight: 1.5 }}>
-          Switch your workspace layout in one click or fine-tune individual sidebar views below.
-        </div>
-
-        {/* 1-Click Profile Switcher */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 'var(--space-3)',
-          marginBottom: 'var(--space-4)'
-        }}>
-          <button
-            type="button"
-            data-testid="profile-focused-btn"
-            onClick={() => handleSelectProfile('focused')}
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 'var(--space-3)',
-              padding: 'var(--space-3)',
-              background: profile === 'focused' ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
-              border: `1.5px solid ${profile === 'focused' ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'border-color 150ms ease, background 150ms ease'
-            }}
-          >
-            <div style={{
-              width: '18px', height: '18px', borderRadius: '50%',
-              border: `2px solid ${profile === 'focused' ? 'var(--color-secondary)' : 'var(--color-text-faint)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px'
-            }}>
-              {profile === 'focused' && (
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-secondary)' }} />
-              )}
-            </div>
-            <div className="min-w-0" style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-                <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
-                  Focused & Clean
-                </span>
-                {profile === 'focused' && (
-                  <span style={{
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    background: 'var(--color-secondary-muted)',
-                    color: 'var(--color-secondary)'
-                  }}>
-                    Active
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45, marginTop: '4px' }}>
-                Kanban, Wall canvas, Notes, and Focus timer. Hides developer logs and secondary tools to minimize distractions.
-              </div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            data-testid="profile-full-btn"
-            onClick={() => handleSelectProfile('full')}
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 'var(--space-3)',
-              padding: 'var(--space-3)',
-              background: profile === 'full' ? 'var(--color-surface-offset)' : 'var(--color-surface-2)',
-              border: `1.5px solid ${profile === 'full' ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'border-color 150ms ease, background 150ms ease'
-            }}
-          >
-            <div style={{
-              width: '18px', height: '18px', borderRadius: '50%',
-              border: `2px solid ${profile === 'full' ? 'var(--color-secondary)' : 'var(--color-text-faint)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px'
-            }}>
-              {profile === 'full' && (
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-secondary)' }} />
-              )}
-            </div>
-            <div className="min-w-0" style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-                <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
-                  Full Suite
-                </span>
-                {profile === 'full' && (
-                  <span style={{
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    background: 'var(--color-secondary-muted)',
-                    color: 'var(--color-secondary)'
-                  }}>
-                    Active
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45, marginTop: '4px' }}>
-                Unlocks the complete workspace: Activity Log stream, Reference Cheatsheets, App Analytics, and Game Dev helpers.
-              </div>
-            </div>
-          </button>
-        </div>
-
-        <div className="col-xs">
-          {SIDEBAR_VIEW_CONFIGS.map((cfg, i) => (
-            <React.Fragment key={cfg.key}>
-              {i > 0 && <Divider />}
-              <FeatureRow
-                cfg={cfg}
-                on={states[cfg.key] ?? false}
-                busy={toggling === cfg.key}
-                onChange={v => handleToggle(cfg, v)}
-              />
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
+  const rows = (configs: ToggleConfig[]) => (
+    <div className="col-xs">
+      {configs.map((cfg, i) => (
+        <React.Fragment key={cfg.key}>
+          {i > 0 && <Divider />}
+          <FeatureRow
+            cfg={cfg}
+            on={states[cfg.key] ?? false}
+            busy={toggling === cfg.key}
+            onChange={v => handleToggle(cfg, v)}
+          />
+          {cfg.key === 'webhook' && states.webhook && <WebhookToken />}
+        </React.Fragment>
+      ))}
     </div>
+  )
+
+  const profiles: { id: LayoutProfile; name: string; description: string; testId: string }[] = [
+    {
+      id: 'focused',
+      name: 'Focused & Clean',
+      description: 'Kanban, Wall, Notes, Focus and the rest of the everyday views, with Log, Cheatsheets, Analytics and Clipboard hidden.',
+      testId: 'profile-focused-btn'
+    },
+    {
+      id: 'full',
+      name: 'Full Suite',
+      description: 'Log, Cheatsheets and Analytics shown as well. Clipboard stays off until you turn it on.',
+      testId: 'profile-full-btn'
+    }
+  ]
+
+  return (
+    <>
+      <SettingsSection icon={<Sparkles size={14} />} title="Assistant" description="The AI features, everywhere at once.">
+        {rows([AI_CONFIG])}
+      </SettingsSection>
+
+      <SettingsSection icon={<Cpu size={14} />} title="Background" description="Things that run while you work, without a page of their own.">
+        {rows(BACKGROUND_CONFIGS)}
+      </SettingsSection>
+
+      <SettingsSection icon={<PanelLeft size={14} />} title="Sidebar views" description="The pages in the sidebar. Pick a starting set, then turn single views on or off.">
+        <div className="col-lg">
+          <div
+            role="radiogroup"
+            aria-label="Starting set"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 16rem), 1fr))',
+              gap: 'var(--space-3)'
+            }}
+          >
+            {profiles.map(option => {
+              const chosen = profile === option.id
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen}
+                  data-testid={option.testId}
+                  onClick={() => handleSelectProfile(option.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 'var(--space-3)',
+                    padding: 'var(--space-3)',
+                    background: chosen ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
+                    border: `1px solid ${chosen ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'border-color var(--duration-fast) var(--ease-default), background var(--duration-fast) var(--ease-default)'
+                  }}
+                >
+                  <span aria-hidden="true" style={{
+                    width: 'var(--space-4)', height: 'var(--space-4)', borderRadius: 'var(--radius-full)',
+                    border: `2px solid ${chosen ? 'var(--color-secondary)' : 'var(--color-text-faint)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 'var(--space-0-5)'
+                  }}>
+                    {chosen && (
+                      <span style={{ width: 'var(--space-2)', height: 'var(--space-2)', borderRadius: 'var(--radius-full)', background: 'var(--color-secondary)' }} />
+                    )}
+                  </span>
+                  <span className="min-w-0" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                    <span className="text-item-strong">
+                      {option.name}
+                    </span>
+                    <span className="text-hint" style={{ lineHeight: 'var(--leading-normal)' }}>
+                      {option.description}
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {rows(SIDEBAR_VIEW_CONFIGS)}
+        </div>
+      </SettingsSection>
+    </>
   )
 }

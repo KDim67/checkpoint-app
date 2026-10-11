@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { Wifi, Globe, Play, Loader2, RefreshCw, Terminal } from 'lucide-react'
+import SettingsSection, { ToggleRow } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import { WebRTCSyncCoordinator } from '../../lib/webrtcSync'
 import { BAD_CODE_MESSAGE, CODE_EXAMPLE, newInternetCode, parseInternetCode } from '../../../../shared/internetPairing'
@@ -9,6 +10,7 @@ import { errorMessage } from '../../../../shared/errors'
 import { SYNC_TCP_PORT } from '../../../../shared/ports'
 import { getBoolSetting, getJsonSetting, setBoolSetting, setJsonSetting } from '../../lib/settings'
 import * as syncApi from '../../data/sync'
+import Presence from '../ui/Presence'
 
 interface Peer {
   name: string
@@ -104,24 +106,25 @@ export default function SyncSettings() {
       if (checked) {
         await syncApi.startHost()
         addLog('Sync engine started. Discoverable on local Wi-Fi.')
-        toast('Sync server active')
+        toast('Sync on')
       } else {
         await syncApi.stopHost()
         handleStopWebRTC()
         setDiscoveredPeers([])
         addLog('Sync engine disabled. All servers closed.')
-        toast('Sync server stopped')
+        toast('Sync off')
       }
     } catch (err) {
       console.error(err)
-      toast('Failed to change sync state')
+      setSyncEnabled(!checked)
+      toast(`Could not turn sync ${checked ? 'on' : 'off'}: ${errorMessage(err, 'try again')}`)
     }
   }
 
   const handleManualLANConnect = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!manualIp || !manualCode) {
-      toast('Please enter target IP/Host and Passcode')
+      toast('Fill in the address and the passcode from the other computer')
       return
     }
 
@@ -136,12 +139,12 @@ export default function SyncSettings() {
       )
       
       addLog(`LAN Sync completed successfully! (Integrated ${stats.dbUpdates} updates)`)
-      toast('Sync successful')
-      await saveSyncSuccess('LAN (Manual)', stats.dbUpdates, stats.filesSynced)
+      toast('Synced')
+      await saveSyncSuccess('your network', stats.dbUpdates, stats.filesSynced)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       addLog(`LAN Sync failed: ${errorMsg}`)
-      toast('Sync failed')
+      toast(`Couldn't sync: ${errorMsg}`)
     } finally {
       setIsManualSyncing(false)
     }
@@ -161,12 +164,12 @@ export default function SyncSettings() {
     try {
       const stats = await syncApi.connectAndSync(peer.ip, peer.port, code)
       addLog(`Sync with "${peer.name}" succeeded! (Integrated ${stats.dbUpdates} updates)`)
-      toast('Sync successful')
-      await saveSyncSuccess(`LAN (${peer.name})`, stats.dbUpdates, stats.filesSynced)
+      toast('Synced')
+      await saveSyncSuccess(peer.name, stats.dbUpdates, stats.filesSynced)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
       addLog(`Sync with "${peer.name}" failed: ${errorMsg}`)
-      toast('Sync failed')
+      toast(`Couldn't sync with ${peer.name}: ${errorMsg}`)
     }
   }
 
@@ -188,13 +191,13 @@ export default function SyncSettings() {
       },
       onComplete: async (stats) => {
         addLog(`[WebRTC] Sync completed successfully! (Integrated ${stats.dbUpdates} updates, ${stats.filesSynced} files)`)
-        toast('Internet sync completed')
+        toast('Synced over the internet')
         setIsWebrtcActive(false)
-        await saveSyncSuccess('Internet', stats.dbUpdates, stats.filesSynced)
+        await saveSyncSuccess('the internet', stats.dbUpdates, stats.filesSynced)
       },
       onError: (err) => {
         addLog(`[WebRTC Error] ${errorMessage(err)}`)
-        toast('Internet sync failed')
+        toast(`Couldn't sync over the internet: ${errorMessage(err)}`)
         setIsWebrtcActive(false)
       }
     })
@@ -223,13 +226,13 @@ export default function SyncSettings() {
       },
       onComplete: async (stats) => {
         addLog(`[WebRTC] Sync completed successfully! (Integrated ${stats.dbUpdates} updates, ${stats.filesSynced} files)`)
-        toast('Internet sync completed')
+        toast('Synced over the internet')
         setIsWebrtcActive(false)
-        await saveSyncSuccess('Internet', stats.dbUpdates, stats.filesSynced)
+        await saveSyncSuccess('the internet', stats.dbUpdates, stats.filesSynced)
       },
       onError: (err) => {
         addLog(`[WebRTC Error] ${errorMessage(err)}`)
-        toast('Internet sync failed')
+        toast(`Couldn't sync over the internet: ${errorMessage(err)}`)
         setIsWebrtcActive(false)
       }
     })
@@ -249,356 +252,261 @@ export default function SyncSettings() {
     setWebrtcCode('')
   }
 
+  const panel: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--space-3)',
+    padding: 'var(--space-4)',
+    background: 'var(--color-surface-2)',
+    border: '1px solid var(--color-surface-offset)',
+    borderRadius: 'var(--radius-md)'
+  }
+
   return (
-    <div className="sync-settings" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: 'var(--space-4)' }}>
-        <div>
-          <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', margin: 0 }}>
-            Device Sync
-          </h2>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: '4px', marginBottom: 0 }}>
-            Keeps your own machines in step: items, notes and settings, over your network or the internet. To hand a board to another person, use Share on the board instead.
-          </p>
-        </div>
-
-        <label className="toggle-switch" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
+    <>
+      <SettingsSection icon={<RefreshCw size={14} />} title="Device Sync" description="Your own computers, kept in step. Not the same as sharing a board.">
+        <div className="sync-settings col-xl">
+          <ToggleRow
+            label="Sync this computer"
+            description="Items, notes and settings, over your network or the internet. To hand a board to someone else, use Share on the board instead."
             checked={syncEnabled}
-            onChange={e => handleToggleSync(e.target.checked)}
-            className="is-hidden"
+            onChange={handleToggleSync}
           />
-          <span
-            style={{
-              position: 'relative',
-              width: '44px',
-              height: '24px',
-              background: syncEnabled ? 'var(--color-success)' : 'var(--color-surface-offset)',
-              borderRadius: '12px',
-              transition: 'background var(--duration-fast) ease',
-              display: 'inline-block'
-            }}
-          >
-            <span
-              style={{
-                position: 'absolute',
-                top: '2px',
-                left: syncEnabled ? '22px' : '2px',
-                width: '20px',
-                height: '20px',
-                background: 'var(--color-surface-1)',
-                borderRadius: '50%',
-                boxShadow: 'var(--shadow-sm)',
-                transition: 'left var(--duration-fast) ease'
-              }}
-            />
-          </span>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: syncEnabled ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-            {syncEnabled ? 'Active' : 'Disabled'}
-          </span>
-        </label>
-      </div>
 
-      {lastSyncStats && (
-        <div style={{
-          background: 'var(--color-surface-offset)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-3) var(--space-4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          border: '1px solid var(--color-surface-offset)'
-        }}>
-          <div>
-            <div className="text-label-xs">
-              Last Sync Succeeded
-            </div>
-            <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-              Completed {new Date(lastSyncStats.time).toLocaleString()} via {lastSyncStats.mode}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 'var(--space-5)' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div className="text-accent-xs-bold">
-                {lastSyncStats.dbUpdates}
-              </div>
-              <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-muted)' }}>
-                DB Merges
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="text-accent-xs-bold">
-                {lastSyncStats.filesSynced}
-              </div>
-              <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-muted)' }}>
-                Files Synced
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {syncEnabled ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
-          <div className="col-lg">
-            <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-                <Wifi size={18} className="text-accent" />
-                <h3 className="heading-sm-bold">
-                  Local LAN Sync (Wi-Fi)
-                </h3>
-              </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }}>
-                <span>Host Port: <code className="text-base">{hostStatus.port}</code></span>
-                <span>LAN Passcode: <strong style={{ color: 'var(--color-secondary)', fontSize: 'var(--text-sm)' }}>{hostStatus.pairingCode}</strong></span>
-              </div>
-              <p className="text-sub" style={{ marginBottom: 'var(--space-4)' }}>
-                Encrypted end to end, and the passcode itself never crosses the network. Both computers need this version of Checkpoint or later.
-              </p>
-
-              <h4 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>
-                Available LAN Peers ({discoveredPeers.length})
-              </h4>
-              
-              {discoveredPeers.length === 0 ? (
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', padding: 'var(--space-3) 0', borderTop: '1px solid var(--color-surface-offset)' }}>
-                  Searching local subnet... Open Checkpoint on your other machine.
+          {lastSyncStats && (
+            <div className="settings-callout" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div>
+                <div className="text-label-xs-semibold">Last synced</div>
+                <div className="text-sub">
+                  {new Date(lastSyncStats.time).toLocaleString()} via {lastSyncStats.mode}
                 </div>
-              ) : (
-                <div className="col">
-                  {discoveredPeers.map((peer, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2) var(--space-3)' }}>
-                      <div>
-                        <div className="text-label-xs">{peer.name}</div>
-                        <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)' }}>{peer.ip}:{peer.port}</div>
-                      </div>
-                      <button
-                        onClick={() => handlePeerSync(peer)}
-                        style={{
-                          background: 'var(--color-secondary)',
-                          color: 'var(--color-surface-1)',
-                          border: 'none',
-                          fontSize: 'var(--text-xxs)',
-                          fontWeight: 'var(--weight-semibold)',
-                          padding: '4px 10px',
-                          borderRadius: 'var(--radius-sm)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <RefreshCw size={10} /> Sync
-                      </button>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-5)', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="text-accent-xs-bold">{lastSyncStats.dbUpdates}</div>
+                  <div className="text-sub">changes</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="text-accent-xs-bold">{lastSyncStats.filesSynced}</div>
+                  <div className="text-sub">files</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {syncEnabled ? (
+            // side by side where both fit, one above the other in a narrow window
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 20rem), 1fr))', gap: 'var(--space-4)' }}>
+              <div className="col-lg" data-settings-part="Local network">
+                <div style={panel}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <Wifi size={16} className="text-accent" aria-hidden="true" />
+                    <h3 className="heading-sm-bold">
+                      On this network
+                    </h3>
+                  </div>
+
+                  <div className="text-hint" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                    <span>Passcode here: <strong style={{ color: 'var(--color-secondary)', fontSize: 'var(--text-sm)', fontVariantNumeric: 'tabular-nums' }}>{hostStatus.pairingCode}</strong></span>
+                    <span>Port <code className="text-base">{hostStatus.port}</code></span>
+                  </div>
+                  <p className="text-sub" style={{ margin: 0 }}>
+                    Encrypted end to end, and the passcode itself never crosses the network. Both computers need this version of Checkpoint or later.
+                  </p>
+
+                  <h4 className="settings-list-title" style={{ margin: 0 }}>
+                    Computers found ({discoveredPeers.length})
+                  </h4>
+
+                  {discoveredPeers.length === 0 ? (
+                    <div className="text-sub" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                      Looking… Open Checkpoint on another computer on this network.
                     </div>
-                  ))}
+                  ) : (
+                    <ul className="settings-list">
+                      {discoveredPeers.map(peer => (
+                        <li key={`${peer.ip}:${peer.port}`} className="settings-list-row">
+                          <div className="settings-row-text">
+                            <div className="text-item">{peer.name}</div>
+                            <div className="text-sub">{peer.ip}:{peer.port}</div>
+                          </div>
+                          <button type="button" className="btn-primary btn-small" onClick={() => handlePeerSync(peer)}>
+                            <RefreshCw size={12} aria-hidden="true" /> Sync
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <form onSubmit={handleManualLANConnect} style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <h3 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', margin: 0 }}>
-                Manual Connect (LAN / VPN)
-              </h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-2)' }}>
-                <input
-                  type="text"
-                  placeholder="e.g. 192.168.1.5 or Tailscale IP"
-                  value={manualIp}
-                  onChange={e => setManualIp(e.target.value)}
-                  className="input-xs"
-                />
-                <input
-                  type="text"
-                  placeholder="Port"
-                  value={manualPort}
-                  onChange={e => setManualPort(e.target.value)}
-                  className="input-xs"
-                />
-              </div>
-
-              <input
-                type="text"
-                placeholder="6-Digit Passcode"
-                value={manualCode}
-                onChange={e => setManualCode(e.target.value)}
-                maxLength={6}
-                className="input-xs"
-              />
-
-              <button
-                type="submit"
-                disabled={isManualSyncing}
-                className="border-offset hover-border-accent"
-                style={{
-                  background: 'var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 'var(--weight-semibold)',
-                  padding: '8px',
-                  borderRadius: 'var(--radius-sm)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 'var(--space-2)',
-                  transition: 'all var(--duration-fast)'
-                }}
-              >
-                {isManualSyncing ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                Connect & Sync
-              </button>
-            </form>
-          </div>
-
-          <div className="col-lg">
-            <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
-                <Globe size={18} className="text-accent" />
-                <h3 className="heading-sm-bold">
-                  Internet Sync (WebRTC)
-                </h3>
-              </div>
-              <p style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)', margin: 0 }}>
-                Direct and end-to-end encrypted. The last six digits of the code never leave either computer.
-              </p>
-
-              {isWebrtcActive ? (
-                <div style={{ background: 'var(--color-surface-3)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                  <div className="row-between">
-                    <span className="text-accent-xs-bold">
-                      Code: {webrtcCode}
-                    </span>
-                    <button
-                      onClick={handleStopWebRTC}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontSize: 'var(--text-xxs)', fontWeight: 'var(--weight-semibold)' }}
-                    >
-                      Disconnect
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 'var(--text-xxs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Loader2 size={10} className="animate-spin" />
-                    {webrtcProgress || 'Initializing...'}
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-                  <button
-                    onClick={handleStartWebRTCHost}
-                    style={{
-                      background: 'var(--color-secondary)',
-                      color: 'var(--color-surface-1)',
-                      border: 'none',
-                      fontSize: 'var(--text-xs)',
-                      fontWeight: 'var(--weight-semibold)',
-                      padding: '8px',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 'var(--space-2)'
-                    }}
-                  >
-                    Show a code for the other computer
-                  </button>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-xxs)', color: 'var(--color-text-faint)' }}>
-                    <div className="rule-fill" />
-                    OR CONNECT TO PEER
-                    <div className="rule-fill" />
+                <form onSubmit={handleManualLANConnect} style={panel} aria-labelledby="sync-by-address">
+                  <div>
+                    <h3 id="sync-by-address" className="heading-sm-bold">
+                      Connect by address
+                    </h3>
+                    <p className="text-sub" style={{ margin: 0 }}>
+                      For a computer on a VPN such as Tailscale, or one that isn't found above.
+                    </p>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-2)' }}>
                     <input
                       type="text"
-                      placeholder={`Code, e.g. ${CODE_EXAMPLE}`}
-                      aria-label="Code from the other computer"
-                      value={webrtcInputCode}
-                      onChange={e => setWebrtcInputCode(e.target.value.toUpperCase())}
-                      maxLength={13}
+                      placeholder="e.g. 192.168.1.5"
+                      aria-label="Address of the other computer"
+                      value={manualIp}
+                      onChange={e => setManualIp(e.target.value)}
                       spellCheck={false}
                       autoComplete="off"
-                      className="input-xs"
+                      className="input-md"
+                      style={{ minWidth: 0 }}
                     />
-                    <button
-                      onClick={handleStartWebRTCClient}
-                      className="border-offset hover-border-accent"
-                      style={{
-                        background: 'var(--color-surface-offset)',
-                        color: 'var(--color-text-base)',
-                        fontSize: 'var(--text-xs)',
-                        fontWeight: 'var(--weight-semibold)',
-                        borderRadius: 'var(--radius-sm)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Connect
-                    </button>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Port"
+                      aria-label="Port"
+                      value={manualPort}
+                      onChange={e => setManualPort(e.target.value)}
+                      className="input-md"
+                      style={{ minWidth: 0 }}
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Passcode shown on the other computer"
+                    aria-label="Passcode shown on the other computer"
+                    value={manualCode}
+                    onChange={e => setManualCode(e.target.value)}
+                    maxLength={6}
+                    autoComplete="off"
+                    className="input-md"
+                  />
+
+                  <button type="submit" disabled={isManualSyncing} className="btn-secondary btn-with-icon" style={{ justifyContent: 'center' }}>
+                    {isManualSyncing ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
+                    {isManualSyncing ? 'Syncing…' : 'Connect and sync'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="col-lg" data-settings-part="Internet">
+                <div style={panel}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <Globe size={16} className="text-accent" aria-hidden="true" />
+                    <h3 className="heading-sm-bold">
+                      Over the internet
+                    </h3>
+                  </div>
+                  <p className="text-sub" style={{ margin: 0 }}>
+                    Direct and end-to-end encrypted. The last six digits of the code never leave either computer.
+                  </p>
+
+                  {isWebrtcActive ? (
+                    <div className="settings-callout" role="status" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                      <div className="row-between">
+                        <span className="text-accent-xs-bold" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          Code: {webrtcCode}
+                        </span>
+                        <button type="button" className="btn-ghost btn-small hover-text-error" onClick={handleStopWebRTC}>
+                          Stop
+                        </button>
+                      </div>
+                      <div className="text-hint" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
+                        <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                        {webrtcProgress || 'Starting…'}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" className="btn-primary" onClick={handleStartWebRTCHost}>
+                        Show a code for the other computer
+                      </button>
+
+                      <div className="text-sub" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <div className="rule-fill" />
+                        or type the code it shows
+                        <div className="rule-fill" />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-2)' }}>
+                        <input
+                          type="text"
+                          placeholder={`Code, e.g. ${CODE_EXAMPLE}`}
+                          aria-label="Code from the other computer"
+                          value={webrtcInputCode}
+                          onChange={e => setWebrtcInputCode(e.target.value.toUpperCase())}
+                          onKeyDown={e => { if (e.key === 'Enter') handleStartWebRTCClient() }}
+                          maxLength={13}
+                          spellCheck={false}
+                          autoComplete="off"
+                          className="input-md"
+                          style={{ minWidth: 0, fontVariantNumeric: 'tabular-nums' }}
+                        />
+                        <button type="button" className="btn-secondary" onClick={handleStartWebRTCClient}>
+                          Connect
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div style={{ ...panel, background: 'var(--color-surface-1)', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <Terminal size={14} className="text-faint" aria-hidden="true" />
+                    <h3 className="settings-list-title" style={{ margin: 0 }}>
+                      What happened
+                    </h3>
+                  </div>
+
+                  <div role="log" aria-label="Sync activity" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-0-5)', maxHeight: '9rem', overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    {logs.length === 0 ? (
+                      <div className="text-faint">Nothing yet. Each step of a sync shows here.</div>
+                    ) : (
+                      logs.map((log, idx) => <div key={idx}>{log}</div>)
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-
-            <div style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: '4px', marginBottom: '4px' }}>
-                <Terminal size={14} className="text-success" />
-                <span style={{ fontSize: 'var(--text-xxs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-success)', textTransform: 'uppercase' }}>
-                  Sync Console Log
-                </span>
-              </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '140px', overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                {logs.length === 0 ? (
-                  <div className="text-faint">Console is empty. Enable sync and trigger a connection.</div>
-                ) : (
-                  logs.map((log, idx) => <div key={idx}>{log}</div>)
-                )}
               </div>
             </div>
-          </div>
+          ) : (
+            <p className="text-sub" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <Wifi size={14} aria-hidden="true" />
+              Sync is off. Turn it on to find your other computers on this network, or to sync over the internet.
+            </p>
+          )}
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-12) 0', border: '1px dashed var(--color-surface-offset)', borderRadius: 'var(--radius-lg)', background: 'var(--color-surface-2)' }}>
-          <Wifi size={48} style={{ color: 'var(--color-text-faint)', marginBottom: 'var(--space-3)' }} />
-          <h3 className="heading-sm-bold">
-            Sync Engine is Disabled
-          </h3>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '4px', maxWidth: '320px', textAlign: 'center' }}>
-            Turn on the switch in the top right corner to activate discovery of your other machines on this network, and sync over the internet.
-          </p>
-        </div>
-      )}
+      </SettingsSection>
 
       <TurnRelaySettings />
 
+      <Presence show={!!peerToPair}>
       {peerToPair && (
-        <ModalShell label="Enter pairing passcode" onClose={() => setPeerToPair(null)} width="320px">
+        <ModalShell label="Enter the passcode" onClose={() => setPeerToPair(null)} width="20rem">
           <h3 className="heading-sm-bold">
-            Enter Pairing Passcode
+            Enter the passcode
           </h3>
           <p className="text-hint-flush">
-            Please type the 6-digit passcode displayed on <strong>{peerToPair.name}</strong> to authorize connection.
+            Type the six digits showing on <strong>{peerToPair.name}</strong>, under Device Sync.
           </p>
           <input
             type="text"
+            inputMode="numeric"
             maxLength={6}
-            placeholder="Passcode (e.g. 123456)"
+            placeholder="123456"
+            aria-label={`Passcode showing on ${peerToPair.name}`}
             value={passcodeVal}
             onChange={e => setPasscodeVal(e.target.value.replace(/\D/g, ''))}
+            className="input-md"
             style={{
               width: '100%',
               background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)',
-              padding: '8px 12px',
-              fontSize: 'var(--text-sm)',
-              color: 'var(--color-text-base)',
-              outline: 'none',
               textAlign: 'center',
-              letterSpacing: '0.1em'
+              letterSpacing: 'var(--tracking-wider)',
+              fontVariantNumeric: 'tabular-nums'
             }}
             autoFocus
             onKeyDown={e => {
@@ -608,42 +516,22 @@ export default function SyncSettings() {
             }}
           />
           <div className="flex-gap-mt2">
-            <button
-              onClick={() => setPeerToPair(null)}
-              style={{
-                flex: 1,
-                fontSize: 'var(--text-xs)',
-                fontWeight: 'var(--weight-semibold)',
-                background: 'transparent',
-                color: 'var(--color-text-muted)',
-                border: '1px solid var(--color-surface-offset)',
-                padding: '8px 0',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer'
-              }}
-            >
+            <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setPeerToPair(null)}>
               Cancel
             </button>
             <button
+              type="button"
+              className="btn-primary"
+              style={{ flex: 1 }}
               onClick={() => submitPeerPairing(passcodeVal)}
               disabled={passcodeVal.length < 5}
-              style={{
-                flex: 1,
-                fontSize: 'var(--text-xs)',
-                fontWeight: 'var(--weight-semibold)',
-                background: passcodeVal.length < 5 ? 'var(--color-surface-offset)' : 'var(--color-secondary)',
-                color: passcodeVal.length < 5 ? 'var(--color-text-faint)' : 'var(--color-text-inverted)',
-                border: 'none',
-                padding: '8px 0',
-                borderRadius: 'var(--radius-md)',
-                cursor: passcodeVal.length < 5 ? 'not-allowed' : 'pointer'
-              }}
             >
-              Connect & Sync
+              Connect and sync
             </button>
           </div>
         </ModalShell>
       )}
-    </div>
+      </Presence>
+    </>
   )
 }

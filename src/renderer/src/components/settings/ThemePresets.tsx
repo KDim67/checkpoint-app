@@ -83,23 +83,9 @@ export default function ThemePresets({ vars, onApply }: Props) {
         </h4>
 
         {!naming && (
-          <button
-            onClick={() => setNaming(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-1)',
-              padding: 'var(--space-1) var(--space-2)',
-              background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-muted)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--text-xs)',
-              cursor: 'pointer'
-            }}
-          >
-            <Plus size={12} />
-            Save current
+          <button type="button" className="btn-secondary btn-small" onClick={() => setNaming(true)}>
+            <Plus size={12} aria-hidden="true" />
+            Save current as a preset
           </button>
         )}
       </div>
@@ -117,46 +103,20 @@ export default function ThemePresets({ vars, onApply }: Props) {
             }}
             placeholder="Preset name"
             aria-label="Preset name"
-            style={{
-              flex: 1,
-              background: 'var(--color-surface-2)',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-base)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-1-5) var(--space-3)',
-              fontSize: 'var(--text-xs)',
-              outline: 'none'
-            }}
+            className="input-md"
+            style={{ flex: 1, background: 'var(--color-surface-2)' }}
           />
-          <button
-            onClick={handleSave}
-            style={{
-              padding: 'var(--space-1-5) var(--space-3)',
-              background: 'var(--color-secondary-muted)',
-              border: '1px solid var(--color-secondary)',
-              color: 'var(--color-secondary)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--weight-semibold)',
-              cursor: 'pointer'
-            }}
-          >
+          <button type="button" className="btn-primary btn-small" onClick={handleSave}>
             Save
           </button>
           <button
+            type="button"
+            className="btn-icon"
             onClick={() => { setNaming(false); setDraftName('') }}
-            aria-label="Cancel saving preset"
-            style={{
-              display: 'flex',
-              padding: 'var(--space-1-5)',
-              background: 'transparent',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-muted)',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer'
-            }}
+            aria-label="Cancel saving the preset"
+            title="Cancel"
           >
-            <X size={14} />
+            <X size={14} aria-hidden="true" />
           </button>
         </div>
       )}
@@ -180,7 +140,9 @@ export default function ThemePresets({ vars, onApply }: Props) {
               }}
             >
               <button
+                type="button"
                 onClick={() => onApply(preset.vars)}
+                aria-pressed={active}
                 title={`Apply ${preset.name}`}
                 style={{
                   display: 'block',
@@ -193,14 +155,14 @@ export default function ThemePresets({ vars, onApply }: Props) {
                   font: 'inherit'
                 }}
               >
-                <div style={{ display: 'flex', gap: '3px', marginBottom: 'var(--space-2)' }}>
+                <div aria-hidden="true" style={{ display: 'flex', gap: 'var(--space-0-5)', marginBottom: 'var(--space-2)' }}>
                   {SWATCH_KEYS.map(key => (
                     <span
                       key={key}
                       style={{
                         flex: 1,
-                        height: '18px',
-                        borderRadius: '3px',
+                        height: 'var(--space-4)',
+                        borderRadius: 'var(--radius-sm)',
                         background: preset.vars[key],
                         // near-black or near-white swatches vanish into the card otherwise
                         boxShadow: 'inset 0 0 0 1px rgba(128,128,128,0.25)'
@@ -209,7 +171,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
                   ))}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                  {active && <Check size={12} className="icon-accent" />}
+                  {active && <Check size={12} className="icon-accent" aria-hidden="true" />}
                   <span style={{
                     fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-medium)',
@@ -225,6 +187,7 @@ export default function ThemePresets({ vars, onApply }: Props) {
 
               {!preset.builtIn && (
                 <button
+                  type="button"
                   onClick={() => handleDelete(preset)}
                   aria-label={`Delete ${preset.name}`}
                   title={`Delete ${preset.name}`}
@@ -234,14 +197,14 @@ export default function ThemePresets({ vars, onApply }: Props) {
                     top: 'var(--space-1)',
                     right: 'var(--space-1)',
                     display: 'flex',
-                    padding: '3px',
+                    padding: 'var(--space-1)',
                     background: 'var(--color-surface-2)',
                     border: '1px solid var(--color-surface-offset)',
-                    borderRadius: '4px',
+                    borderRadius: 'var(--radius-sm)',
                     cursor: 'pointer'
                   }}
                 >
-                  <Trash2 size={11} />
+                  <Trash2 size={13} aria-hidden="true" />
                 </button>
               )}
             </div>

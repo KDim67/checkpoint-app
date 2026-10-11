@@ -60,7 +60,7 @@ export default function CollabFollowBanner({ followingPeer, onStop }: CollabFoll
       <span>
         Following <strong>{followingPeer.name}</strong> ({formatViewName(followingPeer.view)})
       </span>
-      <span style={{ fontSize: '11px', color: 'var(--color-text-muted, #8b949e)', fontWeight: 400 }}>
+      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted, #8b949e)', fontWeight: 400 }}>
         · Esc to stop
       </span>
       <button
@@ -71,7 +71,7 @@ export default function CollabFollowBanner({ followingPeer, onStop }: CollabFoll
           border: '1px solid var(--color-surface-offset, rgba(255, 255, 255, 0.15))',
           borderRadius: 'var(--radius-sm, 4px)',
           padding: '2px 8px',
-          fontSize: '11px',
+          fontSize: 'var(--text-xs)',
           fontWeight: 600,
           color: 'var(--color-text-base, #ffffff)',
           cursor: 'pointer',

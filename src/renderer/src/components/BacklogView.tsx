@@ -28,6 +28,8 @@ import { listTags } from '../data/tags'
 import { bulkDeleteItems, bulkUpdateItems, createItem, queryTasks, updateItem } from '../data/items'
 import * as appApi from '../data/app'
 import { dayEnd, dayStart, formatDueDate } from '../../../shared/dueDate'
+import Presence from './ui/Presence'
+import { usePresence } from '../lib/presence'
 
 interface WorkflowColumn {
   id: string
@@ -371,6 +373,8 @@ export default function BacklogView() {
   // archive browser, since the toast Undo only lasts seconds
   const [showArchive, setShowArchive] = useState(false)
   const archiveRef = useFocusTrap(showArchive)
+  // kept a moment after closing, so the panel slides out rather than vanishing
+  const archivePanel = usePresence(showArchive)
   const [archivedTasks, setArchivedTasks] = useState<Item[]>([])
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [deleteArchivedId, setDeleteArchivedId] = useState<string | null>(null)
@@ -643,7 +647,7 @@ export default function BacklogView() {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-1.5)',
+              gap: 'var(--space-1-5)',
               height: '32px',
               transition: 'filter 120ms ease, transform 120ms ease'
             }}
@@ -669,7 +673,7 @@ export default function BacklogView() {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-1.5)',
+              gap: 'var(--space-1-5)',
               height: '32px',
               transition: 'filter 120ms ease, transform 120ms ease'
             }}
@@ -757,7 +761,7 @@ export default function BacklogView() {
         <div style={{ width: '1px', height: '18px', background: 'var(--color-surface-offset)', flexShrink: 0 }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
             Group
           </span>
           <select
@@ -806,7 +810,7 @@ export default function BacklogView() {
                 background: 'var(--color-secondary)',
                 color: 'var(--color-text-inverted)',
                 borderRadius: 'var(--radius-full)',
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 'bold',
                 minWidth: '16px',
                 height: '16px',
@@ -856,7 +860,7 @@ export default function BacklogView() {
           <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-secondary)' }}>
             {activeView.name}
           </span>
-          <span style={{ flex: 1, fontSize: '11px', color: 'var(--color-text-muted)' }}>
+          <span style={{ flex: 1, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
             {describeView(activeView)}
           </span>
           <button
@@ -1013,7 +1017,7 @@ export default function BacklogView() {
                 border: '1px solid var(--color-surface-offset)',
                 color: page === 1 ? 'var(--color-text-faint)' : 'var(--color-text-base)',
                 borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-1.5) var(--space-3)',
+                padding: 'var(--space-1-5) var(--space-3)',
                 fontSize: 'var(--text-xs)',
                 cursor: page === 1 ? 'default' : 'pointer',
                 display: 'flex',
@@ -1036,7 +1040,7 @@ export default function BacklogView() {
                 border: '1px solid var(--color-surface-offset)',
                 color: page === totalPages ? 'var(--color-text-faint)' : 'var(--color-text-base)',
                 borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-1.5) var(--space-3)',
+                padding: 'var(--space-1-5) var(--space-3)',
                 fontSize: 'var(--text-xs)',
                 cursor: page === totalPages ? 'default' : 'pointer',
                 display: 'flex',
@@ -1050,6 +1054,7 @@ export default function BacklogView() {
         )}
       </div>
 
+      <Presence show={!!activeTaskId}>
       {activeTaskId && (
         <TaskDetailDrawer
           taskId={activeTaskId}
@@ -1061,6 +1066,7 @@ export default function BacklogView() {
           onUpdate={handleUpdateField}
         />
       )}
+      </Presence>
 
       <BulkActionsBar
         selectedItems={selectedItems}
@@ -1089,8 +1095,10 @@ export default function BacklogView() {
       />
 
       {/* archived tasks panel */}
-      {showArchive && (
+      {archivePanel.mounted && (
         <div
+          className="motion-backdrop"
+          data-state={archivePanel.state}
           style={{
             position: 'fixed',
             top: '32px',
@@ -1106,6 +1114,8 @@ export default function BacklogView() {
           onClick={() => setShowArchive(false)}
         >
           <div
+            className="motion-drawer"
+            data-state={archivePanel.state}
             style={{
               width: '420px',
               maxWidth: '100vw',
@@ -1114,8 +1124,7 @@ export default function BacklogView() {
               borderLeft: '1px solid var(--color-surface-offset)',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
-              animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
+              boxShadow: '-10px 0 30px rgba(0,0,0,0.5)'
             }}
             onClick={e => e.stopPropagation()}
             ref={archiveRef}
@@ -1193,7 +1202,7 @@ export default function BacklogView() {
                           background: 'transparent',
                           border: 'none',
                           color: 'var(--color-secondary)',
-                          fontSize: '11px',
+                          fontSize: 'var(--text-xs)',
                           fontWeight: 'var(--weight-semibold)',
                           cursor: 'pointer',
                           display: 'flex',
@@ -1209,7 +1218,7 @@ export default function BacklogView() {
                           background: 'transparent',
                           border: 'none',
                           color: 'var(--color-error)',
-                          fontSize: '11px',
+                          fontSize: 'var(--text-xs)',
                           fontWeight: 'var(--weight-semibold)',
                           cursor: 'pointer',
                           display: 'flex',

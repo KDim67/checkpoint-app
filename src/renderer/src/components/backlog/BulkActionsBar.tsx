@@ -86,7 +86,7 @@ export default function BulkActionsBar({
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-1.5) var(--space-3)',
+              padding: 'var(--space-1-5) var(--space-3)',
               fontSize: 'var(--text-xs)',
               fontWeight: 'var(--weight-semibold)',
               cursor: 'pointer',
@@ -127,8 +127,8 @@ export default function BulkActionsBar({
                   style={{
                     border: 'none',
                     color: 'var(--color-text-base)',
-                    padding: 'var(--space-1.5) var(--space-3)',
-                    fontSize: '11px',
+                    padding: 'var(--space-1-5) var(--space-3)',
+                    fontSize: 'var(--text-xs)',
                     textAlign: 'left',
                     cursor: 'pointer'
                   }}
@@ -152,7 +152,7 @@ export default function BulkActionsBar({
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-1.5) var(--space-3)',
+              padding: 'var(--space-1-5) var(--space-3)',
               fontSize: 'var(--text-xs)',
               fontWeight: 'var(--weight-semibold)',
               cursor: 'pointer',
@@ -193,8 +193,8 @@ export default function BulkActionsBar({
                   style={{
                     border: 'none',
                     color: 'var(--color-text-base)',
-                    padding: 'var(--space-1.5) var(--space-3)',
-                    fontSize: '11px',
+                    padding: 'var(--space-1-5) var(--space-3)',
+                    fontSize: 'var(--text-xs)',
                     textAlign: 'left',
                     cursor: 'pointer',
                     display: 'flex',
@@ -227,7 +227,7 @@ export default function BulkActionsBar({
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-1.5) var(--space-3)',
+              padding: 'var(--space-1-5) var(--space-3)',
               fontSize: 'var(--text-xs)',
               fontWeight: 'var(--weight-semibold)',
               cursor: 'pointer',
@@ -271,8 +271,8 @@ export default function BulkActionsBar({
                   style={{
                     border: 'none',
                     color: 'var(--color-text-base)',
-                    padding: 'var(--space-1.5) var(--space-3)',
-                    fontSize: '11px',
+                    padding: 'var(--space-1-5) var(--space-3)',
+                    fontSize: 'var(--text-xs)',
                     textAlign: 'left',
                     cursor: 'pointer',
                     display: 'flex',
@@ -285,7 +285,7 @@ export default function BulkActionsBar({
                 </button>
               ))}
               {allTags.length === 0 && (
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', padding: 'var(--space-2) var(--space-3)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', padding: 'var(--space-2) var(--space-3)' }}>
                   No tags created
                 </span>
               )}
@@ -304,7 +304,7 @@ export default function BulkActionsBar({
             border: '1px solid var(--color-surface-offset)',
             color: 'var(--color-text-base)',
             borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-1.5) var(--space-3)',
+            padding: 'var(--space-1-5) var(--space-3)',
             fontSize: 'var(--text-xs)',
             fontWeight: 'var(--weight-semibold)',
             cursor: 'pointer',
@@ -326,7 +326,7 @@ export default function BulkActionsBar({
             border: '1px solid var(--color-error)',
             color: 'var(--color-error)',
             borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-1.5) var(--space-3)',
+            padding: 'var(--space-1-5) var(--space-3)',
             fontSize: 'var(--text-xs)',
             fontWeight: 'var(--weight-semibold)',
             cursor: 'pointer',

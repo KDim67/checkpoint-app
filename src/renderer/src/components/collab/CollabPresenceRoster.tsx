@@ -139,7 +139,7 @@ export default function CollabPresenceRoster({
                 borderRadius: '50%',
                 background: color,
                 color: '#ffffff',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 700,
                 border: isFollowing ? '2px solid #ffffff' : '2px solid var(--color-surface-elevated, #24292e)',
                 boxShadow: isFollowing

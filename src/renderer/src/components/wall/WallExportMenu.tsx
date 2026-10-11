@@ -52,7 +52,7 @@ export default function WallExportMenu({ open, setOpen, hasItems, hasSelection, 
               }}
             >
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{option.label}</span>
-              <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>{option.detail}</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>{option.detail}</span>
             </button>
           ))}
         </div>

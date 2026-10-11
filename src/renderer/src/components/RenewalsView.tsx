@@ -17,6 +17,8 @@ import { formatMoney, renewalGroup, renewalTotals, type RenewalField, type Renew
 import { kindById, newRenewalMeta } from '../../../shared/renewalKinds'
 import type { RenewalGuess } from '../../../shared/renewalText'
 import type { RenewalRecord } from '../../../shared/renewalApi'
+import Presence from './ui/Presence'
+import { SkeletonBlocks } from './ui/Skeleton'
 
 const SCOPE_SETTING = 'renewals_scope'
 const MINUTE = 60_000
@@ -262,7 +264,9 @@ export default function RenewalsView(): React.JSX.Element {
           </div>
         )}
 
-        {!loading && records.length === 0 ? (
+        {loading && records.length === 0 ? (
+          <SkeletonBlocks label="Loading what's expiring" count={4} height="3.5rem" gap="var(--space-2)" />
+        ) : !loading && records.length === 0 ? (
           <div>
             <EmptyState
               icon={<CalendarClock size={48} />}
@@ -353,14 +357,16 @@ export default function RenewalsView(): React.JSX.Element {
         />
       )}
 
-      {showKinds && (
-        <RenewalKindsModal
-          kinds={kinds}
-          onClose={() => setShowKinds(false)}
-          onSave={renewals.saveKinds}
-          onRename={renewals.renameField}
-        />
-      )}
+      <Presence show={showKinds}>
+        {showKinds && (
+          <RenewalKindsModal
+            kinds={kinds}
+            onClose={() => setShowKinds(false)}
+            onSave={renewals.saveKinds}
+            onRename={renewals.renameField}
+          />
+        )}
+      </Presence>
     </div>
   )
 }

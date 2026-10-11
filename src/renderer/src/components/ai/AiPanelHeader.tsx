@@ -93,7 +93,7 @@ export default function AiPanelHeader({ panel }: { panel: AiStreamPanelState }) 
         justifyContent: 'space-between',
         width: '100%',
         borderTop: '1px dashed var(--color-surface-offset)',
-        paddingTop: 'var(--space-1.5)'
+        paddingTop: 'var(--space-1-5)'
       }}>
         <span className="label-caps-sm">
           Actions

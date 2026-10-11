@@ -288,7 +288,7 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
             overflow: 'hidden'
           }}
         >
-          <div style={{ padding: '4px 10px', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', borderBottom: '1px solid var(--color-surface-offset)' }}>
+          <div style={{ padding: '4px 10px', fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', borderBottom: '1px solid var(--color-surface-offset)' }}>
             Link to note
           </div>
           {suggestions.map((title, i) => (
@@ -324,7 +324,7 @@ export default function NoteEditor({ content, onChange, noteTitles }: NoteEditor
         display: 'flex',
         justifyContent: 'flex-end',
         gap: '12px',
-        fontSize: '10px',
+        fontSize: 'var(--text-xs)',
         color: 'var(--color-text-faint)',
         userSelect: 'none',
         flexShrink: 0

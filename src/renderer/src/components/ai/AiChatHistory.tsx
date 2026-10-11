@@ -49,7 +49,7 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
             <div className="text-item-strong">
               Your project co-pilot
             </div>
-            <div style={{ fontSize: '11px', marginTop: '2px' }}>
+            <div style={{ fontSize: 'var(--text-xs)', marginTop: '2px' }}>
               It reads your board, creates and edits cards, and remembers your project.
             </div>
           </div>
@@ -70,7 +70,7 @@ export default function AiChatHistory({ panel }: { panel: AiStreamPanelState }) 
                   background: 'var(--color-surface-2)',
                   borderRadius: '999px',
                   padding: '5px 12px',
-                  fontSize: '10px',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-medium)',
                   cursor: 'pointer',
                   transition: 'all 120ms ease'

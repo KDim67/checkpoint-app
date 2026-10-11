@@ -63,7 +63,7 @@ export default function WallBinMenu({ open, setOpen, entries, labelOf, onRestore
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)' }}>{name}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>{formatRelativeTime(entry.at)}</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>{formatRelativeTime(entry.at)}</div>
                 </div>
                 <button
                   onClick={() => onRestore(entry.id)}

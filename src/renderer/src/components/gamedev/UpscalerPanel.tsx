@@ -59,7 +59,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                   <option value="nearest8x">Nearest 8×. Exact pixels</option>
                 </optgroup>
               </select>
-              <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>
                 Scale2x/3x/4x round jagged staircase edges without blurring. Nearest keeps every pixel perfectly square.
               </span>
             </div>
@@ -167,7 +167,7 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                     border: '1px solid rgba(0, 255, 128, 0.2)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-2) var(--space-3)',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     color: 'var(--color-secondary)',
                     display: 'flex',
                     flexDirection: 'column',

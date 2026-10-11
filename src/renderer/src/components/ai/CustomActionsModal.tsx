@@ -2,12 +2,14 @@
 
 import { Sparkles, Trash2, X } from 'lucide-react'
 import type { CustomActions } from './useCustomActions'
+import { usePresenceState } from '../../lib/presence'
 
 interface Props {
   actions: CustomActions
 }
 
 export default function CustomActionsModal({ actions }: Props) {
+  const presence = usePresenceState()
   const {
     customActions,
     persistCustomActions,
@@ -21,12 +23,12 @@ export default function CustomActionsModal({ actions }: Props) {
     setShowCustomActionsModal
   } = actions
   return (
-        <div style={{
+        <div className="motion-backdrop" data-state={presence} style={{
           position: 'absolute', inset: 0, zIndex: 110,
           background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)'
         }}>
-          <div style={{
+          <div className="motion-pop" data-state={presence} style={{
             background: 'var(--color-surface-1)', border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)', width: '100%', maxHeight: '90%',
             display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', overflow: 'hidden'
@@ -51,7 +53,7 @@ export default function CustomActionsModal({ actions }: Props) {
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {customActions.length === 0 ? (
-                <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-3)' }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-3)' }}>
                   No custom actions yet. Save the prompts you find yourself retyping. They'll appear in the ＋ menu.
                 </div>
               ) : (
@@ -62,16 +64,16 @@ export default function CustomActionsModal({ actions }: Props) {
                   }}>
                     <div className="fill">
                       <div className="row-6px">
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{a.label}</span>
+                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{a.label}</span>
                         <span style={{
-                          fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', padding: '1px 6px', borderRadius: '6px',
+                          fontSize: 'var(--text-2xs)', fontWeight: 'bold', textTransform: 'uppercase', padding: '1px 6px', borderRadius: '6px',
                           background: a.intent === 'create' ? 'rgba(205,241,43,0.12)' : 'rgba(59,130,246,0.12)',
                           color: a.intent === 'create' ? 'var(--color-secondary)' : '#60a5fa'
                         }}>
                           {a.intent === 'create' ? 'Creates items' : 'Analyzes'}
                         </span>
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: '2px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                         {a.prompt}
                       </div>
                     </div>
@@ -90,7 +92,7 @@ export default function CustomActionsModal({ actions }: Props) {
                 borderTop: '1px solid var(--color-surface-offset)', paddingTop: 'var(--space-3)',
                 display: 'flex', flexDirection: 'column', gap: '6px'
               }}>
-                <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>New quick action</span>
+                <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>New quick action</span>
                 <input
                   type="text"
                   value={caLabel}
@@ -98,7 +100,7 @@ export default function CustomActionsModal({ actions }: Props) {
                   placeholder="Label (e.g. Write patch notes)"
                   style={{
                     background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)',
-                    color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', fontSize: '11px', outline: 'none'
+                    color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '6px 8px', fontSize: 'var(--text-xs)'
                   }}
                 />
                 <textarea
@@ -109,7 +111,7 @@ export default function CustomActionsModal({ actions }: Props) {
                   style={{
                     background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)',
                     color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '6px 8px',
-                    fontSize: '11px', outline: 'none', resize: 'vertical', fontFamily: 'inherit'
+                    fontSize: 'var(--text-xs)', resize: 'vertical', fontFamily: 'inherit'
                   }}
                 />
                 <div className="row-between-8px">
@@ -119,7 +121,7 @@ export default function CustomActionsModal({ actions }: Props) {
                     title="'Creates items' routes through the structured board generator; 'Analyzes' guarantees a plain-text answer."
                     style={{
                       background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)',
-                      color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '4px 8px', fontSize: '10px', outline: 'none', cursor: 'pointer'
+                      color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)', padding: '4px 8px', fontSize: 'var(--text-xs)', cursor: 'pointer'
                     }}
                   >
                     <option value="analyze">Analyzes (plain text)</option>
@@ -132,7 +134,7 @@ export default function CustomActionsModal({ actions }: Props) {
                       background: caLabel.trim() && caPrompt.trim() ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
                       color: caLabel.trim() && caPrompt.trim() ? '#000' : 'var(--color-text-faint)',
                       border: 'none', borderRadius: 'var(--radius-sm)', padding: '5px 12px',
-                      fontSize: '10px', fontWeight: 'bold', cursor: caLabel.trim() && caPrompt.trim() ? 'pointer' : 'default'
+                      fontSize: 'var(--text-xs)', fontWeight: 'bold', cursor: caLabel.trim() && caPrompt.trim() ? 'pointer' : 'default'
                     }}
                   >
                     Save Action

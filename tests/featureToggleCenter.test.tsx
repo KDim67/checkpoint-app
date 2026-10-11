@@ -88,3 +88,39 @@ describe('FeatureToggleCenter 1-Click Profile Switcher', () => {
     })
   })
 })
+
+describe('what each switch on the features page says', () => {
+  beforeEach(() => {
+    mockSettings.clear()
+    vi.clearAllMocks()
+  })
+
+  afterEach(cleanup)
+
+  it('names each view the way the sidebar does, and marks the chosen starting set', async () => {
+    mockSettings.set('layout_profile', 'full')
+    render(<FeatureToggleCenter />)
+    expect(await screen.findByRole('switch', { name: 'Kanban' })).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Game Dev' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: /Full Suite/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('radio', { name: /Focused & Clean/ }).getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('says what being off means only while it is off, and what to know before turning on whichever way it is', async () => {
+    mockSettings.set('feature_view_renewals', 'false')
+    render(<FeatureToggleCenter />)
+    await screen.findByRole('switch', { name: 'Renewals' })
+    expect(screen.getByText(/Warnings for what is already tracked keep coming/)).toBeTruthy()
+    expect(screen.getByText(/Copies are kept as plain text/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Renewals' }))
+    await waitFor(() => expect(screen.queryByText(/Warnings for what is already tracked keep coming/)).toBeNull())
+    expect(screen.getByText(/Copies are kept as plain text/)).toBeTruthy()
+  })
+
+  it('shows no emoji in place of an icon', async () => {
+    const { container } = render(<FeatureToggleCenter />)
+    await screen.findByRole('switch', { name: 'Kanban' })
+    expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
+  })
+})

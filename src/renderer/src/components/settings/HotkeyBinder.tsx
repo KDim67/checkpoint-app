@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
-import { useToast, useFailureReport } from '../ui/Toast'
+import { useFailureReport } from '../ui/Toast'
 import { useAiEnabled } from '../../lib/useAiEnabled'
 import { getEnumSetting, setStringSetting } from '../../lib/settings'
 import {
   PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES,
   type PanButtons, type MenuButton
 } from '../../lib/wallInput'
-import { AlertTriangle, Keyboard } from 'lucide-react'
+import { AlertTriangle, Globe, Keyboard, LayoutGrid, Mouse } from 'lucide-react'
+import SettingsSection from './SettingsSection'
 import {
   APP_SHORTCUTS,
   VIEW_SHORTCUTS,
@@ -29,13 +30,13 @@ type GlobalAction = 'hud_toggle' | 'clipboard_toggle'
 
 const ACTION_LABELS: Record<GlobalAction, { label: string; desc: string; defaultKey: string }> = {
   hud_toggle: {
-    label: 'Toggle Spotlight HUD overlay',
-    desc: 'Summons the borderless input bar centered on screen.',
+    label: 'Open quick capture',
+    desc: 'The bar for jotting a task or log entry, over whatever you have open.',
     defaultKey: 'Ctrl+Shift+Space'
   },
   clipboard_toggle: {
-    label: 'Open Clipboard History feed',
-    desc: 'Brings focus to the app window and navigates to the clipboard history tab.',
+    label: 'Open clipboard history',
+    desc: 'Brings Checkpoint to the front on the Clipboard page.',
     defaultKey: 'Ctrl+Shift+V'
   }
 }
@@ -66,47 +67,27 @@ function ChoiceRow<T extends string>({
   choices: { value: T; label: string }[]
   onChange: (next: T) => void
 }) {
+  const id = React.useId()
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: 'var(--space-3)',
-      background: 'var(--color-surface-1)',
-      border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-md)'
-    }}>
-      <div className="flex-1-mr">
-        <span className="field-label">
+    <li className="settings-list-row">
+      <div className="settings-row-text">
+        <label htmlFor={id} className="field-label">
           {label}
-        </span>
-        <span className="text-hint">{desc}</span>
+        </label>
+        <span id={`${id}-hint`} className="text-sub">{desc}</span>
       </div>
       <select
+        id={id}
         value={value}
-        aria-label={label}
+        aria-describedby={`${id}-hint`}
         onChange={e => onChange(e.target.value as T)}
-        style={{
-          background: 'var(--color-surface-2)',
-          border: '1px solid var(--color-surface-offset)',
-          color: 'var(--color-text-base)',
-          borderRadius: '4px',
-          padding: '5px 8px',
-          fontSize: 'var(--text-xs)',
-          minWidth: '170px',
-        }}
+        className="select-md settings-row-select"
       >
         {choices.map(choice => (
           <option key={choice.value} value={choice.value}>{choice.label}</option>
         ))}
       </select>
-    </div>
-  )
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h4 className="heading-caps">
-      {children}
-    </h4>
+    </li>
   )
 }
 
@@ -115,129 +96,95 @@ function ShortcutRow({
   desc,
   combo,
   isRecording,
+  problem,
   onStartRecording,
+  onStopRecording,
   onKeyDown
 }: {
   label: string
   desc?: string
   combo: string
   isRecording: boolean
+  /** why the keys just pressed can't be used, said under the row they were meant for */
+  problem: string | null
   onStartRecording: () => void
+  onStopRecording: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 'var(--space-3)',
-        background: 'var(--color-surface-1)',
-        border: `1px solid ${isRecording ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-        borderRadius: 'var(--radius-md)',
-        transition: 'border-color 100ms ease'
-      }}
+    <li
+      className="settings-list-row"
+      style={{ boxShadow: isRecording ? 'inset 0 0 0 1px var(--color-secondary)' : undefined }}
     >
-      <div className="flex-1-mr">
+      <div className="settings-row-text">
         <span className="field-label">
           {label}
         </span>
         {desc && (
-          <span className="text-hint">
+          <span className="text-sub">
             {desc}
+          </span>
+        )}
+        {problem && (
+          <span role="alert" className="settings-note" data-tone="warning">
+            <AlertTriangle size={12} aria-hidden="true" />
+            {problem}
           </span>
         )}
       </div>
 
-      <div className="row">
-        {isRecording ? (
-          <input
-            type="text"
-            placeholder="Press key combination…"
-            aria-label={`Recording shortcut for ${label}`}
-            onKeyDown={onKeyDown}
-            autoFocus
-            style={{
-              background: 'var(--color-surface-offset)',
-              border: '1px solid var(--color-secondary)',
-              color: 'var(--color-secondary)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-xs)',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              width: '160px',
-              outline: 'none',
-              textAlign: 'center'
-            }}
-          />
-        ) : (
-          <button
-            onClick={onStartRecording}
-            aria-label={`Change shortcut for ${label}. Currently ${combo || 'unassigned'}`}
-            className={`hotkey-binder-shortcut-trigger border-offset ${combo ? 'text-base' : 'text-faint'}`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-1)',
-              background: 'var(--color-surface-2)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 'var(--text-xs)',
-              borderRadius: '4px',
-              padding: '4px 10px',
-              cursor: 'pointer',
-              minWidth: '110px',
-              justifyContent: 'center',
-              transition: 'all 100ms ease'
-            }}
-          >
-            <Keyboard size={12} />
-            {combo || 'Unassigned'}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function ActionButton({
-  children,
-  onClick,
-  disabled,
-  variant
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  disabled: boolean
-  variant: 'primary' | 'secondary'
-}) {
-  const base = variant === 'primary' ? 'var(--color-primary)' : 'var(--color-surface-offset)'
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={variant === 'primary' ? 'hotkey-binder-action-primary' : 'hotkey-binder-action-secondary'}
-      style={{
-        padding: 'var(--space-2) var(--space-4)',
-        border: `1px solid ${base}`,
-        color: variant === 'primary' ? '#ffffff' : 'var(--color-text-base)',
-        borderRadius: 'var(--radius-md)',
-        fontSize: 'var(--text-xs)',
-        fontWeight: 'var(--weight-semibold)',
-        cursor: disabled ? 'default' : 'pointer',
-        transition: 'all 100ms ease',
-        opacity: disabled ? 'var(--opacity-disabled)' : 1
-      }}
-    >
-      {children}
-    </button>
+      {isRecording ? (
+        <input
+          type="text"
+          readOnly
+          placeholder="Press the keys…"
+          aria-label={`New shortcut for ${label}. Press the keys, or Escape to keep ${combo || 'none'}`}
+          onKeyDown={onKeyDown}
+          // clicking away keeps the shortcut it had
+          onBlur={onStopRecording}
+          autoFocus
+          className="input-md"
+          style={{
+            width: '10rem',
+            borderColor: 'var(--color-secondary)',
+            color: 'var(--color-secondary)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-xs)',
+            textAlign: 'center'
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={onStartRecording}
+          aria-label={`Change the shortcut for ${label}, now ${combo || 'none'}`}
+          className={`hotkey-binder-shortcut-trigger border-offset ${combo ? 'text-base' : 'text-faint'}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-1-5)',
+            minWidth: '7.5rem',
+            justifyContent: 'center',
+            padding: 'var(--space-1) var(--space-3)',
+            background: 'var(--color-surface-2)',
+            borderRadius: 'var(--radius-sm)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-xs)',
+            cursor: 'pointer',
+            transition: 'border-color var(--duration-fast) var(--ease-default)'
+          }}
+        >
+          <Keyboard size={12} aria-hidden="true" />
+          {combo || 'None'}
+        </button>
+      )}
+    </li>
   )
 }
 
 export default function HotkeyBinder() {
-  const { toast } = useToast()
   const report = useFailureReport()
   const aiEnabled = useAiEnabled()
-  const [engineEnabled, setEngineEnabled] = useState(false)
   const [bindings, setBindings] = useState<Record<string, string>>({
     hud_toggle: 'Ctrl+Shift+Space',
     clipboard_toggle: 'Ctrl+Shift+V'
@@ -247,14 +194,11 @@ export default function HotkeyBinder() {
   const [panButtons, setPanButtons] = useState<PanButtons>(PAN_BUTTON_MODES[0])
   const [menuButton, setMenuButton] = useState<MenuButton>(MENU_BUTTON_MODES[0])
   const [recording, setRecording] = useState<RecordingTarget | null>(null)
-  const [collisionWarning, setCollisionWarning] = useState<string | null>(null)
+  const [problem, setProblem] = useState<{ target: RecordingTarget; message: string } | null>(null)
 
   useEffect(() => {
     const load = async () => {
       try {
-        const enabled = await customizerApi.getEngineState()
-        setEngineEnabled(enabled)
-
         const stored = await customizerApi.getShortcuts()
         if (stored && Object.keys(stored).length > 0) {
           setBindings(prev => ({ ...prev, ...stored }))
@@ -272,9 +216,13 @@ export default function HotkeyBinder() {
 
   const startRecording = (target: RecordingTarget) => {
     setRecording(target)
-    setCollisionWarning(null)
-    toast('Recording... Press your keyboard combination')
+    setProblem(null)
   }
+
+  const stopRecording = () => setRecording(null)
+
+  const problemFor = (target: RecordingTarget): string | null =>
+    problem && problem.target.scope === target.scope && problem.target.id === target.id ? problem.message : null
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!recording) return
@@ -282,64 +230,58 @@ export default function HotkeyBinder() {
     e.preventDefault()
     e.stopPropagation()
 
-    // Escape cancels instead of binding
+    // Escape keeps what it had
     if (e.key === 'Escape') {
       setRecording(null)
-      setCollisionWarning(null)
+      setProblem(null)
       return
     }
 
     const combo = comboFromEvent(e)
     if (!combo) return
 
+    const refuse = (message: string): void => setProblem({ target: recording, message })
+
     if (isReservedCombo(combo)) {
-      setCollisionWarning(`"${combo}" is a reserved system shortcut and cannot be bound.`)
+      refuse(`${combo} belongs to Windows or Checkpoint itself. Try another.`)
       return
     }
 
     if (recording.scope === 'global') {
       const otherAction: GlobalAction = recording.id === 'hud_toggle' ? 'clipboard_toggle' : 'hud_toggle'
       if (bindings[otherAction] === combo) {
-        setCollisionWarning(`"${combo}" is already bound to another action.`)
+        refuse(`${combo} already does "${ACTION_LABELS[otherAction].label}".`)
         return
       }
-      setBindings(prev => ({ ...prev, [recording.id]: combo }))
+      const next = { ...bindings, [recording.id]: combo }
+      setBindings(next)
+      // registered with Windows straight away, like the rest
+      customizerApi.registerShortcuts(next).catch(err => report('set the shortcut', err))
     } else if (recording.scope === 'app') {
       // in-app shortcuts fire everywhere, so check every view
       const clash = shortcutClash(combo, { id: recording.id, scope: 'global' }, appBindings, viewBindings)
       if (clash) {
-        setCollisionWarning(`"${combo}" is already bound to "${clash}".`)
+        refuse(`${combo} already does "${clash}".`)
         return
       }
       const next = { ...appBindings, [recording.id]: combo }
       setAppBindings(next)
       // in-window listeners, nothing to register with the OS
-      saveBindings(next).catch(err => console.error('Failed to save shortcuts:', err))
+      saveBindings(next).catch(err => report('save the shortcut', err))
     } else {
       // another view's keys are free, never on screen together
       const clash = shortcutClash(combo, { id: recording.id, scope: recording.scope }, appBindings, viewBindings)
       if (clash) {
-        setCollisionWarning(`"${combo}" is already bound to "${clash}".`)
+        refuse(`${combo} already does "${clash}".`)
         return
       }
       const next = { ...viewBindings, [recording.id]: combo }
       setViewBindings(next)
-      saveViewBindings(next).catch(err => console.error('Failed to save view shortcuts:', err))
+      saveViewBindings(next).catch(err => report('save the shortcut', err))
     }
 
     setRecording(null)
-    setCollisionWarning(null)
-    toast(`Captured shortcut: ${combo}`)
-  }
-
-  const handleSave = async () => {
-    try {
-      await customizerApi.registerShortcuts(bindings)
-      toast('Global shortcuts registered successfully')
-    } catch (err) {
-      console.error(err)
-      toast('Failed to register custom shortcuts')
-    }
+    setProblem(null)
   }
 
   const handleResetDefaults = async () => {
@@ -348,185 +290,120 @@ export default function HotkeyBinder() {
       clipboard_toggle: ACTION_LABELS.clipboard_toggle.defaultKey
     }
     setBindings(defaults)
-    setCollisionWarning(null)
+    setProblem(null)
     try {
       await customizerApi.registerShortcuts(defaults)
-      toast('Shortcut keys reset to defaults')
     } catch (err) {
-      report('reset the shortcut keys', err)
+      report('reset the global shortcuts', err)
     }
   }
 
   const handleResetAppDefaults = () => {
     const defaults = defaultBindings()
     setAppBindings(defaults)
-    setCollisionWarning(null)
-    saveBindings(defaults)
-      .then(() => toast('In-app shortcuts reset to defaults'))
-      .catch(err => console.error('Failed to reset shortcuts:', err))
+    setProblem(null)
+    saveBindings(defaults).catch(err => report('reset the shortcuts', err))
   }
 
   const handleResetViewDefaults = () => {
     const defaults = defaultViewBindings()
     setViewBindings(defaults)
-    setCollisionWarning(null)
-    saveViewBindings(defaults)
-      .then(() => toast('View shortcuts reset to defaults'))
-      .catch(err => console.error('Failed to reset view shortcuts:', err))
+    setProblem(null)
+    saveViewBindings(defaults).catch(err => report('reset the view shortcuts', err))
   }
 
+  const row = (target: RecordingTarget, label: string, combo: string, desc?: string) => (
+    <ShortcutRow
+      key={target.id}
+      label={label}
+      desc={desc}
+      combo={combo}
+      isRecording={recording?.scope === target.scope && recording.id === target.id}
+      problem={problemFor(target)}
+      onStartRecording={() => startRecording(target)}
+      onStopRecording={stopRecording}
+      onKeyDown={handleKeyDown}
+    />
+  )
+
   return (
-    <div className="col-xl">
-      {!engineEnabled && (
-        <div style={{
-          background: 'rgba(249, 115, 22, 0.1)',
-          border: '1px solid var(--color-warning)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-3) var(--space-4)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-3)'
-        }}>
-          <AlertTriangle size={18} className="icon-warning" />
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
-            Customization Engine is disabled. Enable it in the <strong>Theme Builder</strong> settings tab first to register customized global shortcut triggers. In-app shortcuts below work regardless.
+    <>
+      <SettingsSection icon={<Globe size={14} />} title="Global Shortcuts" description="Work anywhere in Windows, even while Checkpoint is in the background.">
+        <div className="col-md">
+          <ul className="settings-list">
+            {(Object.keys(ACTION_LABELS) as GlobalAction[]).map(action =>
+              row({ scope: 'global', id: action }, ACTION_LABELS[action].label, bindings[action], ACTION_LABELS[action].desc)
+            )}
+          </ul>
+          <div>
+            <button type="button" className="btn-secondary btn-small" onClick={handleResetDefaults} disabled={recording !== null}>
+              Restore the default global shortcuts
+            </button>
           </div>
         </div>
-      )}
+      </SettingsSection>
 
-      {collisionWarning && (
-        <div style={{
-          background: 'rgba(239, 68, 68, 0.08)',
-          border: '1px solid var(--color-error)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-2) var(--space-3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)'
-        }}>
-          <AlertTriangle size={14} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>
-            {collisionWarning}
-          </span>
-        </div>
-      )}
-
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-4)',
-        opacity: engineEnabled ? 1 : 0.6,
-        pointerEvents: engineEnabled ? 'auto' : 'none',
-        transition: 'opacity 200ms ease'
-      }}>
-        <SectionHeading>Global Shortcuts</SectionHeading>
-
-        {(Object.keys(ACTION_LABELS) as GlobalAction[]).map(action => (
-          <ShortcutRow
-            key={action}
-            label={ACTION_LABELS[action].label}
-            desc={ACTION_LABELS[action].desc}
-            combo={bindings[action]}
-            isRecording={recording?.scope === 'global' && recording.id === action}
-            onStartRecording={() => startRecording({ scope: 'global', id: action })}
-            onKeyDown={handleKeyDown}
-          />
-        ))}
-
-        <div className="flex-gap-mt">
-          <ActionButton onClick={handleSave} disabled={recording !== null} variant="primary">
-            Apply Bindings
-          </ActionButton>
-          <ActionButton onClick={handleResetDefaults} disabled={recording !== null} variant="secondary">
-            Restore Default Hotkeys
-          </ActionButton>
-        </div>
-      </div>
-
-      <div className="col-lg">
-        <SectionHeading>In-App Shortcuts</SectionHeading>
-        <span className="text-hint-pull">
-          Fire only while the Checkpoint window has focus, and are ignored while typing. Changes apply immediately.
-        </span>
-
-        {APP_SHORTCUTS.filter(s => s.action.kind !== 'toggleAiPanel' || aiEnabled).map(shortcut => (
-          <ShortcutRow
-            key={shortcut.id}
-            label={shortcut.label}
-            combo={appBindings[shortcut.id]}
-            isRecording={recording?.scope === 'app' && recording.id === shortcut.id}
-            onStartRecording={() => startRecording({ scope: 'app', id: shortcut.id })}
-            onKeyDown={handleKeyDown}
-          />
-        ))}
-
-        <div className="flex-gap-mt">
-          <ActionButton onClick={handleResetAppDefaults} disabled={recording !== null} variant="secondary">
-            Restore Default Shortcuts
-          </ActionButton>
-        </div>
-      </div>
-
-      <div className="col-lg">
-        <SectionHeading>View Shortcuts</SectionHeading>
-        <span className="text-hint-pull">
-          Work only while that view is open, so two of them can share a key without clashing.
-          A kanban card also needs to be focused, which Tab does.
-        </span>
-
-        {VIEW_SCOPES.map(scope => (
-          <div key={scope} className="col">
-            <span className="text-hint-strong">
-              {SCOPE_LABELS[scope]}
-            </span>
-            {VIEW_SHORTCUTS.filter(s => s.scope === scope).map(shortcut => (
-              <ShortcutRow
-                key={shortcut.id}
-                label={shortcut.label}
-                combo={viewBindings[shortcut.id]}
-                isRecording={recording?.scope === scope && recording.id === shortcut.id}
-                onStartRecording={() => startRecording({ scope, id: shortcut.id })}
-                onKeyDown={handleKeyDown}
-              />
-            ))}
+      <SettingsSection icon={<Keyboard size={14} />} title="In-App Shortcuts" description="Work while the Checkpoint window is in front, but not while you're typing.">
+        <div className="col-md">
+          <ul className="settings-list">
+            {APP_SHORTCUTS.filter(s => s.action.kind !== 'toggleAiPanel' || aiEnabled).map(shortcut =>
+              row({ scope: 'app', id: shortcut.id }, shortcut.label, appBindings[shortcut.id])
+            )}
+          </ul>
+          <div>
+            <button type="button" className="btn-secondary btn-small" onClick={handleResetAppDefaults} disabled={recording !== null}>
+              Restore the default in-app shortcuts
+            </button>
           </div>
-        ))}
-
-        <div className="flex-gap-mt">
-          <ActionButton onClick={handleResetViewDefaults} disabled={recording !== null} variant="secondary">
-            Restore Default View Shortcuts
-          </ActionButton>
         </div>
-      </div>
+      </SettingsSection>
 
-      <div className="col-lg">
-        <SectionHeading>Mouse</SectionHeading>
-        <span className="text-hint-pull">
-          On the Wall, where the right button both pans and opens the menu. Holding
-          space and dragging with the left button always pans, whatever these say.
-        </span>
+      <SettingsSection icon={<LayoutGrid size={14} />} title="View Shortcuts" description="Work only while their view is open, so two views can share a key. A Kanban card needs focus first, which Tab gives it.">
+        <div className="col-lg">
+          {VIEW_SCOPES.map(scope => (
+            <div key={scope}>
+              <h3 className="settings-list-title">
+                {SCOPE_LABELS[scope]}
+              </h3>
+              <ul className="settings-list" aria-label={SCOPE_LABELS[scope]}>
+                {VIEW_SHORTCUTS.filter(s => s.scope === scope).map(shortcut =>
+                  row({ scope, id: shortcut.id }, shortcut.label, viewBindings[shortcut.id])
+                )}
+              </ul>
+            </div>
+          ))}
+          <div>
+            <button type="button" className="btn-secondary btn-small" onClick={handleResetViewDefaults} disabled={recording !== null}>
+              Restore the default view shortcuts
+            </button>
+          </div>
+        </div>
+      </SettingsSection>
 
-        <ChoiceRow
-          label="Pan the wall with"
-          desc="Hold the button down and drag to move the view."
-          value={panButtons}
-          choices={PAN_CHOICES}
-          onChange={next => {
-            setPanButtons(next)
-            void setStringSetting(PAN_BUTTONS_KEY, next)
-          }}
-        />
-        <ChoiceRow
-          label="Open the context menu with"
-          desc="A click that does not move. If this button also pans, a drag pans instead."
-          value={menuButton}
-          choices={MENU_CHOICES}
-          onChange={next => {
-            setMenuButton(next)
-            void setStringSetting(MENU_BUTTON_KEY, next)
-          }}
-        />
-      </div>
-    </div>
+      <SettingsSection icon={<Mouse size={14} />} title="Mouse" description="On the Wall, where the right button both pans and opens the menu. Space and a left-button drag always pans.">
+        <ul className="settings-list">
+          <ChoiceRow
+            label="Pan the wall with"
+            desc="Hold the button down and drag to move the view."
+            value={panButtons}
+            choices={PAN_CHOICES}
+            onChange={next => {
+              setPanButtons(next)
+              void setStringSetting(PAN_BUTTONS_KEY, next)
+            }}
+          />
+          <ChoiceRow
+            label="Open the context menu with"
+            desc="A click that does not move. If this button also pans, a drag pans instead."
+            value={menuButton}
+            choices={MENU_CHOICES}
+            onChange={next => {
+              setMenuButton(next)
+              void setStringSetting(MENU_BUTTON_KEY, next)
+            }}
+          />
+        </ul>
+      </SettingsSection>
+    </>
   )
 }

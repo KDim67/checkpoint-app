@@ -109,7 +109,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
         <section className="col-md">
           <h3 style={{
             margin: 0,
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             fontWeight: 'var(--weight-bold)',
             textTransform: 'uppercase',
             letterSpacing: '0.07em',
@@ -137,7 +137,7 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
         <section key={section.group} className="col-md">
           <h3 style={{
             margin: 0,
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             fontWeight: 'var(--weight-bold)',
             textTransform: 'uppercase',
             letterSpacing: '0.07em',

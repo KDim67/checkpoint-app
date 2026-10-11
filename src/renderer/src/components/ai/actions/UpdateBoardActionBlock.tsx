@@ -223,11 +223,11 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
 
   if (error) {
     return (
-      <div style={{ padding: '8px 10px', color: 'var(--color-error)', fontSize: '11px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ padding: '8px 10px', color: 'var(--color-error)', fontSize: 'var(--text-xs)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span>⚠ Failed to edit board: {error}</span>
         <button
           onClick={() => { executedActionSignaturesSet.delete(signature); setError(null) }}
-          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', borderRadius: '4px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}
+          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', borderRadius: '4px', padding: '2px 8px', fontSize: 'var(--text-2xs)', cursor: 'pointer' }}
         >Retry</button>
       </div>
     )
@@ -267,14 +267,14 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
           </span>
         </div>
         {done && appliedList.length > 0 && (
-          <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
             {appliedList.length} change{appliedList.length > 1 ? 's' : ''}
           </span>
         )}
       </div>
 
       {done && (
-        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto' }}>
+        <div style={{ fontSize: 'var(--text-xs)', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto' }}>
           {appliedList.map((d, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', color: 'var(--color-text-base)' }}>
               <CheckCircle2 size={11} style={{ color: '#2dd4bf', flexShrink: 0, marginTop: '2px' }} />
@@ -282,7 +282,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
             </div>
           ))}
           {failedList.length > 0 && (
-            <div style={{ fontSize: '10px', color: 'var(--color-error)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {failedList.map((t, i) => (
                 <span key={i}>✕ Failed: {t}</span>
               ))}
@@ -294,14 +294,14 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
             </div>
           )}
           {notFound.length > 0 && (
-            <div style={{ fontSize: '10px', color: '#f59e0b', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: '#f59e0b', display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {notFound.map((t, i) => (
                 <span key={i}>⚠ Not found on the board: {t}</span>
               ))}
             </div>
           )}
           {result?.replayed && appliedList.length === 0 && notFound.length === 0 && failedList.length === 0 && (
-            <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>
               This edit ran in an earlier session. No record of applied changes is available.
             </div>
           )}
@@ -316,7 +316,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
             title="Restore every edited card to its previous state"
             style={{
               background: 'transparent', border: '1px solid rgba(245, 158, 11, 0.5)', color: '#f59e0b',
-              borderRadius: 'var(--radius-sm)', padding: '4px 10px', fontSize: '11px',
+              borderRadius: 'var(--radius-sm)', padding: '4px 10px', fontSize: 'var(--text-xs)',
               fontWeight: 'bold', cursor: undoing ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', gap: '5px', opacity: undoing ? 0.6 : 1
             }}
@@ -329,7 +329,7 @@ export default function UpdateBoardActionBlock({ jsonString, dedupeKey }: { json
           onClick={() => setView('kanban')}
           style={{
             background: 'var(--color-secondary)', border: 'none', color: 'var(--color-text-inverted)',
-            borderRadius: 'var(--radius-sm)', padding: '4px 10px', fontSize: '11px',
+            borderRadius: 'var(--radius-sm)', padding: '4px 10px', fontSize: 'var(--text-xs)',
             fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
           }}
         >

@@ -14,6 +14,7 @@ import { createStreamBuffer } from '../lib/streamBuffer'
 import * as ollamaApi from '../data/ollama'
 import * as aiApi from '../data/ai'
 import * as appApi from '../data/app'
+import { usePresence } from '../lib/presence'
 
 const SparklesIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -240,7 +241,8 @@ export default function StandupTranslatorView({
     }
     onClose()
   }, [isStreaming, onClose])
-  const dialogRef = useFocusTrap(true)
+  const dialogRef = useFocusTrap(isOpen)
+  const { mounted, state } = usePresence(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
@@ -264,7 +266,7 @@ export default function StandupTranslatorView({
     }
   }, [isOpen])
 
-  if (!isOpen) return null
+  if (!mounted) return null
 
   const handleToggleLog = (id: string) => {
     setSelectedLogIds(prev =>
@@ -415,6 +417,8 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
       role="dialog"
       aria-modal="true"
       aria-labelledby="standup-modal-title"
+      className="motion-backdrop"
+      data-state={state}
     >
       <style>{`
         .pulse-caret::after {
@@ -426,6 +430,8 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
       `}</style>
 
       <div
+        className="motion-pop"
+        data-state={state}
         style={{
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-surface-offset)',
@@ -434,7 +440,6 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
           maxWidth: '950px',
           height: '85vh',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
-          animation: 'modal-pop-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
@@ -533,7 +538,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                         background: timeRange === opt.value ? 'var(--color-surface-offset)' : 'transparent',
                         border: 'none',
                         color: timeRange === opt.value ? 'var(--color-text-base)' : 'var(--color-text-muted)',
-                        fontSize: '11px',
+                        fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-medium)',
                         padding: '5px 0',
                         borderRadius: 'var(--radius-sm)',
@@ -630,7 +635,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 flexShrink: 0
               }}
             >
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
                 Include Logs ({selectedLogIds.length} of {logs.length})
               </span>
               {logs.length > 0 && (
@@ -641,7 +646,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                     background: 'transparent',
                     border: 'none',
                     color: 'var(--color-secondary)',
-                    fontSize: '10px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-medium)',
                     cursor: isStreaming ? 'default' : 'pointer',
                     padding: 0
@@ -709,14 +714,14 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                         </div>
                         <div className="fill">
                           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-3)', marginBottom: '3px' }}>
-                            <span style={{ fontSize: '11px', lineHeight: '16px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <span style={{ fontSize: 'var(--text-xs)', lineHeight: '16px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {log.title}
                             </span>
-                            <span style={{ fontSize: '10px', lineHeight: '16px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                            <span style={{ fontSize: 'var(--text-xs)', lineHeight: '16px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                               {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <p style={{ fontSize: '10px', lineHeight: 1.4, color: 'var(--color-text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <p style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4, color: 'var(--color-text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {log.body}
                           </p>
                         </div>
@@ -788,16 +793,16 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                 flexShrink: 0
               }}
             >
-              <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 Report Output
                 {streamingText && !isStreaming && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#22c55e' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#22c55e' }}>
                     <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-success)' }} />
                     Ready
                   </span>
                 )}
                 {isStreaming && streamingText && (
-                  <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-secondary)' }}>
+                  <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-secondary)' }}>
                     Streaming…
                   </span>
                 )}
@@ -813,7 +818,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                       color: 'var(--color-text-base)',
                       borderRadius: 'var(--radius-sm)',
                       padding: '4px 10px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -831,7 +836,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                       color: 'var(--color-text-base)',
                       borderRadius: 'var(--radius-sm)',
                       padding: '4px 10px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -850,7 +855,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                       color: 'var(--color-text-base)',
                       borderRadius: 'var(--radius-sm)',
                       padding: '4px 10px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       cursor: posting ? 'default' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -874,7 +879,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                     </div>
                   </div>
                   <span className="text-label-xs-semibold">Generating your standup…</span>
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-secondary)' }} />
                     {selectedModel}
                   </span>
@@ -887,7 +892,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                   <p className="heading-sm-strong">
                     No report yet
                   </p>
-                  <span style={{ fontSize: '11px', maxWidth: '280px', lineHeight: 1.6, color: 'var(--color-text-muted)' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', maxWidth: '280px', lineHeight: 1.6, color: 'var(--color-text-muted)' }}>
                     Pick the log entries you want summarised on the left, then hit <strong className="text-base">Generate</strong> to stream your standup here.
                   </span>
                 </div>
@@ -939,7 +944,7 @@ ${selectedLogs.map(l => `- [Created: ${new Date(l.created_at).toLocaleString()}]
                         <a href={href} style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>{children}</a>
                       ),
                       code: ({ children }) => (
-                        <code style={{ background: 'var(--color-surface-offset)', borderRadius: 'var(--radius-sm)', padding: '1px 5px', fontSize: '11px' }}>{children}</code>
+                        <code style={{ background: 'var(--color-surface-offset)', borderRadius: 'var(--radius-sm)', padding: '1px 5px', fontSize: 'var(--text-xs)' }}>{children}</code>
                       )
                     }}
                   >

@@ -38,6 +38,8 @@ import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
 import * as appApi from '../../data/app'
 import { useFailureReport } from '../ui/Toast'
+import { DetailSkeleton } from '../ui/Skeleton'
+import { usePresenceState } from '../../lib/presence'
 
 interface CardDetailModalProps {
   cardId: string
@@ -90,10 +92,13 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   const [newLinkUrl, setNewLinkUrl] = useState('')
 
   const titleInputRef = useRef<HTMLInputElement>(null)
-  const containerRef = useFocusTrap(!loading, titleInputRef)
+  // leaving inside Presence, it hands focus back at once and slides out
+  const presence = usePresenceState()
+  const open = presence === 'open'
+  const containerRef = useFocusTrap(!loading && open, titleInputRef)
   /** set below once the save exists; Escape, the backdrop and the close button all keep what was typed */
   const closeRef = useRef<() => Promise<void>>(async () => onClose())
-  useEscapeKey(() => { void closeRef.current() }, true)
+  useEscapeKey(() => { void closeRef.current() }, open)
 
   const onCloseRef = useRef(onClose)
   useEffect(() => {
@@ -469,23 +474,44 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     toggleRightPanel('ai-chat')
   }
 
+  // loading and loaded share this frame, so the drawer slides in once and the skeleton becomes the card in place
+  const backdropStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: '32px',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    zIndex: 900,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    backdropFilter: 'blur(2px)'
+  }
+  const drawerStyle: React.CSSProperties = {
+    width: '650px',
+    maxWidth: '100vw',
+    height: '100%',
+    background: 'var(--color-surface-1)',
+    borderLeft: '1px solid var(--color-surface-offset)',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '-10px 0 30px rgba(0,0,0,0.5)'
+  }
+
   if (loading) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: '32px',
-        right: 0,
-        bottom: 0,
-        width: '600px',
-        background: 'var(--color-surface-1)',
-        borderLeft: '1px solid var(--color-surface-offset)',
-        zIndex: 900,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--color-text-muted)'
-      }}>
-        Loading details...
+      <div className="motion-backdrop" data-state={presence} style={backdropStyle} onClick={() => onClose()}>
+        <div
+          className="motion-drawer"
+          data-state={presence}
+          style={drawerStyle}
+          onClick={e => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Card"
+        >
+          <DetailSkeleton label="Loading the card" />
+        </div>
       </div>
     )
   }
@@ -493,32 +519,14 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
   if (!card) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: '32px',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      zIndex: 900,
-      display: 'flex',
-      justifyContent: 'flex-end',
-      backdropFilter: 'blur(2px)'
-    }}
+    <div className="motion-backdrop" data-state={presence} style={backdropStyle}
     onClick={() => { void requestClose() }}
     >
       <div
         ref={containerRef}
-        style={{
-          width: '650px',
-          height: '100%',
-          background: 'var(--color-surface-1)',
-          borderLeft: '1px solid var(--color-surface-offset)',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
-          animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
-        }}
+        className="motion-drawer"
+        data-state={presence}
+        style={drawerStyle}
         onClick={e => e.stopPropagation()} // don't close on drawer click
         role="dialog"
         aria-modal="true"
@@ -548,7 +556,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
         }}>
           <div className="row">
             <span style={{
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               fontWeight: 'var(--weight-bold)',
               background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
@@ -641,7 +649,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
           {/* the board's own card component, inert at column width, so the preview can't drift */}
           {previewCard && (
             <div>
-              <span className="label-caps" style={{ fontSize: '10px' }}>On The Board</span>
+              <span className="label-caps" style={{ fontSize: 'var(--text-xs)' }}>On The Board</span>
               {/* inert, not pointer-events: tabbing in and pressing Space jumped to Focus */}
               <div
                 ref={node => { node?.setAttribute('inert', '') }}
@@ -724,7 +732,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
               {dueLock && <p className="link-owned-note">{dueLock}</p>}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)', position: 'relative' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)', position: 'relative' }}>
               <span className="label-caps">
                 Tags
               </span>
@@ -841,7 +849,7 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
                       background: editorMode === mode ? 'var(--color-surface-offset)' : 'transparent',
                       border: 'none',
                       color: editorMode === mode ? 'var(--color-text-base)' : 'var(--color-text-muted)',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-2xs)',
                       textTransform: 'uppercase',
                       padding: '2px 8px',
                       borderRadius: '2px',
@@ -858,8 +866,8 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
             {/* split only: an empty card's panes are indistinguishable without labels */}
             {editorMode === 'split' && (
               <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-                <span className="label-caps" style={{ flex: 1, fontSize: '10px' }}>Markdown</span>
-                <span className="label-caps" style={{ flex: 1, fontSize: '10px' }}>Preview</span>
+                <span className="label-caps" style={{ flex: 1, fontSize: 'var(--text-xs)' }}>Markdown</span>
+                <span className="label-caps" style={{ flex: 1, fontSize: 'var(--text-xs)' }}>Preview</span>
               </div>
             )}
 

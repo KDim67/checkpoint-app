@@ -6,6 +6,8 @@ import Logo from './ui/Logo'
 import * as syncApi from '../data/sync'
 import { defaultBindings, loadBindings, type ShortcutBindings } from '../lib/shortcuts'
 import { useRenewalAttention } from './renewals/useRenewalAttention'
+import { iconUrl } from '../lib/workspaceIcon'
+import { withViewTransition } from '../lib/viewTransition'
 
 // inline SVG, no icon lib
 
@@ -203,7 +205,8 @@ export function Sidebar() {
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const focusIsRunning = useAppStore(s => s.focusIsRunning)
 
-  const returnView = useAppStore(s => s.returnView)
+  const goBack = useAppStore(s => s.goBack)
+  const [brokenIcon, setBrokenIcon] = useState<string | null>(null)
   const onWorkspaces = activeView === 'workspaces'
   const [tooltip, setTooltip] = useState<{ label: string; y: number; keys?: string } | null>(null)
   /** the label teaches the key: Wall, Ctrl+6 */
@@ -272,13 +275,11 @@ export function Sidebar() {
   const activeContextEntry = workspaceList.find(c => c.slug === activeWorkspace)
   const ctxLabel = activeContextEntry ? activeContextEntry.name : activeWorkspace.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   const ctxInitial = ctxLabel[0]?.toUpperCase() ?? 'D'
+  // the workspace's own picture when it has one that loads
+  const picture = activeContextEntry?.icon && activeContextEntry.icon !== brokenIcon ? activeContextEntry.icon : null
 
   function handleNavClick(view: ActiveView) {
-    if (document.startViewTransition) {
-      document.startViewTransition(() => setView(view))
-    } else {
-      setView(view)
-    }
+    withViewTransition(() => setView(view))
   }
 
   return (
@@ -306,7 +307,7 @@ export function Sidebar() {
         title={`Workspaces. You're in ${ctxLabel}.`}
         aria-label={`Workspaces, current workspace ${ctxLabel}`}
         aria-current={onWorkspaces ? 'page' : undefined}
-        onClick={() => setView(onWorkspaces ? (returnView === 'workspaces' ? 'kanban' : returnView) : 'workspaces')}
+        onClick={() => withViewTransition(() => (onWorkspaces ? goBack() : setView('workspaces')))}
         className="sidebar-context-trigger"
         style={{
           position: 'relative',
@@ -322,9 +323,27 @@ export function Sidebar() {
           flexShrink: 0
         }}
       >
-        <div style={{ filter: 'drop-shadow(0 2px 6px rgba(187, 254, 43, 0.35))', display: 'flex' }}>
-          <Logo size={32} />
-        </div>
+        {/* a workspace with a picture takes the big spot, so where you are is the first thing you see; the logo steps into the badge */}
+        {picture ? (
+          <img
+            src={iconUrl(picture)}
+            alt=""
+            draggable={false}
+            onError={() => setBrokenIcon(picture)}
+            style={{
+              display: 'block',
+              width: '32px',
+              height: '32px',
+              objectFit: 'cover',
+              borderRadius: 'var(--radius-md)',
+              border: `1.5px solid ${activeContextEntry?.color || 'var(--color-secondary)'}`
+            }}
+          />
+        ) : (
+          <div style={{ filter: 'drop-shadow(0 2px 6px rgba(187, 254, 43, 0.35))', display: 'flex' }}>
+            <Logo size={32} />
+          </div>
+        )}
         <span
           style={{
             position: 'absolute',
@@ -336,16 +355,17 @@ export function Sidebar() {
             background: 'var(--color-surface-1)',
             border: `1.5px solid ${activeContextEntry?.color || 'var(--color-secondary)'}`,
             color: activeContextEntry?.color || 'var(--color-secondary)',
-            fontSize: '8.5px',
+            fontSize: 'var(--text-xs)',
             fontWeight: 'var(--weight-extrabold)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             lineHeight: 1,
+            overflow: 'hidden',
             boxShadow: '0 1px 4px rgba(0,0,0,0.5)'
           }}
         >
-          {ctxInitial}
+          {picture ? <Logo size={9} /> : ctxInitial}
         </span>
       </button>
 

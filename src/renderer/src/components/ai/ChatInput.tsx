@@ -501,7 +501,7 @@ export default function ChatInput({
             gap: '2px'
           }}
         >
-          <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ padding: '4px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Slash Commands (/)
           </div>
           {filteredSlashCommands.map(cmd => (
@@ -522,7 +522,7 @@ export default function ChatInput({
               }}
             >
               <div className="row-6px">
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-secondary)', fontFamily: 'var(--font-mono)' }}>
                   {cmd.name}
                 </span>
               </div>
@@ -557,7 +557,7 @@ export default function ChatInput({
           }}
         >
           {filteredCheatsheets.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-primary-soft)', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-primary-soft)', textTransform: 'uppercase' }}>
               Cheatsheets
             </div>
           )}
@@ -570,7 +570,7 @@ export default function ChatInput({
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
                 border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
-                fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+                fontSize: 'var(--text-xs)', cursor: 'pointer', textAlign: 'left'
               }}
             >
               <BookOpen size={13} style={{ color: 'var(--color-primary-soft)', flexShrink: 0 }} />
@@ -582,7 +582,7 @@ export default function ChatInput({
           ))}
 
           {filteredNotes.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-success-soft)', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-success-soft)', textTransform: 'uppercase' }}>
               Notes
             </div>
           )}
@@ -595,7 +595,7 @@ export default function ChatInput({
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
                 border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
-                fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+                fontSize: 'var(--text-xs)', cursor: 'pointer', textAlign: 'left'
               }}
             >
               <FileText size={13} style={{ color: 'var(--color-success-soft)', flexShrink: 0 }} />
@@ -607,7 +607,7 @@ export default function ChatInput({
           ))}
 
           {filteredFiles.length > 0 && (
-            <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-info)', textTransform: 'uppercase' }}>
+            <div style={{ padding: '4px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-info)', textTransform: 'uppercase' }}>
               Workspace Files
             </div>
           )}
@@ -621,13 +621,13 @@ export default function ChatInput({
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
                 border: 'none', color: 'var(--color-text-base)', borderRadius: 'var(--radius-sm)',
-                fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+                fontSize: 'var(--text-xs)', cursor: 'pointer', textAlign: 'left'
               }}
             >
               <FileCode size={13} style={{ color: 'var(--color-info)', flexShrink: 0 }} />
               <div className="col-fill">
                 <span className="truncate">{f.name}</span>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.relativePath}</span>
               </div>
               {attachedFiles.includes(f.relativePath) && (
                 <span className="text-accent-nano">Attached</span>
@@ -693,7 +693,7 @@ export default function ChatInput({
                 gap: '2px'
               }}
             >
-              <div style={{ padding: '4px 8px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+              <div style={{ padding: '4px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                 AI Actions & Tools
               </div>
 
@@ -713,7 +713,7 @@ export default function ChatInput({
                   border: 'none',
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-sm)',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   cursor: 'pointer',
                   textAlign: 'left'
                 }}
@@ -734,7 +734,7 @@ export default function ChatInput({
                   border: 'none',
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-sm)',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   cursor: 'pointer',
                   textAlign: 'left'
                 }}
@@ -761,7 +761,7 @@ export default function ChatInput({
                   }}
                 >
                   {availableCheatsheets.length === 0 ? (
-                    <div style={{ padding: '4px 8px', fontSize: '10px', color: 'var(--color-text-faint)' }}>
+                    <div style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
                       No uploaded cheatsheets found.
                     </div>
                   ) : (
@@ -778,7 +778,7 @@ export default function ChatInput({
                           border: 'none',
                           color: attachedCheatsheets.includes(cs.name) ? 'var(--color-secondary)' : 'var(--color-text-base)',
                           borderRadius: 'var(--radius-sm)',
-                          fontSize: '10px',
+                          fontSize: 'var(--text-xs)',
                           cursor: 'pointer',
                           textAlign: 'left'
                         }}
@@ -804,7 +804,7 @@ export default function ChatInput({
                   display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
                   border: 'none',
                   color: visionCapable ? 'var(--color-text-base)' : 'var(--color-text-faint)',
-                  borderRadius: 'var(--radius-sm)', fontSize: '11px', cursor: 'pointer', textAlign: 'left'
+                  borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', cursor: 'pointer', textAlign: 'left'
                 }}
                 title={visionCapable
                   ? 'Attach an image. You can also paste one directly into the input.'
@@ -823,14 +823,14 @@ export default function ChatInput({
                 <>
                   <div className="rule" />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 8px 4px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       My prompts
                     </span>
                     {onManageCustomActions && (
                       <button
                         onClick={() => { setShowPlusMenu(false); onManageCustomActions() }}
                         title="Add, edit or delete your saved prompts"
-                        style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '3px', fontSize: 'var(--text-xs)' }}
                       >
                         <Settings2 size={11} />
                         <span>Manage</span>
@@ -852,7 +852,7 @@ export default function ChatInput({
               )}
 
               <div className="rule" />
-              <div style={{ padding: '2px 8px 4px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ padding: '2px 8px 4px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Create on the board
               </div>
               {CREATE_ACTIONS.map(a => {
@@ -870,7 +870,7 @@ export default function ChatInput({
               })}
 
               <div className="rule" />
-              <div style={{ padding: '2px 8px 4px', fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ padding: '2px 8px 4px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Analyze &amp; advise
               </div>
               {ANALYZE_ACTIONS.map(a => {
@@ -900,7 +900,7 @@ export default function ChatInput({
               border: '1px solid var(--color-secondary)',
               borderRadius: 'var(--radius-sm)',
               padding: '2px 8px',
-              fontSize: '11px',
+              fontSize: 'var(--text-xs)',
               fontWeight: 'bold',
               color: 'var(--color-secondary)',
               alignSelf: 'center',
@@ -938,7 +938,7 @@ export default function ChatInput({
               border: `1px solid ${activeSkill.color}50`,
               borderRadius: 'var(--radius-sm)',
               padding: '2px 8px',
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               fontWeight: 'bold',
               color: activeSkill.color,
               alignSelf: 'center',
@@ -986,7 +986,7 @@ export default function ChatInput({
               display: 'inline-flex', alignItems: 'center', gap: '5px',
               background: 'rgba(34, 197, 94, 0.14)', border: '1px solid rgba(34, 197, 94, 0.4)',
               borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-              fontSize: '11px', fontWeight: 'bold', color: 'var(--color-success-soft)', alignSelf: 'center', flexShrink: 0
+              fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-success-soft)', alignSelf: 'center', flexShrink: 0
             }}
           >
             <FileText size={12} />
@@ -1009,7 +1009,7 @@ export default function ChatInput({
               display: 'inline-flex', alignItems: 'center', gap: '5px',
               background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.4)',
               borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-              fontSize: '11px', fontWeight: 'bold', color: 'var(--color-info)', alignSelf: 'center', flexShrink: 0
+              fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-info)', alignSelf: 'center', flexShrink: 0
             }}
           >
             <FileCode size={12} />
@@ -1058,7 +1058,7 @@ export default function ChatInput({
               border: '1px solid rgba(59, 130, 246, 0.4)',
               borderRadius: 'var(--radius-sm)',
               padding: '2px 8px',
-              fontSize: '11px',
+              fontSize: 'var(--text-xs)',
               fontWeight: 'bold',
               color: 'var(--color-primary-soft)',
               alignSelf: 'center',

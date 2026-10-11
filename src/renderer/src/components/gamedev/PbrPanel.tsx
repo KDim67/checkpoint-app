@@ -79,7 +79,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                       borderRadius: 'var(--radius-sm)',
                       color: 'var(--color-text-base)',
                       padding: '4px 8px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -99,7 +99,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                       borderRadius: 'var(--radius-sm)',
                       color: tool.rotate ? 'var(--color-secondary)' : 'var(--color-text-base)',
                       padding: '4px 8px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -349,7 +349,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                           border: 'none',
                           borderRadius: 'var(--radius-sm)',
                           color: 'var(--color-text-inverted)',
-                          fontSize: '10px',
+                          fontSize: 'var(--text-xs)',
                           fontWeight: 'var(--weight-semibold)',
                           padding: '5px 10px',
                           cursor: 'pointer'
@@ -366,7 +366,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
                           border: '1px solid var(--color-surface-offset)',
                           borderRadius: 'var(--radius-sm)',
                           color: 'var(--color-text-muted)',
-                          fontSize: '10px',
+                          fontSize: 'var(--text-xs)',
                           padding: '5px 10px',
                           cursor: 'pointer'
                         }}

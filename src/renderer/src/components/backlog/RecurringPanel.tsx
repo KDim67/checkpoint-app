@@ -163,7 +163,7 @@ export default function RecurringPanel({ context, onChanged }: Props): React.JSX
                       background: on ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
                       border: `1px solid ${on ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
                       color: on ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-                      fontSize: '11px', cursor: 'pointer'
+                      fontSize: 'var(--text-xs)', cursor: 'pointer'
                     }}
                   >
                     {label}

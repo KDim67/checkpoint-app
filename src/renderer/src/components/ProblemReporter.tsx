@@ -5,6 +5,7 @@ import { useToast } from './ui/Toast'
 import { crashNotice } from '../data/app'
 import { openProblemReport, REPORT_PROBLEM_EVENT } from '../lib/reportProblem'
 import { CRASH_NOTICE_MS } from '../lib/timings'
+import Presence from './ui/Presence'
 
 const ReportProblemDialog = lazy(() => import('./ReportProblemDialog'))
 
@@ -35,10 +36,13 @@ export default function ProblemReporter(): React.JSX.Element | null {
       .catch(() => {})
   }, [toast])
 
-  if (!opened) return null
   return (
-    <Suspense fallback={null}>
-      <ReportProblemDialog initialWhat={opened.what} onClose={() => setOpened(null)} />
-    </Suspense>
+    <Presence show={!!opened}>
+      {opened && (
+        <Suspense fallback={null}>
+          <ReportProblemDialog initialWhat={opened.what} onClose={() => setOpened(null)} />
+        </Suspense>
+      )}
+    </Presence>
   )
 }

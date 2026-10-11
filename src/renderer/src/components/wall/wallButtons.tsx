@@ -247,7 +247,7 @@ export function FontPickerMenu({ current = 'sans', onPick, onClose }: FontPicker
       <div
         style={{
           padding: '4px 8px 3px',
-          fontSize: '10px',
+          fontSize: 'var(--text-2xs)',
           fontWeight: 600,
           color: 'var(--color-text-faint)',
           textTransform: 'uppercase',
@@ -293,7 +293,7 @@ export function FontPickerMenu({ current = 'sans', onPick, onClose }: FontPicker
               <span
                 style={{
                   fontFamily: 'system-ui, -apple-system, sans-serif',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 700,
                   color: 'var(--color-primary)',
                   letterSpacing: '0.02em'
@@ -342,7 +342,7 @@ export function TextSizeMenu({ current, chosen, fit = true, onPick, onClose }: T
       {/* each row is set at its own size, so the list shows what it means */}
       <span style={{ fontSize: `${size}px`, lineHeight: 1.2, fontWeight: selected ? 600 : 400 }}>{label}</span>
       {selected && (
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)' }}>Active</span>
+        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-primary)' }}>Active</span>
       )}
     </button>
   )
@@ -365,7 +365,7 @@ export function TextSizeMenu({ current, chosen, fit = true, onPick, onClose }: T
       }}
     >
       <div style={{
-        padding: '4px 8px 3px', fontSize: '10px', fontWeight: 600,
+        padding: '4px 8px 3px', fontSize: 'var(--text-2xs)', fontWeight: 600,
         color: 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em'
       }}>
         Text size
@@ -383,7 +383,7 @@ export const fontButton = (current: WallFont = 'sans', onPick: (next: WallFont) 
     current,
     font => (
       <span style={{
-        fontSize: '11px',
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
         fontFamily: fontCssFamily(font),
         lineHeight: 1

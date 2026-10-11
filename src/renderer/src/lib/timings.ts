@@ -12,3 +12,12 @@ export const CALENDAR_NUDGE_SETTLE_MS = 600
 
 /** long enough to reach Report after the window comes back from a crash */
 export const CRASH_NOTICE_MS = 12_000
+
+/** a setting found by search stays lit this long */
+export const SETTING_FOUND_MS = 2000
+
+/** a section still loading gets this long to show the setting search went to */
+export const SETTING_REVEAL_WAIT_MS = 3000
+
+/** how long something takes to leave: dialogs, drawers and toasts play this out before they go, quicker than they arrive */
+export const EXIT_MS = 150
