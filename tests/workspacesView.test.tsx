@@ -178,6 +178,68 @@ describe('switching', () => {
   })
 })
 
+describe('the keys', () => {
+  const selected = (): string | null | undefined => lanes().find(lane => lane.dataset.selected === 'true')?.querySelector('.ws-lane-switch')?.textContent
+  const keyHints = (): string => document.querySelector('.ws-keys')?.textContent ?? ''
+
+  it('work after a click beside the lanes leaves nothing focused, on the lane shown as selected', async () => {
+    await openPage()
+    await waitFor(() => expect(document.activeElement).toBe(laneButton('Work')))
+    expect(selected()).toBe('Work')
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
+    expect(selected()).toBe('Client site')
+    await waitFor(() => expect(document.activeElement).toBe(laneButton('Client site')))
+    ;(document.activeElement as HTMLElement).blur()
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(useAppStore.getState()).toMatchObject({ activeWorkspace: 'client', activeView: 'backlog' })
+  })
+
+  it("work after a click on the page's empty space, which focuses the page itself", async () => {
+    await openPage()
+    const page = document.querySelector('.ws-page') as HTMLElement
+    page.focus()
+    fireEvent.keyDown(page, { key: 'ArrowDown', altKey: true })
+    await waitFor(() => expect(savedList().map(e => e.slug)).toEqual(['client', 'work', 'thesis']))
+    page.focus()
+    fireEvent.keyDown(page, { key: 'Escape' })
+    expect(useAppStore.getState().activeView).toBe('backlog')
+  })
+
+  it("are listed with what each does right now, leaving out what can't be done", async () => {
+    await openPage()
+    await waitFor(() => expect(document.activeElement).toBe(laneButton('Work')))
+    expect(keyHints()).toContain('Stay in Work')
+    expect(keyHints()).toContain('Move')
+    expect(keyHints()).toContain('Back')
+    fireEvent.keyDown(laneButton('Work'), { key: 'ArrowDown' })
+    expect(keyHints()).toContain('Switch to Client site')
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'th' } })
+    expect(keyHints()).toContain('Switch to Thesis')
+    expect(keyHints()).toContain('Clear filter')
+    expect(keyHints()).not.toContain('Move')
+  })
+
+  it('switch to the selected lane from the filter too', async () => {
+    await openPage()
+    await waitFor(() => expect(document.activeElement).toBe(laneButton('Work')))
+    fireEvent.keyDown(laneButton('Work'), { key: 'End' })
+    expect(selected()).toBe('Thesis')
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Enter' })
+    expect(useAppStore.getState().activeWorkspace).toBe('thesis')
+  })
+
+  it("leave a dialog's keys to the dialog", async () => {
+    await openPage()
+    fireEvent.click(screen.getByRole('button', { name: 'New workspace' }))
+    await screen.findByLabelText('Name')
+    fireEvent.keyDown(document.body, { key: 'ArrowDown', altKey: true })
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    await act(async () => { await Promise.resolve() })
+    expect(savedList().map(e => e.slug)).toEqual(['work', 'client', 'thesis'])
+    expect(useAppStore.getState().activeView).toBe('workspaces')
+  })
+})
 
 describe("a workspace's picture", () => {
   const choose = (name: string): void => {
@@ -237,6 +299,17 @@ describe('reordering', () => {
     await waitFor(() => expect(savedList().map(e => e.slug)).toEqual(['client', 'work', 'thesis']))
     await waitFor(() => expect(document.activeElement).toBe(laneButton('Work')))
     expect(useAppStore.getState().availableWorkspaces).toEqual(['client', 'work', 'thesis'])
+  })
+
+  it('moves one up or down from its menu, offering only the ways it can go', async () => {
+    await openPage()
+    fireEvent.click(within(lanes()[0]).getByRole('button', { name: 'More for Work' }))
+    expect(screen.queryByRole('menuitem', { name: 'Move up' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move down' }))
+    await waitFor(() => expect(savedList().map(e => e.slug)).toEqual(['client', 'work', 'thesis']))
+    fireEvent.click(within(lanes()[2]).getByRole('button', { name: 'More for Thesis' }))
+    expect(screen.queryByRole('menuitem', { name: 'Move down' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Move up' })).toBeTruthy()
   })
 
   it('leaves the order alone while the list is filtered', async () => {
