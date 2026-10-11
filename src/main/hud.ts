@@ -4,14 +4,19 @@ import { IpcChannels } from '../shared/ipcChannels'
 
 let hudWindow: BrowserWindow | null = null
 
+const HUD_WIDTH = 600
+/** the bar alone, and the bar with its longest list of suggestions */
+const HUD_MIN_HEIGHT = 64
+const HUD_MAX_HEIGHT = 420
+
 function createHudWindow(): BrowserWindow {
   if (hudWindow) return hudWindow
 
   const preloadPath = join(__dirname, '../preload/index.mjs')
 
   hudWindow = new BrowserWindow({
-    width: 600,
-    height: 64,
+    width: HUD_WIDTH,
+    height: HUD_MIN_HEIGHT,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -55,12 +60,11 @@ export function showHud(): void {
   }
 }
 
-/** also sends a reset signal */
-function hideHud(): void {
+/** also sends a reset signal; the HUD sizes itself to what it shows after that */
+export function hideHud(): void {
   if (hudWindow && hudWindow.isVisible()) {
     hudWindow.hide()
     hudWindow.webContents.send(IpcChannels.HUD_RESET)
-    hudWindow.setSize(600, 64)
   }
 }
 
@@ -105,9 +109,9 @@ export function disableHud(): void {
   }
 }
 
-/** e.g. to fit validation errors */
+/** the HUD asks for its content's height; a bad or huge ask can't hide it or cover the screen */
 export function resizeHud(height: number): void {
-  if (hudWindow) {
-    hudWindow.setSize(600, height)
-  }
+  if (!hudWindow || typeof height !== 'number' || !Number.isFinite(height)) return
+  // setSize only ever grows a transparent window that can't be resized by hand; this shrinks it too
+  hudWindow.setContentSize(HUD_WIDTH, Math.round(Math.min(HUD_MAX_HEIGHT, Math.max(HUD_MIN_HEIGHT, height))))
 }
