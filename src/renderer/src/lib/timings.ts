@@ -21,3 +21,6 @@ export const SETTING_REVEAL_WAIT_MS = 3000
 
 /** how long something takes to leave: dialogs, drawers and toasts play this out before they go, quicker than they arrive */
 export const EXIT_MS = 150
+
+/** screens' code is fetched ahead once starting up has had this long to finish */
+export const SCREEN_PRELOAD_DELAY_MS = 1500

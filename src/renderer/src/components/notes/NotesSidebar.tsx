@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
-  Plus, Search, Hash, Pin, PinOff, CalendarDays, ChevronDown,
+  Plus, Search, Hash, CalendarDays, ChevronDown,
   Clock, ArrowDownAZ, HardDrive, X, Loader2, FolderInput
 } from 'lucide-react'
 import type { NoteMetadata } from '../../../../shared/types'
-import { NOTE_TEMPLATES, formatRelativeTime, type SortKey } from './notesUtils'
+import { NOTE_TEMPLATES, type SortKey } from './notesUtils'
 import { SkeletonList } from '../ui/Skeleton'
+import { createNearWatcher } from '../../lib/drawWhenNear'
+import NoteRow, { EAGER_NOTES } from './NoteRow'
 
 export interface SidebarItem {
   note: NoteMetadata
@@ -39,7 +41,7 @@ const SORTS: { key: SortKey; label: string; icon: React.ReactNode }[] = [
   { key: 'size', label: 'Largest first', icon: <HardDrive size={13} /> }
 ]
 
-export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Element {
+function NotesSidebar(props: NotesSidebarProps): React.JSX.Element {
   const {
     items, allTags, totalCount, activeTitle, pinned, loading, searching,
     searchQuery, onSearchChange, sort, onSortChange, selectedTag, onSelectTag,
@@ -51,6 +53,8 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
   const [showAllTags, setShowAllTags] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
+  // one for the list's life, watching its own scroller
+  const [watcher] = useState(createNearWatcher)
 
   useEffect(() => {
     if (!templateMenu && !sortMenu) return
@@ -239,7 +243,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div ref={watcher.setRoot} style={{ flex: 1, overflowY: 'auto' }}>
         {loading ? (
           <SkeletonList label="Loading the notes" count={6} style={{ padding: 'var(--space-4)' }} />
         ) : items.length === 0 ? (
@@ -247,61 +251,19 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
             {searchQuery ? `No notes match “${searchQuery}”.` : selectedTag ? 'No notes with this tag.' : 'No notes yet. Create your first note.'}
           </div>
         ) : (
-          items.map(({ note, snippet }) => {
-            const isActive = note.title === activeTitle
-            const isPinned = pinned.has(note.title)
-            return (
-              <div
-                key={note.title}
-                className={`notes-list-item ${isActive ? 'active' : ''}`}
-                onClick={() => onSelect(note.title)}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '6px' }}>
-                  <span style={{ fontWeight: 'var(--weight-semibold)', fontSize: 'var(--text-sm)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {isPinned && <Pin size={11} className="icon-accent" fill="var(--color-secondary)" />}
-                    {note.title}
-                  </span>
-                  <button
-                    className="notes-pin-toggle"
-                    title={isPinned ? 'Unpin' : 'Pin to top'}
-                    aria-label={isPinned ? 'Unpin note' : 'Pin note'}
-                    onClick={e => { e.stopPropagation(); onTogglePin(note.title) }}
-                  >
-                    {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
-                  </button>
-                </div>
-
-                {(snippet || note.excerpt) && (
-                  <span style={{
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-text-muted)',
-                    lineHeight: 1.45,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden'
-                  }}>
-                    {snippet || note.excerpt}
-                  </span>
-                )}
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', flexShrink: 0 }}>
-                    {formatRelativeTime(note.updatedAt)}
-                  </span>
-                  {note.tags.length > 0 && (
-                    <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', overflow: 'hidden' }}>
-                      {note.tags.slice(0, 3).map(tag => (
-                        <span key={tag} style={{ fontSize: 'var(--text-2xs)', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', padding: '0 5px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap' }}>
-                          {tag.replace(/^#/, '')}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })
+          items.map(({ note, snippet }, i) => (
+            <NoteRow
+              key={note.title}
+              note={note}
+              snippet={snippet}
+              active={note.title === activeTitle}
+              pinned={pinned.has(note.title)}
+              eager={i < EAGER_NOTES}
+              watcher={watcher}
+              onSelect={onSelect}
+              onTogglePin={onTogglePin}
+            />
+          ))
         )}
       </div>
 
@@ -342,3 +304,6 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
     </div>
   )
 }
+
+// the editor's every key re-rendered the whole list
+export default React.memo(NotesSidebar)

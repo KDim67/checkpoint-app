@@ -72,6 +72,11 @@ CREATE INDEX IF NOT EXISTS idx_items_due       ON items(due_at);
 CREATE INDEX IF NOT EXISTS idx_items_status    ON items(status);
 CREATE INDEX IF NOT EXISTS idx_items_position  ON items(position);
 CREATE INDEX IF NOT EXISTS idx_items_created   ON items(created_at DESC);
+-- a workspace's items of one kind in list order, so a page of the board, the log or the backlog reads only its own rows
+CREATE INDEX IF NOT EXISTS idx_items_list         ON items(context, type, position, created_at);
+CREATE INDEX IF NOT EXISTS idx_items_list_created ON items(context, type, created_at);
+-- each workspace's last change, for the Workspaces page
+CREATE INDEX IF NOT EXISTS idx_items_changed      ON items(context, updated_at);
 CREATE TABLE IF NOT EXISTS mcp_activity (
   id          TEXT PRIMARY KEY,
   tool        TEXT NOT NULL,

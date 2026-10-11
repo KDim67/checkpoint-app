@@ -1,26 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import type { NoteMetadata } from '../../../../shared/types'
-
-interface GraphNode {
-  id: string
-  x: number
-  y: number
-  vx: number
-  vy: number
-  fx: number | null
-  fy: number | null
-  /** linked to, but no such note */
-  missing: boolean
-  /** link count, drives size */
-  degree: number
-}
-
-interface GraphLink {
-  source: string
-  target: string
-  sourceNode?: GraphNode
-  targetNode?: GraphNode
-}
+import { ALPHA_DRAG, ALPHA_MIN, CONVERGENCE_KE, cool, EXACT_UP_TO, graphShape, stepSimulation, type GraphLink, type GraphNode } from './graphPhysics'
 
 interface GraphViewProps {
   notes: NoteMetadata[]
@@ -28,14 +8,11 @@ interface GraphViewProps {
   onSelectNote: (title: string) => void
 }
 
-// physics constants
-const REPULSION = 180
-const SPRING = 0.05
-const REST_LENGTH = 65
-const GRAVITY = 0.012
-const FRICTION = 0.82
-const CONVERGENCE_KE = 0.01
 const DRAG_THRESHOLD = 3 // px before a press counts as a drag
+/** a big graph takes this many steps a frame and is drawn once, so it settles in a third of the time */
+const STEPS_PER_FRAME_LARGE = 3
+/** a node that has moved less than this since it was drawn isn't written again; most stop well before the layout does */
+const MIN_PAINT_PX = 0.25
 
 const MIN_ZOOM = 0.4
 const MAX_ZOOM = 4
@@ -44,72 +21,13 @@ const LABEL_ZOOM = 1.3
 /** below this many nodes labels always fit */
 const LABEL_NODE_LIMIT = 12
 
-/** one step, mutates nodes, returns kinetic energy */
-function stepSimulation(nodes: GraphNode[], links: GraphLink[], width: number, height: number): number {
-  const centerX = width / 2
-  const centerY = height / 2
-
-  // repulsion (Coulomb)
-  for (let i = 0; i < nodes.length; i++) {
-    const a = nodes[i]
-    for (let j = i + 1; j < nodes.length; j++) {
-      const b = nodes[j]
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      const distSq = dx * dx + dy * dy
-      const dist = Math.sqrt(distSq) || 0.1
-      const force = REPULSION / (distSq + 10)
-      const fx = (dx / dist) * force
-      const fy = (dy / dist) * force
-      a.vx -= fx; a.vy -= fy
-      b.vx += fx; b.vy += fy
-    }
-  }
-
-  // springs along links (Hooke)
-  for (const link of links) {
-    if (!link.sourceNode || !link.targetNode) continue
-    const a = link.sourceNode
-    const b = link.targetNode
-    const dx = b.x - a.x
-    const dy = b.y - a.y
-    const dist = Math.sqrt(dx * dx + dy * dy) || 0.1
-    const force = SPRING * (dist - REST_LENGTH)
-    const fx = (dx / dist) * force
-    const fy = (dy / dist) * force
-    a.vx += fx; a.vy += fy
-    b.vx -= fx; b.vy -= fy
-  }
-
-  // centre gravity
-  for (const n of nodes) {
-    n.vx += (centerX - n.x) * GRAVITY
-    n.vy += (centerY - n.y) * GRAVITY
-  }
-
-  // integrate, bound, sum KE of free nodes
-  let totalKE = 0
-  for (const n of nodes) {
-    if (n.fx !== null && n.fy !== null) {
-      n.x = n.fx; n.y = n.fy; n.vx = 0; n.vy = 0
-    } else {
-      n.x += n.vx; n.y += n.vy
-      n.vx *= FRICTION; n.vy *= FRICTION
-      totalKE += n.vx * n.vx + n.vy * n.vy
-    }
-    n.x = Math.max(12, Math.min(width - 12, n.x))
-    n.y = Math.max(12, Math.min(height - 12, n.y))
-  }
-  return totalKE
-}
-
 /** hubs read as hubs */
 function radiusFor(node: GraphNode, isActive: boolean): number {
   if (isActive) return 8
   return Math.min(7.5, 4 + Math.sqrt(node.degree) * 1.1)
 }
 
-export default function GraphView({ notes, activeTitle, onSelectNote }: GraphViewProps): React.JSX.Element {
+function GraphView({ notes, activeTitle, onSelectNote }: GraphViewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const [dimensions, setDimensions] = useState({ width: 300, height: 300 })
@@ -136,6 +54,12 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
 
   const rafRef = useRef<number | null>(null)
   const dragNodeIdRef = useRef<string | null>(null)
+  /** how hot the layout runs; it cools each step and the loop stops once it's cold */
+  const alphaRef = useRef(1)
+  /** what the nodes were last built from */
+  const shapeRef = useRef<string | null>(null)
+  /** where each node was last drawn */
+  const paintedRef = useRef(new WeakMap<GraphNode, [number, number]>())
 
   /** one hop from the hovered node, itself included */
   const focus = useMemo(() => {
@@ -148,18 +72,30 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     return near
   }, [hoverId, links])
 
-  // one reusable loop, restart via ensureRunning()
-  const ensureRunning = useCallback(() => {
+  // one reusable loop, restart via ensureRunning(); heat raises how hot it runs, a drag keeps it warm
+  const ensureRunning = useCallback((heat = 0) => {
+    alphaRef.current = Math.max(alphaRef.current, heat)
     if (rafRef.current !== null) return
     const tick = (): void => {
       const { width, height } = dimsRef.current
-      const totalKE = stepSimulation(nodesRef.current, linksRef.current, width, height)
+      const dragging = dragNodeIdRef.current !== null
+      const steps = nodesRef.current.length > EXACT_UP_TO ? STEPS_PER_FRAME_LARGE : 1
+      let totalKE = 0
+      for (let s = 0; s < steps; s++) {
+        alphaRef.current = cool(alphaRef.current, dragging)
+        totalKE = stepSimulation(nodesRef.current, linksRef.current, width, height, alphaRef.current)
+      }
 
       // imperative paint for speed, only what moved enough to see
       const moved = new Set<GraphNode>()
       for (const n of nodesRef.current) {
         const el = nodeElementsRef.current[n.id]
-        if (el) el.setAttribute('transform', `translate(${n.x}, ${n.y})`)
+        if (!el) continue
+        const last = paintedRef.current.get(n)
+        if (last && Math.abs(last[0] - n.x) < MIN_PAINT_PX && Math.abs(last[1] - n.y) < MIN_PAINT_PX) continue
+        el.setAttribute('transform', `translate(${n.x}, ${n.y})`)
+        paintedRef.current.set(n, [n.x, n.y])
+        moved.add(n)
       }
       linksRef.current.forEach((link, idx) => {
         const el = linkElementsRef.current[idx]
@@ -171,8 +107,8 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
         }
       })
 
-      // loop while dragging or until settled
-      if (totalKE < CONVERGENCE_KE && dragNodeIdRef.current === null) {
+      // loop while dragging or until settled, which the cooling makes certain
+      if ((totalKE < CONVERGENCE_KE || alphaRef.current < ALPHA_MIN) && !dragging) {
         rafRef.current = null
         return
       }
@@ -197,6 +133,11 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
 
   // keep positions, reheat so new nodes settle
   useEffect(() => {
+    // every save reloads the list; the same notes and links leave the layout as it is instead of stirring it again
+    const shape = graphShape(notes)
+    if (shape === shapeRef.current) return
+    shapeRef.current = shape
+
     const existing = new Map<string, GraphNode>()
     nodesRef.current.forEach(n => existing.set(n.id, n))
 
@@ -285,12 +226,12 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     newNodes.forEach(n => {
       if (n.fx === null) { n.vx += (Math.cos(n.x) * 0.5); n.vy += (Math.sin(n.y) * 0.5) }
     })
-    ensureRunning()
+    ensureRunning(1)
   }, [notes, ensureRunning])
 
   // reheat on resize and mount, stop on unmount
   useEffect(() => {
-    ensureRunning()
+    ensureRunning(1)
     return () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
@@ -322,7 +263,7 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     const node = nodesRef.current.find(n => n.id === nodeId)
     const at = toGraph(e.clientX, e.clientY)
     if (node) { node.fx = at.x; node.fy = at.y }
-    ensureRunning()
+    ensureRunning(ALPHA_DRAG)
 
     const handleMouseMove = (moveEvent: MouseEvent): void => {
       if (!dragNodeIdRef.current) return
@@ -546,3 +487,6 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
     </div>
   )
 }
+
+// the screen around it redraws on every key typed in a note; its thousands of nodes needn't
+export default React.memo(GraphView)
