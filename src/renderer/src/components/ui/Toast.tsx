@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import React, { useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { EXIT_MS, TOAST_DISMISS_MS } from '../../lib/timings'
 import { prefersReducedMotion } from '../../lib/presence'
 import { errorMessage } from '../../../../shared/errors'
+import { ToastContext } from './toastContext'
 
 export interface ToastAction {
   label: string
@@ -19,11 +20,9 @@ interface ToastMessage {
   leaving?: boolean
 }
 
-interface ToastContextType {
+export interface ToastContextType {
   toast: (text: string, options?: { action?: ToastAction; type?: ToastType; duration?: number }) => void
 }
-
-const ToastContext = createContext<ToastContextType | undefined>(undefined)
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
