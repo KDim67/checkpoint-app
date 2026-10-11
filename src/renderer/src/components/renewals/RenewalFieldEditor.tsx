@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { BookmarkPlus, ExternalLink, MoreHorizontal, Trash2 } from 'lucide-react'
-import RenewalMenu from './RenewalMenu'
+import RowMenu from '../ui/RowMenu'
 import DueDateField from '../ui/DueDateField'
 import { allDay, dueDay } from '../../../../shared/dueDate'
 import {
@@ -214,7 +214,7 @@ export default function RenewalFieldEditor({ field, defaultCurrency, onChange, o
         onBlur={() => { if (!field.label.trim()) onChange({ ...field, label: 'Field' }) }}
         style={{ fontWeight: 'var(--weight-semibold)', background: 'transparent', border: '1px solid transparent', padding: 'var(--space-1) 0' }}
       />
-      <RenewalMenu
+      <RowMenu
         label={`Options for ${field.label}`}
         trigger={<MoreHorizontal size={14} aria-hidden="true" />}
         entries={[

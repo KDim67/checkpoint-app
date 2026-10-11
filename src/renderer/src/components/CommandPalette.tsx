@@ -12,6 +12,7 @@ import { kindLabel, type SearchHit } from '../../../shared/searchResults'
 import { BUILT_IN_VIEWS, normalizeSavedViews, type SavedView } from '../../../shared/savedViews'
 import type { ActiveView } from '../store/appStore'
 import { getStringSetting } from '../lib/settings'
+import { openItem } from '../lib/openItem'
 
 interface Props {
   open: boolean
@@ -34,8 +35,6 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const [hits, setHits] = useState<SearchHit[]>([])
   const [savedViews, setSavedViews] = useState<SavedView[]>(BUILT_IN_VIEWS)
   const setPendingViewId = useAppStore(s => s.setPendingViewId)
-  const selectItem = useAppStore(s => s.selectItem)
-  const setRightPanel = useAppStore(s => s.setRightPanelContent)
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
   const setPendingCreate = useAppStore(s => s.setPendingCreate)
   const setPendingWallLink = useAppStore(s => s.setPendingWallLink)
@@ -99,7 +98,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         create: intent => {
           // parked like the saved view: the view may not be mounted yet to hear an event
           setPendingCreate(intent)
-          setView(intent === 'card' ? 'kanban' : intent === 'task' ? 'backlog' : intent === 'note' ? 'notes' : intent === 'renewal' ? 'renewals' : 'wall')
+          setView(intent === 'card' ? 'kanban' : intent === 'task' ? 'backlog' : intent === 'note' ? 'notes' : intent === 'renewal' ? 'renewals' : intent === 'workspace' ? 'workspaces' : 'wall')
         }
       }),
     [setView, setWorkspace, setSettingsTab, setRightPanelContent, toggleRightPanel, availableWorkspaces, activeWorkspace, enabledViews, savedViews, setPendingViewId, setPendingCreate, aiEnabled]
@@ -157,17 +156,11 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         setView('renewals')
         break
       case 'log':
-        setView('log')
-        selectItem(hit.target)
-        break
       case 'task':
-        setView('backlog')
-        selectItem(hit.target)
+        openItem(hit.kind, hit.target)
         break
       default:
-        setView('kanban')
-        selectItem(hit.target)
-        setRightPanel('item-detail')
+        openItem('card', hit.target)
     }
   }
 

@@ -9,9 +9,9 @@ import {
 } from '../components/focus/pomodoroTimer'
 
 /** what the palette can make, each in the view that owns it */
-export type CreateIntent = 'card' | 'task' | 'note' | 'sticky' | 'wall' | 'renewal'
+export type CreateIntent = 'card' | 'task' | 'note' | 'sticky' | 'wall' | 'renewal' | 'workspace'
 
-export type ActiveView = 'log' | 'kanban' | 'backlog' | 'calendar' | 'renewals' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev'
+export type ActiveView = 'log' | 'kanban' | 'backlog' | 'calendar' | 'renewals' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev' | 'workspaces'
 
 /** type-only, so no runtime cycle back into lib */
 export type { WorkspaceEntry } from '../lib/createWorkspace'
@@ -37,6 +37,8 @@ export type SettingsTab =
 /** workspace above the storage line, context at and below: the column, keys, IPC and payloads are contracts */
 interface AppState {
   activeView: ActiveView
+  /** where the Workspaces page goes back to: the view it was opened from */
+  returnView: ActiveView
   activeWorkspace: string
   availableWorkspaces: string[]
   workspaceList: WorkspaceEntry[]
@@ -116,6 +118,7 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   immer(set => ({
     activeView: 'kanban',
+    returnView: 'kanban',
     activeWorkspace: 'default',
     availableWorkspaces: ['default'],
     workspaceList: [],
@@ -150,10 +153,11 @@ export const useAppStore = create<AppState>()(
 
     setView: (view: ActiveView) => {
       set(state => {
+        if (view === 'workspaces' && state.activeView !== 'workspaces') state.returnView = state.activeView
         state.activeView = view
       })
-      // for "Start on: Last used"; never Settings
-      if (view !== 'settings') {
+      // for "Start on: Last used"; never Settings or the Workspaces page, which are places you pass through
+      if (view !== 'settings' && view !== 'workspaces') {
         setStringSetting('last_active_view', view).catch(err => {
           console.error('Failed to save last_active_view setting:', err)
         })

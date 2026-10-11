@@ -1,6 +1,6 @@
 import React from 'react'
 import { BellOff, Check, ExternalLink, MoreHorizontal, Pencil, RotateCcw, Trash2, XCircle } from 'lucide-react'
-import RenewalMenu from './RenewalMenu'
+import RowMenu from '../ui/RowMenu'
 import { KindIconView } from './kindIcon'
 import { expiryPhrase, formatMoney, isExpired, isInWarningWindow } from '../../../../shared/renewal'
 import { formatDueDate } from '../../../../shared/dueDate'
@@ -114,7 +114,7 @@ export default function RenewalRow({
             <ExternalLink size={14} aria-hidden="true" />
           </button>
         )}
-        <RenewalMenu
+        <RowMenu
           label={`More for ${record.title}`}
           trigger={<MoreHorizontal size={16} aria-hidden="true" />}
           entries={[

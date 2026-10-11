@@ -25,7 +25,6 @@ export default function LogView() {
   const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
   const setWorkspace = useAppStore(s => s.setWorkspace)
   const setView = useAppStore(s => s.setView)
-  const setSettingsTab = useAppStore(s => s.setSettingsTab)
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -313,8 +312,9 @@ export default function LogView() {
                 <MenuDivider />
                 <MenuItem
                   onClick={() => {
-                    setView('settings')
-                    setSettingsTab('workspaces')
+                    // the Workspaces page opens its New workspace form on arrival
+                    useAppStore.getState().setPendingCreate('workspace')
+                    setView('workspaces')
                     setDropdownOpen(false)
                   }}
                 >

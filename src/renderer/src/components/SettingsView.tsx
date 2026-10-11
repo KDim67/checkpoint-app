@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react'
 import { Settings, Layers, Sparkles, Palette, Paintbrush, Monitor, Zap, Info, RefreshCw, Layout, Archive, Keyboard, Boxes, HardDrive, Plug, Bell, PanelTop, Link2 } from 'lucide-react'
 import SettingsSection, { Divider } from './settings/SettingsSection'
-import WorkspaceManager from './settings/WorkspaceManager'
 import SyncSettings from './settings/SyncSettings'
 import NotificationSettings from './settings/NotificationSettings'
 import StartupSettings from './settings/StartupSettings'
@@ -43,7 +42,7 @@ const TAB_GROUPS: { group: string; tabs: TabInfo[] }[] = [
   {
     group: 'Workspace',
     tabs: [
-      { id: 'workspaces', label: 'Workspaces & Board', icon: <Layers size={14} />,   description: 'Manage workspaces and the Kanban columns of the active one.' },
+      { id: 'workspaces', label: 'Board',              icon: <Layers size={14} />,   description: 'The Kanban columns of the active workspace. Workspaces themselves live on the Workspaces page.' },
       { id: 'ai',       label: 'AI Assistant',       icon: <Sparkles size={14} />, description: 'Model providers, generation options, email voice and persistent memory.' },
       { id: 'connections', label: 'Connections',      icon: <Link2 size={14} />,    description: 'Keep cards in step with services you use, such as GitHub issues.' }
     ]
@@ -77,6 +76,7 @@ export default function SettingsView() {
   const rawTab = useAppStore(s => s.settingsTab)
   const setActiveTab = useAppStore(s => s.setSettingsTab)
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const setView = useAppStore(s => s.setView)
   const isWindows = appApi.platform() === 'win32'
   const aiEnabled = useAiEnabled()
 
@@ -106,7 +106,10 @@ export default function SettingsView() {
         return (
           <>
             <SettingsSection icon={<Layers size={14} />} title="Workspaces" description="Each one keeps its own board, logs and notes.">
-              <WorkspaceManager />
+              {/* they moved to their own page, the logo at the top of the sidebar */}
+              <button type="button" className="btn-secondary" onClick={() => setView('workspaces')}>
+                Open the Workspaces page
+              </button>
             </SettingsSection>
             <SettingsSection icon={<Layout size={14} />} title="Kanban Columns" description={`Column names and WIP limits for #${activeWorkspace}.`}>
               <KanbanSettings activeWorkspace={activeWorkspace} />

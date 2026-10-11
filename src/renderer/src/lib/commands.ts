@@ -45,13 +45,14 @@ const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
   { view: 'analytics', label: 'Analytics', keywords: ['stats', 'charts', 'metrics'] },
   { view: 'cookbook', label: 'Cookbook', keywords: ['models', 'ai', 'ollama'] },
   { view: 'cheatsheets', label: 'Cheatsheets', keywords: ['reference', 'docs', 'pdf'] },
-  { view: 'gamedev', label: 'Game Dev', keywords: ['textures', 'sprites', 'atlas'] }
+  { view: 'gamedev', label: 'Game Dev', keywords: ['textures', 'sprites', 'atlas'] },
+  { view: 'workspaces', label: 'Workspaces', keywords: ['switch', 'manage', 'projects', 'context', 'rename', 'reorder'] }
 ]
 
 const SETTINGS_TABS: { tab: SettingsTab; label: string; keywords?: string[] }[] = [
   { tab: 'general', label: 'General' },
   { tab: 'appearance', label: 'Appearance & Theme', keywords: ['colors', 'theme', 'font', 'presets'] },
-  { tab: 'workspaces', label: 'Workspaces & Board', keywords: ['workspaces', 'context', 'columns'] },
+  { tab: 'workspaces', label: 'Board', keywords: ['columns', 'kanban', 'wip', 'limits'] },
   { tab: 'ai', label: 'AI Assistant', keywords: ['model', 'provider', 'api key'] },
   { tab: 'connections', label: 'Connections', keywords: ['github', 'issues', 'integrations', 'key'] },
   { tab: 'hotkeyBinder', label: 'Shortcuts & Mouse', keywords: ['keys', 'bindings', 'hotkeys', 'rebind', 'mouse', 'buttons'] },
@@ -77,7 +78,8 @@ const CREATE: { intent: CreateIntent; view: ActiveView; label: string; keywords:
   { intent: 'note', view: 'notes', label: 'New note', keywords: ['add', 'create', 'write', 'markdown'] },
   { intent: 'sticky', view: 'wall', label: 'New sticky note', keywords: ['add', 'create', 'wall', 'canvas'] },
   { intent: 'wall', view: 'wall', label: 'New wall', keywords: ['add', 'create', 'canvas', 'board', 'whiteboard'] },
-  { intent: 'renewal', view: 'renewals', label: 'New renewal', keywords: ['add', 'expiry', 'subscription', 'domain', 'api key', 'certificate'] }
+  { intent: 'renewal', view: 'renewals', label: 'New renewal', keywords: ['add', 'expiry', 'subscription', 'domain', 'api key', 'certificate'] },
+  { intent: 'workspace', view: 'workspaces', label: 'New workspace', keywords: ['add', 'create', 'project', 'context'] }
 ]
 
 export function buildCommands(ctx: CommandContext): Command[] {

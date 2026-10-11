@@ -23,13 +23,24 @@ const context = (over: Partial<CommandContext> = {}): CommandContext => ({
 })
 
 describe('making things from the palette', () => {
-  it('offers a new card, task, note, sticky, wall and renewal, each handed to its view', () => {
+  it('offers a new card, task, note, sticky, wall, renewal and workspace, each handed to its view', () => {
     const ctx = context()
     const made = buildCommands(ctx).filter(c => c.group === 'Create')
 
-    expect(made.map(c => c.label)).toStrictEqual(['New card', 'New task', 'New note', 'New sticky note', 'New wall', 'New renewal'])
+    expect(made.map(c => c.label)).toStrictEqual(['New card', 'New task', 'New note', 'New sticky note', 'New wall', 'New renewal', 'New workspace'])
     made.find(c => c.label === 'New wall')?.run()
     expect(ctx.create).toHaveBeenCalledWith('wall')
+    made.find(c => c.label === 'New workspace')?.run()
+    expect(ctx.create).toHaveBeenCalledWith('workspace')
+  })
+
+  it('goes to the Workspaces page by name, and Settings now holds only the board', () => {
+    const ctx = context()
+    const commands = buildCommands(ctx)
+    commands.find(c => c.label === 'Go to Workspaces')?.run()
+    expect(ctx.setView).toHaveBeenCalledWith('workspaces')
+    expect(commands.map(c => c.label)).toContain('Settings: Board')
+    expect(commands.map(c => c.label)).not.toContain('Settings: Workspaces & Board')
   })
 
   it('leaves out what belongs to a view that is switched off', () => {

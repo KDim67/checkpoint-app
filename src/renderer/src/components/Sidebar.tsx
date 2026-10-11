@@ -1,10 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { readViewFeatures, defaultViewEnabledMap, type ViewEnabledMap } from '../lib/features'
 import { getBoolSetting } from '../lib/settings'
-import SharedBadge from './ui/SharedBadge'
 import { useAppStore, type ActiveView } from '../store/appStore'
 import Logo from './ui/Logo'
-import MenuItem, { MenuDivider } from './ui/MenuItem'
 import * as syncApi from '../data/sync'
 import { defaultBindings, loadBindings, type ShortcutBindings } from '../lib/shortcuts'
 import { useRenewalAttention } from './renewals/useRenewalAttention'
@@ -120,15 +118,6 @@ function IconChevronDown(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
-function IconPlus(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  )
-}
-
 function IconCheatsheets(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -206,161 +195,6 @@ const NAV_ITEMS: Array<{
   { view: 'cheatsheets', label: 'Cheatsheets', Icon: IconCheatsheets }
 ]
 
-interface ContextPopoverProps {
-  onClose: () => void
-}
-
-/** options are the contexts; Manage sits outside as a footer, an action row isn't an option */
-function ContextPopover({ onClose }: ContextPopoverProps) {
-  const activeWorkspace = useAppStore(s => s.activeWorkspace)
-  const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
-  const workspaceList = useAppStore(s => s.workspaceList)
-  const setWorkspace = useAppStore(s => s.setWorkspace)
-  const setView = useAppStore(s => s.setView)
-  const setSettingsTab = useAppStore(s => s.setSettingsTab)
-
-  const listRef = useRef<HTMLDivElement>(null)
-  const [activeIndex, setActiveIndex] = useState(() => {
-    const i = availableWorkspaces.indexOf(activeWorkspace)
-    return i === -1 ? 0 : i
-  })
-
-  useEffect(() => {
-    listRef.current?.focus()
-  }, [])
-
-  // keep the highlighted option in view past the scroll edge
-  useEffect(() => {
-    listRef.current
-      ?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
-      ?.scrollIntoView({ block: 'nearest' })
-  }, [activeIndex])
-
-  const commit = (index: number) => {
-    const ctx = availableWorkspaces[index]
-    if (ctx) setWorkspace(ctx)
-    onClose()
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const last = availableWorkspaces.length - 1
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        setActiveIndex(i => (i >= last ? 0 : i + 1))
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        setActiveIndex(i => (i <= 0 ? last : i - 1))
-        break
-      case 'Home':
-        e.preventDefault()
-        setActiveIndex(0)
-        break
-      case 'End':
-        e.preventDefault()
-        setActiveIndex(last)
-        break
-      case 'Enter':
-      case ' ':
-        e.preventDefault()
-        commit(activeIndex)
-        break
-      case 'Escape':
-        e.preventDefault()
-        onClose()
-        break
-    }
-  }
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: '12px',
-        left: '62px',
-        zIndex: 100,
-        background: 'var(--color-surface-elevated)',
-        border: '1px solid var(--color-surface-offset)',
-        borderRadius: 'var(--radius-md)',
-        boxShadow: 'var(--shadow-md)',
-        minWidth: '220px',
-        padding: '4px 0',
-        animation: 'dropdown-in 150ms var(--ease-enter)'
-      }}
-    >
-      <div id="context-popover-label" className="label-caps" style={{ padding: '6px 12px 4px', letterSpacing: '0.05em' }}>
-        Workspaces
-      </div>
-      <div
-        ref={listRef}
-        role="listbox"
-        tabIndex={0}
-        aria-labelledby="context-popover-label"
-        aria-activedescendant={`context-option-${activeIndex}`}
-        onKeyDown={handleKeyDown}
-        style={{ maxHeight: '240px', overflowY: 'auto', outline: 'none' }}
-        className="custom-scrollbar"
-      >
-        {availableWorkspaces.map((ctx, index) => {
-          const entry = workspaceList.find(c => c.slug === ctx)
-          const name = entry ? entry.name : ctx.replace(/-/g, ' ').replace(/\w/g, l => l.toUpperCase())
-          const color = entry ? entry.color : 'var(--color-balance)'
-          const isCurrent = ctx === activeWorkspace
-          const isActive = index === activeIndex
-
-          return (
-            <div
-              key={ctx}
-              id={`context-option-${index}`}
-              data-index={index}
-              role="option"
-              aria-selected={isCurrent}
-              onClick={() => commit(index)}
-              onMouseEnter={() => setActiveIndex(index)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-                width: '100%',
-                padding: '6px 12px',
-                cursor: 'pointer',
-                fontSize: 'var(--text-sm)',
-                color: isCurrent ? 'var(--color-secondary)' : 'var(--color-text-base)',
-                background: isActive ? 'var(--color-surface-offset)' : 'none',
-                transition: 'background var(--duration-fast) var(--ease-default)'
-              }}
-            >
-              <span style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: isCurrent ? 'var(--color-secondary)' : color,
-                flexShrink: 0
-              }} />
-              <span className="truncate-fill">
-                {name}
-              </span>
-              {entry?.shared && <SharedBadge />}
-            </div>
-          )
-        })}
-      </div>
-      <MenuDivider />
-      <MenuItem
-        icon={<IconPlus style={{ opacity: 0.7 }} />}
-        onClick={() => {
-          setView('settings')
-          setSettingsTab('workspaces')
-          onClose()
-        }}
-      >
-        Manage / New Workspace
-      </MenuItem>
-    </div>
-  )
-}
-
 export function Sidebar() {
   const activeView = useAppStore(s => s.activeView)
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
@@ -369,14 +203,8 @@ export function Sidebar() {
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
   const focusIsRunning = useAppStore(s => s.focusIsRunning)
 
-  const [contextOpen, setContextOpen] = useState(false)
-  const contextTriggerRef = useRef<HTMLButtonElement>(null)
-
-  // focus moved into the popover, bring it back or tab order restarts
-  const closeContextPopover = useCallback(() => {
-    setContextOpen(false)
-    contextTriggerRef.current?.focus()
-  }, [])
+  const returnView = useAppStore(s => s.returnView)
+  const onWorkspaces = activeView === 'workspaces'
   const [tooltip, setTooltip] = useState<{ label: string; y: number; keys?: string } | null>(null)
   /** the label teaches the key: Wall, Ctrl+6 */
   const [bindings, setBindings] = useState<ShortcutBindings>(defaultBindings)
@@ -441,17 +269,6 @@ export function Sidebar() {
     return () => clearInterval(interval)
   }, [syncEnabled, checkSyncStatus])
 
-  useEffect(() => {
-    if (!contextOpen) return
-    const handler = (e: MouseEvent) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
-        setContextOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [contextOpen])
-
   const activeContextEntry = workspaceList.find(c => c.slug === activeWorkspace)
   const ctxLabel = activeContextEntry ? activeContextEntry.name : activeWorkspace.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   const ctxInitial = ctxLabel[0]?.toUpperCase() ?? 'D'
@@ -483,21 +300,19 @@ export function Sidebar() {
         position: 'relative'
       }}
     >
-      {/* the logo doubles as the context switcher */}
+      {/* the logo opens the Workspaces page, and a second click goes back */}
       <button
-        ref={contextTriggerRef}
         id="context-switcher"
-        title={`Active workspace: ${ctxLabel}. Click to view all workspaces.`}
-        aria-label={`Active workspace: ${ctxLabel}. Click to view the workspace list.`}
-        aria-expanded={contextOpen}
-        aria-haspopup="listbox"
-        onClick={() => setContextOpen(v => !v)}
+        title={`Workspaces. You're in ${ctxLabel}.`}
+        aria-label={`Workspaces, current workspace ${ctxLabel}`}
+        aria-current={onWorkspaces ? 'page' : undefined}
+        onClick={() => setView(onWorkspaces ? (returnView === 'workspaces' ? 'kanban' : returnView) : 'workspaces')}
         className="sidebar-context-trigger"
         style={{
           position: 'relative',
           padding: '4px',
           borderRadius: 'var(--radius-md)',
-          border: `1px solid ${contextOpen ? 'var(--color-secondary)' : 'transparent'}`,
+          border: `1px solid ${onWorkspaces ? 'var(--color-secondary)' : 'transparent'}`,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -533,8 +348,6 @@ export function Sidebar() {
           {ctxInitial}
         </span>
       </button>
-
-      {contextOpen && <ContextPopover onClose={closeContextPopover} />}
 
       <div style={{ height: '1px', width: '32px', background: 'var(--color-surface-offset)', margin: '2px 0 4px' }} />
 

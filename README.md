@@ -30,6 +30,12 @@ The workspace in these is made up, so nothing in them is anyone's real data.
 a pomodoro timer. Notes are plain Markdown files with `[[wiki links]]`, so
 they're readable without Checkpoint and they work with Obsidian.
 
+**Workspaces.** Each project gets its own board, log, notes and history. The
+logo at the top of the sidebar lays them all out as lanes: how much is open and
+late, the last thing you changed, and a strip of the two weeks either side of
+today, with focus time above the line and what's due below it. Click one to
+switch, drag or Alt+arrow to reorder, and rename, export or import them there.
+
 **The Wall.** A freeform canvas. Drop cards, notes, images and text anywhere,
 draw on it, connect things with arrows. It's where I think before anything is
 organised enough for a board.
@@ -304,7 +310,7 @@ to your database.
 
 ### Importing from elsewhere
 
-Trello and Todoist boards import as workspaces (Settings → Workspaces →
+Trello and Todoist boards import as workspaces (the Workspaces page, then
 Import). An Obsidian vault imports as notes, from the button in the Notes
 sidebar. Nothing is silently dropped: anything that can't come across is
 reported back to you.
