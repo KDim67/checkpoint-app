@@ -116,9 +116,12 @@ game dev tools, `Ctrl+L` toggles the AI panel, `Ctrl+,` opens settings. All
 rebindable in Settings → Shortcuts.
 
 **Clipboard history is off until you turn it on.** When it's on it records
-everything you copy into the database in plain text. It skips things that look
-like credentials, but Windows won't tell an app which copies came from a
-password manager, so that's a guess and not a guarantee.
+what you copy into the database in plain text. It skips anything the copying
+app marks as private, the way KeePassXC, 1Password and Bitwarden's desktop app
+mark passwords for Windows' own clipboard history, and it skips text that looks
+like a credential. Browser extensions don't mark their copies, so for those
+it's a guess and not a guarantee. Deleting a copy deletes it on the computers
+you sync with too.
 
 ## Setting things up
 

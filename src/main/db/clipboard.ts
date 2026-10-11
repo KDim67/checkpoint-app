@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
 import type { ClipboardItem } from '../../shared/types'
+import { recordTombstone } from './tombstones'
 
 let stmtGetClipboardHistory: Database.Statement
 let stmtInsertClipboardItem: Database.Statement
@@ -11,6 +12,8 @@ let stmtUpdateClipboardItemLabel: Database.Statement
 let stmtDeleteClipboardItem: Database.Statement
 let stmtClearClipboardHistory: Database.Statement
 let stmtDeleteClipboardHistoryOverflow: Database.Statement
+let stmtGetUnpinnedClipboardIds: Database.Statement
+let clearUnpinned: () => void
 
 export function prepareClipboardStatements(db: Database.Database): void {
   stmtGetClipboardHistory = db.prepare(`
@@ -43,6 +46,13 @@ export function prepareClipboardStatements(db: Database.Database): void {
       SELECT id FROM clipboard_items WHERE is_pinned = 0 ORDER BY created_at DESC LIMIT 200
     )
   `)
+  stmtGetUnpinnedClipboardIds = db.prepare(`
+    SELECT id FROM clipboard_items WHERE is_pinned = 0
+  `)
+  clearUnpinned = db.transaction(() => {
+    for (const { id } of stmtGetUnpinnedClipboardIds.all() as { id: string }[]) recordTombstone(id, 'clipboard_items')
+    stmtClearClipboardHistory.run()
+  })
 }
 
 export function getClipboardHistory(): ClipboardItem[] {
@@ -92,7 +102,9 @@ export function updateClipboardLabel(id: string, label: string | null): void {
   stmtUpdateClipboardItemLabel.run(label || null, id)
 }
 
+/** tombstoned, or the next sync brings a deleted password back from the other computer */
 export function deleteClipboardItem(id: string): void {
+  recordTombstone(id, 'clipboard_items')
   stmtDeleteClipboardItem.run(id)
 }
 
@@ -110,6 +122,7 @@ export function restoreClipboardItem(content: string, isPinned: boolean, label: 
   }
 }
 
+/** pinned snippets stay; each cleared copy is tombstoned like a single delete */
 export function clearClipboardHistory(): void {
-  stmtClearClipboardHistory.run()
+  clearUnpinned()
 }
