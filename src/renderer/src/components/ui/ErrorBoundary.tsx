@@ -1,5 +1,7 @@
 import React from 'react'
 import { errorMessage } from '../../../../shared/errors'
+import { sendWindowError } from '../../lib/windowErrors'
+import { openProblemReport } from '../../lib/reportProblem'
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
@@ -25,6 +27,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     // console too, for whoever has DevTools open
     console.error('[ErrorBoundary]', this.props.label ?? 'app', error, info.componentStack)
+    sendWindowError({ source: 'render', message: errorMessage(error), stack: error?.stack, componentStack: info.componentStack ?? undefined })
     this.setState({ componentStack: info.componentStack ?? '' })
   }
 
@@ -119,6 +122,12 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
           </button>
           <button className="btn-secondary" onClick={this.handleCopy}>
             Copy details
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => openProblemReport(`${this.props.label ?? 'Checkpoint'} hit an error: ${errorMessage(error)}`)}
+          >
+            Report a problem
           </button>
         </div>
       </div>

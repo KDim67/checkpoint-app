@@ -1,5 +1,7 @@
 /** the copying program's own mark decides first, unmarked copies get a guess; skipping a recopyable string beats storing a credential */
 
+import { PRIVATE_KEY, TOKEN_SHAPES } from './redactSecrets'
+
 /** what the marks are read through, so they can be checked without electron */
 export interface ClipboardMarks {
   has(format: string): boolean
@@ -37,20 +39,8 @@ export function markedPrivate(clip: ClipboardMarks, platform: string): boolean {
   }
 }
 
-/** unambiguous shapes, matched first */
-const KNOWN_SECRET_PATTERNS: RegExp[] = [
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-  /^sk-[A-Za-z0-9_-]{16,}$/,              // OpenAI and the APIs that copied it
-  /^(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}$/, // GitHub
-  /^github_pat_[A-Za-z0-9_]{20,}$/,
-  /^lin_api_[A-Za-z0-9]{20,}$/,          // Linear
-  /^ATATT[A-Za-z0-9_=-]{20,}$/,          // Atlassian API token
-  /^(ntn|secret)_[A-Za-z0-9]{30,}$/,      // Notion integration secret
-  /^xox[baprs]-[A-Za-z0-9-]{10,}$/,       // Slack
-  /^AKIA[0-9A-Z]{16}$/,                   // AWS access key id
-  /^AIza[0-9A-Za-z_-]{35}$/,              // Google API key
-  /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/ // a JWT
-]
+/** unambiguous shapes, matched first: a private key anywhere in the copy, a token as the whole of it */
+const KNOWN_SECRET_PATTERNS: RegExp[] = [PRIVATE_KEY, ...TOKEN_SHAPES.map(shape => new RegExp(`^(?:${shape.source})$`))]
 
 /** too short and too word-like below this */
 const MIN_LENGTH = 8

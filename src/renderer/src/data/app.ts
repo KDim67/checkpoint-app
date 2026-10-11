@@ -55,6 +55,18 @@ export const showItemInFolder = (...args: Parameters<Bridge['showItemInFolder']>
 export const showUpdateLog = (...args: Parameters<Bridge['showUpdateLog']>): ReturnType<Bridge['showUpdateLog']> =>
   window.electronAPI.app.showUpdateLog(...args)
 
+export const showAppLog = (...args: Parameters<Bridge['showAppLog']>): ReturnType<Bridge['showAppLog']> =>
+  window.electronAPI.app.showAppLog(...args)
+
+export const problemReport = (...args: Parameters<Bridge['problemReport']>): ReturnType<Bridge['problemReport']> =>
+  window.electronAPI.app.problemReport(...args)
+
+export const crashNotice = (...args: Parameters<Bridge['crashNotice']>): ReturnType<Bridge['crashNotice']> =>
+  window.electronAPI.app.crashNotice(...args)
+
+export const logError = (...args: Parameters<Bridge['logError']>): ReturnType<Bridge['logError']> =>
+  window.electronAPI.app.logError(...args)
+
 export const updateState = (...args: Parameters<Bridge['updateState']>): ReturnType<Bridge['updateState']> =>
   window.electronAPI.app.updateState(...args)
 

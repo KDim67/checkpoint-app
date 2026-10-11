@@ -18,6 +18,7 @@ import type {
   RenewalSnapshot
 } from '../shared/renewalApi'
 import type { RenewalKind } from '../shared/renewalKinds'
+import type { ProblemReportDraft, WindowError } from '../shared/problemReport'
 import type { NotificationCategory, NotificationPolicy } from '../shared/notificationPolicy'
 import type { Subtask } from '../shared/subtasks'
 import type { RemoteMutation } from '../shared/collabProtocol'
@@ -124,6 +125,18 @@ const api = {
     /** the updater's log file, selected in its folder */
     showUpdateLog: (): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_SHOW_UPDATE_LOG),
+    /** the app's own error log, selected in its folder */
+    showAppLog: (): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.APP_SHOW_APP_LOG),
+    /** version, system, the recent log and what happened started from the seed, all with the home folder as ~ and keys redacted */
+    problemReport: (seed?: string): Promise<ProblemReportDraft> =>
+      ipcRenderer.invoke(IpcChannels.APP_PROBLEM_REPORT, seed ?? ''),
+    /** why the window was just reloaded after a crash, once; null when it wasn't */
+    crashNotice: (): Promise<string | null> =>
+      ipcRenderer.invoke(IpcChannels.APP_CRASH_NOTICE),
+    /** fire and forget: a failing window can't wait on an answer */
+    logError: (error: WindowError): void =>
+      ipcRenderer.send(IpcChannels.APP_LOG_ERROR, error),
     /** null when a failed download is cleared */
     onUpdateProgress: (callback: (progress: UpdateProgress | null) => void): (() => void) => {
       const handler = (_event: IpcRendererEvent, progress: UpdateProgress | null) => callback(progress)
