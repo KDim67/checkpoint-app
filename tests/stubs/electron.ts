@@ -65,7 +65,13 @@ export const clipboard = {
   readText(): string {
     return ''
   },
-  writeText(): void {}
+  writeText(): void {},
+  has(_format: string): boolean {
+    return false
+  },
+  readBuffer(_format: string): Buffer {
+    return Buffer.alloc(0)
+  }
 }
 
 export default { ipcMain, nativeTheme, app, BrowserWindow, shell, clipboard, Notification, nativeImage }

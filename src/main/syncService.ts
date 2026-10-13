@@ -292,6 +292,8 @@ export class SyncService {
           db.prepare('DELETE FROM relations WHERE id = ?').run(tomb.id)
         } else if (tomb.table_name === 'renewals') {
           db.prepare('DELETE FROM renewals WHERE id = ?').run(tomb.id)
+        } else if (tomb.table_name === 'clipboard_items') {
+          db.prepare('DELETE FROM clipboard_items WHERE id = ?').run(tomb.id)
         } else if (tomb.table_name === SUBSCRIPTIONS_TABLE) {
           forgetSubscription(tomb.id)
         }
@@ -422,13 +424,14 @@ export class SyncService {
         stmtInsertFocus.run(f)
       }
 
-      // clipboard items: merge history
+      // clipboard items: merge history, a copy deleted on either side stays deleted
       const clip = payload.clipboard_items || []
       const stmtInsertClip = db.prepare(`
         INSERT OR IGNORE INTO clipboard_items (id, content, is_pinned, label, created_at)
         VALUES (@id, @content, @is_pinned, @label, @created_at)
       `)
       for (const c of clip) {
+        if (localTombstones.has(c.id)) continue
         stmtInsertClip.run(c)
       }
 

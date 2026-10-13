@@ -1,9 +1,15 @@
 import { clipboard } from 'electron'
-import { looksLikeSecret } from '../shared/clipboardPrivacy'
+import { looksLikeSecret, markedPrivate, type ClipboardMarks } from '../shared/clipboardPrivacy'
 
 let lastText = ''
 let intervalId: NodeJS.Timeout | null = null
 let recordCopy: ((text: string) => void) | null = null
+
+// availableFormats doesn't list registered names, each mark is asked for by name
+const marks: ClipboardMarks = {
+  has: format => clipboard.has(format),
+  read: format => clipboard.readBuffer(format)
+}
 
 /** separate from start/stop so setSetting can flip it without db reaching into index.ts */
 export function configureClipboardWatcher(recordCopyFn: (text: string) => void): void {
@@ -25,12 +31,14 @@ function startClipboardWatcher(recordCopyFn?: (text: string) => void): void {
   intervalId = setInterval(() => {
     try {
       const currentText = clipboard.readText()
-      if (currentText && currentText.trim().length > 0 && currentText !== lastText) {
-        // mark seen either way or a skipped secret gets rechecked every second
-        lastText = currentText
-        // windows doesn't flag secret copies, so this guesses (see shared/clipboardPrivacy)
-        if (!looksLikeSecret(currentText)) recordCopy?.(currentText)
-      }
+      if (!currentText || currentText.trim().length === 0 || currentText === lastText) return
+      const isPrivate = markedPrivate(marks, process.platform)
+      // a copy landing mid-look pairs one copy's marks with another's text, so look again next tick
+      if (clipboard.readText() !== currentText) return
+      // mark seen either way or a skipped secret gets rechecked every second
+      lastText = currentText
+      if (isPrivate || looksLikeSecret(currentText)) return
+      recordCopy?.(currentText)
     } catch (err) {
       console.error('Error reading system clipboard:', err)
     }

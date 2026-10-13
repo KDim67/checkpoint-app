@@ -211,9 +211,9 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
     key: 'view_clipboard',
     icon: <Clipboard size={16} />,
     description: 'Records every text copy you make, so you can search back through them.',
-    warning: 'Everything copied is stored as plain text in the local database and in backups, '
-      + 'including anything pasted from a password manager. Windows does not tell the app '
-      + 'which copies were meant to be secret. Disabling stops the recording and hides the tab.'
+    warning: 'Copies are stored as plain text in the local database and in backups. Anything a '
+      + 'password manager marks as private is skipped, and so is text that looks like a credential, '
+      + 'but browser extensions don\'t mark their copies. Disabling stops the recording and hides the tab.'
   },
   'feature_view_analytics': {
     key: 'view_analytics',
