@@ -33,11 +33,11 @@
     "check:sandbox": "electron-vite build && node scripts/check-sandbox.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
     "better-sqlite3": "12.11.1",
-    "chokidar": "3.6.0",
+    "chokidar": "5.0.0",
     "electron-updater": "^6.8.9",
     "ical.js": "2.2.1",
     "openai": "4.104.0",
