@@ -36,7 +36,11 @@ function sync(host: 'A' | 'B', client: 'A' | 'B'): void {
 }
 
 const contents = (): string[] => getClipboardHistory().map(c => c.content).sort()
-const idOf = (content: string): string => getClipboardHistory().find(c => c.content === content)!.id
+const idOf = (content: string): string => {
+  const copy = getClipboardHistory().find(c => c.content === content)
+  if (!copy) throw new Error(`no clipboard copy holds "${content}"`)
+  return copy.id
+}
 
 beforeEach(() => {
   dirs.A = mkdtempSync(join(tmpdir(), 'checkpoint-machine-a-'))
