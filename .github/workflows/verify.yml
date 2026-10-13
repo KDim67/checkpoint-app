@@ -32,6 +32,10 @@ jobs:
       - name: Install
         run: npm ci --ignore-scripts
 
+      # the whole tree, since vite bundles devDependencies like mermaid into what ships
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
       # typecheck, lint, tests, build: what contributors run before a PR
       - name: Verify
         run: npm run verify
