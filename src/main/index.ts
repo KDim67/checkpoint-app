@@ -9,6 +9,8 @@ import { initCheatsheets, getCheatsheetsDir } from './cheatsheetService'
 import { beginQuit, getMainWindow, isQuitting, sendToWindow, setMainWindow } from './windows'
 import { registerAppShortcuts } from './appShortcuts'
 import { getStartupSettings, launchedMinimised } from './tray'
+import { captureConsoleErrors } from './appLog'
+import { watchForCrashes } from './windowCrash'
 
 // pure constants, so this static import doesn't drag the MCP SDK (express, hono) into startup
 import { MCP_DEFAULT_PORT, WEBHOOK_DEFAULT_PORT } from '../shared/ports'
@@ -61,6 +63,8 @@ process.on('uncaughtException', err => {
 process.on('unhandledRejection', reason => {
   console.error('[main] unhandled rejection:', reason)
 })
+// from here on every error main reports also lands in the log a bug report quotes
+captureConsoleErrors()
 
 // If custom data dir or profile is requested, set an isolated userData directory
 // before requestSingleInstanceLock() so each profile/data-dir instance has its own
@@ -225,6 +229,7 @@ function createWindow(): void {
     }
   })
   setMainWindow(win)
+  watchForCrashes(win)
 
   // did-finish-load and a timeout back up ready-to-show, which a racy dev server may never fire
   let hasShown = false
@@ -328,6 +333,7 @@ function createWindow(): void {
 
 
 import { registerAppHandlers } from './ipc/app'
+import { registerProblemHandlers } from './ipc/problems'
 import { registerAiHandlers } from './ipc/ai'
 import { registerCookbookHandlers } from './ipc/cookbook'
 import { registerWidgetHandlers } from './ipc/widget'
@@ -359,6 +365,7 @@ import { registerMediaHandlers } from './ipc/media'
 /** one call per module; this was a single 1,086-line function every branch conflicted in */
 function registerIpcHandlers(): void {
   registerAppHandlers()
+  registerProblemHandlers()
   registerAiHandlers()
   registerCookbookHandlers()
   registerWidgetHandlers()

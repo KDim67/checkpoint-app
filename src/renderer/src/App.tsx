@@ -7,6 +7,7 @@ import ErrorBoundary from './components/ui/ErrorBoundary'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { CollabProvider } from './context/CollabContext'
 import FocusTimerEngine from './components/focus/FocusTimerEngine'
+import ProblemReporter from './components/ProblemReporter'
 import { applyFontSize } from './lib/fontScale'
 import { applyStoredTheme, watchTheme, injectCustomCss } from './lib/themeBoot'
 import { DEFAULT_THEME, deriveThemeVars, buildCssVariablesString } from '../../shared/themePresets'
@@ -928,6 +929,8 @@ export default function App() {
         <CollabProvider>
           <CollabFollowController />
           <FocusTimerEngine />
+          {/* outside the net below, so a broken window can still be reported */}
+          <ProblemReporter />
           {/* outermost net: a throw in the titlebar or sidebar would otherwise white out the window */}
           <ErrorBoundary label="Checkpoint">
           <Suspense fallback={null}>

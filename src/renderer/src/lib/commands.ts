@@ -4,6 +4,7 @@ import type { CommandLike } from '../../../shared/commandMatch'
 import type { ActiveView, CreateIntent, SettingsTab } from '../store/appStore'
 import type { SavedView } from '../../../shared/savedViews'
 import { setSetting } from '../data/settings'
+import { openProblemReport } from './reportProblem'
 
 export interface Command extends CommandLike {
   /** shortcut hint or current value */
@@ -182,6 +183,14 @@ export function buildCommands(ctx: CommandContext): Command[] {
     group: 'Help',
     keywords: ['onboarding', 'welcome', 'walkthrough', 'intro', 'guide', 'shortcuts', 'help', 'again'],
     run: () => { window.dispatchEvent(new CustomEvent('replay-onboarding')) }
+  })
+
+  commands.push({
+    id: 'help:report',
+    label: 'Report a problem',
+    group: 'Help',
+    keywords: ['bug', 'issue', 'crash', 'error', 'broken', 'feedback', 'log', 'github'],
+    run: () => openProblemReport()
   })
 
   return commands

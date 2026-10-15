@@ -5,7 +5,9 @@ import type { UpdateCheckResult } from '../../../../shared/types'
 import { describeUpdateProgress } from '../../../../shared/updateEta'
 import { useUpdateProgress } from '../../lib/useUpdateProgress'
 import WhatsNew from './WhatsNew'
-import { FileText, Info, PlayCircle, RefreshCw } from 'lucide-react'
+import { Bug, FileText, Info, PlayCircle, RefreshCw } from 'lucide-react'
+import { REPOSITORY } from '../../../../shared/releaseNotes'
+import { openProblemReport } from '../../lib/reportProblem'
 import { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
 import PathRow from './PathRow'
@@ -177,7 +179,7 @@ export default function AboutPanel() {
           <button
             className="btn-secondary"
             style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-            onClick={() => appApi.openExternal('https://github.com/KDim67/checkpoint-app')}
+            onClick={() => appApi.openExternal(REPOSITORY)}
           >
             <Info size={13} />
             GitHub Repository
@@ -190,6 +192,23 @@ export default function AboutPanel() {
           >
             <FileText size={13} />
             Show Update Log
+          </button>
+          {/* every error the app recorded, which Report a Problem quotes the end of */}
+          <button
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
+            onClick={() => void appApi.showAppLog().catch(err => console.error('Could not show the app log:', err))}
+          >
+            <FileText size={13} />
+            Show App Log
+          </button>
+          <button
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
+            onClick={() => openProblemReport()}
+          >
+            <Bug size={13} />
+            Report a Problem
           </button>
         </div>
 

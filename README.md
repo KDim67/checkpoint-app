@@ -64,6 +64,14 @@ page, and swaps the new version in the next time you close it, or straight
 away if you click Restart to update in the title bar. What changed in each
 release is under Settings, About, and shows once after an update.
 
+If something breaks, **Report a problem** (in Ctrl+K, or Settings, About) fills
+a GitHub bug report with your version, your system and the app's recent errors.
+You read and edit all of it first: your user folder shows as `~`, and anything
+shaped like a key or token as `[redacted]`, though no filter catches
+everything. It goes to GitHub only when you choose Open on GitHub, and is public
+only once you submit it there. If the window crashes it reloads on its own, and
+after three crashes in a minute it stops and asks instead.
+
 ## Building it yourself
 
 You'll need Node 24+ and Git. The test harness uses `node:sqlite`, which is

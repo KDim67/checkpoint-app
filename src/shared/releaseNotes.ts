@@ -1,7 +1,9 @@
 /** the patch notes published with each release on GitHub, as the app shows them */
 
+export const REPOSITORY = 'https://github.com/KDim67/checkpoint-app'
+
 /** where the releases are; a release only links somewhere under here */
-export const RELEASES_PAGE = 'https://github.com/KDim67/checkpoint-app/releases'
+export const RELEASES_PAGE = `${REPOSITORY}/releases`
 
 export interface ReleaseNote {
   /** without the v, as the app reports its own */
