@@ -5,7 +5,11 @@ body:
   - type: markdown
     attributes:
       value: |
-        One thing before you start: **check what is on screen**. A screenshot of
+        The quickest way in is **Report a problem**, in Ctrl+K or under Settings,
+        then About. It fills in the version, the system and the app's recent
+        errors for you to read first.
+
+        One thing before you send: **check what is on screen**. A screenshot of
         Checkpoint shows real note titles, task names and workspace names, and
         this is a public repository.
 
@@ -47,8 +51,8 @@ body:
   - type: textarea
     id: console
     attributes:
-      label: Anything in the console
+      label: Recent errors
       description: >
-        Ctrl+Shift+I opens developer tools, and the Console tab usually holds
-        the real error. Optional, but it is often the whole answer.
+        Report a problem fills this in from the app log, and Show App Log in
+        About opens the whole file. Optional, but it is often the whole answer.
       render: text

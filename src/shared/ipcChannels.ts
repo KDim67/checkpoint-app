@@ -179,6 +179,10 @@ export const enum IpcChannels {
   APP_INSTALL_UPDATE      = 'app:installUpdate',
   APP_SHOW_UPDATE_LOG     = 'app:showUpdateLog',
   APP_RELEASE_NOTES       = 'app:releaseNotes',
+  APP_SHOW_APP_LOG        = 'app:showAppLog',
+  APP_PROBLEM_REPORT      = 'app:problemReport',
+  APP_CRASH_NOTICE        = 'app:crashNotice',
+  APP_LOG_ERROR           = 'app:logError',
 
   // calendar
   CALENDAR_ENTRIES             = 'calendar:entries',

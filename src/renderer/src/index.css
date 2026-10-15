@@ -171,6 +171,10 @@
   --whats-new-notes-max: 55vh;
   --whats-new-refresh:   1.75rem;
 
+  /* report a problem: wide enough for a stack trace line, the log tall enough to read before sending */
+  --report-problem-width:   38rem;
+  --report-problem-log-max: 40vh;
+
   /* cropping a picture: the grips keep one size on screen whatever the zoom, and the cropped item rises over its neighbours */
   --wall-crop-hit:         1.75rem;
   --wall-crop-arm:         1rem;
@@ -1622,6 +1626,99 @@ p, h1, h2, h3, h4, input, textarea, [contenteditable] {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+.report-problem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.report-problem-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-base);
+}
+
+.report-problem-intro,
+.report-problem-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.report-problem-intro {
+  margin-bottom: var(--space-1);
+}
+
+.report-problem-trimmed {
+  color: var(--color-warning);
+}
+
+.report-problem-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-6);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.report-problem-facts div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.report-problem-facts dt {
+  color: var(--color-text-muted);
+}
+
+.report-problem-facts dd {
+  margin: 0;
+  color: var(--color-text-base);
+  font-variant-numeric: tabular-nums;
+}
+
+.report-problem-log-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+}
+
+.report-problem-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.report-problem-link:hover {
+  text-decoration: underline;
+}
+
+.report-problem-link:focus-visible {
+  outline: var(--space-0-5) solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.report-problem-log {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  max-height: var(--report-problem-log-max);
+}
+
+.report-problem-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 /* update indicator, right of the titlebar while downloading */

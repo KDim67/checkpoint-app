@@ -56,8 +56,12 @@ export class BrowserWindow {
 }
 
 export const shell = {
-  openExternal(): Promise<void> {
+  openExternal(_url: string): Promise<void> {
     return Promise.resolve()
+  },
+  showItemInFolder(_path: string): void {},
+  openPath(_path: string): Promise<string> {
+    return Promise.resolve('')
   }
 }
 
