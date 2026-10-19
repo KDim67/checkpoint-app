@@ -1,4 +1,4 @@
-/** export, import and rename a whole workspace */
+/** export, import and rename a whole workspace, and what each one holds for the Workspaces page */
 
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import fs from 'fs'
@@ -7,6 +7,8 @@ import type Database from 'better-sqlite3'
 import { IpcChannels } from '../../shared/ipcChannels'
 import type { ContextExport } from '../../shared/types'
 import { errorMessage } from '../../shared/errors'
+import { handleSafe } from './handleSafe'
+import { workspaceActivity } from '../db/workspaceActivity'
 
 /** takes the handle, these run against the caller's connection only */
 export function registerContextHandlers(db: Database.Database): void {
@@ -107,4 +109,6 @@ export function registerContextHandlers(db: Database.Database): void {
         return { success: false, error: errorMessage(err) }
       }
     })
+
+    ipcMain.handle(IpcChannels.DB_WORKSPACE_ACTIVITY, () => handleSafe(() => workspaceActivity(db, Date.now())))
 }

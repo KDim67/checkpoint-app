@@ -16,3 +16,6 @@ export const importContextData = (...args: Parameters<Db['importContextData']>):
 
 export const renameContext = (...args: Parameters<Db['renameContext']>): ReturnType<Db['renameContext']> =>
   window.electronAPI.db.renameContext(...args)
+
+export const workspaceActivity = (...args: Parameters<Db['workspaceActivity']>): ReturnType<Db['workspaceActivity']> =>
+  window.electronAPI.db.workspaceActivity(...args)
