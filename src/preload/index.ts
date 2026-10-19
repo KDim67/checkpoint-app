@@ -19,6 +19,7 @@ import type {
 } from '../shared/renewalApi'
 import type { RenewalKind } from '../shared/renewalKinds'
 import type { ProblemReportDraft, WindowError } from '../shared/problemReport'
+import type { ActivityBySlug } from '../shared/workspaceLanes'
 import type { NotificationCategory, NotificationPolicy } from '../shared/notificationPolicy'
 import type { Subtask } from '../shared/subtasks'
 import type { RemoteMutation } from '../shared/collabProtocol'
@@ -332,6 +333,13 @@ const api = {
 
     renameContext: async (oldSlug: string, newSlug: string): Promise<{ success: boolean; error?: string }> => {
       return ipcRenderer.invoke(IpcChannels.DB_RENAME_CONTEXT, oldSlug, newSlug)
+    },
+
+    /** every workspace's open work, dates around now, recent focus and last change, keyed by slug */
+    workspaceActivity: async (): Promise<ActivityBySlug> => {
+      const res = await ipcRenderer.invoke(IpcChannels.DB_WORKSPACE_ACTIVITY)
+      if (!res.success) throw new Error(res.error)
+      return res.data
     }
   },
 

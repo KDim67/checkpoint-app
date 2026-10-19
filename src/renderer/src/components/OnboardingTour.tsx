@@ -46,7 +46,7 @@ const STEPS: Step[] = [
   {
     id: 'sidebar',
     title: 'Your workspaces and views',
-    body: 'The badge at the top switches between workspaces. Each has its own board, notes and history. Below it is every active view: board, backlog, notes, the Wall, focus timer, and AI assistant. Hover any icon for its name.',
+    body: 'The logo at the top opens your workspaces, where you switch between them and add more. Each has its own board, notes and history. Below it is every active view: board, backlog, notes, the Wall, focus timer, and AI assistant. Hover any icon for its name.',
     target: '#app-sidebar'
   },
   {

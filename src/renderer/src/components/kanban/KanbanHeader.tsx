@@ -7,6 +7,7 @@ import HeaderBtn from './HeaderBtn'
 import TemplateMenu from './TemplateMenu'
 import BoardThemeMenu from './BoardThemeMenu'
 import type { KanbanBoard } from './useKanbanBoard'
+import { useAppStore } from '../../store/appStore'
 
 /** card face fields a board can toggle */
 const CARD_DISPLAY_FIELDS: { key: keyof CardDisplay; label: string }[] = [
@@ -22,7 +23,7 @@ const CARD_DISPLAY_FIELDS: { key: keyof CardDisplay; label: string }[] = [
 
 export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard }) {
   const {
-    activeWorkspace, availableWorkspaces, workspaceList, setWorkspace, setView, setSettingsTab,
+    activeWorkspace, availableWorkspaces, workspaceList, setWorkspace, setView,
     dropdownOpen, setDropdownOpen, dropdownRef, cards, swimlanesEnabled, setSwimlanesEnabled,
     cardDisplay, setCardDisplay, showCardDisplayMenu, setShowCardDisplayMenu, cardDisplayRef,
     persistConfig, theme, showArchiveBin, setShowArchiveBin, showTemplateSelector,
@@ -113,8 +114,9 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
               <MenuDivider />
               <MenuItem
                 onClick={() => {
-                  setView('settings')
-                  setSettingsTab('workspaces')
+                  // the Workspaces page opens its New workspace form on arrival
+                  useAppStore.getState().setPendingCreate('workspace')
+                  setView('workspaces')
                   setDropdownOpen(false)
                 }}
               >

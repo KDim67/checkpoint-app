@@ -57,6 +57,7 @@ const CalendarView = lazy(() => import('./components/CalendarView'))
 const CookbookView = lazy(() => import('./components/CookbookView'))
 const WallView      = lazy(() => import('./components/wall/WallView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
+const WorkspacesView = lazy(() => import('./components/workspaces/WorkspacesView'))
 const WidgetView    = lazy(() => import('./components/WidgetView'))
 const FocusView     = lazy(() => import('./components/FocusView'))
 const NotesView     = lazy(() => import('./components/NotesView'))
@@ -917,6 +918,7 @@ export default function App() {
       case 'cookbook':  return <CookbookView />
       case 'analytics': return <AnalyticsView />
       case 'settings':  return <SettingsView />
+      case 'workspaces': return <WorkspacesView />
       case 'cheatsheets': return <CheatsheetsView />
       case 'gamedev':   return <GameDevView />
       default:          return null
