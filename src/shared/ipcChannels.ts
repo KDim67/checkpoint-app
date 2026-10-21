@@ -95,6 +95,8 @@ export const enum IpcChannels {
   // HUD
   HUD_TOGGLE             = 'hud:toggle',
   HUD_RESIZE             = 'hud:resize',
+  /** puts the HUD away; the hotkey stays, unlike HUD_TOGGLE with false */
+  HUD_HIDE               = 'hud:hide',
   /** main to renderer: clear the HUD */
   HUD_RESET              = 'hud:reset',
 

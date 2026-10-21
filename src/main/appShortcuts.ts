@@ -8,27 +8,31 @@ import { getMainWindow } from './windows'
 
 let activeClipboardHotkey = ''
 
+/** the keys you bound in Shortcuts, or the defaults when they can't be read; picking a light or dark theme used to switch yours off with the custom colours */
+function boundKeys(): { hudKey: string; clipboardKey: string } {
+  const keys = { hudKey: 'CommandOrControl+Shift+Space', clipboardKey: 'CommandOrControl+Shift+V' }
+  try {
+    const shortcuts = JSON.parse(getSetting<string>('customizer_shortcuts', '{}'))
+    if (shortcuts.hud_toggle) keys.hudKey = shortcuts.hud_toggle
+    if (shortcuts.clipboard_toggle) keys.clipboardKey = shortcuts.clipboard_toggle
+  } catch (err) {
+    console.error('[shortcuts] Failed to parse customizer_shortcuts:', err)
+  }
+  return keys
+}
+
+/** switching Quick Capture back on in Settings used to bring back the default key over your own */
+export function hudShortcut(): string {
+  return boundKeys().hudKey
+}
+
 export function registerAppShortcuts(): void {
   if (activeClipboardHotkey) {
     globalShortcut.unregister(activeClipboardHotkey)
     activeClipboardHotkey = ''
   }
 
-  const customizerEnabled = getSetting<string>('customizer_enabled', 'false') === 'true'
-
-  let hudKey = 'CommandOrControl+Shift+Space'
-  let clipboardKey = 'CommandOrControl+Shift+V'
-
-  if (customizerEnabled) {
-    try {
-      const rawShortcuts = getSetting<string>('customizer_shortcuts', '{}')
-      const shortcuts = JSON.parse(rawShortcuts)
-      if (shortcuts.hud_toggle) hudKey = shortcuts.hud_toggle
-      if (shortcuts.clipboard_toggle) clipboardKey = shortcuts.clipboard_toggle
-    } catch (err) {
-      console.error('[shortcuts] Failed to parse customizer_shortcuts:', err)
-    }
-  }
+  const { hudKey, clipboardKey } = boundKeys()
 
   try {
     const featureHud = getSetting<string>('feature_hud', 'true')

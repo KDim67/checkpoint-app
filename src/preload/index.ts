@@ -413,6 +413,9 @@ const api = {
     toggle: (active?: boolean): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.HUD_TOGGLE, active),
 
+    hide: (): Promise<void> =>
+      ipcRenderer.invoke(IpcChannels.HUD_HIDE),
+
     onReset: (callback: () => void): (() => void) => {
       const handler = () => callback()
       ipcRenderer.on(IpcChannels.HUD_RESET, handler)
