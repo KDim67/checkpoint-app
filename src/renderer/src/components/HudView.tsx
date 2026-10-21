@@ -1,102 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { parseNaturalDate } from '../../../shared/naturalDate'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { AlertCircle, Calendar, Flag, Hash, Loader2, NotebookPen, SquareCheck } from 'lucide-react'
 import { formatDue } from '../../../shared/dueDate'
+import type { Tag } from '../../../shared/types'
+import type { WorkspaceEntry } from '../lib/createWorkspace'
 import { readWorkspaceList } from '../lib/workspaceList'
-import { resolveTagIds } from '../data/tags'
+import { getStringSetting } from '../lib/settings'
+import { listTags, resolveTagIds } from '../data/tags'
 import { createItem } from '../data/items'
 import * as hudApi from '../data/hud'
+import {
+  PRIORITY_NAMES,
+  hasTaskPrefix,
+  matching,
+  parseCapture,
+  typingAt,
+  withPick,
+  withoutTaskPrefix,
+  workspaceNamed,
+  type CaptureKind
+} from '../lib/quickCapture'
 
-function IconChevronRight(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  )
-}
+/** a tag first made here starts in the same quiet slate the tag editor offers first */
+const NEW_TAG_COLOR = '#535e85'
 
-function IconLoader(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin" {...props}>
-      <line x1="12" y1="2" x2="12" y2="6" />
-      <line x1="12" y1="18" x2="12" y2="22" />
-      <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" />
-      <line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
-      <line x1="2" y1="12" x2="6" y2="12" />
-      <line x1="18" y1="12" x2="22" y2="12" />
-      <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" />
-      <line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
-    </svg>
-  )
-}
+const PRIORITY_COLORS = ['var(--color-text-muted)', 'var(--color-priority-low)', 'var(--color-priority-med)', 'var(--color-priority-high)']
 
-interface ParsedResult {
-  text: string
-  cleanedText: string
-  type: 'log' | 'task'
-  context: string
-  priority: 0 | 1 | 2 | 3
-  tags: string[]
-  /** epoch ms, or null */
-  dueAt: number | null
-  /** shown back as a pill while typing */
-  dueSource: string | null
-}
-
-function parseInput(input: string): ParsedResult {
-  let text = input.trim()
-  let type: 'log' | 'task' = 'log'
-
-  if (text.startsWith('- ')) {
-    type = 'task'
-    text = text.substring(2)
-  } else if (text.startsWith('[ ] ')) {
-    type = 'task'
-    text = text.substring(4)
-  }
-
-  // !high/!med/!low/!none or !3 to !0
-  let priority: 0 | 1 | 2 | 3 = 0
-  const priorityMatch = text.match(/!(high|med|medium|low|none|3|2|1|0)\b/i)
-  if (priorityMatch) {
-    const val = priorityMatch[1].toLowerCase()
-    if (val === 'high' || val === '3') priority = 3
-    else if (val === 'med' || val === 'medium' || val === '2') priority = 2
-    else if (val === 'low' || val === '1') priority = 1
-    else if (val === 'none' || val === '0') priority = 0
-    text = text.replace(/!(high|med|medium|low|none|3|2|1|0)\b/i, '')
-  }
-
-  // @context-slug
-  let context = 'default'
-  const contextMatch = text.match(/@([a-zA-Z0-9_-]+)\b/)
-  if (contextMatch) {
-    context = contextMatch[1]
-    text = text.replace(/@([a-zA-Z0-9_-]+)\b/, '')
-  }
-
-  // #tag-slug
-  const tags: string[] = []
-  const tagMatches = Array.from(text.matchAll(/#([a-zA-Z0-9_-]+)\b/g))
-  tagMatches.forEach(match => {
-    tags.push(match[1])
-  })
-  text = text.replace(/#([a-zA-Z0-9_-]+)\b/g, '')
-
-  // due date last, so #tuesday stays a tag instead of a weekday
-  const dated = parseNaturalDate(text.replace(/\s+/g, ' ').trim())
-  const cleanedText = dated.cleanedText
-
-  return {
-    text: input,
-    cleanedText,
-    dueAt: dated.dueAt,
-    dueSource: dated.matched,
-    type,
-    context,
-    priority,
-    tags
-  }
-}
+type Suggestion =
+  | { kind: 'workspace'; entry: WorkspaceEntry; current: boolean }
+  | { kind: 'tag'; tag: Tag }
 
 const playChime = () => {
   try {
@@ -121,270 +52,300 @@ const playChime = () => {
   }
 }
 
+function Key({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <kbd className="hud-key">{children}</kbd>
+}
+
 export default function HudView() {
   const [value, setValue] = useState('')
+  const [mode, setMode] = useState<CaptureKind>('log')
+  const [caret, setCaret] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [isFocused, setIsFocused] = useState(true)
+  const [workspaces, setWorkspaces] = useState<WorkspaceEntry[]>([])
+  const [activeSlug, setActiveSlug] = useState('default')
+  const [tags, setTags] = useState<Tag[]>([])
+  const [highlighted, setHighlighted] = useState(0)
+  // Escape closes the list without closing the bar, until the next keystroke
+  const [listClosed, setListClosed] = useState(false)
+  const shellRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const listId = useId()
 
-  const parsed = parseInput(value)
+  const parsed = parseCapture(value, mode)
+  // the workspace you're in, as the main window last saved it
+  const current: WorkspaceEntry = workspaces.find(entry => entry.slug === activeSlug)
+    ?? workspaces[0]
+    ?? { slug: activeSlug, name: activeSlug, color: 'var(--color-secondary)' }
+  const named = parsed.workspace === null ? null : workspaceNamed(workspaces, parsed.workspace)
+  const destination = parsed.workspace === null ? current : named
+
+  const typing = listClosed ? null : typingAt(value, caret)
+  const suggestions: Suggestion[] = !typing ? [] : typing.marker === '@'
+    ? matching(workspaces, typing.query, entry => [entry.slug, entry.name]).map(entry => ({ kind: 'workspace', entry, current: entry.slug === current.slug }))
+    : matching(tags, typing.query, tag => [tag.name]).map(tag => ({ kind: 'tag', tag }))
+  const listOpen = suggestions.length > 0
+  const shown = Math.min(highlighted, Math.max(0, suggestions.length - 1))
+
+  // the list of workspaces, the one you're in and your tags, read again each time the bar opens
+  const refresh = useCallback(() => {
+    void readWorkspaceList().then(setWorkspaces)
+    void getStringSetting('active_context', 'default').then(slug => setActiveSlug(slug || 'default'))
+    void listTags().then(setTags).catch(err => console.error('Could not read the tags for suggestions:', err))
+  }, [])
 
   useEffect(() => {
     inputRef.current?.focus()
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [refresh])
+
+  // main puts the bar away on blur, Escape or a save
+  useEffect(() => hudApi.onReset(() => {
+    setValue('')
+    setMode('log')
+    setCaret(0)
+    setError(null)
+    setListClosed(false)
+    setHighlighted(0)
+  }), [])
+
+  // the window is as tall as what it shows: a hint line, a list, a preview or an error
+  useEffect(() => {
+    const shell = shellRef.current
+    if (!shell) return
+    const observer = new ResizeObserver(() => hudApi.resize(Math.ceil(shell.getBoundingClientRect().height)))
+    observer.observe(shell)
+    return () => observer.disconnect()
   }, [])
 
-  // main resets it on blur/hide
-  useEffect(() => {
-    const unsub = hudApi.onReset(() => {
-      setValue('')
-      setError(null)
-    })
-    return unsub
-  }, [])
+  const edit = (next: string, at: number): void => {
+    setValue(next)
+    setCaret(at)
+    setError(null)
+    setListClosed(false)
+    setHighlighted(0)
+  }
 
-  // grows to fit errors or syntax tips
-  useEffect(() => {
-    if (error) {
-      hudApi.resize(100)
-    } else if (isFocused) {
-      hudApi.resize(84)
+  const placeCaret = (at: number): void => {
+    requestAnimationFrame(() => inputRef.current?.setSelectionRange(at, at))
+  }
+
+  // Tab, or a click on the chip; "- " typed at the start counts as a task until switched back
+  const switchKind = (): void => {
+    if (hasTaskPrefix(value)) {
+      const next = withoutTaskPrefix(value)
+      edit(next, Math.max(0, caret - (value.length - next.length)))
+      placeCaret(Math.max(0, caret - (value.length - next.length)))
+      setMode('log')
     } else {
-      hudApi.resize(64)
+      setMode(kind => (kind === 'task' ? 'log' : 'task'))
     }
-  }, [error, isFocused])
+    inputRef.current?.focus()
+  }
 
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      if (submitting) return
-      // the blur listener resets the inputs
-      await hudApi.toggle(false)
+  const pick = (suggestion: Suggestion): void => {
+    if (!typing) return
+    const placed = withPick(value, typing, suggestion.kind === 'workspace' ? suggestion.entry.slug : suggestion.tag.name)
+    edit(placed.text, placed.caret)
+    placeCaret(placed.caret)
+    inputRef.current?.focus()
+  }
+
+  const save = async (): Promise<void> => {
+    if (submitting) return
+    if (!parsed.title) {
+      setError('Type something to save first.')
       return
     }
-
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      if (submitting) return
-
-      if (!parsed.cleanedText) {
-        setError('Input content cannot be empty.')
-        return
-      }
-
-      setSubmitting(true)
-      setError(null)
-
-      try {
-        if (parsed.context !== 'default') {
-          const contexts = await readWorkspaceList()
-          const exists = contexts.some(c => c.slug.toLowerCase() === parsed.context.toLowerCase())
-          if (!exists) {
-            setError(`Workspace '@${parsed.context}' does not exist.`)
-            setSubmitting(false)
-            return
-          }
-        }
-
-        const tagIds = await resolveTagIds(
-          parsed.tags.map(name => ({ name: name.toLowerCase(), color: '#535e85' }))
-        )
-
-        await createItem({
-          type: parsed.type,
-          context: parsed.context,
-          title: parsed.cleanedText,
-          body: '',
-          status: 'open',
-          priority: parsed.priority,
-          position: Date.now(),
-          due_at: parsed.dueAt,
-          metadata: '{}'
-        }, tagIds)
-
-        playChime()
-        setValue('')
-        await hudApi.toggle(false)
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Database write failure'
-        setError(msg)
-      } finally {
-        setSubmitting(false)
-      }
+    if (!destination) {
+      setError(`There's no workspace called "${parsed.workspace}". Pick one from the list, or leave out the @ to save to ${current.name}.`)
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      const tagIds = await resolveTagIds(parsed.tags.map(name => ({ name: name.toLowerCase(), color: NEW_TAG_COLOR })))
+      await createItem({
+        type: parsed.kind,
+        // the real slug, so @Work lands in "work" and not a workspace that doesn't exist
+        context: destination.slug,
+        title: parsed.title,
+        body: '',
+        status: 'open',
+        priority: parsed.priority,
+        position: Date.now(),
+        due_at: parsed.dueAt,
+        metadata: '{}'
+      }, tagIds)
+      playChime()
+      await hudApi.hide()
+    } catch (err) {
+      setError(`Couldn't save it: ${err instanceof Error ? err.message : String(err)}. Try again.`)
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  const priorityLabels = ['None', 'Low', 'Med', 'High']
-  const priorityColors = [
-    'var(--color-text-faint)',
-    'var(--color-priority-low)',
-    'var(--color-priority-med)',
-    'var(--color-priority-high)'
-  ]
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey
+    if (listOpen) {
+      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && suggestions.length > 0) {
+        event.preventDefault()
+        const step = event.key === 'ArrowDown' ? 1 : -1
+        setHighlighted((shown + step + suggestions.length) % suggestions.length)
+        return
+      }
+      if ((event.key === 'Enter' || (event.key === 'Tab' && plain)) && suggestions.length > 0) {
+        event.preventDefault()
+        pick(suggestions[shown])
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setListClosed(true)
+        return
+      }
+    }
+    if (event.key === 'Tab' && plain) {
+      event.preventDefault()
+      switchKind()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      if (!submitting) void hudApi.hide()
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      void save()
+    }
+  }
+
+  const kindLabel = parsed.kind === 'task' ? 'Task' : 'Log'
+  const optionId = (index: number): string => `${listId}-${index}`
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      background: 'transparent',
-      fontFamily: 'var(--font-sans)',
-      padding: '4px'
-    }}>
-      <style>{`
-        .hud-container {
-          width: 590px;
-          display: flex;
-          flex-direction: column;
-          background: color-mix(in srgb, var(--color-surface-1) 94%, transparent);
-          backdrop-filter: blur(12px);
-          border: 1px solid var(--color-surface-offset);
-          border-radius: var(--radius-lg);
-          box-shadow: var(--shadow-2xl), 0 0 0 1px color-mix(in srgb, var(--color-text-base) 8%, transparent);
-          overflow: hidden;
-          transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
-        }
-        .hud-container.focused {
-          border-color: var(--color-secondary);
-          box-shadow: var(--shadow-2xl), 0 0 12px var(--color-secondary-muted);
-        }
-        .hud-container.has-error {
-          border-color: var(--color-error);
-          box-shadow: var(--shadow-2xl), 0 0 12px var(--color-error-muted);
-        }
-        .hud-bar {
-          height: 54px;
-          display: flex;
-          align-items: center;
-          padding: 0 var(--space-4);
-          gap: var(--space-2);
-        }
-        .hud-input {
-          flex: 1;
-          background: transparent;
-          border: none;
-          outline: none;
-          color: var(--color-text-base);
-          font-size: var(--text-md);
-          font-weight: var(--weight-normal);
-        }
-        .hud-input::placeholder {
-          color: var(--color-text-faint);
-        }
-        .hud-pill {
-          font-size: 10px;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-weight: var(--weight-semibold);
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          text-transform: uppercase;
-        }
-        .hud-error-tray {
-          height: 36px;
-          background: var(--color-error-muted);
-          border-top: 1px solid color-mix(in srgb, var(--color-error) 25%, transparent);
-          display: flex;
-          align-items: center;
-          padding: 0 var(--space-4);
-          font-size: var(--text-xs);
-          color: var(--color-error);
-          animation: slide-down 150ms var(--ease-enter);
-        }
-        .hud-tip-tray {
-          height: 24px;
-          background: var(--color-surface-2);
-          border-top: 1px solid var(--color-surface-offset);
-          display: flex;
-          align-items: center;
-          padding: 0 var(--space-4);
-          font-size: var(--text-2xs);
-          color: var(--color-text-muted);
-          animation: slide-down 150ms var(--ease-enter);
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-      `}</style>
-
-      <div className={`hud-container ${error ? 'has-error' : isFocused ? 'focused' : ''}`}>
+    <div ref={shellRef} className="hud-shell">
+      <div className="hud" data-error={error ? true : undefined}>
         <div className="hud-bar">
-          {submitting ? (
-            <IconLoader style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
-          ) : (
-            <IconChevronRight style={{ color: error ? 'var(--color-error)' : 'var(--color-secondary)', flexShrink: 0 }} />
-          )}
-          
+          <button
+            type="button"
+            className="hud-kind"
+            tabIndex={-1}
+            onMouseDown={event => event.preventDefault()}
+            onClick={switchKind}
+            aria-label={parsed.kind === 'task' ? 'Saving a task. Switch to a log entry' : 'Saving a log entry. Switch to a task'}
+            title="Switch between a log entry and a task (Tab)"
+          >
+            {submitting
+              ? <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+              : parsed.kind === 'task' ? <SquareCheck size={14} aria-hidden="true" /> : <NotebookPen size={14} aria-hidden="true" />}
+            {kindLabel}
+            <Key>Tab</Key>
+          </button>
+
           <input
             ref={inputRef}
             type="text"
             className="hud-input"
             value={value}
-            onChange={(e) => { setValue(e.target.value); setError(null) }}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder="Type a task (- task #tag @unity !high tomorrow 3pm) or daily log..."
-            aria-label="Quick capture input"
+            onChange={event => edit(event.target.value, event.target.selectionStart ?? event.target.value.length)}
+            onSelect={event => setCaret(event.currentTarget.selectionStart ?? 0)}
+            onKeyDown={onKeyDown}
+            placeholder="Capture a thought, or start with - for a task"
+            aria-label="Quick capture"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={suggestions.length > 0}
+            aria-controls={suggestions.length > 0 ? listId : undefined}
+            aria-activedescendant={suggestions.length > 0 ? optionId(shown) : undefined}
+            aria-invalid={error ? true : undefined}
             disabled={submitting}
-            style={{ opacity: submitting ? 0.5 : 1 }}
+            spellCheck={false}
           />
 
-          {value.trim().length > 0 && (
-            <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
-              <div className="hud-pill" style={{ background: 'var(--color-surface-offset)', color: 'var(--color-text-base)' }}>
-                {parsed.type}
-              </div>
-
-              {/* shown resolved, so an ambiguous phrase is confirmed before creating */}
-              {parsed.dueAt !== null && (
-                <div
-                  className="hud-pill"
-                  title={parsed.dueSource ? 'from "' + parsed.dueSource + '"' : undefined}
-                  style={{
-                    background: 'var(--color-primary-muted)',
-                    color: 'var(--color-primary)',
-                    border: '1px solid var(--color-primary)'
-                  }}
-                >
-                  {formatDue(parsed.dueAt)}
-                </div>
-              )}
-
-              {parsed.context !== 'default' && (
-                <div className="hud-pill" style={{ background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)', border: '1px solid var(--color-secondary)' }}>
-                  @{parsed.context}
-                </div>
-              )}
-
-              {parsed.priority > 0 && (
-                <div className="hud-pill" style={{ background: 'var(--color-surface-2)', color: priorityColors[parsed.priority] }}>
-                  !{priorityLabels[parsed.priority]}
-                </div>
-              )}
-
-              {parsed.tags.map((tag, idx) => (
-                <div key={idx} className="hud-pill" style={{ background: 'color-mix(in srgb, var(--color-balance) 25%, transparent)', color: 'var(--color-text-muted)', border: '1px solid var(--color-balance)' }}>
-                  #{tag}
-                </div>
-              ))}
-            </div>
-          )}
+          <span className="hud-dest" title={destination ? `Saves to ${destination.name}` : undefined}>
+            <span className="hud-dot" style={{ '--hud-dot': (destination ?? current).color } as React.CSSProperties} aria-hidden="true" />
+            <span className="hud-dest-name">{destination ? destination.name : current.name}</span>
+          </span>
         </div>
 
-        {error && (
-          <div className="hud-error-tray">
-            ⚠️ {error}
-          </div>
+        {listOpen && (
+          <ul id={listId} className="hud-list" role="listbox" aria-label={typing?.marker === '@' ? 'Workspaces' : 'Tags'}>
+            {suggestions.map((suggestion, index) => (
+              <li
+                key={suggestion.kind === 'workspace' ? suggestion.entry.slug : suggestion.tag.id}
+                id={optionId(index)}
+                className="hud-option"
+                role="option"
+                aria-selected={index === shown}
+                onMouseDown={event => event.preventDefault()}
+                onMouseEnter={() => setHighlighted(index)}
+                onClick={() => pick(suggestion)}
+              >
+                {suggestion.kind === 'workspace' ? (
+                  <>
+                    <span className="hud-dot" style={{ '--hud-dot': suggestion.entry.color } as React.CSSProperties} aria-hidden="true" />
+                    {suggestion.entry.name}
+                    {suggestion.current && <span className="hud-option-note">current</span>}
+                  </>
+                ) : (
+                  <>
+                    <span className="hud-dot" style={{ '--hud-dot': suggestion.tag.color } as React.CSSProperties} aria-hidden="true" />
+                    #{suggestion.tag.name}
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
 
-        {isFocused && !error && (
-          <div className="hud-tip-tray">
-            💡 Tip: Use - for tasks, @context, #tag, !high/med/low, and a date like tomorrow 3pm, friday, or in 2 days.
+        {error ? (
+          <div className="hud-foot hud-foot-error" role="alert">
+            <AlertCircle size={14} aria-hidden="true" />
+            {error}
+          </div>
+        ) : listOpen ? (
+          <div className="hud-foot">
+            <span className="hud-hint"><Key>↑</Key><Key>↓</Key> choose</span>
+            <span className="hud-hint"><Key>Enter</Key> pick</span>
+            <span className="hud-hint hud-push"><Key>Esc</Key> back to typing</span>
+          </div>
+        ) : value.trim() !== '' ? (
+          // what gets made, read back before it's saved
+          <div className="hud-foot">
+            {parsed.dueAt !== null && (
+              <span className="hud-chip" title={parsed.dueSource ? `from "${parsed.dueSource}"` : undefined}>
+                <Calendar size={12} aria-hidden="true" />
+                {formatDue(parsed.dueAt)}
+              </span>
+            )}
+            {parsed.priority > 0 && (
+              <span className="hud-chip" style={{ color: PRIORITY_COLORS[parsed.priority] }}>
+                <Flag size={12} aria-hidden="true" />
+                {PRIORITY_NAMES[parsed.priority]}
+              </span>
+            )}
+            {parsed.tags.map(tag => (
+              <span key={tag} className="hud-chip">
+                <Hash size={12} aria-hidden="true" />
+                {tag}
+              </span>
+            ))}
+            {destination ? (
+              <span className="hud-hint hud-push"><Key>Enter</Key> save to {destination.name}</span>
+            ) : (
+              // a wrong @ shows while it's typed, not after Enter
+              <span className="hud-hint hud-push hud-warn">No workspace called “{parsed.workspace}”</span>
+            )}
+          </div>
+        ) : (
+          <div className="hud-foot">
+            <span className="hud-hint"><Key>-</Key> task</span>
+            <span className="hud-hint"><Key>@</Key> workspace</span>
+            <span className="hud-hint"><Key>#</Key> tag</span>
+            <span className="hud-hint"><Key>!high</Key> priority</span>
+            <span className="hud-hint"><Key>fri 3pm</Key> due</span>
+            <span className="hud-hint hud-push"><Key>Enter</Key> save <Key>Esc</Key> close</span>
           </div>
         )}
       </div>

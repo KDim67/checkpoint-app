@@ -8,11 +8,14 @@ import '@fontsource/jetbrains-mono/400.css'
 import '@fontsource/jetbrains-mono/500.css'
 import { AppRouter } from './App'
 import { forwardWindowErrors } from './lib/windowErrors'
+import { markOverlayWindow } from './lib/overlayWindow'
 import './preflight.css'
 import './index.css'
 
 // before the first render, so an error while starting up is kept too
 forwardWindowErrors()
+// and before the first paint, or a see-through window flashes black
+markOverlayWindow()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element not found')
