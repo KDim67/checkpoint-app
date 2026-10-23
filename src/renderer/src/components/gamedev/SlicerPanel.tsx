@@ -41,7 +41,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                     border: 'none',
                     borderRadius: 'var(--radius-sm)',
                     color: tool.sliceMode === 'grid' ? 'var(--color-text-base)' : 'var(--color-text-muted)',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     padding: '6px',
                     cursor: 'pointer',
                     fontWeight: tool.sliceMode === 'grid' ? 'var(--weight-bold)' : 'var(--weight-normal)'
@@ -56,7 +56,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                     border: 'none',
                     borderRadius: 'var(--radius-sm)',
                     color: tool.sliceMode === 'auto' ? 'var(--color-text-base)' : 'var(--color-text-muted)',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     padding: '6px',
                     cursor: 'pointer',
                     fontWeight: tool.sliceMode === 'auto' ? 'var(--weight-bold)' : 'var(--weight-normal)'
@@ -81,8 +81,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                       borderRadius: 'var(--radius-md)',
                       color: 'var(--color-text-base)',
                       fontSize: 'var(--text-xs)',
-                      padding: '8px',
-                      outline: 'none'
+                      padding: '8px'
                     }}
                   />
                 </div>
@@ -98,8 +97,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                       borderRadius: 'var(--radius-md)',
                       color: 'var(--color-text-base)',
                       fontSize: 'var(--text-xs)',
-                      padding: '8px',
-                      outline: 'none'
+                      padding: '8px'
                     }}
                   />
                 </div>
@@ -115,7 +113,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                   {tool.slicerPath ? `${tool.slicedFrames.length} Slices Identified` : 'Idle - Please load image'}
                 </span>
                 {tool.slicerPath && tool.sliceMode === 'grid' && tool.slicerDims && (tool.slicerDims.w % tool.sliceCellW > 0 || tool.slicerDims.h % tool.sliceCellH > 0) && (
-                  <span style={{ fontSize: '10px', color: 'var(--color-warning)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertTriangle size={11} />
                     {tool.slicerDims.w % tool.sliceCellW}px width, {tool.slicerDims.h % tool.sliceCellH}px height remainder discarded.
                   </span>
@@ -186,7 +184,7 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                     border: '1px solid rgba(0, 255, 128, 0.2)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-2) var(--space-3)',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     color: 'var(--color-secondary)',
                     display: 'flex',
                     alignItems: 'center',

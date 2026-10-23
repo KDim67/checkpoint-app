@@ -111,6 +111,10 @@ export default function ColorPicker({
         {openAt && createPortal(
           <div
             ref={panelRef}
+            className="motion-drop"
+            // a dialog to the page around it too, so Escape closes the picker and nothing behind it
+            role="dialog"
+            aria-label="Pick a colour"
             // a press here is the picker's own; the menu or panel hosting it would close mid-drag
             onPointerDown={e => e.stopPropagation()}
             onMouseDown={e => e.stopPropagation()}
@@ -142,9 +146,8 @@ export default function ColorPicker({
             border: '1px solid var(--color-surface-offset)',
             borderRadius: '4px',
             color: 'var(--color-text-base)',
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             padding: '2px 4px',
-            outline: 'none',
             fontFamily: 'monospace'
           }}
         />

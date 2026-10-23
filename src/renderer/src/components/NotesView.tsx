@@ -459,7 +459,7 @@ export default function NotesView(): React.JSX.Element {
             <div className="row-between" style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)' }}>
               <span className="text-item-strong">
                 Note graph
-                <span style={{ marginLeft: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-regular)' }}>
+                <span style={{ marginLeft: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-regular)' }}>
                   {notes.length} note{notes.length === 1 ? '' : 's'} · click one to open it
                 </span>
               </span>
@@ -603,7 +603,7 @@ export default function NotesView(): React.JSX.Element {
                 border: 'none',
                 padding: '2px 4px',
                 cursor: 'pointer',
-                fontSize: '10px'
+                fontSize: 'var(--text-xs)'
               }}
             >
               <Maximize2 size={11} />
@@ -620,7 +620,7 @@ export default function NotesView(): React.JSX.Element {
 
           {activeNoteTitle && currentNoteMetadata && (
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', minHeight: 0 }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
                 <span title={new Date(currentNoteMetadata.updatedAt).toLocaleString()}>Updated {formatRelativeTime(currentNoteMetadata.updatedAt)}</span>
                 <span>{liveWordCount} words</span>
                 <span>{formatBytes(currentNoteMetadata.size)}</span>
@@ -637,7 +637,7 @@ export default function NotesView(): React.JSX.Element {
                       <button key={link} onClick={() => handleOpenWikiLink(link)} className="notes-link-chip">
                         {!exists && <FileWarning size={11} className="icon-warning" />}
                         <span className="truncate">{link}</span>
-                        {!exists && <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>new</span>}
+                        {!exists && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>new</span>}
                       </button>
                     )
                   })
@@ -740,7 +740,7 @@ const NOTES_CSS = `
   }
   .notes-title-input:focus { border-bottom-color: var(--color-primary); }
   .notes-save-status {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: var(--weight-bold);
@@ -834,7 +834,7 @@ const NOTES_CSS = `
     background: transparent;
     border: none;
     color: var(--color-text-muted);
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-weight: var(--weight-semibold);
     cursor: pointer;
     padding: 2px 4px;
@@ -872,7 +872,7 @@ const NOTES_CSS = `
   }
   .notes-link-chip:hover { border-color: var(--color-secondary); }
   .notes-panel-label {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: var(--weight-bold);

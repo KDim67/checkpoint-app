@@ -90,7 +90,7 @@ export default function WallBoardRail({
             border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)',
             color: 'var(--color-text-base)',
-            padding: '4px 22px 4px 26px', fontSize: 'var(--text-xs)', outline: 'none'
+            padding: '4px 22px 4px 26px', fontSize: 'var(--text-xs)'
           }}
         />
         {query && (
@@ -144,7 +144,7 @@ export default function WallBoardRail({
                   background: group.column.color || 'var(--color-surface-offset)'
                 }} />
                 <span style={{
-                  flex: 1, minWidth: 0, fontSize: '11px', fontWeight: 600,
+                  flex: 1, minWidth: 0, fontSize: 'var(--text-xs)', fontWeight: 600,
                   color: 'var(--color-text-muted)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                 }}>
@@ -156,7 +156,7 @@ export default function WallBoardRail({
               </div>
 
               {group.cards.length === 0 && (
-                <p style={{ padding: '0 var(--space-2) var(--space-2)', fontSize: '10px', color: 'var(--color-text-faint)' }}>
+                <p style={{ padding: '0 var(--space-2) var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
                   {isTarget ? 'Drop to move here' : 'Empty'}
                 </p>
               )}
@@ -251,7 +251,7 @@ export default function WallBoardRail({
       <p style={{
         padding: 'var(--space-2) var(--space-3)', margin: 0,
         borderTop: '1px solid var(--color-surface-offset)',
-        fontSize: '10px', lineHeight: 1.5, color: 'var(--color-text-faint)'
+        fontSize: 'var(--text-xs)', lineHeight: 1.5, color: 'var(--color-text-faint)'
       }}>
         Drag onto the wall to place. Drag a card back onto a column to move it.
       </p>

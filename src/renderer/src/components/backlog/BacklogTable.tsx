@@ -368,7 +368,7 @@ export default function BacklogTable({
           background: 'var(--color-surface-2)',
           borderBottom: '1px solid var(--color-surface-offset)',
           fontWeight: 'var(--weight-semibold)',
-          fontSize: '10px',
+          fontSize: 'var(--text-2xs)',
           color: 'var(--color-text-muted)',
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
@@ -589,8 +589,8 @@ export default function BacklogTable({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        padding: 'var(--space-1.5) var(--space-3)',
-                        fontSize: '11px',
+                        padding: 'var(--space-1-5) var(--space-3)',
+                        fontSize: 'var(--text-xs)',
                         color: 'var(--color-text-base)',
                         cursor: 'pointer'
                       }}
@@ -708,7 +708,7 @@ export default function BacklogTable({
                       <span>{row.label}</span>
                       <span
                         style={{
-                          fontSize: '10px',
+                          fontSize: 'var(--text-2xs)',
                           color: 'var(--color-text-muted)',
                           background: 'var(--color-surface-offset)',
                           padding: '1px 6px',
@@ -741,7 +741,7 @@ export default function BacklogTable({
                       </div>
                       <span
                         style={{
-                          fontSize: '10px',
+                          fontSize: 'var(--text-xs)',
                           color: 'var(--color-text-faint)',
                           fontWeight: 'var(--weight-normal)',
                           textTransform: 'none',

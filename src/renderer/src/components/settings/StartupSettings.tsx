@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ToggleSwitch, RowBetween } from './SettingsSection'
+import { ToggleRow, SettingsRowsSkeleton } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import {
   DEFAULT_STARTUP_SETTINGS,
@@ -36,7 +36,7 @@ export default function StartupSettings(): React.JSX.Element {
   }
 
   if (!loaded) {
-    return <div className="text-hint-faint">Loading…</div>
+    return <SettingsRowsSkeleton label="Loading the startup settings" rows={4} />
   }
 
   return (
@@ -44,22 +44,14 @@ export default function StartupSettings(): React.JSX.Element {
       {STARTUP_OPTIONS.map(option => {
         const disabled = option.needsTray && !settings.showTrayIcon
         return (
-          <RowBetween key={option.key}>
-            <div style={{ opacity: disabled ? 'var(--opacity-disabled)' : 1 }}>
-              <div className="text-item">
-                {option.label}
-              </div>
-              <div className="text-sub">
-                {option.hint}
-              </div>
-            </div>
-            <ToggleSwitch
-              checked={settings[option.key]}
-              onChange={value => toggle(option.key, value)}
-              disabled={disabled}
-              label={option.label}
-            />
-          </RowBetween>
+          <ToggleRow
+            key={option.key}
+            label={option.label}
+            description={option.hint}
+            checked={settings[option.key]}
+            onChange={value => toggle(option.key, value)}
+            disabled={disabled}
+          />
         )
       })}
     </div>

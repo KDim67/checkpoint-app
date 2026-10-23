@@ -76,7 +76,7 @@ function WallRemotePresence({ cursors, zoom }: WallRemotePresenceProps) {
                 borderRadius: '4px',
                 background: cursor.color,
                 color: '#ffffff',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 600,
                 lineHeight: 1.25,
                 boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',

@@ -146,7 +146,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
             borderRadius: 'var(--radius-sm)',
             color: 'var(--color-text-base)',
             fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
-            padding: '4px 6px', outline: 'none'
+            padding: '4px 6px'
           }}
         />
       </div>

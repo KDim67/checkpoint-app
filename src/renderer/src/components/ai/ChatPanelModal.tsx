@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { usePresenceState } from '../../lib/presence'
 
 interface ChatPanelModalProps {
   icon: ReactNode
@@ -11,6 +12,7 @@ interface ChatPanelModalProps {
 }
 
 export default function ChatPanelModal({ icon, title, actions, onClose, children }: ChatPanelModalProps) {
+  const presence = usePresenceState()
   const close = (
     <button
       onClick={onClose}
@@ -24,6 +26,8 @@ export default function ChatPanelModal({ icon, title, actions, onClose, children
 
   return (
     <div
+      className="motion-backdrop"
+      data-state={presence}
       style={{
         position: 'absolute',
         inset: 0,
@@ -37,6 +41,8 @@ export default function ChatPanelModal({ icon, title, actions, onClose, children
       }}
     >
       <div
+        className="motion-pop"
+        data-state={presence}
         style={{
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-surface-offset)',

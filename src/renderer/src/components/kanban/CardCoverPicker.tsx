@@ -22,7 +22,7 @@ export default function CardCoverPicker({ cover, onChange }: { cover: CardCover 
                 flex: 1,
                 padding: '4px 8px',
                 borderRadius: '4px',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-semibold)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -49,7 +49,7 @@ export default function CardCoverPicker({ cover, onChange }: { cover: CardCover 
                 flex: 1,
                 padding: '4px 8px',
                 borderRadius: '4px',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-semibold)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -96,7 +96,7 @@ export default function CardCoverPicker({ cover, onChange }: { cover: CardCover 
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--color-text-base)',
-                  fontSize: '10px'
+                  fontSize: 'var(--text-2xs)'
                 }}
                 title={color === 'none' ? 'No Cover' : color}
               >

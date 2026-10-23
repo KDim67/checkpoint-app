@@ -414,12 +414,11 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-md)',
                   padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-sm)',
-                  outline: 'none'
+                  fontSize: 'var(--text-sm)'
                 }}
               />
               {error && (
-                <span role="alert" style={{ fontSize: '11px', color: 'var(--color-error)' }}>{error}</span>
+                <span role="alert" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)' }}>{error}</span>
               )}
             </div>
 
@@ -452,7 +451,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                       <span className="text-item">
                         {t.name}
                       </span>
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
                         {describeTemplate(t)}
                       </span>
                     </button>
@@ -497,7 +496,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                 <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
                   Focused & Clean (Recommended)
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: '2px' }}>
                   Keeps the essential Kanban board, Wall canvas, Notes, and Focus timer. Hides developer logs and secondary tools.
                 </div>
               </div>
@@ -535,7 +534,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                 <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-base)' }}>
                   Full Suite (All Tools)
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4, marginTop: '2px' }}>
                   All views visible, including Daily Logs, Analytics, and Quick Cheatsheets.
                 </div>
               </div>
@@ -566,7 +565,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                     </span>
                     <kbd style={{
                       fontFamily: 'var(--font-mono)',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-2xs)',
                       color: 'var(--color-text-muted)',
                       background: 'var(--color-surface-offset)',
                       border: '1px solid var(--color-surface-elevated)',
@@ -576,7 +575,7 @@ export default function OnboardingTour({ onCreateWorkspace, onClose }: Props) {
                       {k.combo}
                     </kbd>
                   </div>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>{k.why}</span>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>{k.why}</span>
                 </div>
               </div>
             ))}

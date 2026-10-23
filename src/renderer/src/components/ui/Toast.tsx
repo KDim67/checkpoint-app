@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
-import { TOAST_DISMISS_MS } from '../../lib/timings'
+import { EXIT_MS, TOAST_DISMISS_MS } from '../../lib/timings'
+import { prefersReducedMotion } from '../../lib/presence'
 import { errorMessage } from '../../../../shared/errors'
 
 export interface ToastAction {
@@ -14,6 +15,8 @@ interface ToastMessage {
   text: string
   action?: ToastAction
   type?: ToastType
+  /** playing its exit, gone once it ends */
+  leaving?: boolean
 }
 
 interface ToastContextType {
@@ -27,11 +30,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const timersRef = useRef<Record<string, NodeJS.Timeout>>({})
 
   const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id))
     if (timersRef.current[id]) {
       clearTimeout(timersRef.current[id])
       delete timersRef.current[id]
     }
+    const drop = (): void => setToasts(prev => prev.filter(t => t.id !== id))
+    if (prefersReducedMotion()) {
+      drop()
+      return
+    }
+    // it fades out first rather than vanishing; the same timer list clears it if the provider goes
+    setToasts(prev => prev.map(t => (t.id === id ? { ...t, leaving: true } : t)))
+    timersRef.current[`${id}:exit`] = setTimeout(() => {
+      delete timersRef.current[`${id}:exit`]
+      drop()
+    }, EXIT_MS)
   }, [])
 
   // timers outlive their toasts if the provider unmounts mid-flight
@@ -104,6 +117,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div
               key={t.id}
               className="toast-item"
+              data-state={t.leaving ? 'closing' : 'open'}
               onMouseEnter={() => holdToast(t.id)}
               onMouseLeave={() => resumeToast(t.id)}
               onFocusCapture={() => holdToast(t.id)}

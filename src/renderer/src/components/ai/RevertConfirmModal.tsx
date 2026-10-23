@@ -6,6 +6,7 @@ import useFocusTrap from '../ui/useFocusTrap'
 import { Trash2 } from 'lucide-react'
 import type { Message } from './types'
 import { useFailureReport } from '../ui/Toast'
+import { usePresenceState } from '../../lib/presence'
 
 interface Props {
   revertConfirmData: { cardTitles: string[]; columnNames: string[]; index: number }
@@ -23,11 +24,13 @@ export default function RevertConfirmModal({
   const report = useFailureReport()
   // a destructive answer, so Cancel takes the focus and Escape backs out
   const cancelRef = useRef<HTMLButtonElement | null>(null)
-  const containerRef = useFocusTrap(true, cancelRef)
-  useEscapeKey(() => setRevertConfirmData(null), true)
+  // leaving inside Presence, it lets go of focus and Escape at once
+  const presence = usePresenceState()
+  const containerRef = useFocusTrap(presence === 'open', cancelRef)
+  useEscapeKey(() => setRevertConfirmData(null), presence === 'open')
 
   return (
-        <div className="modal-overlay" onClick={() => setRevertConfirmData(null)}>
+        <div className="modal-overlay motion-backdrop" data-state={presence} onClick={() => setRevertConfirmData(null)}>
           <style>{`
             .modal-overlay {
               position: fixed;
@@ -56,7 +59,7 @@ export default function RevertConfirmModal({
               animation: modal-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
             }
           `}</style>
-          <div ref={containerRef} className="revert-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="revert-confirm-title">
+          <div ref={containerRef} className="revert-modal motion-pop" data-state={presence} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="revert-confirm-title">
             <div className="row-md">
               <Trash2 style={{ color: 'var(--color-error)' }} size={22} />
               <h2 id="revert-confirm-title" style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>

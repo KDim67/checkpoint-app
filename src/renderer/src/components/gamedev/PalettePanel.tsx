@@ -40,7 +40,7 @@ export default function PalettePanel({
             background: 'var(--color-secondary)',
             color: 'var(--color-text-inverted)',
             border: 'none',
-            padding: 'var(--space-1.5) var(--space-4)',
+            padding: 'var(--space-1-5) var(--space-4)',
             borderRadius: 'var(--radius-md)',
             fontSize: 'var(--text-xs)',
             fontWeight: 'var(--weight-semibold)',
@@ -77,7 +77,7 @@ export default function PalettePanel({
               borderRadius: '4px',
               boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)'
             }} />
-            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', marginTop: '4px', color: 'var(--color-text-muted)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', marginTop: '4px', color: 'var(--color-text-muted)' }}>
               {col.toUpperCase()}
             </span>
             <button
@@ -95,7 +95,7 @@ export default function PalettePanel({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '10px',
+                fontSize: 'var(--text-xs)',
                 cursor: 'pointer'
               }}
             >

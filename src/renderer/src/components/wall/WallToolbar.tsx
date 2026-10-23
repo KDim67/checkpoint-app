@@ -129,7 +129,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
         aria-label="Reset zoom to 100 percent"
         disabled={atFullSize}
         style={{
-          fontSize: '11px', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontFamily: 'var(--font-mono)',
           minWidth: '46px', height: '24px', padding: '0 var(--space-1)',
           background: 'none', border: 'none', borderRadius: 'var(--radius-sm)',
           cursor: atFullSize ? 'default' : 'pointer'
@@ -141,7 +141,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', position: 'relative' }}>
         {isReadOnly && (
           <span style={{
-            fontSize: '11px',
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-warning)',
             background: 'var(--color-warning-muted)',
             border: '1px solid var(--color-warning)',
@@ -154,7 +154,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
           </span>
         )}
 
-        <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
           {toolHint(tool, !!linkPickFor, arrowFrom, panHintLabel(panButtons))}
         </span>
 

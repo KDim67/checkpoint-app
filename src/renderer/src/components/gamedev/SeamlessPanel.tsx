@@ -51,7 +51,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                         borderRadius: 'var(--radius-sm)',
                         color: tool.seamlessAlgorithm === 'mirror' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                         padding: '6px',
-                        fontSize: '11px',
+                        fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-semibold)',
                         cursor: 'pointer'
                       }}
@@ -67,7 +67,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                         borderRadius: 'var(--radius-sm)',
                         color: tool.seamlessAlgorithm === 'feather' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                         padding: '6px',
-                        fontSize: '11px',
+                        fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-semibold)',
                         cursor: 'pointer'
                       }}
@@ -147,7 +147,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                           borderRadius: 'var(--radius-sm)',
                           color: tool.seamlessTilingScale === scale ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                           padding: '6px',
-                          fontSize: '11px',
+                          fontSize: 'var(--text-xs)',
                           fontWeight: 'var(--weight-semibold)',
                           cursor: 'pointer'
                         }}
@@ -211,7 +211,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     onClick={() => tool.setSeamlessShowOriginal(false)}
                     style={{
                       padding: '4px 12px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       fontWeight: 'var(--weight-semibold)',
                       borderRadius: 'calc(var(--radius-sm) - 1px)',
                       border: 'none',
@@ -226,7 +226,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                     onClick={() => tool.setSeamlessShowOriginal(true)}
                     style={{
                       padding: '4px 12px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       fontWeight: 'var(--weight-semibold)',
                       borderRadius: 'calc(var(--radius-sm) - 1px)',
                       border: 'none',
@@ -315,7 +315,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                           border: 'none',
                           borderRadius: 'var(--radius-sm)',
                           color: 'var(--color-text-inverted)',
-                          fontSize: '10px',
+                          fontSize: 'var(--text-xs)',
                           fontWeight: 'var(--weight-semibold)',
                           padding: '5px 10px',
                           cursor: 'pointer'
@@ -332,7 +332,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                           border: '1px solid var(--color-surface-offset)',
                           borderRadius: 'var(--radius-sm)',
                           color: 'var(--color-text-muted)',
-                          fontSize: '10px',
+                          fontSize: 'var(--text-xs)',
                           padding: '5px 10px',
                           cursor: 'pointer'
                         }}

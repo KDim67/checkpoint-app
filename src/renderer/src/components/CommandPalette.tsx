@@ -13,6 +13,7 @@ import { BUILT_IN_VIEWS, normalizeSavedViews, type SavedView } from '../../../sh
 import type { ActiveView } from '../store/appStore'
 import { getStringSetting } from '../lib/settings'
 import { openItem } from '../lib/openItem'
+import { usePresence } from '../lib/presence'
 
 interface Props {
   open: boolean
@@ -63,7 +64,8 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   }, [open])
 
   useEffect(() => {
-    if (!open) { setHits([]); return }
+    // kept while it closes, so the list doesn't empty during its exit; opening resets the query, which clears them
+    if (!open) return
     const q = query.trim()
     if (q.length < MIN_QUERY_LENGTH) { setHits([]); return }
 
@@ -123,8 +125,9 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   }, [active])
 
   const dialogRef = useFocusTrap(open)
+  const { mounted, state } = usePresence(open)
 
-  if (!open) return null
+  if (!mounted) return null
 
   const runCommand = async (command: Command) => {
     onClose()
@@ -192,6 +195,8 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   return (
     <div
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+      className="motion-backdrop"
+      data-state={state}
       style={{
         position: 'fixed',
         inset: 0,
@@ -209,8 +214,12 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
+        className="motion-pop"
+        data-state={state}
         style={{
           width: 'min(560px, 92vw)',
+          // it drops from the top of the window, so it grows from there
+          transformOrigin: 'top center',
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-surface-offset)',
           borderRadius: 'var(--radius-lg)',
@@ -284,7 +293,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
                 {heading && (
                   <div style={{
                     padding: 'var(--space-2) var(--space-3) var(--space-1)',
-                    fontSize: '10px',
+                    fontSize: 'var(--text-2xs)',
                     fontWeight: 'var(--weight-bold)',
                     color: 'var(--color-text-faint)',
                     textTransform: 'uppercase',
@@ -319,7 +328,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
                       {row.type === 'hit' && row.hit.subtitle && (
                         <span style={{
                           display: 'block',
-                          fontSize: '11px',
+                          fontSize: 'var(--text-xs)',
                           color: 'var(--color-text-faint)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -335,7 +344,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
                     alignItems: 'center',
                     gap: 'var(--space-2)',
                     flexShrink: 0,
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     color: isActive ? 'var(--color-secondary)' : 'var(--color-text-faint)'
                   }}>
                     {meta}

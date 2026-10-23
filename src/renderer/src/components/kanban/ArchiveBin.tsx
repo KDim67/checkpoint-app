@@ -3,6 +3,7 @@ import type { Item } from '@shared/types'
 import type { ColumnConfig } from '@shared/boardModel'
 import useFocusTrap from '../ui/useFocusTrap'
 import useEscapeKey from '../ui/useEscapeKey'
+import { usePresenceState } from '../../lib/presence'
 
 interface ArchiveBinProps {
   archivedColumns: ColumnConfig[]
@@ -33,9 +34,10 @@ export default function ArchiveBin({
   onBulkRestore,
   onBulkDelete
 }: ArchiveBinProps) {
-  // mounted only while open, so both are just on
-  const archiveBinRef = useFocusTrap(true)
-  useEscapeKey(onClose, true)
+  // mounted while open, and inside Presence while it slides out, when both let go at once
+  const presence = usePresenceState()
+  const archiveBinRef = useFocusTrap(presence === 'open')
+  useEscapeKey(onClose, presence === 'open')
 
   const toggle = (id: string): void => {
     setSelected(prev => {
@@ -53,6 +55,8 @@ export default function ArchiveBin({
       aria-modal="true"
       aria-label="Archive bin"
       onClick={() => onClose()}
+      className="motion-backdrop"
+      data-state={presence}
       style={{
         position: 'fixed',
         top: '32px',
@@ -68,6 +72,8 @@ export default function ArchiveBin({
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="motion-drawer"
+        data-state={presence}
         style={{
           width: '320px',
           maxWidth: '100vw',
@@ -76,8 +82,7 @@ export default function ArchiveBin({
           borderLeft: '1px solid var(--color-surface-offset)',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-8px 0 24px rgba(0,0,0,0.4)',
-          animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
+          boxShadow: '-8px 0 24px rgba(0,0,0,0.4)'
         }}
       >
         <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-surface-offset)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -117,13 +122,13 @@ export default function ArchiveBin({
                 <div className="flex-6px">
                   <button
                     onClick={() => onRestoreColumn(col.id)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', fontSize: '10px', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', fontSize: 'var(--text-xs)', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
                   >
                     Restore
                   </button>
                   <button
                     onClick={() => onDeleteColumn(col.id)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}
                   >
                     Delete
                   </button>
@@ -148,7 +153,7 @@ export default function ArchiveBin({
                   {archivedCards.length > 0 && (
                     <button
                       onClick={() => setSelected(allSelected ? new Set() : new Set(archivedCards.map(c => c.id)))}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '10px', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: 'var(--text-xs)', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
                     >
                       {allSelected ? 'Clear' : 'Select all'}
                     </button>
@@ -164,13 +169,13 @@ export default function ArchiveBin({
                     <div className="flex-6px">
                       <button
                         onClick={onBulkRestore}
-                        style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-secondary)', fontSize: '10px', fontWeight: 'var(--weight-semibold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
+                        style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-secondary)', fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-semibold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
                       >
                         Restore
                       </button>
                       <button
                         onClick={onBulkDelete}
-                        style={{ background: 'var(--color-error)', border: 'none', color: 'var(--color-on-accent)', fontSize: '10px', fontWeight: 'var(--weight-bold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
+                        style={{ background: 'var(--color-error)', border: 'none', color: 'var(--color-on-accent)', fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', cursor: 'pointer', borderRadius: 'var(--radius-sm)', padding: '3px 10px' }}
                       >
                         Delete ({selCount})
                       </button>
@@ -202,7 +207,7 @@ export default function ArchiveBin({
                             width: '15px', height: '15px', flexShrink: 0, borderRadius: '4px',
                             border: `1.5px solid ${selected ? 'var(--color-primary)' : 'var(--color-balance)'}`,
                             background: selected ? 'var(--color-primary)' : 'transparent',
-                            color: 'var(--color-on-accent)', fontSize: '10px', lineHeight: '13px', textAlign: 'center', fontWeight: 'bold'
+                            color: 'var(--color-on-accent)', fontSize: 'var(--text-xs)', lineHeight: '13px', textAlign: 'center', fontWeight: 'bold'
                           }}
                         >
                           {selected ? '✓' : ''}
@@ -214,13 +219,13 @@ export default function ArchiveBin({
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                         <button
                           onClick={e => { e.stopPropagation(); onRestoreCard(card.id) }}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', fontSize: '10px', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', fontSize: 'var(--text-xs)', cursor: 'pointer', fontWeight: 'var(--weight-semibold)' }}
                         >
                           Restore
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); onDeleteCard(card) }}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', fontSize: '10px', cursor: 'pointer' }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}
                         >
                           Delete
                         </button>

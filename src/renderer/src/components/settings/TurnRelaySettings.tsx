@@ -6,28 +6,7 @@ import * as syncApi from '../../data/sync'
 import { refreshTurnServer } from '../../lib/webrtcTransport'
 import { describeTurnSettings, turnIceServer } from '../../../../shared/iceConfig'
 import { SAVED_FEEDBACK_MS } from '../../lib/timings'
-
-const field: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'var(--color-surface-2)',
-  border: '1px solid var(--color-surface-offset)',
-  borderRadius: 'var(--radius-sm)',
-  color: 'var(--color-text-base)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 'var(--text-xs)',
-  padding: '6px 8px',
-  outline: 'none'
-}
-
-const label: React.CSSProperties = {
-  display: 'block',
-  fontSize: '10px',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: 'var(--color-text-faint)',
-  marginBottom: '3px'
-}
+import SettingsSection, { FieldRow, SettingsInput } from './SettingsSection'
 
 export default function TurnRelaySettings(): React.JSX.Element {
   const [url, setUrl] = useState('')
@@ -58,100 +37,52 @@ export default function TurnRelaySettings(): React.JSX.Element {
   }
 
   return (
-    <div style={{
-      marginTop: 'var(--space-4)',
-      padding: 'var(--space-4)',
-      background: 'var(--color-surface-1)',
-      border: '1px solid var(--color-surface-offset)',
-      borderRadius: 'var(--radius-md)'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '4px' }}>
-        <Route size={14} className="text-accent" />
-        <span className="text-item-bold">
-          Relay server (optional)
-        </span>
-        {active && (
-          <span style={{
-            padding: '1px 6px', borderRadius: 'var(--radius-full)',
-            background: 'var(--color-secondary-muted)', color: 'var(--color-secondary)',
-            fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em'
-          }}>
-            in use
-          </span>
-        )}
-      </div>
+    <SettingsSection icon={<Route size={14} />} title="Relay Server" description="Optional. Only for internet sync between two strict networks.">
+      <div className="col-lg">
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          <p className="text-sub" style={{ margin: 0, flex: '1 1 20rem', lineHeight: 'var(--leading-relaxed)' }}>
+            Internet sync usually finds a direct route between two computers. Behind a strict network, such as a phone's
+            hotspot or an office, it can't, and a relay has to carry the traffic. Checkpoint doesn't come with one, so
+            point this at your own TURN server or a hosted one. Sync on your own network never needs it.
+          </p>
+          {active && <span className="plugin-status" data-status="running">In use</span>}
+        </div>
 
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5, margin: '0 0 var(--space-3)' }}>
-        Internet sync finds a direct route between two machines on its own most
-        of the time. When both ends are behind a strict NAT, which is common on
-        mobile tethering and office networks, it cannot, and a relay has to
-        carry the traffic. Checkpoint ships no relay: point this at your own
-        coturn or a hosted one. LAN sync never needs it.
-      </p>
-
-      <div className="col">
-        <div>
-          <label style={label} htmlFor="turn-url">Server URL</label>
-          <input
-            id="turn-url"
+        <FieldRow label="Server address">
+          <SettingsInput
             value={url}
-            onChange={e => setUrl(e.target.value)}
+            onChange={setUrl}
             placeholder="turn:relay.example.com:3478"
-            spellCheck={false}
-            style={field}
           />
-        </div>
+        </FieldRow>
 
-        <div className="flex-gap">
-          <div className="flex-1">
-            <label style={label} htmlFor="turn-user">Username</label>
-            <input
-              id="turn-user"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              spellCheck={false}
-              style={field}
-            />
+        <div className="flex-gap" style={{ flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 12rem' }}>
+            <FieldRow label="Username">
+              <SettingsInput value={username} onChange={setUsername} />
+            </FieldRow>
           </div>
-          <div className="flex-1">
-            <label style={label} htmlFor="turn-pass">Password</label>
-            <input
-              id="turn-pass"
-              type="password"
-              value={credential}
-              onChange={e => setCredential(e.target.value)}
-              spellCheck={false}
-              style={field}
-            />
+          <div style={{ flex: '1 1 12rem' }}>
+            <FieldRow label="Password" hint="Kept encrypted on this computer, and never sent to a computer you sync with.">
+              <SettingsInput type="password" value={credential} onChange={setCredential} />
+            </FieldRow>
           </div>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-        <button
-          onClick={() => void save()}
-          style={{
-            fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
-            background: 'var(--color-secondary)', color: 'var(--color-text-inverted)',
-            border: 'none', padding: '6px 14px', borderRadius: 'var(--radius-md)', cursor: 'pointer'
-          }}
-        >
-          Save
-        </button>
-        {saved && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>
-            <Check size={12} /> Saved
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <button type="button" className="btn-primary" onClick={() => void save()}>
+            Save
+          </button>
+          <span role="status" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-xs)' }}>
+            {saved && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', color: 'var(--color-success)' }}>
+                <Check size={12} aria-hidden="true" /> Saved
+              </span>
+            )}
+            {problem && <span style={{ color: 'var(--color-warning)' }}>{problem}</span>}
           </span>
-        )}
-        {problem && (
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>{problem}</span>
-        )}
+        </div>
       </div>
-
-      <p style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.5, margin: 'var(--space-3) 0 0' }}>
-        The password is encrypted with the OS keychain and never leaves this
-        machine, including when syncing with a paired one.
-      </p>
-    </div>
+    </SettingsSection>
   )
 }

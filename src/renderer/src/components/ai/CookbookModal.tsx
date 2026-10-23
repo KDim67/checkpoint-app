@@ -28,7 +28,7 @@ export default function CookbookModal({ models }: Props) {
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {/* installed models */}
         <div>
-          <div style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+          <div style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
             Installed Local Models
           </div>
           {(() => {
@@ -37,7 +37,7 @@ export default function CookbookModal({ models }: Props) {
               ...(selectedModel ? [selectedModel] : [])
             ]))
             if (effectiveModels.length === 0) {
-              return <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No local Ollama models detected.</div>
+              return <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No local Ollama models detected.</div>
             }
             return (
               <div className="col-4px">
@@ -54,7 +54,7 @@ export default function CookbookModal({ models }: Props) {
                         background: isSelected ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
                         border: '1px solid var(--color-surface-offset)',
                         borderRadius: 'var(--radius-sm)',
-                        fontSize: '11px'
+                        fontSize: 'var(--text-xs)'
                       }}
                     >
                       <span style={{ fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? 'var(--color-secondary)' : 'var(--color-text-base)' }}>
@@ -68,7 +68,7 @@ export default function CookbookModal({ models }: Props) {
                           border: 'none',
                           borderRadius: 'var(--radius-sm)',
                           padding: '2px 8px',
-                          fontSize: '10px',
+                          fontSize: 'var(--text-2xs)',
                           fontWeight: 'bold',
                           cursor: 'pointer'
                         }}
@@ -85,7 +85,7 @@ export default function CookbookModal({ models }: Props) {
 
         {/* catalogue */}
         <div>
-          <div style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
+          <div style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>
             Catalog Models
           </div>
           <div className="col-6px">
@@ -112,7 +112,7 @@ export default function CookbookModal({ models }: Props) {
                   }}
                 >
                   <div className="row-between">
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{cat.name}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-base)' }}>{cat.name}</span>
                     {isInstalled ? (
                       <button
                         onClick={() => {
@@ -124,7 +124,7 @@ export default function CookbookModal({ models }: Props) {
                           handleModelChange(matched);
                           setShowCookbookModal(false)
                         }}
-                        style={{ background: 'var(--color-surface-1)', color: 'var(--color-secondary)', border: '1px solid var(--color-secondary-muted)', borderRadius: 'var(--radius-sm)', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                        style={{ background: 'var(--color-surface-1)', color: 'var(--color-secondary)', border: '1px solid var(--color-secondary-muted)', borderRadius: 'var(--radius-sm)', padding: '2px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', cursor: 'pointer' }}
                       >
                         Select
                       </button>
@@ -132,14 +132,14 @@ export default function CookbookModal({ models }: Props) {
                       <button
                         disabled={isPullingThis}
                         onClick={() => handlePullModel(q4Tag)}
-                        style={{ background: 'var(--color-primary)', color: 'var(--color-on-accent)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        style={{ background: 'var(--color-primary)', color: 'var(--color-on-accent)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '2px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
                         {isPullingThis ? <RefreshCw size={10} className="spin" /> : <Download size={10} />}
                         <span>{isPullingThis ? `${pullProgress}%` : 'Download'}</span>
                       </button>
                     )}
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', lineHeight: '1.3' }}>{cat.description}</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: '1.3' }}>{cat.description}</div>
                 </div>
               )
             })}

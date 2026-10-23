@@ -299,7 +299,7 @@ export default function LogEntry({ item, onTogglePin, onDelete, onConvertToCard 
                   background: 'var(--color-surface-2)',
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2.5) var(--space-3.5)',
+                  padding: 'var(--space-2-5) var(--space-3-5)',
                   fontSize: 'var(--text-sm)',
                   outline: 'none',
                   transition: 'border-color var(--duration-fast) var(--ease-default)'

@@ -168,11 +168,11 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
 
   if (error) {
     return (
-      <div style={{ padding: '8px 10px', color: 'var(--color-error)', fontSize: '11px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ padding: '8px 10px', color: 'var(--color-error)', fontSize: 'var(--text-xs)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius-sm)', margin: '8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span>⚠ Failed to create card: {error}</span>
         <button
           onClick={() => { executedActionSignaturesSet.delete(signature); setError(null) }}
-          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', borderRadius: '4px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}
+          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--color-error)', borderRadius: '4px', padding: '2px 8px', fontSize: 'var(--text-2xs)', cursor: 'pointer' }}
         >Retry</button>
       </div>
     )
@@ -181,7 +181,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
   if (!data) {
     return (
       <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)', margin: '8px 0' }}>
-        <div style={{ padding: '4px 0', color: 'var(--color-text-muted)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ padding: '4px 0', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <RefreshCw size={12} className="animate-spin" />
           <span>Generating card block...</span>
         </div>
@@ -210,14 +210,14 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary-soft)', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.02em', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary-soft)', fontSize: 'var(--text-xs)', fontWeight: 'bold', letterSpacing: '0.02em', flexShrink: 0 }}>
           <CheckCircle2 size={14} style={{ color: '#3b82f6', flexShrink: 0 }} />
           <span>Added to board</span>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, minWidth: 0 }}>
           <span
             style={{
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               padding: '2px 8px',
               borderRadius: '12px',
               fontWeight: 'bold',
@@ -234,7 +234,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
           </span>
           <span
             style={{
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               padding: '2px 8px',
               borderRadius: '12px',
               fontWeight: 'bold',
@@ -253,7 +253,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
           {data.title}
         </div>
         {data.body && (
-          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {data.body}
           </div>
         )}
@@ -268,7 +268,7 @@ export default function CreateTaskActionBlock({ jsonString }: { jsonString: stri
               <span
                 key={idx}
                 style={{
-                  fontSize: '10px',
+                  fontSize: 'var(--text-2xs)',
                   padding: '2px 6px',
                   borderRadius: '4px',
                   fontWeight: 'bold',

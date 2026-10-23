@@ -107,7 +107,7 @@ export default function TrayPanel(): React.JSX.Element {
           {value}
         </div>
         <div style={{
-          fontSize: '10px',
+          fontSize: 'var(--text-2xs)',
           marginTop: '3px',
           color: 'var(--color-text-faint)',
           textTransform: 'uppercase',
@@ -146,7 +146,7 @@ export default function TrayPanel(): React.JSX.Element {
         </span>
         {summary.context && (
           <span style={{
-            fontSize: '10px', color: 'var(--color-text-faint)', minWidth: 0,
+            fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', minWidth: 0,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }}>
             {summary.context}
@@ -190,7 +190,7 @@ export default function TrayPanel(): React.JSX.Element {
 
       <div style={{ padding: '0 var(--space-3-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <span style={{
-          fontSize: '10px', fontWeight: 'var(--weight-bold)',
+          fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)',
           color: 'var(--color-text-faint)', textTransform: 'uppercase',
           letterSpacing: 'var(--tracking-wider)'
         }}>
@@ -210,7 +210,7 @@ export default function TrayPanel(): React.JSX.Element {
             >
               <div className="min-w-0">
                 <div className="text-xs-base">{label}</div>
-                <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginTop: '1px' }}>{hint}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginTop: '1px' }}>{hint}</div>
               </div>
               <ToggleSwitch
                 checked={startup[key]}

@@ -39,7 +39,7 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
             border: 'none',
             borderRadius: 'var(--radius-sm)',
             padding: '2px 8px',
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             fontWeight: 'bold',
             cursor: 'pointer',
             display: 'flex',
@@ -70,8 +70,7 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-sm)',
               padding: '5px 8px 5px 26px',
-              fontSize: '11px',
-              outline: 'none',
+              fontSize: 'var(--text-xs)',
               boxSizing: 'border-box'
             }}
           />
@@ -88,14 +87,14 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
             : savedChats
           if (savedChats.length === 0) {
             return (
-              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-4)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-4)' }}>
                 No saved conversations yet. Start chatting to auto-save!
               </div>
             )
           }
           if (visibleChats.length === 0) {
             return (
-              <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-4)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-4)' }}>
                 No chats match “{chatSearchQuery.trim()}”.
               </div>
             )
@@ -138,12 +137,11 @@ export default function SavedChatsModal({ chats, handleNewChat, handleLoadChat, 
                         color: 'var(--color-text-base)',
                         borderRadius: 'var(--radius-sm)',
                         padding: '1px 4px',
-                        fontSize: '11px',
-                        outline: 'none'
+                        fontSize: 'var(--text-xs)'
                       }}
                     />
                   ) : (
-                    <span style={{ fontSize: '11px', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? 'var(--color-secondary)' : 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: isActive ? 'bold' : 'normal', color: isActive ? 'var(--color-secondary)' : 'var(--color-text-base)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {chat.title}
                     </span>
                   )}

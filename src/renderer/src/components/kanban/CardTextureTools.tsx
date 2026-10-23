@@ -20,7 +20,7 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
     }}>
       <div className="row">
         <Sparkles size={14} className="text-accent" />
-        <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Game Dev: Texture Tooling Detected
         </span>
       </div>
@@ -36,7 +36,7 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {fileName}
                 </span>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={path}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={path}>
                   {path}
                 </span>
               </div>
@@ -53,7 +53,7 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
                     border: 'none',
                     borderRadius: 'var(--radius-sm)',
                     color: 'white',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-semibold)',
                     padding: '6px 12px',
                     cursor: 'pointer',
@@ -76,7 +76,7 @@ export default function CardTextureTools({ body, cardId, onClose }: { body: stri
                   style={{
                     borderRadius: 'var(--radius-sm)',
                     color: 'var(--color-text-base)',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-semibold)',
                     padding: '6px 12px',
                     cursor: 'pointer',

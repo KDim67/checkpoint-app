@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
+import { FieldRow, ToggleRow, Divider } from './SettingsSection'
 import { getBoolSetting, getNumberSetting, getStringSetting, setBoolSetting, setNumberSetting, setStringSetting } from '../../lib/settings'
 import * as appApi from '../../data/app'
 import * as widgetApi from '../../data/widget'
@@ -52,45 +52,33 @@ export default function WidgetSettings() {
   }
 
   const POSITIONS: { value: typeof position; label: string }[] = [
-    { value: 'top-left',     label: '↖ Top Left'      },
-    { value: 'top-right',    label: '↗ Top Right'     },
-    { value: 'bottom-left',  label: '↙ Bottom Left'   },
-    { value: 'bottom-right', label: '↘ Bottom Right'  }
+    { value: 'top-left',     label: 'Top left'     },
+    { value: 'top-right',    label: 'Top right'    },
+    { value: 'bottom-left',  label: 'Bottom left'  },
+    { value: 'bottom-right', label: 'Bottom right' }
   ]
 
   return (
     <div className="col-xl">
-      <RowBetween>
-        <div>
-          <div className="text-item">
-            Show Desktop Widget
-          </div>
-          <div className="text-sub">
-            Transparent always-on-top overlay, never steals focus from your IDE.
-          </div>
-        </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} label="Show Desktop Widget" />
-      </RowBetween>
+      <ToggleRow
+        label="Show desktop widget"
+        description="It stays on top without taking the keyboard from whatever you're working in."
+        checked={enabled}
+        onChange={handleToggle}
+      />
 
       {enabled && (
         <>
           <Divider />
-          <FieldRow label="Position">
-            <div className="flex-wrap-gap">
+          <FieldRow label="Corner of the screen" group>
+            <div className="settings-choices" data-fit="">
               {POSITIONS.map(p => (
                 <button
                   key={p.value}
+                  type="button"
+                  className="settings-choice"
+                  aria-pressed={position === p.value}
                   onClick={() => handlePosition(p.value)}
-                  style={{
-                    padding: 'var(--space-2) var(--space-3)',
-                    background: position === p.value ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
-                    border: `1px solid ${position === p.value ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-                    color: position === p.value ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-                    borderRadius: 'var(--radius-md)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-xs)',
-                    transition: 'all 100ms ease'
-                  }}
                 >
                   {p.label}
                 </button>
@@ -105,6 +93,7 @@ export default function WidgetSettings() {
               max={1.0}
               step={0.05}
               value={opacity}
+              aria-valuetext={`${Math.round(opacity * 100)}%`}
               onChange={e => handleOpacity(parseFloat(e.target.value))}
               className="range-accent"
             />

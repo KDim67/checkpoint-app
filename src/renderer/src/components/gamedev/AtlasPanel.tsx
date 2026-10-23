@@ -34,7 +34,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 placeholder="Choose a Folder..."
               />
               {tool.atlasFolderPath && (
-                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', overflowWrap: 'break-word' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', overflowWrap: 'break-word' }}>
                   Path: {tool.atlasFolderPath}
                 </span>
               )}
@@ -107,7 +107,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 border: '1px solid rgba(255, 170, 0, 0.3)',
                 borderRadius: 'var(--radius-md)',
                 padding: 'var(--space-2) var(--space-3)',
-                fontSize: '10px',
+                fontSize: 'var(--text-xs)',
                 color: 'var(--color-warning)',
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -132,7 +132,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                 </span>
               </div>
               {tool.atlasLayout && (
-                <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: '11px' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: 'var(--text-xs)' }}>
                   <div>
                     <span style={{ color: 'var(--color-text-muted)', marginRight: '4px' }}>Packed Dimensions:</span>
                     <span style={{ fontWeight: 'var(--weight-bold)', color: 'var(--color-secondary)' }}>{tool.atlasLayout.size} x {tool.atlasLayout.size} px</span>
@@ -221,7 +221,7 @@ export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
                     border: '1px solid rgba(0, 255, 128, 0.2)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-2) var(--space-3)',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     color: 'var(--color-secondary)',
                     display: 'flex',
                     flexDirection: 'column',

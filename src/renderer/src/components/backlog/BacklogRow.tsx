@@ -76,7 +76,7 @@ export default function BacklogRow({
                 color: 'var(--color-text-base)',
                 borderRadius: '4px',
                 padding: '2px 8px',
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 'var(--weight-semibold)',
                 cursor: 'pointer',
                 textAlign: 'left',
@@ -115,8 +115,8 @@ export default function BacklogRow({
                     style={{
                       border: 'none',
                       color: 'var(--color-text-base)',
-                      padding: 'var(--space-1.5) var(--space-3)',
-                      fontSize: '11px',
+                      padding: 'var(--space-1-5) var(--space-3)',
+                      fontSize: 'var(--text-xs)',
                       textAlign: 'left',
                       cursor: 'pointer',
                       display: 'flex',
@@ -194,8 +194,8 @@ export default function BacklogRow({
                     style={{
                       border: 'none',
                       color: 'var(--color-text-base)',
-                      padding: 'var(--space-1.5) var(--space-3)',
-                      fontSize: '11px',
+                      padding: 'var(--space-1-5) var(--space-3)',
+                      fontSize: 'var(--text-xs)',
                       textAlign: 'left',
                       cursor: 'pointer',
                       display: 'flex',
@@ -290,7 +290,7 @@ export default function BacklogRow({
               <span
                 key={t.id}
                 style={{
-                  fontSize: '10px',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-semibold)',
                   color: t.color,
                   background: `${t.color}15`,
@@ -366,7 +366,7 @@ export default function BacklogRow({
                 color: 'var(--color-text-muted)',
                 borderRadius: '4px',
                 padding: '2px 6px',
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 'var(--weight-semibold)'
               }}>
                 <Link2 size={10} /> {relationsCount}

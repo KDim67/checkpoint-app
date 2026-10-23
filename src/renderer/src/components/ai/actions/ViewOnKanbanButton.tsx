@@ -12,7 +12,7 @@ export default function ViewOnKanbanButton({ onClick }: { onClick: MouseEventHan
         color: 'var(--color-text-inverted)',
         borderRadius: 'var(--radius-sm)',
         padding: '4px 10px',
-        fontSize: '11px',
+        fontSize: 'var(--text-xs)',
         fontWeight: 'bold',
         cursor: 'pointer',
         display: 'flex',

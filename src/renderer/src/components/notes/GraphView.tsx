@@ -155,14 +155,15 @@ export default function GraphView({ notes, activeTitle, onSelectNote }: GraphVie
       const { width, height } = dimsRef.current
       const totalKE = stepSimulation(nodesRef.current, linksRef.current, width, height)
 
-      // imperative paint for speed
+      // imperative paint for speed, only what moved enough to see
+      const moved = new Set<GraphNode>()
       for (const n of nodesRef.current) {
         const el = nodeElementsRef.current[n.id]
         if (el) el.setAttribute('transform', `translate(${n.x}, ${n.y})`)
       }
       linksRef.current.forEach((link, idx) => {
         const el = linkElementsRef.current[idx]
-        if (el && link.sourceNode && link.targetNode) {
+        if (el && link.sourceNode && link.targetNode && (moved.has(link.sourceNode) || moved.has(link.targetNode))) {
           el.setAttribute('x1', String(link.sourceNode.x))
           el.setAttribute('y1', String(link.sourceNode.y))
           el.setAttribute('x2', String(link.targetNode.x))

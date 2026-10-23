@@ -1,6 +1,7 @@
 import React, { useRef, createContext, useContext, useState, useCallback, useMemo } from 'react'
 import useEscapeKey from './useEscapeKey'
 import useFocusTrap from './useFocusTrap'
+import { usePresence } from '../../lib/presence'
 
 /** rows, not buttons: past three answers a label can't say what each does */
 interface PickChoice {
@@ -27,29 +28,33 @@ interface ConfirmDialogProps {
   onCancel: () => void
 }
 
-export default function ConfirmDialog({
-  isOpen,
-  title,
-  message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  isDestructive = false,
-  warning,
-  choices,
-  onConfirm,
-  onPick,
-  onCancel
-}: ConfirmDialogProps) {
+export default function ConfirmDialog(props: ConfirmDialogProps) {
+  const { isOpen, onConfirm, onPick, onCancel } = props
+  // the words it was opened with stay while it leaves; the provider clears them the moment you answer
+  const kept = useRef(props)
+  if (isOpen) kept.current = props
+  const {
+    title,
+    message,
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    isDestructive = false,
+    warning,
+    choices
+  } = isOpen ? props : kept.current
+  const { mounted, state } = usePresence(isOpen)
   const picking = Boolean(choices && choices.length > 0 && onPick)
   const cancelBtnRef = useRef<HTMLButtonElement | null>(null)
   const containerRef = useFocusTrap(isOpen, cancelBtnRef)
   useEscapeKey(onCancel, isOpen)
 
-  if (!isOpen) return null
+  if (!mounted) return null
 
   return (
     <div
       ref={containerRef}
+      className="motion-backdrop"
+      data-state={state}
       style={{
         position: 'fixed',
         top: 0,
@@ -71,6 +76,8 @@ export default function ConfirmDialog({
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="motion-pop"
+        data-state={state}
         style={{
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-surface-offset)',
@@ -79,8 +86,7 @@ export default function ConfirmDialog({
           maxWidth: '400px',
           // explained answers can outgrow a short window, keep the buttons on screen
           maxHeight: '85vh',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.5)',
-          animation: 'confirm-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          boxShadow: 'var(--shadow-xl)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'

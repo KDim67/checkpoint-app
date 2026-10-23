@@ -1,6 +1,7 @@
 import React from 'react'
 import useFocusTrap from './useFocusTrap'
 import useEscapeKey from './useEscapeKey'
+import { usePresenceState } from '../../lib/presence'
 
 interface ModalShellProps {
   /** accessible name; the visible heading stays in children */
@@ -20,8 +21,11 @@ export default function ModalShell({
   closeOnBackdrop = true,
   children
 }: ModalShellProps) {
-  const containerRef = useFocusTrap(true)
-  useEscapeKey(onClose, true)
+  // leaving inside Presence, it gives focus back at once and plays its exit
+  const presence = usePresenceState()
+  const open = presence === 'open'
+  const containerRef = useFocusTrap(open)
+  useEscapeKey(onClose, open)
 
   return (
     <div
@@ -29,6 +33,8 @@ export default function ModalShell({
       role="dialog"
       aria-modal="true"
       aria-label={label}
+      className="motion-backdrop"
+      data-state={presence}
       onClick={closeOnBackdrop ? e => e.target === e.currentTarget && onClose() : undefined}
       style={{
         position: 'fixed',
@@ -43,6 +49,8 @@ export default function ModalShell({
       }}
     >
       <div
+        className="motion-pop"
+        data-state={presence}
         style={{
           background: 'var(--color-surface-elevated)',
           border: '1px solid var(--color-surface-offset)',
@@ -55,8 +63,7 @@ export default function ModalShell({
           display: 'flex',
           flexDirection: 'column',
           gap: 'var(--space-4)',
-          boxShadow: 'var(--shadow-lg)',
-          animation: 'modal-pop-in 200ms var(--ease-enter)'
+          boxShadow: 'var(--shadow-lg)'
         }}
       >
         {children}

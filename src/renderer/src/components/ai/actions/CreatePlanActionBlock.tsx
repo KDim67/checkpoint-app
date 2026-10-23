@@ -127,7 +127,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
 
   const btnBase: React.CSSProperties = {
     border: 'none', borderRadius: 'var(--radius-sm)',
-    padding: '5px 12px', fontSize: '11px', fontWeight: 'bold',
+    padding: '5px 12px', fontSize: 'var(--text-xs)', fontWeight: 'bold',
     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
   }
 
@@ -153,12 +153,12 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
           <Sparkles size={14} className="no-shrink" />
           <span>Implementation Plan</span>
           {phase === 'review' && (
-            <span style={{ background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: '#7dd3fc', fontSize: '10px', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
+            <span style={{ background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: '#7dd3fc', fontSize: 'var(--text-2xs)', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
               Awaiting Approval
             </span>
           )}
           {phase === 'committed' && (
-            <span style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: 'var(--color-success-soft)', fontSize: '10px', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
+            <span style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: 'var(--color-success-soft)', fontSize: 'var(--text-2xs)', padding: '1px 6px', borderRadius: '10px', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
               ✓ Committed
             </span>
           )}
@@ -172,7 +172,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
               color: 'var(--color-info)',
               borderRadius: 'var(--radius-sm)',
               padding: '3px 8px',
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
@@ -184,12 +184,12 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
             <Layout size={11} /> Expand Plan
           </button>
           {phase === 'review' && (
-            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               {approvedCount}/{steps.length} approved
             </span>
           )}
           {phase === 'committed' && exportedCount !== null && (
-            <span style={{ fontSize: '10px', color: 'var(--color-success-soft)', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-success-soft)', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
               {exportedCount} card{exportedCount !== 1 ? 's' : ''} created
             </span>
           )}
@@ -199,7 +199,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
       <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#f1f5f9', marginBottom: planOverview ? '6px' : '10px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{planTitle}</div>
       {planOverview && (
         <div style={{
-          fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '12px', lineHeight: 1.6,
+          fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: '12px', lineHeight: 1.6,
           background: 'rgba(255,255,255,0.03)',
           borderLeft: `2px solid ${phase === 'committed' ? 'rgba(34,197,94,0.4)' : 'rgba(56,189,248,0.4)'}`,
           paddingLeft: '10px', borderRadius: '0 4px 4px 0',
@@ -239,7 +239,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
               </div>
               <div className="fill">
                 <div style={{
-                  fontSize: '11px', fontWeight: 'bold',
+                  fontSize: 'var(--text-xs)', fontWeight: 'bold',
                   color: isApproved ? '#e2e8f0' : '#64748b',
                   textDecoration: isApproved ? 'none' : 'line-through',
                   marginBottom: s.details ? '2px' : '0'
@@ -247,7 +247,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                   {s.title}
                 </div>
                 {s.details && (
-                  <div style={{ fontSize: '10px', color: isApproved ? 'var(--color-text-muted)' : 'var(--color-text-faint)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: isApproved ? 'var(--color-text-muted)' : 'var(--color-text-faint)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                     {s.details}
                   </div>
                 )}
@@ -283,7 +283,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
-          <span style={{ fontSize: '10px', color: '#64748b' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: '#64748b' }}>
             {skippedCount > 0 ? `${skippedCount} step${skippedCount !== 1 ? 's' : ''} skipped` : 'All steps exported'}
           </span>
           <button
@@ -307,7 +307,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
         }}>
           <style>{`
             .plan-markdown-body {
-              font-size: 11px;
+              font-size: var(--text-xs);
               line-height: 1.5;
               color: var(--color-text-muted);
               white-space: normal;
@@ -354,7 +354,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
               padding: 2px 4px;
               border-radius: var(--radius-sm);
               font-family: var(--font-mono);
-              font-size: 10px;
+              font-size: var(--text-2xs);
             }
           `}</style>
           <div style={{
@@ -391,7 +391,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                 overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px',
                 padding: '18px', background: 'var(--color-surface-1)', flexShrink: 0
               }}>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.08em' }}>
+                <div style={{ fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-faint)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.08em' }}>
                   Steps Checklist ({approvedCount}/{steps.length} approved)
                 </div>
                 {steps.map((s, idx) => {
@@ -427,11 +427,11 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                         {isApproved && <Check size={10} color="#fff" strokeWidth={3} />}
                       </div>
                       <div className="col-fill">
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: isSelected ? 'var(--color-secondary)' : 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', color: isSelected ? 'var(--color-secondary)' : 'var(--color-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
                           Step 0{idx + 1}
                         </span>
                         <span style={{
-                          fontSize: '11px', fontWeight: isSelected ? 'bold' : 'normal',
+                          fontSize: 'var(--text-xs)', fontWeight: isSelected ? 'bold' : 'normal',
                           color: isApproved ? (isSelected ? 'var(--color-text-base)' : 'var(--color-text-muted)') : 'var(--color-text-faint)',
                           textDecoration: isApproved ? 'none' : 'line-through',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
@@ -449,7 +449,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: '16px' }}>
                       <div className="col-4px">
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-secondary)', fontWeight: 'bold', letterSpacing: '0.1em' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-secondary)', fontWeight: 'bold', letterSpacing: '0.1em' }}>
                           STEP DETAILS • 0{activeStepIndex + 1} OF {steps.length}
                         </span>
                         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--color-text-base)', letterSpacing: '-0.01em' }}>
@@ -462,7 +462,7 @@ export default function CreatePlanActionBlock({ jsonString }: { jsonString: stri
                           background: stepApprovals[activeStepIndex] !== false ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
                           border: `1px solid ${stepApprovals[activeStepIndex] !== false ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
                           color: stepApprovals[activeStepIndex] !== false ? 'var(--color-success-soft)' : '#f87171',
-                          borderRadius: '20px', padding: '6px 14px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+                          borderRadius: '20px', padding: '6px 14px', fontSize: 'var(--text-xs)', fontWeight: 'bold', cursor: 'pointer',
                           display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 150ms ease'
                         }}
                       >

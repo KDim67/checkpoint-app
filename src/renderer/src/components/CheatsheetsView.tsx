@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Plus, Search, FileText, Trash2, Edit3, UploadCloud, X, BookOpen, ExternalLink, RefreshCw, Pin, Sparkles, FileType2, Copy, Check, ChevronUp, ChevronDown, ArrowDownAZ, Clock, HardDrive } from 'lucide-react'
+import { Plus, Search, FileText, Trash2, Edit3, UploadCloud, X, BookOpen, ExternalLink, Pin, Sparkles, FileType2, Copy, Check, ChevronUp, ChevronDown, ArrowDownAZ, Clock, HardDrive } from 'lucide-react'
 import { useToast } from './ui/Toast'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { useAppStore } from '../store/appStore'
@@ -9,6 +9,7 @@ import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { getJsonSetting, setJsonSetting } from '../lib/settings'
 import * as cheatsheetsApi from '../data/cheatsheets'
 import * as appApi from '../data/app'
+import { SkeletonLines, SkeletonList } from './ui/Skeleton'
 
 interface CheatsheetFile {
   name: string
@@ -537,7 +538,7 @@ export default function CheatsheetsView() {
           color: var(--color-text-faint);
           border-radius: var(--radius-sm);
           padding: 3px 8px;
-          font-size: 10px;
+          font-size: var(--text-2xs);
           font-weight: var(--weight-medium);
           cursor: pointer;
           display: inline-flex;
@@ -560,7 +561,7 @@ export default function CheatsheetsView() {
           gap: var(--space-2);
         }
         .list-section-label {
-          font-size: 9px;
+          font-size: var(--text-2xs);
           font-weight: var(--weight-bold);
           text-transform: uppercase;
           letter-spacing: 0.06em;
@@ -787,9 +788,7 @@ export default function CheatsheetsView() {
 
         <div className="cheatsheet-list">
           {loading && cheatsheets.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--color-text-muted)' }}>
-              <RefreshCw size={20} className="animate-spin" />
-            </div>
+            <SkeletonList label="Loading the cheatsheets" count={5} style={{ padding: 'var(--space-3)' }} />
           ) : pinnedList.length === 0 && unpinnedList.length === 0 && contentOnlyHits.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: 'var(--space-4)', textAlign: 'center', gap: 'var(--space-2)' }}>
               <BookOpen size={32} className="text-faint" />
@@ -845,12 +844,12 @@ export default function CheatsheetsView() {
                       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <FileType2 size={12} className="icon-accent" />
                         <span className="truncate">{hit.name.replace(/\.pdf$/i, '')}</span>
-                        <span style={{ fontSize: '10px', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)', flexShrink: 0 }}>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-secondary)', fontWeight: 'var(--weight-bold)', flexShrink: 0 }}>
                           {hit.matchCount} match{hit.matchCount > 1 ? 'es' : ''}
                         </span>
                       </span>
                       {hit.snippets[0] && (
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {hit.snippets[0]}
                         </span>
                       )}
@@ -884,7 +883,7 @@ export default function CheatsheetsView() {
                 <h2 style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px', margin: 0 }}>
                   {selectedPdf.name.replace(/\.pdf$/i, '')}
                 </h2>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
                   {formatSize(selectedPdf.size)}
                 </span>
               </div>
@@ -948,7 +947,7 @@ export default function CheatsheetsView() {
                   />
                 </div>
                 {textQuery.trim().length >= 2 && (
-                  <span style={{ fontSize: '10px', color: matchCount > 0 ? 'var(--color-secondary)' : 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: matchCount > 0 ? 'var(--color-secondary)' : 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', whiteSpace: 'nowrap' }}>
                     {matchCount > 0 ? `${activeMatch + 1} / ${matchCount}` : 'No matches'}
                   </span>
                 )}
@@ -988,10 +987,7 @@ export default function CheatsheetsView() {
                 }}
               >
                 {textLoading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
-                    <RefreshCw size={14} className="animate-spin" />
-                    Extracting text…
-                  </div>
+                  <SkeletonLines label="Reading the text out of the PDF" lines={8} />
                 ) : !textContent ? (
                   <div className="text-empty">
                     No extractable text found in this PDF (it may be a scanned image).

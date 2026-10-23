@@ -120,7 +120,7 @@ export default function RelationsPanel({ links, placeholder }: { links: ItemRela
                   gap: '2px'
                 }}
               >
-                <strong style={{ fontSize: '11px' }}>{res.title}</strong>
+                <strong style={{ fontSize: 'var(--text-xs)' }}>{res.title}</strong>
                 <span className="text-nano">#{res.id.substring(0, 8)} | context: {res.context}</span>
               </button>
             ))}

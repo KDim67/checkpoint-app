@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import type { NoteMetadata } from '../../../../shared/types'
 import { NOTE_TEMPLATES, formatRelativeTime, type SortKey } from './notesUtils'
+import { SkeletonList } from '../ui/Skeleton'
 
 export interface SidebarItem {
   note: NoteMetadata
@@ -70,7 +71,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
         <div className="row-between">
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             Notes
-            <span style={{ fontSize: '10px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-faint)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)', padding: '1px 7px' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-faint)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)', padding: '1px 7px' }}>
               {totalCount}
             </span>
           </span>
@@ -178,8 +179,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
               borderRadius: 'var(--radius-md)',
               color: 'var(--color-text-base)',
               fontSize: 'var(--text-xs)',
-              padding: '6px 28px 6px 30px',
-              outline: 'none'
+              padding: '6px 28px 6px 30px'
             }}
           />
           {searchQuery && (
@@ -195,7 +195,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }} ref={sortRef}>
-          <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
+          <span style={{ fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
             {searchQuery ? 'Search results' : 'Sorted by'}
           </span>
           {!searchQuery && (
@@ -241,9 +241,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {loading ? (
-          <div style={{ padding: 'var(--space-4)', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)', textAlign: 'center' }}>
-            Loading notes…
-          </div>
+          <SkeletonList label="Loading the notes" count={6} style={{ padding: 'var(--space-4)' }} />
         ) : items.length === 0 ? (
           <div style={{ padding: 'var(--space-6)', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)', textAlign: 'center', lineHeight: 1.6 }}>
             {searchQuery ? `No notes match “${searchQuery}”.` : selectedTag ? 'No notes with this tag.' : 'No notes yet. Create your first note.'}
@@ -275,7 +273,7 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
 
                 {(snippet || note.excerpt) && (
                   <span style={{
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     color: 'var(--color-text-muted)',
                     lineHeight: 1.45,
                     display: '-webkit-box',
@@ -288,13 +286,13 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
                 )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', flexShrink: 0 }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', flexShrink: 0 }}>
                     {formatRelativeTime(note.updatedAt)}
                   </span>
                   {note.tags.length > 0 && (
                     <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', overflow: 'hidden' }}>
                       {note.tags.slice(0, 3).map(tag => (
-                        <span key={tag} style={{ fontSize: '10px', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', padding: '0 5px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap' }}>
+                        <span key={tag} style={{ fontSize: 'var(--text-2xs)', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', padding: '0 5px', borderRadius: 'var(--radius-sm)', whiteSpace: 'nowrap' }}>
                           {tag.replace(/^#/, '')}
                         </span>
                       ))}
@@ -310,11 +308,11 @@ export default function NotesSidebar(props: NotesSidebarProps): React.JSX.Elemen
       {allTags.length > 0 && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', borderTop: '1px solid var(--color-surface-offset)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '180px', overflowY: 'auto', flexShrink: 0 }}>
           <div className="row-between">
-            <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)' }}>
               Filter by tag
             </span>
             {selectedTag && (
-              <button onClick={() => onSelectTag(null)} style={{ fontSize: '10px', background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 0 }}>
+              <button onClick={() => onSelectTag(null)} style={{ fontSize: 'var(--text-xs)', background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 0 }}>
                 Clear
               </button>
             )}

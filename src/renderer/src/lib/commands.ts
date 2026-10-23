@@ -5,6 +5,8 @@ import type { ActiveView, CreateIntent, SettingsTab } from '../store/appStore'
 import type { SavedView } from '../../../shared/savedViews'
 import { setSetting } from '../data/settings'
 import { openProblemReport } from './reportProblem'
+import { SECTION_TERMS } from './settingsSearch'
+import { withViewTransition } from './viewTransition'
 
 export interface Command extends CommandLike {
   /** shortcut hint or current value */
@@ -49,19 +51,19 @@ const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
   { view: 'workspaces', label: 'Workspaces', keywords: ['switch', 'manage', 'projects', 'context', 'rename', 'reorder'] }
 ]
 
-const SETTINGS_TABS: { tab: SettingsTab; label: string; keywords?: string[] }[] = [
+const SETTINGS_TABS: { tab: SettingsTab; label: string }[] = [
   { tab: 'general', label: 'General' },
-  { tab: 'appearance', label: 'Appearance & Theme', keywords: ['colors', 'theme', 'font', 'presets'] },
-  { tab: 'workspaces', label: 'Board', keywords: ['columns', 'kanban', 'wip', 'limits'] },
-  { tab: 'ai', label: 'AI Assistant', keywords: ['model', 'provider', 'api key'] },
-  { tab: 'connections', label: 'Connections', keywords: ['github', 'issues', 'integrations', 'key'] },
-  { tab: 'hotkeyBinder', label: 'Shortcuts & Mouse', keywords: ['keys', 'bindings', 'hotkeys', 'rebind', 'mouse', 'buttons'] },
-  { tab: 'features', label: 'Features & Plugins', keywords: ['toggles', 'extensions'] },
-  { tab: 'notifications', label: 'Notifications', keywords: ['alerts', 'quiet hours', 'reminders'] },
-  { tab: 'backup', label: 'Database Backup', keywords: ['snapshot', 'restore'] },
-  { tab: 'storage', label: 'Storage & Export', keywords: ['files', 'disk', 'export', 'csv', 'markdown', 'backup data'] },
-  { tab: 'sync', label: 'Device Sync', keywords: ['sync', 'p2p', 'peer', 'lan', 'devices', 'machines'] },
-  { tab: 'mcp', label: 'MCP Server', keywords: ['agent', 'tools', 'activity'] },
+  { tab: 'appearance', label: 'Appearance' },
+  { tab: 'workspaces', label: 'Board' },
+  { tab: 'ai', label: 'AI Assistant' },
+  { tab: 'connections', label: 'Connections' },
+  { tab: 'hotkeyBinder', label: 'Shortcuts & Mouse' },
+  { tab: 'features', label: 'Features & Plugins' },
+  { tab: 'notifications', label: 'Notifications' },
+  { tab: 'backup', label: 'Database Backup' },
+  { tab: 'storage', label: 'Storage & Export' },
+  { tab: 'sync', label: 'Device Sync' },
+  { tab: 'mcp', label: 'MCP Server' },
   { tab: 'about', label: 'About' }
 ]
 
@@ -98,7 +100,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
       label: `Go to ${label}`,
       group: 'Navigation',
       keywords,
-      run: () => ctx.setView(view)
+      run: () => withViewTransition(() => ctx.setView(view))
     })
   }
 
@@ -164,13 +166,13 @@ export function buildCommands(ctx: CommandContext): Command[] {
     }
   )
 
-  for (const { tab, label, keywords } of SETTINGS_TABS) {
+  for (const { tab, label } of SETTINGS_TABS) {
     if (tab === 'ai' && !ctx.aiEnabled) continue
     commands.push({
       id: `settings:${tab}`,
       label: `Settings: ${label}`,
       group: 'Settings',
-      keywords,
+      keywords: [...SECTION_TERMS[tab]],
       run: () => {
         ctx.setSettingsTab(tab)
         ctx.setView('settings')

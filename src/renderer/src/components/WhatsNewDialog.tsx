@@ -25,7 +25,7 @@ export default function WhatsNewDialog({ version, releases, onClose }: {
                 {releaseDate(release.publishedAt) && <span className="whats-new-date">{releaseDate(release.publishedAt)}</span>}
               </h3>
             )}
-            <ReleaseNotesBody notes={release.notes} />
+            <ReleaseNotesBody notes={release.notes} level={releases.length > 1 ? 4 : 3} />
           </section>
         ))}
       </div>

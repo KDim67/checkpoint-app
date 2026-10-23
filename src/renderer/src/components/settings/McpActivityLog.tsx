@@ -3,6 +3,7 @@ import { RotateCcw, History } from 'lucide-react'
 import { useToast } from '../ui/Toast'
 import type { McpActivityEntry } from '../../../../shared/mcpActivity'
 import * as mcpApi from '../../data/mcp'
+import { SkeletonBlocks } from '../ui/Skeleton'
 
 /** coarse on purpose: just now, or last week? */
 function relativeTime(ms: number, now: number): string {
@@ -59,7 +60,7 @@ export default function McpActivityLog(): React.JSX.Element {
   }
 
   if (loading) {
-    return <div className="text-hint-faint">Loading…</div>
+    return <SkeletonBlocks label="Loading what agents changed" count={2} height="3rem" gap="var(--space-2)" />
   }
 
   if (entries.length === 0) {
@@ -75,33 +76,25 @@ export default function McpActivityLog(): React.JSX.Element {
         fontSize: 'var(--text-xs)',
         color: 'var(--color-text-muted)'
       }}>
-        <History size={14} className="no-shrink" />
-        Nothing yet. Changes made by an external agent through MCP show up here.
+        <History size={14} className="no-shrink" aria-hidden="true" />
+        Nothing yet. What an agent changes through MCP shows here.
       </div>
     )
   }
 
   return (
-    <div className="col-xs">
+    <ul className="settings-list" aria-label="Agent changes">
       {entries.map(entry => {
         const undone = entry.undoneAt !== null
         return (
-          <div
+          <li
             key={entry.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
-              padding: 'var(--space-2) var(--space-3)',
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              borderRadius: 'var(--radius-md)',
-              opacity: undone ? 0.55 : 1
-            }}
+            className="settings-list-row"
+            style={{ flexWrap: 'nowrap', opacity: undone ? 'var(--opacity-disabled)' : 1 }}
           >
-            <div className="fill">
-              <div style={{
-                fontSize: 'var(--text-xs)',
+            <div className="fill min-w-0">
+              <div title={entry.summary} style={{
+                fontSize: 'var(--text-sm)',
                 color: 'var(--color-text-base)',
                 textDecoration: undone ? 'line-through' : 'none',
                 overflow: 'hidden',
@@ -120,26 +113,27 @@ export default function McpActivityLog(): React.JSX.Element {
 
             {!undone && entry.undo && (
               <button
-                className="btn-secondary"
+                type="button"
+                className="btn-secondary btn-small"
                 onClick={() => handleUndo(entry)}
                 disabled={busyId === entry.id}
                 aria-label={`Undo: ${entry.summary}`}
                 title="Undo this change"
-                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}
+                style={{ flexShrink: 0 }}
               >
-                <RotateCcw size={12} />
+                <RotateCcw size={12} aria-hidden="true" />
                 Undo
               </button>
             )}
             {!undone && !entry.undo && (
               // say so instead of an inert button, not every write reverses
-              <span style={{ fontSize: '11px', color: 'var(--color-text-faint)', flexShrink: 0 }}>
-                not reversible
+              <span className="text-sub" style={{ flexShrink: 0, marginTop: 0 }}>
+                Can't be undone
               </span>
             )}
-          </div>
+          </li>
         )
       })}
-    </div>
+    </ul>
   )
 }

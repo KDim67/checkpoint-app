@@ -6,6 +6,7 @@ import { errorMessage } from '../../../../shared/errors'
 import { compareVersions, type ReleaseNote, type ReleaseNotesState } from '../../../../shared/releaseNotes'
 import ReleaseNotesBody, { releaseDate } from '../ui/ReleaseNotesBody'
 import * as appApi from '../../data/app'
+import { SkeletonLines } from '../ui/Skeleton'
 
 function VersionLine({ release, running }: { release: ReleaseNote; running: string }): React.JSX.Element {
   const date = releaseDate(release.publishedAt)
@@ -45,9 +46,9 @@ export default function WhatsNew(): React.JSX.Element {
   const kept = state?.fetchedAt ? new Date(state.fetchedAt).toLocaleDateString() : ''
 
   return (
-    <section className="whats-new" aria-labelledby="whats-new-heading">
+    <section className="whats-new" aria-label="Release notes">
       <div className="whats-new-head">
-        <h3 id="whats-new-heading" className="whats-new-heading">What&apos;s new</h3>
+        <span className="text-sub" style={{ marginTop: 0 }}>{kept ? `Kept from GitHub on ${kept}.` : 'From GitHub.'}</span>
         <button
           type="button"
           className="whats-new-refresh"
@@ -65,7 +66,7 @@ export default function WhatsNew(): React.JSX.Element {
           {state.error}{latest && kept ? ` Showing the notes kept on ${kept}.` : ''}
         </p>
       )}
-      {!state && loading && <p className="whats-new-status">Loading the notes from GitHub…</p>}
+      {!state && loading && <SkeletonLines label="Loading the notes from GitHub" lines={5} />}
       {state && !latest && !state.error && <p className="whats-new-status">No releases have notes yet.</p>}
 
       {latest && (

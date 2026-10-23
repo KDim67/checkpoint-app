@@ -181,7 +181,7 @@ export default function ItemDetailPanel() {
             ) : (
               <Layout size={12} className="text-primary" />
             )}
-            <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)' }}>
               {item.type}
             </span>
           </div>
@@ -286,7 +286,7 @@ export default function ItemDetailPanel() {
         </div>
 
         <div>
-          <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', display: 'block', marginBottom: 'var(--space-2)' }}>
+          <span style={{ fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)', display: 'block', marginBottom: 'var(--space-2)' }}>
             Tags
           </span>
           <div className="row-wrap">
@@ -356,7 +356,7 @@ export default function ItemDetailPanel() {
                     />
                   ))}
                   {allTags.length === 0 && (
-                    <div style={{ padding: '8px', fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center' }}>
+                    <div style={{ padding: '8px', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', textAlign: 'center' }}>
                       No tags configured
                     </div>
                   )}
@@ -375,7 +375,7 @@ export default function ItemDetailPanel() {
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="row-between-mb">
-            <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-faint)', fontWeight: 'var(--weight-bold)' }}>
               Description
             </span>
             <button
@@ -389,7 +389,7 @@ export default function ItemDetailPanel() {
                 background: 'transparent',
                 border: 'none',
                 color: 'var(--color-primary)',
-                fontSize: '10px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-semibold)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -428,7 +428,6 @@ export default function ItemDetailPanel() {
                   fontSize: 'var(--text-sm)',
                   fontFamily: 'var(--font-sans)',
                   resize: 'none',
-                  outline: 'none',
                   lineHeight: 1.5
                 }}
               />

@@ -25,7 +25,7 @@ export default function ActiveTextureHeader({ label, path, onChange, onClear }: 
             border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-sm)',
             color: 'var(--color-text-base)',
-            fontSize: '11px',
+            fontSize: 'var(--text-xs)',
             padding: '6px 12px',
             cursor: 'pointer'
           }}
@@ -39,7 +39,7 @@ export default function ActiveTextureHeader({ label, path, onChange, onClear }: 
             border: '1px solid var(--color-error-muted)',
             borderRadius: 'var(--radius-sm)',
             color: 'var(--color-error)',
-            fontSize: '11px',
+            fontSize: 'var(--text-xs)',
             padding: '6px 12px',
             cursor: 'pointer'
           }}

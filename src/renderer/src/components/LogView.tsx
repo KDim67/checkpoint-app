@@ -343,7 +343,6 @@ export default function LogView() {
                 color: 'var(--color-text-base)',
                 fontSize: 'var(--text-xs)',
                 padding: '6px 26px 6px 28px',
-                outline: 'none',
                 transition: 'width var(--duration-fast) var(--ease-default)'
               }}
             />

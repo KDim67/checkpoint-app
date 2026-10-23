@@ -1,9 +1,54 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Archive, Clock, Trash2 } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
 import { useConfirm } from '../ui/ConfirmDialog'
-import { FieldRow, ToggleSwitch, Divider, RowBetween } from './SettingsSection'
+import SettingsSection, { FieldRow, ToggleRow, Divider, SettingsInput, SettingsSelect, SettingsCardSkeleton } from './SettingsSection'
 import { useToast, useFailureReport } from '../ui/Toast'
 import { setBoolSetting, setNumberSetting, setStringSetting } from '../../lib/settings'
 import * as backupApi from '../../data/backup'
+
+interface Backup {
+  filename: string
+  timestamp: number
+  size: number
+  kind?: 'scheduled' | 'preRestore' | 'preUpdate'
+  /** the version a copy before an update was made for */
+  version?: string
+}
+
+/** the day and time, the year only when it isn't this one */
+function whenOf(timestamp: number): string {
+  const date = new Date(timestamp)
+  return date.toLocaleString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+/** only the copies the app made on its own get a label; every other one is a plain backup */
+function madeFor(backup: Backup): { label: string; why: string } | null {
+  if (backup.kind === 'preRestore') {
+    return { label: 'Before a restore', why: 'Taken automatically just before a restore, so the restore can be undone.' }
+  }
+  if (backup.kind === 'preUpdate') {
+    return {
+      label: backup.version ? `Before updating to ${backup.version}` : 'Before an update',
+      why: 'Taken automatically just before a new version of Checkpoint changed your data, so the update can be undone.'
+    }
+  }
+  return null
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  if (kb < 1024) return `${kb.toFixed(1)} KB`
+  return `${(kb / 1024).toFixed(1)} MB`
+}
 
 export default function BackupSettings() {
   const confirm = useConfirm()
@@ -13,14 +58,7 @@ export default function BackupSettings() {
   const [interval, setIntervalVal] = useState('daily')
   const [maxCount, setMaxCount] = useState(10)
   const [customPath, setCustomPath] = useState('')
-  const [backups, setBackups] = useState<{
-    filename: string
-    timestamp: number
-    size: number
-    kind?: 'scheduled' | 'preRestore' | 'preUpdate'
-    /** the version a copy before an update was made for */
-    version?: string
-  }[]>([])
+  const [backups, setBackups] = useState<Backup[]>([])
 
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
@@ -52,11 +90,11 @@ export default function BackupSettings() {
       setEnabled(checked)
       await setBoolSetting('feature_backup', checked)
       await backupApi.run('init')
-      toast(checked ? 'Backup scheduler activated' : 'Backup scheduler deactivated')
+      toast(checked ? 'Automatic backups on' : 'Automatic backups off')
       loadStatus()
     } catch (err) {
-      console.error(err)
-      toast('Failed to update backup settings')
+      setEnabled(!checked)
+      report(checked ? 'turn automatic backups on' : 'turn automatic backups off', err)
     }
   }
 
@@ -65,7 +103,6 @@ export default function BackupSettings() {
       setIntervalVal(val)
       await setStringSetting('backup_interval', val)
       await backupApi.run('init')
-      toast(`Backup schedule set to: ${val}`)
       loadStatus()
     } catch (err) {
       report('change the backup schedule', err)
@@ -88,7 +125,7 @@ export default function BackupSettings() {
     try {
       await setStringSetting('backup_path', customPath.trim())
       await backupApi.run('init')
-      toast('Backup destination path updated')
+      toast('Backups now go to the new folder')
       loadStatus()
     } catch (err) {
       report('change the backup folder', err)
@@ -100,261 +137,170 @@ export default function BackupSettings() {
     setRunning(true)
     try {
       await backupApi.run('backup')
-      toast('Backup created successfully!')
+      toast('Backed up')
       loadStatus()
     } catch (err) {
-      console.error(err)
-      const msg = err instanceof Error ? err.message : String(err)
-      toast(`Backup failed: ${msg}`)
+      report('back up', err)
     } finally {
       setRunning(false)
     }
   }
 
-  const handleDelete = async (filename: string) => {
+  // a backup is the way back from a mistake, so losing one is asked about first
+  const handleDelete = async (backup: Backup) => {
+    const ok = await confirm({
+      title: 'Delete this backup?',
+      message: `The backup from ${whenOf(backup.timestamp)} is deleted from the backups folder and can't be brought back.`,
+      confirmText: 'Delete',
+      isDestructive: true
+    })
+    if (!ok) return
     try {
-      await backupApi.run('delete', filename)
-      toast('Backup archive deleted')
+      await backupApi.run('delete', backup.filename)
+      toast('Backup deleted')
       loadStatus()
     } catch (err) {
-      console.error(err)
-      toast('Failed to delete backup archive')
+      report('delete the backup', err)
     }
   }
 
-  const handleRestore = async (filename: string) => {
+  const handleRestore = async (backup: Backup) => {
     const ok = await confirm({
-      title: 'Confirm Database Restore',
-      message: `Are you sure you want to restore ${filename}?`,
-      warning: 'This will overwrite your current active database. To prevent data loss, a safety backup of your current database is created first.',
-      confirmText: 'Yes, Restore Database',
+      title: 'Restore this backup?',
+      message: `Everything goes back to how it was on ${whenOf(backup.timestamp)}.`,
+      warning: 'A copy of how things are now is saved first, so you can undo this from the list below.',
+      confirmText: 'Restore',
       isDestructive: true
     })
     if (!ok) return
 
-    setRestoring(filename)
-    toast('Restoring database, please wait...')
+    setRestoring(backup.filename)
     try {
-      await backupApi.run('restore', filename)
-      toast('Database restored successfully! App state reloaded.')
+      await backupApi.run('restore', backup.filename)
+      toast('Backup restored')
       loadStatus()
     } catch (err) {
-      console.error(err)
-      const msg = err instanceof Error ? err.message : String(err)
-      toast(`Restore failed: ${msg}`)
+      report('restore the backup', err)
     } finally {
       setRestoring(null)
     }
   }
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    const kb = bytes / 1024
-    if (kb < 1024) return `${kb.toFixed(1)} KB`
-    const mb = kb / 1024
-    return `${mb.toFixed(1)} MB`
-  }
-
-  if (loading) return <div className="text-sm-faint">Loading backup vault…</div>
+  if (loading) return <SettingsCardSkeleton label="Loading the backups" rows={3} />
 
   return (
-    <div className="col-xl">
-      <RowBetween>
-        <div>
-          <div className="text-item">
-            Automated Backups
-          </div>
-          <div className="text-sub">
-            Periodically saves transactionally consistent snapshots of your active database.
-          </div>
-        </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} label="Automated Backups" />
-      </RowBetween>
+    <>
+      <SettingsSection icon={<Clock size={14} />} title="Automatic Backups" description="When copies are made, where they go and how many are kept.">
+        <div className="col-xl">
+          <ToggleRow
+            label="Automatic backups"
+            description="A complete copy of your data, made safely even while Checkpoint is busy."
+            checked={enabled}
+            onChange={handleToggle}
+          />
 
-      {enabled && (
-        <>
-          <Divider />
+          {enabled && (
+            <>
+              <Divider />
 
-          <FieldRow label="Backup Directory Path">
-            <input
-              value={customPath}
-              onChange={e => setCustomPath(e.target.value)}
-              onBlur={handlePathBlur}
-              placeholder="Default: <App Data>/backups"
-              style={{
-                width: '100%',
-                background: 'var(--color-surface-2)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-base)',
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-2) var(--space-3)',
-                fontSize: 'var(--text-sm)',
-                outline: 'none'
-              }}
-            />
-          </FieldRow>
+              <FieldRow label="Backup folder" hint="Leave it empty to keep them in Checkpoint's own data folder.">
+                <SettingsInput
+                  value={customPath}
+                  onChange={setCustomPath}
+                  onBlur={handlePathBlur}
+                  placeholder="Checkpoint's data folder"
+                />
+              </FieldRow>
 
-          <FieldRow label="Backup Interval">
-            <select
-              value={interval}
-              onChange={e => handleIntervalChange(e.target.value)}
-              className="select-md"
-            >
-              <option value="daily">Daily Check</option>
-              <option value="weekly">Weekly Check</option>
-              <option value="launch-exit">On Launch and Exit</option>
-            </select>
-          </FieldRow>
+              <FieldRow label="How often">
+                <SettingsSelect
+                  value={interval}
+                  onChange={e => handleIntervalChange(e.target.value)}
+                >
+                  <option value="daily">Once a day</option>
+                  <option value="weekly">Once a week</option>
+                  <option value="launch-exit">Each time Checkpoint opens and closes</option>
+                </SettingsSelect>
+              </FieldRow>
 
-          <FieldRow label="Rolling Retention Limit">
-            <div className="row">
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={maxCount}
-                onChange={e => handleMaxCountChange(parseInt(e.target.value) || 10)}
-                style={{
-                  width: '80px',
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  fontSize: 'var(--text-sm)',
-                  outline: 'none',
-                  textAlign: 'center'
-                }}
-              />
-              <span className="text-hint-faint">
-                Maximum number of rolling backup files kept before pruning.
-              </span>
-            </div>
-          </FieldRow>
-
-          <Divider />
-
-          <div className="row-between">
-            <div className="text-item-strong">
-              Backup Archives
-            </div>
-            <button
-              onClick={handleBackupNow}
-              disabled={running}
-              className="hover-brighten-sm"
-              style={{
-                background: 'var(--color-secondary)',
-                border: 'none',
-                color: 'var(--color-text-inverted)',
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-1.5) var(--space-4)',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 'var(--weight-bold)',
-                cursor: running ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-1.5)',
-                transition: 'filter var(--duration-fast)'
-              }}
-            >
-              {running ? 'Creating Backup...' : 'Backup Database Now'}
-            </button>
-          </div>
-
-          {backups.length === 0 ? (
-            <div style={{ padding: 'var(--space-6) 0', textAlign: 'center', color: 'var(--color-text-faint)', fontSize: 'var(--text-xs)' }}>
-              No database backups created yet. Click the button above to generate your first snapshot.
-            </div>
-          ) : (
-            <div
-              style={{
-                border: '1px solid var(--color-surface-offset)',
-                borderRadius: 'var(--radius-md)',
-                overflow: 'hidden',
-                background: 'var(--color-surface-1)'
-              }}
-            >
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)' }}>
-                    <th style={{ padding: 'var(--space-3) var(--space-4)' }}>Archive File</th>
-                    <th style={{ padding: 'var(--space-3) var(--space-4)' }}>Date Created</th>
-                    <th style={{ padding: 'var(--space-3) var(--space-4)', textAlign: 'right' }}>Compressed Size</th>
-                    <th style={{ padding: 'var(--space-3) var(--space-4)', textAlign: 'center', width: '150px' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {backups.map(b => (
-                    <tr key={b.filename} style={{ borderBottom: '1px solid var(--color-surface-offset)', color: 'var(--color-text-base)' }}>
-                      <td style={{ padding: 'var(--space-2.5) var(--space-4)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-                        {b.filename}
-                        {(b.kind === 'preRestore' || b.kind === 'preUpdate') && (
-                          <span
-                            title={b.kind === 'preRestore'
-                              ? 'Taken automatically just before a restore, so the restore can be undone.'
-                              : 'Taken automatically just before a new version of Checkpoint changed your data, so the update can be undone.'}
-                            style={{
-                              marginLeft: 'var(--space-2)',
-                              padding: '1px 6px',
-                              borderRadius: 'var(--radius-full)',
-                              background: 'var(--color-surface-2)',
-                              color: 'var(--color-text-muted)',
-                              fontFamily: 'var(--font-sans)',
-                              fontSize: '10px',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {b.kind === 'preRestore' ? 'before a restore' : b.version ? `before updating to ${b.version}` : 'before an update'}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: 'var(--space-2.5) var(--space-4)', color: 'var(--color-text-muted)' }}>
-                        {new Date(b.timestamp).toLocaleString()}
-                      </td>
-                      <td style={{ padding: 'var(--space-2.5) var(--space-4)', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
-                        {formatSize(b.size)}
-                      </td>
-                      <td style={{ padding: 'var(--space-2.5) var(--space-4)', display: 'flex', gap: 'var(--space-2)', justifyContent: 'center' }}>
-                        <button
-                          onClick={() => handleRestore(b.filename)}
-                          disabled={restoring !== null}
-                          style={{
-                            background: 'var(--color-primary-muted)',
-                            border: '1px solid var(--color-primary)',
-                            color: 'var(--color-text-base)',
-                            padding: '2px 8px',
-                            borderRadius: 'var(--radius-sm)',
-                            cursor: restoring !== null ? 'default' : 'pointer',
-                            fontSize: '10px'
-                          }}
-                        >
-                          {restoring === b.filename ? 'Restoring...' : 'Restore'}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(b.filename)}
-                          disabled={restoring !== null}
-                          style={{
-                            background: 'transparent',
-                            border: '1px solid var(--color-surface-offset)',
-                            color: 'var(--color-error)',
-                            padding: '2px 8px',
-                            borderRadius: 'var(--radius-sm)',
-                            cursor: restoring !== null ? 'default' : 'pointer',
-                            fontSize: '10px'
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+              <FieldRow label="Backups to keep" hint="The oldest is deleted once there are more. Between 1 and 100.">
+                <SettingsInput
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={100}
+                  value={maxCount || ''}
+                  // kept on blur; saving each keystroke clamped 25 to 2 on the way
+                  onChange={v => setMaxCount(parseInt(v, 10) || 0)}
+                  onBlur={() => handleMaxCountChange(maxCount || 10)}
+                />
+              </FieldRow>
+            </>
           )}
-        </>
-      )}
+        </div>
+      </SettingsSection>
 
-    </div>
+      {/* here whatever the schedule, so switching it off never hides the copies already made */}
+      <SettingsSection icon={<Archive size={14} />} title="Backups" description="Newest first. Restoring one saves a copy of how things are now before it.">
+      <div className="col-lg">
+        <div className="row-between">
+          <div className="text-sub">
+            {backups.length === 0 ? '' : backups.length === 1 ? 'One backup' : `${backups.length} backups`}
+          </div>
+          <button type="button" className="btn-primary backup-now" onClick={handleBackupNow} disabled={running}>
+            {running ? 'Backing up…' : 'Back up now'}
+          </button>
+        </div>
+
+        {backups.length === 0 ? (
+          <p className="backup-empty">No backups yet. Back up now to make the first one.</p>
+        ) : (
+          <ul className="backup-list" aria-label="Backups">
+            {backups.map(backup => {
+              const when = whenOf(backup.timestamp)
+              const made = madeFor(backup)
+              return (
+                <li key={backup.filename} className="backup-row">
+                  <Archive size={16} className="backup-row-icon" aria-hidden="true" />
+                  <div className="backup-row-text">
+                    <div className="backup-row-when">
+                      <time dateTime={new Date(backup.timestamp).toISOString()}>{when}</time>
+                      <span className="backup-row-ago">{formatDistanceToNow(backup.timestamp, { addSuffix: true })}</span>
+                    </div>
+                    <div className="backup-row-detail">
+                      {made && <span className="backup-badge" title={made.why}>{made.label}</span>}
+                      {/* the name to look for in the backups folder, cut short with the whole of it on hover */}
+                      <span className="backup-row-file" title={backup.filename}>{backup.filename}</span>
+                    </div>
+                  </div>
+                  <span className="backup-row-size">{formatSize(backup.size)}</span>
+                  <div className="backup-row-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary backup-action"
+                      onClick={() => handleRestore(backup)}
+                      disabled={restoring !== null}
+                    >
+                      {restoring === backup.filename ? 'Restoring…' : 'Restore'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost backup-delete"
+                      onClick={() => handleDelete(backup)}
+                      disabled={restoring !== null}
+                      aria-label={`Delete the backup from ${when}`}
+                      title="Delete"
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+      </SettingsSection>
+    </>
   )
 }

@@ -44,6 +44,9 @@ import * as mcpApi from './data/mcp'
 import { onThemeUpdate } from './data/theme'
 import { useCollabFollow } from './lib/useCollabFollow'
 import CollabFollowBanner from './components/collab/CollabFollowBanner'
+import Presence from './components/ui/Presence'
+import { withViewTransition } from './lib/viewTransition'
+import { usePresence } from './lib/presence'
 
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
 const OnboardingTour = lazy(() => import('./components/OnboardingTour'))
@@ -431,6 +434,12 @@ function RightPanel() {
   // state not a ref: the width transition must switch off mid-drag or the panel lags a frame
   const [isResizing, setIsResizing] = useState(false)
 
+  // what it showed stays while it closes, so the panel narrows with its content rather than emptying first
+  const panel = usePresence(rightPanelOpen)
+  const shownContent = useRef(rightPanelContent)
+  if (rightPanelOpen) shownContent.current = rightPanelContent
+  const content = rightPanelOpen ? rightPanelContent : shownContent.current
+
   const panelTabs: { id: PanelTabId; label: string }[] = [
     ...(aiEnabled ? [{ id: 'ai-chat' as PanelTabId, label: 'AI Assistant' }] : []),
     { id: 'git', label: 'Git' },
@@ -488,7 +497,11 @@ function RightPanel() {
       style={{
         width: rightPanelOpen ? `${panelWidth}px` : '0',
         overflow: 'hidden',
-        transition: isResizing ? 'none' : 'width var(--duration-fast) cubic-bezier(0.32, 0.72, 0, 1)',
+        transition: isResizing
+          ? 'none'
+          : rightPanelOpen
+            ? 'width var(--duration-normal) var(--ease-enter)'
+            : 'width var(--duration-exit) var(--ease-exit)',
         borderLeft: rightPanelOpen ? '1px solid var(--color-surface-offset)' : 'none',
         background: 'var(--color-surface-1)',
         display: 'flex',
@@ -516,7 +529,7 @@ function RightPanel() {
           title="Drag to resize panel"
         />
       )}
-      {rightPanelOpen && (
+      {panel.mounted && (
         <div style={{ width: `${panelWidth}px`, height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{
             height: '44px',
@@ -538,7 +551,7 @@ function RightPanel() {
                   key={tab.id}
                   id={tab.id}
                   label={tab.label}
-                  isSelected={rightPanelContent === tab.id}
+                  isSelected={content === tab.id}
                   onSelect={() => setRightPanelContent(tab.id)}
                 />
               ))}
@@ -554,19 +567,19 @@ function RightPanel() {
           <div
             id="right-panel-body"
             role="tabpanel"
-            aria-labelledby={rightPanelContent ? `panel-tab-${rightPanelContent}` : undefined}
+            aria-labelledby={content ? `panel-tab-${content}` : undefined}
             style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
           >
-            <ErrorBoundary label="This panel" resetKey={rightPanelContent ?? ''}>
+            <ErrorBoundary label="This panel" resetKey={content ?? ''}>
               <Suspense fallback={<div className="skeleton" style={{ margin: 'var(--space-4)', height: '64px', borderRadius: 'var(--radius-md)' }} />}>
-                {rightPanelContent === 'ai-chat' && aiEnabled && <AiStreamPanel />}
-                {rightPanelContent === 'ai-chat' && !aiEnabled && (
+                {content === 'ai-chat' && aiEnabled && <AiStreamPanel />}
+                {content === 'ai-chat' && !aiEnabled && (
                   <p style={{ padding: 'var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
                     The assistant is switched off in Settings, Features.
                   </p>
                 )}
-                {rightPanelContent === 'git' && <GitPanel />}
-                {rightPanelContent === 'item-detail' && <ItemDetailPanel />}
+                {content === 'git' && <GitPanel />}
+                {content === 'item-detail' && <ItemDetailPanel />}
               </Suspense>
             </ErrorBoundary>
           </div>
@@ -629,7 +642,8 @@ function TrayShell() {
 function HudShell() {
   useSatelliteTheme()
   return (
-    <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    // pinned to the top: the window follows the bar's height a moment later, and a centred bar would bob
+    <div style={{ background: 'transparent', width: '100vw', height: '100vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
       <ErrorBoundary label="Quick capture">
         <Suspense fallback={null}><HudView /></Suspense>
       </ErrorBoundary>
@@ -859,14 +873,16 @@ export default function App() {
 
       e.preventDefault()
       switch (shortcut.action.kind) {
-        case 'view':
-          setView(shortcut.action.view)
+        case 'view': {
+          const view = shortcut.action.view
+          withViewTransition(() => setView(view))
           break
+        }
         case 'toggleAiPanel':
           if (aiEnabledRef.current) toggleRightPanel('ai-chat')
           break
         case 'openSettings':
-          setView('settings')
+          withViewTransition(() => setView('settings'))
           break
         case 'openPalette':
           // not during the tour: it opened over the tour and one Escape closed both for good
@@ -943,9 +959,11 @@ export default function App() {
                 onClose={closeOnboarding}
               />
             )}
-            {whatsNew && !showOnboarding && (
-              <WhatsNewDialog version={whatsNew.version} releases={whatsNew.releases} onClose={whatsNew.dismiss} />
-            )}
+            <Presence show={!!whatsNew && !showOnboarding}>
+              {whatsNew && !showOnboarding && (
+                <WhatsNewDialog version={whatsNew.version} releases={whatsNew.releases} onClose={whatsNew.dismiss} />
+              )}
+            </Presence>
           </Suspense>
           <div className="app-shell">
             <Titlebar />

@@ -41,7 +41,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
 
       <div className="row-lg">
         <div className="row-6px">
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Priority:</span>
+          <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Priority:</span>
           <select
             value={filterPriority}
             onChange={e => setFilterPriority(parseInt(e.target.value))}
@@ -63,7 +63,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
         </div>
 
         <div className="row-6px">
-          <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Tag:</span>
+          <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>Tag:</span>
           <select
             value={filterTagId}
             onChange={e => setFilterTagId(e.target.value)}
@@ -91,7 +91,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
               background: 'transparent',
               border: 'none',
               color: 'var(--color-secondary)',
-              fontSize: '11px',
+              fontSize: 'var(--text-xs)',
               cursor: 'pointer',
               fontWeight: 'var(--weight-bold)',
               padding: '2px 4px'

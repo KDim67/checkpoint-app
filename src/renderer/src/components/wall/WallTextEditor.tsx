@@ -291,7 +291,7 @@ export default function WallTextEditor({
             active={hasWrap(value, selection[0], selection[1], '`')}
             onClick={() => toggleMarker('`')}
           >
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>&lt;/&gt;</span>
+            <span style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>&lt;/&gt;</span>
           </FormatButton>
         </div>
       )}

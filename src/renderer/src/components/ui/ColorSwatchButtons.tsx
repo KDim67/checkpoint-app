@@ -20,7 +20,7 @@ export default function ColorSwatchButtons({ value, onPick }: { value: string | 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             color: 'var(--color-text-base)'
           }}
           title={cVal === 'none' ? 'Default Accent' : cVal}

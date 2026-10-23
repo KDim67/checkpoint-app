@@ -24,14 +24,39 @@ afterEach(cleanup)
 
 describe('the logo', () => {
   it('opens the Workspaces page, and a second click goes back to the view it came from', async () => {
-    useAppStore.setState({ activeView: 'calendar', returnView: 'kanban', activeWorkspace: 'work', workspaceList: [{ slug: 'work', name: 'Work', color: '#10b981' }] })
+    useAppStore.setState({ activeView: 'calendar', backTrail: [], activeWorkspace: 'work', workspaceList: [{ slug: 'work', name: 'Work', color: '#10b981' }] })
     await act(async () => { render(<Sidebar />) })
     const logo = screen.getByRole('button', { name: 'Workspaces, current workspace Work' })
     fireEvent.click(logo)
-    expect(useAppStore.getState()).toMatchObject({ activeView: 'workspaces', returnView: 'calendar' })
+    expect(useAppStore.getState()).toMatchObject({ activeView: 'workspaces', backTrail: ['calendar'] })
     expect(logo.getAttribute('aria-current')).toBe('page')
     fireEvent.click(logo)
     expect(useAppStore.getState().activeView).toBe('calendar')
+  })
+
+  it('puts the current workspace\'s picture in the big spot and the logo in the badge, and swaps back when the picture is missing', async () => {
+    useAppStore.setState({ activeView: 'kanban', activeWorkspace: 'work', workspaceList: [{ slug: 'work', name: 'Work', color: '#10b981', icon: 'work-logo.webp' }] })
+    await act(async () => { render(<Sidebar />) })
+    const button = screen.getByRole('button', { name: 'Workspaces, current workspace Work' })
+    const picture = button.querySelector('img[src^="checkpoint-media"]') as HTMLImageElement
+    expect(picture.getAttribute('src')).toBe('checkpoint-media://work-logo.webp')
+    expect(picture.style.width).toBe('32px')
+    // the logo still there, now the small one in the corner
+    expect(button.querySelectorAll('[alt="Checkpoint Logo"]')).toHaveLength(1)
+    expect(button.textContent).not.toContain('W')
+
+    fireEvent.error(picture)
+    expect(button.querySelector('img[src^="checkpoint-media"]')).toBeNull()
+    expect(button.querySelectorAll('[alt="Checkpoint Logo"]')).toHaveLength(1)
+    expect(button.textContent).toContain('W')
+  })
+
+  it('keeps the logo big and the letter in the badge for a workspace with no picture', async () => {
+    useAppStore.setState({ activeView: 'kanban', activeWorkspace: 'home', workspaceList: [{ slug: 'home', name: 'Home', color: '#10b981' }] })
+    await act(async () => { render(<Sidebar />) })
+    const button = screen.getByRole('button', { name: 'Workspaces, current workspace Home' })
+    expect(button.querySelector('img[src^="checkpoint-media"]')).toBeNull()
+    expect(button.textContent).toContain('H')
   })
 
   it('never remembers the Workspaces page as the view to start on', () => {
