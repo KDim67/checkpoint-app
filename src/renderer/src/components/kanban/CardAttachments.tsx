@@ -66,7 +66,7 @@ export default function CardAttachments({
         borderRadius: 'var(--radius-md)'
       }}
     >
-      <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Paperclip size={13} className="text-accent" />
         Attachments
         <span style={{ fontWeight: 'var(--weight-regular)', textTransform: 'none', color: 'var(--color-text-faint)' }}>
@@ -94,7 +94,7 @@ export default function CardAttachments({
                 <span
                   title={att.path}
                   style={{
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     color: 'var(--color-text-base)',
                     fontWeight: 'var(--weight-medium)',
                     overflow: 'hidden',
@@ -123,7 +123,7 @@ export default function CardAttachments({
                       background: 'transparent',
                       border: 'none',
                       color: 'var(--color-secondary)',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       cursor: 'pointer',
                       padding: '2px'
                     }}
@@ -157,8 +157,7 @@ export default function CardAttachments({
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-sm)',
               padding: '3px 6px',
-              fontSize: '11px',
-              outline: 'none'
+              fontSize: 'var(--text-xs)'
             }}
           />
           <input
@@ -173,8 +172,7 @@ export default function CardAttachments({
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-sm)',
               padding: '3px 6px',
-              fontSize: '11px',
-              outline: 'none',
+              fontSize: 'var(--text-xs)',
               minWidth: 0
             }}
           />
@@ -189,7 +187,7 @@ export default function CardAttachments({
               border: 'none',
               borderRadius: 'var(--radius-sm)',
               color: 'var(--color-text-base)',
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               fontWeight: 'var(--weight-semibold)',
               padding: '3px 8px',
               cursor: 'pointer'
@@ -207,7 +205,7 @@ export default function CardAttachments({
               border: '1px solid var(--color-surface-offset)',
               borderRadius: 'var(--radius-sm)',
               color: 'var(--color-text-base)',
-              fontSize: '10px',
+              fontSize: 'var(--text-xs)',
               fontWeight: 'var(--weight-semibold)',
               padding: '4px 10px',
               cursor: 'pointer',

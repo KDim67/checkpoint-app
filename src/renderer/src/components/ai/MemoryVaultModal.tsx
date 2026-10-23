@@ -4,6 +4,8 @@ import React from 'react'
 import type { MemoryCategory } from '../../../../shared/memoryActions'
 import { Brain, X, Plus, Search, Pin, Trash2, Edit2, RefreshCw } from 'lucide-react'
 import type { MemoryVault } from './useMemoryVault'
+import { usePresenceState } from '../../lib/presence'
+import { SkeletonList } from '../ui/Skeleton'
 
 interface Props {
   vault: MemoryVault
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
+  const presence = usePresenceState()
   const {
     setShowMemoryPanel,
     memories,
@@ -55,21 +58,13 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
         const orderedMems = [...pinnedMems, ...unpinnedMems]
 
         return (
-          <div className="memory-vault-overlay" style={{
+          <div className="memory-vault-overlay motion-backdrop" data-state={presence} style={{
             position: 'absolute', inset: 0, zIndex: 100,
             background: 'rgba(10, 12, 18, 0.82)', backdropFilter: 'blur(10px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: '16px'
           }}>
-            <style>{`
-              .memory-vault-overlay {
-                animation: memory-fade-in 150ms ease-out;
-              }
-              .memory-vault-card {
-                animation: memory-scale-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
-              }
-            `}</style>
-            <div className="memory-vault-card" style={{
+            <div className="memory-vault-card motion-pop" data-state={presence} style={{
               background: 'var(--color-surface-1)',
               border: '1px solid var(--color-surface-offset)',
               borderRadius: 'var(--radius-lg)', width: '100%', maxHeight: '92%',
@@ -92,7 +87,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                       Memory Vault
                     </span>
                     {memoryConsolidating && (
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <RefreshCw size={9} className="animate-spin" />
                         Consolidating…
                       </span>
@@ -106,10 +101,10 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <div className="row-6px">
-                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
+                    <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', background: 'var(--color-surface-offset)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>
                       Workspace: {activeWorkspace}
                     </span>
-                    <span style={{ fontSize: '10px', color: 'var(--color-accent-ai)', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                    <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-accent-ai)', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
                       {memories.length} memories
                     </span>
                   </div>
@@ -122,7 +117,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                         border: '1px solid rgba(168,85,247,0.3)',
                         color: showAddMemoryForm ? '#fff' : '#a855f7',
                         borderRadius: 'var(--radius-sm)', padding: '4px 10px',
-                        fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+                        fontSize: 'var(--text-xs)', fontWeight: 'bold', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: '4px',
                         transition: 'all 150ms'
                       }}
@@ -137,7 +132,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                         border: '1px solid rgba(168,85,247,0.3)',
                         color: '#a855f7',
                         borderRadius: 'var(--radius-sm)', padding: '4px 10px',
-                        fontSize: '10px', fontWeight: 'bold', cursor: 'pointer',
+                        fontSize: 'var(--text-xs)', fontWeight: 'bold', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: '4px',
                         transition: 'all 150ms'
                       }}
@@ -180,9 +175,8 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                     border: '1px solid var(--color-surface-offset)',
                     borderRadius: 'var(--radius-md)',
                     color: 'var(--color-text-base)',
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     padding: '8px 12px 8px 30px',
-                    outline: 'none',
                     transition: 'border-color 150ms ease, box-shadow 150ms ease'
                   }}
                 />
@@ -227,7 +221,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                         flex: 1, background: 'var(--color-surface-2)',
                         border: '1px solid rgba(168,85,247,0.3)',
                         borderRadius: 'var(--radius-sm)', color: 'var(--color-text-base)',
-                        fontSize: '11px', padding: '5px 8px', outline: 'none'
+                        fontSize: 'var(--text-xs)', padding: '5px 8px'
                       }}
                     />
                     <select
@@ -237,7 +231,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                         background: 'var(--color-surface-2)',
                         border: '1px solid rgba(168,85,247,0.3)',
                         borderRadius: 'var(--radius-sm)', color: 'var(--color-text-base)',
-                        fontSize: '11px', padding: '5px 6px', outline: 'none'
+                        fontSize: 'var(--text-xs)', padding: '5px 6px'
                       }}
                     >
                       <option value="semantic">Semantic (Fact)</option>
@@ -255,14 +249,14 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                       background: 'var(--color-surface-2)',
                       border: '1px solid rgba(168,85,247,0.3)',
                       borderRadius: 'var(--radius-sm)', color: 'var(--color-text-base)',
-                      fontSize: '11px', padding: '5px 8px', outline: 'none',
+                      fontSize: 'var(--text-xs)', padding: '5px 8px',
                       fontFamily: 'inherit'
                     }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
                     <button
                       onClick={() => { setShowAddMemoryForm(false); setNewMemoryKey(''); setNewMemoryContent('') }}
-                      style={{ background: 'transparent', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', borderRadius: 'var(--radius-sm)', padding: '3px 10px', fontSize: '10px', cursor: 'pointer' }}
+                      style={{ background: 'transparent', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', borderRadius: 'var(--radius-sm)', padding: '3px 10px', fontSize: 'var(--text-2xs)', cursor: 'pointer' }}
                     >Cancel</button>
                     <button
                       onClick={handleAddMemory}
@@ -273,7 +267,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                         // disabled fill is a plain surface, white on it vanished in light mode
                         color: newMemoryKey.trim() && newMemoryContent.trim() ? 'var(--color-on-accent)' : 'var(--color-text-faint)',
                         borderRadius: 'var(--radius-sm)',
-                        padding: '3px 10px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer'
+                        padding: '3px 10px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', cursor: 'pointer'
                       }}
                     >Save Memory</button>
                   </div>
@@ -282,12 +276,9 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {memoryLoading ? (
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                    <RefreshCw size={12} className="animate-spin" />
-                    Loading memories…
-                  </div>
+                  <SkeletonList label="Loading the memories" count={4} />
                 ) : orderedMems.length === 0 ? (
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-faint)', textAlign: 'center', padding: '24px', fontStyle: 'italic', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', textAlign: 'center', padding: '24px', fontStyle: 'italic', lineHeight: 1.6 }}>
                     {memorySearchQuery ? `No memories match "${memorySearchQuery}"` : (
                       <>No memories stored for this workspace yet.<br />The AI will automatically extract important facts as you chat.</>
                     )}
@@ -311,7 +302,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden', minWidth: 0 }}>
                           <span style={{
-                            fontSize: '10px',
+                            fontSize: 'var(--text-xs)',
                             fontWeight: 'var(--weight-bold)',
                             flexShrink: 0,
                             letterSpacing: '0.04em',
@@ -403,28 +394,28 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                               background: 'var(--color-surface-1)',
                               border: '1px solid rgba(59,130,246,0.4)',
                               borderRadius: '3px', color: 'var(--color-text-base)',
-                              fontSize: '11px', padding: '4px 6px', outline: 'none',
+                              fontSize: 'var(--text-xs)', padding: '4px 6px',
                               fontFamily: 'inherit', lineHeight: 1.4
                             }}
                           />
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
                             <button
                               onClick={() => setEditingMemoryId(null)}
-                              style={{ background: 'transparent', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}
+                              style={{ background: 'transparent', border: '1px solid var(--color-surface-offset)', color: 'var(--color-text-muted)', borderRadius: '3px', padding: '2px 8px', fontSize: 'var(--text-2xs)', cursor: 'pointer' }}
                             >Cancel</button>
                             <button
                               onClick={() => handleSaveEditMemory(mem.id)}
-                              style={{ background: 'var(--color-primary)', border: 'none', color: 'var(--color-on-accent)', borderRadius: '3px', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                              style={{ background: 'var(--color-primary)', border: 'none', color: 'var(--color-on-accent)', borderRadius: '3px', padding: '2px 8px', fontSize: 'var(--text-2xs)', fontWeight: 'bold', cursor: 'pointer' }}
                             >Save</button>
                           </div>
                         </div>
                       ) : (
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.5, paddingLeft: '2px' }}>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5, paddingLeft: '2px' }}>
                           {mem.content}
                         </div>
                       )}
 
-                      <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', display: 'flex', gap: '8px', paddingLeft: '2px' }}>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', display: 'flex', gap: '8px', paddingLeft: '2px' }}>
                         <span>Recalled {mem.access_count}×</span>
                         <span>·</span>
                         <span>Updated {new Date(mem.updated_at).toLocaleDateString()}</span>
@@ -450,7 +441,7 @@ export default function MemoryVaultModal({ vault, activeWorkspace }: Props) {
                     <span className="text-nano">{label}</span>
                   </div>
                 ))}
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', marginLeft: 'auto' }}>
                   Auto-extracted after each AI response
                 </span>
               </div>

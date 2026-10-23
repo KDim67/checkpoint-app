@@ -83,7 +83,7 @@ export default function DialoguePanel({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 'var(--space-1.5)'
+              gap: 'var(--space-1-5)'
             }}
           >
             <Plus size={14} />
@@ -122,12 +122,12 @@ export default function DialoguePanel({
                     <Trash2 size={12} />
                   </button>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                   &ldquo;{node.text}&rdquo;
                 </div>
                 
                 {node.choices.map((c, choiceIdx) => (
-                  <div key={choiceIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', background: 'var(--color-surface-1)', padding: '2px 6px', borderRadius: '4px', marginTop: '2px' }}>
+                  <div key={choiceIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-2xs)', background: 'var(--color-surface-1)', padding: '2px 6px', borderRadius: '4px', marginTop: '2px' }}>
                     <span>choice: <strong>{c.text}</strong> ➔ {c.nextId}</span>
                     <button
                       onClick={() => tool.removeChoiceFromNode(nodeIdx, choiceIdx)}
@@ -157,7 +157,7 @@ export default function DialoguePanel({
                       color: 'var(--color-text-base)',
                       borderRadius: '4px',
                       padding: '2px 6px',
-                      fontSize: '10px'
+                      fontSize: 'var(--text-2xs)'
                     }}
                   />
                   <select
@@ -176,7 +176,7 @@ export default function DialoguePanel({
                       color: 'var(--color-text-base)',
                       borderRadius: '4px',
                       padding: '2px',
-                      fontSize: '10px'
+                      fontSize: 'var(--text-2xs)'
                     }}
                   >
                     <option value="">Next Node</option>
@@ -202,7 +202,7 @@ export default function DialoguePanel({
                       color: 'var(--color-text-base)',
                       cursor: 'pointer',
                       padding: '2px 8px',
-                      fontSize: '10px'
+                      fontSize: 'var(--text-2xs)'
                     }}
                   >
                     + Add
@@ -227,7 +227,7 @@ export default function DialoguePanel({
                     border: 'none',
                     padding: '4px 8px',
                     borderRadius: '4px',
-                    fontSize: '10px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-semibold)',
                     cursor: 'pointer',
                     transition: 'all 120ms ease'
@@ -243,7 +243,7 @@ export default function DialoguePanel({
                     border: 'none',
                     padding: '4px 8px',
                     borderRadius: '4px',
-                    fontSize: '10px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-semibold)',
                     cursor: 'pointer',
                     transition: 'all 120ms ease'
@@ -260,7 +260,7 @@ export default function DialoguePanel({
                   color: 'var(--color-text-base)',
                   padding: '4px 10px',
                   borderRadius: 'var(--radius-md)',
-                  fontSize: '10px',
+                  fontSize: 'var(--text-xs)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',

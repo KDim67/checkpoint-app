@@ -6,13 +6,29 @@ import * as appApi from '../../data/app'
 
 const WEB = /^(https?:|mailto:)/i
 
-export default function ReleaseNotesBody({ notes }: { notes: string }): React.JSX.Element {
+type Level = 1 | 2 | 3 | 4 | 5 | 6
+
+/** the notes' own ## sections become this level, so they sit under the heading around them rather than beside it */
+function headingAt(level: Level, depth: number) {
+  const Tag = `h${Math.min(6, level + Math.max(0, depth - 2))}` as 'h1'
+  return function Heading({ children }: { children?: React.ReactNode }) {
+    return <Tag>{children}</Tag>
+  }
+}
+
+export default function ReleaseNotesBody({ notes, level = 3 }: { notes: string; level?: Level }): React.JSX.Element {
   if (!notes.trim()) return <p className="release-notes-empty">No notes were written for this release.</p>
   return (
     <div className="markdown-body release-notes">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          h1: headingAt(level, 1),
+          h2: headingAt(level, 2),
+          h3: headingAt(level, 3),
+          h4: headingAt(level, 4),
+          h5: headingAt(level, 5),
+          h6: headingAt(level, 6),
           a: ({ href, children }) => (
             <a
               href={href}

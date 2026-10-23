@@ -92,7 +92,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
             </span>
             {session.active && (
               <span style={{
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 background: session.elsewhere ? 'var(--color-warning-muted)' : 'var(--color-secondary-muted)',
                 color: session.elsewhere ? 'var(--color-warning)' : 'var(--color-secondary)',
                 padding: '2px 6px',
@@ -107,7 +107,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
           {/* the session stays in its workspace; showing Active here read like a dead connection */}
           {session.elsewhere && (
             <div style={{
-              fontSize: '11px',
+              fontSize: 'var(--text-xs)',
               color: 'var(--color-warning)',
               background: 'var(--color-warning-muted)',
               border: '1px solid var(--color-warning)',
@@ -162,8 +162,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                     borderRadius: 'var(--radius-sm)',
                     color: 'var(--color-text-base)',
                     fontSize: 'var(--text-xs)',
-                    padding: '6px var(--space-2)',
-                    outline: 'none'
+                    padding: '6px var(--space-2)'
                   }}
                 />
               </div>
@@ -234,8 +233,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                       borderRadius: 'var(--radius-md)',
                       padding: '4px 8px',
                       fontSize: 'var(--text-xs)',
-                      color: 'var(--color-text-base)',
-                      outline: 'none'
+                      color: 'var(--color-text-base)'
                     }}
                   />
                   <button
@@ -261,7 +259,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
               {/* the two features are one word apart, each says what it isn't */}
               <p style={{
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 color: 'var(--color-text-faint)',
                 margin: 0,
                 paddingTop: 'var(--space-2)',
@@ -295,7 +293,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
               <div style={{ background: 'var(--color-surface-offset)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 <div className="row-between">
                   <span className="text-caption">Role:</span>
-                  <span style={{ fontSize: '11px', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-base)' }}>
                     {session.isHost ? `Host (${session.mode === 'readonly' ? 'Read-Only' : 'Collaborative'})` : 'Client'}
                   </span>
                 </div>
@@ -336,7 +334,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                       return (
                         <div key={member.id} className="row-between" style={{ gap: 'var(--space-2)' }}>
                           <span style={{
-                            fontSize: '11px',
+                            fontSize: 'var(--text-xs)',
                             fontWeight: 'var(--weight-semibold)',
                             color: 'var(--color-text-base)',
                             overflow: 'hidden',
@@ -358,7 +356,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                                 border: '1px solid var(--color-surface-offset)',
                                 borderRadius: 'var(--radius-sm)',
                                 padding: '1px 6px',
-                                fontSize: '10px',
+                                fontSize: 'var(--text-2xs)',
                                 color: 'var(--color-text-muted)',
                                 cursor: 'pointer'
                               }}
@@ -383,7 +381,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                                 border: isFollowing ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
                                 borderRadius: 'var(--radius-sm)',
                                 padding: '1px 6px',
-                                fontSize: '10px',
+                                fontSize: 'var(--text-2xs)',
                                 color: isFollowing ? '#ffffff' : 'var(--color-text-muted)',
                                 fontWeight: isFollowing ? 'var(--weight-bold)' : 'normal',
                                 cursor: 'pointer',
@@ -402,7 +400,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
                                   background: 'transparent',
                                   border: 'none',
                                   padding: '0 2px',
-                                  fontSize: '10px',
+                                  fontSize: 'var(--text-xs)',
                                   fontWeight: 'var(--weight-semibold)',
                                   cursor: 'pointer',
                                   flexShrink: 0
@@ -422,7 +420,7 @@ export default function CollabPanel({ session }: { session: CollabSession }) {
 
                 <div className="col-2px">
                   <span className="text-micro-faint">Status Logs:</span>
-                  <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {session.progress}
                   </span>
                 </div>

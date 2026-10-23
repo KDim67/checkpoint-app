@@ -10,20 +10,21 @@ interface ViewFeature {
 }
 
 export const VIEW_FEATURES: ViewFeature[] = [
-  { view: 'kanban',      key: 'feature_view_kanban',      label: 'Kanban Board View',        defaultOn: true },
-  { view: 'log',         key: 'feature_view_log',         label: 'Daily Log View',           defaultOn: true },
-  { view: 'backlog',     key: 'feature_view_backlog',     label: 'Structured Backlog View',  defaultOn: true },
-  { view: 'calendar',    key: 'feature_view_calendar',    label: 'Calendar',                 defaultOn: true },
-  { view: 'renewals',    key: 'feature_view_renewals',    label: 'Renewals & Expiry Alerts', defaultOn: true },
-  { view: 'focus',       key: 'feature_view_focus',       label: 'Focus Timer & Pomodoro',   defaultOn: true },
-  { view: 'notes',       key: 'feature_view_notes',       label: 'Obsidian-Style Notes',     defaultOn: true },
-  { view: 'wall',        key: 'feature_view_wall',        label: 'Wall (freeform canvas)',   defaultOn: true },
+  // named as the sidebar names them, so the switch and the tab it shows read the same
+  { view: 'kanban',      key: 'feature_view_kanban',      label: 'Kanban',      defaultOn: true },
+  { view: 'log',         key: 'feature_view_log',         label: 'Log',         defaultOn: true },
+  { view: 'backlog',     key: 'feature_view_backlog',     label: 'Backlog',     defaultOn: true },
+  { view: 'calendar',    key: 'feature_view_calendar',    label: 'Calendar',    defaultOn: true },
+  { view: 'renewals',    key: 'feature_view_renewals',    label: 'Renewals',    defaultOn: true },
+  { view: 'focus',       key: 'feature_view_focus',       label: 'Focus',       defaultOn: true },
+  { view: 'notes',       key: 'feature_view_notes',       label: 'Notes',       defaultOn: true },
+  { view: 'wall',        key: 'feature_view_wall',        label: 'Wall',        defaultOn: true },
   // the only view off by default, it records every copy
-  { view: 'clipboard',   key: 'feature_view_clipboard',   label: 'Clipboard History Vault',  defaultOn: false },
-  { view: 'analytics',   key: 'feature_view_analytics',   label: 'Time & App Analytics',     defaultOn: true },
-  { view: 'cookbook',    key: 'feature_view_cookbook',    label: 'AI Assistant Cookbook',    defaultOn: true },
-  { view: 'cheatsheets', key: 'feature_view_cheatsheets', label: 'Quick Cheatsheets & PDFs', defaultOn: true },
-  { view: 'gamedev',     key: 'feature_gamedev_helpers',  label: 'Game Development Helpers', defaultOn: false }
+  { view: 'clipboard',   key: 'feature_view_clipboard',   label: 'Clipboard',   defaultOn: false },
+  { view: 'analytics',   key: 'feature_view_analytics',   label: 'Analytics',   defaultOn: true },
+  { view: 'cookbook',    key: 'feature_view_cookbook',    label: 'AI Cookbook', defaultOn: true },
+  { view: 'cheatsheets', key: 'feature_view_cheatsheets', label: 'Cheatsheets', defaultOn: true },
+  { view: 'gamedev',     key: 'feature_gamedev_helpers',  label: 'Game Dev',    defaultOn: false }
 ]
 
 /** off means no model calls at all; nothing is deleted */
@@ -40,6 +41,9 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
 
 export type ViewEnabledMap = Record<ActiveView, boolean>
 
+/** no switch of their own: Settings is where the others are turned off, and the Workspaces page is how you change workspace */
+const ALWAYS_OPEN: ActiveView[] = ['settings', 'workspaces']
+
 /** the Cookbook follows the AI switch */
 export function applyAiGate(map: ViewEnabledMap, aiEnabled: boolean): ViewEnabledMap {
   return aiEnabled ? map : { ...map, cookbook: false }
@@ -49,7 +53,7 @@ export function applyAiGate(map: ViewEnabledMap, aiEnabled: boolean): ViewEnable
 export function defaultViewEnabledMap(): ViewEnabledMap {
   const map = {} as ViewEnabledMap
   for (const f of VIEW_FEATURES) map[f.view] = f.defaultOn
-  map.settings = true
+  for (const view of ALWAYS_OPEN) map[view] = true
   return map
 }
 
@@ -59,8 +63,7 @@ export async function readViewFeatures(): Promise<ViewEnabledMap> {
     readAiEnabled()
   ])
   const map = Object.fromEntries(entries) as ViewEnabledMap
-  // settings has no flag, it's where you turn the others off
-  map.settings = true
+  for (const view of ALWAYS_OPEN) map[view] = true
   return applyAiGate(map, aiEnabled)
 }
 

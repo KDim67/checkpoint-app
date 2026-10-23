@@ -45,7 +45,7 @@ export default function WallShortcutsMenu({
             >
               <div style={{
                 marginBottom: '2px',
-                fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em',
+                fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.06em',
                 color: 'var(--color-text-faint)'
               }}>
                 {section.group}
@@ -66,7 +66,7 @@ export default function WallShortcutsMenu({
                     border: '1px solid var(--color-surface-offset)',
                     borderRadius: 'var(--radius-sm)',
                     color: 'var(--color-text-muted)',
-                    fontFamily: 'var(--font-mono)', fontSize: '10px'
+                    fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)'
                   }}>
                     {keys}
                   </kbd>

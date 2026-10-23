@@ -257,7 +257,7 @@ export default function GitPanel() {
             border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)',
             padding: 'var(--space-2) var(--space-3)',
-            fontSize: '11px',
+            fontSize: 'var(--text-xs)',
             fontFamily: 'var(--font-mono)',
             color: 'var(--color-text-faint)',
             wordBreak: 'break-word',
@@ -321,7 +321,7 @@ export default function GitPanel() {
               {getRepoName(gitPath)}
             </h3>
             <span style={{
-              fontSize: '10px',
+              fontSize: 'var(--text-xs)',
               color: 'var(--color-text-faint)',
               fontFamily: 'var(--font-mono)',
               display: 'block',
@@ -362,7 +362,7 @@ export default function GitPanel() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', color: 'var(--color-text-muted)' }}>
               <GitBranch size={12} />
-              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Branch</span>
+              <span style={{ fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Branch</span>
             </div>
             <span style={{
               fontSize: 'var(--text-sm)',
@@ -388,7 +388,7 @@ export default function GitPanel() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', color: 'var(--color-text-muted)' }}>
               <FileText size={12} />
-              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Changes</span>
+              <span style={{ fontSize: 'var(--text-2xs)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Changes</span>
             </div>
             <span style={{
               fontSize: 'var(--text-sm)',
@@ -404,7 +404,7 @@ export default function GitPanel() {
 
         <div className="col">
           <div style={{
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             color: 'var(--color-text-muted)',
@@ -447,7 +447,7 @@ export default function GitPanel() {
                     <div className="row-between">
                       <span style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: '10px',
+                        fontSize: 'var(--text-2xs)',
                         fontWeight: 'var(--weight-semibold)',
                         color: 'var(--color-secondary)',
                         background: 'rgba(205, 241, 43, 0.08)',
@@ -490,7 +490,7 @@ export default function GitPanel() {
                     <div style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       color: 'var(--color-text-muted)'
                     }}>
                       <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '60%' }}>

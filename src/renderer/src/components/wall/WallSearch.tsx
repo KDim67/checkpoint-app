@@ -83,7 +83,7 @@ export default function WallSearch({ query, setQuery, kind, setKind, matches, ju
                 aria-pressed={kind === option.kind}
                 style={{
                   border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-full)',
-                  padding: '1px var(--space-2)', fontSize: '10px', cursor: 'pointer',
+                  padding: '1px var(--space-2)', fontSize: 'var(--text-2xs)', cursor: 'pointer',
                   background: kind === option.kind ? 'var(--color-secondary-muted)' : 'transparent',
                   color: kind === option.kind ? 'var(--color-secondary)' : 'var(--color-text-muted)'
                 }}

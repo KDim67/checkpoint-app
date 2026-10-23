@@ -106,6 +106,13 @@ export interface WorkspaceEntry {
   gitPath?: string
   /** a label, not a mode: someone else's board shouldn't look like your own */
   shared?: boolean
+  /** a picture in the media folder shown instead of the first letter, synced with the rest of the media */
+  icon?: string
+}
+
+/** a workspace as people named it; one missing from the list reads as its slug in words */
+export function workspaceName(slug: string, list: readonly WorkspaceEntry[]): string {
+  return list.find(w => w.slug === slug)?.name ?? slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
 /** shared by onboarding, settings and joining */

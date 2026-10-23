@@ -5,10 +5,11 @@ import type { UpdateCheckResult } from '../../../../shared/types'
 import { describeUpdateProgress } from '../../../../shared/updateEta'
 import { useUpdateProgress } from '../../lib/useUpdateProgress'
 import WhatsNew from './WhatsNew'
-import { Bug, FileText, Info, PlayCircle, RefreshCw } from 'lucide-react'
+import { Bug, FileText, Info, Newspaper, PlayCircle, RefreshCw } from 'lucide-react'
+import ServiceLogo from '../ui/ServiceLogo'
 import { REPOSITORY } from '../../../../shared/releaseNotes'
 import { openProblemReport } from '../../lib/reportProblem'
-import { Divider } from './SettingsSection'
+import SettingsSection, { Divider } from './SettingsSection'
 import Logo from '../ui/Logo'
 import PathRow from './PathRow'
 import * as appApi from '../../data/app'
@@ -85,211 +86,193 @@ export default function AboutPanel() {
   }, [])
 
   const versions = [
-    { label: 'App Version',      value: info.app },
     { label: 'Electron',         value: info.electron },
     { label: 'Node.js',          value: info.node },
     { label: 'Chromium',         value: info.chrome }
   ]
 
   return (
-    <div className="col-xl">
-      <div className="row-lg">
-        <Logo size={48} />
-        <div>
-          <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
-            Checkpoint
+    <>
+      <SettingsSection icon={<Info size={14} />} title="Checkpoint" description="The version you have, and where to turn when something's wrong.">
+        <div className="col-xl">
+          <div className="row-lg">
+            <Logo size={48} />
+            <div className="fill">
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)' }}>
+                Checkpoint
+              </div>
+              <div className="text-hint-faint">
+                A local-first desktop workspace for keeping track of what you’re doing
+              </div>
+            </div>
+            <span className="plugin-version" style={{ fontVariantNumeric: 'tabular-nums' }}>App version {info.app}</span>
           </div>
-          <div className="text-hint-faint">
-            A local-first desktop workspace for keeping track of what you’re doing
-          </div>
-        </div>
-      </div>
 
-      <Divider />
+          <Divider />
 
-      {/* first-run replay lives here, where people ask what the app is */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
-        <div>
-          <div className="text-item">
-            Getting started
-          </div>
-          <div className="text-caption-sub">
-            The welcome panel, with the keyboard shortcuts worth knowing.
-          </div>
-        </div>
-        <button
-          className="btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', flexShrink: 0 }}
-          onClick={() => window.dispatchEvent(new CustomEvent('replay-onboarding'))}
-        >
-          <PlayCircle size={13} />
-          Show again
-        </button>
-      </div>
-
-      <Divider />
-
-      <div className="col">
-        {versions.map(v => (
-          <div
-            key={v.label}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: 'var(--space-2) var(--space-3)',
-              background: 'var(--color-surface-2)',
-              borderRadius: 'var(--radius-sm)'
-            }}
-          >
-            <span className="text-hint">{v.label}</span>
-            <code style={{
-              fontSize: 'var(--text-xs)',
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--color-text-base)'
-            }}>
-              {v.value}
-            </code>
-          </div>
-        ))}
-      </div>
-
-      <div>
-        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
-          Database Location
-        </div>
-        <PathRow openTitle="Open folder" onOpen={() => appApi.openExternal(`file://${info.dataPath}`)}>
-          {info.dataPath}/checkpoint.db
-        </PathRow>
-      </div>
-
-      <Divider />
-
-      <div>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-          <button
-            className="btn-secondary"
-            disabled={checking}
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-            onClick={checkForUpdates}
-          >
-            <RefreshCw size={13} className={checking ? 'animate-spin' : undefined} />
-            {checking ? 'Checking…' : 'Check for Updates'}
-          </button>
-          <button
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-            onClick={() => appApi.openExternal(REPOSITORY)}
-          >
-            <Info size={13} />
-            GitHub Repository
-          </button>
-          {/* for a bug report: every check, download, install and error, with times */}
-          <button
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-            onClick={() => void appApi.showUpdateLog().catch(err => console.error('Could not show the update log:', err))}
-          >
-            <FileText size={13} />
-            Show Update Log
-          </button>
-          {/* every error the app recorded, which Report a Problem quotes the end of */}
-          <button
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-            onClick={() => void appApi.showAppLog().catch(err => console.error('Could not show the app log:', err))}
-          >
-            <FileText size={13} />
-            Show App Log
-          </button>
-          <button
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)' }}
-            onClick={() => openProblemReport()}
-          >
-            <Bug size={13} />
-            Report a Problem
-          </button>
-        </div>
-
-        {/* the live line below already says it with a number */}
-        {update && !(update.status === 'available' && progress) && (
-          <div
-            role="status"
-            style={{
-              marginTop: 'var(--space-3)',
-              fontSize: 'var(--text-xs)',
-              lineHeight: 1.5,
-              color: UPDATE_TONE[update.status]
-            }}
-          >
-            {describeUpdate(update)}
-          </div>
-        )}
-
-        {/* full download detail, the titlebar says it in two words */}
-        {progress && (
-          <div
-            role="status"
-            style={{
-              marginTop: 'var(--space-3)',
-              fontSize: 'var(--text-xs)',
-              lineHeight: 1.5,
-              color: progress.phase === 'ready' ? 'var(--color-success)' : 'var(--color-text-muted)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <span>{describeUpdateProgress(progress)}</span>
-              {progress.phase === 'ready' && (
-                <button
-                  className="btn-secondary"
-                  style={{ fontSize: 'var(--text-xs)', padding: '2px 8px' }}
-                  onClick={() => void appApi.installUpdate()}
-                >
-                  Restart now
-                </button>
-              )}
+          <div className="col-md">
+            <div className="row-between" style={{ gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+              <div className="settings-row-text">
+                <div className="text-item">Updates</div>
+                <div className="text-sub">Checkpoint looks for a new version on its own, and installs it when you close the app.</div>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary btn-with-icon"
+                disabled={checking}
+                onClick={checkForUpdates}
+              >
+                <RefreshCw size={14} aria-hidden="true" className={checking ? 'animate-spin' : undefined} />
+                {checking ? 'Checking…' : 'Check for updates'}
+              </button>
             </div>
 
-            {progress.phase === 'downloading' && (
+            {/* the live line below already says it with a number */}
+            {update && !(update.status === 'available' && progress) && (
               <div
-                aria-hidden
+                role="status"
                 style={{
-                  marginTop: '6px', height: '3px', width: '220px', maxWidth: '100%',
-                  borderRadius: '999px', background: 'var(--color-surface-offset)', overflow: 'hidden'
+                  fontSize: 'var(--text-xs)',
+                  lineHeight: 'var(--leading-normal)',
+                  color: UPDATE_TONE[update.status]
                 }}
               >
-                <div style={{
-                  height: '100%',
-                  width: `${Math.min(100, Math.max(0, progress.percent))}%`,
-                  borderRadius: '999px',
-                  background: 'var(--color-secondary)',
-                  transition: 'width 200ms linear'
-                }} />
+                {describeUpdate(update)}
+              </div>
+            )}
+
+            {/* full download detail, the titlebar says it in two words */}
+            {progress && (
+              <div
+                role="status"
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  lineHeight: 'var(--leading-normal)',
+                  color: progress.phase === 'ready' ? 'var(--color-success)' : 'var(--color-text-muted)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span>{describeUpdateProgress(progress)}</span>
+                  {progress.phase === 'ready' && (
+                    <button
+                      type="button"
+                      className="btn-primary btn-small"
+                      onClick={() => void appApi.installUpdate()}
+                    >
+                      Restart now
+                    </button>
+                  )}
+                </div>
+
+                {progress.phase === 'downloading' && (
+                  <div
+                    aria-hidden
+                    style={{
+                      marginTop: 'var(--space-1-5)', height: '3px', width: '14rem', maxWidth: '100%',
+                      borderRadius: 'var(--radius-full)', background: 'var(--color-surface-offset)', overflow: 'hidden'
+                    }}
+                  >
+                    <div style={{
+                      height: '100%',
+                      width: `${Math.min(100, Math.max(0, progress.percent))}%`,
+                      borderRadius: 'var(--radius-full)',
+                      background: 'var(--color-secondary)',
+                      transition: 'width var(--duration-normal) linear'
+                    }} />
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
 
-      <Divider />
+          {/* first-run replay lives here, where people ask what the app is */}
+          <div className="row-between" style={{ gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <div className="settings-row-text">
+              <div className="text-item">
+                Getting started
+              </div>
+              <div className="text-sub">
+                The welcome panel, with the keyboard shortcuts worth knowing.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary btn-with-icon"
+              onClick={() => window.dispatchEvent(new CustomEvent('replay-onboarding'))}
+            >
+              <PlayCircle size={14} aria-hidden="true" />
+              Show again
+            </button>
+          </div>
 
-      <WhatsNew />
+          <div className="col-md">
+            <div>
+              <div className="text-item">Something wrong?</div>
+              <div className="text-sub">
+                Report a problem fills in GitHub's bug form with the version and recent errors, for you to read before sending.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <button type="button" className="btn-secondary btn-with-icon" onClick={() => openProblemReport()}>
+                <Bug size={14} aria-hidden="true" />
+                Report a problem
+              </button>
+              {/* every error the app recorded, which Report a problem quotes the end of */}
+              <button
+                type="button"
+                className="btn-secondary btn-with-icon"
+                onClick={() => void appApi.showAppLog().catch(err => console.error('Could not show the app log:', err))}
+              >
+                <FileText size={14} aria-hidden="true" />
+                Show the app log
+              </button>
+              {/* for a bug report: every check, download, install and error, with times */}
+              <button
+                type="button"
+                className="btn-secondary btn-with-icon"
+                onClick={() => void appApi.showUpdateLog().catch(err => console.error('Could not show the update log:', err))}
+              >
+                <FileText size={14} aria-hidden="true" />
+                Show the update log
+              </button>
+              <button type="button" className="btn-secondary btn-with-icon" onClick={() => appApi.openExternal(REPOSITORY)}>
+                <ServiceLogo service="github" size={14} />
+                Open on GitHub
+              </button>
+            </div>
+          </div>
 
-      <div style={{
-        fontSize: '11px',
-        color: 'var(--color-text-faint)',
-        lineHeight: 1.6,
-        padding: 'var(--space-3)',
-        background: 'var(--color-surface-2)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--color-surface-offset)'
-      }}>
-        <strong>MIT License</strong>. Copyright © {copyrightYears(new Date().getFullYear())} {COPYRIGHT_HOLDER}.
-        Permission is hereby granted, free of charge, to any person obtaining a copy
-        of this software to use, copy, modify, merge, publish, distribute, sublicense,
-        and/or sell copies of the Software, subject to the conditions of the MIT license.
-      </div>
-    </div>
+          <Divider />
+
+          <div className="col-md">
+            <div className="text-item">Database location</div>
+            <PathRow openTitle="Open the data folder" onOpen={() => appApi.openExternal(`file://${info.dataPath}`)}>
+              {`${info.dataPath}/checkpoint.db`}
+            </PathRow>
+            <dl className="settings-list" style={{ margin: 0 }}>
+              {versions.map(v => (
+                <div key={v.label} className="settings-list-row" style={{ padding: 'var(--space-2) var(--space-4)' }}>
+                  <dt className="text-hint">{v.label}</dt>
+                  <dd style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', fontVariantNumeric: 'tabular-nums' }}>
+                    {v.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <p className="text-sub" style={{ margin: 0, lineHeight: 'var(--leading-relaxed)' }}>
+            <strong>MIT License</strong>. Copyright © {copyrightYears(new Date().getFullYear())} {COPYRIGHT_HOLDER}.
+            Permission is hereby granted, free of charge, to any person obtaining a copy
+            of this software to use, copy, modify, merge, publish, distribute, sublicense,
+            and/or sell copies of the Software, subject to the conditions of the MIT license.
+          </p>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection icon={<Newspaper size={14} />} title="What's New" description="What changed in each version, from the release notes on GitHub.">
+        <WhatsNew />
+      </SettingsSection>
+    </>
   )
 }

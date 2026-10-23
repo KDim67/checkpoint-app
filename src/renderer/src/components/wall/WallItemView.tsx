@@ -17,6 +17,7 @@ import type { Side } from '../../../../shared/wallGrow'
 import type { TopicPlace } from '../../../../shared/wallMindMap'
 import { HIGHLIGHT_OPACITY } from '../../../../shared/wallInk'
 import { fontCssFamily } from './wallButtons'
+import { SkeletonLines } from '../ui/Skeleton'
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Med', 3: 'High' }
 
@@ -517,7 +518,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             {item.text || host}
           </span>
           {previewing ? (
-            <span style={{ fontSize: '11px', color: 'var(--color-text-faint)' }}>Fetching the page…</span>
+            <SkeletonLines label="Fetching the page" lines={2} />
           ) : item.summary && (
             <span style={{
               fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: 1.45,

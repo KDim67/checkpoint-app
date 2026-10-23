@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { loadBoardConfig, patchBoardConfig, type ColumnConfig } from '../../lib/boardConfig'
 import { useFailureReport } from '../ui/Toast'
+import { SkeletonBlocks } from '../ui/Skeleton'
 
 // per-context column config
 export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: string }) {
@@ -40,74 +41,51 @@ export default function KanbanSettings({ activeWorkspace }: { activeWorkspace: s
   const updateColWip = (id: string, wipLimit: number | null) =>
     save(columns.map(c => c.id === id ? { ...c, wipLimit } : c))
 
-  if (loading) return <div className="text-sm-faint">Loading…</div>
+  if (loading) return <SkeletonBlocks label="Loading the columns" count={4} height="3.25rem" gap="var(--space-2)" />
 
   return (
     <div className="col-md">
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', margin: 0 }}>
-        Set a WIP limit of 0 for unlimited. You can also rename columns by double-clicking their headers on the board itself.
+      <p className="text-sub" style={{ margin: 0 }}>
+        A limit of 0 lets a column hold any number of cards. Double-clicking a column's name on the board renames it too.
       </p>
-      {columns.map(col => (
-        <div
-          key={col.id}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-3)',
-            padding: 'var(--space-3)',
-            background: 'var(--color-surface-2)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--color-surface-offset)'
-          }}
-        >
-          <input
-            value={localNames[col.id] ?? col.name}
-            onChange={e => setLocalNames(prev => ({ ...prev, [col.id]: e.target.value }))}
-            onBlur={() => handleNameBlur(col.id)}
-            style={{
-              flex: 1,
-              background: 'var(--color-surface-1)',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-base)',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              fontSize: 'var(--text-sm)',
-              outline: 'none'
-            }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
-            <label style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-              WIP Limit
-            </label>
+      <ul className="settings-list" aria-label="Columns">
+        {columns.map((col, index) => (
+          <li key={col.id} className="settings-list-row">
             <input
-              type="number"
-              min={0}
-              value={col.wipLimit ?? 0}
-              onChange={e => {
-                const n = parseInt(e.target.value) || 0
-                // tracked locally, not saved yet
-                setColumns(prev => prev.map(c => c.id === col.id ? { ...c, wipLimit: n === 0 ? null : n } : c))
-              }}
-              onBlur={e => {
-                const n = parseInt(e.target.value) || 0
-                updateColWip(col.id, n === 0 ? null : n)
-              }}
-              placeholder="∞"
-              style={{
-                width: '60px',
-                background: 'var(--color-surface-1)',
-                border: '1px solid var(--color-surface-offset)',
-                color: 'var(--color-text-base)',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                fontSize: 'var(--text-sm)',
-                outline: 'none',
-                textAlign: 'center'
-              }}
+              value={localNames[col.id] ?? col.name}
+              onChange={e => setLocalNames(prev => ({ ...prev, [col.id]: e.target.value }))}
+              onBlur={() => handleNameBlur(col.id)}
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+              aria-label={`Name of column ${index + 1}`}
+              className="input-md"
+              style={{ flex: '1 1 12rem', minWidth: 0, background: 'var(--color-surface-2)' }}
             />
-          </div>
-        </div>
-      ))}
+            <div className="row">
+              <label htmlFor={`wip-${col.id}`} className="text-hint" style={{ whiteSpace: 'nowrap' }}>
+                WIP limit
+              </label>
+              <input
+                id={`wip-${col.id}`}
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={col.wipLimit ?? 0}
+                onChange={e => {
+                  const n = parseInt(e.target.value) || 0
+                  // tracked locally, not saved yet
+                  setColumns(prev => prev.map(c => c.id === col.id ? { ...c, wipLimit: n === 0 ? null : n } : c))
+                }}
+                onBlur={e => {
+                  const n = parseInt(e.target.value) || 0
+                  updateColWip(col.id, n === 0 ? null : n)
+                }}
+                className="input-md"
+                style={{ width: '5rem', textAlign: 'center', background: 'var(--color-surface-2)', fontVariantNumeric: 'tabular-nums' }}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

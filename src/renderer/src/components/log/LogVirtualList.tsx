@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import LogEntry from './LogEntry'
 import type { Item } from '../../../../shared/types'
 import { Calendar } from 'lucide-react'
+import { SkeletonBlocks } from '../ui/Skeleton'
 
 interface LogVirtualListProps {
   items: Item[]
@@ -139,27 +140,9 @@ export default function LogVirtualList({
         </div>
       )}
 
+      {/* earlier entries on their way, in the shape of entries */}
       {loadingMore && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'var(--space-3)',
-          background: 'var(--color-surface-1)',
-          color: 'var(--color-text-muted)',
-          fontSize: 'var(--text-xs)',
-          gap: 'var(--space-2)'
-        }}>
-          <span className="spinner" style={{
-            width: '12px',
-            height: '12px',
-            border: '2px solid var(--color-secondary-muted)',
-            borderTopColor: 'var(--color-secondary)',
-            borderRadius: '50%',
-            animation: 'spin 0.6s linear infinite'
-          }} />
-          Loading historical entries...
-        </div>
+        <SkeletonBlocks label="Loading earlier entries" count={2} height="4rem" style={{ padding: 'var(--space-3) var(--space-6)' }} />
       )}
 
       {items.length === 0 ? (

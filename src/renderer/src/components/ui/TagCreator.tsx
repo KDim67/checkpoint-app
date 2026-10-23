@@ -41,7 +41,7 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
       gap: '6px'
     }}>
       <span style={{
-        fontSize: '10px',
+        fontSize: 'var(--text-2xs)',
         fontWeight: 'var(--weight-bold)',
         color: 'var(--color-text-faint)',
         textTransform: 'uppercase'
@@ -60,9 +60,8 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
             border: '1px solid var(--color-surface-offset)',
             borderRadius: '4px',
             color: 'var(--color-text-base)',
-            fontSize: '11px',
+            fontSize: 'var(--text-xs)',
             padding: '3px 6px',
-            outline: 'none',
             minWidth: 0
           }}
           onKeyDown={e => {
@@ -80,7 +79,7 @@ export default function TagCreator({ onCreated }: TagCreatorProps) {
             borderRadius: '4px',
             color: 'var(--color-text-inverted)',
             fontWeight: 'var(--weight-bold)',
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             padding: '3px 8px',
             cursor: 'pointer',
             flexShrink: 0

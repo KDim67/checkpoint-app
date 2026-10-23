@@ -1,12 +1,14 @@
 /** for models the catalogue doesn't list; state lives in useModelConfig */
 
 import type { ModelConfig } from './useModelConfig'
+import { usePresenceState } from '../../lib/presence'
 
 interface Props {
   models: ModelConfig
 }
 
 export default function CustomModelPromptModal({ models }: Props) {
+  const presence = usePresenceState()
   const {
     customModelInput,
     setCustomModelInput,
@@ -14,13 +16,13 @@ export default function CustomModelPromptModal({ models }: Props) {
     setShowCustomModelPrompt
   } = models
   return (
-        <div style={{
+        <div className="motion-backdrop" data-state={presence} style={{
           position: 'absolute', inset: 0, zIndex: 1000,
           background: 'rgba(10, 12, 18, 0.75)', backdropFilter: 'blur(3px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '16px'
         }}>
-          <div style={{
+          <div className="motion-pop" data-state={presence} style={{
             background: 'var(--color-surface-1)',
             border: '1px solid var(--color-surface-offset)',
             borderRadius: 'var(--radius-md)',
@@ -55,9 +57,8 @@ export default function CustomModelPromptModal({ models }: Props) {
                 border: '1px solid var(--color-surface-offset)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '6px 10px',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 color: 'var(--color-text-base)',
-                outline: 'none',
                 boxSizing: 'border-box'
               }}
             />
@@ -70,7 +71,7 @@ export default function CustomModelPromptModal({ models }: Props) {
                   border: 'none',
                   borderRadius: 'var(--radius-sm)',
                   padding: '5px 12px',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   cursor: 'pointer',
                   fontWeight: 'bold'
                 }}
@@ -89,7 +90,7 @@ export default function CustomModelPromptModal({ models }: Props) {
                   border: 'none',
                   borderRadius: 'var(--radius-sm)',
                   padding: '5px 12px',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   cursor: 'pointer',
                   fontWeight: 'bold'
                 }}

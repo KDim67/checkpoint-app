@@ -34,11 +34,14 @@ export type SettingsTab =
   | 'mcp'
   | 'about'
 
+/** pages you visit and leave, rather than work in */
+const PASS_THROUGH: ActiveView[] = ['settings', 'workspaces']
+
 /** workspace above the storage line, context at and below: the column, keys, IPC and payloads are contracts */
 interface AppState {
   activeView: ActiveView
-  /** where the Workspaces page goes back to: the view it was opened from */
-  returnView: ActiveView
+  /** the views behind Settings or the Workspaces page, newest last, for going back */
+  backTrail: ActiveView[]
   activeWorkspace: string
   availableWorkspaces: string[]
   workspaceList: WorkspaceEntry[]
@@ -82,6 +85,8 @@ interface AppState {
   focusSettings: FocusSettings    // lengths, cadence, chime, notifications
 
   setView: (view: ActiveView) => void
+  /** leaves Settings or the Workspaces page for where you were before it */
+  goBack: () => void
   setWorkspace: (slug: string) => void
   setSettingsTab: (tab: SettingsTab) => void
   toggleRightPanel: (content?: AppState['rightPanelContent']) => void
@@ -118,7 +123,7 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   immer(set => ({
     activeView: 'kanban',
-    returnView: 'kanban',
+    backTrail: [],
     activeWorkspace: 'default',
     availableWorkspaces: ['default'],
     workspaceList: [],
@@ -153,16 +158,29 @@ export const useAppStore = create<AppState>()(
 
     setView: (view: ActiveView) => {
       set(state => {
-        if (view === 'workspaces' && state.activeView !== 'workspaces') state.returnView = state.activeView
+        if (view === state.activeView) return
+        if (!PASS_THROUGH.includes(view)) state.backTrail = []
+        else {
+          const at = state.backTrail.indexOf(view)
+          // reaching a page already behind you by another way is going back to it
+          if (at >= 0) state.backTrail.splice(at)
+          else state.backTrail.push(state.activeView)
+        }
         state.activeView = view
       })
       // for "Start on: Last used"; never Settings or the Workspaces page, which are places you pass through
-      if (view !== 'settings' && view !== 'workspaces') {
+      if (!PASS_THROUGH.includes(view)) {
         setStringSetting('last_active_view', view).catch(err => {
           console.error('Failed to save last_active_view setting:', err)
         })
       }
     },
+
+    goBack: () =>
+      set(state => {
+        // opened with nothing behind it, as from a link at startup
+        state.activeView = state.backTrail.pop() ?? 'kanban'
+      }),
 
     setWorkspace: (slug: string) => {
       set(state => {

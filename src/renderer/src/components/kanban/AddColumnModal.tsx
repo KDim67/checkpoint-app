@@ -5,6 +5,7 @@ import useFocusTrap from '../ui/useFocusTrap'
 import ColorPicker from '../ui/ColorPicker'
 import FormActions from '../ui/FormActions'
 import ColorSwatchButtons from '../ui/ColorSwatchButtons'
+import { usePresenceState } from '../../lib/presence'
 
 interface AddColumnModalProps {
   onClose: () => void
@@ -21,8 +22,10 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
   const [error, setError] = useState<string | null>(null)
 
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const containerRef = useFocusTrap(true, inputRef)
-  useEscapeKey(onClose, true)
+  // leaving inside Presence, it lets go of focus and Escape at once
+  const presence = usePresenceState()
+  const containerRef = useFocusTrap(presence === 'open', inputRef)
+  useEscapeKey(onClose, presence === 'open')
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,7 +52,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay motion-backdrop" data-state={presence} onClick={onClose}>
       <style>{`
         .modal-overlay {
           position: fixed;
@@ -81,7 +84,8 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
 
       <form
         ref={containerRef as React.RefObject<HTMLFormElement>}
-        className="modal-form"
+        className="modal-form motion-pop"
+        data-state={presence}
         onSubmit={handleFormSubmit}
         onClick={e => e.stopPropagation()}
         role="dialog"
@@ -130,9 +134,8 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2.5) var(--space-3.5)',
-              fontSize: 'var(--text-sm)',
-              outline: 'none'
+              padding: 'var(--space-2-5) var(--space-3-5)',
+              fontSize: 'var(--text-sm)'
             }}
           />
         </div>
@@ -153,9 +156,8 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2.5) var(--space-3.5)',
-              fontSize: 'var(--text-sm)',
-              outline: 'none'
+              padding: 'var(--space-2-5) var(--space-3-5)',
+              fontSize: 'var(--text-sm)'
             }}
           />
         </div>
@@ -177,7 +179,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
               border: '1px solid var(--color-surface-offset)',
               color: 'var(--color-text-base)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2.5) var(--space-3.5)',
+              padding: 'var(--space-2-5) var(--space-3-5)',
               fontSize: 'var(--text-sm)'
             }}
           />
@@ -195,7 +197,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
               style={{
                 flex: 1,
                 padding: '6px',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-bold)',
                 borderRadius: '4px',
                 border: colorMode === 'header' ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
@@ -212,7 +214,7 @@ export default function AddColumnModal({ onClose, onSubmit, existingNames }: Add
               style={{
                 flex: 1,
                 padding: '6px',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-bold)',
                 borderRadius: '4px',
                 border: colorMode === 'full' ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',

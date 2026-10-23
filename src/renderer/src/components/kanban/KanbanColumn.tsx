@@ -66,7 +66,7 @@ function MenuItem({ label, onClick, danger = false }: { label: string; onClick: 
         background: hover ? 'var(--color-surface-offset)' : 'transparent',
         border: 'none',
         padding: '6px 12px',
-        fontSize: '11px',
+        fontSize: 'var(--text-xs)',
         color: danger ? 'var(--color-error)' : hover ? 'var(--color-text-base)' : 'var(--color-text-muted)',
         textAlign: 'left',
         cursor: 'pointer',
@@ -372,7 +372,6 @@ function ColumnBody({
                     padding: '4px 8px',
                     fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-bold)',
-                    outline: 'none',
                     letterSpacing: 'var(--tracking-wide)',
                     textTransform: 'uppercase'
                   }}
@@ -395,8 +394,7 @@ function ColumnBody({
                     borderRadius: '4px',
                     padding: '4px 4px',
                     fontSize: 'var(--text-xs)',
-                    fontWeight: 'var(--weight-bold)',
-                    outline: 'none'
+                    fontWeight: 'var(--weight-bold)'
                   }}
                 />
                 <button
@@ -445,7 +443,7 @@ function ColumnBody({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--color-surface-2)', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--color-surface-offset)' }}>
                 <div className="row-between">
-                  <span style={{ fontSize: '10px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Theme & Display Mode
                   </span>
                 </div>
@@ -460,7 +458,7 @@ function ColumnBody({
                     style={{
                       flex: 1,
                       padding: '3px 6px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-2xs)',
                       fontWeight: 'var(--weight-bold)',
                       borderRadius: '4px',
                       border: (editColorMode !== 'full') ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
@@ -480,7 +478,7 @@ function ColumnBody({
                     style={{
                       flex: 1,
                       padding: '3px 6px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-2xs)',
                       fontWeight: 'var(--weight-bold)',
                       borderRadius: '4px',
                       border: (editColorMode === 'full') ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
@@ -545,7 +543,7 @@ function ColumnBody({
                       alignItems: 'center',
                       gap: '4px',
                       padding: '4px 8px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-xs)',
                       fontWeight: 'bold',
                       color: 'var(--color-error)',
                       background: 'rgba(239, 68, 68, 0.1)',
@@ -584,7 +582,7 @@ function ColumnBody({
               </h3>
 
               <span style={{
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 'var(--weight-bold)',
                 background: isWipExceeded
                   ? 'var(--color-warning)'
@@ -729,7 +727,7 @@ function ColumnBody({
                     border: `2px dashed ${t.color}`,
                     background: `${t.color}15`,
                     color: t.color,
-                    fontSize: '11px',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
@@ -761,7 +759,7 @@ function ColumnBody({
                 border: `2px dashed ${t.color}`,
                 background: `${t.color}15`,
                 color: t.color,
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',

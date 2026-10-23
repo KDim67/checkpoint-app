@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Divider, ToggleSwitch } from './SettingsSection'
+import { Divider, ToggleSwitch, SettingsRowsSkeleton } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import { FolderOpen, Sparkles, AlertTriangle, Terminal, ShieldCheck, X } from 'lucide-react'
 import type { PluginInfo, PluginLogLine } from '../../../../shared/types'
@@ -9,6 +9,7 @@ import * as customizerApi from '../../data/customizer'
 import { useAppStore } from '../../store/appStore'
 import PluginConsentModal from './PluginConsentModal'
 import PluginSettingsModal from './PluginSettingsModal'
+import Presence from '../ui/Presence'
 
 const STATUS_LABEL: Record<PluginStatus, string> = {
   off: 'Off',
@@ -117,7 +118,7 @@ export default function ExtensionsTab() {
         return true
       }
       setLoadError(current => (current?.name === plugin.name ? null : current))
-      toast(engineEnabled ? `${plugin.name} is on` : `${plugin.name} will run once the Customization Engine is on`)
+      toast(engineEnabled ? `${plugin.name} is on` : `${plugin.name} runs once your customizations are on`)
       return true
     } catch (err) {
       console.error(err)
@@ -147,12 +148,12 @@ export default function ExtensionsTab() {
       await customizerApi.openPluginsFolder()
     } catch (err) {
       console.error(err)
-      toast('Failed to open plugins directory')
+      toast('Could not open the plugins folder')
     }
   }
 
   if (loading) {
-    return <div className="text-sm-faint">Scanning plugins…</div>
+    return <SettingsRowsSkeleton label="Looking for your plugins" rows={3} />
   }
 
   // on before plugins were sandboxed; main hides that grant, so it shows as on with none
@@ -196,34 +197,36 @@ export default function ExtensionsTab() {
         <div className="plugin-notice plugin-notice-warning">
           <AlertTriangle size={16} className="plugin-notice-icon" />
           <div className="fill">
-            The Customization Engine is off, so no plugin runs. It also powers the Theme Builder in <strong>Appearance &amp; Theme</strong>.
+            Your customizations are off, so no plugin runs. The same switch is at the top of the Theme Builder in <strong>Appearance</strong>.
           </div>
           <button
+            type="button"
             className="plugin-engine-button"
             onClick={async () => {
               try {
                 await customizerApi.toggleEngine(true)
+                window.dispatchEvent(new CustomEvent('customizer-engine-changed', { detail: { enabled: true } }))
                 await loadPluginsList()
-                toast('Customization Engine activated')
+                toast('Customizations on')
               } catch (err) {
                 console.error(err)
-                toast('Failed to enable the Customization Engine')
+                toast('Could not turn your customizations on. Try again.')
               }
             }}
           >
-            Enable now
+            Turn them on
           </button>
         </div>
       )}
 
       <div className="row-between">
         <div>
-          <h3 className="heading-sm-strong">User Plugins</h3>
-          <p className="text-sub">JavaScript files from your plugins folder, each in its own sandbox.</p>
+          <h3 className="heading-sm-strong">Your plugins</h3>
+          <p className="text-sub">JavaScript files in your plugins folder.</p>
         </div>
-        <button onClick={handleOpenFolder} className="extensions-tab-open-folder">
-          <FolderOpen size={12} />
-          Open Plugins Folder
+        <button type="button" onClick={handleOpenFolder} className="btn-secondary btn-small">
+          <FolderOpen size={13} aria-hidden="true" />
+          Open the plugins folder
         </button>
       </div>
 
@@ -258,7 +261,7 @@ export default function ExtensionsTab() {
         {plugins.length === 0 ? (
           <div className="plugin-empty">
             <Sparkles size={24} className="text-faint" />
-            <div className="text-item">No plugins found in the plugins directory</div>
+            <div className="text-item">No plugins yet</div>
             <div className="text-sub">
               Create a JavaScript file (for example <code>hello.js</code>) in the plugins folder. A plugin lists
               what it needs in <code>permissions</code>, and the sites it talks to in <code>hosts</code>.
@@ -319,7 +322,7 @@ export default function ExtensionsTab() {
                 <ToggleSwitch
                   checked={p.active}
                   onChange={checked => void handleToggle(p, checked)}
-                  label={`Turn on ${p.name}`}
+                  label={p.name}
                 />
               </div>
 
@@ -340,23 +343,27 @@ export default function ExtensionsTab() {
         )}
       </div>
 
-      {configuring && (
-        <PluginSettingsModal
-          plugin={configuring}
-          onClose={() => setConfiguring(null)}
-          onSaved={() => toast(`Saved the settings for ${configuring.name}`)}
-        />
-      )}
+      <Presence show={!!configuring}>
+        {configuring && (
+          <PluginSettingsModal
+            plugin={configuring}
+            onClose={() => setConfiguring(null)}
+            onSaved={() => toast(`Saved the settings for ${configuring.name}`)}
+          />
+        )}
+      </Presence>
 
-      {reviewing && (
-        <PluginConsentModal
-          plugin={reviewing}
-          workspaces={workspaceList}
-          activeWorkspace={activeWorkspace}
-          onClose={() => setReviewing(null)}
-          onApprove={workspaces => handleApprove(reviewing, workspaces)}
-        />
-      )}
+      <Presence show={!!reviewing}>
+        {reviewing && (
+          <PluginConsentModal
+            plugin={reviewing}
+            workspaces={workspaceList}
+            activeWorkspace={activeWorkspace}
+            onClose={() => setReviewing(null)}
+            onApprove={workspaces => handleApprove(reviewing, workspaces)}
+          />
+        )}
+      </Presence>
     </div>
   )
 }

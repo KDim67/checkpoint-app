@@ -42,7 +42,7 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
             color: 'var(--color-text-base)',
             borderRadius: '999px',
             padding: '5px 12px',
-            fontSize: '10px',
+            fontSize: 'var(--text-xs)',
             fontWeight: 'bold',
             cursor: 'pointer',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
@@ -82,7 +82,7 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
                   color: isActive ? skill.color : 'var(--color-text-muted)',
                   borderRadius: '999px',
                   padding: '3px 10px',
-                  fontSize: '10px',
+                  fontSize: 'var(--text-2xs)',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
@@ -103,7 +103,7 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
               display: 'flex', alignItems: 'center', gap: '5px',
               background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.4)',
               color: 'var(--color-info)', borderRadius: '999px', padding: '3px 8px 3px 10px',
-              fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap'
+              fontSize: 'var(--text-2xs)', fontWeight: 'bold', whiteSpace: 'nowrap'
             }}
           >
             <FolderOpen size={11} />
@@ -128,7 +128,7 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
               display: 'flex', alignItems: 'center', gap: '5px',
               background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.4)',
               color: 'var(--color-accent-ai-soft)', borderRadius: '999px', padding: '3px 10px',
-              fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap', cursor: 'pointer'
+              fontSize: 'var(--text-2xs)', fontWeight: 'bold', whiteSpace: 'nowrap', cursor: 'pointer'
             }}
           >
             <Brain size={11} />
@@ -152,7 +152,7 @@ export default function AiInputDock({ panel }: { panel: AiStreamPanelState }) {
               transition: 'width 200ms ease'
             }} />
           </div>
-          <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
             {Math.round(tokenUsage.ratio * 100)}%
           </span>
         </div>

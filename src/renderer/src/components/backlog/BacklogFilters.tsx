@@ -203,7 +203,7 @@ export default function BacklogFilters({
           </span>
           <div className="col-6px">
             <div className="row-4px">
-              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', width: '30px' }}>From</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', width: '30px' }}>From</span>
               <input
                 type="date"
                 value={dueStart}
@@ -215,13 +215,12 @@ export default function BacklogFilters({
                   borderRadius: '4px',
                   padding: '2px 4px',
                   fontSize: 'var(--text-2xs)',
-                  outline: 'none',
                   flex: 1
                 }}
               />
             </div>
             <div className="row-4px">
-              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', width: '30px' }}>To</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', width: '30px' }}>To</span>
               <input
                 type="date"
                 value={dueEnd}
@@ -233,13 +232,12 @@ export default function BacklogFilters({
                   borderRadius: '4px',
                   padding: '2px 4px',
                   fontSize: 'var(--text-2xs)',
-                  outline: 'none',
                   flex: 1
                 }}
               />
             </div>
             {isDateRangeInvalid && (
-              <span style={{ fontSize: '10px', color: 'var(--color-warning)', marginTop: '2px' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', marginTop: '2px' }}>
                 ⚠️ Start date is after end date
               </span>
             )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { ToggleSwitch, Divider } from './SettingsSection'
+import { ToggleRow, Divider } from './SettingsSection'
 import { useToast, useFailureReport } from '../ui/Toast'
+import { useConfirm } from '../ui/ConfirmDialog'
 import ColorPicker from '../ui/ColorPicker'
 import ThemePresets from './ThemePresets'
 import {
@@ -12,17 +13,17 @@ import {
 import * as customizerApi from '../../data/customizer'
 
 const COLOR_VARIABLE_LABELS: Record<Exclude<keyof ThemeVariables, '--font-sans'>, { label: string; desc: string }> = {
-  '--color-background': { label: 'Canvas Background', desc: 'Base color for the entire workspace background.' },
-  '--color-surface-1': { label: 'Panel Base', desc: 'Background color for panels and main container cards.' },
-  '--color-surface-2': { label: 'Input Fields', desc: 'Background color for form inputs and nested lists.' },
-  '--color-surface-offset': { label: 'Hover States & Borders', desc: 'Visual divider line and list hover background.' },
-  '--color-surface-elevated': { label: 'Context Menus & Tooltips', desc: 'Background color for popovers and tooltips.' },
-  '--color-primary': { label: 'Primary Brand Color', desc: 'Brand Electric Blue used for links and focus borders.' },
-  '--color-secondary': { label: 'Secondary Accent Color', desc: 'Brand Volt Lime used for highlight alerts and selections.' },
-  '--color-balance': { label: 'Idle Icons & Outlines', desc: 'Sidebar icons at rest, card outlines, and neutral marks.' },
-  '--color-text-base': { label: 'Primary Text', desc: 'Color of normal, high-visibility body text.' },
-  '--color-text-muted': { label: 'Muted Labels', desc: 'Secondary details, metadata, and description text.' },
-  '--color-text-faint': { label: 'Faint Labels / Placeholders', desc: 'Disabled inputs, metadata timestamps, and placeholder text.' }
+  '--color-background': { label: 'Background', desc: 'Behind everything, the window itself.' },
+  '--color-surface-1': { label: 'Panels', desc: 'Cards, panels and the sidebar.' },
+  '--color-surface-2': { label: 'Fields', desc: 'Text boxes, menus and lists inside a panel.' },
+  '--color-surface-offset': { label: 'Lines and hover', desc: 'Dividing lines, and a row under the pointer.' },
+  '--color-surface-elevated': { label: 'Menus and tooltips', desc: 'Whatever pops up over the rest.' },
+  '--color-primary': { label: 'Primary accent', desc: 'Links, focus rings and the main buttons.' },
+  '--color-secondary': { label: 'Secondary accent', desc: 'What is selected or switched on.' },
+  '--color-balance': { label: 'Icons and outlines', desc: 'Sidebar icons at rest, card outlines and quiet marks.' },
+  '--color-text-base': { label: 'Text', desc: 'Most of the words you read.' },
+  '--color-text-muted': { label: 'Secondary text', desc: 'Descriptions, details and labels.' },
+  '--color-text-faint': { label: 'Faint text', desc: 'Hints, times, placeholders and switched-off things.' }
 }
 
 const FONTS_OPTIONS = [
@@ -36,6 +37,7 @@ const FONTS_OPTIONS = [
 export default function ThemeCustomizer() {
   const { toast } = useToast()
   const report = useFailureReport()
+  const confirm = useConfirm()
   const [engineEnabled, setEngineEnabled] = useState(false)
   const [themeVars, setThemeVars] = useState<ThemeVariables>(DEFAULT_THEME)
 
@@ -79,10 +81,10 @@ export default function ThemeCustomizer() {
       setEngineEnabled(checked)
       await customizerApi.toggleEngine(checked)
       window.dispatchEvent(new CustomEvent('customizer-engine-changed', { detail: { enabled: checked } }))
-      toast(checked ? 'Customization Engine activated' : 'Customization Engine deactivated')
+      toast(checked ? 'Customizations on' : 'Customizations off')
     } catch (err) {
-      console.error(err)
-      toast('Failed to toggle customization engine')
+      setEngineEnabled(!checked)
+      report(checked ? 'turn your customizations on' : 'turn your customizations off', err)
     }
   }
 
@@ -105,132 +107,110 @@ export default function ThemeCustomizer() {
 
   const handleApplyPreset = async (vars: ThemeVariables) => {
     await applyVars(vars)
-    toast(engineEnabled ? 'Preset applied' : 'Preset loaded (enable the engine to apply it)')
+    toast(engineEnabled ? 'Preset applied' : 'Preset picked. Turn customizations on to see it.')
   }
 
+  // every colour and the font go at once, so it's asked about first
   const handleReset = async () => {
+    const ok = await confirm({
+      title: 'Reset the colours and font?',
+      message: "Every colour and the font go back to Checkpoint's own. Presets you saved are kept.",
+      confirmText: 'Reset',
+      isDestructive: true
+    })
+    if (!ok) return
     setThemeVars(DEFAULT_THEME)
-    if (engineEnabled) {
-      try {
-        await customizerApi.updateTheme({})
-        toast('Custom theme colors reset to default')
-      } catch (err) {
-        report('reset the colours', err)
-      }
-    } else {
-      toast('Defaults restored (enable customization engine to apply)')
+    if (!engineEnabled) {
+      toast('Colours and font reset')
+      return
+    }
+    try {
+      await customizerApi.updateTheme({})
+      toast('Colours and font reset')
+    } catch (err) {
+      report('reset the colours', err)
     }
   }
 
   return (
     <div className="col-xl">
-      <div style={{
-        background: 'var(--color-surface-2)',
-        border: '1px solid var(--color-surface-offset)',
-        borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-4)'
-      }}>
-        <div className="row-between">
-          <div>
-            <h3 className="heading-sm-strong">
-              Enable Customizer Engine
-            </h3>
-            <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-              Turns on theme variable overriding and user plugins.
-            </p>
-          </div>
-          <ToggleSwitch checked={engineEnabled} onChange={handleEngineToggle} label="Enable Customizer Engine" />
-        </div>
-      </div>
+      <ToggleRow
+        label="Use my customizations"
+        description="The colours and font below, and the plugins you allowed."
+        checked={engineEnabled}
+        onChange={handleEngineToggle}
+      />
 
       <Divider />
 
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-4)',
-        opacity: engineEnabled ? 1 : 0.5,
-        pointerEvents: engineEnabled ? 'auto' : 'none',
-        transition: 'opacity 200ms ease'
-      }}>
+      {/* switched off, the controls are disabled rather than faded, so the keyboard skips them too */}
+      <fieldset className="settings-fieldset" disabled={!engineEnabled} aria-label="Colours and font">
         <ThemePresets vars={themeVars} onApply={handleApplyPreset} />
-
-        <Divider />
-
-        <h4 className="heading-caps">
-          Color Scheme Overrides
-        </h4>
-
-        {Object.entries(COLOR_VARIABLE_LABELS).map(([varName, info]) => {
-          const name = varName as Exclude<keyof ThemeVariables, '--font-sans'>
-          return (
-            <div
-              key={name}
-              className="panel-row-sm"
-            >
-              <div className="flex-1-mr">
-                <span className="field-label">
-                  {info.label}
-                </span>
-                <span className="text-caption">
-                  {info.desc}
-                </span>
-              </div>
-              <div className="row">
-                <ColorPicker
-                  value={themeVars[name]}
-                  onCommit={val => handleColorChange(name, val)}
-                  showHexInput={false}
-                  swatchSize={32}
-                  title={`Color for ${info.label}`}
-                />
-                <code style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11px',
-                  color: 'var(--color-text-muted)',
-                  textTransform: 'uppercase',
-                  background: 'var(--color-surface-2)',
-                  padding: '2px 6px',
-                  borderRadius: '4px'
-                }}>
-                  {themeVars[name]}
-                </code>
-              </div>
-            </div>
-          )
-        })}
 
         <Divider />
 
         <div className="col-md">
           <h4 className="heading-caps">
-            Typography Customization
+            Colours
           </h4>
+          <ul className="settings-list">
+            {Object.entries(COLOR_VARIABLE_LABELS).map(([varName, info]) => {
+              const name = varName as Exclude<keyof ThemeVariables, '--font-sans'>
+              return (
+                <li key={name} className="settings-list-row">
+                  <div className="settings-row-text">
+                    <span className="field-label">
+                      {info.label}
+                    </span>
+                    <span className="text-sub">
+                      {info.desc}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <ColorPicker
+                      value={themeVars[name]}
+                      onCommit={val => handleColorChange(name, val)}
+                      showHexInput={false}
+                      swatchSize={32}
+                      title={`Colour for ${info.label.toLowerCase()}`}
+                    />
+                    <code style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-muted)',
+                      textTransform: 'uppercase',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      {themeVars[name]}
+                    </code>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
 
-          <div
-            className="panel-row-sm"
-          >
-            <div className="flex-1-mr">
-              <span className="field-label">
-                Primary Font Family
-              </span>
-              <span className="text-caption">
-                Select the font family used across primary headers and text.
-              </span>
-            </div>
-            <div>
+        <Divider />
+
+        <div className="col-md">
+          <h4 className="heading-caps">
+            Font
+          </h4>
+          <ul className="settings-list">
+            <li className="settings-list-row">
+              <div className="settings-row-text">
+                <label htmlFor="theme-font" className="field-label">
+                  Font family
+                </label>
+                <span className="text-sub">
+                  Used for headings and text across Checkpoint.
+                </span>
+              </div>
               <select
+                id="theme-font"
                 value={themeVars['--font-sans']}
                 onChange={e => handleFontChange('--font-sans', e.target.value)}
-                style={{
-                  background: 'var(--color-surface-2)',
-                  border: '1px solid var(--color-surface-offset)',
-                  color: 'var(--color-text-base)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-1-5) var(--space-3)',
-                  fontSize: 'var(--text-xs)',
-                  cursor: 'pointer'
-                }}
+                className="select-md settings-row-select"
               >
                 {FONTS_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>
@@ -238,30 +218,16 @@ export default function ThemeCustomizer() {
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
+            </li>
+          </ul>
         </div>
 
-        <div className="mt-2">
-          <button
-            onClick={handleReset}
-            className="theme-customizer-reset"
-            style={{
-              padding: 'var(--space-2) var(--space-4)',
-              border: '1px solid var(--color-surface-offset)',
-              color: 'var(--color-text-base)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--weight-semibold)',
-              cursor: 'pointer',
-              transition: 'all 100ms ease'
-            }}
-          >
-            Reset to Defaults
+        <div>
+          <button type="button" className="btn-secondary" onClick={handleReset}>
+            Reset colours and font
           </button>
         </div>
-      </div>
+      </fieldset>
     </div>
   )
 }
-

@@ -86,7 +86,7 @@ export default function ServiceRow({ view, icon, summary, steps, fields, keyLabe
   }
 
   return (
-    <div className="connection-row" role="group" aria-label={name}>
+    <div className="connection-row" role="group" aria-label={name} data-settings-part={name}>
       <div className="connection-head">
         {icon}
         <span className="text-item-strong">{name}</span>

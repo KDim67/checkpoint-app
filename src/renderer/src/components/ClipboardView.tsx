@@ -21,6 +21,7 @@ import { useToast, useFailureReport } from './ui/Toast'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import * as clipboardApi from '../data/clipboard'
 import * as appApi from '../data/app'
+import { SkeletonBlocks } from './ui/Skeleton'
 
 // keep in sync with the DELETE ... LIMIT in db/clipboard.ts
 const HISTORY_LIMIT = 200
@@ -303,10 +304,9 @@ export default function ClipboardView() {
                       background: 'var(--color-surface-1)',
                       border: '1px solid var(--color-secondary)',
                       color: 'var(--color-text-base)',
-                      fontSize: '11px',
+                      fontSize: 'var(--text-xs)',
                       borderRadius: '4px',
                       padding: '2px 6px',
-                      outline: 'none',
                       flex: 1,
                       minWidth: 0
                     }}
@@ -345,7 +345,7 @@ export default function ClipboardView() {
                     <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: meta.accent, border: '1px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
                   )}
                   <span style={{
-                    fontSize: '10px',
+                    fontSize: 'var(--text-2xs)',
                     fontWeight: 'var(--weight-bold)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
@@ -357,7 +357,7 @@ export default function ClipboardView() {
                   }}>
                     {meta.label}
                   </span>
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                     {formatTime(item.created_at)}
                   </span>
                 </>
@@ -441,7 +441,7 @@ export default function ClipboardView() {
           </pre>
 
           <div className="row-between-gap">
-            <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', whiteSpace: 'nowrap' }}>
               {item.content.length.toLocaleString()} chars{lineCount > 1 ? ` · ${lineCount} lines` : ''}
             </span>
             {isLong && (
@@ -454,7 +454,7 @@ export default function ClipboardView() {
                   background: 'transparent',
                   border: 'none',
                   color: 'var(--color-primary)',
-                  fontSize: '10px',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-semibold)',
                   cursor: 'pointer',
                   padding: 0
@@ -477,7 +477,6 @@ export default function ClipboardView() {
     borderRadius: 'var(--radius-md)',
     padding: 'var(--space-2) var(--space-3) var(--space-2) var(--space-8)',
     fontSize: 'var(--text-sm)',
-    outline: 'none',
     boxSizing: 'border-box'
   }
 
@@ -565,9 +564,7 @@ export default function ClipboardView() {
 
         <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {loading ? (
-            <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', textAlign: 'center', padding: 'var(--space-6)' }}>
-              Loading history…
-            </div>
+            <SkeletonBlocks label="Loading the clipboard history" count={5} height="4.5rem" />
           ) : filteredHistory.length === 0 ? (
             <div style={{
               display: 'flex',
@@ -659,8 +656,7 @@ export default function ClipboardView() {
                   color: 'var(--color-text-base)',
                   borderRadius: 'var(--radius-sm)',
                   padding: '6px 8px',
-                  fontSize: 'var(--text-xs)',
-                  outline: 'none'
+                  fontSize: 'var(--text-xs)'
                 }}
               />
               <textarea
@@ -680,18 +676,17 @@ export default function ClipboardView() {
                   borderRadius: 'var(--radius-sm)',
                   padding: '6px 8px',
                   fontSize: 'var(--text-xs)',
-                  outline: 'none',
                   resize: 'vertical',
                   fontFamily: 'var(--font-mono)'
                 }}
               />
               <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <span style={{ marginRight: 'auto', fontSize: '10px', color: 'var(--color-text-faint)' }}>⌘/Ctrl+Enter to save</span>
+                <span style={{ marginRight: 'auto', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>⌘/Ctrl+Enter to save</span>
                 <button
                   type="button"
                   onClick={() => setIsAdding(false)}
                   className="btn-secondary"
-                  style={{ fontSize: '11px', padding: '5px 12px', height: '28px' }}
+                  style={{ fontSize: 'var(--text-xs)', padding: '5px 12px', height: '28px' }}
                 >
                   Cancel
                 </button>
@@ -699,7 +694,7 @@ export default function ClipboardView() {
                   type="submit"
                   className="btn-primary"
                   disabled={!newContent.trim()}
-                  style={{ fontSize: '11px', padding: '5px 12px', height: '28px', opacity: newContent.trim() ? 1 : 0.5, cursor: newContent.trim() ? 'pointer' : 'not-allowed' }}
+                  style={{ fontSize: 'var(--text-xs)', padding: '5px 12px', height: '28px', opacity: newContent.trim() ? 1 : 0.5, cursor: newContent.trim() ? 'pointer' : 'not-allowed' }}
                 >
                   Save Snippet
                 </button>
@@ -749,7 +744,7 @@ export default function ClipboardView() {
                 <p style={{ margin: '0 0 2px 0', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)' }}>
                   {searchSnippets ? 'No matches' : 'No pinned snippets'}
                 </p>
-                <p style={{ margin: 0, fontSize: '10px', maxWidth: '210px' }}>
+                <p style={{ margin: 0, fontSize: 'var(--text-xs)', maxWidth: '210px' }}>
                   {searchSnippets ? 'Try a different search term.' : 'Star a history item, or add one manually with the + button.'}
                 </p>
               </div>
@@ -765,7 +760,7 @@ export default function ClipboardView() {
           display: 'flex',
           alignItems: 'center',
           gap: 'var(--space-2)',
-          fontSize: '10px',
+          fontSize: 'var(--text-xs)',
           color: 'var(--color-text-faint)',
           background: 'var(--color-surface-2)'
         }}>

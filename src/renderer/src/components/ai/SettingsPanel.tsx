@@ -33,10 +33,10 @@ export default function SettingsPanel({
           <div className="col">
             <div className="col-4px">
               <div className="row-between">
-                <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Temperature
                 </span>
-                <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-secondary)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-secondary)' }}>
                   {temperature.toFixed(1)}
                 </span>
               </div>
@@ -57,10 +57,10 @@ export default function SettingsPanel({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
               <div className="row-between">
-                <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Max Response Tokens
                 </span>
-                <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-secondary)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-secondary)' }}>
                   {maxTokens}
                 </span>
               </div>
@@ -80,7 +80,7 @@ export default function SettingsPanel({
             </div>
           </div>
           <div className="col-4px">
-            <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
               System Prompt Override (optional)
             </span>
             <textarea
@@ -94,9 +94,8 @@ export default function SettingsPanel({
                 color: 'var(--color-text-base)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '6px 8px',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 resize: 'vertical',
-                outline: 'none',
                 fontFamily: 'inherit',
                 lineHeight: 1.4
               }}

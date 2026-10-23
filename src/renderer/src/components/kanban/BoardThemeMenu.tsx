@@ -84,7 +84,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--color-surface-offset)', paddingBottom: '8px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-base)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>
               Board Theme
             </span>
           </div>
@@ -94,7 +94,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('presets')}
               style={{
                 padding: '4px 0',
-                fontSize: '10px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -109,7 +109,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('solid')}
               style={{
                 padding: '4px 0',
-                fontSize: '10px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -124,7 +124,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('gradient')}
               style={{
                 padding: '4px 0',
-                fontSize: '10px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -139,7 +139,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
               onClick={() => setCustomBgTab('image')}
               style={{
                 padding: '4px 0',
-                fontSize: '10px',
+                fontSize: 'var(--text-xs)',
                 fontWeight: 'var(--weight-semibold)',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
@@ -177,7 +177,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '10px',
+                        fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-bold)',
                         // not a token: sits on the preset's image, the shadow keeps it legible
                         color: '#fff',
@@ -207,7 +207,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: getTextColorForBackground(customSolidColor),
-                  fontSize: '10px',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-bold)',
                   textShadow: '0 1px 2px rgba(0,0,0,0.6)'
                 }}
@@ -248,7 +248,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   background: 'var(--color-secondary)',
                   color: '#0f172a',
                   fontWeight: 'var(--weight-bold)',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   border: 'none',
                   cursor: 'pointer',
                   textAlign: 'center',
@@ -280,7 +280,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                         justifyContent: 'center',
                         // on the gradient, no single colour to contrast against
                         color: '#fff',
-                        fontSize: '10px',
+                        fontSize: 'var(--text-xs)',
                         fontWeight: 'var(--weight-bold)',
                         textShadow: '0 1px 2px rgba(0,0,0,0.7)'
                       }}
@@ -340,7 +340,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                           onClick={() => setCustomGradType('linear')}
                           style={{
                             padding: '2px 8px',
-                            fontSize: '10px',
+                            fontSize: 'var(--text-2xs)',
                             border: 'none',
                             borderRadius: '2px',
                             background: customGradType === 'linear' ? 'var(--color-surface-offset)' : 'transparent',
@@ -354,7 +354,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                           onClick={() => setCustomGradType('radial')}
                           style={{
                             padding: '2px 8px',
-                            fontSize: '10px',
+                            fontSize: 'var(--text-2xs)',
                             border: 'none',
                             borderRadius: '2px',
                             background: customGradType === 'radial' ? 'var(--color-surface-offset)' : 'transparent',
@@ -369,7 +369,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
 
                     {customGradType === 'linear' && (
                       <div className="col-4px">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
                           <span>Angle / Direction</span>
                           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-secondary)', fontWeight: 'bold' }}>{customGradAngle}°</span>
                         </div>
@@ -388,7 +388,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                               onClick={() => setCustomGradAngle(ang)}
                               style={{
                                 padding: '2px 0',
-                                fontSize: '10px',
+                                fontSize: 'var(--text-2xs)',
                                 borderRadius: '3px',
                                 border: '1px solid var(--color-surface-offset)',
                                 background: customGradAngle === ang ? 'var(--color-surface-offset)' : 'transparent',
@@ -417,7 +417,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                         background: 'var(--color-secondary)',
                         color: '#0f172a',
                         fontWeight: 'var(--weight-bold)',
-                        fontSize: '11px',
+                        fontSize: 'var(--text-xs)',
                         border: 'none',
                         cursor: 'pointer',
                         textAlign: 'center',
@@ -457,19 +457,19 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-semibold)',
                   transition: 'all 120ms ease'
                 }}
               >
                 <Upload size={18} className="text-accent" />
                 <span>Upload Image from Computer</span>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>PNG, JPG, WEBP, GIF (Max 8MB)</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>PNG, JPG, WEBP, GIF (Max 8MB)</span>
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
                 <div className="rule-fill" />
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>OR PASTE LINK</span>
+                <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-faint)', textTransform: 'uppercase' }}>OR PASTE LINK</span>
                 <div className="rule-fill" />
               </div>
 
@@ -481,7 +481,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                 style={{
                   width: '100%',
                   padding: '6px 10px',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   borderRadius: 'var(--radius-md)',
                   background: 'var(--color-surface-2)',
                   border: '1px solid var(--color-surface-offset)',
@@ -499,7 +499,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   overflow: 'hidden'
                 }}>
                   {/* white on its own black scrim, outside the theme */}
-                  <span style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '10px', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>Preview</span>
+                  <span style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: 'var(--text-2xs)', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px', color: '#fff' }}>Preview</span>
                 </div>
               )}
 
@@ -520,7 +520,7 @@ export default function BoardThemeMenu({ theme, persistConfig }: BoardThemeMenuP
                   background: customImageUrl.trim() ? 'var(--color-secondary)' : 'var(--color-surface-offset)',
                   color: customImageUrl.trim() ? '#0f172a' : 'var(--color-text-muted)',
                   fontWeight: 'var(--weight-bold)',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   border: 'none',
                   cursor: customImageUrl.trim() ? 'pointer' : 'not-allowed',
                   textAlign: 'center',

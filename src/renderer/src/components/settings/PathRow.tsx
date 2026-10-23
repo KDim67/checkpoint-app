@@ -12,9 +12,9 @@ export default function PathRow({ children, openTitle, onOpen }: { children: Rea
       borderRadius: 'var(--radius-md)',
       padding: 'var(--space-2) var(--space-3)'
     }}>
-      <code style={{
+      <code title={typeof children === 'string' ? children : undefined} style={{
         flex: 1,
-        fontSize: '11px',
+        fontSize: 'var(--text-xs)',
         fontFamily: 'var(--font-mono)',
         color: 'var(--color-text-muted)',
         overflow: 'hidden',
@@ -24,12 +24,14 @@ export default function PathRow({ children, openTitle, onOpen }: { children: Rea
         {children}
       </code>
       <button
+        type="button"
         className="btn-icon"
         title={openTitle}
-        style={{ width: '28px', height: '28px', flexShrink: 0 }}
+        aria-label={openTitle}
+        style={{ flexShrink: 0 }}
         onClick={onOpen}
       >
-        <FolderOpen size={13} />
+        <FolderOpen size={14} aria-hidden="true" />
       </button>
     </div>
   )

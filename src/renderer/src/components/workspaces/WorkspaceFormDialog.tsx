@@ -8,10 +8,12 @@ import { slugifyWorkspace, WORKSPACE_COLORS } from '../../lib/createWorkspace'
 import { DEFAULT_TEMPLATE_ID, describeTemplate, PROJECT_TEMPLATES } from '../../../../shared/projectTemplates'
 import { errorMessage } from '../../../../shared/errors'
 import type { Outcome, WorkspaceFields } from './useWorkspaces'
+import WorkspaceTile from './WorkspaceTile'
+import { ICON_TYPES, storeWorkspaceIcon } from '../../lib/workspaceIcon'
 
 interface Props {
   mode: 'new' | 'edit'
-  initial: { name: string; color: string; gitPath: string; slug?: string }
+  initial: { name: string; color: string; gitPath: string; slug?: string; icon?: string }
   /** the field the cursor starts in: Linked repository opens on the folder */
   focus?: 'name' | 'repo'
   onSubmit: (fields: WorkspaceFields) => Promise<Outcome>
@@ -36,10 +38,13 @@ export default function WorkspaceFormDialog({ mode, initial, focus = 'name', onS
   const [gitPath, setGitPath] = useState(initial.gitPath)
   const [slug, setSlug] = useState(initial.slug ?? '')
   const [templateId, setTemplateId] = useState(DEFAULT_TEMPLATE_ID)
+  const [icon, setIcon] = useState(initial.icon ?? '')
+  const [iconState, setIconState] = useState<{ busy: boolean; error: string }>({ busy: false, error: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
   const repoRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     ;(focus === 'repo' ? repoRef : nameRef).current?.focus()
@@ -50,11 +55,12 @@ export default function WorkspaceFormDialog({ mode, initial, focus = 'name', onS
 
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault()
-    if (busy) return
+    // a picture still being prepared would be left behind
+    if (busy || iconState.busy) return
     setBusy(true)
     setError('')
     try {
-      const outcome = await onSubmit({ name, color, gitPath, slug: mode === 'edit' ? slug : undefined, templateId: mode === 'new' ? templateId : undefined })
+      const outcome = await onSubmit({ name, color, gitPath, icon, slug: mode === 'edit' ? slug : undefined, templateId: mode === 'new' ? templateId : undefined })
       if (outcome.ok) onClose()
       else setError(outcome.reason)
     } finally {
@@ -72,6 +78,20 @@ export default function WorkspaceFormDialog({ mode, initial, focus = 'name', onS
   }
 
   const swatches = WORKSPACE_COLORS.includes(color) ? WORKSPACE_COLORS : [...WORKSPACE_COLORS, color]
+
+  const pickImage = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0]
+    // cleared, so choosing the same file again still counts as a change
+    event.target.value = ''
+    if (!file) return
+    setIconState({ busy: true, error: '' })
+    try {
+      setIcon(await storeWorkspaceIcon(file))
+      setIconState({ busy: false, error: '' })
+    } catch (err) {
+      setIconState({ busy: false, error: errorMessage(err) })
+    }
+  }
 
   return (
     <ModalShell label={title} onClose={onClose} width="var(--ws-form-width)" closeOnBackdrop={false}>
@@ -117,6 +137,31 @@ export default function WorkspaceFormDialog({ mode, initial, focus = 'name', onS
             </div>
             <ColorPicker value={color} onCommit={setColor} swatchSize={22} hexInputWidth={64} title="Any colour" />
           </div>
+        </div>
+
+        <div className="ws-field">
+          <span className="field-label" id="ws-form-image">Image</span>
+          <div className="ws-image-row">
+            <WorkspaceTile name={name || '#'} color={color} icon={icon || undefined} large />
+            <button
+              type="button"
+              className="btn-secondary"
+              aria-describedby="ws-form-image ws-form-image-hint"
+              aria-busy={iconState.busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              {iconState.busy ? 'Preparing…' : icon ? 'Change image…' : 'Choose image…'}
+            </button>
+            {icon && (
+              <button type="button" className="ws-link-button" onClick={() => setIcon('')}>Remove</button>
+            )}
+            <input ref={fileRef} type="file" accept={ICON_TYPES.join(',')} hidden data-testid="ws-form-image-file" onChange={event => void pickImage(event)} />
+          </div>
+          {iconState.error ? (
+            <p className="ws-field-error" role="alert">{iconState.error}</p>
+          ) : (
+            <p id="ws-form-image-hint" className="ws-field-hint">Optional. Shown instead of the letter, trimmed to a square.</p>
+          )}
         </div>
 
         <div className="ws-field">

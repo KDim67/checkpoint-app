@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { Download } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
+import { workspaceName } from '../../lib/createWorkspace'
+import { FieldRow } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import { EXPORT_FORMATS, type ExportFormat } from '../../../../shared/exportFormats'
 import * as exporterApi from '../../data/exporter'
@@ -8,6 +10,7 @@ import * as exporterApi from '../../data/exporter'
 export default function ExportPanel(): React.JSX.Element {
   const { toast } = useToast()
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const workspaceList = useAppStore(s => s.workspaceList)
   const [format, setFormat] = useState<ExportFormat>('markdown')
   const [scope, setScope] = useState<'current' | 'all'>('current')
   const [busy, setBusy] = useState(false)
@@ -21,63 +24,51 @@ export default function ExportPanel(): React.JSX.Element {
       })
       // a cancelled dialog isn't a failure
       if (result.ok) toast(`Exported ${result.count} item${result.count === 1 ? '' : 's'}`)
-      else if (result.reason !== 'cancelled') toast(result.reason ?? 'Export failed')
+      else if (result.reason !== 'cancelled') toast(result.reason ?? 'Could not export. Try again.')
     } catch (err) {
       console.error(err)
-      toast('Export failed')
+      toast('Could not export. Try again.')
     } finally {
       setBusy(false)
     }
   }
 
-  const choice = (active: boolean): React.CSSProperties => ({
-    padding: 'var(--space-2) var(--space-3)',
-    background: active ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
-    border: `1px solid ${active ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-    color: active ? 'var(--color-secondary)' : 'var(--color-text-muted)',
-    borderRadius: 'var(--radius-md)',
-    fontSize: 'var(--text-xs)',
-    cursor: 'pointer'
-  })
-
   return (
-    <div className="col-md">
-      <div>
-        <div className="text-item">
-          Export your data
-        </div>
-        <div className="text-sub">
-          Cards, tasks and log entries with their tags. Notes are already plain
-          markdown files on disk.
-        </div>
-      </div>
+    <div className="col-lg">
+      <p className="text-sub" style={{ margin: 0 }}>
+        Tags come along. Notes aren't included, since they are already Markdown files in their folder.
+      </p>
 
-      <div className="flex-wrap-gap">
-        <button onClick={() => setScope('current')} style={choice(scope === 'current')}>
-          {activeWorkspace}
-        </button>
-        <button onClick={() => setScope('all')} style={choice(scope === 'all')}>
-          All workspaces
-        </button>
-      </div>
-
-      <div className="flex-wrap-gap">
-        {EXPORT_FORMATS.map(f => (
-          <button key={f.id} onClick={() => setFormat(f.id)} style={choice(format === f.id)}>
-            {f.label}
+      <FieldRow label="What to export" group>
+        <div className="settings-choices" data-fit="">
+          <button type="button" className="settings-choice" aria-pressed={scope === 'current'} onClick={() => setScope('current')}>
+            {workspaceName(activeWorkspace, workspaceList)}
           </button>
-        ))}
-      </div>
+          <button type="button" className="settings-choice" aria-pressed={scope === 'all'} onClick={() => setScope('all')}>
+            All workspaces
+          </button>
+        </div>
+      </FieldRow>
+
+      <FieldRow label="As" group>
+        <div className="settings-choices" data-fit="">
+          {EXPORT_FORMATS.map(f => (
+            <button key={f.id} type="button" className="settings-choice" aria-pressed={format === f.id} onClick={() => setFormat(f.id)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </FieldRow>
 
       <div>
         <button
-          className="btn-primary"
+          type="button"
+          className="btn-primary btn-with-icon"
           onClick={handleExport}
           disabled={busy}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}
         >
-          <Download size={13} />
-          {busy ? 'Exporting…' : 'Export'}
+          <Download size={14} aria-hidden="true" />
+          {busy ? 'Exporting…' : 'Export…'}
         </button>
       </div>
     </div>

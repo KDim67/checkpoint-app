@@ -5,6 +5,7 @@ import { History, ChevronRight, GitCommit as GitCommitIcon, Clipboard, MonitorSm
 import { formatDuration, type Rewind, type Signal } from '../../../../shared/rewind'
 import { loadRewind } from '../../lib/rewind'
 import type { Item } from '../../../../shared/types'
+import { SkeletonLines } from '../ui/Skeleton'
 
 /** locale-aware, one line */
 function formatWhen(start: number, end: number): string {
@@ -77,7 +78,7 @@ function Group({ icon, label, count, children }: GroupProps) {
 }
 
 const lineStyle: React.CSSProperties = {
-  fontSize: '11px',
+  fontSize: 'var(--text-xs)',
   color: 'var(--color-text-muted)',
   lineHeight: 1.5,
   overflow: 'hidden',
@@ -155,9 +156,7 @@ export default function RewindPanel({ item }: { item: Item }) {
 
   if (loading) {
     return shell(
-      <div aria-live="polite" className="text-hint-faint">
-        Looking back…
-      </div>
+      <SkeletonLines label="Looking back" lines={3} />
     )
   }
 
@@ -251,7 +250,7 @@ export default function RewindPanel({ item }: { item: Item }) {
 
       {/* say it plainly, not a mysteriously thin panel */}
       {state && state.unavailable.length > 0 && (
-        <div style={{ fontSize: '10px', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', lineHeight: 1.5 }}>
           Not included: {state.unavailable.join(', ')}. Turn these on in Settings for a fuller picture.
         </div>
       )}

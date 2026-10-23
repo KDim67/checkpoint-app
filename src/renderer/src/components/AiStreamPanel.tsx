@@ -9,6 +9,7 @@ import { useAiStreamPanel } from './ai/useAiStreamPanel'
 import AiPanelHeader from './ai/AiPanelHeader'
 import AiChatHistory from './ai/AiChatHistory'
 import AiInputDock from './ai/AiInputDock'
+import Presence from './ui/Presence'
 
 export default function AiStreamPanel() {
   const panel = useAiStreamPanel()
@@ -39,16 +40,16 @@ export default function AiStreamPanel() {
 
       <AiInputDock panel={panel} />
 
-      {showCustomActionsModal && <CustomActionsModal actions={quickActions} />}
+      <Presence show={showCustomActionsModal}>{showCustomActionsModal && <CustomActionsModal actions={quickActions} />}</Presence>
 
-      {showCookbookModal && <CookbookModal models={modelConfig} />}
+      <Presence show={showCookbookModal}>{showCookbookModal && <CookbookModal models={modelConfig} />}</Presence>
 
-      {showSavedChatsModal && <SavedChatsModal chats={chatHistory} handleNewChat={handleNewChat} handleLoadChat={handleLoadChat} handleDeleteChat={handleDeleteChat} />}
-      {showMemoryPanel && <MemoryVaultModal vault={vault} activeWorkspace={activeWorkspace} />}
+      <Presence show={showSavedChatsModal}>{showSavedChatsModal && <SavedChatsModal chats={chatHistory} handleNewChat={handleNewChat} handleLoadChat={handleLoadChat} handleDeleteChat={handleDeleteChat} />}</Presence>
+      <Presence show={showMemoryPanel}>{showMemoryPanel && <MemoryVaultModal vault={vault} activeWorkspace={activeWorkspace} />}</Presence>
 
-      {revertConfirmData && <RevertConfirmModal revertConfirmData={revertConfirmData} setRevertConfirmData={setRevertConfirmData} revertAICreatedEntities={revertAICreatedEntities} setMessages={setMessages} />}
+      <Presence show={!!revertConfirmData}>{revertConfirmData && <RevertConfirmModal revertConfirmData={revertConfirmData} setRevertConfirmData={setRevertConfirmData} revertAICreatedEntities={revertAICreatedEntities} setMessages={setMessages} />}</Presence>
 
-      {showCustomModelPrompt && <CustomModelPromptModal models={modelConfig} />}
+      <Presence show={showCustomModelPrompt}>{showCustomModelPrompt && <CustomModelPromptModal models={modelConfig} />}</Presence>
     </div>
   )
 }

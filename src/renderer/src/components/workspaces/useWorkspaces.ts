@@ -23,6 +23,8 @@ export interface WorkspaceFields {
   slug?: string
   /** new only */
   templateId?: string
+  /** a stored picture's name; empty or left out for the letter */
+  icon?: string
 }
 
 /** a file picked and read, waiting for a name before anything is written */
@@ -87,7 +89,7 @@ export function useWorkspaces() {
     if (!slug) return { ok: false, reason: 'Give it a name with at least one letter or number.' }
     if (listRef.current.some(entry => entry.slug === slug)) return { ok: false, reason: `There's already a workspace called "${slug}".` }
     try {
-      const entry: WorkspaceEntry = { slug, name, color: fields.color, gitPath: fields.gitPath.trim() || undefined }
+      const entry: WorkspaceEntry = { slug, name, color: fields.color, gitPath: fields.gitPath.trim() || undefined, icon: fields.icon || undefined }
       const { list: next, summary, templateFailed } = await createWorkspace(listRef.current, entry, fields.templateId ?? DEFAULT_TEMPLATE_ID)
       show(next)
       if (templateFailed) toast(`Created ${name}, but its template couldn't be applied.`, { type: 'warning' })
@@ -114,7 +116,7 @@ export function useWorkspaces() {
         if (res?.error) return { ok: false, reason: `Couldn't move it to "${nextSlug}": ${res.error}` }
         if (activeWorkspace === slug) setWorkspace(nextSlug)
       }
-      await persist(replaced(listRef.current, slug, { ...current, slug: nextSlug, name, color: fields.color, gitPath: fields.gitPath.trim() || undefined }))
+      await persist(replaced(listRef.current, slug, { ...current, slug: nextSlug, name, color: fields.color, gitPath: fields.gitPath.trim() || undefined, icon: fields.icon || undefined }))
       toast('Saved', { type: 'success' })
       return { ok: true }
     } catch (err) {

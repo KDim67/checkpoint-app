@@ -106,7 +106,7 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
             borderRadius: '4px',
             background: remoteSelectedBy[0].color,
             color: '#ffffff',
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             fontWeight: 600,
             lineHeight: 1.25,
             whiteSpace: 'nowrap',

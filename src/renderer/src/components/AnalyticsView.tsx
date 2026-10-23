@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore'
 import type { AnalyticsData } from '../../../shared/types'
 import * as analyticsApi from '../data/analytics'
 import * as trackerApi from '../data/tracker'
+import { LoadingRegion } from './ui/Skeleton'
 
 const ALLOCATION_COLORS = ['#10b981', '#1e45fc', '#f97316', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#cdf12b']
 
@@ -270,7 +271,7 @@ export default function AnalyticsView() {
             </div>
 
             <div className="flex-4px">
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '10px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
                 <span>Sun</span>
                 <span>Tue</span>
                 <span>Thu</span>
@@ -547,11 +548,10 @@ export default function AnalyticsView() {
         </div>
 
         {timelineLoading ? (
-          <div style={{ padding: 'var(--space-8)', display: 'flex', justifyContent: 'center' }}>
-            <div className="text-sm-faint">
-              Querying active timeline logs...
-            </div>
-          </div>
+          <LoadingRegion label="Loading the timeline" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div className="skeleton" style={{ height: '120px', borderRadius: 'var(--radius-lg)' }} />
+            <div className="skeleton" style={{ height: '240px', borderRadius: 'var(--radius-lg)' }} />
+          </LoadingRegion>
         ) : !timelineData || timelineData.totalDurationMs === 0 ? (
           <div style={{
             background: 'var(--color-surface-1)',
@@ -611,7 +611,7 @@ export default function AnalyticsView() {
             {/* right: window titles */}
             <div className="analytics-card col-lg">
               <h3 style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>Top Active Windows</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2.5)', overflowY: 'auto', maxHeight: '320px', paddingRight: '2px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)', overflowY: 'auto', maxHeight: '320px', paddingRight: '2px' }}>
                 {timelineData.byTitle.map((title, idx) => {
                   const percentage = timelineData.totalDurationMs > 0 ? (title.durationMs / timelineData.totalDurationMs) * 100 : 0
                   return (
@@ -629,7 +629,7 @@ export default function AnalyticsView() {
                         <span style={{ color: 'var(--color-text-base)', fontWeight: 'var(--weight-medium)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={title.windowTitle}>
                           {title.windowTitle || 'Untitled Window'}
                         </span>
-                        <span style={{ color: 'var(--color-text-faint)', fontSize: '10px', textTransform: 'uppercase' }}>
+                        <span style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-2xs)', textTransform: 'uppercase' }}>
                           {title.processName}
                         </span>
                       </div>
@@ -854,7 +854,7 @@ export default function AnalyticsView() {
                 style={{
                   position: 'absolute',
                   left: `${header.colIndex * 12}px`,
-                  fontSize: '10px',
+                  fontSize: 'var(--text-xs)',
                   color: 'var(--color-text-muted)',
                   whiteSpace: 'nowrap'
                 }}
@@ -865,7 +865,7 @@ export default function AnalyticsView() {
           </div>
 
           <div className="flex-4px">
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: '10px', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '82px', fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', width: '22px', textAlign: 'right', paddingRight: '4px', paddingTop: '2px' }}>
               <span>Sun</span>
               <span>Tue</span>
               <span>Thu</span>
@@ -904,7 +904,7 @@ export default function AnalyticsView() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
           <span>Less</span>
           <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: 'var(--color-surface-2)' }} />
           <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: 'var(--color-secondary)', opacity: 0.3 }} />
@@ -1123,7 +1123,7 @@ export default function AnalyticsView() {
                         y={barHeight - 8}
                         textAnchor="middle"
                         fill="var(--color-text-muted)"
-                        style={{ fontSize: '10px', textTransform: 'capitalize' }}
+                        style={{ fontSize: 'var(--text-xs)', textTransform: 'capitalize' }}
                       >
                         {formatColumnLabel(d.column)}
                       </text>
@@ -1267,7 +1267,7 @@ export default function AnalyticsView() {
                     </span>
                   </div>
                   {session.context && (
-                    <div style={{ fontSize: '10px', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       Workspace: {session.context}
                     </div>
                   )}

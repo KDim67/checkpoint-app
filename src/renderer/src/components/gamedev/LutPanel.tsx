@@ -114,7 +114,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                 border: '1px solid var(--color-surface-offset)',
                 borderRadius: 'var(--radius-md)',
                 color: 'var(--color-text-muted)',
-                fontSize: '11px',
+                fontSize: 'var(--text-xs)',
                 padding: '8px 12px',
                 cursor: 'pointer',
                 marginTop: 'var(--space-2)'
@@ -183,7 +183,7 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                   border: '1px solid rgba(0, 255, 128, 0.2)',
                   borderRadius: 'var(--radius-md)',
                   padding: 'var(--space-2) var(--space-3)',
-                  fontSize: '11px',
+                  fontSize: 'var(--text-xs)',
                   color: 'var(--color-secondary)',
                   display: 'flex',
                   flexDirection: 'column',

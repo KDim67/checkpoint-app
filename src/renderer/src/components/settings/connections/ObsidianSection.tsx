@@ -44,7 +44,7 @@ export default function ObsidianSection({ view, onChange }: { view: ObsidianStat
   }
 
   return (
-    <div className="connection-row" role="group" aria-label="Obsidian">
+    <div className="connection-row" role="group" aria-label="Obsidian" data-settings-part="Obsidian">
       <div className="connection-head">
         <ServiceLogo service="obsidian" />
         <span className="text-item-strong">Obsidian</span>

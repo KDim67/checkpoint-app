@@ -22,6 +22,13 @@ const context = (over: Partial<CommandContext> = {}): CommandContext => ({
   ...over
 })
 
+describe('settings in the palette', () => {
+  it('finds a section by the same words Settings search uses for it', () => {
+    const about = buildCommands(context()).find(c => c.id === 'settings:about')
+    expect(about?.keywords).toEqual(expect.arrayContaining(['version', 'licence']))
+  })
+})
+
 describe('making things from the palette', () => {
   it('offers a new card, task, note, sticky, wall, renewal and workspace, each handed to its view', () => {
     const ctx = context()

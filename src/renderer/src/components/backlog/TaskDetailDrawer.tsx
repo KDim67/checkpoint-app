@@ -11,6 +11,8 @@ import {
 } from '../../../../shared/subtasks'
 import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
+import { DetailSkeleton } from '../ui/Skeleton'
+import { usePresenceState } from '../../lib/presence'
 import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
 import RelationsPanel from '../ui/RelationsPanel'
@@ -77,8 +79,11 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const { setRelations } = itemRelations
 
   const titleInputRef = useRef<HTMLInputElement | null>(null)
-  const containerRef = useFocusTrap(!loading, titleInputRef)
-  useEscapeKey(onClose, true)
+  // leaving inside Presence, it hands focus back at once and slides out
+  const presence = usePresenceState()
+  const open = presence === 'open'
+  const containerRef = useFocusTrap(!loading && open, titleInputRef)
+  useEscapeKey(onClose, open)
 
   const onCloseRef = useRef(onClose)
   useEffect(() => {
@@ -241,24 +246,44 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   const legacyChecklist = legacyChecklistOf(body)
   const progress = useMemo(() => computeProgress(subtasks), [subtasks])
 
+  // loading and loaded share this frame, so the drawer slides in once and the skeleton becomes the task in place
+  const backdropStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: '32px',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    zIndex: 1100,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    backdropFilter: 'blur(2px)'
+  }
+  const drawerStyle: React.CSSProperties = {
+    width: '650px',
+    maxWidth: '100vw',
+    height: '100%',
+    background: 'var(--color-surface-1)',
+    borderLeft: '1px solid var(--color-surface-offset)',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '-10px 0 30px rgba(0,0,0,0.5)'
+  }
+
   if (loading) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: '32px',
-        right: 0,
-        bottom: 0,
-        width: '600px',
-        maxWidth: '100vw',
-        background: 'var(--color-surface-1)',
-        borderLeft: '1px solid var(--color-surface-offset)',
-        zIndex: 1100,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--color-text-muted)'
-      }}>
-        Loading details...
+      <div className="motion-backdrop" data-state={presence} style={backdropStyle} onClick={onClose}>
+        <div
+          className="motion-drawer"
+          data-state={presence}
+          style={drawerStyle}
+          onClick={e => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Task"
+        >
+          <DetailSkeleton label="Loading the task" />
+        </div>
       </div>
     )
   }
@@ -266,33 +291,14 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
   if (!task) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: '32px',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      zIndex: 1100,
-      display: 'flex',
-      justifyContent: 'flex-end',
-      backdropFilter: 'blur(2px)'
-    }}
+    <div className="motion-backdrop" data-state={presence} style={backdropStyle}
     onClick={onClose}
     >
       <div
         ref={containerRef}
-        style={{
-          width: '650px',
-          maxWidth: '100vw',
-          height: '100%',
-          background: 'var(--color-surface-1)',
-          borderLeft: '1px solid var(--color-surface-offset)',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
-          animation: 'slide-in 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
-        }}
+        className="motion-drawer"
+        data-state={presence}
+        style={drawerStyle}
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -309,7 +315,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
         }}>
           <div>
             <span style={{
-              fontSize: '10px',
+              fontSize: 'var(--text-2xs)',
               fontWeight: 'var(--weight-bold)',
               background: 'var(--color-surface-2)',
               border: '1px solid var(--color-surface-offset)',
@@ -409,7 +415,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1.5)', position: 'relative', gridColumn: 'span 2' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)', position: 'relative', gridColumn: 'span 2' }}>
               <span className="label-caps">
                 Tags
               </span>
@@ -500,7 +506,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                     transition: 'width 150ms ease'
                   }} />
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flexShrink: 0 }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', flexShrink: 0 }}>
                   {progress.done}/{progress.total}
                 </span>
               </div>
@@ -525,7 +531,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                 background: 'var(--color-surface-2)',
                 border: '1px solid var(--color-surface-offset)',
                 borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-3.5)'
+                padding: 'var(--space-3-5)'
               }}>
                 {subtasks.map(t => (
                   <div
@@ -624,7 +630,7 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
                       background: editorMode === mode ? 'var(--color-surface-offset)' : 'transparent',
                       border: 'none',
                       color: editorMode === mode ? 'var(--color-text-base)' : 'var(--color-text-muted)',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-2xs)',
                       textTransform: 'uppercase',
                       padding: '2px 8px',
                       borderRadius: '2px',

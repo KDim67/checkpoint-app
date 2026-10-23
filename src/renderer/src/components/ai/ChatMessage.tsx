@@ -142,7 +142,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 border: '1px solid var(--color-secondary)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '2px 8px',
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 'bold',
                 color: 'var(--color-secondary)'
               }}
@@ -163,7 +163,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 border: '1px solid rgba(59, 130, 246, 0.4)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '2px 8px',
-                fontSize: '10px',
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 'bold',
                 color: 'var(--color-primary-soft)'
               }}
@@ -180,7 +180,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 background: 'rgba(34, 197, 94, 0.14)', border: '1px solid rgba(34, 197, 94, 0.4)',
                 borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-                fontSize: '10px', fontWeight: 'bold', color: 'var(--color-success-soft)'
+                fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-success-soft)'
               }}
             >
               <FileText size={12} />
@@ -196,7 +196,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 background: 'rgba(56, 189, 248, 0.14)', border: '1px solid rgba(56, 189, 248, 0.4)',
                 borderRadius: 'var(--radius-sm)', padding: '2px 8px',
-                fontSize: '10px', fontWeight: 'bold', color: 'var(--color-info)'
+                fontSize: 'var(--text-2xs)', fontWeight: 'bold', color: 'var(--color-info)'
               }}
             >
               <FileText size={12} />
@@ -246,8 +246,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     color: 'var(--color-text-base)',
                     borderRadius: 'var(--radius-sm)',
                     padding: 'var(--space-2)',
-                    fontSize: '11px',
-                    outline: 'none',
+                    fontSize: 'var(--text-xs)',
                     fontFamily: 'var(--font-sans)',
                     resize: 'vertical'
                   }}
@@ -261,7 +260,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                       borderRadius: 'var(--radius-sm)',
                       color: 'var(--color-text-muted)',
                       padding: '2px 8px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-2xs)',
                       cursor: 'pointer'
                     }}
                   >
@@ -275,7 +274,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                       borderRadius: 'var(--radius-sm)',
                       color: 'var(--color-text-inverted)',
                       padding: '2px 8px',
-                      fontSize: '10px',
+                      fontSize: 'var(--text-2xs)',
                       fontWeight: 'bold',
                       cursor: 'pointer'
                     }}
@@ -298,7 +297,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     className="chat-message-rewrite"
                     style={{
                       background: 'transparent', border: 'none',
-                      fontSize: '10px', cursor: 'pointer',
+                      fontSize: 'var(--text-2xs)', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 4px', borderRadius: '4px'
                     }}
                     title="Edit prompt and resubmit"
@@ -313,7 +312,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     className="chat-message-resend"
                     style={{
                       background: 'transparent', border: 'none',
-                      color: 'var(--color-secondary)', fontSize: '10px', fontWeight: 'bold',
+                      color: 'var(--color-secondary)', fontSize: 'var(--text-2xs)', fontWeight: 'bold',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 4px', borderRadius: '4px'
                     }}
                     title="Resend this prompt turn"
@@ -329,7 +328,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     }}
                     style={{
                       background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)',
-                      color: 'var(--color-error)', fontSize: '10px', fontWeight: 'bold',
+                      color: 'var(--color-error)', fontSize: 'var(--text-2xs)', fontWeight: 'bold',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 4px', borderRadius: '4px'
                     }}
                     title="Undo board changes and rollback history"
@@ -350,7 +349,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                 borderRadius: 'var(--radius-sm)',
                 padding: '8px 10px',
                 marginBottom: '10px',
-                fontSize: '11px'
+                fontSize: 'var(--text-xs)'
               }}>
                 <button
                   onClick={() => setShowThinking(prev => !prev)}
@@ -358,7 +357,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     background: 'none', border: 'none', padding: 0,
                     color: 'var(--color-secondary)', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: '5px',
-                    fontSize: '10px', fontWeight: 'bold'
+                    fontSize: 'var(--text-xs)', fontWeight: 'bold'
                   }}
                 >
                   <Brain size={12} className="text-accent" />
@@ -377,7 +376,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     whiteSpace: 'pre-wrap',
                     fontStyle: 'italic',
                     fontFamily: 'var(--font-mono)',
-                    fontSize: '10px'
+                    fontSize: 'var(--text-xs)'
                   }}>
                     {message.thinking}
                   </div>
@@ -510,7 +509,7 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                     background: 'transparent', border: 'none',
                     color: isCopied ? 'var(--color-secondary)' : 'var(--color-text-muted)',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-                    padding: '2px 4px', borderRadius: '4px', fontSize: '10px'
+                    padding: '2px 4px', borderRadius: '4px', fontSize: 'var(--text-2xs)'
                   }}
                   title="Copy response"
                 >

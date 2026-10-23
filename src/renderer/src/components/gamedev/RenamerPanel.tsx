@@ -112,7 +112,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
             <div style={{
               border: '1px solid var(--color-surface-offset)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2.5)',
+              padding: 'var(--space-2-5)',
               background: 'var(--color-surface-2)',
               display: 'flex',
               flexDirection: 'column',
@@ -140,7 +140,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                         color: 'var(--color-text-base)',
                         borderRadius: '4px',
                         padding: '4px 6px',
-                        fontSize: '11px'
+                        fontSize: 'var(--text-xs)'
                       }}
                     />
                   </div>
@@ -156,7 +156,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                         color: 'var(--color-text-base)',
                         borderRadius: '4px',
                         padding: '4px 6px',
-                        fontSize: '11px'
+                        fontSize: 'var(--text-xs)'
                       }}
                     />
                   </div>
@@ -199,7 +199,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
             <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', maxWidth: '240px', lineHeight: 1.5 }}>
               Supports models, textures, sound clips. Paths will load securely into preview.
             </p>
-            <span style={{ display: 'inline-block', marginTop: 'var(--space-3)', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: '4px 12px', fontSize: '11px', fontWeight: 'var(--weight-medium)' }}>
+            <span style={{ display: 'inline-block', marginTop: 'var(--space-3)', background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-offset)', borderRadius: 'var(--radius-md)', padding: '4px 12px', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)' }}>
               Browse Local Files
             </span>
           </div>
@@ -243,7 +243,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                   background: 'var(--color-secondary)',
                   color: 'var(--color-text-inverted)',
                   border: 'none',
-                  padding: 'var(--space-1.5) var(--space-4)',
+                  padding: 'var(--space-1-5) var(--space-4)',
                   borderRadius: 'var(--radius-md)',
                   fontSize: 'var(--text-xs)',
                   fontWeight: 'var(--weight-semibold)',
@@ -304,7 +304,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                       {newName}
                       {clashes && (
                         <span
-                          style={{ color: 'var(--color-warning)', marginLeft: '6px', fontSize: '10px' }}
+                          style={{ color: 'var(--color-warning)', marginLeft: '6px', fontSize: 'var(--text-xs)' }}
                           title="Another file in this batch would take this name. Renaming both would destroy one, so this is skipped."
                         >
                           Name clash
@@ -312,7 +312,7 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                       )}
                       {file.status === 'success' && <CheckCircle size={12} style={{ color: 'var(--color-success)', marginLeft: '6px', display: 'inline' }} />}
                       {file.status === 'error' && (
-                        <span style={{ color: 'var(--color-error)', marginLeft: '6px', fontSize: '10px' }} title={file.error}>
+                        <span style={{ color: 'var(--color-error)', marginLeft: '6px', fontSize: 'var(--text-xs)' }} title={file.error}>
                           ⚠ Fail
                         </span>
                       )}

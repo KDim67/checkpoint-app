@@ -46,7 +46,6 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
               color: 'var(--color-text-base)',
               fontSize: 'var(--text-xs)',
               fontFamily: 'inherit',
-              outline: 'none',
               resize: 'none'
             }}
           />
@@ -59,7 +58,7 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
               border: 'none',
               color: 'var(--color-text-inverted)',
               fontWeight: 'var(--weight-bold)',
-              fontSize: '10px',
+              fontSize: 'var(--text-xs)',
               padding: '4px 12px',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -85,20 +84,20 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
               }}
             >
               <div className="row-between">
-                <strong style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>{authorLabel(c.user)}</strong>
+                <strong style={{ fontSize: 'var(--text-xs)', color: 'var(--color-secondary)' }}>{authorLabel(c.user)}</strong>
                 <div className="row-6px">
-                  <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
                     {new Date(c.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                   </span>
                   <button
                     onClick={() => onDelete(c.id)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', fontSize: '10px', padding: 0 }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-text-faint)', cursor: 'pointer', fontSize: 'var(--text-xs)', padding: 0 }}
                   >
                     delete
                   </button>
                 </div>
               </div>
-              <p style={{ margin: 0, fontSize: '11px', color: 'var(--color-text-base)', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-base)', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
                 {c.text}
               </p>
             </div>
@@ -108,7 +107,7 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
 
       {/* activity trail */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderLeft: '1px solid var(--color-surface-offset)', paddingLeft: 'var(--space-4)' }}>
-        <span style={{ fontSize: '11px', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Clock size={11} className="text-faint" />
           Activity History
         </span>
@@ -116,18 +115,18 @@ export default function CardDiscussion({ comments, activities, draft, setDraft, 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' }}>
           {visibleCardHistory(activities).map(act => (
             <div key={act.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '4px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--color-text-muted)', lineHeight: 1.3 }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.3 }}>
                 {changeSentence(act)}
               </span>
               {act.at > 0 && (
-                <span style={{ fontSize: '10px', color: 'var(--color-text-faint)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)' }}>
                   {new Date(act.at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
                 </span>
               )}
             </div>
           ))}
           {visibleCardHistory(activities).length === 0 && (
-            <span style={{ fontSize: '10px', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No changes yet.</span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', fontStyle: 'italic' }}>No changes yet.</span>
           )}
         </div>
       </div>
