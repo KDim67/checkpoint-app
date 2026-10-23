@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import useFocusTrap from './ui/useFocusTrap'
-import { Search, Plus, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2, Repeat } from 'lucide-react'
+import { Search, SlidersHorizontal, ArrowLeft, ArrowRight, Archive, X, RotateCcw, Trash2, Repeat, ListTodo } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { useAiEnabled } from '../lib/useAiEnabled'
 import type { Item, Tag as TagType } from '../../../shared/types'
@@ -50,24 +50,28 @@ export default function BacklogView() {
   const [activeView, setActiveView] = useState<SavedView | null>(null)
   const pendingViewId = useAppStore(s => s.pendingViewId)
 
+  // the newest request wins, and leaving the screen drops one still loading
+  const viewRequest = useRef(0)
+  useEffect(() => () => { viewRequest.current++ }, [])
+
   // subscribed, not read once: the palette can apply a view while this screen is open
   useEffect(() => {
     if (!pendingViewId) return
+    const wanted = pendingViewId
+    const request = ++viewRequest.current
+    // clearing it re-runs this effect, so the lookup can't be cancelled by that; it used to be, and no view was ever applied
     useAppStore.getState().setPendingViewId(null)
-    let cancelled = false
     ;(async () => {
       const stored = await getStringSetting('saved_views', '').catch(() => '')
       const all = [...BUILT_IN_VIEWS, ...normalizeSavedViews(stored)]
-      const found = all.find(v => v.id === pendingViewId) ?? null
-      if (!cancelled) {
-        setActiveView(found)
-        setPage(1)
-      }
+      const found = all.find(v => v.id === wanted) ?? null
+      if (request !== viewRequest.current) return
+      setActiveView(found)
+      setPage(1)
     })()
-    return () => { cancelled = true }
   }, [pendingViewId])
   const { toast } = useToast()
-  /** New Task and the empty state both lead here, so nothing is made before it has a name */
+  /** the one way to add a task: the box stays at the top while the list scrolls, so nothing else needs to lead to it */
   const quickAddRef = useRef<HTMLInputElement>(null)
   const report = useFailureReport()
 
@@ -295,17 +299,38 @@ export default function BacklogView() {
     return () => window.removeEventListener('item-updated', handleItemUpdated)
   }, [loadTasks])
 
-  const handleResetFilters = () => {
+  /** the search and every filter, but not how the list is grouped, which hides nothing */
+  const clearSearchAndFilters = () => {
     setSelectedStatuses([])
     setSelectedPriorities([])
     setSelectedTagIds([])
     setDueStart('')
     setDueEnd('')
     setHasRelations('all')
-    setGrouping('none')
     setSearchQuery('')
     setPage(1)
   }
+
+  const handleResetFilters = () => {
+    clearSearchAndFilters()
+    setGrouping('none')
+  }
+
+  /** from an empty list: everything back, the saved view included */
+  const showAllTasks = () => {
+    setActiveView(null)
+    clearSearchAndFilters()
+  }
+
+  /** an empty list then means nothing matched, not that there's nothing to show; a saved view narrows it on its own */
+  const narrowed = activeView !== null
+    || debouncedQuery.trim() !== ''
+    || selectedStatuses.length > 0
+    || selectedPriorities.length > 0
+    || selectedTagIds.length > 0
+    || dueStart !== ''
+    || dueEnd !== ''
+    || hasRelations !== 'all'
 
   const handleUpdateField = async (id: string, patch: Partial<Item>, tagIds?: string[]) => {
     try {
@@ -541,8 +566,6 @@ export default function BacklogView() {
     }
   }
 
-  const focusQuickAdd = (): void => quickAddRef.current?.focus()
-
   /** New task from the palette lands in the box, ready to type */
   const pendingCreate = useAppStore(s => s.pendingCreate)
   const setPendingCreate = useAppStore(s => s.setPendingCreate)
@@ -680,31 +703,6 @@ export default function BacklogView() {
           >
             <Archive size={13} />
             Archive
-          </button>
-
-          <button
-            onClick={focusQuickAdd}
-            title="Type the task in the box below and press Enter"
-            className="hover-brighten hover-lift"
-            style={{
-              background: 'var(--color-secondary)',
-              border: 'none',
-              color: 'var(--color-text-inverted)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--weight-bold)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-1-5)',
-              height: '32px',
-              letterSpacing: '0.01em',
-              transition: 'filter 120ms ease, transform 120ms ease'
-            }}
-          >
-            <Plus size={13} />
-            New Task
           </button>
         </div>
       </div>
@@ -955,13 +953,20 @@ export default function BacklogView() {
               ))}
             </div>
           </div>
-        ) : tasks.length === 0 ? (
+        ) : tasks.length === 0 && narrowed ? (
           <EmptyState
             icon={<Search size={48} />}
-            title="No Tasks Found"
-            description="Your backlog is clear. Add structured tasks or adjust filters to see existing items."
-            actionLabel="Create Task"
-            onActionClick={focusQuickAdd}
+            title={activeView ? `Nothing in ${activeView.name}` : 'Nothing matches'}
+            description={activeView ? 'No task fits this view right now.' : 'No task fits this search and these filters.'}
+            actionLabel={activeView ? 'Show all tasks' : 'Clear search and filters'}
+            onActionClick={showAllTasks}
+          />
+        ) : tasks.length === 0 ? (
+          // the box above is how to add one, so this points there rather than offering a button that only focuses it
+          <EmptyState
+            icon={<ListTodo size={48} />}
+            title="No tasks yet"
+            description="Type one in the box above. A date like “fri 3pm” sets when it’s due."
           />
         ) : (
           <BacklogTable
@@ -986,6 +991,8 @@ export default function BacklogView() {
         )}
       </div>
 
+      {/* nothing to count or page through when the list is empty; the message above says why */}
+      {totalTasks > 0 && (
       <div
         style={{
           display: 'flex',
@@ -998,11 +1005,7 @@ export default function BacklogView() {
         }}
       >
         <span className="text-hint">
-          {totalTasks > 0 ? (
-            `Showing ${Math.min(totalTasks, (page - 1) * pageSize + 1)}–${Math.min(totalTasks, page * pageSize)} of ${totalTasks} tasks`
-          ) : (
-            'No tasks found'
-          )}
+          {`Showing ${Math.min(totalTasks, (page - 1) * pageSize + 1)}–${Math.min(totalTasks, page * pageSize)} of ${totalTasks} tasks`}
         </span>
 
         {totalPages > 1 && (
@@ -1053,6 +1056,7 @@ export default function BacklogView() {
           </div>
         )}
       </div>
+      )}
 
       <Presence show={!!activeTaskId}>
       {activeTaskId && (
