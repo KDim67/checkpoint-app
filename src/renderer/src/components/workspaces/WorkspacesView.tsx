@@ -13,6 +13,7 @@ import RemoveWorkspaceDialog from './RemoveWorkspaceDialog'
 import { useWorkspaces, type ImportDraft } from './useWorkspaces'
 import { matching, nextColor } from '../../lib/workspaceEdits'
 import { openItem } from '../../lib/openItem'
+import { withViewTransition } from '../../lib/viewTransition'
 import { workspaceActivity } from '../../data/workspaces'
 import { firstDayOfWeek } from '../../../../shared/calendar'
 import { laneOf, type ActivityBySlug, type LastChange } from '../../../../shared/workspaceLanes'
@@ -32,7 +33,7 @@ const DRAG_SETTLE_MS = 250
 
 export default function WorkspacesView(): React.JSX.Element {
   const workspaces = useWorkspaces()
-  const { list, loading } = workspaces
+  const { list, loading, move } = workspaces
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const setWorkspace = useAppStore(s => s.setWorkspace)
   const goBack = useAppStore(s => s.goBack)
@@ -47,6 +48,7 @@ export default function WorkspacesView(): React.JSX.Element {
   const [focused, setFocused] = useState(activeWorkspace)
   const [dialog, setDialog] = useState<Dialog | null>(null)
 
+  const pageRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
   const laneButtons = useRef(new Map<string, HTMLButtonElement>())
   const dragEndedAt = useRef(0)
@@ -101,6 +103,7 @@ export default function WorkspacesView(): React.JSX.Element {
 
   // with the focused lane filtered away, Tab still needs a lane to land on
   const tabStop = shown.some(entry => entry.slug === focused) ? focused : shown[0]?.slug
+  const selected = shown.find(entry => entry.slug === tabStop)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_DISTANCE } }))
   const onDragEnd = ({ active, over }: DragEndEvent): void => {
@@ -110,35 +113,57 @@ export default function WorkspacesView(): React.JSX.Element {
   }
   const settlingDrag = useCallback(() => Date.now() - dragEndedAt.current < DRAG_SETTLE_MS, [])
 
-  const onLanesKey = (event: React.KeyboardEvent<HTMLUListElement>): void => {
-    if (shown.length === 0 || !tabStop) return
-    const at = Math.max(0, shown.findIndex(entry => entry.slug === tabStop))
-    if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-      event.preventDefault()
-      // reordering part of the list would be guesswork
-      if (filtered) return
-      const slug = tabStop
-      void workspaces.move(slug, event.key === 'ArrowUp' ? -1 : 1).then(() => focusLane(slug))
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      focusLane(shown[Math.min(at + 1, shown.length - 1)].slug)
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      if (at === 0) filterRef.current?.focus()
-      else focusLane(shown[at - 1].slug)
-    } else if (event.key === 'Home') {
-      event.preventDefault()
-      focusLane(shown[0].slug)
-    } else if (event.key === 'End') {
-      event.preventDefault()
-      focusLane(shown[shown.length - 1].slug)
-    } else if (event.key.length === 1 && event.key !== ' ' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      // typing goes to the filter, as in a file list
-      event.preventDefault()
-      setQuery(current => current + event.key)
-      filterRef.current?.focus()
+  // on the window, not the lanes: a click on the page's empty space, or beside it, takes focus off them and left every key dead
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const page = pageRef.current
+      const target = event.target as HTMLElement
+      if (!page || !(page.contains(target) || target === document.body) || event.defaultPrevented) return
+      // a dialog or menu open here takes its own keys
+      if (document.querySelector('[role="dialog"]') || target.closest('[role="menu"]')) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        // a filter is cleared first, then Escape goes back
+        if (query) setQuery('')
+        else withViewTransition(goBack)
+        return
+      }
+      // the filter keeps the rest of its keys
+      if (target.closest('input, textarea, select, [contenteditable="true"]') || shown.length === 0 || !tabStop) return
+      const at = Math.max(0, shown.findIndex(entry => entry.slug === tabStop))
+      if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        event.preventDefault()
+        // reordering part of the list would be guesswork
+        if (filtered) return
+        void move(tabStop, event.key === 'ArrowUp' ? -1 : 1).then(() => focusLane(tabStop))
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        focusLane(shown[Math.min(at + 1, shown.length - 1)].slug)
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        if (at === 0) filterRef.current?.focus()
+        else focusLane(shown[at - 1].slug)
+      } else if (event.key === 'Home') {
+        event.preventDefault()
+        focusLane(shown[0].slug)
+      } else if (event.key === 'End') {
+        event.preventDefault()
+        focusLane(shown[shown.length - 1].slug)
+      } else if (event.key === 'Enter') {
+        // a focused button's Enter is its own click, which on a lane switches already
+        if (target.closest('button')) return
+        event.preventDefault()
+        switchTo(tabStop)
+      } else if (event.key.length === 1 && event.key !== ' ' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        // typing goes to the filter, as in a file list
+        event.preventDefault()
+        setQuery(current => current + event.key)
+        filterRef.current?.focus()
+      }
     }
-  }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [filtered, focusLane, goBack, move, query, shown, switchTo, tabStop])
 
   const onFilterKey = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'ArrowDown' && shown.length > 0) {
@@ -146,17 +171,10 @@ export default function WorkspacesView(): React.JSX.Element {
       focusLane(shown[0].slug)
     } else if (event.key === 'Enter') {
       event.preventDefault()
-      if (shown.length > 0) switchTo(shown[0].slug)
+      // the lane shown as selected, which is the first match once typing has filtered the one picked before away
+      if (tabStop) switchTo(tabStop)
       else if (filtered) setDialog({ kind: 'new', name: query.trim() })
     }
-  }
-
-  // Escape clears the filter first, then goes back; a dialog's or menu's Escape is theirs
-  const onPageKey = (event: React.KeyboardEvent): void => {
-    if (event.key !== 'Escape' || dialog || event.defaultPrevented) return
-    event.preventDefault()
-    if (query) setQuery('')
-    else goBack()
   }
 
   const startImport = async (): Promise<void> => {
@@ -169,7 +187,7 @@ export default function WorkspacesView(): React.JSX.Element {
   const closeDialog = (): void => setDialog(null)
 
   return (
-    <div className="ws-page" onKeyDown={onPageKey} tabIndex={-1}>
+    <div ref={pageRef} className="ws-page" tabIndex={-1}>
       <header className="ws-head">
         <h1 className="ws-title">
           Workspaces <span className="ws-total">{list.length}</span>
@@ -208,9 +226,10 @@ export default function WorkspacesView(): React.JSX.Element {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} onDragCancel={() => { dragEndedAt.current = Date.now() }}>
           <SortableContext items={shown.map(entry => entry.slug)} strategy={verticalListSortingStrategy}>
-            <ul id="ws-lanes" className="ws-lanes" aria-label="Workspaces" onKeyDown={onLanesKey}>
+            <ul id="ws-lanes" className="ws-lanes" aria-label="Workspaces">
               {shown.map(entry => {
                 const lane = lanes.get(entry.slug) ?? laneOf(undefined, now, weekStart)
+                const index = list.indexOf(entry)
                 return (
                   <WorkspaceLane
                     key={entry.slug}
@@ -221,6 +240,8 @@ export default function WorkspacesView(): React.JSX.Element {
                     tabStop={entry.slug === tabStop}
                     canRemove={list.length > 1}
                     sortable={!filtered}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < list.length - 1}
                     settlingDrag={settlingDrag}
                     buttonRef={el => {
                       if (el) laneButtons.current.set(entry.slug, el)
@@ -230,6 +251,7 @@ export default function WorkspacesView(): React.JSX.Element {
                     onSwitch={() => switchTo(entry.slug)}
                     onOpenLastChange={change => openLastChange(entry.slug, change)}
                     onEdit={field => setDialog({ kind: 'edit', slug: entry.slug, field })}
+                    onMove={by => void move(entry.slug, by)}
                     onExport={() => void workspaces.exportOne(entry)}
                     onUnshare={() => void workspaces.unshare(entry.slug)}
                     onRemove={() => setDialog({ kind: 'remove', slug: entry.slug })}
@@ -246,7 +268,18 @@ export default function WorkspacesView(): React.JSX.Element {
         <span className="ws-legend"><span className="ws-mark" aria-hidden="true" />due</span>
         <span className="ws-legend"><span className="ws-mark ws-mark-late" aria-hidden="true" />late</span>
         <span className="ws-legend"><span className="ws-legend-today" aria-hidden="true" />today</span>
-        <span className="ws-keys">Enter switches · Alt+↑↓ reorders · Esc goes back</span>
+        {/* what each key does right now, by name, and only the ones that do something */}
+        <span className="ws-keys">
+          {shown.length > 1 && <span className="ws-key"><kbd>↑</kbd><kbd>↓</kbd>Choose</span>}
+          {selected && (
+            <span className="ws-key">
+              <kbd>Enter</kbd>
+              <span className="ws-key-what">{selected.slug === activeWorkspace ? `Stay in ${selected.name}` : `Switch to ${selected.name}`}</span>
+            </span>
+          )}
+          {!filtered && list.length > 1 && <span className="ws-key"><kbd>Alt</kbd><kbd>↑</kbd><kbd>↓</kbd>Move</span>}
+          <span className="ws-key"><kbd>Esc</kbd>{filtered ? 'Clear filter' : 'Back'}</span>
+        </span>
       </footer>
 
       <Presence show={dialog?.kind === 'new'}>
