@@ -3,7 +3,7 @@
 import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Download, FolderGit2, GitBranch, MoreHorizontal, Pencil, Trash2, UserMinus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Download, FolderGit2, GitBranch, MoreHorizontal, Pencil, Trash2, UserMinus } from 'lucide-react'
 import RowMenu, { type RowMenuEntry } from '../ui/RowMenu'
 import ActivityStrip from './ActivityStrip'
 import WorkspaceTile from './WorkspaceTile'
@@ -15,6 +15,7 @@ export interface LaneActions {
   onSwitch: () => void
   onOpenLastChange: (change: LastChange) => void
   onEdit: (field: 'name' | 'repo') => void
+  onMove: (by: -1 | 1) => void
   onExport: () => void
   onUnshare: () => void
   onRemove: () => void
@@ -26,11 +27,14 @@ interface Props extends LaneActions {
   /** false while the activity is still being read */
   ready: boolean
   current: boolean
-  /** the one lane Tab lands on; arrows move between the rest */
+  /** the one lane Tab lands on and the keys act on, marked so it shows where they will */
   tabStop: boolean
   canRemove: boolean
   /** off while filtered: reordering part of the list would be guesswork */
   sortable: boolean
+  /** false at that end of the list, so the menu only offers a move that happens */
+  canMoveUp: boolean
+  canMoveDown: boolean
   /** true just after a drag, so the click that ends it doesn't also switch */
   settlingDrag: () => boolean
   buttonRef: (el: HTMLButtonElement | null) => void
@@ -40,12 +44,15 @@ interface Props extends LaneActions {
 const folderName = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path
 
 export default function WorkspaceLane(props: Props): React.JSX.Element {
-  const { entry, lane, ready, current, tabStop, canRemove, sortable } = props
+  const { entry, lane, ready, current, tabStop, canRemove, sortable, canMoveUp, canMoveDown } = props
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({ id: entry.slug, disabled: !sortable })
 
   const entries: RowMenuEntry[] = [
     { label: 'Rename and colour', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => props.onEdit('name') },
     { label: 'Linked repository', icon: <FolderGit2 size={14} aria-hidden="true" />, onSelect: () => props.onEdit('repo') },
+    // the mouse's way to what Alt and the arrows do, for anyone who doesn't drag
+    ...(sortable && canMoveUp ? [{ label: 'Move up', icon: <ArrowUp size={14} aria-hidden="true" />, onSelect: () => props.onMove(-1) }] : []),
+    ...(sortable && canMoveDown ? [{ label: 'Move down', icon: <ArrowDown size={14} aria-hidden="true" />, onSelect: () => props.onMove(1) }] : []),
     { label: 'Export', icon: <Download size={14} aria-hidden="true" />, onSelect: props.onExport },
     ...(entry.shared ? [{ label: 'Stop sharing', icon: <UserMinus size={14} aria-hidden="true" />, onSelect: props.onUnshare }] : []),
     ...(canRemove ? [{ label: 'Remove workspace', icon: <Trash2 size={14} aria-hidden="true" />, onSelect: props.onRemove, danger: true }] : [])
@@ -64,8 +71,11 @@ export default function WorkspaceLane(props: Props): React.JSX.Element {
       ref={setNodeRef}
       className="ws-lane"
       data-dragging={isDragging}
+      data-selected={tabStop}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       onClick={onClick}
+      // focus on anything in it, its menu included, makes it the lane the keys act on
+      onFocus={props.onFocused}
       {...listeners}
     >
       <WorkspaceTile name={entry.name} color={entry.color} icon={entry.icon} />
@@ -79,7 +89,6 @@ export default function WorkspaceLane(props: Props): React.JSX.Element {
             tabIndex={tabStop ? 0 : -1}
             aria-label={ready ? laneLabel(entry.name, lane, { current, shared: !!entry.shared }) : `${entry.name}, loading`}
             aria-current={current ? 'true' : undefined}
-            onFocus={props.onFocused}
           >
             {entry.name}
           </button>
