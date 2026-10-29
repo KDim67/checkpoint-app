@@ -37,11 +37,14 @@ export function workspaceActivity(db: Database.Database, now: number): ActivityB
   ).all(since) as { context: string; completed_at: number; duration_ms: number }[]
   for (const row of focus) of(row.context).focus.push({ at: row.completed_at, ms: row.duration_ms })
 
-  // sqlite fills the bare columns from the row that holds the max
-  const latest = db.prepare(
-    'SELECT context, id, type, title, substr(body, 1, 400) AS body, MAX(updated_at) AS at FROM items GROUP BY context'
-  ).all() as { context: string; id: string; type: LastChange['type']; title: string; body: string; at: number }[]
-  for (const row of latest) of(row.context).lastChanged = { id: row.id, type: row.type, title: titleOf(row.title, row.body), at: row.at }
+  // each workspace's newest from the end of idx_items_changed; grouping for the latest read every item in every workspace
+  const newest = db.prepare(
+    'SELECT id, type, title, substr(body, 1, 400) AS body, updated_at AS at FROM items WHERE context = ? ORDER BY updated_at DESC LIMIT 1'
+  )
+  for (const { context } of db.prepare('SELECT DISTINCT context FROM items').all() as { context: string }[]) {
+    const row = newest.get(context) as { id: string; type: LastChange['type']; title: string; body: string; at: number } | undefined
+    if (row) of(context).lastChanged = { id: row.id, type: row.type, title: titleOf(row.title, row.body), at: row.at }
+  }
 
   return result
 }

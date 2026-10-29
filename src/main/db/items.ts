@@ -19,28 +19,22 @@ let stmtGetContexts: Database.Statement
 let stmtGetItemsForRebalance: Database.Statement
 let stmtUpdateItemPosition: Database.Statement
 
-export function prepareItemStatements(db: Database.Database): void {
-  stmtGetItemsPaginated = db.prepare(`
-    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
-    FROM items i
-    LEFT JOIN item_tags it ON i.id = it.item_id
-    LEFT JOIN tags t ON it.tag_id = t.id
-    WHERE i.context = ? AND i.type = ?
-    GROUP BY i.id
-    ORDER BY i.position ASC, i.created_at DESC
-    LIMIT ? OFFSET ?
-  `)
+/** an item's tags as one string, for each row returned; joining the tags and grouping sorted the whole workspace before a page could be taken */
+export const TAG_DATA = `(SELECT GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = i.id) AS tag_data`
 
-  stmtGetLogsPaginated = db.prepare(`
-    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
-    FROM items i
-    LEFT JOIN item_tags it ON i.id = it.item_id
-    LEFT JOIN tags t ON it.tag_id = t.id
-    WHERE i.context = ? AND i.type = ?
-    GROUP BY i.id
-    ORDER BY i.position DESC, i.created_at DESC
-    LIMIT ? OFFSET ?
-  `)
+/** the page's own rows first, read in order from idx_items_list, then their tags */
+function pageQuery(order: string): string {
+  return `
+    SELECT i.*, ${TAG_DATA}
+    FROM (SELECT * FROM items WHERE context = ? AND type = ? ORDER BY ${order} LIMIT ? OFFSET ?) i
+    ORDER BY ${order}
+  `
+}
+
+export function prepareItemStatements(db: Database.Database): void {
+  stmtGetItemsPaginated = db.prepare(pageQuery('position ASC, created_at DESC'))
+
+  stmtGetLogsPaginated = db.prepare(pageQuery('position DESC, created_at DESC'))
 
   stmtGetItemsTotal = db.prepare(
     `SELECT COUNT(*) as count FROM items WHERE context = ? AND type = ?`
@@ -129,12 +123,9 @@ export function getItemsPaginated(
 export function getAllItems(context: string, type: string): Item[] {
   const order = type === 'log' ? 'i.position DESC' : 'i.position ASC'
   const rows = prepareOnce(getDb(), `
-    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
+    SELECT i.*, ${TAG_DATA}
     FROM items i
-    LEFT JOIN item_tags it ON i.id = it.item_id
-    LEFT JOIN tags t ON it.tag_id = t.id
     WHERE i.context = ? AND i.type = ?
-    GROUP BY i.id
     ORDER BY ${order}, i.created_at DESC
   `).all(context, type) as Record<string, unknown>[]
   return rows.map(rowToItem)

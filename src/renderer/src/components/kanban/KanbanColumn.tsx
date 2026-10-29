@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import KanbanCard from './KanbanCard'
+import { CardWindowContext, createCardWindow, EAGER_CARDS } from './cardWindow'
 import ColorPicker from '../ui/ColorPicker'
 import { Trash2, Edit2, Check, Plus, X, GripVertical, MoreHorizontal, ChevronRight } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
@@ -132,6 +133,8 @@ function ColumnBody({
 
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(name)
+  // one per column for its life, watching its own scroller
+  const [cardWindow] = useState(createCardWindow)
   const [editWip, setEditWip] = useState<number | null>(wipLimit)
   const [editColor, setEditColor] = useState<string | undefined>(color)
   const [editColorMode, setEditColorMode] = useState<'header' | 'full'>(colorMode || 'header')
@@ -704,6 +707,7 @@ function ColumnBody({
       )}
 
       <div
+        ref={cardWindow.setRoot}
         style={{
           flex: 1,
           padding: 'var(--space-3)',
@@ -714,6 +718,7 @@ function ColumnBody({
           minHeight: '80px'
         }}
       >
+        <CardWindowContext.Provider value={cardWindow}>
         <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
           {cards.map((card, i) => (
             <React.Fragment key={card.id}>
@@ -746,6 +751,7 @@ function ColumnBody({
                 onUpdate={onCardUpdate}
                 display={cardDisplay}
                 remoteDrag={remoteCardDrags?.get(card.id)}
+                eager={i < EAGER_CARDS}
               />
             </React.Fragment>
           ))}
@@ -771,6 +777,7 @@ function ColumnBody({
             </div>
           ))}
         </SortableContext>
+        </CardWindowContext.Provider>
 
 
         {cards.length === 0 && (

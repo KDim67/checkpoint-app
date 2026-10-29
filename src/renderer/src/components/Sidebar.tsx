@@ -8,6 +8,7 @@ import { defaultBindings, loadBindings, type ShortcutBindings } from '../lib/sho
 import { useRenewalAttention } from './renewals/useRenewalAttention'
 import { iconUrl } from '../lib/workspaceIcon'
 import { withViewTransition } from '../lib/viewTransition'
+import { preloadScreen } from './screens'
 
 // inline SVG, no icon lib
 
@@ -393,9 +394,10 @@ export function Sidebar() {
                 aria-label={view === 'renewals' && renewalsDue > 0 ? `${label}, ${renewalsDue} need a look` : label}
                 aria-current={isActive ? 'page' : undefined}
                 onClick={() => handleNavClick(view)}
-                onMouseEnter={e => showTooltip(e.currentTarget, label, bindings[`view_${view}`])}
+                // its code is fetched as the pointer or the keyboard arrives, ahead of the click
+                onMouseEnter={e => { preloadScreen(view); showTooltip(e.currentTarget, label, bindings[`view_${view}`]) }}
                 onMouseLeave={() => setTooltip(null)}
-                onFocus={e => showTooltip(e.currentTarget, label, bindings[`view_${view}`])}
+                onFocus={e => { preloadScreen(view); showTooltip(e.currentTarget, label, bindings[`view_${view}`]) }}
                 onBlur={() => setTooltip(null)}
                 style={{
                   width: '40px',
@@ -507,9 +509,9 @@ export function Sidebar() {
             aria-label="Settings"
             aria-current={activeView === 'settings' ? 'page' : undefined}
             onClick={() => handleNavClick('settings')}
-            onMouseEnter={e => showTooltip(e.currentTarget, 'Settings', bindings.open_settings)}
+            onMouseEnter={e => { preloadScreen('settings'); showTooltip(e.currentTarget, 'Settings', bindings.open_settings) }}
             onMouseLeave={() => setTooltip(null)}
-            onFocus={e => showTooltip(e.currentTarget, 'Settings', bindings.open_settings)}
+            onFocus={e => { preloadScreen('settings'); showTooltip(e.currentTarget, 'Settings', bindings.open_settings) }}
             onBlur={() => setTooltip(null)}
             style={{
               width: '40px',

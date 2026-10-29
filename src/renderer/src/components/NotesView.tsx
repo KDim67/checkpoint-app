@@ -18,6 +18,7 @@ import { useAppStore } from '../store/appStore'
 import * as notesApi from '../data/notes'
 import { errorMessage } from '../../../shared/errors'
 import * as appApi from '../data/app'
+import { useStableCallback } from '../lib/useStableCallback'
 
 export default function NotesView(): React.JSX.Element {
   const { toast } = useToast()
@@ -344,18 +345,23 @@ export default function NotesView(): React.JSX.Element {
       return
     }
     setSearching(true)
+    // a slower earlier search can finish after a later one, and mustn't replace its results
+    let current = true
     const timer = setTimeout(async () => {
       try {
         const results = await notesApi.searchNotes(q)
-        setSearchResults(results)
+        if (current) setSearchResults(results)
       } catch (err) {
         console.error('Note search failed:', err)
-        setSearchResults([])
+        if (current) setSearchResults([])
       } finally {
-        setSearching(false)
+        if (current) setSearching(false)
       }
     }, 220)
-    return () => clearTimeout(timer)
+    return () => {
+      current = false
+      clearTimeout(timer)
+    }
   }, [searchQuery])
 
   const uniqueTags = useMemo(() => {
@@ -399,6 +405,16 @@ export default function NotesView(): React.JSX.Element {
     const rest = list.filter(n => !pinnedSet.has(n.title))
     return [...pinnedItems, ...rest].map(note => ({ note }))
   }, [notes, searchQuery, searchResults, selectedTag, sort, pinnedSet])
+
+  // these change with every key typed in a note; the list gets copies that don't, so it isn't redrawn while typing
+  const selectFromList = useStableCallback(handleSelectNote)
+  const createFromList = useStableCallback(handleCreate)
+  const dailyFromList = useStableCallback(handleDailyNote)
+  const importFromList = useStableCallback(handleImportVault)
+  const openFromBigGraph = useStableCallback((title: string) => {
+    handleSelectNote(title)
+    setGraphExpanded(false)
+  })
 
   const currentNoteMetadata = useMemo(
     () => (activeNoteTitle ? notes.find(n => n.title === activeNoteTitle) ?? null : null),
@@ -473,7 +489,7 @@ export default function NotesView(): React.JSX.Element {
               <GraphView
                 notes={notes}
                 activeTitle={activeNoteTitle}
-                onSelectNote={title => { handleSelectNote(title); setGraphExpanded(false) }}
+                onSelectNote={openFromBigGraph}
               />
             </div>
           </div>
@@ -494,11 +510,11 @@ export default function NotesView(): React.JSX.Element {
         onSortChange={setSort}
         selectedTag={selectedTag}
         onSelectTag={setSelectedTag}
-        onSelect={handleSelectNote}
+        onSelect={selectFromList}
         onTogglePin={togglePin}
-        onCreate={handleCreate}
-        onDaily={handleDailyNote}
-        onImportVault={handleImportVault}
+        onCreate={createFromList}
+        onDaily={dailyFromList}
+        onImportVault={importFromList}
       />
 
       <div className="notes-editor-panel">
@@ -615,7 +631,7 @@ export default function NotesView(): React.JSX.Element {
             style={{ height: '220px', flexShrink: 0, cursor: 'zoom-in' }}
             onDoubleClick={() => setGraphExpanded(true)}
           >
-            <GraphView notes={notes} activeTitle={activeNoteTitle} onSelectNote={handleSelectNote} />
+            <GraphView notes={notes} activeTitle={activeNoteTitle} onSelectNote={selectFromList} />
           </div>
 
           {activeNoteTitle && currentNoteMetadata && (
@@ -757,6 +773,16 @@ const NOTES_CSS = `
     flex-direction: column;
     gap: 4px;
   }
+  .notes-list-item-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text-base);
+  }
+  /* a row not drawn yet keeps the room it will take */
+  .notes-list-item-held { overflow: hidden; }
   .notes-list-item:hover { background: var(--color-surface-offset); }
   .notes-list-item.active {
     background: var(--color-primary-muted);
