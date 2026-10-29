@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useContext, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Edit2, Trash2, ArrowRightLeft, Calendar, GripVertical, Play, Check, CheckSquare } from 'lucide-react'
@@ -11,6 +11,8 @@ import { useViewShortcuts } from '../../lib/useViewShortcuts'
 import { formatDue, isOverdue as isDueOverdue } from '../../../../shared/dueDate'
 import { linkOf } from '../../../../shared/connections'
 import LinkBadge from './LinkBadge'
+import { CardWindowContext, cardHeights } from './cardWindow'
+import { useDrawWhenNear } from '../../lib/drawWhenNear'
 
 export interface RemoteCardDragInfo {
   peerId: string
@@ -28,6 +30,8 @@ interface KanbanCardProps {
   /** board-level card face switches */
   display?: CardDisplay
   remoteDrag?: RemoteCardDragInfo | null
+  /** among its column's first cards, so drawn without waiting to come near */
+  eager?: boolean
 }
 
 function stripMarkdown(md: string): string {
@@ -59,7 +63,7 @@ function stripMarkdown(md: string): string {
 
 type Sortable = ReturnType<typeof useSortable>
 
-interface CardFaceProps extends Omit<KanbanCardProps, 'isOverlay'> {
+interface CardFaceProps extends Omit<KanbanCardProps, 'isOverlay' | 'eager'> {
   dragAttributes?: Sortable['attributes']
   isDragging: boolean
 }
@@ -519,14 +523,6 @@ function CardFace({
           )}
         </div>
       </div>
-
-      <style>{`
-        .kanban-card:focus-visible {
-          outline: 1.5px solid var(--color-secondary) !important;
-          outline-offset: -1.5px;
-          border-color: var(--color-secondary) !important;
-        }
-      `}</style>
     </div>
   )
 }
@@ -575,14 +571,22 @@ function ActionBtn({
 // memoized apart: dnd-kit re-renders every sortable when a drag starts and whenever the card under the pointer changes
 const MemoCardFace = React.memo(CardFace)
 
-function KanbanCard({ isOverlay = false, remoteDrag, ...face }: KanbanCardProps) {
+function KanbanCard({ isOverlay = false, remoteDrag, eager = false, ...face }: KanbanCardProps) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: face.card.id, disabled: isOverlay })
+  // far down a long column it holds its room until it comes near, rather than being built with the whole board
+  const { drawn, ref: wrapper, heldPx, drawForFocus } = useDrawWhenNear(useContext(CardWindowContext), cardHeights, face.card.id, isOverlay || eager, '.kanban-card')
+
+  const setWrapper = useCallback((el: HTMLDivElement | null) => {
+    wrapper.current = el
+    setNodeRef(el)
+  }, [setNodeRef, wrapper])
+
   // the overlay copy only borrows the look, it has no place in a list
   if (isOverlay) return <MemoCardFace {...face} isDragging={false} />
   return (
     // sorting restyles every card's transform and transition, so they live out here where the face memo can't see them
     <div
-      ref={setNodeRef}
+      ref={setWrapper}
       // pointer only: the face's keydown always overrode dnd-kit's keyboard pickup
       onPointerDown={listeners?.onPointerDown as React.PointerEventHandler<HTMLDivElement> | undefined}
       style={{
@@ -621,7 +625,19 @@ function KanbanCard({ isOverlay = false, remoteDrag, ...face }: KanbanCardProps)
           {remoteDrag.name} is moving
         </div>
       )}
-      <MemoCardFace {...face} dragAttributes={attributes} isDragging={isDragging} />
+      {drawn ? (
+        <MemoCardFace {...face} dragAttributes={attributes} isDragging={isDragging} />
+      ) : (
+        <div
+          className="kanban-card-pending"
+          style={{ height: heldPx }}
+          role="button"
+          tabIndex={0}
+          aria-label={face.card.title || 'Untitled card'}
+          // tabbing onto it draws the card and hands it the focus
+          onFocus={drawForFocus}
+        />
+      )}
     </div>
   )
 }

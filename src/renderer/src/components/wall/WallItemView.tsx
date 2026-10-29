@@ -5,7 +5,7 @@ import { FileQuestion, FileText, Globe } from 'lucide-react'
 import { fontSizeOf, inkNaturalSize, inkPath, SHAPE_TYPES, type ImageCrop, type TextAlign, type WallItem } from '../../../../shared/wallModel'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../../shared/wallShape'
 import { cropFrame } from '../../../../shared/wallCrop'
-import { fitTextSize } from '../../lib/fitText'
+import { fitTextSizeSoon, useFontLoads } from '../../lib/fitText'
 import { getTextColorForBackground } from '../../lib/contrast'
 import type { Item, NoteMetadata } from '../../../../shared/types'
 import { parseWallLink } from '../../../../shared/wallLink'
@@ -40,13 +40,15 @@ function FittedText({ text, width, height, base, min = FIT_FONT_MIN, color, alig
   onNeedRoom?: (extra: number) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const fontLoads = useFontLoads()
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const { over } = fitTextSize(el, base, min)
-    if (over > 0) onNeedRoom?.(over)
-  }, [text, width, height, base, min, onNeedRoom])
+    return fitTextSizeSoon(el, base, min, ({ over }) => {
+      if (over > 0) onNeedRoom?.(over)
+    })
+  }, [text, width, height, base, min, onNeedRoom, fontLoads])
 
   return (
     <div ref={ref} style={{
@@ -70,12 +72,13 @@ function TextBox({ item, style, onAutoSize }: {
   onAutoSize?: (id: string, height: number) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const fontLoads = useFontLoads()
 
   useLayoutEffect(() => {
     // the words' own height, not the stored box around them
     const height = ref.current?.offsetHeight
     if (height && onAutoSize) onAutoSize(item.id, height)
-  }, [item.id, item.text, item.width, onAutoSize])
+  }, [item.id, item.text, item.width, onAutoSize, fontLoads])
 
   return (
     <div ref={ref} style={{ ...style, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>

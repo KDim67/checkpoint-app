@@ -71,8 +71,10 @@ describe('opening a sticky to write in', () => {
 })
 
 describe('a chosen text size', () => {
-  it('sets the words at it, and writing in them starts there too', () => {
+  it('sets the words at it, and writing in them starts there too', async () => {
     const { container } = view({ text: 'Hello', fontSize: 28 })
+    // fitted with the rest of the wall just before the frame is drawn
+    await Promise.resolve()
     expect((container.querySelector('.wall-paper > div > div') as HTMLElement).style.fontSize).toBe('28px')
     cleanup()
 

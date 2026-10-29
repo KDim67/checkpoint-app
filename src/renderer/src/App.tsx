@@ -47,33 +47,18 @@ import CollabFollowBanner from './components/collab/CollabFollowBanner'
 import Presence from './components/ui/Presence'
 import { withViewTransition } from './lib/viewTransition'
 import { usePresence } from './lib/presence'
+import {
+  AiStreamPanel, AnalyticsView, BacklogView, CalendarView, CheatsheetsView, ClipboardView, CookbookView, FocusView,
+  GameDevView, GitPanel, ItemDetailPanel, KanbanView, LogView, NotesView, preloadScreensWhenIdle, RenewalsView,
+  SettingsView, WallView, WorkspacesView
+} from './components/screens'
 
 const CommandPalette = lazy(() => import('./components/CommandPalette'))
 const OnboardingTour = lazy(() => import('./components/OnboardingTour'))
 const WhatsNewDialog = lazy(() => import('./components/WhatsNewDialog'))
 const TrayPanel      = lazy(() => import('./components/TrayPanel'))
-const LogView      = lazy(() => import('./components/LogView'))
-const KanbanView   = lazy(() => import('./components/KanbanView'))
-const BacklogView  = lazy(() => import('./components/BacklogView'))
-const RenewalsView = lazy(() => import('./components/RenewalsView'))
-const CalendarView = lazy(() => import('./components/CalendarView'))
-const CookbookView = lazy(() => import('./components/CookbookView'))
-const WallView      = lazy(() => import('./components/wall/WallView'))
-const SettingsView = lazy(() => import('./components/SettingsView'))
-const WorkspacesView = lazy(() => import('./components/workspaces/WorkspacesView'))
 const WidgetView    = lazy(() => import('./components/WidgetView'))
-const FocusView     = lazy(() => import('./components/FocusView'))
-const NotesView     = lazy(() => import('./components/NotesView'))
-const ClipboardView = lazy(() => import('./components/ClipboardView'))
-const AnalyticsView = lazy(() => import('./components/AnalyticsView'))
 const HudView       = lazy(() => import('./components/HudView'))
-const CheatsheetsView = lazy(() => import('./components/CheatsheetsView'))
-const GameDevView = lazy(() => import('./components/GameDevView'))
-
-// lazy: eager imports pulled ~7,000 lines into every startup, panel open or not
-const AiStreamPanel   = lazy(() => import('./components/AiStreamPanel'))
-const GitPanel        = lazy(() => import('./components/GitPanel'))
-const ItemDetailPanel = lazy(() => import('./components/ItemDetailPanel'))
 
 function ViewSkeleton() {
   return (
@@ -919,6 +904,9 @@ export default function App() {
     window.addEventListener('settings-update-features', checkEnabledViews)
     return () => window.removeEventListener('settings-update-features', checkEnabledViews)
   }, [checkEnabledViews])
+
+  // a first visit to a screen used to show its loading screen, which React then holds for 300 ms
+  useEffect(preloadScreensWhenIdle, [])
 
   function renderView() {
     switch (activeView) {

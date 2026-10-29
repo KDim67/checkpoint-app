@@ -433,20 +433,6 @@ export default function BacklogRow({
         if (!visibleColumns[colKey]) return null
         return renderCell(colKey)
       })}
-      
-      <style>{`
-        .backlog-row-container:hover {
-          background-color: var(--color-surface-2) !important;
-        }
-        .backlog-row-container:hover .backlog-play-btn {
-          display: inline-flex !important;
-        }
-        .backlog-row-container:focus-visible {
-          outline: 1.5px solid var(--color-secondary) !important;
-          outline-offset: -1.5px;
-          background-color: var(--color-surface-2) !important;
-        }
-      `}</style>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 /** dot grid scales with the camera, Fit is always there, cards are references; right-drag pans */
 
+import { useEffect } from 'react'
 import WallContextMenu from './WallContextMenu'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import WallBoardRail from './WallBoardRail'
@@ -10,9 +11,11 @@ import WallRailHandle from './WallRailHandle'
 import { useWallView } from './useWallView'
 import WallToolbar from './WallToolbar'
 import WallCanvas from './WallCanvas'
+import { loadWallFonts } from './wallFonts'
 
 export default function WallView() {
   const wallView = useWallView()
+  useEffect(loadWallFonts, [])
   const {
     cards, notes, menu, setMenu, pendingDelete, setPendingDelete, railOpen, railWidth,
     setRailWidth, railTab, setRailTab, railQuery, setRailQuery, columns, dropColumnId, toggleRail,
