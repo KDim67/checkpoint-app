@@ -1,4 +1,4 @@
-import { join } from 'path'
+import { dirname, join } from 'path'
 import fs from 'fs'
 import zlib from 'zlib'
 import { pipeline } from 'stream/promises'
@@ -275,16 +275,12 @@ function storedBackupPath(db: Database.Database): string {
   }
 }
 
-/** the database as the last version left it, before this one changes it; restorable from Settings like any backup */
-export function snapshotBeforeUpdate(db: Database.Database, fromSchema: number): void {
-  const backupDir = backupDirFor(storedBackupPath(db))
-  const timestamp = Date.now()
-  const version = app.getVersion().replace(/[^0-9A-Za-z.-]/g, '-')
-  const temp = join(backupDir, `temp_pre_update_${timestamp}.db`)
-  const file = join(backupDir, `${PREFIXES.preUpdate}${timestamp}_${version}.db.gz`)
+/** a compressed copy of the database as the open connection sees it, written under a scratch name and renamed into place */
+function writeCompressedCopy(db: Database.Database, file: string, tempName: string): void {
+  const temp = join(dirname(file), tempName)
   const partial = `${file}.partial`
   try {
-    // synchronous on purpose: nothing may change the database until it's copied
+    // from the connection, not the file on disk, which lacks whatever is still in the write-ahead log
     db.exec(`VACUUM INTO '${temp.replace(/'/g, "''")}'`)
     fs.writeFileSync(partial, zlib.gzipSync(fs.readFileSync(temp)))
     fs.renameSync(partial, file)
@@ -293,10 +289,20 @@ export function snapshotBeforeUpdate(db: Database.Database, fromSchema: number):
       try {
         if (fs.existsSync(leftover)) fs.unlinkSync(leftover)
       } catch (err) {
-        console.error('Failed to clean up after the copy before updating:', err)
+        console.error('Failed to clean up after copying the database:', err)
       }
     }
   }
+}
+
+/** the database as the last version left it, before this one changes it; restorable from Settings like any backup */
+export function snapshotBeforeUpdate(db: Database.Database, fromSchema: number): void {
+  const backupDir = backupDirFor(storedBackupPath(db))
+  const timestamp = Date.now()
+  const version = app.getVersion().replace(/[^0-9A-Za-z.-]/g, '-')
+  const file = join(backupDir, `${PREFIXES.preUpdate}${timestamp}_${version}.db.gz`)
+  // synchronous on purpose: nothing may change the database until it's copied
+  writeCompressedCopy(db, file, `temp_pre_update_${timestamp}.db`)
   pruneBackups(backupDir, KEEP_BEFORE_UPDATE, 'preUpdate')
   console.log(`[backup] Copied the database at schema ${fromSchema} before updating it: ${file}`)
 }
@@ -309,8 +315,9 @@ export function deleteBackup(filename: string): void {
   }
 }
 
-export function initializeBackupScheduler(): void {
-  shutdownBackupScheduler()
+/** atLaunch: the app is starting, as against the schedule being set again after a change in Settings */
+export function initializeBackupScheduler({ atLaunch = false }: { atLaunch?: boolean } = {}): void {
+  stopBackupTimers()
 
   const isEnabled = getSetting<string>('feature_backup', 'true') !== 'false'
   if (!isEnabled) return
@@ -318,7 +325,8 @@ export function initializeBackupScheduler(): void {
   const interval = getSetting<string>('backup_interval', 'daily')
 
   if (interval === 'launch-exit') {
-    runBackup().catch(err => console.error('Failed to run boot backup:', err))
+    // a change in Settings used to take one too, as if the app had just started
+    if (atLaunch) runBackup().catch(err => console.error('Failed to run boot backup:', err))
     return
   }
 
@@ -337,13 +345,13 @@ export function initializeBackupScheduler(): void {
 async function checkAndRunTimedBackup() {
   const isEnabled = getSetting<string>('feature_backup', 'true') !== 'false'
   if (!isEnabled) {
-    shutdownBackupScheduler()
+    stopBackupTimers()
     return
   }
 
   const interval = getSetting<string>('backup_interval', 'daily')
   if (interval === 'launch-exit') {
-    shutdownBackupScheduler()
+    stopBackupTimers()
     return
   }
 
@@ -365,7 +373,7 @@ async function checkAndRunTimedBackup() {
   }
 }
 
-export function shutdownBackupScheduler(): void {
+function stopBackupTimers(): void {
   if (initialCheckTimer) {
     clearTimeout(initialCheckTimer)
     initialCheckTimer = null
@@ -374,53 +382,28 @@ export function shutdownBackupScheduler(): void {
     clearInterval(backupTimer)
     backupTimer = null
   }
+}
+
+/** at quit: the timers stop, and the backup is taken when backups run at launch and exit; before the database closes, which the caller does after */
+export function shutdownBackupScheduler(): void {
+  stopBackupTimers()
 
   try {
     const isEnabled = getSetting<string>('feature_backup', 'true') !== 'false'
     const interval = getSetting<string>('backup_interval', 'daily')
-    if (isEnabled && interval === 'launch-exit') {
-      console.log('[BackupScheduler] Running exit backup...')
+    if (!isEnabled || interval !== 'launch-exit') return
 
-      const backupDir = getBackupDir()
-      const timestamp = Date.now()
-      const tempFile = join(backupDir, `temp_exit_backup_${timestamp}.db`)
-      const compressedFile = join(backupDir, `backup_${timestamp}.db.gz`)
+    console.log('[BackupScheduler] Running exit backup...')
+    const backupDir = getBackupDir()
+    const timestamp = Date.now()
+    const file = join(backupDir, `${PREFIXES.scheduled}${timestamp}.db.gz`)
+    // synchronous: the process ends straight after, and quitting gives up on async work after 800 ms
+    writeCompressedCopy(getDb(), file, `temp_exit_backup_${timestamp}.db`)
+    setSetting('last_backup_time', String(timestamp))
 
-      const dataPath = app.getPath('userData')
-      const primaryDbFile = join(dataPath, 'checkpoint.db')
-
-      if (fs.existsSync(primaryDbFile)) {
-        fs.copyFileSync(primaryDbFile, tempFile)
-
-        // sync on exit, async work dies with the process
-        const gzip = zlib.gzipSync(fs.readFileSync(tempFile))
-        fs.writeFileSync(compressedFile, gzip)
-
-        fs.unlinkSync(tempFile)
-
-        const maxCountStr = getSetting<string>('backup_max_count', '10')
-        const maxCount = parseInt(maxCountStr, 10) || 10
-        const files = fs.readdirSync(backupDir)
-          .filter(f => f.startsWith('backup_') && f.endsWith('.db.gz'))
-          .map(f => {
-            const match = f.match(/^backup_(\d+)\.db\.gz$/)
-            return {
-              filename: f,
-              timestamp: match ? parseInt(match[1], 10) : 0
-            }
-          })
-          .sort((a, b) => a.timestamp - b.timestamp)
-
-        if (files.length > maxCount) {
-          const toPrune = files.slice(0, files.length - maxCount)
-          for (const f of toPrune) {
-            fs.unlinkSync(join(backupDir, f.filename))
-          }
-        }
-
-        console.log('[BackupScheduler] Exit backup completed:', compressedFile)
-      }
-    }
+    const maxCount = parseInt(getSetting<string>('backup_max_count', '10'), 10) || 10
+    pruneBackups(backupDir, maxCount)
+    console.log('[BackupScheduler] Exit backup completed:', file)
   } catch (err) {
     console.error('[BackupScheduler] Exit backup failed:', err)
   }

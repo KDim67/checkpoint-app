@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
+import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { initDb, discardDb, getDb, createItem, searchItems, getSetting, setSetting } from '../src/main/db'
-import { runBackup, runRestore, listCompletedBackups, getBackupDir, parseBackupName } from '../src/main/backupVault'
+import { runBackup, runRestore, listCompletedBackups, getBackupDir, parseBackupName, shutdownBackupScheduler, initializeBackupScheduler } from '../src/main/backupVault'
 import { app } from 'electron'
 
 // the corrupt-db dialog points here; the electron stub pins userData to a throwaway path
@@ -171,5 +173,85 @@ describe('a backup that did not finish', () => {
     const good = listCompletedBackups().filter(b => b.kind === 'scheduled')[0]
     await runRestore(good.filename)
     expect(search('good')).toBe(1)
+  })
+})
+
+describe('the backup taken on quit', () => {
+  /** the item titles in a database file opened on its own, none when it doesn't even have the table */
+  const titlesInFile = (file: string): string[] => {
+    const db = new DatabaseSync(file)
+    try {
+      const hasItems = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'items'").get()
+      return hasItems ? (db.prepare('SELECT title FROM items ORDER BY title').all() as { title: string }[]).map(row => row.title) : []
+    } finally {
+      db.close()
+    }
+  }
+  /** what a backup holds, unpacked the way a restore would */
+  const titlesIn = (backupFile: string): string[] => {
+    const plain = join(dataPath, 'inspect.db')
+    writeFileSync(plain, gunzipSync(readFileSync(backupFile)))
+    try {
+      return titlesInFile(plain)
+    } finally {
+      rmSync(plain, { force: true })
+    }
+  }
+  const scheduledBackups = (): string[] => listCompletedBackups().filter(b => b.kind === 'scheduled').map(b => join(getBackupDir(), b.filename))
+
+  it('holds the last changes, which are still in the write-ahead log rather than the database file', () => {
+    initDb(dataPath)
+    setSetting('backup_interval', 'launch-exit')
+    addItem('written just before quitting')
+
+    // a copy of the file alone, as it used to be taken, misses it
+    const fileOnly = join(dataPath, 'file-only.db')
+    copyFileSync(join(dataPath, 'checkpoint.db'), fileOnly)
+    expect(titlesInFile(fileOnly)).toEqual([])
+
+    shutdownBackupScheduler()
+
+    const [backup] = scheduledBackups()
+    expect(titlesIn(backup)).toEqual(['written just before quitting'])
+  })
+
+  it('leaves nothing half-written behind, and is counted as the latest backup', () => {
+    initDb(dataPath)
+    setSetting('backup_interval', 'launch-exit')
+    shutdownBackupScheduler()
+    expect(readdirSync(getBackupDir()).filter(f => f.includes('temp_') || f.endsWith('.partial'))).toEqual([])
+    expect(Number(getSetting<string>('last_backup_time', '0'))).toBeGreaterThan(0)
+  })
+
+  it('keeps no more than the number set, dropping the oldest', () => {
+    initDb(dataPath)
+    setSetting('backup_interval', 'launch-exit')
+    setSetting('backup_max_count', '2')
+    const dir = getBackupDir()
+    for (const at of [1000, 2000, 3000]) writeFileSync(join(dir, `backup_${at}.db.gz`), 'old')
+    shutdownBackupScheduler()
+    const kept = listCompletedBackups().filter(b => b.kind === 'scheduled').map(b => b.timestamp)
+    expect(kept).toHaveLength(2)
+    expect(kept).toContain(3000)
+    expect(Math.max(...kept)).toBeGreaterThan(3000)
+  })
+
+  it('is only taken when backups are set to run at launch and exit', () => {
+    initDb(dataPath)
+    shutdownBackupScheduler()
+    setSetting('backup_interval', 'launch-exit')
+    setSetting('feature_backup', 'false')
+    shutdownBackupScheduler()
+    expect(scheduledBackups()).toEqual([])
+  })
+
+  it('is not taken when the schedule is set again, as starting up and every change in Settings used to', async () => {
+    initDb(dataPath)
+    setSetting('backup_interval', 'launch-exit')
+    initializeBackupScheduler()
+    // a backup started at launch would be under way by now
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(scheduledBackups()).toEqual([])
+    shutdownBackupScheduler()
   })
 })
