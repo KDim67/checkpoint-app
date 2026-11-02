@@ -15,6 +15,9 @@ export interface Sandbox {
 /** one session per plugin; chromium never shares a renderer process across sessions, so plugins can't share one */
 const partitionFor = (filename: string): string => `plugin-${filename}`
 
+/** keep a reference so v8 does not garbage collect the view while its sandbox is running */
+const activeViews = new Set<WebContentsView>()
+
 function lockDown(ses: Electron.Session): void {
   // the host page is the only thing it may load, everything else is cancelled, websockets included
   ses.webRequest.onBeforeRequest((details, callback) => callback({ cancel: details.url !== HOST_PAGE_URL }))
@@ -53,6 +56,7 @@ export function openSandbox(
       safeDialogs: true
     }
   })
+  activeViews.add(view)
   const contents = view.webContents
   let closed = false
 
@@ -92,6 +96,7 @@ export function openSandbox(
     close(force: boolean): void {
       if (closed) return
       closed = true
+      activeViews.delete(view)
       if (!contents.isDestroyed()) {
         // a worker stuck in a loop won't let the page close politely
         if (force) contents.forcefullyCrashRenderer()
