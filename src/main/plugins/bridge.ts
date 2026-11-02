@@ -178,7 +178,7 @@ const FORBIDDEN_HEADERS = /^(host|connection|content-length|transfer-encoding|ke
 
 const fetchSchema = z.object({
   method: z.enum(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']).optional(),
-  headers: z.record(z.string().max(8192)).optional(),
+  headers: z.record(z.string(), z.string().max(8192)).optional(),
   body: z.string().optional()
 }).strict()
 
@@ -281,7 +281,9 @@ const HANDLERS: Record<string, Handler> = {
     if (options.body !== undefined && Buffer.byteLength(options.body, 'utf8') > FETCH_BODY_BYTES) {
       throw new PluginCallError(`api.fetch: the body is larger than ${FETCH_BODY_BYTES / 1024} KB.`)
     }
-    const headers = Object.fromEntries(Object.entries(options.headers ?? {}).filter(([k]) => !FORBIDDEN_HEADERS.test(k)))
+    const headers: Record<string, string> = Object.fromEntries(
+      Object.entries(options.headers ?? {}).filter(([k]) => !FORBIDDEN_HEADERS.test(k))
+    )
     limit(ctx, deps, 'fetch')
     return deps.fetch(url, { method, headers, ...(options.body !== undefined ? { body: options.body } : {}) }, grant.hosts)
   },

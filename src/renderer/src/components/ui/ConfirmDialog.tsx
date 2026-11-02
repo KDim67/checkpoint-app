@@ -1,7 +1,8 @@
-import React, { useRef, createContext, useContext, useState, useCallback, useMemo } from 'react'
+import React, { useRef, useContext, useState, useCallback, useMemo } from 'react'
 import useEscapeKey from './useEscapeKey'
 import useFocusTrap from './useFocusTrap'
 import { usePresence } from '../../lib/presence'
+import { ConfirmContext } from './confirmContext'
 
 /** rows, not buttons: past three answers a label can't say what each does */
 interface PickChoice {
@@ -258,11 +259,9 @@ interface PickOptions extends ConfirmOptions {
   choices: PickChoice[]
 }
 
-type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
+export type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
 /** null for every way of refusing */
-type PickFn = (options: PickOptions) => Promise<string | null>
-
-const ConfirmContext = createContext<{ confirm: ConfirmFn; pick: PickFn } | undefined>(undefined)
+export type PickFn = (options: PickOptions) => Promise<string | null>
 
 /** same shape as native confirm(), which blocks the renderer and ignores the theme */
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {

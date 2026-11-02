@@ -1,18 +1,30 @@
 import { z } from 'zod'
 
-export const CreateItemSchema = z.object({
+const itemFields = {
   type: z.enum(['log', 'card', 'task']),
   context: z.string().min(1, 'Workspace slug cannot be empty'),
-  title: z.string().default(''),
-  body: z.string().default(''),
-  status: z.string().default('open'),
-  priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).default(0),
-  position: z.number().default(0),
-  due_at: z.number().nullable().optional().default(null),
-  metadata: z.string().default('{}')
+  title: z.string(),
+  body: z.string(),
+  status: z.string(),
+  priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
+  position: z.number(),
+  due_at: z.number().nullable().optional(),
+  metadata: z.string()
+}
+
+export const CreateItemSchema = z.object({
+  type: itemFields.type,
+  context: itemFields.context,
+  title: itemFields.title.default(''),
+  body: itemFields.body.default(''),
+  status: itemFields.status.default('open'),
+  priority: itemFields.priority.default(0),
+  position: itemFields.position.default(0),
+  due_at: itemFields.due_at.default(null),
+  metadata: itemFields.metadata.default('{}')
 })
 
-export const UpdateItemSchema = CreateItemSchema.partial()
+export const UpdateItemSchema = z.object(itemFields).partial()
 
 export const CreateTagSchema = z.object({
   name: z.string().min(1, 'Tag name cannot be empty'),
