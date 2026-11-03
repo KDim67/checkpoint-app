@@ -77,6 +77,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
       <div
         ref={areaRef}
         onPointerDown={track(areaRef, (fx, fy) => ({ ...hsvRef.current, s: fx, v: 1 - fy }))}
+        onMouseDown={e => e.preventDefault()}
         role="slider"
         aria-label="Saturation and brightness"
         aria-valuetext={hex}
@@ -100,6 +101,7 @@ export default function ColorField({ value, onChange, onCommit }: Props): React.
       <div
         ref={hueRef}
         onPointerDown={track(hueRef, fx => ({ ...hsvRef.current, h: fx * 360 }))}
+        onMouseDown={e => e.preventDefault()}
         role="slider"
         aria-label="Hue"
         aria-valuemin={0}

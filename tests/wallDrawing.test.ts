@@ -58,6 +58,15 @@ describe('a drawn stroke', () => {
     expect(ink.strokeWidth).toBe(STROKE_WIDTHS[2])
   })
 
+  it('creates a straight line stroke between start and end points when holding shift', () => {
+    const straightLine = [{ x: 50, y: 50 }, { x: 250, y: 150 }]
+    const ink = defined(inkFromPath(straightLine, []))
+    expect(ink.kind).toBe('ink')
+    expect(ink.points).toHaveLength(4)
+    const d = inkPath(ink)
+    expect(d).toMatch(/^M\d+\.\d+,\d+\.\d+L\d+\.\d+,\d+\.\d+$/)
+  })
+
   it('renders as a move followed by lines', () => {
     const d = inkPath(item({ kind: 'ink', points: [0, 0, 10, 5, 20, 0] }))
     expect(d.startsWith('M0.0,0.0')).toBe(true)

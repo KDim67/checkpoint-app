@@ -317,7 +317,10 @@ export default function WallRichEditor({
               style={style}
               // a click on the text bar, or in one of its pickers, is still writing
               onBlur={event => {
-                if (event.relatedTarget instanceof Node && wrapper.current?.contains(event.relatedTarget)) return
+                const rt = event.relatedTarget
+                if (rt instanceof Element) {
+                  if (wrapper.current?.contains(rt) || rt.closest('[data-wall-ui]') || rt.closest('[data-wall-popover]')) return
+                }
                 onFinish()
               }}
             />

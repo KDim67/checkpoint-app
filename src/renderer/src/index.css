@@ -3117,6 +3117,12 @@ html[data-overlay] body {
   outline: none;
 }
 
+.wall-rich-editor *::selection,
+.wall-rich-editor::selection {
+  background-color: rgba(59, 130, 246, 0.35);
+  color: inherit;
+}
+
 .wall-rich-line {
   margin: 0;
 }

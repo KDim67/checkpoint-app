@@ -2,8 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  $getSelection, $isElementNode, $isRangeSelection, $isTextNode, FORMAT_ELEMENT_COMMAND, FORMAT_TEXT_COMMAND,
-  type LexicalNode, type TextFormatType
+  $getSelection, $isElementNode, $isRangeSelection, $isTextNode, $setSelection, FORMAT_ELEMENT_COMMAND, FORMAT_TEXT_COMMAND,
+  type LexicalNode, type RangeSelection, type TextFormatType
 } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $patchStyleText } from '@lexical/selection'
@@ -129,19 +129,32 @@ export default function WallTextBar({ boxSize, boxAlign, textColor }: {
 }): React.JSX.Element {
   const [editor] = useLexicalComposerContext()
   const [state, setState] = useState<BarState>(EMPTY)
+  const lastSelectionRef = useRef<RangeSelection | null>(null)
 
   useEffect(() => {
-    const read = (): void => setState(editor.getEditorState().read(() => $readBar(boxAlign)))
+    const read = (): void => {
+      editor.getEditorState().read(() => {
+        const selection = $getSelection()
+        if ($isRangeSelection(selection)) {
+          lastSelectionRef.current = selection.clone()
+        }
+        setState($readBar(boxAlign))
+      })
+    }
     read()
     return editor.registerUpdateListener(read)
   }, [editor, boxAlign])
 
   const refocus = (): void => editor.focus()
-  const patch = (style: Record<string, string | null>): void => {
+  const patch = (style: Record<string, string | null>, tag?: string): void => {
     editor.update(() => {
-      const selection = $getSelection()
+      let selection = $getSelection()
+      if (!$isRangeSelection(selection) && lastSelectionRef.current) {
+        $setSelection(lastSelectionRef.current)
+        selection = $getSelection()
+      }
       if ($isRangeSelection(selection)) $patchStyleText(selection, style)
-    })
+    }, tag ? { tag } : undefined)
   }
   const format = (kind: TextFormatType): void => {
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, kind)
@@ -171,7 +184,7 @@ export default function WallTextBar({ boxSize, boxAlign, textColor }: {
       <StyleToggle label="Underline (Ctrl+U)" active={state.formats.underline} onToggle={() => format('underline')}><u className="wall-tb-glyph">U</u></StyleToggle>
       <StyleToggle label="Strikethrough (Ctrl+Shift+X)" active={state.formats.strikethrough} onToggle={() => format('strikethrough')}><s className="wall-tb-glyph">S</s></StyleToggle>
       <StyleToggle label="Code (Ctrl+E)" active={state.formats.code} onToggle={() => format('code')}><span className="wall-tb-glyph wall-tb-glyph-code">&lt;/&gt;</span></StyleToggle>
-      <ColorA value={state.color} fallback={textColor} onPick={color => patch({ color })} onDone={refocus} />
+      <ColorA value={state.color} fallback={textColor} onPick={(color, final) => patch({ color }, final ? undefined : 'history-merge')} onDone={refocus} />
       <LinkButton
         current={state.link}
         disabled={state.collapsed && state.link === null}

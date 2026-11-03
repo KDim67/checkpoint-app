@@ -361,9 +361,11 @@ describe('WallSelectionBar', () => {
     expect(shapeColor).not.toHaveBeenCalled()
   })
 
-  it('offers cropping and a quarter turn on a single picture', () => {
+  it('offers cropping, reset proportions and a quarter turn on a single picture', () => {
     const picture = [item('a', { kind: 'image', ref: 'p.png' })]
     const { onCropImage, onTurn } = renderBar({ items: picture, selectedIds: new Set(['a']), single: picture[0] })
+
+    expect(screen.getByLabelText('Reset to original proportions')).toBeTruthy()
 
     fireEvent.click(button('Crop this picture'))
     expect(onCropImage).toHaveBeenCalledWith('a')
@@ -374,6 +376,7 @@ describe('WallSelectionBar', () => {
 
     renderBar({ items: picture, selectedIds: new Set(['a']), single: { ...picture[0], locked: true } })
     expect(screen.queryByLabelText('Crop this picture')).toBeNull()
+    expect(screen.queryByLabelText('Reset to original proportions')).toBeNull()
   })
 
   it('groups loose items, and ungroups a group', () => {

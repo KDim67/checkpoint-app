@@ -34,9 +34,12 @@ export default function WallBackgroundMenu({
             colors={WALL_COLORS}
             value={custom ?? undefined}
             onChange={setBackground}
+            onCommit={setBackground}
+            onDone={() => setBgOpen(false)}
             columns={4}
             defaultLabel="Follow the theme"
-            onDefault={() => { setBackground('default'); setBgOpen(false) }}
+            onDefault={() => setBackground('default')}
+            onDefaultPreview={() => setBackground('default')}
           />
         </div>
       )}

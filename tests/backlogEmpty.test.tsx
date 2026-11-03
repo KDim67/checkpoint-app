@@ -44,6 +44,7 @@ describe('an empty backlog', () => {
   })
 
   it('says nothing matched a search, and clears it to bring everything back', async () => {
+    cleanup()
     vi.useFakeTimers()
     try {
       await show()

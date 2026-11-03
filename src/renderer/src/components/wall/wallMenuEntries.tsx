@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket, Shapes, KanbanSquare, Group, Ungroup, Frame, Presentation, ImageDown, Code, Network, Tags, ListTree, Crop, RotateCw, RotateCcw, Minus, AlignStartVertical } from 'lucide-react'
-import { bringToFront, createWallItem, sendToBack, type WallDoc, type WallItem, type WallItemKind } from '../../../../shared/wallModel'
+import { StickyNote, Type, Square, Layers, Maximize2, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, ExternalLink, Wand2, Expand, Palette, Link2, Unlink, RefreshCw, ClipboardCopy, ClipboardPaste, Scissors, Paintbrush, PaintBucket, Shapes, KanbanSquare, Group, Ungroup, Frame, Presentation, ImageDown, Code, Network, Tags, ListTree, Crop, RotateCw, RotateCcw, Minus, AlignStartVertical, Ratio } from 'lucide-react'
+import { bringToFront, createWallItem, patchItems, sendToBack, type WallDoc, type WallItem, type WallItemKind } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { isWritable, switchKinds, type WritableKind } from '../../../../shared/wallShape'
 import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
@@ -87,7 +87,27 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
       ? [
           ...(item.locked
             ? []
-            : [{ label: 'Crop this picture', icon: <Crop size={13} />, onClick: () => startCrop(item.id) }]),
+            : [
+                {
+                  label: 'Reset to original proportions',
+                  icon: <Ratio size={13} />,
+                  onClick: () => {
+                    const img = new Image()
+                    img.onload = () => {
+                      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                        const ratio = img.naturalWidth / img.naturalHeight
+                        const newHeight = Math.max(32, Math.round(item.width / ratio))
+                        setItems(patchItems(doc.items, new Set([item.id]), {
+                          height: newHeight,
+                          crop: undefined
+                        }))
+                      }
+                    }
+                    img.src = `checkpoint-media://${item.ref}`
+                  }
+                },
+                { label: 'Crop this picture', icon: <Crop size={13} />, onClick: () => startCrop(item.id) }
+              ]),
           {
             label: 'Generate PBR maps',
             icon: <Wand2 size={13} />,

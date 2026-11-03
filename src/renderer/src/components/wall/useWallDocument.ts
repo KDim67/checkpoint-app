@@ -37,7 +37,7 @@ import { addTopic, layoutMap, mapRoot, mapsOf, withBranches, type TopicPlace } f
 import { listTags, resolveTagIds } from '../../data/tags'
 import { cropInPlace, isFullCrop } from '../../../../shared/wallCrop'
 import { fitImageBox, rowCentres } from '../../../../shared/wallImage'
-import { readImageSize } from '../../lib/imageSize'
+import { readImageSize, readImageUrlSize } from '../../lib/imageSize'
 import { wallIdOf } from '../../../../shared/wallSearch'
 
 export interface Menu { x: number; y: number; itemId: string | null; at: { x: number; y: number } }
@@ -1189,7 +1189,11 @@ export function useWallDocument() {
         const ext = (file.type.split('/')[1] || 'png').replace('+xml', '')
         const filename = await mediaApi.saveFromBuffer(buffer, ext)
         // its own shape, or the old box when it can't be read
-        const size = fitImageBox(await readImageSize(file)) ?? DEFAULT_SIZES.image
+        let natural = await readImageSize(file)
+        if (!natural) {
+          natural = await readImageUrlSize(`checkpoint-media://${filename}`)
+        }
+        const size = fitImageBox(natural) ?? DEFAULT_SIZES.image
         saved.push({ filename, name: file.name, size })
         window.dispatchEvent(
           new CustomEvent('collab-broadcast-asset', {

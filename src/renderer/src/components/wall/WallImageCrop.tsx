@@ -73,7 +73,8 @@ export default function WallImageCrop({ item, zoom, onApply, onCancel }: Props):
   const rotation = item.rotation ?? 0
   const portrait = picture.height > picture.width
   const shapes = shapesFor(portrait)
-  const lockedRatio = shape === 'free' ? null : (shapes.find(s => s.shape === shape)?.ratio(picture.width / picture.height) ?? null)
+  const originalRatio = (natural && natural.width > 0 && natural.height > 0) ? (natural.width / natural.height) : (picture.width / picture.height)
+  const lockedRatio = shape === 'free' ? null : (shapes.find(s => s.shape === shape)?.ratio(originalRatio) ?? null)
 
   /** done once, whichever way it ends; read through a ref so listeners see the latest window */
   const settledRef = useRef(false)
@@ -277,7 +278,7 @@ export default function WallImageCrop({ item, zoom, onApply, onCancel }: Props):
               aria-pressed={shape === s.shape}
               title={s.shape === 'free' ? 'Any shape' : s.shape === 'original' ? "The picture's own shape" : `Keep it ${s.label}`}
               {...holdFocus}
-              onClick={() => pickShape(s.shape, s.ratio(picture.width / picture.height))}
+              onClick={() => pickShape(s.shape, s.ratio(originalRatio))}
             >
               {s.label}
             </button>

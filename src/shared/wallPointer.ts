@@ -38,7 +38,7 @@ export type WallDrag =
   | { mode: 'arrowEnd'; id: string; end: 'start' | 'end' }
   | { mode: 'rotate'; id: string; cx: number; cy: number; start: number }
   | { mode: 'marquee'; startX: number; startY: number; base: Set<string> }
-  | { mode: 'draw' }
+  | { mode: 'draw'; startPoint?: Point }
   /** strokes go as they're touched; before and removed make the sweep one undo step and one bin entry */
   | {
       mode: 'erase'

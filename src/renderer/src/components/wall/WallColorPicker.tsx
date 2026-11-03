@@ -20,6 +20,7 @@ interface Props {
   /** follow-the-theme option */
   defaultLabel?: string
   onDefault?: () => void
+  onDefaultPreview?: () => void
   /** any colour via our picker */
   allowCustom?: boolean
 }
@@ -29,14 +30,85 @@ const TARGET = 26
 const DOT = 18
 
 export default function WallColorPicker({
-  colors, value, onChange, onCommit, onDone, columns = 4, defaultLabel, onDefault, allowCustom = true
+  colors, value, onChange, onCommit, onDone, columns = 4, defaultLabel, onDefault, onDefaultPreview, allowCustom = true
 }: Props): React.JSX.Element {
-  const isCustom = !!value && !colors.includes(value)
+  const [committedValue, setCommittedValue] = useState<string | undefined>(value)
+  const [hoveredColor, setHoveredColor] = useState<string | null>(null)
+  const isCustom = !!committedValue && !colors.includes(committedValue)
   /** portal on body: the palette's centring transform trapped fixed panels in a clipping scroller */
   const [customAt, setCustomAt] = useState<{ left: number; top: number } | null>(null)
   const customRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const customOpen = customAt !== null
+
+  const initialValueRef = useRef(value)
+  const committedRef = useRef(false)
+  const isDraggingRef = useRef(false)
+  const isHoveringRef = useRef(false)
+
+  useEffect(() => {
+    if (!isHoveringRef.current && !isDraggingRef.current) {
+      initialValueRef.current = value
+      setCommittedValue(value)
+      committedRef.current = false
+    }
+  }, [value])
+
+  const handleHover = (color: string): void => {
+    isHoveringRef.current = true
+    setHoveredColor(color)
+    onChange(color)
+  }
+
+  const handleDefaultHover = (): void => {
+    isHoveringRef.current = true
+    setHoveredColor('__default__')
+    if (onDefaultPreview) {
+      onDefaultPreview()
+    } else if (onDefault) {
+      onDefault()
+    }
+  }
+
+  const handleLeave = (): void => {
+    if (customOpen) return
+    if (!isHoveringRef.current) return
+    isHoveringRef.current = false
+    setHoveredColor(null)
+    if (!committedRef.current && !isDraggingRef.current) {
+      if (initialValueRef.current !== undefined) {
+        onChange(initialValueRef.current)
+      } else if (onDefaultPreview) {
+        onDefaultPreview()
+      } else if (onDefault) {
+        onDefault()
+      }
+    }
+  }
+
+  const handlePick = (color: string): void => {
+    isHoveringRef.current = false
+    committedRef.current = true
+    setCommittedValue(color)
+    initialValueRef.current = color
+    setHoveredColor(null)
+    onChange(color)
+    onCommit?.(color)
+    onDone?.()
+  }
+
+  const handleDefaultClick = (): void => {
+    isHoveringRef.current = false
+    committedRef.current = true
+    setCommittedValue(undefined)
+    initialValueRef.current = undefined
+    setHoveredColor(null)
+    onDefault?.()
+    onDone?.()
+  }
+
+  const callbacksRef = useRef({ onChange, onDefault, onDefaultPreview })
+  callbacksRef.current = { onChange, onDefault, onDefaultPreview }
 
   useEffect(() => {
     if (!customOpen) return
@@ -46,7 +118,16 @@ export default function WallColorPicker({
       if (customRef.current?.contains(target) || panelRef.current?.contains(target)) return
       setCustomAt(null)
     }
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setCustomAt(null) }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        setCustomAt(null)
+        if (!committedRef.current) {
+          if (initialValueRef.current !== undefined) callbacksRef.current.onChange(initialValueRef.current)
+          else if (callbacksRef.current.onDefaultPreview) callbacksRef.current.onDefaultPreview()
+          else if (callbacksRef.current.onDefault) callbacksRef.current.onDefault()
+        }
+      }
+    }
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -55,10 +136,14 @@ export default function WallColorPicker({
     }
   }, [customOpen])
 
-  const swatch = (color: string, selected: boolean, label: string, onClick: () => void): React.JSX.Element => (
+  const swatch = (color: string, selected: boolean, hovered: boolean, label: string): React.JSX.Element => (
     <button
       key={label}
-      onClick={onClick}
+      type="button"
+      data-swatch-color={color}
+      onPointerEnter={() => handleHover(color)}
+      onMouseDown={e => e.preventDefault()}
+      onClick={() => handlePick(color)}
       title={label}
       aria-label={label}
       aria-pressed={selected}
@@ -78,7 +163,9 @@ export default function WallColorPicker({
         // gapped ring, a border eats the colour
         boxShadow: selected
           ? '0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--color-secondary)'
-          : 'inset 0 0 0 1px rgba(0,0,0,0.28)',
+          : hovered
+            ? '0 0 0 2px var(--color-surface-elevated), 0 0 0 3px var(--color-text-muted)'
+            : 'inset 0 0 0 1px rgba(0,0,0,0.28)',
         transition: 'box-shadow var(--duration-fast) var(--ease-default)'
       }}>
         {selected && <Check size={11} strokeWidth={3} />}
@@ -87,38 +174,81 @@ export default function WallColorPicker({
   )
 
   return (
-    <div className="col-6px">
+    <div className="col-6px" onPointerLeave={handleLeave}>
       {defaultLabel && onDefault && (
         <button
-          onClick={onDefault}
-          aria-pressed={!value}
+          type="button"
+          onPointerEnter={handleDefaultHover}
+          onMouseEnter={handleDefaultHover}
+          onMouseDown={e => e.preventDefault()}
+          onClick={handleDefaultClick}
+          aria-pressed={!committedValue}
           style={{
             display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
             whiteSpace: 'nowrap',
             padding: 'var(--space-1) var(--space-2)', cursor: 'pointer',
-            background: !value ? 'var(--color-secondary-muted)' : 'none',
+            background: !committedValue
+              ? 'var(--color-secondary-muted)'
+              : (hoveredColor === '__default__' ? 'var(--color-surface-offset)' : 'none'),
             border: 'none', borderRadius: 'var(--radius-sm)',
-            color: !value ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+            color: !committedValue ? 'var(--color-secondary)' : 'var(--color-text-muted)',
             fontSize: 'var(--text-xs)',
             transition: 'background var(--duration-fast) var(--ease-default)'
           }}
         >
-          <Check size={12} style={{ opacity: value ? 0 : 1, flexShrink: 0 }} />
+          <Check size={12} style={{ opacity: !committedValue ? 1 : 0, flexShrink: 0 }} />
           <span>{defaultLabel}</span>
         </button>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, ${TARGET}px)`, gap: '4px', justifyContent: 'center' }}>
+      <div
+        onPointerDown={e => {
+          const target = (e.target as HTMLElement).closest<HTMLElement>('[data-swatch-color]')
+          if (target) {
+            isDraggingRef.current = true
+            const col = target.getAttribute('data-swatch-color')
+            if (col) handleHover(col)
+          }
+        }}
+        onPointerMove={e => {
+          if (!isDraggingRef.current) return
+          const el = document.elementFromPoint(e.clientX, e.clientY)
+          const swatchEl = el?.closest<HTMLElement>('[data-swatch-color]')
+          const col = swatchEl?.getAttribute('data-swatch-color')
+          if (col) handleHover(col)
+        }}
+        onPointerUp={e => {
+          if (isDraggingRef.current) {
+            isDraggingRef.current = false
+            const el = document.elementFromPoint(e.clientX, e.clientY)
+            const swatchEl = el?.closest<HTMLElement>('[data-swatch-color]')
+            const col = swatchEl?.getAttribute('data-swatch-color')
+            if (col) {
+              handlePick(col)
+            }
+          }
+        }}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columns}, ${TARGET}px)`,
+          gap: '4px',
+          justifyContent: 'center',
+          touchAction: 'none'
+        }}
+      >
         {/* a swatch is the whole gesture: paint it, record it, and let the caller close */}
-        {colors.map(color => swatch(color, value === color, color, () => {
-          onChange(color)
-          onCommit?.(color)
-          onDone?.()
-        }))}
+        {colors.map(color => swatch(
+          color,
+          committedValue === color,
+          hoveredColor === color && committedValue !== color,
+          color
+        ))}
 
         {allowCustom && (
           <div ref={customRef} className="relative">
             <button
+              type="button"
+              onMouseDown={e => e.preventDefault()}
               onClick={e => {
                 if (customOpen) { setCustomAt(null); return }
                 const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -131,6 +261,7 @@ export default function WallColorPicker({
               title="Any colour"
               aria-label="Custom colour"
               aria-expanded={customOpen}
+              aria-pressed={isCustom}
               className="hover-grow"
               style={{
                 width: `${TARGET}px`, height: `${TARGET}px`, padding: 0, cursor: 'pointer',
@@ -141,15 +272,19 @@ export default function WallColorPicker({
             >
               <span style={{
                 width: `${DOT}px`, height: `${DOT}px`, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: isCustom && committedValue ? getTextColorForBackground(committedValue) : undefined,
                 // the wheel says anything
                 background: isCustom
-                  ? value
+                  ? committedValue
                   : `conic-gradient(${[...colors, colors[0]].join(', ')})`,
                 boxShadow: isCustom
                   ? '0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--color-secondary)'
                   : 'inset 0 0 0 1px rgba(0,0,0,0.28)',
                 transition: 'box-shadow var(--duration-fast) var(--ease-default)'
-              }} />
+              }}>
+                {isCustom && <Check size={11} strokeWidth={3} />}
+              </span>
             </button>
 
             {customAt && createPortal(
@@ -170,9 +305,16 @@ export default function WallColorPicker({
                 }}
               >
                 <ColorField
-                  value={isCustom && value ? value : colors[0]}
+                  value={isCustom && committedValue ? committedValue : (value || colors[0])}
                   onChange={onChange}
-                  onCommit={onCommit ?? onChange}
+                  onCommit={c => {
+                    committedRef.current = true
+                    setCommittedValue(c)
+                    initialValueRef.current = c
+                    setHoveredColor(null)
+                    if (onCommit) onCommit(c)
+                    else onChange(c)
+                  }}
                 />
               </div>,
               document.body

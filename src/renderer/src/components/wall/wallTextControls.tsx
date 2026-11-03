@@ -19,7 +19,11 @@ function usePopover(): { open: boolean; setOpen: (open: boolean) => void; ref: R
   useEffect(() => {
     if (!open) return
     const close = (e: PointerEvent): void => {
-      if (ref.current && e.target instanceof Node && !ref.current.contains(e.target)) setOpen(false)
+      const target = e.target
+      if (!(target instanceof Node)) return
+      if (ref.current?.contains(target)) return
+      if (target instanceof Element && (target.closest('[data-wall-ui]') || target.closest('[data-wall-popover]'))) return
+      setOpen(false)
     }
     document.addEventListener('pointerdown', close, true)
     return () => document.removeEventListener('pointerdown', close, true)
@@ -198,11 +202,8 @@ export function ColorA({ value, fallback, label = 'Text colour', defaultLabel = 
             value={value ?? undefined}
             onChange={c => onPick(c, false)}
             onCommit={c => onPick(c, true)}
-            onDefault={() => {
-              onPick(null, true)
-              setOpen(false)
-              onDone?.()
-            }}
+            onDefault={() => onPick(null, true)}
+            onDefaultPreview={() => onPick(null, false)}
             defaultLabel={defaultLabel}
             onDone={() => {
               setOpen(false)

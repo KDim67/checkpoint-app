@@ -73,4 +73,77 @@ describe('picking a colour on the wall', () => {
       document.removeEventListener('pointerdown', closed)
     }
   })
+
+  it('previews colour on swatch hover without committing, and restores initial on mouse leave', () => {
+    const { onChange, onCommit, onDone } = open({ value: '#f28b82' })
+    const yellow = screen.getByLabelText('#fbbc04')
+    const container = yellow.closest('.col-6px') as HTMLElement
+
+    fireEvent.pointerEnter(yellow)
+    expect(onChange).toHaveBeenCalledWith('#fbbc04')
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onDone).not.toHaveBeenCalled()
+
+    fireEvent.pointerLeave(container)
+    expect(onChange).toHaveBeenLastCalledWith('#f28b82')
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('does not close or commit on default option hover, and only closes on click', () => {
+    const onDefault = vi.fn()
+    const { onDone } = open({ defaultLabel: 'Follow the theme', onDefault })
+    const defBtn = screen.getByText('Follow the theme')
+
+    fireEvent.mouseEnter(defBtn)
+    expect(onDefault).toHaveBeenCalled()
+    expect(onDone).not.toHaveBeenCalled()
+
+    fireEvent.click(defBtn)
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
+  it('maintains the checkmark on the committed swatch while hovering another swatch', () => {
+    open({ value: '#f28b82' })
+    const red = screen.getByLabelText('#f28b82')
+    const yellow = screen.getByLabelText('#fbbc04')
+
+    expect(red.getAttribute('aria-pressed')).toBe('true')
+    expect(red.querySelector('svg')).not.toBeNull()
+    expect(yellow.getAttribute('aria-pressed')).toBe('false')
+    expect(yellow.querySelector('svg')).toBeNull()
+
+    // Hover over yellow swatch
+    fireEvent.pointerEnter(yellow)
+
+    // Red swatch must retain its checkmark and committed selected state
+    expect(red.getAttribute('aria-pressed')).toBe('true')
+    expect(red.querySelector('svg')).not.toBeNull()
+    expect(yellow.getAttribute('aria-pressed')).toBe('false')
+    expect(yellow.querySelector('svg')).toBeNull()
+
+    // Clicking yellow swatch commits it
+    fireEvent.click(yellow)
+    expect(yellow.getAttribute('aria-pressed')).toBe('true')
+    expect(yellow.querySelector('svg')).not.toBeNull()
+    expect(red.getAttribute('aria-pressed')).toBe('false')
+    expect(red.querySelector('svg')).toBeNull()
+  })
+
+  it('keeps checkmark on committed color when hovering default option', () => {
+    const onDefault = vi.fn()
+    open({ value: '#f28b82', defaultLabel: 'Follow the theme', onDefault })
+    const red = screen.getByLabelText('#f28b82')
+    const defBtn = screen.getByText('Follow the theme').closest('button') as HTMLElement
+
+    expect(red.getAttribute('aria-pressed')).toBe('true')
+    expect(defBtn.getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.pointerEnter(defBtn)
+    expect(onDefault).toHaveBeenCalled()
+    // Red retains checkmark
+    expect(red.getAttribute('aria-pressed')).toBe('true')
+    expect(red.querySelector('svg')).not.toBeNull()
+    expect(defBtn.getAttribute('aria-pressed')).toBe('false')
+  })
 })

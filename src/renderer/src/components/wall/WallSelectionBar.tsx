@@ -3,7 +3,7 @@ import {
   Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Link2, Group, Ungroup, SlidersHorizontal,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
-  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw
+  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw, Ratio
 } from 'lucide-react'
 import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
@@ -122,6 +122,22 @@ export default function WallSelectionBar({
   const first = chosen[0]
   // the drag was record: false, letting go makes it one undo step
   const commitSlider = (): void => setItems(items)
+
+  const resetImageProportions = (item: WallItem): void => {
+    if (item.kind !== 'image' || !item.ref) return
+    const img = new Image()
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        const ratio = img.naturalWidth / img.naturalHeight
+        const newHeight = Math.max(32, Math.round(item.width / ratio))
+        setItems(patchItems(items, new Set([item.id]), {
+          height: newHeight,
+          crop: undefined
+        }))
+      }
+    }
+    img.src = `checkpoint-media://${item.ref}`
+  }
 
   return (
     <div ref={floatingRef} data-wall-ui style={{
@@ -333,6 +349,7 @@ export default function WallSelectionBar({
                   onCommit={c => setItems(patchItems(items, selectedIds, { borderColor: c }))}
                   defaultLabel="Default"
                   onDefault={() => setItems(patchItems(items, selectedIds, { borderColor: undefined }))}
+                  onDefaultPreview={() => setItems(patchItems(items, selectedIds, { borderColor: undefined }), { record: false })}
                   columns={4}
                 />
               </div>
@@ -371,7 +388,10 @@ export default function WallSelectionBar({
       )}
       {/* a picture: keep part of it, and put an upright photo the right way up */}
       {single && single.kind === 'image' && !single.locked && (
-        toolButton('Crop this picture', <Crop size={13} />, () => onCropImage(single.id))
+        <>
+          {toolButton('Reset to original proportions', <Ratio size={13} />, () => resetImageProportions(single))}
+          {toolButton('Crop this picture', <Crop size={13} />, () => onCropImage(single.id))}
+        </>
       )}
       {single && single.kind !== 'arrow' && !single.locked && (
         toolButton('Rotate a quarter turn', <RotateCw size={13} />, () => onTurn(90))

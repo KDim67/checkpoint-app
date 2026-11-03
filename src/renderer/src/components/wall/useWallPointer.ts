@@ -1,4 +1,4 @@
-import React, { useCallback, useLayoutEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Point, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
 import { CORNERS, arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, rotationAngle, rotationStart, snapMoving, turnedResize, type WallDrag } from '../../../../shared/wallPointer'
 import { pushHistory, replacePresent } from '../../../../shared/history'
@@ -43,6 +43,27 @@ export function useWallPointer(wallDocument: WallDocument) {
     addItem, linkPickFor, setLinkPickFor, followLink, setItemLink, pointerRef, growFrom, eraserMode, stepWith
   } = wallDocument
   const lastLiveMoveDispatchRef = useRef(0)
+  const drawingRef = useRef<{ x: number; y: number }[] | null>(null)
+  const lastDrawPointRef = useRef<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    drawingRef.current = drawing
+  }, [drawing])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift' && dragRef.current?.mode === 'draw' && (tool === 'pen' || tool === 'highlighter')) {
+        const start = dragRef.current.startPoint
+        const at = lastDrawPointRef.current
+        if (start && at) {
+          drawingRef.current = [start, at]
+          setDrawing([start, at])
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [tool, dragRef, setDrawing])
   const screenPoint = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
     const rect = viewportRef.current?.getBoundingClientRect()
     return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : { x: 0, y: 0 }
@@ -334,8 +355,11 @@ export function useWallPointer(wallDocument: WallDocument) {
 
     // the pen family owns the gesture over items too; the move branch used to win
     if ((tool === 'pen' || tool === 'highlighter' || tool === 'lasso') && e.button === 0) {
-      dragRef.current = { mode: 'draw' }
-      setDrawing([toWallPoint(screenPoint(e), docRef.current.camera)])
+      const startPoint = toWallPoint(screenPoint(e), docRef.current.camera)
+      dragRef.current = { mode: 'draw', startPoint }
+      lastDrawPointRef.current = startPoint
+      drawingRef.current = [startPoint]
+      setDrawing([startPoint])
       return
     }
 
@@ -497,11 +521,20 @@ export function useWallPointer(wallDocument: WallDocument) {
 
     if (drag.mode === 'draw') {
       const at = toWallPoint(screenPoint(e), cam)
+      lastDrawPointRef.current = at
+      if (e.shiftKey && (tool === 'pen' || tool === 'highlighter')) {
+        const start = drag.startPoint ?? at
+        drawingRef.current = [start, at]
+        setDrawing([start, at])
+        return
+      }
       // drop near-duplicate points, every point is persisted
       setDrawing(path => {
         if (!path) return path
         const last = path[path.length - 1]
-        return isStrokeJitter(last, at, cam.zoom) ? path : [...path, at]
+        const next = isStrokeJitter(last, at, cam.zoom) ? path : [...path, at]
+        drawingRef.current = next
+        return next
       })
       return
     }
@@ -727,8 +760,18 @@ export function useWallPointer(wallDocument: WallDocument) {
     }
 
     if (drag?.mode === 'draw') {
-      const path = drawing
+      lastDrawPointRef.current = null
+      const at = toWallPoint(screenPoint(e), docRef.current.camera)
+      let path = drawingRef.current ?? drawing
+      drawingRef.current = null
       setDrawing(null)
+
+      if (e.shiftKey && (tool === 'pen' || tool === 'highlighter')) {
+        const start = drag.startPoint ?? (path && path[0]) ?? at
+        if (Math.hypot(at.x - start.x, at.y - start.y) >= CLICK_SLOP) {
+          path = [start, at]
+        }
+      }
 
       if (tool === 'lasso') {
         const items = docRef.current.items
@@ -740,11 +783,12 @@ export function useWallPointer(wallDocument: WallDocument) {
       }
 
       const highlight = tool === 'highlighter'
+      const isStraight = Boolean(path && path.length === 2 && drag.startPoint)
       const ink = path && inkFromPath(path, docRef.current.items, {
         color: penColor,
         strokeWidth: highlight ? penWidth * HIGHLIGHT_SCALE : penWidth,
         ...(highlight ? { highlight: true } : {}),
-        ...(smoothing ? { smooth: SMOOTHING_STRENGTH } : {})
+        ...(smoothing && !isStraight ? { smooth: SMOOTHING_STRENGTH } : {})
       })
       if (ink) {
         setItems([...docRef.current.items, ink])
