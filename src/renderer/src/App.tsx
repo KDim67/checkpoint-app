@@ -280,7 +280,13 @@ function Titlebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion'] }}>
           <button
             type="button"
-            onClick={() => withViewTransition(navigateBack)}
+            onClick={() => {
+              if (!canNavigateBack) return
+              const store = useAppStore.getState()
+              const nextTarget = store.historyBack[store.historyBack.length - 1] ?? store.backTrail[store.backTrail.length - 1]
+              if (!nextTarget || nextTarget === store.activeView) return
+              withViewTransition(navigateBack)
+            }}
             disabled={!canNavigateBack}
             aria-label="Back (Alt+Left)"
             title="Back (Alt+Left)"
@@ -303,7 +309,13 @@ function Titlebar() {
           </button>
           <button
             type="button"
-            onClick={() => withViewTransition(navigateForward)}
+            onClick={() => {
+              if (!canNavigateForward) return
+              const store = useAppStore.getState()
+              const nextTarget = store.historyForward[store.historyForward.length - 1]
+              if (!nextTarget || nextTarget === store.activeView) return
+              withViewTransition(navigateForward)
+            }}
             disabled={!canNavigateForward}
             aria-label="Forward (Alt+Right)"
             title="Forward (Alt+Right)"
@@ -910,14 +922,22 @@ export default function App() {
       if ((e.altKey && e.key === 'ArrowLeft') || e.key === 'BrowserBack') {
         if (!isTypingTarget(e.target)) {
           e.preventDefault()
-          withViewTransition(() => useAppStore.getState().navigateBack())
+          const store = useAppStore.getState()
+          if (!store.canNavigateBack && store.backTrail.length === 0) return
+          const nextTarget = store.historyBack[store.historyBack.length - 1] ?? store.backTrail[store.backTrail.length - 1]
+          if (!nextTarget || nextTarget === store.activeView) return
+          withViewTransition(() => store.navigateBack())
           return
         }
       }
       if ((e.altKey && e.key === 'ArrowRight') || e.key === 'BrowserForward') {
         if (!isTypingTarget(e.target)) {
           e.preventDefault()
-          withViewTransition(() => useAppStore.getState().navigateForward())
+          const store = useAppStore.getState()
+          if (!store.canNavigateForward) return
+          const nextTarget = store.historyForward[store.historyForward.length - 1]
+          if (!nextTarget || nextTarget === store.activeView) return
+          withViewTransition(() => store.navigateForward())
           return
         }
       }
@@ -950,10 +970,18 @@ export default function App() {
     const handleMouseNav = (e: MouseEvent) => {
       if (e.button === 3) {
         e.preventDefault()
-        withViewTransition(() => useAppStore.getState().navigateBack())
+        const store = useAppStore.getState()
+        if (!store.canNavigateBack && store.backTrail.length === 0) return
+        const nextTarget = store.historyBack[store.historyBack.length - 1] ?? store.backTrail[store.backTrail.length - 1]
+        if (!nextTarget || nextTarget === store.activeView) return
+        withViewTransition(() => store.navigateBack())
       } else if (e.button === 4) {
         e.preventDefault()
-        withViewTransition(() => useAppStore.getState().navigateForward())
+        const store = useAppStore.getState()
+        if (!store.canNavigateForward) return
+        const nextTarget = store.historyForward[store.historyForward.length - 1]
+        if (!nextTarget || nextTarget === store.activeView) return
+        withViewTransition(() => store.navigateForward())
       }
     }
 

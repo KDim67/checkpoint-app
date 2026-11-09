@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { useAppStore } from '../src/renderer/src/store/appStore'
+import { useAppStore, type ActiveView } from '../src/renderer/src/store/appStore'
 import { ToastProvider, useToast } from '../src/renderer/src/components/ui/Toast'
 
 vi.mock('../src/renderer/src/lib/settings', () => ({
@@ -72,6 +72,43 @@ describe('useAppStore view history navigation', () => {
       setView(views[i % views.length])
     }
     expect(useAppStore.getState().historyBack.length).toBeLessThanOrEqual(50)
+  })
+
+  it('safely handles navigateBack and navigateForward at history boundaries without changing view', () => {
+    const { navigateBack, navigateForward } = useAppStore.getState()
+
+    // At initial state: no history
+    expect(useAppStore.getState().activeView).toBe('kanban')
+    expect(useAppStore.getState().canNavigateBack).toBe(false)
+    expect(useAppStore.getState().canNavigateForward).toBe(false)
+
+    navigateBack()
+    expect(useAppStore.getState().activeView).toBe('kanban')
+    expect(useAppStore.getState().canNavigateBack).toBe(false)
+
+    navigateForward()
+    expect(useAppStore.getState().activeView).toBe('kanban')
+    expect(useAppStore.getState().canNavigateForward).toBe(false)
+
+    // With historyBack containing only identical entries
+    useAppStore.setState({
+      activeView: 'kanban',
+      historyBack: ['kanban', 'kanban'] as ActiveView[],
+      canNavigateBack: true
+    })
+    navigateBack()
+    expect(useAppStore.getState().activeView).toBe('kanban')
+    expect(useAppStore.getState().canNavigateBack).toBe(false)
+
+    // With historyForward containing only identical entries
+    useAppStore.setState({
+      activeView: 'kanban',
+      historyForward: ['kanban', 'kanban'] as ActiveView[],
+      canNavigateForward: true
+    })
+    navigateForward()
+    expect(useAppStore.getState().activeView).toBe('kanban')
+    expect(useAppStore.getState().canNavigateForward).toBe(false)
   })
 })
 

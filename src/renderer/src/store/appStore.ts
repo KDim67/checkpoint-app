@@ -219,15 +219,26 @@ export const useAppStore = create<AppState>()(
       set(state => {
         if (state.historyBack.length === 0) {
           if (state.backTrail.length > 0) {
-            targetView = state.backTrail.pop() ?? 'kanban'
-            state.activeView = targetView
+            const popped = state.backTrail.pop()
+            if (popped && popped !== state.activeView) {
+              targetView = popped
+              state.activeView = targetView
+            }
             state.canNavigateBack = false
           }
           return
         }
-        const prev = state.historyBack.pop()
-        if (!prev) return
-        targetView = prev
+        while (state.historyBack.length > 0) {
+          const prev = state.historyBack.pop()
+          if (prev && prev !== state.activeView) {
+            targetView = prev
+            break
+          }
+        }
+        if (!targetView) {
+          state.canNavigateBack = false
+          return
+        }
         state.historyForward.push(state.activeView)
         if (state.historyForward.length > 50) state.historyForward.shift()
         state.canNavigateBack = state.historyBack.length > 0
@@ -245,9 +256,17 @@ export const useAppStore = create<AppState>()(
       let targetView: ActiveView | null = null
       set(state => {
         if (state.historyForward.length === 0) return
-        const next = state.historyForward.pop()
-        if (!next) return
-        targetView = next
+        while (state.historyForward.length > 0) {
+          const next = state.historyForward.pop()
+          if (next && next !== state.activeView) {
+            targetView = next
+            break
+          }
+        }
+        if (!targetView) {
+          state.canNavigateForward = false
+          return
+        }
         state.historyBack.push(state.activeView)
         if (state.historyBack.length > 50) state.historyBack.shift()
         state.canNavigateBack = true
