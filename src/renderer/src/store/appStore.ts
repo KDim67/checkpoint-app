@@ -42,6 +42,10 @@ interface AppState {
   activeView: ActiveView
   /** the views behind Settings or the Workspaces page, newest last, for going back */
   backTrail: ActiveView[]
+  historyBack: ActiveView[]
+  historyForward: ActiveView[]
+  canNavigateBack: boolean
+  canNavigateForward: boolean
   activeWorkspace: string
   availableWorkspaces: string[]
   workspaceList: WorkspaceEntry[]
@@ -89,6 +93,8 @@ interface AppState {
   setView: (view: ActiveView) => void
   /** leaves Settings or the Workspaces page for where you were before it */
   goBack: () => void
+  navigateBack: () => void
+  navigateForward: () => void
   setWorkspace: (slug: string) => void
   setSettingsTab: (tab: SettingsTab) => void
   toggleRightPanel: (content?: AppState['rightPanelContent']) => void
@@ -127,6 +133,10 @@ export const useAppStore = create<AppState>()(
   immer(set => ({
     activeView: 'kanban',
     backTrail: [],
+    historyBack: [],
+    historyForward: [],
+    canNavigateBack: false,
+    canNavigateForward: false,
     activeWorkspace: 'default',
     availableWorkspaces: ['default'],
     workspaceList: [],
@@ -170,6 +180,11 @@ export const useAppStore = create<AppState>()(
           if (at >= 0) state.backTrail.splice(at)
           else state.backTrail.push(state.activeView)
         }
+        state.historyBack.push(state.activeView)
+        if (state.historyBack.length > 50) state.historyBack.shift()
+        state.historyForward = []
+        state.canNavigateBack = state.historyBack.length > 0
+        state.canNavigateForward = false
         state.activeView = view
       })
       // for "Start on: Last used"; never Settings or the Workspaces page, which are places you pass through
@@ -180,11 +195,71 @@ export const useAppStore = create<AppState>()(
       }
     },
 
-    goBack: () =>
+    goBack: () => {
+      let targetView: ActiveView = 'kanban'
       set(state => {
-        // opened with nothing behind it, as from a link at startup
-        state.activeView = state.backTrail.pop() ?? 'kanban'
-      }),
+        targetView = state.backTrail.pop() ?? 'kanban'
+        if (state.historyBack.length > 0 && state.historyBack[state.historyBack.length - 1] === targetView) {
+          state.historyBack.pop()
+        }
+        state.historyForward.push(state.activeView)
+        state.canNavigateBack = state.historyBack.length > 0
+        state.canNavigateForward = state.historyForward.length > 0
+        state.activeView = targetView
+      })
+      if (!PASS_THROUGH.includes(targetView)) {
+        setStringSetting('last_active_view', targetView).catch(err => {
+          console.error('Failed to save last_active_view setting:', err)
+        })
+      }
+    },
+
+    navigateBack: () => {
+      let targetView: ActiveView | null = null
+      set(state => {
+        if (state.historyBack.length === 0) {
+          if (state.backTrail.length > 0) {
+            targetView = state.backTrail.pop() ?? 'kanban'
+            state.activeView = targetView
+            state.canNavigateBack = false
+          }
+          return
+        }
+        const prev = state.historyBack.pop()
+        if (!prev) return
+        targetView = prev
+        state.historyForward.push(state.activeView)
+        if (state.historyForward.length > 50) state.historyForward.shift()
+        state.canNavigateBack = state.historyBack.length > 0
+        state.canNavigateForward = true
+        state.activeView = targetView
+      })
+      if (targetView && !PASS_THROUGH.includes(targetView)) {
+        setStringSetting('last_active_view', targetView).catch(err => {
+          console.error('Failed to save last_active_view setting:', err)
+        })
+      }
+    },
+
+    navigateForward: () => {
+      let targetView: ActiveView | null = null
+      set(state => {
+        if (state.historyForward.length === 0) return
+        const next = state.historyForward.pop()
+        if (!next) return
+        targetView = next
+        state.historyBack.push(state.activeView)
+        if (state.historyBack.length > 50) state.historyBack.shift()
+        state.canNavigateBack = true
+        state.canNavigateForward = state.historyForward.length > 0
+        state.activeView = targetView
+      })
+      if (targetView && !PASS_THROUGH.includes(targetView)) {
+        setStringSetting('last_active_view', targetView).catch(err => {
+          console.error('Failed to save last_active_view setting:', err)
+        })
+      }
+    },
 
     setWorkspace: (slug: string) => {
       set(state => {

@@ -81,7 +81,23 @@ export function useBoardActions(boardState: BoardState) {
         patch: { status: 'archived' }
       })
       loadCards()
-      toast(`Archived all cards in column`)
+      toast(`Archived ${colCards.length} card${colCards.length > 1 ? 's' : ''} in column`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await bulkUpdateItems({
+                ids: colCards.map(c => c.id),
+                patch: { status: columnId }
+              })
+              loadCards()
+              toast(`Restored ${colCards.length} card${colCards.length > 1 ? 's' : ''}`)
+            } catch (err) {
+              report('restore the cards', err)
+            }
+          }
+        }
+      })
     } catch (err) {
       report('archive the cards', err)
     }
@@ -109,7 +125,28 @@ export function useBoardActions(boardState: BoardState) {
         return
       }
       loadCards()
-      toast(`Column "${colToArchive.name}" archived`)
+      toast(`Column "${colToArchive.name}" archived`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              const currentCols = columnsRef.current
+              const currentArchived = archivedColumnsRef.current
+              const restoredArchived = currentArchived.filter(c => c.id !== colId)
+              const restoredCols = [...currentCols, colToArchive]
+              columnsRef.current = restoredCols
+              archivedColumnsRef.current = restoredArchived
+              setColumns(restoredCols)
+              setArchivedColumns(restoredArchived)
+              await persistConfig({ columns: restoredCols, archivedColumns: restoredArchived })
+              loadCards()
+              toast(`Column "${colToArchive.name}" restored`)
+            } catch (err) {
+              report('restore the column', err)
+            }
+          }
+        }
+      })
     } catch (err) {
       report('archive the column', err)
     }
@@ -170,9 +207,29 @@ export function useBoardActions(boardState: BoardState) {
   const handleCardConvertToTask = useCallback(async (id: string) => {
     try {
       const targetCard = cards.find(c => c.id === id)
+      const originalIndex = cards.findIndex(c => c.id === id)
       await updateItem(id, { type: 'task', status: 'open' })
       setCards(prev => prev.filter(c => c.id !== id))
-      toast(`Card "${targetCard?.title}" converted to Backlog Task`)
+      toast(`Card "${targetCard?.title}" converted to Backlog Task`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              if (targetCard) {
+                await updateItem(id, { type: 'card', status: targetCard.status })
+                setCards(prev => {
+                  const updated = [...prev]
+                  updated.splice(originalIndex >= 0 ? originalIndex : 0, 0, targetCard)
+                  return updated
+                })
+                toast('Card restored to Kanban')
+              }
+            } catch (err) {
+              report('restore the card', err)
+            }
+          }
+        }
+      })
     } catch (err) {
       report('move the card to the backlog', err)
     }

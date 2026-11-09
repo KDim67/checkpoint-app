@@ -3,6 +3,8 @@ import { EXIT_MS, TOAST_DISMISS_MS } from '../../lib/timings'
 import { prefersReducedMotion } from '../../lib/presence'
 import { errorMessage } from '../../../../shared/errors'
 import { ToastContext } from './toastContext'
+import { useAppStore } from '../../store/appStore'
+import { isTypingTarget } from '../../lib/shortcuts'
 
 export interface ToastAction {
   label: string
@@ -81,7 +83,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     options?: ToastOptions
   ) => {
     const id = options?.id || Math.random().toString(36).substring(2, 9)
-    const duration = options?.duration ?? 4000
+    const duration = options?.duration ?? (options?.action ? 6000 : 4000)
 
     if (timersRef.current[id]) {
       clearTimeout(timersRef.current[id])
@@ -115,6 +117,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       removeToast(id)
     }, duration)
   }, [removeToast])
+
+  useEffect(() => {
+    const handleUndoKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey && !e.altKey) {
+        if (isTypingTarget(e.target)) return
+        const activeView = useAppStore.getState().activeView
+        if (activeView === 'wall') return // Wall handles its own canvas undo
+
+        const activeToast = [...toasts].reverse().find(t => !t.leaving && t.action)
+        if (activeToast?.action) {
+          e.preventDefault()
+          activeToast.action.onClick()
+          removeToast(activeToast.id)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleUndoKey)
+    return () => window.removeEventListener('keydown', handleUndoKey)
+  }, [toasts, removeToast])
 
   return (
     <ToastContext.Provider value={{ toast }}>
@@ -177,20 +198,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               
               {t.action && (
                 <button
+                  type="button"
                   onClick={() => {
                     t.action?.onClick()
                     removeToast(t.id)
                   }}
                   className="hover-brighten"
                   style={{
-                    background: 'transparent',
-                    border: 'none',
+                    background: 'var(--color-surface-offset)',
+                    border: '1px solid var(--color-surface-offset)',
+                    borderRadius: 'var(--radius-sm)',
                     color: 'var(--color-secondary)',
                     cursor: 'pointer',
-                    fontSize: 'var(--text-sm)',
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 'var(--weight-bold)',
-                    padding: 0,
-                    whiteSpace: 'nowrap'
+                    padding: '3px 8px',
+                    whiteSpace: 'nowrap',
+                    transition: 'background var(--duration-fast), color var(--duration-fast)'
                   }}
                 >
                   {t.action.label}

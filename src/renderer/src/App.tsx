@@ -31,6 +31,7 @@ import {
   loadBindings,
   defaultBindings,
   globalShortcutFor,
+  isTypingTarget,
   type ShortcutBindings
 } from './lib/shortcuts'
 import { readWorkspaceList, writeWorkspaceList } from './lib/workspaceList'
@@ -46,6 +47,7 @@ import { useCollabFollow } from './lib/useCollabFollow'
 import CollabFollowBanner from './components/collab/CollabFollowBanner'
 import Presence from './components/ui/Presence'
 import { withViewTransition } from './lib/viewTransition'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePresence } from './lib/presence'
 import {
   AiStreamPanel, AnalyticsView, BacklogView, CalendarView, CheatsheetsView, ClipboardView, CookbookView, FocusView,
@@ -243,6 +245,10 @@ function ThemeToggle() {
 function Titlebar() {
   const setView = useAppStore(s => s.setView)
   const setSettingsTab = useAppStore(s => s.setSettingsTab)
+  const canNavigateBack = useAppStore(s => s.canNavigateBack)
+  const canNavigateForward = useAppStore(s => s.canNavigateForward)
+  const navigateBack = useAppStore(s => s.navigateBack)
+  const navigateForward = useAppStore(s => s.navigateForward)
   const platform = appApi.platform()
   const isWindows = platform === 'win32'
   const isMac = platform === 'darwin'
@@ -259,7 +265,7 @@ function Titlebar() {
         paddingRight: isWindows ? '144px' : undefined
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', userSelect: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', userSelect: 'none' }}>
         <span
           style={{
             fontSize: 'var(--text-xs)',
@@ -271,6 +277,54 @@ function Titlebar() {
         >
           Checkpoint
         </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion'] }}>
+          <button
+            type="button"
+            onClick={() => withViewTransition(navigateBack)}
+            disabled={!canNavigateBack}
+            aria-label="Back (Alt+Left)"
+            title="Back (Alt+Left)"
+            style={{
+              width: '22px',
+              height: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              cursor: canNavigateBack ? 'pointer' : 'default',
+              opacity: canNavigateBack ? 0.8 : 0.25,
+              color: 'var(--color-text-muted)',
+              transition: 'opacity var(--duration-fast), background var(--duration-fast), color var(--duration-fast)'
+            }}
+          >
+            <ChevronLeft size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => withViewTransition(navigateForward)}
+            disabled={!canNavigateForward}
+            aria-label="Forward (Alt+Right)"
+            title="Forward (Alt+Right)"
+            style={{
+              width: '22px',
+              height: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              cursor: canNavigateForward ? 'pointer' : 'default',
+              opacity: canNavigateForward ? 0.8 : 0.25,
+              color: 'var(--color-text-muted)',
+              transition: 'opacity var(--duration-fast), background var(--duration-fast), color var(--duration-fast)'
+            }}
+          >
+            <ChevronRight size={13} />
+          </button>
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion'] }}>
         <UpdateIndicator
@@ -853,6 +907,21 @@ export default function App() {
 
     // matched against the user's bindings
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.altKey && e.key === 'ArrowLeft') || e.key === 'BrowserBack') {
+        if (!isTypingTarget(e.target)) {
+          e.preventDefault()
+          withViewTransition(() => useAppStore.getState().navigateBack())
+          return
+        }
+      }
+      if ((e.altKey && e.key === 'ArrowRight') || e.key === 'BrowserForward') {
+        if (!isTypingTarget(e.target)) {
+          e.preventDefault()
+          withViewTransition(() => useAppStore.getState().navigateForward())
+          return
+        }
+      }
+
       const shortcut = globalShortcutFor(e, shortcutBindingsRef.current)
       if (!shortcut) return
 
@@ -878,13 +947,25 @@ export default function App() {
       }
     }
 
+    const handleMouseNav = (e: MouseEvent) => {
+      if (e.button === 3) {
+        e.preventDefault()
+        withViewTransition(() => useAppStore.getState().navigateBack())
+      } else if (e.button === 4) {
+        e.preventDefault()
+        withViewTransition(() => useAppStore.getState().navigateForward())
+      }
+    }
+
     window.addEventListener('keydown', handleGlobalKeyDown)
+    window.addEventListener('mouseup', handleMouseNav)
 
     return () => {
       unsubTheme()
       unsubNavigate()
       unsubMcp()
       window.removeEventListener('keydown', handleGlobalKeyDown)
+      window.removeEventListener('mouseup', handleMouseNav)
     }
   }, [loadContexts, setView, toggleRightPanel])
 
