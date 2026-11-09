@@ -860,6 +860,7 @@ export default function App() {
       switch (shortcut.action.kind) {
         case 'view': {
           const view = shortcut.action.view
+          if (view === useAppStore.getState().activeView) return
           withViewTransition(() => setView(view))
           break
         }
@@ -867,6 +868,7 @@ export default function App() {
           if (aiEnabledRef.current) toggleRightPanel('ai-chat')
           break
         case 'openSettings':
+          if (useAppStore.getState().activeView === 'settings') return
           withViewTransition(() => setView('settings'))
           break
         case 'openPalette':

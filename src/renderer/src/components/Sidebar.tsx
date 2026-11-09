@@ -280,6 +280,7 @@ export function Sidebar() {
   const picture = activeContextEntry?.icon && activeContextEntry.icon !== brokenIcon ? activeContextEntry.icon : null
 
   function handleNavClick(view: ActiveView) {
+    if (view === activeView) return
     withViewTransition(() => setView(view))
   }
 

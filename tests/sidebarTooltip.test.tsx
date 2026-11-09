@@ -66,6 +66,17 @@ describe('the logo', () => {
     useAppStore.getState().setView('log')
     expect(settings.mock.calls.map(call => call[1])).toEqual(['log'])
   })
+
+  it('does nothing when clicking the active tab', async () => {
+    useAppStore.setState({ activeView: 'cheatsheets', backTrail: [] })
+    await act(async () => { render(<Sidebar />) })
+    const cheatsheets = screen.getByLabelText('Cheatsheets')
+    expect(cheatsheets.getAttribute('aria-current')).toBe('page')
+
+    fireEvent.click(cheatsheets)
+    expect(useAppStore.getState().activeView).toBe('cheatsheets')
+    expect(useAppStore.getState().backTrail).toEqual([])
+  })
 })
 
 describe('the sidebar labels', () => {
