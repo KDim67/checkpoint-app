@@ -23,7 +23,7 @@ export default function WallSwitcher({
     <div data-wall-popover="wall" className="relative">
       <button
         onClick={() => { setWallMenuOpen(v => !v); setRenaming(null) }}
-        title="Walls: switch between them, rename one, or start another"
+        title="Walls: switch between them (PageUp / PageDown, mouse buttons 4 & 5), rename one, or start another"
         aria-label={`Wall: ${activeWall?.name ?? 'loading'}. Switch, rename or add a wall`}
         aria-haspopup="menu"
         aria-expanded={wallMenuOpen}

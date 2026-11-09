@@ -800,6 +800,18 @@ export function setActiveWall(index: WallIndex, id: string): WallIndex {
   return index.walls.some(w => w.id === id) ? { ...index, activeId: id } : index
 }
 
+/** cycle forward or backward through the list of walls */
+export function cycleWall(index: WallIndex, direction: 'next' | 'prev'): WallIndex {
+  if (index.walls.length <= 1) return index
+  const currentIdx = index.walls.findIndex(w => w.id === index.activeId)
+  if (currentIdx === -1) return index
+  const count = index.walls.length
+  const nextIdx = direction === 'next'
+    ? (currentIdx + 1) % count
+    : (currentIdx - 1 + count) % count
+  return setActiveWall(index, index.walls[nextIdx].id)
+}
+
 /** centre inside, not full enclosure; locked and rotation ignored */
 export function itemsInFrame(items: WallItem[], frame: WallItem): string[] {
   if (frame.kind !== 'frame') return []

@@ -223,6 +223,10 @@ export function useWallPointer(wallDocument: WallDocument) {
   }
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 3 || e.button === 4) {
+      e.preventDefault()
+      return
+    }
     setMenu(null)
     const target = e.target as HTMLElement
 

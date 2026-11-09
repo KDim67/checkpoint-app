@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type ImageCrop, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cycleWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type ImageCrop, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
@@ -424,6 +424,19 @@ export function useWallDocument() {
     setIndex({ context: activeWorkspace, value: next })
     void saveWallIndex(activeWorkspace, next)
   }, [activeWorkspace, isReadOnly, toast])
+
+  const switchWall = useCallback((direction: 'next' | 'prev') => {
+    if (!wallIndex || wallIndex.walls.length <= 1) return
+    const next = cycleWall(wallIndex, direction)
+    if (next.activeId !== wallIndex.activeId) {
+      commitIndex(next)
+      const active = next.walls.find(w => w.id === next.activeId)
+      if (active) {
+        toast(`Wall: ${active.name}`)
+        setAnnouncement(`Switched to wall ${active.name}`)
+      }
+    }
+  }, [wallIndex, commitIndex, toast, setAnnouncement])
 
   const addWall = useCallback(() => {
     // from the loaded index, so a slow load can't start a competing list
@@ -1342,6 +1355,7 @@ export function useWallDocument() {
     activeWall,
     commitIndex,
     addWall,
+    switchWall,
     handOffToColumn,
     setBackground,
     toggleRail,

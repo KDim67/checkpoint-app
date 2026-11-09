@@ -39,7 +39,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
     copyStyle, pasteStyle, makeCards, pasteCells, searchKind, presenting, stepPresenting, frameSelection,
     startPresenting, setFramesOpen, setExportOpen, setBinOpen, openItem, showItem, gatherTags,
-    addMindMap, tidyMap, cropping, setCropping, turnSelection, setAlignOpen
+    addMindMap, tidyMap, cropping, setCropping, turnSelection, setAlignOpen, switchWall
   } = wallDocument
   const {
     fitToContent, zoomBy, zoomReset, zoomToSelection, exportWall
@@ -76,7 +76,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       const el = document.activeElement
       // bare letters arm tools, typing "a" mustn't switch to arrow
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
-      if (el instanceof HTMLElement && el.isContentEditable) return
+      if (el instanceof HTMLElement && (el.isContentEditable || el.closest('[contenteditable="true"], [contenteditable=""]'))) return
 
       // a slideshow listens to its own keys and nothing else
       if (presenting !== null) {
@@ -109,6 +109,8 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (command === 'wall_zoom_selection') { e.preventDefault(); zoomToSelection(); return }
       if (command === 'wall_duplicate') { e.preventDefault(); duplicateSelected(); return }
       if (command === 'wall_delete') { e.preventDefault(); removeSelected(); return }
+      if (command === 'wall_next_wall' || (!mod && !e.altKey && e.key === 'PageDown')) { e.preventDefault(); switchWall('next'); return }
+      if (command === 'wall_prev_wall' || (!mod && !e.altKey && e.key === 'PageUp')) { e.preventDefault(); switchWall('prev'); return }
       if (command === 'wall_link') {
         const chosen = docRef.current.items.filter(i => selectedRef.current.has(i.id))
         if (chosen.length === 1 && isLinkable(chosen[0].kind) && !chosen[0].locked) {
@@ -222,7 +224,37 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [applyHistory, copyStyle, docRef, duplicateSelected, fitToContent, historyRef, labelRef, matchKey, openItem, pasteStyle, presenting, removeSelected, selectedRef, setAlignOpen, setArrowDrag, setArrowFrom, setBgOpen, setBinOpen, setCropping, setEditingId, setExportOpen, setFramesOpen, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen, showItem, stepPresenting, zoomBy, zoomReset, zoomToSelection])
+  }, [applyHistory, copyStyle, docRef, duplicateSelected, fitToContent, historyRef, labelRef, matchKey, openItem, pasteStyle, presenting, removeSelected, selectedRef, setAlignOpen, setArrowDrag, setArrowFrom, setBgOpen, setBinOpen, setCropping, setEditingId, setExportOpen, setFramesOpen, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen, showItem, stepPresenting, zoomBy, zoomReset, zoomToSelection, switchWall])
+
+  useEffect(() => {
+    const onMouseUp = (e: MouseEvent): void => {
+      if (e.button !== 3 && e.button !== 4) return
+      e.preventDefault()
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if (target?.closest('input, textarea, [contenteditable="true"], [contenteditable=""]')) return
+      const el = document.activeElement
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+      if (el instanceof HTMLElement && (el.isContentEditable || el.closest('[contenteditable="true"], [contenteditable=""]'))) return
+      if (document.querySelector('[role="dialog"]')) return
+      if (presenting !== null) return
+      switchWall(e.button === 3 ? 'prev' : 'next')
+    }
+
+    const preventAux = (e: MouseEvent): void => {
+      if (e.button === 3 || e.button === 4) {
+        e.preventDefault()
+      }
+    }
+
+    window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('pointerdown', preventAux)
+    window.addEventListener('auxclick', preventAux)
+    return () => {
+      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('pointerdown', preventAux)
+      window.removeEventListener('auxclick', preventAux)
+    }
+  }, [switchWall, presenting])
 
   /** this app's private format beside plain words for any other; text selected on the page stays the page's to copy */
   useEffect(() => {

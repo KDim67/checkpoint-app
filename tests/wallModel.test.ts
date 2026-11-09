@@ -31,6 +31,7 @@ import {
   removeWall,
   renameWall,
   setActiveWall,
+  cycleWall,
   wallIndexKey,
   itemsInFrame,
   withFrameContents,
@@ -632,6 +633,21 @@ describe('several walls per workspace', () => {
     const base = normalizeWallIndex({ walls: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], activeId: 'a' })
     expect(setActiveWall(base, 'b').activeId).toBe('b')
     expect(setActiveWall(base, 'nope')).toBe(base)
+  })
+
+  it('cycles forward and backward through walls with wrap-around', () => {
+    const base = normalizeWallIndex({ walls: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }], activeId: 'a' })
+    expect(cycleWall(base, 'next').activeId).toBe('b')
+    expect(cycleWall(base, 'prev').activeId).toBe('c')
+    const atEnd = { ...base, activeId: 'c' }
+    expect(cycleWall(atEnd, 'next').activeId).toBe('a')
+    expect(cycleWall(atEnd, 'prev').activeId).toBe('b')
+  })
+
+  it('leaves a single wall or empty index alone when cycling', () => {
+    const single = normalizeWallIndex({ walls: [{ id: 'a', name: 'A' }], activeId: 'a' })
+    expect(cycleWall(single, 'next')).toBe(single)
+    expect(cycleWall(single, 'prev')).toBe(single)
   })
 })
 

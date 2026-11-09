@@ -4,7 +4,6 @@
 // For autocomplete in your editor, put this line above module.exports:
 //   /** @type {import('./checkpoint-plugin').Plugin} */
 //
-// The full reference is docs/plugins.md in the Checkpoint repository.
 
 /** what a plugin can ask for; you approve exactly this list when you turn it on */
 export type Permission = 'read' | 'write' | 'notify'

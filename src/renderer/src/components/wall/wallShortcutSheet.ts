@@ -39,7 +39,8 @@ export const wallShortcutSections = (
       ['Drag near another item', 'Guides show where it lines up, and it snaps there'],
       ['Ctrl while dragging', 'Move without lining up on other items'],
       ['Click a connect dot', 'Add the next item on that side, joined by an arrow'],
-      ['Ctrl+click', 'Follow an item\'s link, or an address in its text']
+      ['Ctrl+click', 'Follow an item\'s link, or an address in its text'],
+      ['Mouse 4 / 5', 'Previous / next wall']
     ]
   },
   {
@@ -49,7 +50,9 @@ export const wallShortcutSections = (
       [bindings.wall_zoom_out || 'Unbound', 'Zoom out'],
       [bindings.wall_zoom_reset || 'Unbound', 'Zoom to 100%'],
       [bindings.wall_zoom_fit || 'Unbound', 'Fit everything in view'],
-      [bindings.wall_zoom_selection || 'Unbound', 'Zoom to the selection']
+      [bindings.wall_zoom_selection || 'Unbound', 'Zoom to the selection'],
+      [bindings.wall_next_wall || 'PageDown', 'Next wall'],
+      [bindings.wall_prev_wall || 'PageUp', 'Previous wall']
     ]
   },
   {
