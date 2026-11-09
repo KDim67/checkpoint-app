@@ -409,11 +409,19 @@ export default function CheatsheetsView() {
     }
   }
 
-  const handleOpenExternal = () => {
+  const handleOpenExternal = async () => {
     if (!selectedPdf) return
     const url = `cheatsheet://show/${encodeURIComponent(selectedPdf.name)}`
     if (selectedPdf.path) {
-      void appApi.openPath(selectedPdf.path)
+      try {
+        const success = await appApi.openPath(selectedPdf.path)
+        if (!success) {
+          toast('Could not open file in native viewer', { type: 'error' })
+        }
+      } catch (err) {
+        console.error('Failed to open native viewer:', err)
+        toast('Could not open file in native viewer', { type: 'error' })
+      }
     } else {
       appApi.openExternal(url)
     }

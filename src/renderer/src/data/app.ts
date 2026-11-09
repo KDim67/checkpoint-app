@@ -52,8 +52,22 @@ export const setTitleBarColors = (...args: Parameters<Bridge['setTitleBarColors'
 export const showItemInFolder = (...args: Parameters<Bridge['showItemInFolder']>): ReturnType<Bridge['showItemInFolder']> =>
   window.electronAPI.app.showItemInFolder(...args)
 
-export const openPath = (...args: Parameters<Bridge['openPath']>): ReturnType<Bridge['openPath']> =>
-  window.electronAPI.app.openPath(...args)
+export const openPath = async (...args: Parameters<Bridge['openPath']>): Promise<boolean> => {
+  try {
+    if (typeof window.electronAPI?.app?.openPath === 'function') {
+      return await window.electronAPI.app.openPath(...args)
+    }
+    const [filePath] = args
+    if (filePath && typeof window.electronAPI?.app?.openExternal === 'function') {
+      const fileUrl = filePath.startsWith('file://') ? filePath : `file:///${filePath.replace(/\\/g, '/')}`
+      await window.electronAPI.app.openExternal(fileUrl)
+      return true
+    }
+  } catch (err) {
+    console.error('Failed to open path:', err)
+  }
+  return false
+}
 
 export const showUpdateLog = (...args: Parameters<Bridge['showUpdateLog']>): ReturnType<Bridge['showUpdateLog']> =>
   window.electronAPI.app.showUpdateLog(...args)

@@ -181,7 +181,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       style={{
         flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
         cursor: spaceHeld ? 'grab' : linkPickFor ? 'alias' : tool === 'arrow' ? 'copy' : tool === 'eraser' ? 'cell' : tool !== 'select' ? 'crosshair' : undefined,
-        background: canvasBackground,
+        backgroundColor: canvasBackground,
         backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
         backgroundSize: `${gridSpacing(camera.zoom)}px ${gridSpacing(camera.zoom)}px`,
         backgroundPosition: `${camera.x}px ${camera.y}px`
