@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react'
-import { Frame, GripVertical, Presentation } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Frame, GripVertical, Presentation } from 'lucide-react'
 import { frameLabel, moveFrame } from '../../../../shared/wallFrames'
 import type { WallItem } from '../../../../shared/wallModel'
 import { toolButton } from './wallButtons'
@@ -16,6 +16,7 @@ interface WallFramesMenuProps {
   /** an order was chosen, so there's a reading order to go back to */
   customOrder: boolean
   onResetOrder: () => void
+  onCycleFrame?: (delta: 1 | -1) => void
 }
 
 const row: CSSProperties = {
@@ -25,7 +26,7 @@ const row: CSSProperties = {
 }
 
 /** the wall's frames as its pages: jump to one, put them in order, or present them */
-export default function WallFramesMenu({ open, setOpen, frames, onShow, onPresent, onReorder, customOrder, onResetOrder }: WallFramesMenuProps) {
+export default function WallFramesMenu({ open, setOpen, frames, onShow, onPresent, onReorder, customOrder, onResetOrder, onCycleFrame }: WallFramesMenuProps) {
   const [dragging, setDragging] = useState<number | null>(null)
   const none = frames.length === 0
 
@@ -44,14 +45,38 @@ export default function WallFramesMenu({ open, setOpen, frames, onShow, onPresen
             borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)'
           }}
         >
-          <button
-            onClick={() => { setOpen(false); onPresent(0) }}
-            disabled={none}
-            className="bg-clear hover-bg-offset"
-            style={{ ...row, fontWeight: 600, opacity: none ? 0.5 : 1, cursor: none ? 'default' : 'pointer' }}
-          >
-            <Presentation size={12} /> Present
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-1)' }}>
+            <button
+              onClick={() => { setOpen(false); onPresent(0) }}
+              disabled={none}
+              className="bg-clear hover-bg-offset"
+              style={{ ...row, flex: 1, fontWeight: 600, opacity: none ? 0.5 : 1, cursor: none ? 'default' : 'pointer' }}
+            >
+              <Presentation size={12} /> Present
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', paddingRight: '2px' }}>
+              <button
+                onClick={() => onCycleFrame?.(-1)}
+                disabled={none}
+                title="Previous frame ([)"
+                aria-label="Previous frame"
+                className="btn-icon"
+                style={{ width: '24px', height: '24px', opacity: none ? 0.4 : 1 }}
+              >
+                <ChevronLeft size={13} />
+              </button>
+              <button
+                onClick={() => onCycleFrame?.(1)}
+                disabled={none}
+                title="Next frame (])"
+                aria-label="Next frame"
+                className="btn-icon"
+                style={{ width: '24px', height: '24px', opacity: none ? 0.4 : 1 }}
+              >
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
 
           <div className="rule" />
 

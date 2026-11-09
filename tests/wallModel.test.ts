@@ -30,6 +30,8 @@ import {
   normalizeWallIndex,
   removeWall,
   renameWall,
+  duplicateWall,
+  reorderWall,
   setActiveWall,
   cycleWall,
   wallIndexKey,
@@ -648,6 +650,26 @@ describe('several walls per workspace', () => {
     const single = normalizeWallIndex({ walls: [{ id: 'a', name: 'A' }], activeId: 'a' })
     expect(cycleWall(single, 'next')).toBe(single)
     expect(cycleWall(single, 'prev')).toBe(single)
+  })
+
+  it('duplicates a wall reference, naming it (Copy) and placing it right after source', () => {
+    const base = normalizeWallIndex({ walls: [{ id: 'a', name: 'Brainstorm' }, { id: 'b', name: 'Roadmap' }], activeId: 'a' })
+    const { index, wall } = duplicateWall(base, 'a')
+    expect(wall.name).toBe('Brainstorm (Copy)')
+    expect(index.walls).toHaveLength(3)
+    expect(index.walls[1].id).toBe(wall.id)
+    expect(index.walls[1].name).toBe('Brainstorm (Copy)')
+    expect(index.activeId).toBe(wall.id)
+  })
+
+  it('reorders a wall up and down within bounds', () => {
+    const base = normalizeWallIndex({ walls: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }], activeId: 'a' })
+    const movedUp = reorderWall(base, 'b', -1)
+    expect(movedUp.walls.map(w => w.id)).toEqual(['b', 'a', 'c'])
+    expect(reorderWall(base, 'a', -1)).toBe(base)
+    expect(reorderWall(base, 'c', 1)).toBe(base)
+    const movedDown = reorderWall(base, 'a', 1)
+    expect(movedDown.walls.map(w => w.id)).toEqual(['b', 'a', 'c'])
   })
 })
 

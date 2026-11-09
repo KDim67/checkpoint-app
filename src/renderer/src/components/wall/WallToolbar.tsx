@@ -32,11 +32,11 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
     doc, notes, picker, setPicker, snapping, setSnapping, tool, setTool, arrowFrom, setArrowFrom,
     query, setQuery, searchKind, setSearchKind, wallMenuOpen, setWallMenuOpen, renaming, setRenaming,
     setPendingDelete, railOpen, bgOpen, setBgOpen, shortcutsOpen, setShortcutsOpen, keys, panButtons,
-    menuButton, fileInputRef, historyRef, wallIndex, activeWall, commitIndex, addWall, setBackground,
+    menuButton, fileInputRef, historyRef, wallIndex, activeWall, commitIndex, addWall, duplicateWall, moveWall, setBackground,
     toggleRail, applyHistory, addItem, placeImageFiles, jumpTo, exportWall, fitToContent, zoomReset,
     camera, custom, pickerRows, labelOf, matches, undoable, redoable, linkPickFor, selectedIds,
     framesOpen, setFramesOpen, exportOpen, setExportOpen, binOpen, setBinOpen, frames, binEntries,
-    restoreDeleted, showFrame, startPresenting, setFrameOrder, collab, isReadOnly, addMindMap
+    restoreDeleted, showFrame, cycleFrame, startPresenting, setFrameOrder, collab, isReadOnly, addMindMap
   } = wallView
   const atFullSize = Math.round(camera.zoom * 100) === 100
   const [shapePickerOpen, setShapePickerOpen] = useState(false)
@@ -61,6 +61,8 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
         setRenaming={setRenaming}
         commitIndex={commitIndex}
         addWall={addWall}
+        duplicateWall={duplicateWall}
+        moveWall={moveWall}
         setPendingDelete={setPendingDelete}
       />
 
@@ -112,6 +114,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
         onReorder={setFrameOrder}
         customOrder={(doc.frameOrder?.length ?? 0) > 0}
         onResetOrder={() => setFrameOrder(undefined)}
+        onCycleFrame={cycleFrame}
       />
       <WallExportMenu
         open={exportOpen}

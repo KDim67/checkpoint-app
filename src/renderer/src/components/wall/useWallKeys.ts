@@ -39,7 +39,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
     copyStyle, pasteStyle, makeCards, pasteCells, searchKind, presenting, stepPresenting, frameSelection,
     startPresenting, setFramesOpen, setExportOpen, setBinOpen, openItem, showItem, gatherTags,
-    addMindMap, tidyMap, cropping, setCropping, turnSelection, setAlignOpen, switchWall
+    addMindMap, tidyMap, cropping, setCropping, turnSelection, setAlignOpen, switchWall, cycleFrame
   } = wallDocument
   const {
     fitToContent, zoomBy, zoomReset, zoomToSelection, exportWall
@@ -119,6 +119,18 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         if (e.repeat) return
         e.preventDefault()
         switchWall('prev')
+        return
+      }
+      if (command === 'wall_next_frame' || (!mod && !e.altKey && e.key === ']')) {
+        if (e.repeat) return
+        e.preventDefault()
+        cycleFrame(1)
+        return
+      }
+      if (command === 'wall_prev_frame' || (!mod && !e.altKey && e.key === '[')) {
+        if (e.repeat) return
+        e.preventDefault()
+        cycleFrame(-1)
         return
       }
       if (command === 'wall_link') {
@@ -234,7 +246,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [applyHistory, copyStyle, docRef, duplicateSelected, fitToContent, historyRef, labelRef, matchKey, openItem, pasteStyle, presenting, removeSelected, selectedRef, setAlignOpen, setArrowDrag, setArrowFrom, setBgOpen, setBinOpen, setCropping, setEditingId, setExportOpen, setFramesOpen, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen, showItem, stepPresenting, zoomBy, zoomReset, zoomToSelection, switchWall])
+  }, [applyHistory, copyStyle, docRef, duplicateSelected, fitToContent, historyRef, labelRef, matchKey, openItem, pasteStyle, presenting, removeSelected, selectedRef, setAlignOpen, setArrowDrag, setArrowFrom, setBgOpen, setBinOpen, setCropping, setEditingId, setExportOpen, setFramesOpen, setItems, setLinkOpen, setLinkPickFor, setMenu, setPicker, setRenaming, setSelectedIds, setShortcutsOpen, setTool, setWallMenuOpen, showItem, stepPresenting, zoomBy, zoomReset, zoomToSelection, switchWall, cycleFrame])
 
   useEffect(() => {
     const onMouseUp = (e: MouseEvent): void => {

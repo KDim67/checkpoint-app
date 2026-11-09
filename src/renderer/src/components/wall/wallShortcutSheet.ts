@@ -52,7 +52,9 @@ export const wallShortcutSections = (
       [bindings.wall_zoom_fit || 'Unbound', 'Fit everything in view'],
       [bindings.wall_zoom_selection || 'Unbound', 'Zoom to the selection'],
       [bindings.wall_next_wall || 'PageDown', 'Next wall'],
-      [bindings.wall_prev_wall || 'PageUp', 'Previous wall']
+      [bindings.wall_prev_wall || 'PageUp', 'Previous wall'],
+      [bindings.wall_next_frame || ']', 'Next frame'],
+      [bindings.wall_prev_frame || '[', 'Previous frame']
     ]
   },
   {

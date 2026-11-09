@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, removeWall, setActiveWall, cycleWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type ImageCrop, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, duplicateWall as modelDuplicateWall, reorderWall, removeWall, setActiveWall, cycleWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type ImageCrop, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
@@ -29,7 +29,7 @@ import { rememberStyle, rememberedStyle } from './wallClipboardMemory'
 import { cameraShowing, grownItem, type Side } from '../../../../shared/wallGrow'
 import { cellStickies, MAX_CELLS } from '../../lib/wallCells'
 import { binRemoved, restoreEntry } from '../../../../shared/wallBin'
-import { frameAround, framesInOrder, type PresentAction } from '../../../../shared/wallFrames'
+import { frameAround, frameLabel, framesInOrder, type PresentAction } from '../../../../shared/wallFrames'
 import type { SearchKind } from '../../../../shared/wallFind'
 import { ERASER_MODES, type EraserMode, type WallTool } from './wallTools'
 import { addTag, gatherByTag, removeTag, taggable } from '../../../../shared/wallTags'
@@ -443,6 +443,32 @@ export function useWallDocument() {
     if (!wallIndex) return
     commitIndex(createWall(wallIndex).index)
     setWallMenuOpen(false)
+  }, [wallIndex, commitIndex])
+
+  const duplicateWall = useCallback(async (sourceWall: WallRef) => {
+    if (!wallIndex) return
+    const currentKey = wallDocKey(activeWorkspace, wallIndex.activeId)
+    await flushWallDoc(currentKey, docRef.current, { context: activeWorkspace, wallId: wallIndex.activeId })
+
+    const sourceKey = wallDocKey(activeWorkspace, sourceWall.id)
+    const sourceDoc = sourceWall.id === wallIndex.activeId ? docRef.current : await loadWallDoc(sourceKey)
+
+    const { index: nextIndex, wall: newWall } = modelDuplicateWall(wallIndex, sourceWall.id)
+    const newKey = wallDocKey(activeWorkspace, newWall.id)
+    await flushWallDoc(newKey, { ...sourceDoc }, { context: activeWorkspace, wallId: newWall.id })
+
+    commitIndex(nextIndex)
+    setWallMenuOpen(false)
+    toast(`Duplicated "${sourceWall.name}" as "${newWall.name}"`, { id: 'wall-duplicate', duration: 2000 })
+    setAnnouncement(`Duplicated wall ${sourceWall.name}`)
+  }, [wallIndex, activeWorkspace, commitIndex, toast, setAnnouncement])
+
+  const moveWall = useCallback((id: string, direction: -1 | 1) => {
+    if (!wallIndex) return
+    const next = reorderWall(wallIndex, id, direction)
+    if (next !== wallIndex) {
+      commitIndex(next)
+    }
   }, [wallIndex, commitIndex])
 
   /** a drop onto a column is an instruction, so it really moves the card */
@@ -1087,6 +1113,24 @@ export function useWallDocument() {
     setCamera(fitCamera([frame], { width: rect.width, height: rect.height }, padding))
   }, [setCamera])
 
+  const cycleFrame = useCallback((direction: 1 | -1) => {
+    const frames = framesInOrder(docRef.current.items, docRef.current.frameOrder)
+    if (frames.length === 0) return
+    const currentIdx = frames.findIndex(f => selectedRef.current.has(f.id))
+    let nextIdx: number
+    if (currentIdx === -1) {
+      nextIdx = direction === 1 ? 0 : frames.length - 1
+    } else {
+      nextIdx = (currentIdx + direction + frames.length) % frames.length
+    }
+    const target = frames[nextIdx]
+    if (target) {
+      showFrame(target)
+      setSelectedIds(new Set([target.id]))
+      toast(`Frame ${nextIdx + 1} of ${frames.length}: ${frameLabel(target, nextIdx)}`, { id: 'frame-cycle', duration: 1500 })
+    }
+  }, [showFrame, setSelectedIds, toast])
+
   const startPresenting = useCallback((index = 0) => {
     const count = framesInOrder(docRef.current.items, docRef.current.frameOrder).length
     if (count === 0) {
@@ -1355,6 +1399,8 @@ export function useWallDocument() {
     activeWall,
     commitIndex,
     addWall,
+    duplicateWall,
+    moveWall,
     switchWall,
     handOffToColumn,
     setBackground,
@@ -1411,6 +1457,7 @@ export function useWallDocument() {
     restoreDeleted,
     frameSelection,
     showFrame,
+    cycleFrame,
     startPresenting,
     stopPresenting,
     stepPresenting,

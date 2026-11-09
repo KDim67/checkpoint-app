@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { ChevronDown, Layers2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Layers2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { renameWall, setActiveWall, type WallIndex, type WallRef } from '../../../../shared/wallModel'
 
 type Renaming = { id: string; draft: string } | null
@@ -13,11 +13,13 @@ interface WallSwitcherProps {
   setRenaming: Dispatch<SetStateAction<Renaming>>
   commitIndex: (next: WallIndex) => void
   addWall: () => void
+  duplicateWall?: (wall: WallRef) => void
+  moveWall?: (id: string, direction: -1 | 1) => void
   setPendingDelete: Dispatch<SetStateAction<WallRef | null>>
 }
 
 export default function WallSwitcher({
-  wallIndex, activeWall, wallMenuOpen, setWallMenuOpen, renaming, setRenaming, commitIndex, addWall, setPendingDelete
+  wallIndex, activeWall, wallMenuOpen, setWallMenuOpen, renaming, setRenaming, commitIndex, addWall, duplicateWall, moveWall, setPendingDelete
 }: WallSwitcherProps) {
   return (
     <div data-wall-popover="wall" className="relative">
@@ -53,14 +55,14 @@ export default function WallSwitcher({
             role="menu"
             style={{
               position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 41,
-              width: '240px', padding: '4px',
+              width: '270px', padding: '4px',
               background: 'var(--color-surface-elevated)',
               border: '1px solid var(--color-surface-offset)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-lg)'
             }}
           >
-            {wallIndex.walls.map(w => {
+            {wallIndex.walls.map((w, i) => {
               const isActive = w.id === wallIndex.activeId
               const isRenaming = renaming?.id === w.id
 
@@ -101,13 +103,23 @@ export default function WallSwitcher({
                   key={w.id}
                   className="wall-switcher-row"
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                    display: 'flex', alignItems: 'center', gap: '2px',
                     borderRadius: 'var(--radius-sm)',
                     background: isActive ? 'var(--color-surface-offset)' : 'transparent'
                   }}
                 >
                   <button
                     onClick={() => { commitIndex(setActiveWall(wallIndex, w.id)); setWallMenuOpen(false) }}
+                    onKeyDown={e => {
+                      if (e.altKey && e.key === 'ArrowUp') {
+                        e.preventDefault()
+                        moveWall?.(w.id, -1)
+                      } else if (e.altKey && e.key === 'ArrowDown') {
+                        e.preventDefault()
+                        moveWall?.(w.id, 1)
+                      }
+                    }}
+                    title={`${w.name}${wallIndex.walls.length > 1 ? ' · Alt+Up/Down to reorder' : ''}`}
                     style={{
                       flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none',
                       cursor: 'pointer', padding: 'var(--space-2)',
@@ -119,12 +131,47 @@ export default function WallSwitcher({
                     {w.name}
                   </button>
 
+                  {wallIndex.walls.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => moveWall?.(w.id, -1)}
+                        disabled={i === 0}
+                        title="Move up (Alt+Up)"
+                        aria-label={`Move ${w.name} up`}
+                        className="btn-icon"
+                        style={{ width: '22px', height: '22px', flexShrink: 0, opacity: i === 0 ? 0.3 : 1 }}
+                      >
+                        <ChevronUp size={12} />
+                      </button>
+                      <button
+                        onClick={() => moveWall?.(w.id, 1)}
+                        disabled={i === wallIndex.walls.length - 1}
+                        title="Move down (Alt+Down)"
+                        aria-label={`Move ${w.name} down`}
+                        className="btn-icon"
+                        style={{ width: '22px', height: '22px', flexShrink: 0, opacity: i === wallIndex.walls.length - 1 ? 0.3 : 1 }}
+                      >
+                        <ChevronDown size={12} />
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => duplicateWall?.(w)}
+                    title="Duplicate wall"
+                    aria-label={`Duplicate ${w.name}`}
+                    className="btn-icon"
+                    style={{ width: '22px', height: '22px', flexShrink: 0 }}
+                  >
+                    <Copy size={12} />
+                  </button>
+
                   <button
                     onClick={() => setRenaming({ id: w.id, draft: w.name })}
                     title="Rename"
                     aria-label={`Rename ${w.name}`}
                     className="btn-icon"
-                    style={{ width: '24px', height: '24px', flexShrink: 0 }}
+                    style={{ width: '22px', height: '22px', flexShrink: 0 }}
                   >
                     <Pencil size={12} />
                   </button>
@@ -136,7 +183,7 @@ export default function WallSwitcher({
                       title="Delete wall"
                       aria-label={`Delete ${w.name}`}
                       className="btn-icon"
-                      style={{ width: '24px', height: '24px', flexShrink: 0, marginRight: '2px' }}
+                      style={{ width: '22px', height: '22px', flexShrink: 0, marginRight: '2px' }}
                     >
                       <Trash2 size={12} />
                     </button>

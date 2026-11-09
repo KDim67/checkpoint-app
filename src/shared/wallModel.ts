@@ -778,6 +778,36 @@ export function createWall(index: WallIndex, name?: string): { index: WallIndex;
   }
 }
 
+/** duplicate a wall reference in the index, inserting it beside the source wall */
+export function duplicateWall(index: WallIndex, sourceId: string): { index: WallIndex; wall: WallRef } {
+  const sourceIndex = index.walls.findIndex(w => w.id === sourceId)
+  const source = sourceIndex !== -1 ? index.walls[sourceIndex] : null
+  const baseName = source ? source.name : 'Wall'
+  const wall: WallRef = {
+    id: newWallId(),
+    name: `${baseName} (Copy)`
+  }
+  const nextWalls = [...index.walls]
+  const insertAt = sourceIndex !== -1 ? sourceIndex + 1 : nextWalls.length
+  nextWalls.splice(insertAt, 0, wall)
+  return {
+    index: { ...index, walls: nextWalls, activeId: wall.id },
+    wall
+  }
+}
+
+/** move a wall up or down in the list */
+export function reorderWall(index: WallIndex, id: string, direction: -1 | 1): WallIndex {
+  const i = index.walls.findIndex(w => w.id === id)
+  if (i === -1) return index
+  const target = i + direction
+  if (target < 0 || target >= index.walls.length) return index
+  const nextWalls = [...index.walls]
+  const [removed] = nextWalls.splice(i, 1)
+  nextWalls.splice(target, 0, removed)
+  return { ...index, walls: nextWalls }
+}
+
 export function renameWall(index: WallIndex, id: string, name: string): WallIndex {
   const trimmed = name.trim()
   if (!trimmed) return index

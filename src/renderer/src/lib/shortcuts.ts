@@ -85,6 +85,8 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   { id: 'wall_zoom_selection',   label: 'Zoom to the selection',   scope: 'wall',   defaultCombo: 'Alt+2' },
   { id: 'wall_next_wall',        label: 'Next wall',               scope: 'wall',   defaultCombo: 'PageDown' },
   { id: 'wall_prev_wall',        label: 'Previous wall',           scope: 'wall',   defaultCombo: 'PageUp' },
+  { id: 'wall_next_frame',       label: 'Next frame',              scope: 'wall',   defaultCombo: ']' },
+  { id: 'wall_prev_frame',       label: 'Previous frame',          scope: 'wall',   defaultCombo: '[' },
 
   { id: 'kanban_focus_session',  label: 'Start a focus session',   scope: 'kanban', defaultCombo: 'Space' },
   { id: 'kanban_open_details',   label: 'Open the card',           scope: 'kanban', defaultCombo: 'E' },

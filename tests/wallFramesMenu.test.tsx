@@ -10,13 +10,14 @@ afterEach(cleanup)
 const frame = (id: string, text?: string): WallItem =>
   ({ id, kind: 'frame', x: 0, y: 0, width: 400, height: 300, z: 0, ...(text ? { text } : {}) })
 
-function Menu({ frames, onShow = vi.fn(), onPresent = vi.fn(), onReorder = vi.fn(), custom = false, onResetOrder = vi.fn() }: {
+function Menu({ frames, onShow = vi.fn(), onPresent = vi.fn(), onReorder = vi.fn(), custom = false, onResetOrder = vi.fn(), onCycleFrame = vi.fn() }: {
   frames: WallItem[]
   onShow?: (frame: WallItem) => void
   onPresent?: (index: number) => void
   onReorder?: (ids: string[]) => void
   custom?: boolean
   onResetOrder?: () => void
+  onCycleFrame?: (delta: 1 | -1) => void
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -29,6 +30,7 @@ function Menu({ frames, onShow = vi.fn(), onPresent = vi.fn(), onReorder = vi.fn
       onReorder={onReorder}
       customOrder={custom}
       onResetOrder={onResetOrder}
+      onCycleFrame={onCycleFrame}
     />
   )
 }
@@ -90,5 +92,17 @@ describe('WallFramesMenu', () => {
 
     expect(screen.getByText(/No frames yet/)).toBeTruthy()
     expect((screen.getByText('Present').closest('button') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('cycles frames with previous and next frame buttons', () => {
+    const onCycleFrame = vi.fn()
+    render(<Menu frames={[frame('a', 'Intro'), frame('b', 'Outro')]} onCycleFrame={onCycleFrame} />)
+    fireEvent.click(screen.getByLabelText('Frames'))
+
+    fireEvent.click(screen.getByLabelText('Previous frame'))
+    expect(onCycleFrame).toHaveBeenCalledWith(-1)
+
+    fireEvent.click(screen.getByLabelText('Next frame'))
+    expect(onCycleFrame).toHaveBeenCalledWith(1)
   })
 })
