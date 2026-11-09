@@ -72,4 +72,37 @@ describe('KanbanFilterBar', () => {
     expect(filters()).toEqual({ searchQuery: '', filterPriority: -1, filterTagId: 'all' })
     expect(screen.queryByText('Reset')).toBeNull()
   })
+
+  it('clears search input with inline clear button', () => {
+    render(<Board />)
+    const input = screen.getByPlaceholderText('Search cards (title, body, tag)...')
+    fireEvent.change(input, { target: { value: 'fix error' } })
+    expect(filters().searchQuery).toBe('fix error')
+
+    const clearBtn = screen.getByLabelText('Clear search')
+    expect(clearBtn).toBeTruthy()
+    fireEvent.click(clearBtn)
+    expect(filters().searchQuery).toBe('')
+  })
+
+  it('displays the hidden count badge when cards are filtered out', () => {
+    const mockBoard = {
+      searchQuery: 'task 1',
+      setSearchQuery: () => {},
+      filterPriority: -1,
+      setFilterPriority: () => {},
+      filterTagId: 'all',
+      setFilterTagId: () => {},
+      allTags: tags,
+      cards: [
+        { id: '1', title: 'task 1', status: 'active' },
+        { id: '2', title: 'task 2', status: 'active' },
+        { id: '3', title: 'task 3', status: 'active' }
+      ],
+      columns: [{ id: 'col-1', name: 'Todo' }],
+      getCardsForColumn: (_colId: string) => [{ id: '1', title: 'task 1', status: 'active' }]
+    }
+    render(<KanbanFilterBar kanbanBoard={mockBoard as unknown as KanbanBoard} />)
+    expect(screen.getByText('2 hidden')).toBeTruthy()
+  })
 })

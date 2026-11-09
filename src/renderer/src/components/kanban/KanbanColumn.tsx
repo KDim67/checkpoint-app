@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import KanbanCard from './KanbanCard'
 import { CardWindowContext, createCardWindow, EAGER_CARDS } from './cardWindow'
 import ColorPicker from '../ui/ColorPicker'
-import { Trash2, Edit2, Check, Plus, X, GripVertical, MoreHorizontal, ChevronRight } from 'lucide-react'
+import { Trash2, Edit2, Check, Plus, X, GripVertical, MoreHorizontal, ChevronRight, ChevronLeft } from 'lucide-react'
 import type { Item } from '../../../../shared/types'
 import { sameCardDisplay, type CardDisplay, type ColumnSort } from '../../lib/boardConfig'
 import { getTextColorForBackground } from '../../lib/contrast'
@@ -237,27 +237,18 @@ function ColumnBody({
           alignItems: 'center',
           height: '100%',
           overflow: 'hidden',
-          boxShadow: 'var(--shadow-sm)'
+          boxShadow: 'var(--shadow-sm)',
+          cursor: 'pointer'
         }}
+        onClick={() => onToggleCollapse?.(id)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCollapse?.(id) } }}
+        tabIndex={0}
+        role="button"
+        aria-label={`Expand ${name} column`}
+        title={`Click to expand ${name} column`}
       >
         <div style={{ height: '3px', width: '100%', backgroundColor: accentColor, flexShrink: 0 }} />
-        <button
-          onClick={() => onToggleCollapse?.(id)}
-          aria-label={`Expand ${name} column`}
-          title={`Expand ${name}`}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--color-text-muted)',
-            cursor: 'pointer',
-            padding: 'var(--space-2) 0',
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'center'
-          }}
-        >
-          <ChevronRight size={14} />
-        </button>
+        <div style={{ color: 'var(--color-text-muted)', padding: 'var(--space-2) 0', width: '100%', display: 'flex', justifyContent: 'center' }}><ChevronRight size={14} /></div>
         <div
           style={{
             fontSize: 'var(--text-xs)',
@@ -615,6 +606,9 @@ function ColumnBody({
             transition: 'opacity 100ms ease',
             flexShrink: 0
           }}>
+            <HeaderBtn title={`Collapse ${name} column`} aria-label={`Collapse ${name} column`} onClick={() => onToggleCollapse?.(id)} colTextColor={isFullCol ? colTextColor : undefined}>
+              <ChevronLeft size={11} />
+            </HeaderBtn>
             <HeaderBtn title="Rename & Settings" onClick={() => setIsEditing(true)} colTextColor={isFullCol ? colTextColor : undefined}>
               <Edit2 size={11} />
             </HeaderBtn>
@@ -812,19 +806,22 @@ function ColumnBody({
 }
 
 function HeaderBtn({
-  children, title, onClick, danger = false, colTextColor
+  children, title, onClick, danger = false, colTextColor, ariaLabel, 'aria-label': ariaLabelKebab
 }: {
   children: React.ReactNode
   title: string
   onClick: () => void
   danger?: boolean
   colTextColor?: string
+  ariaLabel?: string
+  'aria-label'?: string
 }) {
   const [hover, setHover] = useState(false)
   const textColor = colTextColor || 'var(--color-text-muted)'
   return (
     <button
       title={title}
+      aria-label={ariaLabel || ariaLabelKebab || title}
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}

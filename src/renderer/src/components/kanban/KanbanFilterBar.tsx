@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import type { KanbanBoard } from './useKanbanBoard'
 
 export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBoard }) {
@@ -5,6 +6,17 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
     searchQuery, setSearchQuery, filterPriority, setFilterPriority, filterTagId, setFilterTagId,
     allTags
   } = kanbanBoard
+
+  const cards = kanbanBoard.cards ?? []
+  const columns = kanbanBoard.columns ?? []
+  const getCardsForColumn = kanbanBoard.getCardsForColumn
+  const totalActive = cards.filter(c => c.status !== 'archived').length
+  const visibleCount = typeof getCardsForColumn === 'function' && columns.length > 0
+    ? columns.reduce((acc, col) => acc + (getCardsForColumn(col.id)?.length || 0), 0)
+    : 0
+  const hiddenCount = typeof getCardsForColumn === 'function' && columns.length > 0 ? Math.max(0, totalActive - visibleCount) : 0
+  const hasActiveFilter = Boolean(searchQuery.trim() || filterPriority !== -1 || filterTagId !== 'all')
+
   return (
     <div style={{
       display: 'flex',
@@ -18,7 +30,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
       gap: 'var(--space-4)',
       flexWrap: 'wrap'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, minWidth: '200px' }}>
         <input
           type="text"
           placeholder="Search cards (title, body, tag)..."
@@ -31,12 +43,36 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
             background: 'var(--color-surface-2)',
             color: 'var(--color-text-base)',
             borderRadius: 'var(--radius-md)',
-            padding: '5px 10px',
+            padding: searchQuery ? '5px 28px 5px 10px' : '5px 10px',
             fontSize: 'var(--text-xs)',
             outline: 'none',
             transition: 'border-color var(--duration-fast)'
           }}
         />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            aria-label="Clear search"
+            title="Clear search"
+            style={{
+              position: 'absolute',
+              right: '6px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--color-text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '2px'
+            }}
+          >
+            <X size={12} />
+          </button>
+        )}
       </div>
 
       <div className="row-lg">
@@ -84,20 +120,42 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
           </select>
         </div>
 
-        {(searchQuery || filterPriority !== -1 || filterTagId !== 'all') && (
+        {hasActiveFilter && (
           <button
             onClick={() => { setSearchQuery(''); setFilterPriority(-1); setFilterTagId('all') }}
+            aria-label="Clear all filters"
             style={{
-              background: 'transparent',
-              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'var(--color-surface-2)',
+              border: '1px solid var(--color-surface-offset)',
+              borderRadius: 'var(--radius-full)',
               color: 'var(--color-secondary)',
               fontSize: 'var(--text-xs)',
               cursor: 'pointer',
               fontWeight: 'var(--weight-bold)',
-              padding: '2px 4px'
+              padding: '2px 8px',
+              transition: 'background var(--duration-fast), border-color var(--duration-fast)'
             }}
           >
-            Reset
+            <X size={12} style={{ color: 'var(--color-text-muted)' }} />
+            <span>Reset</span>
+            {hiddenCount > 0 && (
+              <span
+                style={{
+                  background: 'var(--color-primary-muted, var(--color-surface-offset))',
+                  color: 'var(--color-primary, var(--color-text-base))',
+                  fontSize: 'var(--text-2xs)',
+                  fontWeight: 'var(--weight-bold)',
+                  borderRadius: 'var(--radius-full)',
+                  padding: '1px 6px',
+                  lineHeight: 1.2
+                }}
+              >
+                {hiddenCount} hidden
+              </span>
+            )}
           </button>
         )}
       </div>

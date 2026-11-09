@@ -1,9 +1,9 @@
-import React, { useCallback, useContext, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Edit2, Trash2, ArrowRightLeft, Calendar, GripVertical, Play, Check, CheckSquare } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
-import type { Item } from '../../../../shared/types'
+import type { Item, ItemPriority } from '../../../../shared/types'
 import { getTextColorForBackground } from '../../lib/contrast'
 import { PRIORITY_COLORS } from '../../lib/priority'
 import { DEFAULT_CARD_DISPLAY, type CardDisplay } from '../../lib/boardConfig'
@@ -153,13 +153,29 @@ function CardFace({
   const showTemplate = display.template && isTemplate
 
   /** the board says why a save failed, so a shortcut here only has to not throw */
-  const save = async (patch: Partial<Item>): Promise<void> => {
+  const save = useCallback(async (patch: Partial<Item>): Promise<void> => {
     try {
       await onUpdate?.(card.id, patch)
     } catch {
       // already reported
     }
-  }
+  }, [onUpdate, card.id])
+
+  useEffect(() => {
+    if (!hovered) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable)) return
+      if (['0', '1', '2', '3'].includes(e.key)) {
+        e.preventDefault()
+        const newPriority = parseInt(e.key, 10) as ItemPriority
+        void save({ priority: newPriority })
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hovered, save])
 
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) return
@@ -172,6 +188,16 @@ function CardFace({
     }
 
     const command = matchKey(e)
+
+    if (command === 'kanban_priority_none') { e.preventDefault(); await save({ priority: 0 }); return }
+    if (command === 'kanban_priority_low') { e.preventDefault(); await save({ priority: 1 }); return }
+    if (command === 'kanban_priority_med') { e.preventDefault(); await save({ priority: 2 }); return }
+    if (command === 'kanban_priority_high') { e.preventDefault(); await save({ priority: 3 }); return }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && ['0', '1', '2', '3'].includes(e.key)) {
+      e.preventDefault()
+      await save({ priority: parseInt(e.key, 10) as ItemPriority })
+      return
+    }
 
     if (command === 'kanban_focus_session') {
       e.preventDefault()

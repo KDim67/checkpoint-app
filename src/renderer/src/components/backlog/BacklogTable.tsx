@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Eye } from 'lucide-react'
 import type { Item, Tag as TagType } from '../../../../shared/types'
 import BacklogRow from './BacklogRow'
+import { useAppStore } from '../../store/appStore'
 import { PRIORITY_LABELS_LONG as PRIORITY_LABELS, PRIORITY_LEVELS } from '../../lib/priority'
 
 interface BacklogTableProps {
@@ -52,7 +53,15 @@ export default function BacklogTable({
   const containerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(500)
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  const activeWorkspace = useAppStore(s => s.activeWorkspace)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(`checkpoint_backlog_collapsed_${activeWorkspace}`)
+      return raw ? JSON.parse(raw) : {}
+    } catch {
+      return {}
+    }
+  })
   const [showVisibilityMenu, setShowVisibilityMenu] = useState(false)
 
   useEffect(() => {
@@ -314,10 +323,15 @@ export default function BacklogTable({
   }
 
   const toggleGroupCollapse = (groupKey: string) => {
-    setCollapsedGroups((prev) => ({
-      ...prev,
-      [groupKey]: !prev[groupKey]
-    }))
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [groupKey]: !prev[groupKey] }
+      try {
+        localStorage.setItem(`checkpoint_backlog_collapsed_${activeWorkspace}`, JSON.stringify(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
   }
 
   // only with focus in the table and not in a text field

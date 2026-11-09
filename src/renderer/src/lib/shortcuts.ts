@@ -94,6 +94,10 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   { id: 'kanban_toggle_template', label: 'Mark as a template',     scope: 'kanban', defaultCombo: 'T' },
   { id: 'kanban_archive',        label: 'Archive the card',        scope: 'kanban', defaultCombo: 'C' },
   { id: 'kanban_toggle_done',    label: 'Mark done',               scope: 'kanban', defaultCombo: 'X' },
+  { id: 'kanban_priority_none',  label: 'Set priority: None',      scope: 'kanban', defaultCombo: '0' },
+  { id: 'kanban_priority_low',   label: 'Set priority: Low',       scope: 'kanban', defaultCombo: '1' },
+  { id: 'kanban_priority_med',   label: 'Set priority: Medium',    scope: 'kanban', defaultCombo: '2' },
+  { id: 'kanban_priority_high',  label: 'Set priority: High',      scope: 'kanban', defaultCombo: '3' },
 
   { id: 'focus_toggle_timer',    label: 'Start or pause',          scope: 'focus',  defaultCombo: 'Space' },
   { id: 'focus_log_distraction', label: 'Log a distraction',       scope: 'focus',  defaultCombo: 'D' },
