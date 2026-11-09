@@ -37,7 +37,7 @@
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
     "better-sqlite3": "12.11.1",
-    "chokidar": "5.0.0",
+    "chokidar": "6.0.0",
     "electron-updater": "^6.8.9",
     "ical.js": "2.2.1",
     "openai": "^6.49.0",
