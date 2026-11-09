@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { isObsidianOpen } from '../src/main/openExternal'
+import { describe, expect, it, vi } from 'vitest'
+import { isObsidianOpen, openExternalSafely } from '../src/main/openExternal'
 import { linkOf } from '../src/shared/connections'
+import { shell } from 'electron'
 
 const url = (text: string): URL => new URL(text)
 
@@ -19,5 +20,25 @@ describe('which obsidian links may be opened', () => {
     expect(link('obsidian://open?vault=My%20Vault&file=Inbox')?.url).toBe('obsidian://open?vault=My%20Vault&file=Inbox')
     expect(link('obsidian://advanced-uri?vault=v&commandid=x')).toBeNull()
     expect(link('https://example.com/')).toBeNull()
+  })
+})
+
+describe('openExternalSafely', () => {
+  it('opens web URLs via shell.openExternal', () => {
+    const spy = vi.spyOn(shell, 'openExternal')
+    openExternalSafely('https://github.com')
+    expect(spy).toHaveBeenCalledWith('https://github.com/')
+  })
+
+  it('routes file:// URLs to shell.openPath', () => {
+    const spy = vi.spyOn(shell, 'openPath')
+    openExternalSafely('file:///C:/Users/dimit/Documents/test.pdf')
+    expect(spy).toHaveBeenCalled()
+  })
+
+  it('routes cheatsheet:// URLs to shell.openPath', () => {
+    const spy = vi.spyOn(shell, 'openPath')
+    openExternalSafely('cheatsheet://show/Unity_Guide.pdf')
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('Unity_Guide.pdf'))
   })
 })

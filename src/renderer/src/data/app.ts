@@ -52,6 +52,9 @@ export const setTitleBarColors = (...args: Parameters<Bridge['setTitleBarColors'
 export const showItemInFolder = (...args: Parameters<Bridge['showItemInFolder']>): ReturnType<Bridge['showItemInFolder']> =>
   window.electronAPI.app.showItemInFolder(...args)
 
+export const openPath = (...args: Parameters<Bridge['openPath']>): ReturnType<Bridge['openPath']> =>
+  window.electronAPI.app.openPath(...args)
+
 export const showUpdateLog = (...args: Parameters<Bridge['showUpdateLog']>): ReturnType<Bridge['showUpdateLog']> =>
   window.electronAPI.app.showUpdateLog(...args)
 

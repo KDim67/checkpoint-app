@@ -18,6 +18,23 @@ export function registerAppHandlers(): void {
     if (typeof url === 'string') openExternalSafely(url)
   })
 
+  ipcMain.handle(IpcChannels.APP_OPEN_PATH, async (_event, targetPath: unknown) => {
+    if (typeof targetPath === 'string') {
+      try {
+        const error = await shell.openPath(targetPath)
+        if (error) {
+          console.error('[openPath] Failed to open path:', error)
+          return false
+        }
+        return true
+      } catch (err) {
+        console.error('[openPath] Error opening path:', err)
+        return false
+      }
+    }
+    return false
+  })
+
   ipcMain.on(IpcChannels.APP_MINIMIZE, () => getMainWindow()?.minimize())
   ipcMain.on(IpcChannels.APP_MAXIMIZE, () => {
     const win = getMainWindow()

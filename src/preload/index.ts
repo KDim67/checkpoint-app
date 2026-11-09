@@ -112,6 +112,8 @@ const api = {
       ipcRenderer.invoke(IpcChannels.APP_SAVE_BINARY_FILE, defaultName, data, extension),
     showItemInFolder: (filePath: string): Promise<void> =>
       ipcRenderer.invoke(IpcChannels.APP_SHOW_ITEM_IN_FOLDER, filePath),
+    openPath: (filePath: string): Promise<boolean> =>
+      ipcRenderer.invoke(IpcChannels.APP_OPEN_PATH, filePath),
     /** failures come back as a result, not a throw */
     checkForUpdates: (): Promise<UpdateCheckResult> =>
       ipcRenderer.invoke(IpcChannels.APP_CHECK_FOR_UPDATES),

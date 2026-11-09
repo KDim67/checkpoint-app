@@ -20,6 +20,7 @@ vi.mock('../src/renderer/src/data/cheatsheets', () => ({
 
 vi.mock('../src/renderer/src/data/app', () => ({
   openExternal: vi.fn(),
+  openPath: vi.fn(async () => true),
   getPathForFile: vi.fn((file: File) => (file as unknown as { path?: string }).path || '')
 }))
 
@@ -136,5 +137,25 @@ describe('CheatsheetsView QoL improvements', () => {
 
     heading = screen.getByRole('heading', { level: 2 })
     expect(heading.textContent).toBe('React-Guide')
+  })
+
+  it('calls openPath with the file path when clicking Open Native', async () => {
+    const { openPath } = await import('../src/renderer/src/data/app')
+    localStorage.setItem('checkpoint_last_cheatsheet', 'Unity-Shaders.pdf')
+
+    await act(async () => {
+      render(
+        <ToastProvider>
+          <CheatsheetsView />
+        </ToastProvider>
+      )
+    })
+
+    const openNativeBtn = screen.getByRole('button', { name: /open native/i })
+    await act(async () => {
+      fireEvent.click(openNativeBtn)
+    })
+
+    expect(openPath).toHaveBeenCalledWith('/path/Unity-Shaders.pdf')
   })
 })

@@ -168,6 +168,7 @@ export const enum IpcChannels {
   // app
   APP_GET_VERSION        = 'app:getVersion',
   APP_OPEN_EXTERNAL      = 'app:openExternal',
+  APP_OPEN_PATH          = 'app:openPath',
   APP_GET_DATA_PATH      = 'app:getDataPath',
   APP_MINIMIZE           = 'app:minimize',
   APP_MAXIMIZE           = 'app:maximize',

@@ -412,7 +412,11 @@ export default function CheatsheetsView() {
   const handleOpenExternal = () => {
     if (!selectedPdf) return
     const url = `cheatsheet://show/${encodeURIComponent(selectedPdf.name)}`
-    appApi.openExternal(url)
+    if (selectedPdf.path) {
+      void appApi.openPath(selectedPdf.path)
+    } else {
+      appApi.openExternal(url)
+    }
   }
 
   const { pinnedList, unpinnedList } = useMemo(() => {
@@ -601,15 +605,16 @@ export default function CheatsheetsView() {
           top: 50%;
           transform: translateY(-50%);
           color: var(--color-text-faint);
+          pointer-events: none;
         }
         .search-input {
           width: 100%;
           background: var(--color-surface-2);
           border: 1px solid var(--color-surface-offset);
           border-radius: var(--radius-md);
-          padding: 8px 10px 8px 32px;
+          padding: 7px 28px 7px 34px;
           color: var(--color-text-base);
-          font-size: var(--text-sm);
+          font-size: var(--text-xs);
           outline: none;
           transition: border-color var(--duration-fast);
           box-sizing: border-box;
@@ -830,12 +835,13 @@ export default function CheatsheetsView() {
         <div className="search-container">
           <div className="row">
             <div className="search-input-wrapper">
-              <Search size={16} className="search-icon" />
+              <Search size={14} className="search-icon" style={{ pointerEvents: 'none' }} />
               <input
                 type="text"
                 placeholder="Search names & contents…"
                 aria-label="Search cheatsheets"
                 className="search-input"
+                style={{ padding: '7px 28px 7px 34px', fontSize: 'var(--text-xs)' }}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 onKeyDown={e => {
@@ -854,6 +860,28 @@ export default function CheatsheetsView() {
                   }
                 }}
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                  aria-label="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-text-faint)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 0
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
             <button
               onClick={handleAddFile}
