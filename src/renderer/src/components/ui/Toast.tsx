@@ -20,8 +20,17 @@ interface ToastMessage {
   leaving?: boolean
 }
 
+const MAX_TOASTS = 3
+
+export interface ToastOptions {
+  id?: string
+  action?: ToastAction
+  type?: ToastType
+  duration?: number
+}
+
 export interface ToastContextType {
-  toast: (text: string, options?: { action?: ToastAction; type?: ToastType; duration?: number }) => void
+  toast: (text: string, options?: ToastOptions) => void
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -69,19 +78,39 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const toast = useCallback((
     text: string,
-    options?: { action?: ToastAction; type?: ToastType; duration?: number }
+    options?: ToastOptions
   ) => {
-    const id = Math.random().toString(36).substring(2, 9)
+    const id = options?.id || Math.random().toString(36).substring(2, 9)
+    const duration = options?.duration ?? 4000
+
+    if (timersRef.current[id]) {
+      clearTimeout(timersRef.current[id])
+      delete timersRef.current[id]
+    }
+    if (timersRef.current[`${id}:exit`]) {
+      clearTimeout(timersRef.current[`${id}:exit`])
+      delete timersRef.current[`${id}:exit`]
+    }
+
     const newToast: ToastMessage = {
       id,
       text,
       action: options?.action,
-      type: options?.type || 'info'
+      type: options?.type || 'info',
+      leaving: false
     }
 
-    setToasts(prev => [...prev, newToast])
+    setToasts(prev => {
+      const existingIdx = prev.findIndex(t => t.id === id)
+      if (existingIdx >= 0) {
+        const next = [...prev]
+        next[existingIdx] = newToast
+        return next
+      }
+      const trimmed = prev.length >= MAX_TOASTS ? prev.slice(prev.length - (MAX_TOASTS - 1)) : prev
+      return [...trimmed, newToast]
+    })
 
-    const duration = options?.duration ?? 4000
     timersRef.current[id] = setTimeout(() => {
       removeToast(id)
     }, duration)

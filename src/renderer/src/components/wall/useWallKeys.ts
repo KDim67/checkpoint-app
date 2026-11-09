@@ -109,8 +109,18 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (command === 'wall_zoom_selection') { e.preventDefault(); zoomToSelection(); return }
       if (command === 'wall_duplicate') { e.preventDefault(); duplicateSelected(); return }
       if (command === 'wall_delete') { e.preventDefault(); removeSelected(); return }
-      if (command === 'wall_next_wall' || (!mod && !e.altKey && e.key === 'PageDown')) { e.preventDefault(); switchWall('next'); return }
-      if (command === 'wall_prev_wall' || (!mod && !e.altKey && e.key === 'PageUp')) { e.preventDefault(); switchWall('prev'); return }
+      if (command === 'wall_next_wall' || (!mod && !e.altKey && e.key === 'PageDown')) {
+        if (e.repeat) return
+        e.preventDefault()
+        switchWall('next')
+        return
+      }
+      if (command === 'wall_prev_wall' || (!mod && !e.altKey && e.key === 'PageUp')) {
+        if (e.repeat) return
+        e.preventDefault()
+        switchWall('prev')
+        return
+      }
       if (command === 'wall_link') {
         const chosen = docRef.current.items.filter(i => selectedRef.current.has(i.id))
         if (chosen.length === 1 && isLinkable(chosen[0].kind) && !chosen[0].locked) {

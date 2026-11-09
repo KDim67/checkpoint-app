@@ -115,6 +115,25 @@ describe('a toast', () => {
     act(() => { vi.advanceTimersByTime(EXIT_MS) })
     expect(screen.queryByText('Saved')).toBeNull()
   })
+
+  it('updates an existing toast in place when the same id is used', () => {
+    function Sender() {
+      const { toast } = useToast()
+      return (
+        <>
+          <button type="button" onClick={() => toast('Wall 1', { id: 'wall' })}>one</button>
+          <button type="button" onClick={() => toast('Wall 2', { id: 'wall' })}>two</button>
+        </>
+      )
+    }
+    render(<ToastProvider><Sender /></ToastProvider>)
+    fireEvent.click(screen.getByText('one'))
+    expect(screen.getByText('Wall 1')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('two'))
+    expect(screen.queryByText('Wall 1')).toBeNull()
+    expect(screen.getByText('Wall 2')).toBeTruthy()
+  })
 })
 
 describe('changing view', () => {

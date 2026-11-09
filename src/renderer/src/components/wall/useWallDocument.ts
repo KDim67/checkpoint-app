@@ -432,7 +432,7 @@ export function useWallDocument() {
       commitIndex(next)
       const active = next.walls.find(w => w.id === next.activeId)
       if (active) {
-        toast(`Wall: ${active.name}`)
+        toast(`Wall: ${active.name}`, { id: 'wall-switch', duration: 1500 })
         setAnnouncement(`Switched to wall ${active.name}`)
       }
     }

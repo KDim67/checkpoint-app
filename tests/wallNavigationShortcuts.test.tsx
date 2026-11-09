@@ -135,6 +135,30 @@ describe('Wall Navigation Shortcuts & Mouse Side Buttons', () => {
     expect(wallDoc.switchWall).toHaveBeenCalledWith('next')
   })
 
+  it('ignores repeated keydown events when holding PageDown or PageUp', () => {
+    const wallDoc = createMockDocument()
+    const wallPtr = createMockPointer()
+    render(<TestComponent wallDoc={wallDoc} wallPtr={wallPtr} />)
+
+    fireEvent.keyDown(window, { key: 'PageDown', repeat: true })
+    expect(wallDoc.switchWall).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(window, { key: 'PageUp', repeat: true })
+    expect(wallDoc.switchWall).not.toHaveBeenCalled()
+  })
+
+  it('ignores repeated keydown events when holding PageDown or PageUp', () => {
+    const wallDoc = createMockDocument()
+    const wallPtr = createMockPointer()
+    render(<TestComponent wallDoc={wallDoc} wallPtr={wallPtr} />)
+
+    fireEvent.keyDown(window, { key: 'PageDown', repeat: true })
+    expect(wallDoc.switchWall).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(window, { key: 'PageUp', repeat: true })
+    expect(wallDoc.switchWall).not.toHaveBeenCalled()
+  })
+
   it('switches to prev wall on PageUp key', () => {
     const wallDoc = createMockDocument()
     const wallPtr = createMockPointer()
