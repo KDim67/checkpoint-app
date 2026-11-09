@@ -33,9 +33,25 @@ const SORT_LABELS: Record<SortMode, { label: string; icon: React.ReactNode }> = 
   size: { label: 'Size', icon: <HardDrive size={11} /> }
 }
 
+const LAST_CHEATSHEET_KEY = 'checkpoint_last_cheatsheet'
+
+function getLastCheatsheet(): string | null {
+  try { return localStorage.getItem(LAST_CHEATSHEET_KEY) } catch { return null }
+}
+
+function setLastCheatsheet(name: string | null): void {
+  try {
+    if (name) localStorage.setItem(LAST_CHEATSHEET_KEY, name)
+    else localStorage.removeItem(LAST_CHEATSHEET_KEY)
+  } catch {}
+}
+
 export default function CheatsheetsView() {
   const { toast } = useToast()
   const setRightPanelContent = useAppStore(s => s.setRightPanelContent)
+  const pendingCheatsheetName = useAppStore(s => s.pendingCheatsheetName)
+  const setPendingCheatsheetName = useAppStore(s => s.setPendingCheatsheetName)
+  const listRef = useRef<HTMLDivElement>(null)
   const aiEnabled = useAiEnabled()
 
   const [cheatsheets, setCheatsheets] = useState<CheatsheetFile[]>([])
@@ -71,6 +87,20 @@ export default function CheatsheetsView() {
     try {
       const list = await cheatsheetsApi.list()
       setCheatsheets(list)
+      setSelectedPdf(prev => {
+        if (prev && list.some(c => c.name === prev.name)) return prev
+        const pending = useAppStore.getState().pendingCheatsheetName
+        if (pending) {
+          const match = list.find(c => c.name === pending)
+          if (match) return match
+        }
+        const last = getLastCheatsheet()
+        if (last) {
+          const match = list.find(c => c.name === last)
+          if (match) return match
+        }
+        return null
+      })
     } catch (err) {
       console.error('Failed to load cheatsheets:', err)
       toast('Failed to load cheatsheets list', { type: 'error' })
@@ -78,6 +108,21 @@ export default function CheatsheetsView() {
       setLoading(false)
     }
   }, [toast])
+
+  useEffect(() => {
+    if (!pendingCheatsheetName || cheatsheets.length === 0) return
+    const match = cheatsheets.find(c => c.name === pendingCheatsheetName)
+    if (match) {
+      setSelectedPdf(match)
+      setPendingCheatsheetName(null)
+    }
+  }, [pendingCheatsheetName, cheatsheets, setPendingCheatsheetName])
+
+  useEffect(() => {
+    if (selectedPdf?.name) {
+      setLastCheatsheet(selectedPdf.name)
+    }
+  }, [selectedPdf])
 
   useEffect(() => {
     loadCheatsheets()
@@ -322,6 +367,7 @@ export default function CheatsheetsView() {
 
       if (selectedPdf && selectedPdf.name === renamePdf.name) {
         setSelectedPdf(prev => prev ? { ...prev, name: newFileName } : null)
+        setLastCheatsheet(newFileName)
       }
 
       setRenamePdf(null)
@@ -352,6 +398,7 @@ export default function CheatsheetsView() {
       }
       if (selectedPdf && selectedPdf.name === deletePdf.name) {
         setSelectedPdf(null)
+        setLastCheatsheet(null)
       }
 
       setDeletePdf(null)
@@ -387,6 +434,44 @@ export default function CheatsheetsView() {
     const q = searchQuery.toLowerCase()
     return contentResults.filter(r => !r.name.toLowerCase().includes(q))
   }, [contentResults, searchQuery])
+
+
+  const contentHitFiles = useMemo(() => {
+    return contentOnlyHits
+      .map(hit => cheatsheets.find(c => c.name === hit.name))
+      .filter((c): c is CheatsheetFile => c != null)
+  }, [contentOnlyHits, cheatsheets])
+
+  const allVisibleItems = useMemo(
+    () => [...pinnedList, ...unpinnedList, ...contentHitFiles],
+    [pinnedList, unpinnedList, contentHitFiles]
+  )
+
+  const handleNavigateList = useCallback((direction: 1 | -1) => {
+    if (allVisibleItems.length === 0) return
+    const curIdx = selectedPdf ? allVisibleItems.findIndex(c => c.name === selectedPdf.name) : -1
+    let nextIdx: number
+    if (curIdx === -1) {
+      nextIdx = direction === 1 ? 0 : allVisibleItems.length - 1
+    } else {
+      nextIdx = Math.max(0, Math.min(allVisibleItems.length - 1, curIdx + direction))
+    }
+    const target = allVisibleItems[nextIdx]
+    if (target) {
+      setSelectedPdf(target)
+    }
+  }, [allVisibleItems, selectedPdf])
+
+  useEffect(() => {
+    if (!selectedPdf) return
+    requestAnimationFrame(() => {
+      const activeEl = listRef.current?.querySelector('.cheatsheet-item.active') as HTMLElement | null
+      if (typeof activeEl?.scrollIntoView === 'function') {
+        activeEl.scrollIntoView({ block: 'nearest' })
+      }
+    })
+  }, [selectedPdf])
+
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 B'
@@ -559,6 +644,7 @@ export default function CheatsheetsView() {
           display: flex;
           flex-direction: column;
           gap: var(--space-2);
+          outline: none;
         }
         .list-section-label {
           font-size: var(--text-2xs);
@@ -752,7 +838,21 @@ export default function CheatsheetsView() {
                 className="search-input"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Escape') setSearchQuery('') }}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') {
+                    setSearchQuery('')
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    handleNavigateList(1)
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    handleNavigateList(-1)
+                  } else if (e.key === 'Enter') {
+                    if (allVisibleItems.length > 0 && !selectedPdf) {
+                      setSelectedPdf(allVisibleItems[0])
+                    }
+                  }
+                }}
               />
             </div>
             <button
@@ -786,7 +886,27 @@ export default function CheatsheetsView() {
           </div>
         </div>
 
-        <div className="cheatsheet-list">
+        <div
+          ref={listRef}
+          className="cheatsheet-list"
+          tabIndex={0}
+          role="listbox"
+          aria-label="Cheatsheets list"
+          onKeyDown={e => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+            if (e.key === 'ArrowDown' || e.key === 'j') {
+              e.preventDefault()
+              handleNavigateList(1)
+            } else if (e.key === 'ArrowUp' || e.key === 'k') {
+              e.preventDefault()
+              handleNavigateList(-1)
+            } else if (e.key === 'Enter') {
+              if (allVisibleItems.length > 0 && !selectedPdf) {
+                setSelectedPdf(allVisibleItems[0])
+              }
+            }
+          }}
+        >
           {loading && cheatsheets.length === 0 ? (
             <SkeletonList label="Loading the cheatsheets" count={5} style={{ padding: 'var(--space-3)' }} />
           ) : pinnedList.length === 0 && unpinnedList.length === 0 && contentOnlyHits.length === 0 ? (

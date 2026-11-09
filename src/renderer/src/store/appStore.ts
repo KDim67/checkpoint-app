@@ -53,6 +53,8 @@ interface AppState {
   preselectedTaskId: string | null
   /** consumed and cleared by NotesView on mount */
   pendingNoteTitle: string | null
+  /** consumed and cleared by CheatsheetsView */
+  pendingCheatsheetName: string | null
   /** consumed and cleared by BacklogView */
   pendingViewId: string | null
   /** something to make on arrival, asked for from the palette; the view it belongs to clears it */
@@ -96,6 +98,7 @@ interface AppState {
   setWorkspaceList: (list: WorkspaceEntry[]) => void
   setPreselectedTaskId: (id: string | null) => void
   setPendingNoteTitle: (title: string | null) => void
+  setPendingCheatsheetName: (name: string | null) => void
   setPendingViewId: (id: string | null) => void
   setPendingCreate: (intent: CreateIntent | null) => void
   setPendingWallLink: (link: string | null) => void
@@ -133,6 +136,7 @@ export const useAppStore = create<AppState>()(
     selectedItemId: null,
     preselectedTaskId: null,
     pendingNoteTitle: null,
+    pendingCheatsheetName: null,
     pendingViewId: null,
     pendingCreate: null,
     pendingWallLink: null,
@@ -253,6 +257,11 @@ export const useAppStore = create<AppState>()(
     setPendingNoteTitle: (title: string | null) =>
       set(state => {
         state.pendingNoteTitle = title
+      }),
+
+    setPendingCheatsheetName: (name: string | null) =>
+      set(state => {
+        state.pendingCheatsheetName = name
       }),
 
     setPendingCreate: (intent: CreateIntent | null) =>

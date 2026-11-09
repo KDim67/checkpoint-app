@@ -37,6 +37,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
   const [savedViews, setSavedViews] = useState<SavedView[]>(BUILT_IN_VIEWS)
   const setPendingViewId = useAppStore(s => s.setPendingViewId)
   const setPendingNoteTitle = useAppStore(s => s.setPendingNoteTitle)
+  const setPendingCheatsheetName = useAppStore(s => s.setPendingCheatsheetName)
   const setPendingCreate = useAppStore(s => s.setPendingCreate)
   const setPendingWallLink = useAppStore(s => s.setPendingWallLink)
   const setPendingRenewalId = useAppStore(s => s.setPendingRenewalId)
@@ -148,6 +149,7 @@ export default function CommandPalette({ open, onClose }: Props): React.JSX.Elem
         setView('notes')
         break
       case 'cheatsheet':
+        setPendingCheatsheetName(hit.target)
         setView('cheatsheets')
         break
       case 'wall':
