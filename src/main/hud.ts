@@ -90,7 +90,7 @@ export function enableHud(shortcut: string = 'CommandOrControl+Shift+Space'): vo
   })
 
   if (!registered) {
-    console.error(`Failed to register global HUD hotkey: ${activeHotkey}`)
+    console.warn(`[shortcuts] Could not register global HUD hotkey "${activeHotkey}" — another application or Windows may already be using it.`)
     activeHotkey = ''
   }
 

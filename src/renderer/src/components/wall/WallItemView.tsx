@@ -378,14 +378,15 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
     )
   }
 
-  // outline plus label above, an annotation not a container
+  // outline rendered in vector SVG; title bar rendered here
   if (item.kind === 'frame') {
     const stroke = item.color || 'var(--color-surface-elevated)'
     return (
-      <div style={{ ...base, position: 'relative', overflow: 'visible' }}>
+      <div style={{ position: 'relative', width: '100%', height: '100%', pointerEvents: 'auto' }}>
         <div style={{
-          position: 'absolute', bottom: '100%', left: 0, marginBottom: '4px',
-          maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+          position: 'absolute', bottom: 0, left: 0,
+          maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          pointerEvents: 'auto', cursor: 'grab'
         }}>
           {editing ? (
             <input
@@ -405,12 +406,6 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
             </span>
           )}
         </div>
-        <div style={{
-          width: '100%', height: '100%',
-          border: `2px solid ${stroke}`,
-          borderRadius: 'var(--radius-md)',
-          background: 'transparent'
-        }} />
       </div>
     )
   }

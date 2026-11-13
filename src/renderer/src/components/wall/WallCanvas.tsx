@@ -215,20 +215,58 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         </div>
       )}
 
-      <div data-wall-camera-layer style={{
-        position: 'absolute', top: 0, left: 0,
-        transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-        transformOrigin: '0 0',
-        // promoted up front, or the first pan frame repaints the whole board
-        willChange: 'transform',
-      }}>
-        {/* one layer for all arrows, redrawn from their items */}
-        <svg
+      {/* 1. Vector layer: All frames, arrows, and gesture previews in a single viewport-bounded SVG */}
+      <svg
+        data-wall-vector-svg
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          pointerEvents: 'none',
+          zIndex: 1
+        }}
+      >
+        <g
+          data-wall-camera-layer
           style={{
-            position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
-            overflow: 'visible', pointerEvents: 'none', zIndex: 1
+            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+            transformOrigin: '0 0'
           }}
         >
+          {/* Frame outlines (drawn behind non-frame items) */}
+          {doc.items.filter(i => i.kind === 'frame').map(frame => {
+            const isSelected = selectedIds.has(frame.id)
+            const stroke = frame.color || 'var(--color-surface-elevated)'
+            return (
+              <g
+                key={frame.id}
+                data-wall-frame-wrap={frame.id}
+                style={{
+                  transform: `translate(${frame.x}px, ${frame.y}px)${frame.rotation ? ` rotate(${frame.rotation}deg)` : ''}`,
+                  transformOrigin: '0 0'
+                }}
+              >
+                <rect
+                  data-wall-item={frame.id}
+                  data-wall-frame-rect={frame.id}
+                  x={0}
+                  y={0}
+                  width={frame.width}
+                  height={frame.height}
+                  rx={8}
+                  ry={8}
+                  fill="none"
+                  stroke={isSelected ? 'var(--color-secondary)' : stroke}
+                  strokeWidth={isSelected ? 3 : 2}
+                  style={{ pointerEvents: 'stroke', cursor: 'grab' }}
+                />
+              </g>
+            )
+          })}
+
+          {/* Arrows */}
           {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
             const ends = arrowAnchors(arrow, itemsById)
             if (!ends) return null
@@ -237,7 +275,6 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             const stroke = arrow.color || 'var(--color-text-muted)'
             const selected = selectedIds.has(arrow.id)
             const heads = arrow.arrowHeads ?? ARROW_HEAD_MODES[0]
-            // stop behind heads so thick strokes don't fill the notch
             const inset = arrowHeadInset(width)
             const g = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0], {
               end: heads !== 'none' ? inset : 0,
@@ -245,7 +282,11 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             })
 
             return (
-              <g key={arrow.id} data-wall-arrow={arrow.id} opacity={searching ? 0.2 : selected ? 1 : 0.85}>
+              <g
+                key={arrow.id}
+                data-wall-arrow={arrow.id}
+                opacity={searching ? 0.2 : selected ? 1 : 0.85}
+              >
                 <path
                   d={g.d}
                   fill="none"
@@ -265,12 +306,11 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             )
           })}
 
-          {/* drawn in its final style */}
+          {/* arrowDrag preview */}
           {arrowDrag && (() => {
             const from = itemsById.get(arrowDrag.fromId)
             if (!from) return null
 
-            // snap to the item under the pointer, else follow it
             const target = arrowDrag.overId ? itemsById.get(arrowDrag.overId) : undefined
             const landing: WallItem = target ?? {
               id: '', kind: 'note', z: 0,
@@ -302,12 +342,9 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               </g>
             )
           })()}
-        </svg>
 
-        {/* not an item until the pointer comes up */}
-        {drawing && drawing.length > 1 && (
-          <svg style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', overflow: 'visible', pointerEvents: 'none', zIndex: 2 }}>
-            {/* the lasso is a dashed loop a screen pixel wide, the pens preview the stroke they'll leave */}
+          {/* drawing preview (pen / highlighter / lasso) */}
+          {drawing && drawing.length > 1 && (
             <polyline
               points={drawing.map(pt => `${pt.x},${pt.y}`).join(' ')}
               fill="none"
@@ -318,8 +355,17 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-          </svg>
-        )}
+          )}
+        </g>
+      </svg>
+
+      {/* 2. Interactive HTML Layer for notes, images, cards, inputs */}
+      <div data-wall-camera-layer style={{
+        position: 'absolute', top: 0, left: 0,
+        transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+        transformOrigin: '0 0',
+        zIndex: 2
+      }}>
 
         {inPaintOrder(doc.items).filter(i => i.kind !== 'arrow').map(item => {
           const isSelected = selectedIds.has(item.id)
@@ -364,119 +410,104 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         {WALL_GAP_SLOTS.map(slot => (
           <div key={slot} data-wall-gap={slot} className="wall-gap-guide" style={{ display: 'none' }} />
         ))}
-      </div>
 
-      {/* Remote peer cursors layer */}
-      <div data-wall-camera-layer style={{
-        position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
-        transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-        transformOrigin: '0 0', zIndex: 20, pointerEvents: 'none',
-        willChange: 'transform'
-      }}>
-        <WallRemotePresence cursors={remoteCursors} zoom={camera.zoom} />
-      </div>
+        {/* Remote peer cursors layer inside main camera container */}
+        <div style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', zIndex: 20, pointerEvents: 'none' }}>
+          <WallRemotePresence cursors={remoteCursors} zoom={camera.zoom} />
+        </div>
 
-      {/* labels above lines and items; arrow labels live in text like frames */}
-      <div data-wall-camera-layer style={{
-        position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
-        transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-        transformOrigin: '0 0', zIndex: 5, pointerEvents: 'none',
-        willChange: 'transform'
-      }}>
-        {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
-          const editing = editingId === arrow.id
-          if (!arrow.text && !editing) return null
+        {/* labels above lines and items; arrow labels live in text like frames */}
+        <div style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', zIndex: 5, pointerEvents: 'none' }}>
+          {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
+            const editing = editingId === arrow.id
+            if (!arrow.text && !editing) return null
 
-          const ends = arrowAnchors(arrow, itemsById)
-          if (!ends) return null
-          const { mid } = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0])
+            const ends = arrowAnchors(arrow, itemsById)
+            if (!ends) return null
+            const { mid } = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0])
 
-          return (
-            <div
-              key={arrow.id}
-              data-arrow-label={arrow.id}
-              onPointerDown={e => { e.stopPropagation(); setSelectedIds(new Set([arrow.id])) }}
-              onDoubleClick={e => { e.stopPropagation(); setEditingId(arrow.id) }}
-              style={{
-                position: 'absolute', left: 0, top: 0,
-                transform: `translate(${mid.x}px, ${mid.y}px) translate(-50%, -50%)`,
-                maxWidth: '220px',
-                padding: '2px 6px',
-                background: 'var(--color-surface-1)',
-                border: `1px solid ${selectedIds.has(arrow.id) ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
-                borderRadius: 'var(--radius-sm)',
-                color: 'var(--color-text-base)',
-                fontSize: '12px', lineHeight: 1.3,
-                pointerEvents: 'auto', cursor: 'text'
-              }}
-            >
-              {editing ? (
-                <input
-                  autoFocus
-                  defaultValue={arrow.text ?? ''}
-                  placeholder="Label"
-                  onBlur={e => {
-                    setEditingId(null)
-                    const text = e.target.value.trim()
-                    // an emptied label is removed, not a blank chip
-                    setItems(patchItems(docRef.current.items, new Set([arrow.id]), {
-                      text: text || undefined
-                    }))
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
-                  }}
-                  style={{
-                    width: '120px', background: 'none', border: 'none', outline: 'none',
-                    color: 'var(--color-text-base)', font: 'inherit', padding: 0
-                  }}
-                />
-              ) : (
-                <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{arrow.text}</span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* both ends grabbable, sized against zoom */}
-      {single?.kind === 'arrow' && (() => {
-        const ends = arrowAnchors(single, itemsById)
-        if (!ends) return null
-
-        const heads = single.arrowHeads ?? ARROW_HEAD_MODES[0]
-        const g = arrowGeometry(ends.from, ends.to, single.arrowShape ?? ARROW_SHAPES[0])
-        const size = 12 / camera.zoom
-        const ring = 2 / camera.zoom
-
-        return (
-          <div data-wall-camera-layer style={{
-            position: 'absolute', left: 0, top: 0, width: '1px', height: '1px',
-            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
-            transformOrigin: '0 0', zIndex: 6,
-            willChange: 'transform'
-          }}>
-            {([['start', g.start], ['end', g.end]] as const).map(([which, at]) => (
+            return (
               <div
-                key={which}
-                data-arrow-handle={which}
-                title={which === 'end' ? 'Drag to point somewhere else' : 'Drag to start somewhere else'}
+                key={arrow.id}
+                data-arrow-label={arrow.id}
+                onPointerDown={e => { e.stopPropagation(); setSelectedIds(new Set([arrow.id])) }}
+                onDoubleClick={e => { e.stopPropagation(); setEditingId(arrow.id) }}
                 style={{
                   position: 'absolute', left: 0, top: 0,
-                  width: `${size}px`, height: `${size}px`, boxSizing: 'border-box',
-                  transform: `translate3d(${at.x - size / 2}px, ${at.y - size / 2}px, 0)`,
-                  borderRadius: '50%',
-                  background: 'var(--color-surface-elevated)',
-                  border: `${ring}px solid var(--color-secondary)`,
-                  // square tail, round head
-                  ...(which === 'start' && heads !== 'both' ? { borderRadius: '20%' } : {}),
-                  cursor: 'grab'
+                  transform: `translate(${mid.x}px, ${mid.y}px) translate(-50%, -50%)`,
+                  maxWidth: '220px',
+                  padding: '2px 6px',
+                  background: 'var(--color-surface-1)',
+                  border: `1px solid ${selectedIds.has(arrow.id) ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-base)',
+                  fontSize: '12px', lineHeight: 1.3,
+                  pointerEvents: 'auto', cursor: 'text'
                 }}
-              />
-            ))}
-          </div>
-        )
-      })()}
+              >
+                {editing ? (
+                  <input
+                    autoFocus
+                    defaultValue={arrow.text ?? ''}
+                    placeholder="Label"
+                    onBlur={e => {
+                      setEditingId(null)
+                      const text = e.target.value.trim()
+                      // an emptied label is removed, not a blank chip
+                      setItems(patchItems(docRef.current.items, new Set([arrow.id]), {
+                        text: text || undefined
+                      }))
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
+                    }}
+                    style={{
+                      width: '120px', background: 'none', border: 'none', outline: 'none',
+                      color: 'var(--color-text-base)', font: 'inherit', padding: 0
+                    }}
+                  />
+                ) : (
+                  <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{arrow.text}</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* both ends grabbable, sized against zoom */}
+        {single?.kind === 'arrow' && (() => {
+          const ends = arrowAnchors(single, itemsById)
+          if (!ends) return null
+
+          const heads = single.arrowHeads ?? ARROW_HEAD_MODES[0]
+          const g = arrowGeometry(ends.from, ends.to, single.arrowShape ?? ARROW_SHAPES[0])
+          const size = 12 / camera.zoom
+          const ring = 2 / camera.zoom
+
+          return (
+            <div style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', zIndex: 6 }}>
+              {([['start', g.start], ['end', g.end]] as const).map(([which, at]) => (
+                <div
+                  key={which}
+                  data-arrow-handle={which}
+                  title={which === 'end' ? 'Drag to point somewhere else' : 'Drag to start somewhere else'}
+                  style={{
+                    position: 'absolute', left: 0, top: 0,
+                    width: `${size}px`, height: `${size}px`, boxSizing: 'border-box',
+                    transform: `translate3d(${at.x - size / 2}px, ${at.y - size / 2}px, 0)`,
+                    borderRadius: '50%',
+                    background: 'var(--color-surface-elevated)',
+                    border: `${ring}px solid var(--color-secondary)`,
+                    // square tail, round head
+                    ...(which === 'start' && heads !== 'both' ? { borderRadius: '20%' } : {}),
+                    cursor: 'grab'
+                  }}
+                />
+              ))}
+            </div>
+          )
+        })()}
+      </div>
 
       {/* screen space, doesn't scale with the camera */}
       {marquee && (() => {

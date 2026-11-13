@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { boundsOf as wallBounds, type WallCamera, type WallDoc, type WallItem } from '../../../../shared/wallModel'
 
 interface WallMinimapProps {
@@ -10,9 +11,26 @@ interface WallMinimapProps {
 }
 
 export default function WallMinimap({ items, selectedIds, camera, viewportRef, docRef, setCamera }: WallMinimapProps) {
+  const [viewportSize, setViewportSize] = useState<{ width: number; height: number } | null>(() => {
+    const r = viewportRef.current?.getBoundingClientRect()
+    return r && r.width > 0 && r.height > 0 ? { width: r.width, height: r.height } : null
+  })
+
+  useEffect(() => {
+    const measure = () => {
+      const r = viewportRef.current?.getBoundingClientRect()
+      if (r && r.width > 0 && r.height > 0) {
+        setViewportSize(prev => (prev?.width === r.width && prev?.height === r.height ? prev : { width: r.width, height: r.height }))
+      }
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [viewportRef])
+
   const b = wallBounds(items)
-  const rect = viewportRef.current?.getBoundingClientRect()
-  if (!b || !rect) return null
+  const rect = viewportSize ?? (viewportRef.current?.getBoundingClientRect() ? { width: viewportRef.current.getBoundingClientRect().width, height: viewportRef.current.getBoundingClientRect().height } : null)
+  if (!b || !rect || rect.width <= 0 || rect.height <= 0) return null
 
   const W = 150
   const H = 110
@@ -62,7 +80,8 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
             position: 'absolute',
             left: `${i.x * k + ox}px`, top: `${i.y * k + oy}px`,
             width: `${Math.max(2, i.width * k)}px`, height: `${Math.max(2, i.height * k)}px`,
-            background: i.color || 'var(--color-surface-offset)',
+            background: i.kind === 'frame' ? 'transparent' : (i.color || 'var(--color-surface-offset)'),
+            border: i.kind === 'frame' ? `1px solid ${i.color || 'var(--color-surface-elevated)'}` : undefined,
             borderRadius: '1px',
             opacity: selectedIds.has(i.id) ? 1 : 0.7
           }}

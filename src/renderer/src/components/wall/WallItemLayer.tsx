@@ -48,12 +48,12 @@ interface Props {
   onCrop?: (id: string, crop: ImageCrop | null) => void
 }
 
-/** a grip on each corner, and the resize cursor that points along its diagonal */
-const CORNER_HANDLES: { corner: Corner; place: React.CSSProperties; cursor: string }[] = [
-  { corner: 'nw', place: { left: '-11px', top: '-11px' }, cursor: 'nwse-resize' },
-  { corner: 'ne', place: { right: '-11px', top: '-11px' }, cursor: 'nesw-resize' },
-  { corner: 'sw', place: { left: '-11px', bottom: '-11px' }, cursor: 'nesw-resize' },
-  { corner: 'se', place: { right: '-11px', bottom: '-11px' }, cursor: 'nwse-resize' }
+/** a grip on each corner, positioned relative to item dimensions */
+const CORNER_HANDLES: { corner: Corner; getPlace: (item: WallItem) => React.CSSProperties; cursor: string }[] = [
+  { corner: 'nw', getPlace: () => ({ left: '-11px', top: '-11px' }), cursor: 'nwse-resize' },
+  { corner: 'ne', getPlace: i => ({ left: `${i.width - 11}px`, top: '-11px' }), cursor: 'nesw-resize' },
+  { corner: 'sw', getPlace: i => ({ left: '-11px', top: `${i.height - 11}px` }), cursor: 'nesw-resize' },
+  { corner: 'se', getPlace: i => ({ left: `${i.width - 11}px`, top: `${i.height - 11}px` }), cursor: 'nwse-resize' }
 ]
 
 /** memoised: the box around each item cost ~90ms a render; selection is a data attribute, not a prop */
@@ -73,22 +73,24 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
       style={{
         position: 'absolute',
         left: 0, top: 0,
-        width: `${item.width}px`, height: `${item.height}px`,
+        // frames only need layout room for their title bar; their outline is rendered in vector SVG
+        width: `${item.kind === 'frame' ? Math.min(item.width, 600) : item.width}px`,
+        height: `${item.kind === 'frame' ? 26 : item.height}px`,
         // 2D translate: no layout, and translate3d gave hundreds of items their own layers
         transform: `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`,
-        // own layer so canvas repaints don't re-rasterise big photos
-        willChange: item.kind === 'image' ? 'transform' : undefined,
-        // ink lets presses through, only the stroke takes them
+        // camera layer handles GPU transforms; ink passes presses through to items beneath
         pointerEvents: item.kind === 'ink' ? 'none' : undefined,
         cursor: item.locked ? 'default' : 'grab',
-        // selected outline lives in index.css via data-wall-selected
-        outline: arrowTarget
-          ? '3px solid var(--color-secondary)'
-          : arrowFrom
-            ? '2px dashed var(--color-secondary)'
-            : remoteSelectedBy && remoteSelectedBy.length > 0
-              ? `2px solid ${remoteSelectedBy[0].color}`
-              : undefined,
+        // selected outline lives in index.css via data-wall-selected; frames outline themselves in SVG
+        outline: item.kind === 'frame'
+          ? 'none'
+          : arrowTarget
+            ? '3px solid var(--color-secondary)'
+            : arrowFrom
+              ? '2px dashed var(--color-secondary)'
+              : remoteSelectedBy && remoteSelectedBy.length > 0
+                ? `2px solid ${remoteSelectedBy[0].color}`
+                : undefined,
         outlineOffset: '2px'
       }}
     >
@@ -209,13 +211,13 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
       {showHandles && !cropping && (
         <>
           {/* every corner pulls, the opposite one stays; 22px grab area around a 12px dot */}
-          {CORNER_HANDLES.map(({ corner, place, cursor }) => (
+          {CORNER_HANDLES.map(({ corner, getPlace, cursor }) => (
             <div
               key={corner}
               data-wall-handle={corner}
               title={item.kind === 'image' ? 'Drag to resize, hold Shift to stretch' : 'Drag to resize, hold Shift to keep the shape'}
               style={{
-                position: 'absolute', ...place, width: '22px', height: '22px',
+                position: 'absolute', ...getPlace(item), width: '22px', height: '22px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor
               }}
@@ -231,7 +233,10 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
             data-wall-handle="rotate"
             title="Drag to rotate, hold Shift for 15° steps"
             style={{
-              position: 'absolute', left: '50%', top: '-30px', transform: 'translateX(-50%)',
+              position: 'absolute',
+              left: `${item.kind === 'frame' ? item.width / 2 : '50%'}`,
+              top: '-30px',
+              transform: 'translateX(-50%)',
               width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'grab'
             }}

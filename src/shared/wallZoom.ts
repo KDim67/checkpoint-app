@@ -3,7 +3,7 @@
 import { MAX_ZOOM, MIN_ZOOM, toWallPoint, type WallCamera } from './wallModel'
 
 /** round numbers people recognise in the percentage beside the toolbar */
-export const ZOOM_STEPS = [MIN_ZOOM, 0.25, 0.33, 0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 2.5, MAX_ZOOM]
+export const ZOOM_STEPS = [MIN_ZOOM, 0.05, 0.1, 0.15, 0.2, 0.25, 0.33, 0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 2.5, MAX_ZOOM]
 
 /** the next level that way; from between two levels, the nearer one in that direction */
 export function nextZoom(zoom: number, direction: 1 | -1): number {

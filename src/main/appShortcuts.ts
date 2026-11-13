@@ -57,7 +57,7 @@ export function registerAppShortcuts(): void {
   })
 
   if (!registered) {
-    console.error(`Failed to register global clipboard hotkey: ${activeClipboardHotkey}`)
+    console.warn(`[shortcuts] Could not register global clipboard hotkey "${activeClipboardHotkey}" — another application or Windows may already be using it.`)
     activeClipboardHotkey = ''
   }
 }

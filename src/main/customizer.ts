@@ -77,6 +77,7 @@ export async function enableCustomizer(): Promise<void> {
       persistent: true,
       ignoreInitial: true,      // skip files already there at start
       depth: 1,                 // root and plugins/ only
+      ignored: [/[\\/](media|cache|notes)[\\/]/],
       awaitWriteFinish: {
         stabilityThreshold: 100,
         pollInterval: 50
@@ -87,6 +88,10 @@ export async function enableCustomizer(): Promise<void> {
       .on('add', (filePath: string) => handleFileChange(filePath))
       .on('change', (filePath: string) => handleFileChange(filePath))
       .on('unlink', (filePath: string) => handleFileChange(filePath))
+      .on('error', (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`[customizer] Watcher error (ignored): ${msg}`)
+      })
 
     console.log(`[customizer] Started file watcher on ${configDir}`)
   } catch (err) {

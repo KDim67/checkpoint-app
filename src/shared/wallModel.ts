@@ -164,8 +164,14 @@ export const MAX_FONT_SIZE = 200
 export const fontSizeOf = (item: WallItem): number =>
   item.fontSize ?? OWN_FONT_SIZES[item.kind] ?? 13
 
-export const MIN_ZOOM = 0.2
+export const MIN_ZOOM = 0.02
 export const MAX_ZOOM = 3
+
+/** items beyond this coordinate are clamped; prevents SVG/CSS rendering overflow */
+export const MAX_COORD = 50_000
+
+/** clamp a single coordinate to the safe range */
+const clampCoord = (v: number): number => (Number.isFinite(v) ? Math.max(-MAX_COORD, Math.min(MAX_COORD, v)) : v)
 
 /** legible when dropped, no resize needed */
 export const DEFAULT_SIZES: Record<WallItemKind, { width: number; height: number }> = {
@@ -354,8 +360,8 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   return {
     id: str(o.id).trim() || `w${index}-${Math.random().toString(36).slice(2, 8)}`,
     kind,
-    x: num(o.x, 0),
-    y: num(o.y, 0),
+    x: clampCoord(num(o.x, 0)),
+    y: clampCoord(num(o.y, 0)),
     // floors: zero-size items are unclickable
     width: Math.max(40, num(o.width, size.width)),
     height: Math.max(32, num(o.height, size.height)),
@@ -371,8 +377,8 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
     // the item wins over a stale point
-    ...(!from && fromPoint ? { fromPoint } : {}),
-    ...(!to && toPoint ? { toPoint } : {}),
+    ...(!from && fromPoint ? { fromPoint: { x: clampCoord(fromPoint.x), y: clampCoord(fromPoint.y) } } : {}),
+    ...(!to && toPoint ? { toPoint: { x: clampCoord(toPoint.x), y: clampCoord(toPoint.y) } } : {}),
     // defaults left out, only restyled arrows carry it
     ...(arrowShape && arrowShape !== ARROW_SHAPES[0] ? { arrowShape } : {}),
     ...(arrowLine && arrowLine !== ARROW_LINES[0] ? { arrowLine } : {}),
@@ -464,9 +470,14 @@ export function sendToBack(items: WallItem[], id: string): WallItem[] {
   return items.map(i => (i.id === id ? { ...i, z: min } : i))
 }
 
-/** lowest z first */
+/** lowest z first; frames paint behind contents so they never occlude items */
 export function inPaintOrder(items: WallItem[]): WallItem[] {
-  return [...items].sort((a, b) => a.z - b.z)
+  return [...items].sort((a, b) => {
+    const aFrame = a.kind === 'frame' ? 0 : 1
+    const bFrame = b.kind === 'frame' ? 0 : 1
+    if (aFrame !== bFrame) return aFrame - bFrame
+    return a.z - b.z
+  })
 }
 
 export interface Bounds { minX: number; minY: number; maxX: number; maxY: number }
@@ -609,7 +620,7 @@ export function itemsInRect(items: WallItem[], rect: Rect): string[] {
 /** locked ones stay put */
 export function moveItems(items: WallItem[], ids: Set<string>, dx: number, dy: number): WallItem[] {
   return items.map(i =>
-    ids.has(i.id) && !i.locked ? { ...i, x: i.x + dx, y: i.y + dy } : i
+    ids.has(i.id) && !i.locked ? { ...i, x: clampCoord(i.x + dx), y: clampCoord(i.y + dy) } : i
   )
 }
 
@@ -619,7 +630,13 @@ export function patchItems(
   ids: Set<string>,
   patch: Partial<WallItem>
 ): WallItem[] {
-  return items.map(i => (ids.has(i.id) && !i.locked ? { ...i, ...patch } : i))
+  return items.map(i => {
+    if (!ids.has(i.id) || i.locked) return i
+    const next = { ...i, ...patch }
+    if (typeof next.x === 'number') next.x = clampCoord(next.x)
+    if (typeof next.y === 'number') next.y = clampCoord(next.y)
+    return next
+  })
 }
 
 /** offset from the originals; the caller appends and selects */
@@ -635,8 +652,8 @@ export function duplicateItems(
       const copy: WallItem = {
         ...i,
         id: `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-        x: i.x + offset,
-        y: i.y + offset,
+        x: clampCoord(i.x + offset),
+        y: clampCoord(i.y + offset),
         z: z++
       }
       // copies arrive unlocked so a locked background's copy can be moved
@@ -660,22 +677,29 @@ export const MIN_GRID_PX = 12
 export function gridSpacing(zoom: number): number {
   if (!(zoom > 0)) return SNAP_GRID
   let step = SNAP_GRID
-  while (step * zoom < MIN_GRID_PX) step *= 2
+  while (step * zoom < MIN_GRID_PX && step < 10000) step *= 2
   return step * zoom
 }
 
 /** pointer capture retargets clicks, so hit-test by point; unrotated box */
 export function itemAtPoint(items: WallItem[], point: { x: number; y: number }): WallItem | null {
   let hit: WallItem | null = null
+  let hitFrame: WallItem | null = null
   for (const i of items) {
     // arrow and ink boxes aren't their shape, don't let them block
     if (i.kind === 'arrow' || i.kind === 'ink') continue
     const inside =
       point.x >= i.x && point.x <= i.x + i.width &&
       point.y >= i.y && point.y <= i.y + i.height
-    if (inside && (!hit || i.z > hit.z)) hit = i
+    if (inside) {
+      if (i.kind === 'frame') {
+        if (!hitFrame || i.z > hitFrame.z) hitFrame = i
+      } else {
+        if (!hit || i.z > hit.z) hit = i
+      }
+    }
   }
-  return hit
+  return hit ?? hitFrame
 }
 
 /** keeps zoom */

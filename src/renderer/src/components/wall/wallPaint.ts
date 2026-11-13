@@ -66,7 +66,7 @@ export function paintWallGaps(viewport: HTMLElement, gaps: GapMark[], zoom: numb
 
 export function paintWallCamera(viewport: HTMLElement, cam: WallCamera): void {
   const transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.zoom})`
-  viewport.querySelectorAll<HTMLElement>('[data-wall-camera-layer]').forEach(layer => {
+  viewport.querySelectorAll<HTMLElement | SVGElement>('[data-wall-camera-layer]').forEach(layer => {
     layer.style.transform = transform
   })
   viewport.style.backgroundPosition = `${cam.x}px ${cam.y}px`
@@ -99,9 +99,22 @@ export function paintWallSelection(
 
   touched.forEach(id => {
     const el = viewport.querySelector<HTMLElement>(`[data-wall-item="${id}"]`)
-    if (!el) return
-    if (next.has(id)) el.setAttribute('data-wall-selected', '')
-    else el.removeAttribute('data-wall-selected')
+    if (el) {
+      if (next.has(id)) el.setAttribute('data-wall-selected', '')
+      else el.removeAttribute('data-wall-selected')
+    }
+    const frameRect = viewport.querySelector<SVGRectElement>(`[data-wall-frame-rect="${id}"]`)
+    if (frameRect) {
+      const item = items.find(i => i.id === id)
+      const defaultStroke = item?.color || 'var(--color-surface-elevated)'
+      if (next.has(id)) {
+        frameRect.setAttribute('stroke', 'var(--color-secondary)')
+        frameRect.setAttribute('stroke-width', '3')
+      } else {
+        frameRect.setAttribute('stroke', defaultStroke)
+        frameRect.setAttribute('stroke-width', '2')
+      }
+    }
   })
   return new Set(next)
 }
@@ -111,9 +124,15 @@ export function paintWallItems(viewport: HTMLElement, items: WallItem[], ids: Se
 
   ids.forEach(id => {
     const item = byId.get(id)
+    if (!item) return
     const el = viewport.querySelector<HTMLElement>(`[data-wall-item="${id}"]`)
-    if (!item || !el) return
-    el.style.transform = `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`
+    if (el) {
+      el.style.transform = `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`
+    }
+    const frameWrap = viewport.querySelector<SVGGElement>(`[data-wall-frame-wrap="${id}"]`)
+    if (frameWrap) {
+      frameWrap.style.transform = `translate(${item.x}px, ${item.y}px)${item.rotation ? ` rotate(${item.rotation}deg)` : ''}`
+    }
   })
 
   // arrows on moving items redraw from both ends
