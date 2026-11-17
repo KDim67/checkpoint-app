@@ -213,14 +213,28 @@ export default function KanbanView() {
   const columnSortableIds = columns.map(c => `col::${c.id}`)
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      background: getBoardBackgroundStyle(boardBg),
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
+    <div
+      onDragOver={e => {
+        if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+      }}
+      onDrop={async e => {
+        const files = Array.from(e.dataTransfer.files ?? [])
+        const jsonFile = files.find(f => f.name.toLowerCase().endsWith('.json') || f.type === 'application/json')
+        if (jsonFile) {
+          e.preventDefault()
+          const text = await jsonFile.text()
+          void kanbanBoard.handleImportBoard(text)
+        }
+      }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        background: getBoardBackgroundStyle(boardBg),
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
       <KanbanHeader kanbanBoard={kanbanBoard} />
 
       <KanbanFilterBar kanbanBoard={kanbanBoard} />

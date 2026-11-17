@@ -28,7 +28,7 @@ export function useKanbanBoard() {
     handleClearColumnCards, handleArchiveColumn, handleUpdateCardDetails, handleCardDelete,
     handleCardConvertToTask, handleAddCardToColumn, handleCreateCardFromTemplate,
     handleRestoreColumn, handleDeleteColumnPermanently, handleRestoreCard, handleBulkDeleteArchived,
-    handleBulkRestoreArchived, handleDeleteArchivedCard, templateCards
+    handleBulkRestoreArchived, handleDeleteArchivedCard, handleExportBoard, handleImportBoard, templateCards
   } = boardActions
 
   return {
@@ -106,6 +106,8 @@ export function useKanbanBoard() {
     handleBulkDeleteArchived,
     handleBulkRestoreArchived,
     handleDeleteArchivedCard,
+    handleExportBoard,
+    handleImportBoard,
     templateCards
   }
 }

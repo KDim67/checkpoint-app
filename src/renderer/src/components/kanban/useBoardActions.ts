@@ -3,6 +3,11 @@ import type { Item } from '../../../../shared/types'
 import { useFailureReport } from '../ui/Toast'
 import { bulkUpdateItems, createItem, deleteItem, updateItem } from '../../data/items'
 import { cardFromTemplate, isTemplateCard } from '../../../../shared/cardTemplates'
+import { buildKanbanJsonExport, parseKanbanJsonExport } from '../../../../shared/kanbanExport'
+import { loadBoardConfig } from '../../lib/boardConfig'
+import { tagResolver } from '../../data/tags'
+import * as appApi from '../../data/app'
+import { errorMessage } from '../../../../shared/errors'
 import type { BoardState } from './useBoardState'
 
 export function useBoardActions(boardState: BoardState) {
@@ -419,6 +424,78 @@ export function useBoardActions(boardState: BoardState) {
     if (!showArchiveBin) setSelectedArchived(new Set())
   }, [setSelectedArchived, showArchiveBin])
 
+  const handleExportBoard = useCallback(async () => {
+    try {
+      const config = await loadBoardConfig(activeWorkspace)
+      const exportPayload = buildKanbanJsonExport(config, cards, activeWorkspace)
+      const defaultName = `${activeWorkspace}-kanban.json`.replace(/[^\w.-]+/g, '-')
+      const json = JSON.stringify(exportPayload, null, 2)
+      const data = new TextEncoder().encode(json).buffer as ArrayBuffer
+      if (await appApi.saveBinaryFile(defaultName, data, 'json')) {
+        toast('Board exported.')
+      }
+    } catch (err) {
+      toast(`Export failed: ${errorMessage(err)}`, { type: 'error' })
+    }
+  }, [activeWorkspace, cards, toast])
+
+  const handleImportBoard = useCallback(async (content: string | unknown): Promise<boolean> => {
+    try {
+      const parsed = parseKanbanJsonExport(content)
+      if (!parsed || parsed.cards.length === 0) {
+        toast('No cards found in the file to import.', { type: 'error' })
+        return false
+      }
+
+      // 1. If board config has columns, ensure all target columns exist or add missing ones
+      let currentCols = [...columnsRef.current]
+      const existingColIds = new Set(currentCols.map(c => c.id))
+      const missingCols = (parsed.config?.columns ?? []).filter(c => !existingColIds.has(c.id))
+      if (missingCols.length > 0) {
+        currentCols = [...currentCols, ...missingCols]
+        await persistColumns(currentCols)
+        setColumns(currentCols)
+      }
+
+      const fallbackColId = currentCols[0]?.id ?? 'todo'
+      const resolveTags = await tagResolver()
+
+      // 2. Import cards
+      let importedCount = 0
+      for (const card of parsed.cards) {
+        const colId = (card.status && currentCols.some(c => c.id === card.status))
+          ? card.status
+          : fallbackColId
+
+        let tagIds: string[] = []
+        if (card.tags && card.tags.length > 0) {
+          const resolved = await resolveTags(card.tags.map(t => ({ name: t.name, color: t.color || '#535e85' })))
+          tagIds = resolved.map(t => t.id)
+        }
+
+        await createItem({
+          type: 'card',
+          context: activeWorkspace,
+          title: card.title,
+          body: card.body ?? '',
+          status: colId,
+          priority: card.priority ?? 0,
+          position: card.position ?? (Date.now() + importedCount * 10),
+          due_at: card.due_at ?? null,
+          metadata: card.metadata ?? '{}'
+        }, tagIds)
+        importedCount++
+      }
+
+      await loadCards()
+      toast(`Imported ${importedCount} card${importedCount === 1 ? '' : 's'} to Kanban board.`, { id: 'kanban-import' })
+      return true
+    } catch (err) {
+      toast(`Import failed: ${errorMessage(err)}`, { type: 'error' })
+      return false
+    }
+  }, [activeWorkspace, columnsRef, persistColumns, setColumns, loadCards, toast])
+
   const templateCards = cards.filter(isTemplateCard)
 
   return {
@@ -439,6 +516,8 @@ export function useBoardActions(boardState: BoardState) {
     handleBulkDeleteArchived,
     handleBulkRestoreArchived,
     handleDeleteArchivedCard,
+    handleExportBoard,
+    handleImportBoard,
     templateCards
   }
 }

@@ -135,4 +135,34 @@ describe('WallMinimap', () => {
     const zoomedIn = setCamera.mock.calls[0][0]
     expect(zoomedIn.zoom).toBeGreaterThan(1)
   })
+
+  it('highlights selected items and renders connector lines on the minimap', () => {
+    const itemsWithArrow: WallItem[] = [
+      ...items,
+      { id: 'arr-1', kind: 'arrow', x: 100, y: 0, width: 200, height: 50, from: '1', to: '2', z: 4 }
+    ]
+
+    const { container } = render(
+      <WallMinimap
+        items={itemsWithArrow}
+        selectedIds={new Set(['arr-1', '1'])}
+        camera={defaultCamera}
+        viewportRef={{ current: viewportEl }}
+        docRef={docRef}
+        setCamera={setCamera}
+      />
+    )
+
+    const connectors = container.querySelector('[data-wall-minimap-connectors]')
+    expect(connectors).toBeTruthy()
+
+    const arrowLine = container.querySelector('[data-minimap-arrow="arr-1"]') as SVGLineElement
+    expect(arrowLine).toBeTruthy()
+    expect(arrowLine.getAttribute('stroke')).toBe('var(--color-secondary, #38bdf8)')
+    expect(arrowLine.getAttribute('stroke-width')).toBe('2')
+
+    const selectedItem = container.querySelector('[data-minimap-item="1"]') as HTMLDivElement
+    expect(selectedItem).toBeTruthy()
+    expect(selectedItem.style.outline).toContain('var(--color-secondary')
+  })
 })

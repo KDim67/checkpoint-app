@@ -6,6 +6,7 @@ import CollabPresenceRoster from '../collab/CollabPresenceRoster'
 import HeaderBtn from './HeaderBtn'
 import TemplateMenu from './TemplateMenu'
 import BoardThemeMenu from './BoardThemeMenu'
+import BoardExportMenu from './BoardExportMenu'
 import type { KanbanBoard } from './useKanbanBoard'
 import { useAppStore } from '../../store/appStore'
 
@@ -141,6 +142,7 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
         <CollabPanel session={collab} />
 
         <BoardThemeMenu theme={theme} persistConfig={persistConfig} />
+        <BoardExportMenu kanbanBoard={kanbanBoard} />
 
         <HeaderBtn
           onClick={() => setShowArchiveBin(true)}

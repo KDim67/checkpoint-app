@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { boundsOf as wallBounds, MAX_ZOOM, MIN_ZOOM, type WallCamera, type WallDoc, type WallItem } from '../../../../shared/wallModel'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { arrowAnchors, boundsOf as wallBounds, MAX_ZOOM, MIN_ZOOM, type WallCamera, type WallDoc, type WallItem } from '../../../../shared/wallModel'
 import { paintWallCamera } from './wallPaint'
 
 interface WallMinimapProps {
@@ -37,6 +37,7 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
     }
   }, [viewportRef])
 
+  const itemsById = useMemo(() => new Map(items.map(i => [i.id, i])), [items])
   const b = wallBounds(items)
   const rect = viewportSize ?? (viewportRef.current?.getBoundingClientRect() ? { width: viewportRef.current.getBoundingClientRect().width, height: viewportRef.current.getBoundingClientRect().height } : null)
   if (!b || !rect || rect.width <= 0 || rect.height <= 0) return null
@@ -174,21 +175,60 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
         touchAction: 'none'
       }}
     >
-      {items.filter(i => i.kind !== 'arrow').map(i => (
-        <div
-          key={i.id}
-          style={{
-            position: 'absolute',
-            left: `${i.x * k + ox}px`, top: `${i.y * k + oy}px`,
-            width: `${Math.max(2, i.width * k)}px`, height: `${Math.max(2, i.height * k)}px`,
-            background: i.kind === 'frame' ? 'transparent' : (i.color || 'var(--color-surface-offset)'),
-            border: i.kind === 'frame' ? `1px solid ${i.color || 'var(--color-surface-elevated)'}` : undefined,
-            borderRadius: '1px',
-            opacity: selectedIds.has(i.id) ? 1 : 0.7,
-            pointerEvents: 'none'
-          }}
-        />
-      ))}
+      {/* 1. Connector lines layer */}
+      <svg
+        data-wall-minimap-connectors
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
+      >
+        {items.filter(i => i.kind === 'arrow').map(arrow => {
+          const ends = arrowAnchors(arrow, itemsById)
+          if (!ends) return null
+          const isSel = selectedIds.has(arrow.id) || (arrow.from && selectedIds.has(arrow.from)) || (arrow.to && selectedIds.has(arrow.to))
+          const fx = ends.from.x * k + ox
+          const fy = ends.from.y * k + oy
+          const tx = ends.to.x * k + ox
+          const ty = ends.to.y * k + oy
+          return (
+            <line
+              key={arrow.id}
+              data-minimap-arrow={arrow.id}
+              x1={fx}
+              y1={fy}
+              x2={tx}
+              y2={ty}
+              stroke={isSel ? 'var(--color-secondary, #38bdf8)' : (arrow.color || 'var(--color-surface-offset, #475569)')}
+              strokeWidth={isSel ? 2 : 1}
+              strokeDasharray={isSel ? '3 2' : undefined}
+              opacity={isSel ? 1 : 0.45}
+            />
+          )
+        })}
+      </svg>
+
+      {/* 2. Items & frames layer */}
+      {items.filter(i => i.kind !== 'arrow').map(i => {
+        const isSel = selectedIds.has(i.id)
+        return (
+          <div
+            key={i.id}
+            data-minimap-item={i.id}
+            style={{
+              position: 'absolute',
+              left: `${i.x * k + ox}px`, top: `${i.y * k + oy}px`,
+              width: `${Math.max(2, i.width * k)}px`, height: `${Math.max(2, i.height * k)}px`,
+              background: i.kind === 'frame' ? 'transparent' : (i.color || 'var(--color-surface-offset)'),
+              border: i.kind === 'frame' ? `1px solid ${i.color || 'var(--color-surface-elevated)'}` : undefined,
+              borderRadius: '1px',
+              outline: isSel ? '1.5px solid var(--color-secondary, #38bdf8)' : undefined,
+              outlineOffset: isSel ? '1px' : undefined,
+              boxShadow: isSel ? '0 0 4px var(--color-secondary, #38bdf8)' : undefined,
+              zIndex: isSel ? 3 : 2,
+              opacity: isSel ? 1 : 0.7,
+              pointerEvents: 'none'
+            }}
+          />
+        )
+      })}
       <div
         data-wall-minimap-view
         // geometry on the element so a pan can move it without recomputing
