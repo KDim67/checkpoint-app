@@ -50,6 +50,14 @@ export function buildCssVariablesString(vars: Record<string, string>): string {
   return `:root {\n${declarations}\n}`
 }
 
+export function isCustomizerIgnoredPath(targetPath: string): boolean {
+  if (/(?:^|[\\/])(media|cache|notes|backups)(?:$|[\\/])/i.test(targetPath)) return true
+  if (/(?:^|[\\/])\.(git|svn|hg|DS_Store|trash|vscode)(?:$|[\\/])/i.test(targetPath)) return true
+  const basename = targetPath.split(/[\\/]/).pop() || ''
+  if (basename.startsWith('.')) return true
+  return false
+}
+
 export async function enableCustomizer(): Promise<void> {
   if (isEngineRunning) return
 
@@ -77,21 +85,22 @@ export async function enableCustomizer(): Promise<void> {
       persistent: true,
       ignoreInitial: true,      // skip files already there at start
       depth: 1,                 // root and plugins/ only
-      ignored: [/[\\/](media|cache|notes)[\\/]/],
+      ignored: isCustomizerIgnoredPath,
       awaitWriteFinish: {
         stabilityThreshold: 100,
         pollInterval: 50
       }
     })
 
+    watcher.on('error', (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn(`[customizer] Watcher error (ignored): ${msg}`)
+    })
+
     watcher
       .on('add', (filePath: string) => handleFileChange(filePath))
       .on('change', (filePath: string) => handleFileChange(filePath))
       .on('unlink', (filePath: string) => handleFileChange(filePath))
-      .on('error', (err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err)
-        console.warn(`[customizer] Watcher error (ignored): ${msg}`)
-      })
 
     console.log(`[customizer] Started file watcher on ${configDir}`)
   } catch (err) {

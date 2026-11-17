@@ -31,7 +31,13 @@ type Suggestion =
 
 const playChime = () => {
   try {
-    const audioCtx = new AudioContext()
+    const AudioCtx =
+      typeof window !== 'undefined'
+        ? (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
+        : undefined
+    if (typeof AudioCtx !== 'function') return
+
+    const audioCtx = new AudioCtx()
     const osc = audioCtx.createOscillator()
     const gainNode = audioCtx.createGain()
 
@@ -48,7 +54,8 @@ const playChime = () => {
     osc.start()
     osc.stop(audioCtx.currentTime + 0.36)
   } catch (e) {
-    console.error('Chime audio failure:', e)
+    // Audio device may be absent or restricted in headless or VM environments
+    console.debug?.('Chime audio failure:', e)
   }
 }
 

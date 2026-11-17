@@ -71,8 +71,14 @@ export default function FocusTimerEngine(): null {
 
   const playChime = (volume: number) => {
     try {
+      const AudioCtx =
+        typeof window !== 'undefined'
+          ? (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
+          : undefined
+      if (typeof AudioCtx !== 'function') return
+
       if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new AudioContext()
+        audioCtxRef.current = new AudioCtx()
       }
       const audioCtx = audioCtxRef.current
       const playTone = (freq: number, start: number, duration: number) => {
@@ -93,7 +99,7 @@ export default function FocusTimerEngine(): null {
       playTone(659.25, now + 0.15, 0.4)
       playTone(783.99, now + 0.3, 0.6)
     } catch (err) {
-      console.error('AudioContext chime failed:', err)
+      console.debug?.('AudioContext chime failed:', err)
     }
   }
 
