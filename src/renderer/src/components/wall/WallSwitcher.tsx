@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { ChevronDown, ChevronUp, Copy, Layers2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, Layers2, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { renameWall, setActiveWall, type WallIndex, type WallRef } from '../../../../shared/wallModel'
 
 type Renaming = { id: string; draft: string } | null
@@ -13,13 +13,14 @@ interface WallSwitcherProps {
   setRenaming: Dispatch<SetStateAction<Renaming>>
   commitIndex: (next: WallIndex) => void
   addWall: () => void
+  onImportWall?: () => void
   duplicateWall?: (wall: WallRef) => void
   moveWall?: (id: string, direction: -1 | 1) => void
   setPendingDelete: Dispatch<SetStateAction<WallRef | null>>
 }
 
 export default function WallSwitcher({
-  wallIndex, activeWall, wallMenuOpen, setWallMenuOpen, renaming, setRenaming, commitIndex, addWall, duplicateWall, moveWall, setPendingDelete
+  wallIndex, activeWall, wallMenuOpen, setWallMenuOpen, renaming, setRenaming, commitIndex, addWall, onImportWall, duplicateWall, moveWall, setPendingDelete
 }: WallSwitcherProps) {
   return (
     <div data-wall-popover="wall" className="relative">
@@ -206,6 +207,24 @@ export default function WallSwitcher({
             >
               <Plus size={12} /> New wall
             </button>
+
+            {onImportWall && (
+              <button
+                onClick={() => {
+                  setWallMenuOpen(false)
+                  onImportWall()
+                }}
+                className="bg-clear hover-bg-offset"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%',
+                  border: 'none', cursor: 'pointer',
+                  padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)',
+                  color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)'
+                }}
+              >
+                <Upload size={12} /> Import wall (JSON)
+              </button>
+            )}
           </div>
         </>
       )}

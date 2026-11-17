@@ -35,7 +35,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     setWallMenuOpen, setRenaming, setBgOpen, setShortcutsOpen, setSpaceHeld, setSwatchOpen, matchKey,
     viewportRef, panCameraRef, labelRef, docRef, selectedRef, historyRef, cardsById, itemsById, selectedItems,
     single, arrowsSelected, setItems, applyHistory, addItem, removeSelected, duplicateSelected,
-    toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, setLinkPickFor, setLinkOpen,
+    toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, mergeWallItems, setLinkPickFor, setLinkOpen,
     setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
     copyStyle, pasteStyle, makeCards, pasteCells, searchKind, presenting, stepPresenting, frameSelection,
     startPresenting, setFramesOpen, setExportOpen, setBinOpen, openItem, showItem, gatherTags,
@@ -346,6 +346,19 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         e.preventDefault()
         pasteClip(remembered)
         return
+      }
+
+      if (text.trim().startsWith('{') && (text.includes('"checkpointType"') || text.includes('"items"'))) {
+        try {
+          const parsed = JSON.parse(text)
+          if (parsed.checkpointType === 'wall' || (parsed.version === 1 && Array.isArray(parsed.items))) {
+            e.preventDefault()
+            mergeWallItems(parsed)
+            return
+          }
+        } catch {
+          // not wall json, proceed
+        }
       }
 
       const cells = pastedCells(text, e.clipboardData?.getData('text/html') ?? '')

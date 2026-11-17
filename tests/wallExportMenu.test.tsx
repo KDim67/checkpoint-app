@@ -6,7 +6,7 @@ import WallExportMenu, { type ExportChoice } from '../src/renderer/src/component
 
 afterEach(cleanup)
 
-function Menu(props: { hasItems: boolean; hasSelection: boolean; frameCount: number; onExport?: (choice: ExportChoice) => void }) {
+function Menu(props: { hasItems: boolean; hasSelection: boolean; frameCount: number; onExport?: (choice: ExportChoice) => void; onImportWall?: () => void }) {
   const [open, setOpen] = useState(false)
   return <WallExportMenu open={open} setOpen={setOpen} onExport={vi.fn()} {...props} />
 }
@@ -23,7 +23,9 @@ describe('WallExportMenu', () => {
       ['Selection as PNG', 'selection'],
       ['Whole wall as SVG', 'svg'],
       ['Frames as PDF, a page each', 'pdf'],
-      ['Words as CSV', 'csv']
+      ['Words as CSV', 'csv'],
+      ['Whole wall as JSON', 'json'],
+      ['Selection as JSON', 'json-selection']
     ]
     for (const [label, choice] of choices) {
       fireEvent.click(screen.getByLabelText('Export'))
@@ -38,7 +40,16 @@ describe('WallExportMenu', () => {
     fireEvent.click(screen.getByLabelText('Export'))
 
     expect(option('Selection as PNG').disabled).toBe(true)
+    expect(option('Selection as JSON').disabled).toBe(true)
     expect(screen.getByText('Whole wall as PDF')).toBeTruthy()
+  })
+
+  it('triggers onImportWall when clicked in the menu', () => {
+    const onImportWall = vi.fn()
+    render(<Menu hasItems hasSelection={false} frameCount={0} onImportWall={onImportWall} />)
+    fireEvent.click(screen.getByLabelText('Export'))
+    fireEvent.click(screen.getByText('Import wall (JSON)'))
+    expect(onImportWall).toHaveBeenCalledTimes(1)
   })
 
   it('has nothing to export from an empty wall', () => {

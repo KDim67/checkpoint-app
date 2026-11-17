@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
-import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type Point, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
+import { boundsOf, bringToFront, fitCamera, itemsInRect, moveItems, patchItems, rectFromPoints, cameraCentredOn, toWallPoint, zoomAt, withFrameContents, arrowGeometry, arrowAnchors, distanceToPolyline, inkFromPath, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, buildWallJsonExport, type Point, type Rect, type WallCamera, type WallItem } from '../../../../shared/wallModel'
 import { CORNERS, arrowDropTarget, arrowEndTarget, arrowRelease, isStrokeJitter, pressSelection, recordsHistory, rotationAngle, rotationStart, snapMoving, turnedResize, type WallDrag } from '../../../../shared/wallPointer'
 import { pushHistory, replacePresent } from '../../../../shared/history'
 import { clipSelection, placeClip } from '../../../../shared/wallClipboard'
@@ -26,7 +26,7 @@ const CLICK_SLOP = 4
 /** wheel idle time before zoom becomes state */
 const ZOOM_SETTLE_MS = 150
 
-export type WallExport = { kind: 'png' | 'selection' | 'svg' | 'pdf' | 'csv' } | { kind: 'frame'; frame: WallItem }
+export type WallExport = { kind: 'png' | 'selection' | 'svg' | 'pdf' | 'csv' | 'json' | 'json-selection' } | { kind: 'frame'; frame: WallItem }
 
 type EraseDrag = Extract<WallDrag, { mode: 'erase' }>
 
@@ -113,11 +113,12 @@ export function useWallPointer(wallDocument: WallDocument) {
 
   const exportWall = useCallback(async (choice: WallExport) => {
     const all = docRef.current.items
+    const isSelectionExport = choice.kind === 'selection' || choice.kind === 'json-selection'
     const items = choice.kind === 'frame'
       ? frameContents(all, choice.frame)
-      : choice.kind === 'selection' ? clipSelection(all, selectedRef.current)?.items ?? [] : all
+      : isSelectionExport ? clipSelection(all, selectedRef.current)?.items ?? [] : all
     if (items.length === 0) {
-      toast(choice.kind === 'selection' ? 'Select something to export first.' : 'Nothing on this wall to export yet.')
+      toast(isSelectionExport ? 'Select something to export first.' : 'Nothing on this wall to export yet.')
       return
     }
 
@@ -129,6 +130,14 @@ export function useWallPointer(wallDocument: WallDocument) {
     setBusy('Rendering')
     try {
       const context = exportContext()
+
+      if (choice.kind === 'json' || choice.kind === 'json-selection') {
+        const payload = buildWallJsonExport(docRef.current, activeWall?.name ?? 'Wall', items)
+        const json = JSON.stringify(payload, null, 2)
+        const suffix = choice.kind === 'json-selection' ? '-selection' : ''
+        await save(`${base}${suffix}`, new TextEncoder().encode(json).buffer as ArrayBuffer, 'json')
+        return
+      }
 
       if (choice.kind === 'csv') {
         // the byte order mark tells a spreadsheet the file is UTF-8

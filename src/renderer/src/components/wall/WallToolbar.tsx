@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { StickyNote, Type, Shapes, Square, Layers, Image as ImageIcon, Maximize2, Undo2, Redo2, Grid3x3, FileText, PanelRight, PenLine, Spline, MousePointer2, Code, Network } from 'lucide-react'
 import { redo, undo } from '../../../../shared/history'
 import WallSwitcher from './WallSwitcher'
@@ -32,7 +32,8 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
     doc, notes, picker, setPicker, snapping, setSnapping, tool, setTool, arrowFrom, setArrowFrom,
     query, setQuery, searchKind, setSearchKind, wallMenuOpen, setWallMenuOpen, renaming, setRenaming,
     setPendingDelete, railOpen, bgOpen, setBgOpen, shortcutsOpen, setShortcutsOpen, keys, panButtons,
-    menuButton, fileInputRef, historyRef, wallIndex, activeWall, commitIndex, addWall, duplicateWall, moveWall, setBackground,
+    menuButton, fileInputRef, historyRef, wallIndex, activeWall, commitIndex, addWall, importWallDocument,
+    duplicateWall, moveWall, setBackground,
     toggleRail, applyHistory, addItem, placeImageFiles, jumpTo, exportWall, fitToContent, zoomReset,
     camera, custom, pickerRows, labelOf, matches, undoable, redoable, linkPickFor, selectedIds,
     framesOpen, setFramesOpen, exportOpen, setExportOpen, binOpen, setBinOpen, frames, binEntries,
@@ -40,6 +41,8 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
   } = wallView
   const atFullSize = Math.round(camera.zoom * 100) === 100
   const [shapePickerOpen, setShapePickerOpen] = useState(false)
+  const jsonFileInputRef = useRef<HTMLInputElement>(null)
+  const onImportWall = useCallback(() => { jsonFileInputRef.current?.click() }, [])
 
   return (
     <div style={{
@@ -61,6 +64,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
         setRenaming={setRenaming}
         commitIndex={commitIndex}
         addWall={addWall}
+        onImportWall={onImportWall}
         duplicateWall={duplicateWall}
         moveWall={moveWall}
         setPendingDelete={setPendingDelete}
@@ -123,6 +127,7 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
         hasSelection={selectedIds.size > 0}
         frameCount={frames.length}
         onExport={choice => void exportWall({ kind: choice })}
+        onImportWall={onImportWall}
       />
 
       {/* clickable, it's the fastest way back from a bad zoom */}
@@ -198,6 +203,21 @@ export default function WallToolbar({ wallView }: { wallView: WallViewState }) {
       <input
         ref={fileInputRef} type="file" accept="image/*" multiple className="is-hidden"
         onChange={e => { void placeImageFiles(Array.from(e.target.files ?? [])); e.target.value = '' }}
+      />
+      <input
+        ref={jsonFileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="is-hidden"
+        aria-label="Import wall JSON file"
+        onChange={async e => {
+          const file = e.target.files?.[0]
+          if (file) {
+            const text = await file.text()
+            void importWallDocument(text, file.name)
+          }
+          e.target.value = ''
+        }}
       />
     </div>
   )

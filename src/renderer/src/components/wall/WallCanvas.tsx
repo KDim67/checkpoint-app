@@ -25,7 +25,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     setArrowLine, arrowHeads, setArrowHeads, marquee, busy, spaceHeld, swatchOpen, setSwatchOpen,
     viewportRef, marqueeRectRef, docRef, cardsById, itemsById, notesByTitle, selectedItems, single,
     arrowsSelected, setItems, setCamera, onItemTextChange, onItemFinishEditing, onItemAutoSize, growItemRoom, rememberStickyColor, cropping, applyCrop, addItem,
-    removeSelected, duplicateSelected, toggleLock, placeImageFiles, screenPoint, onWheel,
+    removeSelected, duplicateSelected, toggleLock, placeImageFiles, mergeWallItems, screenPoint, onWheel,
     arrowAt, onPointerDown, onPointerMove, onPointerLeave, endDrag, camera, canvasBackground, dotColor, floatingRef,
     floatingPos, linkPickFor, linkOpen, setLinkOpen, setItemLink, startLinkPick, followLink,
     wallIndex, activeWall, labelOf, previewing, addBookmark, growFrom, searching, matchIds, presenting,
@@ -244,11 +244,23 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         if (dragged) { addItem(dragged.kind, { ref: dragged.ref }, at); return }
 
         const files = Array.from(e.dataTransfer.files ?? [])
+        const jsonFile = files.find(f => f.name.toLowerCase().endsWith('.json') || f.type === 'application/json')
+        if (jsonFile) {
+          void jsonFile.text().then(text => {
+            mergeWallItems(text, at)
+          })
+          return
+        }
         if (files.some(f => f.type.startsWith('image/'))) { void placeImageFiles(files, at); return }
+
+        const textPlain = e.dataTransfer.getData('text/plain')
+        if (textPlain && textPlain.trim().startsWith('{') && (textPlain.includes('"checkpointType"') || textPlain.includes('"items"'))) {
+          if (mergeWallItems(textPlain, at)) return
+        }
 
         // a link dragged out of a browser; uri-list lines starting with # are comments
         const uri = e.dataTransfer.getData('text/uri-list').split(/\r?\n/).find(line => line && !line.startsWith('#'))
-        const link = pastedLink(uri ?? e.dataTransfer.getData('text/plain'))
+        const link = pastedLink(uri ?? textPlain)
         if (link && !link.startsWith('wall:')) addBookmark(link, at)
       }}
       style={{

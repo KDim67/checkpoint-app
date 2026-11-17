@@ -425,9 +425,13 @@ export function normalizeWallDoc(raw: unknown): WallDoc {
     try { source = JSON.parse(raw) } catch { source = null }
   }
 
-  const o = source && typeof source === 'object' && !Array.isArray(source)
+  let o = source && typeof source === 'object' && !Array.isArray(source)
     ? (source as Record<string, unknown>)
     : {}
+
+  if (o.wall && typeof o.wall === 'object' && !Array.isArray(o.wall) && !Array.isArray(o.items)) {
+    o = o.wall as Record<string, unknown>
+  }
 
   // a deleted member can leave a group of one
   const items = pruneGroups((Array.isArray(o.items) ? o.items : [])
@@ -456,6 +460,38 @@ export function normalizeWallDoc(raw: unknown): WallDoc {
     ...(bin.length > 0 ? { bin } : {}),
     ...(frameOrder.length > 0 ? { frameOrder } : {})
   }
+}
+
+export interface WallJsonExport {
+  checkpointType: 'wall'
+  version: 1
+  name: string
+  exportedAt: string
+  wall: WallDoc
+}
+
+export function buildWallJsonExport(doc: WallDoc, name = 'Wall', items?: WallItem[]): WallJsonExport {
+  return {
+    checkpointType: 'wall',
+    version: 1,
+    name,
+    exportedAt: new Date().toISOString(),
+    wall: items ? { ...doc, items } : doc
+  }
+}
+
+export function extractWallExportMeta(raw: unknown): { name?: string; exportedAt?: string } {
+  let source = raw
+  if (typeof raw === 'string') {
+    try { source = JSON.parse(raw) } catch { return {} }
+  }
+  if (source && typeof source === 'object' && !Array.isArray(source)) {
+    const o = source as Record<string, unknown>
+    const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim() : undefined
+    const exportedAt = typeof o.exportedAt === 'string' && o.exportedAt.trim() ? o.exportedAt.trim() : undefined
+    return { name, exportedAt }
+  }
+  return {}
 }
 
 /** above everything present */

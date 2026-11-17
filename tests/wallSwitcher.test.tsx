@@ -16,9 +16,10 @@ const twoWalls: WallIndex = {
 type SwitcherProps = Parameters<typeof WallSwitcher>[0]
 
 /** controlled, so menu and rename draft live here like in WallView */
-function Harness({ index, commitIndex, duplicateWall, moveWall, setPendingDelete }: {
+function Harness({ index, commitIndex, onImportWall, duplicateWall, moveWall, setPendingDelete }: {
   index: WallIndex
   commitIndex: SwitcherProps['commitIndex']
+  onImportWall?: SwitcherProps['onImportWall']
   duplicateWall?: SwitcherProps['duplicateWall']
   moveWall?: SwitcherProps['moveWall']
   setPendingDelete: SwitcherProps['setPendingDelete']
@@ -35,6 +36,7 @@ function Harness({ index, commitIndex, duplicateWall, moveWall, setPendingDelete
       setRenaming={setRenaming}
       commitIndex={commitIndex}
       addWall={vi.fn()}
+      onImportWall={onImportWall}
       duplicateWall={duplicateWall}
       moveWall={moveWall}
       setPendingDelete={setPendingDelete}
@@ -42,12 +44,12 @@ function Harness({ index, commitIndex, duplicateWall, moveWall, setPendingDelete
   )
 }
 
-const renderSwitcher = (index = twoWalls) => {
+const renderSwitcher = (index = twoWalls, onImportWall?: () => void) => {
   const commitIndex = vi.fn<SwitcherProps['commitIndex']>()
   const duplicateWall = vi.fn<NonNullable<SwitcherProps['duplicateWall']>>()
   const moveWall = vi.fn<NonNullable<SwitcherProps['moveWall']>>()
   const setPendingDelete = vi.fn<SwitcherProps['setPendingDelete']>()
-  render(<Harness index={index} commitIndex={commitIndex} duplicateWall={duplicateWall} moveWall={moveWall} setPendingDelete={setPendingDelete} />)
+  render(<Harness index={index} commitIndex={commitIndex} onImportWall={onImportWall} duplicateWall={duplicateWall} moveWall={moveWall} setPendingDelete={setPendingDelete} />)
   return { commitIndex, duplicateWall, moveWall, setPendingDelete }
 }
 
@@ -142,5 +144,12 @@ describe('WallSwitcher', () => {
 
     expect(setPendingDelete).toHaveBeenCalledWith({ id: 'b', name: 'Roadmap' })
     expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('triggers onImportWall when Import wall (JSON) is clicked', () => {
+    const onImport = vi.fn()
+    renderSwitcher(twoWalls, onImport)
+    fireEvent.click(screen.getByText('Import wall (JSON)'))
+    expect(onImport).toHaveBeenCalledTimes(1)
   })
 })

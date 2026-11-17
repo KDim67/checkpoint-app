@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store/appStore'
 import { useToast } from '../ui/Toast'
-import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, duplicateWall as modelDuplicateWall, reorderWall, removeWall, setActiveWall, cycleWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type ImageCrop, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
+import { createWallItem, duplicateItems, normalizeWallDoc, normalizeWallIndex, patchItems, toWallPoint, WALL_COLORS, createWall, duplicateWall as modelDuplicateWall, reorderWall, removeWall, setActiveWall, cycleWall, cameraCentredOn, fitCamera, withFrameContents, DEFAULT_SIZES, wallDocKey, pruneArrows, STROKE_WIDTHS, SMOOTHING_STRENGTH, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, extractWallExportMeta, type ArrowShape, type ArrowLine, type ArrowHeads, type WallBinEntry, type WallCamera, type WallDoc, type ImageCrop, type WallIndex, type WallItem, type WallItemKind, type WallRef } from '../../../../shared/wallModel'
 import type { WallDrag } from '../../../../shared/wallPointer'
 import { initHistory, pushHistory, replacePresent, type History } from '../../../../shared/history'
 import { deleteWallDoc, flushWallDoc, loadWallDoc, loadWallIndex, saveWallDoc, saveWallIndex } from '../../lib/wallDoc'
@@ -470,6 +470,44 @@ export function useWallDocument() {
       commitIndex(next)
     }
   }, [wallIndex, commitIndex])
+
+  const importWallDocument = useCallback(async (content: string | unknown, fileName?: string): Promise<boolean> => {
+    if (!wallIndex) return false
+
+    try {
+      const meta = extractWallExportMeta(content)
+      const norm = normalizeWallDoc(content)
+
+      if (norm.items.length === 0 && !norm.background && !norm.camera) {
+        toast('No valid wall content found in file.', { type: 'error' })
+        return false
+      }
+
+      // Flush current wall before switching
+      const currentKey = wallDocKey(activeWorkspace, wallIndex.activeId)
+      await flushWallDoc(currentKey, docRef.current, { context: activeWorkspace, wallId: wallIndex.activeId })
+
+      // Determine new wall name: meta.name -> fileName cleaned -> 'Imported Wall'
+      const cleanFileName = fileName?.replace(/\.json$/i, '').trim()
+      const suggestedName = meta.name || cleanFileName || 'Imported Wall'
+
+      // Create new wall entry in index
+      const { index: nextIndex, wall: newWall } = createWall(wallIndex, suggestedName)
+      const newKey = wallDocKey(activeWorkspace, newWall.id)
+
+      // Flush imported wall doc
+      await flushWallDoc(newKey, norm, { context: activeWorkspace, wallId: newWall.id })
+
+      commitIndex(nextIndex)
+      setWallMenuOpen(false)
+      toast(`Imported wall "${newWall.name}"`, { id: 'wall-import', duration: 2500 })
+      setAnnouncement(`Imported wall ${newWall.name}`)
+      return true
+    } catch (err) {
+      toast(`Import failed: ${errorMessage(err)}`, { type: 'error' })
+      return false
+    }
+  }, [wallIndex, activeWorkspace, commitIndex, toast, setAnnouncement])
 
   /** a drop onto a column is an instruction, so it really moves the card */
   const handOffToColumn = async (columnId: string): Promise<void> => {
@@ -966,6 +1004,36 @@ export function useWallDocument() {
     setSelectedIds(new Set(placed.map(i => i.id)))
   }, [cardsById, pastePoint, setItems, toast])
 
+  const mergeWallItems = useCallback((content: string | unknown, at?: { x: number; y: number }): boolean => {
+    try {
+      const norm = normalizeWallDoc(content)
+      if (norm.items.length === 0) {
+        toast('No wall items found in file to import.', { type: 'error' })
+        return false
+      }
+
+      const items = docRef.current.items
+      // Cards belong to workspace board
+      const known = pruneArrows(norm.items.filter(i => i.kind !== 'card' || cardsById.has(i.ref ?? '')))
+      const leftBehind = norm.items.filter(i => i.kind === 'card').length - known.filter(i => i.kind === 'card').length
+      if (leftBehind > 0) {
+        toast(`${leftBehind} card${leftBehind === 1 ? '' : 's'} stayed behind. A card can only go on its own workspace's walls.`)
+      }
+
+      const placed = placeClip({ version: 1, items: known }, items, at ?? centreOfView())
+      if (placed.length === 0) return false
+
+      setItems([...items, ...placed])
+      setEditingId(null)
+      setSelectedIds(new Set(placed.map(i => i.id)))
+      toast(`Imported ${placed.length} item${placed.length === 1 ? '' : 's'}.`, { id: 'wall-merge-import', duration: 2000 })
+      return true
+    } catch (err) {
+      toast(`Import failed: ${errorMessage(err)}`, { type: 'error' })
+      return false
+    }
+  }, [cardsById, centreOfView, setItems, toast])
+
   /** a spreadsheet range, a sticky a cell in the grid they sat in */
   const pasteCells = useCallback((rows: string[][]) => {
     const filled = rows.flat().filter(cell => cell.trim()).length
@@ -1399,6 +1467,8 @@ export function useWallDocument() {
     activeWall,
     commitIndex,
     addWall,
+    importWallDocument,
+    mergeWallItems,
     duplicateWall,
     moveWall,
     switchWall,
