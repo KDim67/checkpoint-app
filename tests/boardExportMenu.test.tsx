@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import BoardExportMenu from '../src/renderer/src/components/kanban/BoardExportMenu'
+import type { useKanbanBoard } from '../src/renderer/src/components/kanban/useKanbanBoard'
 
 afterEach(cleanup)
 
@@ -13,7 +14,7 @@ describe('BoardExportMenu', () => {
     const mockKanbanBoard = {
       handleExportBoard,
       handleImportBoard
-    } as any
+    } as unknown as ReturnType<typeof useKanbanBoard>
 
     render(<BoardExportMenu kanbanBoard={mockKanbanBoard} />)
 
@@ -36,7 +37,7 @@ describe('BoardExportMenu', () => {
     const mockKanbanBoard = {
       handleExportBoard,
       handleImportBoard
-    } as any
+    } as unknown as ReturnType<typeof useKanbanBoard>
 
     const { container } = render(<BoardExportMenu kanbanBoard={mockKanbanBoard} />)
 

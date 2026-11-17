@@ -73,11 +73,12 @@ describe('kanbanExport', () => {
 
     const parsed = parseKanbanJsonExport(jsonStr)
     expect(parsed).not.toBeNull()
-    expect(parsed!.workspace).toBe('project-a')
-    expect(parsed!.config?.columns).toHaveLength(2)
-    expect(parsed!.cards).toHaveLength(1)
-    expect(parsed!.cards[0].title).toBe('First Card')
-    expect(parsed!.cards[0].tags).toEqual([{ name: 'UI', color: '#3b82f6' }])
+    if (!parsed) return
+    expect(parsed.workspace).toBe('project-a')
+    expect(parsed.config?.columns).toHaveLength(2)
+    expect(parsed.cards).toHaveLength(1)
+    expect(parsed.cards[0].title).toBe('First Card')
+    expect(parsed.cards[0].tags).toEqual([{ name: 'UI', color: '#3b82f6' }])
   })
 
   it('parseKanbanJsonExport gracefully handles arbitrary or bare card arrays', () => {
@@ -88,9 +89,10 @@ describe('kanbanExport', () => {
     }
     const parsed = parseKanbanJsonExport(bare)
     expect(parsed).not.toBeNull()
-    expect(parsed!.cards).toHaveLength(1)
-    expect(parsed!.cards[0].title).toBe('Bare Task')
-    expect(parsed!.cards[0].priority).toBe(3)
+    if (!parsed) return
+    expect(parsed.cards).toHaveLength(1)
+    expect(parsed.cards[0].title).toBe('Bare Task')
+    expect(parsed.cards[0].priority).toBe(3)
   })
 
   it('normalizePriority maps both numbers and priority name strings', () => {

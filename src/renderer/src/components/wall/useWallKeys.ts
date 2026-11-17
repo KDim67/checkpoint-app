@@ -388,7 +388,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [placeImageFiles, docRef, selectedRef, setItemLink, addBookmark, pasteClip, pasteCells, toast])
+  }, [placeImageFiles, docRef, selectedRef, setItemLink, addBookmark, pasteClip, pasteCells, mergeWallItems, toast])
 
   /** a menu click raises no copy event, so the clip is remembered and only its words reach the clipboard */
   const copyFromMenu = (cut: boolean): void => {

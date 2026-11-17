@@ -102,9 +102,14 @@ describe('wallJsonExportImport', () => {
 
     expect(placed).toHaveLength(3)
     // IDs must be regenerated so they never collide with existing canvas items
-    const placedNote1 = placed.find(i => i.text === 'Hello')!
-    const placedNote2 = placed.find(i => i.text === 'World')!
-    const placedArrow = placed.find(i => i.kind === 'arrow')!
+    const placedNote1 = placed.find(i => i.text === 'Hello')
+    const placedNote2 = placed.find(i => i.text === 'World')
+    const placedArrow = placed.find(i => i.kind === 'arrow')
+
+    expect(placedNote1).toBeDefined()
+    expect(placedNote2).toBeDefined()
+    expect(placedArrow).toBeDefined()
+    if (!placedNote1 || !placedNote2 || !placedArrow || placedArrow.kind !== 'arrow') return
 
     expect(placedNote1.id).not.toBe('note-1')
     expect(placedNote2.id).not.toBe('note-2')
@@ -115,7 +120,9 @@ describe('wallJsonExportImport', () => {
     expect(placedArrow.to).toBe(placedNote2.id)
 
     // Items must be centered around drop position
-    const bounds = boundsOf(placed)!
+    const bounds = boundsOf(placed)
+    expect(bounds).not.toBeNull()
+    if (!bounds) return
     const centerX = (bounds.minX + bounds.maxX) / 2
     const centerY = (bounds.minY + bounds.maxY) / 2
     expect(Math.round(centerX)).toBe(dropAt.x)

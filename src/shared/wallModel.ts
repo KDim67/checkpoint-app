@@ -510,8 +510,9 @@ export function bringToFront(items: WallItem[], idOrIds: string | Set<string> | 
     zMap.set(item.id, top++)
   }
   return items.map(i => {
-    if (!zMap.has(i.id)) return i
-    return { ...i, z: zMap.get(i.id)!, ...(i.kind === 'arrow' ? { layer: 'front' as const } : {}) }
+    const newZ = zMap.get(i.id)
+    if (newZ === undefined) return i
+    return { ...i, z: newZ, ...(i.kind === 'arrow' ? { layer: 'front' as const } : {}) }
   })
 }
 
@@ -526,8 +527,9 @@ export function sendToBack(items: WallItem[], idOrIds: string | Set<string> | st
     zMap.set(item.id, startZ + index)
   })
   return items.map(i => {
-    if (!zMap.has(i.id)) return i
-    return { ...i, z: zMap.get(i.id)!, ...(i.kind === 'arrow' ? { layer: 'back' as const } : {}) }
+    const newZ = zMap.get(i.id)
+    if (newZ === undefined) return i
+    return { ...i, z: newZ, ...(i.kind === 'arrow' ? { layer: 'back' as const } : {}) }
   })
 }
 

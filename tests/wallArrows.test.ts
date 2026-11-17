@@ -460,18 +460,18 @@ describe('arrow layering', () => {
     const c = box({ id: 'c', z: 10 })
 
     const brought = bringToFront([a, b, arr1, arr2, c], new Set(['a', 'arr1']))
-    const broughtA = brought.find(i => i.id === 'a')!
-    const broughtArr1 = brought.find(i => i.id === 'arr1')!
-    expect(broughtArr1.layer).toBe('front')
-    expect(broughtA.z).toBeGreaterThan(10)
-    expect(broughtArr1.z).toBeGreaterThan(broughtA.z)
+    const broughtA = brought.find(i => i.id === 'a')
+    const broughtArr1 = brought.find(i => i.id === 'arr1')
+    expect(broughtArr1?.layer).toBe('front')
+    expect(broughtA?.z).toBeGreaterThan(10)
+    expect(broughtArr1?.z).toBeGreaterThan(broughtA?.z ?? 0)
 
     const sent = sendToBack(brought, new Set(['a', 'arr1']))
-    const sentA = sent.find(i => i.id === 'a')!
-    const sentArr1 = sent.find(i => i.id === 'arr1')!
-    expect(sentArr1.layer).toBe('back')
-    expect(sentArr1.z).toBeLessThan(1)
-    expect(sentA.z).toBeLessThan(sentArr1.z)
+    const sentA = sent.find(i => i.id === 'a')
+    const sentArr1 = sent.find(i => i.id === 'arr1')
+    expect(sentArr1?.layer).toBe('back')
+    expect(sentArr1?.z).toBeLessThan(1)
+    expect(sentA?.z).toBeLessThan(sentArr1?.z ?? 0)
   })
 
   it('orders items in inPaintOrder by layer tiers: frames, back arrows, items, front arrows', () => {

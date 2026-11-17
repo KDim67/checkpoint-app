@@ -18,7 +18,7 @@ describe('WallMinimap', () => {
 
   let viewportEl: HTMLDivElement
   let docRef: { current: WallDoc }
-  let setCamera: any
+  let setCamera: ((camera: WallCamera) => void) & { mock: { calls: [WallCamera][] }; mockClear: () => void }
 
   beforeEach(() => {
     viewportEl = document.createElement('div')
@@ -33,7 +33,7 @@ describe('WallMinimap', () => {
         background: 'default'
       }
     }
-    setCamera = vi.fn()
+    setCamera = vi.fn() as unknown as ((camera: WallCamera) => void) & { mock: { calls: [WallCamera][] }; mockClear: () => void }
   })
 
   it('renders minimap wireframe elements and viewport box', () => {
@@ -67,7 +67,8 @@ describe('WallMinimap', () => {
       />
     )
 
-    const map = container.querySelector('[data-wall-minimap]')!
+    const map = container.querySelector('[data-wall-minimap]') as HTMLElement
+    expect(map).toBeTruthy()
     map.getBoundingClientRect = () => ({
       left: 100, top: 100, right: 250, bottom: 210, width: 150, height: 110, x: 100, y: 100, toJSON: () => {}
     })
@@ -94,7 +95,8 @@ describe('WallMinimap', () => {
       />
     )
 
-    const map = container.querySelector('[data-wall-minimap]')!
+    const map = container.querySelector('[data-wall-minimap]') as HTMLElement
+    expect(map).toBeTruthy()
     map.getBoundingClientRect = () => ({
       left: 100, top: 100, right: 250, bottom: 210, width: 150, height: 110, x: 100, y: 100, toJSON: () => {}
     })
@@ -123,7 +125,8 @@ describe('WallMinimap', () => {
       />
     )
 
-    const map = container.querySelector('[data-wall-minimap]')!
+    const map = container.querySelector('[data-wall-minimap]') as HTMLElement
+    expect(map).toBeTruthy()
     map.getBoundingClientRect = () => ({
       left: 100, top: 100, right: 250, bottom: 210, width: 150, height: 110, x: 100, y: 100, toJSON: () => {}
     })
