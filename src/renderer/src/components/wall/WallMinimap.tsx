@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { boundsOf as wallBounds, type WallCamera, type WallDoc, type WallItem } from '../../../../shared/wallModel'
+import { useEffect, useRef, useState } from 'react'
+import { boundsOf as wallBounds, MAX_ZOOM, MIN_ZOOM, type WallCamera, type WallDoc, type WallItem } from '../../../../shared/wallModel'
+import { paintWallCamera } from './wallPaint'
 
 interface WallMinimapProps {
   items: WallItem[]
@@ -16,6 +17,11 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
     return r && r.width > 0 && r.height > 0 ? { width: r.width, height: r.height } : null
   })
 
+  const [isDragging, setIsDragging] = useState(false)
+  const draggingRef = useRef(false)
+  const latestCamRef = useRef<WallCamera | null>(null)
+  const rafRef = useRef<number>(0)
+
   useEffect(() => {
     const measure = () => {
       const r = viewportRef.current?.getBoundingClientRect()
@@ -25,7 +31,10 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
     }
     measure()
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('resize', measure)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
   }, [viewportRef])
 
   const b = wallBounds(items)
@@ -47,30 +56,122 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
   const viewW = (rect.width / camera.zoom) * k
   const viewH = (rect.height / camera.zoom) * k
 
+  const computeCameraAt = (clientX: number, clientY: number, box: DOMRect): WallCamera => {
+    const px = clientX - box.left
+    const py = clientY - box.top
+    const wx = (px - ox) / k
+    const wy = (py - oy) / k
+    const currentZoom = docRef.current.camera.zoom
+    return {
+      ...docRef.current.camera,
+      x: rect.width / 2 - wx * currentZoom,
+      y: rect.height / 2 - wy * currentZoom
+    }
+  }
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation()
+    if (e.button !== 0) return
+    const el = e.currentTarget
+    if (typeof el.setPointerCapture === 'function') {
+      try {
+        el.setPointerCapture(e.pointerId)
+      } catch {}
+    }
+    draggingRef.current = true
+    setIsDragging(true)
+
+    const box = el.getBoundingClientRect()
+    const nextCam = computeCameraAt(e.clientX, e.clientY, box)
+    latestCamRef.current = nextCam
+    if (viewportRef.current) paintWallCamera(viewportRef.current, nextCam)
+    setCamera(nextCam)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return
+    e.stopPropagation()
+    const box = e.currentTarget.getBoundingClientRect()
+    const nextCam = computeCameraAt(e.clientX, e.clientY, box)
+    latestCamRef.current = nextCam
+
+    if (viewportRef.current) {
+      paintWallCamera(viewportRef.current, nextCam)
+    }
+
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = 0
+        if (latestCamRef.current) {
+          setCamera(latestCamRef.current)
+        }
+      })
+    }
+  }
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return
+    e.stopPropagation()
+    if (typeof e.currentTarget.releasePointerCapture === 'function') {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {}
+    }
+    draggingRef.current = false
+    setIsDragging(false)
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
+    }
+    if (latestCamRef.current) {
+      setCamera(latestCamRef.current)
+      latestCamRef.current = null
+    }
+  }
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.stopPropagation()
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+    const box = e.currentTarget.getBoundingClientRect()
+    const px = e.clientX - box.left
+    const py = e.clientY - box.top
+    const wx = (px - ox) / k
+    const wy = (py - oy) / k
+    const currentCam = docRef.current.camera
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, currentCam.zoom * factor))
+    if (newZoom === currentCam.zoom) return
+    const newCam = {
+      ...currentCam,
+      zoom: newZoom,
+      x: rect.width / 2 - wx * newZoom,
+      y: rect.height / 2 - wy * newZoom
+    }
+    latestCamRef.current = newCam
+    if (viewportRef.current) paintWallCamera(viewportRef.current, newCam)
+    setCamera(newCam)
+  }
+
   return (
     <div
-      onPointerDown={e => {
-        e.stopPropagation()
-        // click to centre the view there
-        const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
-        const wx = (e.clientX - box.left - ox) / k
-        const wy = (e.clientY - box.top - oy) / k
-        setCamera({
-          ...docRef.current.camera,
-          x: rect.width / 2 - wx * docRef.current.camera.zoom,
-          y: rect.height / 2 - wy * docRef.current.camera.zoom
-        })
-      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onWheel={handleWheel}
       data-wall-ui
-      title="Click to jump"
+      data-wall-minimap
+      title={isDragging ? 'Dragging view' : 'Drag or click to navigate'}
       style={{
         position: 'absolute', right: 'var(--space-3)', bottom: 'var(--space-3)',
-        width: `${W}px`, height: `${H}px`, zIndex: 20, cursor: 'pointer',
+        width: `${W}px`, height: `${H}px`, zIndex: 20,
+        cursor: isDragging ? 'grabbing' : 'crosshair',
         background: 'var(--color-surface-1)',
         border: '1px solid var(--color-surface-offset)',
         borderRadius: 'var(--radius-md)',
         boxShadow: 'var(--shadow-md)',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        userSelect: 'none',
+        touchAction: 'none'
       }}
     >
       {items.filter(i => i.kind !== 'arrow').map(i => (
@@ -83,7 +184,8 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
             background: i.kind === 'frame' ? 'transparent' : (i.color || 'var(--color-surface-offset)'),
             border: i.kind === 'frame' ? `1px solid ${i.color || 'var(--color-surface-elevated)'}` : undefined,
             borderRadius: '1px',
-            opacity: selectedIds.has(i.id) ? 1 : 0.7
+            opacity: selectedIds.has(i.id) ? 1 : 0.7,
+            pointerEvents: 'none'
           }}
         />
       ))}
@@ -97,7 +199,9 @@ export default function WallMinimap({ items, selectedIds, camera, viewportRef, d
           width: `${viewW}px`, height: `${viewH}px`,
           border: '1px solid var(--color-secondary)',
           background: 'var(--color-secondary-muted)',
-          pointerEvents: 'none'
+          cursor: isDragging ? 'grabbing' : 'grab',
+          pointerEvents: 'auto',
+          boxSizing: 'border-box'
         }}
       />
     </div>
