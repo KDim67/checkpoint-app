@@ -147,15 +147,15 @@ describe('styleOf and applyStyle', () => {
   })
 
   it('carries arrow looks only to arrows, and line weight to arrows and ink', () => {
-    const source = arrow('src', { color: '#000000', strokeWidth: 8, arrowShape: 'elbow', arrowLine: 'dashed' })
+    const source = arrow('src', { color: '#000000', strokeWidth: 8, arrowShape: 'elbow', arrowLine: 'dashed', layer: 'front' })
 
     const [connector, ink, note] = applyStyle(
-      [arrow('ar', { arrowHeads: 'both' }), item('in', { kind: 'ink', strokeWidth: 2 }), item('no')],
+      [arrow('ar', { arrowHeads: 'both', layer: 'back' }), item('in', { kind: 'ink', strokeWidth: 2 }), item('no')],
       new Set(['ar', 'in', 'no']),
       styleOf(source)
     )
 
-    expect(connector).toMatchObject({ strokeWidth: 8, arrowShape: 'elbow', arrowLine: 'dashed' })
+    expect(connector).toMatchObject({ strokeWidth: 8, arrowShape: 'elbow', arrowLine: 'dashed', layer: 'front' })
     // the source had default heads, so the connector does now
     expect(connector.arrowHeads).toBeUndefined()
     expect(ink.strokeWidth).toBe(8)

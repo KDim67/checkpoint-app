@@ -13,6 +13,7 @@ import {
   normalizeWallItem,
   bringToFront,
   sendToBack,
+  inPaintOrder,
   ARROW_SHAPES,
   ARROW_LINES,
   ARROW_HEAD_MODES,
@@ -449,6 +450,38 @@ describe('arrow layering', () => {
     const sentArrow = sent.find(i => i.id === 'arr')
     expect(sentArrow?.layer).toBe('back')
     expect(sentArrow?.z).toBeLessThan(0)
+  })
+
+  it('supports bringing multiple items to front and back while preserving relative order', () => {
+    const a = box({ id: 'a', z: 1 })
+    const b = box({ id: 'b', z: 2 })
+    const arr1 = box({ id: 'arr1', kind: 'arrow', z: 3, fromPoint: { x: 0, y: 0 }, toPoint: { x: 10, y: 10 } })
+    const arr2 = box({ id: 'arr2', kind: 'arrow', z: 4, fromPoint: { x: 0, y: 0 }, toPoint: { x: 20, y: 20 } })
+    const c = box({ id: 'c', z: 10 })
+
+    const brought = bringToFront([a, b, arr1, arr2, c], new Set(['a', 'arr1']))
+    const broughtA = brought.find(i => i.id === 'a')!
+    const broughtArr1 = brought.find(i => i.id === 'arr1')!
+    expect(broughtArr1.layer).toBe('front')
+    expect(broughtA.z).toBeGreaterThan(10)
+    expect(broughtArr1.z).toBeGreaterThan(broughtA.z)
+
+    const sent = sendToBack(brought, new Set(['a', 'arr1']))
+    const sentA = sent.find(i => i.id === 'a')!
+    const sentArr1 = sent.find(i => i.id === 'arr1')!
+    expect(sentArr1.layer).toBe('back')
+    expect(sentArr1.z).toBeLessThan(1)
+    expect(sentA.z).toBeLessThan(sentArr1.z)
+  })
+
+  it('orders items in inPaintOrder by layer tiers: frames, back arrows, items, front arrows', () => {
+    const frame = box({ id: 'f', kind: 'frame', z: 50 })
+    const backArrow = box({ id: 'arr-back', kind: 'arrow', layer: 'back', z: 40 })
+    const note = box({ id: 'n', kind: 'note', z: 10 })
+    const frontArrow = box({ id: 'arr-front', kind: 'arrow', layer: 'front', z: 5 })
+
+    const ordered = inPaintOrder([frontArrow, frame, note, backArrow])
+    expect(ordered.map(i => i.id)).toEqual(['f', 'arr-back', 'n', 'arr-front'])
   })
 })
 

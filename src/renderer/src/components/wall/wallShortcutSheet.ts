@@ -70,6 +70,8 @@ export const wallShortcutSections = (
       [bindings.wall_paste_style || 'Unbound', 'Paste style'],
       [bindings.wall_group || 'Unbound', 'Group, or ungroup a group'],
       [bindings.wall_ungroup || 'Unbound', 'Ungroup'],
+      [bindings.wall_bring_to_front || 'Ctrl+]', 'Bring to front'],
+      [bindings.wall_send_to_back || 'Ctrl+[', 'Send to back'],
       ['Ctrl+A', 'Select everything unlocked'],
       // the bound key is a preference, Delete is a fact
       [bindings.wall_delete ? `${bindings.wall_delete} or Delete` : 'Delete', 'Remove the selection'],

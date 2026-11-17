@@ -105,10 +105,12 @@ describe('WallSelectionBar', () => {
     fireEvent.click(button('Route: Straight'))
     fireEvent.click(button('Line: Solid'))
     fireEvent.click(button('Heads: End'))
+    fireEvent.click(button('Line weight: Medium (4px)'))
 
     expect(setItems).toHaveBeenNthCalledWith(1, patchItems(arrows, both, { arrowShape: 'curved' }))
     expect(setItems).toHaveBeenNthCalledWith(2, patchItems(arrows, both, { arrowLine: 'dashed' }))
     expect(setItems).toHaveBeenNthCalledWith(3, patchItems(arrows, both, { arrowHeads: 'both' }))
+    expect(setItems).toHaveBeenNthCalledWith(4, patchItems(arrows, both, { strokeWidth: 8 }))
   })
 
   it('labels a single arrow, or edits the label it already has', () => {

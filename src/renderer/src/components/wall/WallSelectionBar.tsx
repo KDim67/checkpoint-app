@@ -5,7 +5,7 @@ import {
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
   AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw, Ratio, Layers
 } from 'lucide-react'
-import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
+import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, STROKE_WIDTHS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
 import { alignableUnits, alignItems, distributeItems, type AlignEdge } from '../../../../shared/wallAlign'
 import { groupItems, groupState, ungroupItems } from '../../../../shared/wallGroup'
@@ -237,7 +237,10 @@ export default function WallSelectionBar({
         single?.arrowHeads ?? ARROW_HEAD_MODES[0],
         v => setItems(patchItems(items, selectedIds, { arrowShape: v })),
         v => setItems(patchItems(items, selectedIds, { arrowLine: v })),
-        v => setItems(patchItems(items, selectedIds, { arrowHeads: v }))
+        v => setItems(patchItems(items, selectedIds, { arrowHeads: v })),
+        false,
+        single?.strokeWidth ?? STROKE_WIDTHS[1],
+        w => setItems(patchItems(items, selectedIds, { strokeWidth: w }))
       )}
       {arrowsSelected && toolButton(
         single?.layer === 'front' ? 'In front of items (click to place behind)' : 'Behind items (click to place in front)',

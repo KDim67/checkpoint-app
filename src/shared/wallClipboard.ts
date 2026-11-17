@@ -148,6 +148,7 @@ export interface WallStyle {
   arrowShape?: ArrowShape
   arrowLine?: ArrowLine
   arrowHeads?: ArrowHeads
+  layer?: 'front' | 'back'
   /** the side the words sit on as it looks, since each kind has its own default */
   align?: TextAlign
   font?: WallFont
@@ -165,7 +166,7 @@ export function styleOf(item: WallItem): WallStyle {
   return {
     color: item.color,
     ...(drawsLines(item) ? { strokeWidth: item.strokeWidth } : {}),
-    ...(item.kind === 'arrow' ? { arrowShape: item.arrowShape, arrowLine: item.arrowLine, arrowHeads: item.arrowHeads } : {}),
+    ...(item.kind === 'arrow' ? { arrowShape: item.arrowShape, arrowLine: item.arrowLine, arrowHeads: item.arrowHeads, layer: item.layer } : {}),
     ...(isWritable(item.kind) ? { align: textAlignOf(item), font: item.font, fontSize: item.fontSize } : {}),
     ...(item.kind === 'shape' ? { borderColor: item.borderColor, radius: item.radius, opacity: item.opacity } : {})
   }
@@ -188,6 +189,7 @@ export function applyStyle(items: WallItem[], ids: Set<string>, style: WallStyle
       take(next, 'arrowShape')
       take(next, 'arrowLine')
       take(next, 'arrowHeads')
+      take(next, 'layer')
     }
     if (isWritable(item.kind)) {
       if (style.align) {

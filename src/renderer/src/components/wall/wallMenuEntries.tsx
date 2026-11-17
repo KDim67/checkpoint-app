@@ -260,8 +260,8 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
             onClick: () => setItems(patchItems(doc.items, selectedIds, { layer: item.layer === 'front' ? 'back' : 'front' }))
           }]
         : []),
-      { label: 'Bring to front', icon: <ArrowUp size={13} />, onClick: () => setItems(bringToFront(doc.items, item.id)) },
-      { label: 'Send to back', icon: <ArrowDown size={13} />, onClick: () => setItems(sendToBack(doc.items, item.id)) },
+      { label: many ? `Bring ${selectedIds.size} items to front` : 'Bring to front', icon: <ArrowUp size={13} />, hint: 'Ctrl ]', onClick: () => setItems(bringToFront(doc.items, many ? selectedIds : item.id)) },
+      { label: many ? `Send ${selectedIds.size} items to back` : 'Send to back', icon: <ArrowDown size={13} />, hint: 'Ctrl [', onClick: () => setItems(sendToBack(doc.items, many ? selectedIds : item.id)) },
       {
         label: item.locked ? 'Unlock' : 'Lock in place',
         icon: item.locked ? <Unlock size={13} /> : <Lock size={13} />,

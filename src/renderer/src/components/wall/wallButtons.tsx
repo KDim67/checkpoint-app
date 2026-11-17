@@ -1,7 +1,7 @@
 import React from 'react'
 import {
   ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, TEXT_ALIGNS,
-  WALL_FONTS, WALL_FONT_NAMES, WALL_FONT_SIZES,
+  WALL_FONTS, WALL_FONT_NAMES, WALL_FONT_SIZES, STROKE_WIDTHS,
   type ArrowShape, type ArrowLine, type ArrowHeads, type ShapeType, type TextAlign, type WallFont
 } from '../../../../shared/wallModel'
 import { SHAPE_NAMES } from '../../../../shared/wallShape'
@@ -41,7 +41,7 @@ const headsGlyph = (heads: ArrowHeads): React.JSX.Element => (
 const nameOf = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1)
 
 /** one cycling button per property keeps the palette one column */
-const cycleButton = <T extends string>(
+const cycleButton = <T extends string | number>(
   label: string,
   options: readonly T[],
   current: T,
@@ -51,9 +51,10 @@ const cycleButton = <T extends string>(
   /** when the stored value isn't the word people say */
   names: Partial<Record<T, string>> = {}
 ): React.JSX.Element => {
-  const next = options[(options.indexOf(current) + 1) % options.length]
+  const currentIndex = options.indexOf(current)
+  const next = options[currentIndex === -1 ? 0 : (currentIndex + 1) % options.length]
   const size = compact ? '26px' : '30px'
-  const name = (value: T): string => names[value] ?? nameOf(value)
+  const name = (value: T): string => names[value] ?? (typeof value === 'string' ? nameOf(value) : String(value))
   return (
     <button
       key={label}
@@ -81,12 +82,44 @@ export const arrowStyleButtons = (
   onShape: (v: ArrowShape) => void,
   onLine: (v: ArrowLine) => void,
   onHeads: (v: ArrowHeads) => void,
-  compact = false
-): React.JSX.Element[] => [
-  cycleButton('Route', ARROW_SHAPES, shape, arrowRouteGlyph, onShape, compact),
-  cycleButton('Line', ARROW_LINES, line, lineGlyph, onLine, compact),
-  cycleButton('Heads', ARROW_HEAD_MODES, heads, headsGlyph, onHeads, compact)
-]
+  compact = false,
+  strokeWidth?: number,
+  onStrokeWidth?: (w: number) => void
+): React.JSX.Element[] => {
+  const buttons: React.JSX.Element[] = [
+    cycleButton('Route', ARROW_SHAPES, shape, arrowRouteGlyph, onShape, compact),
+    cycleButton('Line', ARROW_LINES, line, lineGlyph, onLine, compact),
+    cycleButton('Heads', ARROW_HEAD_MODES, heads, headsGlyph, onHeads, compact)
+  ]
+  if (strokeWidth !== undefined && onStrokeWidth) {
+    buttons.push(
+      cycleButton(
+        'Line weight',
+        STROKE_WIDTHS,
+        strokeWidth,
+        width => (
+          <svg {...glyphProps}>
+            <line
+              x1="3"
+              y1="7.5"
+              x2="12"
+              y2="7.5"
+              strokeWidth={width === 8 ? 5.5 : width === 4 ? 3.5 : 1.8}
+            />
+          </svg>
+        ),
+        onStrokeWidth,
+        compact,
+        {
+          2: 'Thin (2px)',
+          4: 'Medium (4px)',
+          8: 'Thick (8px)'
+        }
+      )
+    )
+  }
+  return buttons
+}
 
 export const OUTLINE_GLYPHS: Record<ShapeType, React.JSX.Element> = {
   rectangle: <rect x="2" y="3.5" width="11" height="8" />,

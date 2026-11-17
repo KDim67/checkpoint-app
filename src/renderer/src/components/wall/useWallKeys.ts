@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { boundsOf, moveItems, withFrameContents, type WallItem } from '../../../../shared/wallModel'
+import { boundsOf, bringToFront, moveItems, sendToBack, withFrameContents, type WallItem } from '../../../../shared/wallModel'
 import { canRedo, canUndo, redo, undo } from '../../../../shared/history'
 import type { MenuEntry } from './WallContextMenu'
 import { getTextColorForBackground } from '../../lib/contrast'
@@ -132,6 +132,20 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
         e.preventDefault()
         cycleFrame(-1)
         return
+      }
+      if (command === 'wall_bring_to_front' || (mod && !e.altKey && (e.key === ']' || e.key === '}'))) {
+        if (selectedRef.current.size > 0) {
+          e.preventDefault()
+          setItems(bringToFront(docRef.current.items, selectedRef.current))
+          return
+        }
+      }
+      if (command === 'wall_send_to_back' || (mod && !e.altKey && (e.key === '[' || e.key === '{'))) {
+        if (selectedRef.current.size > 0) {
+          e.preventDefault()
+          setItems(sendToBack(docRef.current.items, selectedRef.current))
+          return
+        }
       }
       if (command === 'wall_link') {
         const chosen = docRef.current.items.filter(i => selectedRef.current.has(i.id))

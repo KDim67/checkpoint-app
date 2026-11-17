@@ -464,22 +464,53 @@ export function topZ(items: WallItem[]): number {
 }
 
 /** without disturbing the rest */
-export function bringToFront(items: WallItem[], id: string): WallItem[] {
-  const top = topZ(items)
-  return items.map(i => (i.id === id ? { ...i, z: top, ...(i.kind === 'arrow' ? { layer: 'front' as const } : {}) } : i))
+export function bringToFront(items: WallItem[], idOrIds: string | Set<string> | string[]): WallItem[] {
+  const ids = typeof idOrIds === 'string' ? new Set([idOrIds]) : new Set(idOrIds)
+  if (ids.size === 0) return items
+  let top = topZ(items)
+  const targetItems = items.filter(i => ids.has(i.id)).sort((a, b) => a.z - b.z)
+  const zMap = new Map<string, number>()
+  for (const item of targetItems) {
+    zMap.set(item.id, top++)
+  }
+  return items.map(i => {
+    if (!zMap.has(i.id)) return i
+    return { ...i, z: zMap.get(i.id)!, ...(i.kind === 'arrow' ? { layer: 'front' as const } : {}) }
+  })
 }
 
-export function sendToBack(items: WallItem[], id: string): WallItem[] {
-  const min = items.reduce((m, i) => Math.min(m, i.z), 0) - 1
-  return items.map(i => (i.id === id ? { ...i, z: min, ...(i.kind === 'arrow' ? { layer: 'back' as const } : {}) } : i))
+export function sendToBack(items: WallItem[], idOrIds: string | Set<string> | string[]): WallItem[] {
+  const ids = typeof idOrIds === 'string' ? new Set([idOrIds]) : new Set(idOrIds)
+  if (ids.size === 0) return items
+  const min = items.reduce((m, i) => Math.min(m, i.z), 0)
+  const targetItems = items.filter(i => ids.has(i.id)).sort((a, b) => a.z - b.z)
+  const startZ = min - targetItems.length
+  const zMap = new Map<string, number>()
+  targetItems.forEach((item, index) => {
+    zMap.set(item.id, startZ + index)
+  })
+  return items.map(i => {
+    if (!zMap.has(i.id)) return i
+    return { ...i, z: zMap.get(i.id)!, ...(i.kind === 'arrow' ? { layer: 'back' as const } : {}) }
+  })
 }
 
-/** lowest z first; frames paint behind contents so they never occlude items */
+function tier(item: WallItem): number {
+  if (item.kind === 'frame') return 0
+  if (item.kind === 'arrow') {
+    if (item.layer === 'back') return 1
+    if (item.layer === 'front') return 3
+    return 2
+  }
+  return 2
+}
+
+/** lowest z first; frames paint behind contents so they never occlude items; arrows observe layer placement */
 export function inPaintOrder(items: WallItem[]): WallItem[] {
   return [...items].sort((a, b) => {
-    const aFrame = a.kind === 'frame' ? 0 : 1
-    const bFrame = b.kind === 'frame' ? 0 : 1
-    if (aFrame !== bFrame) return aFrame - bFrame
+    const aTier = tier(a)
+    const bTier = tier(b)
+    if (aTier !== bTier) return aTier - bTier
     return a.z - b.z
   })
 }
