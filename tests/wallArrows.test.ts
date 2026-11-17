@@ -11,6 +11,8 @@ import {
   boundsOf,
   midpointAlong,
   normalizeWallItem,
+  bringToFront,
+  sendToBack,
   ARROW_SHAPES,
   ARROW_LINES,
   ARROW_HEAD_MODES,
@@ -405,8 +407,48 @@ describe('what a loose end does to the wall bounds', () => {
     expect(b).toEqual({ minX: 10, minY: 5, maxX: 30, maxY: 20 })
   })
 
+  it('computes bounds for a connected arrow when looking up connected items', () => {
+    const noteA = box({ id: 'na', x: 0, y: 0, width: 100, height: 100 })
+    const noteB = box({ id: 'nb', x: 200, y: 0, width: 100, height: 100 })
+    const arrow = box({ id: 'arr', kind: 'arrow', from: 'na', to: 'nb' })
+    const byId = new Map<string, WallItem>([['na', noteA], ['nb', noteB], ['arr', arrow]])
+    const b = defined(boundsOf([arrow], byId))
+    expect(b.minX).toBe(100)
+    expect(b.maxX).toBe(200)
+    expect(b.minY).toBe(50)
+    expect(b.maxY).toBe(50)
+  })
+
   it('is still null for a wall with nothing on it', () => {
     expect(boundsOf([])).toBeNull()
+  })
+})
+
+describe('arrow layering', () => {
+  it('normalizes front and back layer properties', () => {
+    const front = normalizeWallItem({ id: 'a1', kind: 'arrow', fromPoint: { x: 0, y: 0 }, toPoint: { x: 10, y: 10 }, layer: 'front' }, 0)
+    expect(front?.layer).toBe('front')
+
+    const back = normalizeWallItem({ id: 'a2', kind: 'arrow', fromPoint: { x: 0, y: 0 }, toPoint: { x: 10, y: 10 }, layer: 'back' }, 0)
+    expect(back?.layer).toBe('back')
+
+    const none = normalizeWallItem({ id: 'a3', kind: 'arrow', fromPoint: { x: 0, y: 0 }, toPoint: { x: 10, y: 10 } }, 0)
+    expect(none?.layer).toBeUndefined()
+  })
+
+  it('sets layer to front on bringToFront and back on sendToBack for arrows', () => {
+    const arrow = box({ id: 'arr', kind: 'arrow', z: 1, fromPoint: { x: 0, y: 0 }, toPoint: { x: 10, y: 10 } })
+    const card = box({ id: 'c1', kind: 'card', z: 2 })
+
+    const brought = bringToFront([arrow, card], 'arr')
+    const broughtArrow = brought.find(i => i.id === 'arr')
+    expect(broughtArrow?.layer).toBe('front')
+    expect(broughtArrow?.z).toBeGreaterThan(2)
+
+    const sent = sendToBack(brought, 'arr')
+    const sentArrow = sent.find(i => i.id === 'arr')
+    expect(sentArrow?.layer).toBe('back')
+    expect(sentArrow?.z).toBeLessThan(0)
   })
 })
 

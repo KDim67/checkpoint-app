@@ -130,4 +130,12 @@ describe('wall item menu', () => {
     expect(labels).toContain('Ungroup')
     expect(labels).not.toContain('Group')
   })
+
+  it('offers bringing in front or sending behind for an arrow', () => {
+    const backArrow = item('arr1', { kind: 'arrow', layer: 'back' })
+    expect(labelsFor([backArrow], ['arr1'])).toContain('Bring in front of items')
+
+    const frontArrow = item('arr2', { kind: 'arrow', layer: 'front' })
+    expect(labelsFor([frontArrow], ['arr2'])).toContain('Send behind items')
+  })
 })

@@ -253,6 +253,13 @@ export function wallMenuEntries(ctx: WallMenuContext): MenuEntry[] {
       ...(many ? [] : [{ label: 'Copy style', icon: <Paintbrush size={13} />, onClick: copyStyle }]),
       { label: 'Paste style', icon: <PaintBucket size={13} />, onClick: pasteStyle, disabled: !canPasteStyle },
       { label: many ? `Duplicate ${selectedIds.size} items` : 'Duplicate', icon: <Copy size={13} />, hint: 'Ctrl D', onClick: duplicateSelected },
+      ...(item.kind === 'arrow'
+        ? [{
+            label: item.layer === 'front' ? 'Send behind items' : 'Bring in front of items',
+            icon: <Layers size={13} />,
+            onClick: () => setItems(patchItems(doc.items, selectedIds, { layer: item.layer === 'front' ? 'back' : 'front' }))
+          }]
+        : []),
       { label: 'Bring to front', icon: <ArrowUp size={13} />, onClick: () => setItems(bringToFront(doc.items, item.id)) },
       { label: 'Send to back', icon: <ArrowDown size={13} />, onClick: () => setItems(sendToBack(doc.items, item.id)) },
       {

@@ -394,4 +394,20 @@ describe('WallSelectionBar', () => {
     fireEvent.click(button('Ungroup'))
     expect(again).toHaveBeenCalledWith(ungroupItems(pair, new Set(['a', 'b'])))
   })
+
+  it('toggles arrow layer between front and back', () => {
+    const arrow = item('arr', { kind: 'arrow', layer: 'back' })
+    const { setItems } = renderBar({
+      items: [arrow],
+      selectedIds: new Set(['arr']),
+      single: arrow,
+      arrowsSelected: true
+    })
+
+    const layerBtn = screen.getByLabelText(/Behind items/i)
+    expect(layerBtn).toBeTruthy()
+    fireEvent.click(layerBtn)
+
+    expect(setItems).toHaveBeenCalledWith(patchItems([arrow], new Set(['arr']), { layer: 'front' }))
+  })
 })

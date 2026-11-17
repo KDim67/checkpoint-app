@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { inPaintOrder, patchItems, itemAtPoint, gridSpacing, toWallPoint, arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, setActiveWall, type WallItem } from '../../../../shared/wallModel'
+import { pressSelection } from '../../../../shared/wallPointer'
 import WallItemLayer from './WallItemLayer'
 import WallMinimap from './WallMinimap'
 import { decodeWallDrag, WALL_DRAG_MIME } from '../../../../shared/wallBoard'
@@ -118,6 +119,70 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     itemExists: id => itemsById.has(id)
   })
 
+  const renderArrow = (arrow: WallItem) => {
+    const ends = arrowAnchors(arrow, itemsById)
+    if (!ends) return null
+
+    const width = arrow.strokeWidth ?? 2
+    const stroke = arrow.color || 'var(--color-text-muted)'
+    const selected = selectedIds.has(arrow.id)
+    const heads = arrow.arrowHeads ?? ARROW_HEAD_MODES[0]
+    const inset = arrowHeadInset(width)
+    const g = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0], {
+      end: heads !== 'none' ? inset : 0,
+      start: heads === 'both' ? inset : 0
+    })
+
+    return (
+      <g
+        key={arrow.id}
+        data-wall-arrow={arrow.id}
+        data-wall-item={arrow.id}
+        opacity={searching ? 0.2 : selected ? 1 : 0.85}
+        style={{ cursor: 'pointer' }}
+      >
+        {/* Invisible fat hit target for reliable clicking and hover */}
+        <path
+          d={g.d}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={Math.max(24, width + 16)}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          data-wall-item={arrow.id}
+          style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+        />
+        <path
+          d={g.d}
+          fill="none"
+          stroke={selected ? 'var(--color-secondary)' : stroke}
+          strokeWidth={width + (selected ? 2 : 0)}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray={arrowDash(arrow.arrowLine ?? ARROW_LINES[0], width)}
+          data-wall-item={arrow.id}
+          style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+        />
+        {heads !== 'none' && (
+          <polygon
+            points={arrowHeadPoints(g.end, g.endAngle, width)}
+            fill={selected ? 'var(--color-secondary)' : stroke}
+            data-wall-item={arrow.id}
+            style={{ pointerEvents: 'all', cursor: 'pointer' }}
+          />
+        )}
+        {heads === 'both' && (
+          <polygon
+            points={arrowHeadPoints(g.start, g.startAngle, width)}
+            fill={selected ? 'var(--color-secondary)' : stroke}
+            data-wall-item={arrow.id}
+            style={{ pointerEvents: 'all', cursor: 'pointer' }}
+          />
+        )}
+      </g>
+    )
+  }
+
   return (
     <div
       ref={viewportRef}
@@ -146,6 +211,14 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
 
         // panels are canvas children; without this a palette dblclick made a note
         if ((e.target as HTMLElement).closest('[data-wall-ui], [data-wall-link]')) return
+        const targetEl = (e.target as Element).closest<Element>('[data-wall-item]')
+        const targetId = targetEl ? (targetEl.getAttribute('data-wall-item') ?? (targetEl as HTMLElement).dataset?.wallItem) : undefined
+        const targetArrow = targetId ? docRef.current.items.find(i => i.id === targetId && i.kind === 'arrow') : null
+        if (targetArrow) {
+          setSelectedIds(new Set([targetArrow.id]))
+          setEditingId(targetArrow.id)
+          return
+        }
         const at = toWallPoint(screenPoint(e), docRef.current.camera)
         const hit = itemAtPoint(docRef.current.items, at)
         if (!hit) {
@@ -215,7 +288,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         </div>
       )}
 
-      {/* 1. Vector layer: All frames, arrows, and gesture previews in a single viewport-bounded SVG */}
+      {/* 1. Back vector layer: All frames and behind-items arrows in a single viewport-bounded SVG */}
       <svg
         data-wall-vector-svg
         style={{
@@ -266,96 +339,8 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             )
           })}
 
-          {/* Arrows */}
-          {doc.items.filter(i => i.kind === 'arrow').map(arrow => {
-            const ends = arrowAnchors(arrow, itemsById)
-            if (!ends) return null
-
-            const width = arrow.strokeWidth ?? 2
-            const stroke = arrow.color || 'var(--color-text-muted)'
-            const selected = selectedIds.has(arrow.id)
-            const heads = arrow.arrowHeads ?? ARROW_HEAD_MODES[0]
-            const inset = arrowHeadInset(width)
-            const g = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0], {
-              end: heads !== 'none' ? inset : 0,
-              start: heads === 'both' ? inset : 0
-            })
-
-            return (
-              <g
-                key={arrow.id}
-                data-wall-arrow={arrow.id}
-                opacity={searching ? 0.2 : selected ? 1 : 0.85}
-              >
-                <path
-                  d={g.d}
-                  fill="none"
-                  stroke={stroke}
-                  strokeWidth={width + (selected ? 2 : 0)}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={arrowDash(arrow.arrowLine ?? ARROW_LINES[0], width)}
-                />
-                {heads !== 'none' && (
-                  <polygon points={arrowHeadPoints(g.end, g.endAngle, width)} fill={stroke} />
-                )}
-                {heads === 'both' && (
-                  <polygon points={arrowHeadPoints(g.start, g.startAngle, width)} fill={stroke} />
-                )}
-              </g>
-            )
-          })}
-
-          {/* arrowDrag preview */}
-          {arrowDrag && (() => {
-            const from = itemsById.get(arrowDrag.fromId)
-            if (!from) return null
-
-            const target = arrowDrag.overId ? itemsById.get(arrowDrag.overId) : undefined
-            const landing: WallItem = target ?? {
-              id: '', kind: 'note', z: 0,
-              x: arrowDrag.at.x, y: arrowDrag.at.y, width: 1, height: 1
-            }
-            const inset = arrowHeadInset(penWidth)
-            const g = arrowGeometry(from, landing, arrowShape, {
-              end: arrowHeads !== 'none' ? inset : 0,
-              start: arrowHeads === 'both' ? inset : 0
-            })
-
-            return (
-              <g opacity={target ? 0.9 : 0.55}>
-                <path
-                  d={g.d}
-                  fill="none"
-                  stroke={penColor}
-                  strokeWidth={penWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={arrowDash(arrowLine, penWidth)}
-                />
-                {arrowHeads !== 'none' && (
-                  <polygon points={arrowHeadPoints(g.end, g.endAngle, penWidth)} fill={penColor} />
-                )}
-                {arrowHeads === 'both' && (
-                  <polygon points={arrowHeadPoints(g.start, g.startAngle, penWidth)} fill={penColor} />
-                )}
-              </g>
-            )
-          })()}
-
-          {/* drawing preview (pen / highlighter / lasso) */}
-          {drawing && drawing.length > 1 && (
-            <polyline
-              points={drawing.map(pt => `${pt.x},${pt.y}`).join(' ')}
-              fill="none"
-              stroke={tool === 'lasso' ? 'var(--color-secondary)' : penColor}
-              strokeWidth={tool === 'lasso' ? 1.5 / camera.zoom : tool === 'highlighter' ? penWidth * HIGHLIGHT_SCALE : penWidth}
-              strokeDasharray={tool === 'lasso' ? `${6 / camera.zoom} ${4 / camera.zoom}` : undefined}
-              opacity={tool === 'highlighter' ? HIGHLIGHT_OPACITY : undefined}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
+          {/* Arrows behind items */}
+          {doc.items.filter(i => i.kind === 'arrow' && i.layer !== 'front').map(renderArrow)}
         </g>
       </svg>
 
@@ -410,7 +395,92 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         {WALL_GAP_SLOTS.map(slot => (
           <div key={slot} data-wall-gap={slot} className="wall-gap-guide" style={{ display: 'none' }} />
         ))}
+      </div>
 
+      {/* 3. Front vector layer: In-front arrows and active gesture/connection previews */}
+      <svg
+        data-wall-vector-svg-front
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          pointerEvents: 'none',
+          zIndex: 3
+        }}
+      >
+        <g
+          data-wall-camera-layer
+          style={{
+            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+            transformOrigin: '0 0'
+          }}
+        >
+          {/* Arrows in front of items */}
+          {doc.items.filter(i => i.kind === 'arrow' && i.layer === 'front').map(renderArrow)}
+
+          {/* arrowDrag preview */}
+          {arrowDrag && (() => {
+            const from = itemsById.get(arrowDrag.fromId)
+            if (!from) return null
+
+            const target = arrowDrag.overId ? itemsById.get(arrowDrag.overId) : undefined
+            const landing: WallItem = target ?? {
+              id: '', kind: 'note', z: 0,
+              x: arrowDrag.at.x, y: arrowDrag.at.y, width: 1, height: 1
+            }
+            const inset = arrowHeadInset(penWidth)
+            const g = arrowGeometry(from, landing, arrowShape, {
+              end: arrowHeads !== 'none' ? inset : 0,
+              start: arrowHeads === 'both' ? inset : 0
+            })
+
+            return (
+              <g opacity={target ? 0.9 : 0.55}>
+                <path
+                  d={g.d}
+                  fill="none"
+                  stroke={penColor}
+                  strokeWidth={penWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray={arrowDash(arrowLine, penWidth)}
+                />
+                {arrowHeads !== 'none' && (
+                  <polygon points={arrowHeadPoints(g.end, g.endAngle, penWidth)} fill={penColor} />
+                )}
+                {arrowHeads === 'both' && (
+                  <polygon points={arrowHeadPoints(g.start, g.startAngle, penWidth)} fill={penColor} />
+                )}
+              </g>
+            )
+          })()}
+
+          {/* drawing preview (pen / highlighter / lasso) */}
+          {drawing && drawing.length > 1 && (
+            <polyline
+              points={drawing.map(pt => `${pt.x},${pt.y}`).join(' ')}
+              fill="none"
+              stroke={tool === 'lasso' ? 'var(--color-secondary)' : penColor}
+              strokeWidth={tool === 'lasso' ? 1.5 / camera.zoom : tool === 'highlighter' ? penWidth * HIGHLIGHT_SCALE : penWidth}
+              strokeDasharray={tool === 'lasso' ? `${6 / camera.zoom} ${4 / camera.zoom}` : undefined}
+              opacity={tool === 'highlighter' ? HIGHLIGHT_OPACITY : undefined}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+        </g>
+      </svg>
+
+      {/* 4. Overlays layer for arrow labels, selection handles, and remote presence */}
+      <div data-wall-camera-layer style={{
+        position: 'absolute', top: 0, left: 0,
+        transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+        transformOrigin: '0 0',
+        pointerEvents: 'none',
+        zIndex: 4
+      }}>
         {/* Remote peer cursors layer inside main camera container */}
         <div style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', zIndex: 20, pointerEvents: 'none' }}>
           <WallRemotePresence cursors={remoteCursors} zoom={camera.zoom} />
@@ -430,19 +500,31 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               <div
                 key={arrow.id}
                 data-arrow-label={arrow.id}
-                onPointerDown={e => { e.stopPropagation(); setSelectedIds(new Set([arrow.id])) }}
+                data-wall-item={arrow.id}
+                onPointerDown={e => {
+                  e.stopPropagation()
+                  setSelectedIds(e.shiftKey ? pressSelection(selectedIds, arrow.id, true) : new Set([arrow.id]))
+                }}
                 onDoubleClick={e => { e.stopPropagation(); setEditingId(arrow.id) }}
                 style={{
                   position: 'absolute', left: 0, top: 0,
                   transform: `translate(${mid.x}px, ${mid.y}px) translate(-50%, -50%)`,
-                  maxWidth: '220px',
-                  padding: '2px 6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 'max-content',
+                  minWidth: 'max-content',
+                  maxWidth: '320px',
+                  padding: '3px 8px',
                   background: 'var(--color-surface-1)',
                   border: `1px solid ${selectedIds.has(arrow.id) ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
                   borderRadius: 'var(--radius-sm)',
+                  boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.3))',
                   color: 'var(--color-text-base)',
-                  fontSize: '12px', lineHeight: 1.3,
-                  pointerEvents: 'auto', cursor: 'text'
+                  fontSize: '12px', lineHeight: 1.35,
+                  pointerEvents: 'auto', cursor: 'pointer',
+                  userSelect: 'none',
+                  boxSizing: 'border-box'
                 }}
               >
                 {editing ? (
@@ -462,12 +544,28 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
                       if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
                     }}
                     style={{
-                      width: '120px', background: 'none', border: 'none', outline: 'none',
-                      color: 'var(--color-text-base)', font: 'inherit', padding: 0
+                      minWidth: '100px',
+                      maxWidth: '300px',
+                      background: 'none',
+                      border: 'none',
+                      outline: 'none',
+                      color: 'var(--color-text-base)',
+                      font: 'inherit',
+                      padding: 0,
+                      textAlign: 'center',
+                      cursor: 'text'
                     }}
                   />
                 ) : (
-                  <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{arrow.text}</span>
+                  <span style={{
+                    wordBreak: 'normal',
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                    textAlign: 'center',
+                    maxWidth: '300px'
+                  }}>
+                    {arrow.text}
+                  </span>
                 )}
               </div>
             )
@@ -485,7 +583,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           const ring = 2 / camera.zoom
 
           return (
-            <div style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', zIndex: 6 }}>
+            <div style={{ position: 'absolute', left: 0, top: 0, width: '1px', height: '1px', zIndex: 6, pointerEvents: 'auto' }}>
               {([['start', g.start], ['end', g.end]] as const).map(([which, at]) => (
                 <div
                   key={which}

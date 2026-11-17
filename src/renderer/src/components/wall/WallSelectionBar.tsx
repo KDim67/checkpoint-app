@@ -3,7 +3,7 @@ import {
   Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Link2, Group, Ungroup, SlidersHorizontal,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
-  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw, Ratio
+  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw, Ratio, Layers
 } from 'lucide-react'
 import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
@@ -238,6 +238,15 @@ export default function WallSelectionBar({
         v => setItems(patchItems(items, selectedIds, { arrowShape: v })),
         v => setItems(patchItems(items, selectedIds, { arrowLine: v })),
         v => setItems(patchItems(items, selectedIds, { arrowHeads: v }))
+      )}
+      {arrowsSelected && toolButton(
+        single?.layer === 'front' ? 'In front of items (click to place behind)' : 'Behind items (click to place in front)',
+        <Layers size={13} />,
+        () => {
+          const nextLayer = single?.layer === 'front' ? 'back' : 'front'
+          setItems(patchItems(items, selectedIds, { layer: nextLayer }))
+        },
+        { active: single?.layer === 'front' }
       )}
       {wordsSelected && textAlignButton(
         textAlignOf(first),

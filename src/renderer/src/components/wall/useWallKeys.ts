@@ -33,7 +33,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
     toast, doc, cards, notes, selectedIds, setSelectedIds, editingId, setEditingId, picker,
     setPicker, menu, setMenu, setTool, setArrowFrom, setArrowDrag, query, historyTick,
     setWallMenuOpen, setRenaming, setBgOpen, setShortcutsOpen, setSpaceHeld, setSwatchOpen, matchKey,
-    viewportRef, panCameraRef, labelRef, docRef, selectedRef, historyRef, cardsById, selectedItems,
+    viewportRef, panCameraRef, labelRef, docRef, selectedRef, historyRef, cardsById, itemsById, selectedItems,
     single, arrowsSelected, setItems, applyHistory, addItem, removeSelected, duplicateSelected,
     toggleLock, placeDerived, runImageOp, openCard, placeImageFiles, setLinkPickFor, setLinkOpen,
     setItemLink, addBookmark, refreshPreview, followLink, copyItemLink, pasteClip, cutSelected,
@@ -440,7 +440,7 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
   const redoable = canRedo(historyRef.current)
 
   /** above the selection, below if no room; clamped both ways since the canvas clips */
-  const selectionBounds = boundsOf(selectedItems)
+  const selectionBounds = boundsOf(selectedItems, itemsById)
   /** its width changes with the selection */
   const floatingRef = useRef<HTMLDivElement>(null)
   const [floatingWidth, setFloatingWidth] = useState(220)

@@ -75,6 +75,8 @@ export interface WallItem {
   language?: string
   /** the mind map a topic is part of, read through wallMindMap */
   map?: string
+  /** layer placement: 'front' renders on top of items (cards, notes, images); 'back' renders behind items */
+  layer?: 'front' | 'back'
 }
 
 /** contents live under wallDocKey */
@@ -352,6 +354,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
   const tags = kind === 'note' ? cleanTags(o.tags) : []
   // a topic holds words, so only the kinds that do can be one
   const map = kind === 'note' || kind === 'text' || kind === 'shape' ? str(o.map).trim() : ''
+  const layer = o.layer === 'front' || o.layer === 'back' ? o.layer : undefined
 
   // a hand-edited doc can't plant a link main would refuse
   const link = (isLinkable(kind) || kind === 'bookmark') && parseWallLink(o.link) ? str(o.link).trim() : ''
@@ -400,6 +403,7 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(tags.length > 0 ? { tags } : {}),
     ...(kind === 'code' && isCodeLanguage(o.language) ? { language: o.language } : {}),
     ...(map ? { map } : {}),
+    ...(layer ? { layer } : {}),
     z: num(o.z, index)
   }
 }
@@ -462,12 +466,12 @@ export function topZ(items: WallItem[]): number {
 /** without disturbing the rest */
 export function bringToFront(items: WallItem[], id: string): WallItem[] {
   const top = topZ(items)
-  return items.map(i => (i.id === id ? { ...i, z: top } : i))
+  return items.map(i => (i.id === id ? { ...i, z: top, ...(i.kind === 'arrow' ? { layer: 'front' as const } : {}) } : i))
 }
 
 export function sendToBack(items: WallItem[], id: string): WallItem[] {
   const min = items.reduce((m, i) => Math.min(m, i.z), 0) - 1
-  return items.map(i => (i.id === id ? { ...i, z: min } : i))
+  return items.map(i => (i.id === id ? { ...i, z: min, ...(i.kind === 'arrow' ? { layer: 'back' as const } : {}) } : i))
 }
 
 /** lowest z first; frames paint behind contents so they never occlude items */
@@ -482,15 +486,22 @@ export function inPaintOrder(items: WallItem[]): WallItem[] {
 
 export interface Bounds { minX: number; minY: number; maxX: number; maxY: number }
 
-export function boundsOf(items: WallItem[]): Bounds | null {
-  // arrow boxes are placeholders; a pinned end is real extent
+export function boundsOf(items: WallItem[], byId?: Map<string, WallItem>): Bounds | null {
+  // arrow boxes are placeholders; a pinned end or resolved anchor is real extent
   const boxed = items.filter(i => i.kind !== 'arrow')
-  const loose = items
+  const lookup = byId ?? new Map(items.map(i => [i.id, i]))
+  const arrowPoints = items
     .filter(i => i.kind === 'arrow')
-    .flatMap(i => [i.fromPoint, i.toPoint])
-    .filter((p): p is { x: number; y: number } => !!p)
+    .flatMap(arrow => {
+      const ends = arrowAnchors(arrow, lookup)
+      if (ends) {
+        const { start, end, mid } = arrowGeometry(ends.from, ends.to, arrow.arrowShape ?? ARROW_SHAPES[0])
+        return [start, end, mid]
+      }
+      return [arrow.fromPoint, arrow.toPoint].filter((p): p is { x: number; y: number } => !!p)
+    })
 
-  if (boxed.length === 0 && loose.length === 0) return null
+  if (boxed.length === 0 && arrowPoints.length === 0) return null
 
   const bounds = boxed.reduce<Bounds>(
     (b, i) => ({
@@ -502,7 +513,7 @@ export function boundsOf(items: WallItem[]): Bounds | null {
     { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
   )
 
-  return loose.reduce<Bounds>(
+  return arrowPoints.reduce<Bounds>(
     (b, p) => ({
       minX: Math.min(b.minX, p.x),
       minY: Math.min(b.minY, p.y),

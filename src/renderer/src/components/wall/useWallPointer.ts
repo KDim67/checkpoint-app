@@ -209,7 +209,7 @@ export function useWallPointer(wallDocument: WallDocument) {
 
   /** if the click was near enough */
   const arrowAt = (at: { x: number; y: number }): WallItem | null => {
-    const slack = 8 / docRef.current.camera.zoom
+    const slack = 16 / docRef.current.camera.zoom
     for (const arrow of docRef.current.items.filter(i => i.kind === 'arrow')) {
       const ends = arrowAnchors(arrow, itemsById)
       if (!ends) continue
@@ -240,7 +240,8 @@ export function useWallPointer(wallDocument: WallDocument) {
     if (target.closest('[data-wall-link]')) return
 
     const handle = target.closest<HTMLElement>('[data-wall-handle]')
-    const itemEl = target.closest<HTMLElement>('[data-wall-item]')
+    const itemEl = target.closest<HTMLElement | SVGElement>('[data-wall-item]')
+    const itemElId = itemEl ? (itemEl.getAttribute('data-wall-item') ?? (itemEl as HTMLElement).dataset?.wallItem) : undefined
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
     // a right press can't know menu vs pan until release; panning can move to middle
@@ -255,7 +256,7 @@ export function useWallPointer(wallDocument: WallDocument) {
         rightPressRef.current = {
           clientX: e.clientX,
           clientY: e.clientY,
-          itemId: itemEl?.dataset.wallItem ?? null,
+          itemId: itemElId ?? null,
           at: toWallPoint(screenPoint(e), cam),
           moved: false
         }
@@ -277,7 +278,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       return
     }
 
-    const pressedItem = itemEl ? docRef.current.items.find(i => i.id === itemEl.dataset.wallItem) : undefined
+    const pressedItem = itemElId ? docRef.current.items.find(i => i.id === itemElId) : undefined
 
     // Pick an item: this press names the target, a press anywhere else calls it off
     if (linkPickFor && e.button === 0) {
@@ -343,7 +344,7 @@ export function useWallPointer(wallDocument: WallDocument) {
       return
     }
 
-    const id = itemEl?.dataset.wallItem
+    const id = itemElId
     const item = id ? docRef.current.items.find(i => i.id === id) : undefined
 
     // drag to connect; a still press picks two items, easier when they nearly touch
@@ -378,6 +379,11 @@ export function useWallPointer(wallDocument: WallDocument) {
 
     if (id && item && e.button === 0) {
       if (item.locked) { setSelectedIds(new Set()); return }
+      if (item.kind === 'arrow') {
+        const next = pressSelection(selectedRef.current, id, e.shiftKey)
+        setSelectedIds(next)
+        return
+      }
       const members = groupOf(docRef.current.items, id)
       const selected = selectedRef.current
       const next = pressSelection(selected, id, e.shiftKey, members)

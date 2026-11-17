@@ -150,10 +150,15 @@ export function paintWallItems(viewport: HTMLElement, items: WallItem[], ids: Se
       end: heads !== 'none' ? inset : 0,
       start: heads === 'both' ? inset : 0
     })
-    g.querySelector('path')?.setAttribute('d', geo.d)
+    g.querySelectorAll('path').forEach(p => p.setAttribute('d', geo.d))
     // end head first, then start, as rendered
     const [endHead, startHead] = Array.from(g.querySelectorAll('polygon'))
     endHead?.setAttribute('points', arrowHeadPoints(geo.end, geo.endAngle, width))
     startHead?.setAttribute('points', arrowHeadPoints(geo.start, geo.startAngle, width))
+
+    const label = viewport.querySelector<HTMLElement>(`[data-arrow-label="${arrow.id}"]`)
+    if (label) {
+      label.style.transform = `translate(${geo.mid.x}px, ${geo.mid.y}px) translate(-50%, -50%)`
+    }
   })
 }
