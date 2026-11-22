@@ -23,6 +23,7 @@ function toolHint(tool: WallTool, linkPicking: boolean, arrowFrom: string | null
   if (tool === 'highlighter') return 'Drag to highlight · Esc to stop'
   if (tool === 'eraser') return 'Drag across strokes to erase them · Esc to stop'
   if (tool === 'lasso') return 'Draw a loop around what to select · Esc to stop'
+  if (tool === 'laser') return 'Move pointer to shine laser · Esc or L to stop'
   if (tool === 'arrow') return arrowFrom ? 'Now click the item to point at' : 'Drag from one item to another, or to anywhere'
   return `Drag to select · Space or ${panHint} to pan`
 }

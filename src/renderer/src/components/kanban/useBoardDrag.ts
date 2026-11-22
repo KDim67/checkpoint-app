@@ -8,6 +8,7 @@ import { canAimAtSlot } from './dropSlots'
 import type { BoardState } from './useBoardState'
 import { useFailureReport } from '../ui/Toast'
 import { dueSortKey } from '../../../../shared/dueDate'
+import { triggerConfetti } from '../../lib/celebration'
 
 /** columns, cards and each card's column, from board state: a col:: sortable read as a card sent drops to the end */
 interface DropGeometry {
@@ -250,6 +251,11 @@ export function useBoardDrag(boardState: BoardState) {
       position: newPosition ?? rest[index].position
     }
     if (newPriority !== undefined) patch.priority = newPriority
+
+    const isDoneCol = newStatus === 'done' || columns.find(c => c.id === newStatus)?.name.toLowerCase() === 'done'
+    if (draggedCard.status !== newStatus && isDoneCol) {
+      void triggerConfetti()
+    }
 
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...patch } : c))
     try {

@@ -386,6 +386,10 @@ export function useWallPointer(wallDocument: WallDocument) {
       return
     }
 
+    if (tool === 'laser') {
+      return
+    }
+
     if (id && item && e.button === 0) {
       if (item.locked) { setSelectedIds(new Set()); return }
       if (item.kind === 'arrow') {

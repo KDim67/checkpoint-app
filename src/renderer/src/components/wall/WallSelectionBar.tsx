@@ -3,7 +3,7 @@ import {
   Type, Trash2, ArrowUp, ArrowDown, Copy, Lock, Unlock, Link2, Group, Ungroup, SlidersHorizontal,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal,
-  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw, Ratio, Layers
+  AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, Tags, Crop, RotateCw, Ratio, Layers, Smile
 } from 'lucide-react'
 import { bringToFront, fontSizeOf, patchItems, sendToBack, WALL_COLORS, STROKE_WIDTHS, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, SHAPE_TYPES, type WallItem } from '../../../../shared/wallModel'
 import { isLinkable } from '../../../../shared/wallLink'
@@ -86,6 +86,8 @@ const ALIGN: { edge: AlignEdge; label: string; icon: ReactNode }[] = [
   { edge: 'bottom', label: 'Align bottom edges', icon: <AlignEndHorizontal size={13} /> }
 ]
 
+export const STAMP_EMOJIS = ['🔥', '🚀', '⭐', '💡', '👏', '❤️', '🎯', '🎉'] as const
+
 export default function WallSelectionBar({
   floatingPos, floatingRef, swatchOpen, setSwatchOpen, alignOpen, setAlignOpen, linkOpen, setLinkOpen, single, linkLabel,
   arrowsSelected, items, selectedIds, setItems, setEditingId, duplicateSelected, toggleLock,
@@ -108,9 +110,11 @@ export default function WallSelectionBar({
   const [styleFor, setStyleFor] = useState<Set<string> | null>(null)
   const [shapePickerFor, setShapePickerFor] = useState<Set<string> | null>(null)
   const [tagsFor, setTagsFor] = useState<Set<string> | null>(null)
+  const [stampFor, setStampFor] = useState<Set<string> | null>(null)
   const styleOpen = styleFor === selectedIds
   const shapePickerOpen = shapePickerFor === selectedIds
   const tagsOpen = tagsFor === selectedIds
+  const stampOpen = stampFor === selectedIds
   const closeOthers = (): void => {
     setSwatchOpen(false)
     setLinkOpen(false)
@@ -118,6 +122,7 @@ export default function WallSelectionBar({
     setStyleFor(null)
     setShapePickerFor(null)
     setTagsFor(null)
+    setStampFor(null)
   }
   const first = chosen[0]
   // the drag was record: false, letting go makes it one undo step
@@ -448,6 +453,48 @@ export default function WallSelectionBar({
       {canUngroup && toolButton('Ungroup', <Ungroup size={13} />, () => setItems(ungroupItems(items, selectedIds)))}
       {toolButton('Bring to front', <ArrowUp size={13} />, () => single && setItems(bringToFront(items, single.id)), { disabled: !single })}
       {toolButton('Send to back', <ArrowDown size={13} />, () => single && setItems(sendToBack(items, single.id)), { disabled: !single })}
+      {/* reaction stamps for selected items */}
+      <div className="relative">
+        {toolButton(
+          'Add reaction stamp',
+          <Smile size={13} />,
+          () => { const open = stampOpen; closeOthers(); if (!open) setStampFor(selectedIds) },
+          { active: stampOpen }
+        )}
+        {stampOpen && (
+          <div style={{ ...popover, padding: '4px 6px', display: 'flex', gap: '4px', width: 'auto', whiteSpace: 'nowrap' }}>
+            {STAMP_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                title={`Add ${emoji}`}
+                onClick={() => {
+                  const updated = items.map(item => {
+                    if (!selectedIds.has(item.id)) return item
+                    const rec = { ...(item.reactions ?? {}) }
+                    rec[emoji] = (rec[emoji] ?? 0) + 1
+                    return { ...item, reactions: rec }
+                  })
+                  setItems(updated)
+                  setStampFor(null)
+                }}
+                className="hover-brighten"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  lineHeight: 1
+                }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       {toolButton('Duplicate', <Copy size={13} />, duplicateSelected)}
       {toolButton(single?.locked ? 'Unlock' : 'Lock', single?.locked ? <Unlock size={13} /> : <Lock size={13} />, toggleLock)}
       {toolButton('Delete', <Trash2 size={13} />, removeSelected)}

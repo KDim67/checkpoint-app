@@ -33,6 +33,7 @@ import { listTags } from '../../data/tags'
 import { readItems } from '../../data/items'
 import DrawerCloseButton from '../ui/DrawerCloseButton'
 import { dueLockOf, linkOf, SERVICES } from '../../../../shared/connections'
+import { triggerConfetti } from '../../lib/celebration'
 import DueDateField from '../ui/DueDateField'
 import { getRelations } from '../../data/relations'
 import DetailTitleInput from '../ui/DetailTitleInput'
@@ -343,6 +344,9 @@ export default function CardDetailModal({ cardId, initialCard, columns, onClose,
     })
     setChecklist(updated)
     updateMetadata({ checklist: updated })
+    if (updated.length > 0 && updated.every(item => item.done)) {
+      void triggerConfetti()
+    }
   }
 
   const handleDeleteChecklistItem = (itemId: string) => {

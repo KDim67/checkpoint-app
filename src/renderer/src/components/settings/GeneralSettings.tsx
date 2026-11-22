@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { FieldRow, SettingsSelect } from './SettingsSection'
+import { FieldRow, SettingsSelect, ToggleRow } from './SettingsSection'
 import { VIEW_FEATURES, readViewFeatures, defaultViewEnabledMap, START_VIEW_LAST_USED, type ViewEnabledMap } from '../../lib/features'
-import { getStringSetting, setStringSetting } from '../../lib/settings'
+import { getBoolSetting, getStringSetting, setBoolSetting, setStringSetting } from '../../lib/settings'
 import { useAppStore } from '../../store/appStore'
 import { workspaceName } from '../../lib/createWorkspace'
 
@@ -12,12 +12,14 @@ export default function GeneralSettings() {
   const [defaultContext, setDefaultContext] = useState<string>('')
   const [startView, setStartView] = useState<string>(START_VIEW_LAST_USED)
   const [enabledViews, setEnabledViews] = useState<ViewEnabledMap>(defaultViewEnabledMap)
+  const [celebrationsEnabled, setCelebrationsEnabled] = useState<boolean>(true)
 
   useEffect(() => {
     const load = async () => {
       setDefaultContext(await getStringSetting('default_context', ''))
       setStartView(await getStringSetting('start_view', START_VIEW_LAST_USED))
       setEnabledViews(await readViewFeatures())
+      setCelebrationsEnabled(await getBoolSetting('completion_celebrations_enabled', true))
     }
     load().catch(err => console.error('Failed to load general settings:', err))
   }, [])
@@ -61,6 +63,18 @@ export default function GeneralSettings() {
           ))}
         </SettingsSelect>
       </FieldRow>
+
+      <ToggleRow
+        label="Task completion celebrations"
+        description="Celebrate moving a card to Done or checking off all subtasks with a confetti burst."
+        checked={celebrationsEnabled}
+        onChange={val => {
+          setCelebrationsEnabled(val)
+          setBoolSetting('completion_celebrations_enabled', val).catch(err => {
+            console.error('Failed to save completion_celebrations_enabled:', err)
+          })
+        }}
+      />
     </div>
   )
 }

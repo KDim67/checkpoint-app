@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { Eraser, Highlighter, LassoSelect, PenLine, Scissors, Spline } from 'lucide-react'
+import { Eraser, Flame, Highlighter, LassoSelect, PenLine, Scissors, Spline } from 'lucide-react'
 import { WALL_COLORS, STROKE_WIDTHS, SMOOTHING_STRENGTH, type ArrowShape, type ArrowLine, type ArrowHeads } from '../../../../shared/wallModel'
 import WallColorPicker from './WallColorPicker'
 import { setNumberSetting, setStringSetting } from '../../lib/settings'
@@ -36,7 +36,8 @@ const MODES: { tool: DrawTool; label: string; icon: React.ReactNode }[] = [
   { tool: 'pen', label: 'Pen', icon: <PenLine size={13} /> },
   { tool: 'highlighter', label: 'Highlighter', icon: <Highlighter size={13} /> },
   { tool: 'eraser', label: 'Eraser', icon: <Eraser size={13} /> },
-  { tool: 'lasso', label: 'Lasso select', icon: <LassoSelect size={13} /> }
+  { tool: 'lasso', label: 'Lasso select', icon: <LassoSelect size={13} /> },
+  { tool: 'laser', label: 'Laser pointer (L)', icon: <Flame size={13} /> }
 ]
 
 const divider = <div style={{ height: '1px', width: '100%', background: 'var(--color-surface-offset)', margin: '2px 0' }} />

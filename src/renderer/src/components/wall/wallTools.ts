@@ -1,7 +1,7 @@
 /** the tools the toolbar arms; the pen family shares one panel and one gesture */
-export type WallTool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'lasso' | 'arrow'
+export type WallTool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'lasso' | 'arrow' | 'laser'
 
-export const DRAW_TOOLS = ['pen', 'highlighter', 'eraser', 'lasso'] as const
+export const DRAW_TOOLS = ['pen', 'highlighter', 'eraser', 'lasso', 'laser'] as const
 export type DrawTool = (typeof DRAW_TOOLS)[number]
 
 export const isDrawTool = (tool: WallTool): tool is DrawTool => (DRAW_TOOLS as readonly WallTool[]).includes(tool)

@@ -13,6 +13,7 @@ import useEscapeKey from '../ui/useEscapeKey'
 import useFocusTrap from '../ui/useFocusTrap'
 import { DetailSkeleton } from '../ui/Skeleton'
 import { usePresenceState } from '../../lib/presence'
+import { triggerConfetti } from '../../lib/celebration'
 import TagRow from '../ui/TagRow'
 import TagCreator from '../ui/TagCreator'
 import RelationsPanel from '../ui/RelationsPanel'
@@ -200,7 +201,14 @@ export default function TaskDetailDrawer({ taskId, columns, onClose, onUpdate }:
 
   const handleToggleSubtask = async (subtask: Subtask) => {
     // optimistic, a checkbox waiting on a round trip feels broken
-    setSubtasks(prev => prev.map(s => (s.id === subtask.id ? { ...s, done: !s.done } : s)))
+    const nextDone = !subtask.done
+    setSubtasks(prev => {
+      const next = prev.map(s => (s.id === subtask.id ? { ...s, done: nextDone } : s))
+      if (nextDone && next.length > 0 && next.every(s => s.done)) {
+        void triggerConfetti()
+      }
+      return next
+    })
     await subtasksApi.update(subtask.id, { done: !subtask.done })
     if (task) loadSubtasks(task.id)
   }

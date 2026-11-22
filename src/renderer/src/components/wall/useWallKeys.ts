@@ -102,6 +102,11 @@ export function useWallKeys(wallDocument: WallDocument, wallPointer: WallPointer
       if (command === 'wall_tool_highlight') { setTool('highlighter'); setArrowFrom(null); return }
       if (command === 'wall_tool_erase') { setTool('eraser'); setArrowFrom(null); return }
       if (command === 'wall_tool_lasso') { setTool('lasso'); setArrowFrom(null); return }
+      if (!mod && !e.altKey && (e.key === 'l' || e.key === 'L')) {
+        setTool(t => t === 'laser' ? 'select' : 'laser')
+        setArrowFrom(null)
+        return
+      }
       if (command === 'wall_zoom_in') { e.preventDefault(); zoomBy(1); return }
       if (command === 'wall_zoom_out') { e.preventDefault(); zoomBy(-1); return }
       if (command === 'wall_zoom_reset') { e.preventDefault(); zoomReset(); return }

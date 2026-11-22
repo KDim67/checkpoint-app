@@ -13,6 +13,7 @@ import { linkOf } from '../../../../shared/connections'
 import LinkBadge from './LinkBadge'
 import { CardWindowContext, cardHeights } from './cardWindow'
 import { useDrawWhenNear } from '../../lib/drawWhenNear'
+import { triggerConfetti } from '../../lib/celebration'
 
 export interface RemoteCardDragInfo {
   peerId: string
@@ -321,6 +322,7 @@ function CardFace({
                       delete nextMeta.prevStatus
                     } else {
                       nextMeta.prevStatus = card.status
+                      void triggerConfetti({ x: e.clientX, y: e.clientY })
                     }
                     await save({
                       status: newStatus,

@@ -77,6 +77,8 @@ export interface WallItem {
   map?: string
   /** layer placement: 'front' renders on top of items (cards, notes, images); 'back' renders behind items */
   layer?: 'front' | 'back'
+  /** floating reaction stamps placed on the item */
+  reactions?: Record<string, number>
 }
 
 /** contents live under wallDocKey */
@@ -404,6 +406,17 @@ export function normalizeWallItem(raw: unknown, index: number): WallItem | null 
     ...(kind === 'code' && isCodeLanguage(o.language) ? { language: o.language } : {}),
     ...(map ? { map } : {}),
     ...(layer ? { layer } : {}),
+    ...(o.reactions && typeof o.reactions === 'object' && !Array.isArray(o.reactions)
+      ? (() => {
+          const recs: Record<string, number> = {}
+          for (const [k, v] of Object.entries(o.reactions as Record<string, unknown>)) {
+            if (typeof k === 'string' && k.trim() && typeof v === 'number' && Number.isFinite(v) && v > 0) {
+              recs[k.trim()] = Math.round(v)
+            }
+          }
+          return Object.keys(recs).length > 0 ? { reactions: recs } : {}
+        })()
+      : {}),
     z: num(o.z, index)
   }
 }

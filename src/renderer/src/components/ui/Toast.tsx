@@ -119,6 +119,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [removeToast])
 
   useEffect(() => {
+    const handleToastEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ text: string; options?: ToastOptions }>).detail
+      if (detail?.text) {
+        toast(detail.text, detail.options)
+      }
+    }
+    window.addEventListener('checkpoint-toast', handleToastEvent)
+    return () => window.removeEventListener('checkpoint-toast', handleToastEvent)
+  }, [toast])
+
+  useEffect(() => {
     const handleUndoKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey && !e.altKey) {
         if (isTypingTarget(e.target)) return
@@ -234,6 +245,13 @@ export function useToast() {
     throw new Error('useToast must be used within a ToastProvider')
   }
   return context
+}
+
+/** triggers a toast from anywhere via window event */
+export function showToast(text: string, options?: ToastOptions): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('checkpoint-toast', { detail: { text, options } }))
+  }
 }
 
 /**

@@ -7,6 +7,12 @@ import { setSetting } from '../data/settings'
 import { openProblemReport } from './reportProblem'
 import { SECTION_TERMS } from './settingsSearch'
 import { withViewTransition } from './viewTransition'
+import { triggerConfetti } from './celebration'
+
+function notifyToast(text: string, options?: { duration?: number }) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('checkpoint-toast', { detail: { text, ...options } }))
+}
 
 export interface Command extends CommandLike {
   /** shortcut hint or current value */
@@ -196,6 +202,103 @@ export function buildCommands(ctx: CommandContext): Command[] {
     keywords: ['bug', 'issue', 'crash', 'error', 'broken', 'feedback', 'log', 'github'],
     run: () => openProblemReport()
   })
+
+  // Fun & Quick Utilities
+  commands.push(
+    {
+      id: 'fun:roll',
+      label: 'Roll a Die (/roll)',
+      group: 'Fun & Utilities',
+      keywords: ['/roll', 'dice', 'd6', 'd20', 'random', 'roll', 'tabletop', 'game'],
+      run: async () => {
+        const d6 = Math.floor(Math.random() * 6) + 1
+        const d20 = Math.floor(Math.random() * 20) + 1
+        const result = `🎲 Rolled ${d6} (d6) and ${d20} (d20)${d20 === 20 ? ' — Critical Hit! 🔥' : d20 === 1 ? ' — Critical Miss! 💀' : ''}`
+        try { await navigator.clipboard?.writeText(result) } catch {}
+        notifyToast(result, { duration: 5000 })
+      }
+    },
+    {
+      id: 'fun:flip',
+      label: 'Flip a Coin (/flip)',
+      group: 'Fun & Utilities',
+      keywords: ['/flip', 'coin', 'toss', 'heads', 'tails', 'random', 'choice'],
+      run: async () => {
+        const outcome = Math.random() < 0.5 ? 'Heads' : 'Tails'
+        const result = `🪙 Coin landed on: ${outcome}!`
+        try { await navigator.clipboard?.writeText(outcome) } catch {}
+        notifyToast(result, { duration: 4000 })
+      }
+    },
+    {
+      id: 'fun:decide',
+      label: 'Decide For Me (/decide)',
+      group: 'Fun & Utilities',
+      keywords: ['/decide', 'choose', 'random', 'pick', 'choice'],
+      run: () => {
+        const answers = ['Yes, absolutely! 🚀', 'Better not right now 🛑', 'Go for it! ✨', 'Signs point to yes 🔮', 'Flip another coin 🪙']
+        const pick = answers[Math.floor(Math.random() * answers.length)]
+        notifyToast(`🎯 Decider says: ${pick}`, { duration: 5000 })
+      }
+    },
+    {
+      id: 'fun:confetti',
+      label: 'Throw Confetti! (/confetti)',
+      group: 'Fun & Utilities',
+      keywords: ['/confetti', 'celebrate', 'party', 'fireworks', 'yay'],
+      run: () => {
+        void triggerConfetti()
+        notifyToast('🎉 Woohoo! Celebrating your progress!', { duration: 3000 })
+      }
+    },
+    {
+      id: 'fun:shrug',
+      label: 'Copy ¯\\_(ツ)_/¯ (/shrug)',
+      group: 'Fun & Utilities',
+      keywords: ['/shrug', 'ascii', 'kaomoji', 'emoji', 'shrug'],
+      run: async () => {
+        try { await navigator.clipboard?.writeText('¯\\_(ツ)_/¯') } catch {}
+        notifyToast('¯\\_(ツ)_/¯ copied to clipboard!')
+      }
+    },
+    {
+      id: 'fun:tableflip',
+      label: 'Copy (╯°□°)╯︵ ┻━┻ (/tableflip)',
+      group: 'Fun & Utilities',
+      keywords: ['/tableflip', 'ascii', 'rage', 'kaomoji', 'tableflip'],
+      run: async () => {
+        try { await navigator.clipboard?.writeText('(╯°□°)╯︵ ┻━┻') } catch {}
+        notifyToast('(╯°□°)╯︵ ┻━┻ copied to clipboard!')
+      }
+    },
+    {
+      id: 'fun:unflip',
+      label: 'Copy ┬─┬ノ( º _ ºノ) (/unflip)',
+      group: 'Fun & Utilities',
+      keywords: ['/unflip', 'ascii', 'calm', 'kaomoji', 'unflip', 'table'],
+      run: async () => {
+        try { await navigator.clipboard?.writeText('┬─┬ノ( º _ ºノ)') } catch {}
+        notifyToast('┬─┬ノ( º _ ºノ) copied to clipboard!')
+      }
+    },
+    {
+      id: 'fun:motivate',
+      label: 'Daily Dev Motivation (/motivate)',
+      group: 'Fun & Utilities',
+      keywords: ['/motivate', 'quote', 'inspiration', 'daily', 'wisdom'],
+      run: () => {
+        const quotes = [
+          '✨ "Done is better than perfect." — Keep shipping!',
+          '🛠️ "First make it work, then make it right, then make it fast."',
+          '💡 "Small, steady commits turn into massive milestones."',
+          '🎮 "Great games are not made; they are iterated into greatness."',
+          '☕ "Code. Test. Breathe. You got this!"'
+        ]
+        const quote = quotes[Math.floor(Math.random() * quotes.length)]
+        showToast(quote, { duration: 6000 })
+      }
+    }
+  )
 
   return commands
 }

@@ -154,6 +154,24 @@ describe('normalizeWallItem', () => {
   it('keeps an empty text body, which is a legitimate empty sticky note', () => {
     expect(defined(normalizeWallItem({ kind: 'note', text: '' }, 0)).text).toBe('')
   })
+
+  it('normalizes reactions, keeping valid positive emoji counts and dropping non-objects or invalid numbers', () => {
+    const raw = {
+      kind: 'note',
+      reactions: {
+        '🔥': 3,
+        '🚀': 'invalid',
+        '⭐': -1,
+        '💡': 0,
+        '👏': 5.7
+      }
+    }
+    const result = defined(normalizeWallItem(raw, 0))
+    expect(result.reactions).toEqual({
+      '🔥': 3,
+      '👏': 6
+    })
+  })
 })
 
 describe('normalizeCamera', () => {

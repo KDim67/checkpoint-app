@@ -156,6 +156,71 @@ function WallItemLayer({ item, card, note, editing, connectable, showHandles, ar
         </button>
       )}
 
+      {/* Emoji reaction stamps */}
+      {item.reactions && Object.entries(item.reactions).filter(([_, count]) => count > 0).length > 0 && (
+        <div
+          data-wall-reactions
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: '100%',
+            marginTop: link && linkLabel !== undefined ? '32px' : '6px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '4px',
+            pointerEvents: 'auto',
+            zIndex: 3
+          }}
+        >
+          {Object.entries(item.reactions)
+            .filter(([_, count]) => count > 0)
+            .map(([emoji, count]) => (
+              <button
+                key={emoji}
+                type="button"
+                className="wall-reaction-chip"
+                title={`${emoji} ${count} (Click to add, right-click to remove)`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.dispatchEvent(
+                    new CustomEvent('wall-reaction-click', {
+                      detail: { itemId: item.id, emoji, delta: 1 }
+                    })
+                  )
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  window.dispatchEvent(
+                    new CustomEvent('wall-reaction-click', {
+                      detail: { itemId: item.id, emoji, delta: -1 }
+                    })
+                  )
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 6px',
+                  borderRadius: '12px',
+                  fontSize: 'var(--text-xs)',
+                  lineHeight: '14px',
+                  background: 'var(--color-surface-elevated, #1e2227)',
+                  border: '1px solid var(--color-surface-offset, rgba(255,255,255,0.12))',
+                  color: 'var(--color-text-base, #e6edf3)',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                  transition: 'transform 80ms ease, background 120ms ease'
+                }}
+              >
+                <span style={{ fontSize: 'var(--text-sm)' }}>{emoji}</span>
+                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, opacity: 0.9 }}>{count}</span>
+              </button>
+            ))}
+        </div>
+      )}
+
       {item.locked && (
         <div className="wall-lock-selected" style={{ position: 'absolute', top: '-8px', right: '-8px', color: 'var(--color-text-faint)' }}>
           <Lock size={12} />

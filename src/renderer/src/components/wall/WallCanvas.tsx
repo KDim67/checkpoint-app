@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { inPaintOrder, patchItems, itemAtPoint, gridSpacing, toWallPoint, arrowGeometry, arrowAnchors, arrowDash, arrowHeadPoints, arrowHeadInset, ARROW_SHAPES, ARROW_LINES, ARROW_HEAD_MODES, setActiveWall, type WallItem } from '../../../../shared/wallModel'
 import { pressSelection } from '../../../../shared/wallPointer'
 import WallItemLayer from './WallItemLayer'
@@ -57,6 +57,55 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       }
     }
   })
+
+  const [laserPoints, setLaserPoints] = useState<{ x: number; y: number; time: number }[]>([])
+  const laserPointsRef = useRef<{ x: number; y: number; time: number }[]>([])
+  const [laserTip, setLaserTip] = useState<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    if (tool !== 'laser') {
+      setLaserTip(null)
+    }
+  }, [tool])
+
+  useEffect(() => {
+    if (laserPoints.length === 0) return
+    const timer = setInterval(() => {
+      const now = Date.now()
+      const filtered = laserPointsRef.current.filter(p => now - p.time < 1100)
+      if (filtered.length !== laserPointsRef.current.length) {
+        laserPointsRef.current = filtered
+        setLaserPoints(filtered)
+      }
+    }, 40)
+    return () => clearInterval(timer)
+  }, [laserPoints.length > 0])
+
+  useEffect(() => {
+    const handleReactionClick = (e: Event) => {
+      const detail = (e as CustomEvent<{ itemId: string; emoji: string; delta?: number }>).detail
+      if (!detail || !detail.itemId || !detail.emoji) return
+      const item = docRef.current.items.find(i => i.id === detail.itemId)
+      if (!item) return
+      const delta = detail.delta ?? 1
+      const currentCount = item.reactions?.[detail.emoji] ?? 0
+      const nextCount = Math.max(0, currentCount + delta)
+      const nextReactions = { ...(item.reactions ?? {}) }
+      if (nextCount > 0) {
+        nextReactions[detail.emoji] = nextCount
+      } else {
+        delete nextReactions[detail.emoji]
+      }
+      setItems(
+        patchItems(docRef.current.items, new Set([item.id]), {
+          reactions: Object.keys(nextReactions).length > 0 ? nextReactions : undefined
+        })
+      )
+    }
+
+    window.addEventListener('wall-reaction-click', handleReactionClick)
+    return () => window.removeEventListener('wall-reaction-click', handleReactionClick)
+  }, [docRef, setItems])
 
   // Live remote item movement preview
   useEffect(() => {
@@ -198,6 +247,13 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
         onPointerMove(e)
         const at = toWallPoint(screenPoint(e), docRef.current.camera)
         broadcastCursor(at.x, at.y)
+        if (tool === 'laser') {
+          const now = Date.now()
+          const next = [...laserPointsRef.current.filter(p => now - p.time < 1100), { x: at.x, y: at.y, time: now }]
+          laserPointsRef.current = next
+          setLaserPoints(next)
+          setLaserTip(at)
+        }
       }}
       onPointerLeave={onPointerLeave}
       onPointerUp={endDrag}
@@ -265,7 +321,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       }}
       style={{
         flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden',
-        cursor: spaceHeld ? 'grab' : linkPickFor ? 'alias' : tool === 'arrow' ? 'copy' : tool === 'eraser' ? 'cell' : tool !== 'select' ? 'crosshair' : undefined,
+        cursor: spaceHeld ? 'grab' : linkPickFor ? 'alias' : tool === 'arrow' ? 'copy' : tool === 'eraser' ? 'cell' : tool === 'laser' ? 'none' : tool !== 'select' ? 'crosshair' : undefined,
         backgroundColor: canvasBackground,
         backgroundImage: `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`,
         backgroundSize: `${gridSpacing(camera.zoom)}px ${gridSpacing(camera.zoom)}px`,
@@ -422,6 +478,16 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
           zIndex: 3
         }}
       >
+        <defs>
+          <filter id="wall-laser-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         <g
           data-wall-camera-layer
           style={{
@@ -429,6 +495,46 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
             transformOrigin: '0 0'
           }}
         >
+          {/* Laser pointer trail */}
+          {(laserPoints.length > 0 || (tool === 'laser' && laserTip)) && (() => {
+            const now = Date.now()
+            const valid = laserPoints.filter(pt => now - pt.time < 1100)
+            const tip = laserTip ?? (valid.length > 0 ? valid[valid.length - 1] : null)
+
+            return (
+              <g data-wall-laser-trail filter="url(#wall-laser-glow)">
+                {valid.slice(1).map((pt, idx) => {
+                  const prev = valid[idx]
+                  const age = now - pt.time
+                  const ratio = Math.max(0, 1 - age / 1100)
+                  return (
+                    <line
+                      key={`${pt.x}-${pt.y}-${idx}`}
+                      x1={prev.x}
+                      y1={prev.y}
+                      x2={pt.x}
+                      y2={pt.y}
+                      stroke="#ff2a6d"
+                      strokeWidth={Math.max(2, 5 * ratio)}
+                      strokeLinecap="round"
+                      opacity={ratio * 0.9}
+                    />
+                  )
+                })}
+                {tip && (
+                  <circle
+                    cx={tip.x}
+                    cy={tip.y}
+                    r={Math.max(3.5, 5 / camera.zoom)}
+                    fill="#ffffff"
+                    stroke="#ff2a6d"
+                    strokeWidth={Math.max(1.5, 2.5 / camera.zoom)}
+                  />
+                )}
+              </g>
+            )
+          })()}
+
           {/* Arrows in front of items */}
           {doc.items.filter(i => i.kind === 'arrow' && i.layer === 'front').map(renderArrow)}
 
