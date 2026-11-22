@@ -55,7 +55,6 @@ win:
 nsis:
   # one click, no wizard; per-user is what makes losing the directory choice acceptable
   oneClick: true
-  disableWebInstaller: true
 
   # %LOCALAPPDATA%\Programs, so never a UAC prompt
   perMachine: false
