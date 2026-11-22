@@ -68,8 +68,9 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
     }
   }, [tool])
 
+  const hasLaserPoints = laserPoints.length > 0
   useEffect(() => {
-    if (laserPoints.length === 0) return
+    if (!hasLaserPoints) return
     const timer = setInterval(() => {
       const now = Date.now()
       const filtered = laserPointsRef.current.filter(p => now - p.time < 1100)
@@ -79,7 +80,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
       }
     }, 40)
     return () => clearInterval(timer)
-  }, [laserPoints.length > 0])
+  }, [hasLaserPoints])
 
   useEffect(() => {
     const handleReactionClick = (e: Event) => {
