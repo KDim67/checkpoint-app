@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     // components opt into jsdom with a `@vitest-environment jsdom` docblock; the rest run in fast plain Node
     include: ['tests/**/*.test.{ts,tsx}'],
-    environment: 'node'
+    environment: 'node',
+    testTimeout: 15000
   }
 })

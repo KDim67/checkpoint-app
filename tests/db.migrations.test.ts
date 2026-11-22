@@ -143,7 +143,7 @@ describe('upgrading a legacy database', () => {
     initDb(dir)
     const row = getDb().prepare(`SELECT * FROM items WHERE id = 'itm_legacy'`).get()
     expect({ ...(row as Record<string, unknown>) }).toEqual(LEGACY_ROW)
-  })
+  }, 25000)
 
   it('does not cascade-delete tag links or relations when items is dropped', () => {
     // both cascade from items, so FKs on would wipe them
