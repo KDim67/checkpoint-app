@@ -20,6 +20,12 @@ vi.mock('../src/renderer/src/lib/presence', () => ({
   prefersReducedMotion: vi.fn(() => false)
 }))
 
+// Skip real overlay animations in tests — return instant results
+vi.mock('../src/renderer/src/lib/funAnimations', () => ({
+  animateDiceRoll: vi.fn(async () => ({ d6: 4, d20: 17 })),
+  animateCoinFlip: vi.fn(async () => 'Heads')
+}))
+
 describe('triggerConfetti', () => {
   beforeEach(async () => {
     const settings = await import('../src/renderer/src/lib/settings')

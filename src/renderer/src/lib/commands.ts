@@ -8,6 +8,7 @@ import { openProblemReport } from './reportProblem'
 import { SECTION_TERMS } from './settingsSearch'
 import { withViewTransition } from './viewTransition'
 import { triggerConfetti } from './celebration'
+import { animateDiceRoll, animateCoinFlip } from './funAnimations'
 
 function notifyToast(text: string, options?: { duration?: number }) {
   if (typeof window === 'undefined') return
@@ -211,8 +212,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
       group: 'Fun & Utilities',
       keywords: ['/roll', 'dice', 'd6', 'd20', 'random', 'roll', 'tabletop', 'game'],
       run: async () => {
-        const d6 = Math.floor(Math.random() * 6) + 1
-        const d20 = Math.floor(Math.random() * 20) + 1
+        const { d6, d20 } = await animateDiceRoll()
         const result = `🎲 Rolled ${d6} (d6) and ${d20} (d20)${d20 === 20 ? ' — Critical Hit! 🔥' : d20 === 1 ? ' — Critical Miss! 💀' : ''}`
         try { await navigator.clipboard?.writeText(result) } catch {}
         notifyToast(result, { duration: 5000 })
@@ -224,7 +224,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
       group: 'Fun & Utilities',
       keywords: ['/flip', 'coin', 'toss', 'heads', 'tails', 'random', 'choice'],
       run: async () => {
-        const outcome = Math.random() < 0.5 ? 'Heads' : 'Tails'
+        const outcome = await animateCoinFlip()
         const result = `🪙 Coin landed on: ${outcome}!`
         try { await navigator.clipboard?.writeText(outcome) } catch {}
         notifyToast(result, { duration: 4000 })
@@ -236,7 +236,12 @@ export function buildCommands(ctx: CommandContext): Command[] {
       group: 'Fun & Utilities',
       keywords: ['/decide', 'choose', 'random', 'pick', 'choice'],
       run: () => {
-        const answers = ['Yes, absolutely! 🚀', 'Better not right now 🛑', 'Go for it! ✨', 'Signs point to yes 🔮', 'Flip another coin 🪙']
+        const answers = [
+          'Yes, absolutely! 🚀', 'Better not right now 🛑', 'Go for it! ✨',
+          'Signs point to yes 🔮', 'Flip another coin 🪙', 'Without a doubt 💯',
+          'Ask again after coffee ☕', 'The stars say yes ⭐', 'Hard no 🧱',
+          'Sleep on it 😴', 'My sources say no 🔍', 'Definitely! 🎯'
+        ]
         const pick = answers[Math.floor(Math.random() * answers.length)]
         notifyToast(`🎯 Decider says: ${pick}`, { duration: 5000 })
       }
@@ -253,12 +258,12 @@ export function buildCommands(ctx: CommandContext): Command[] {
     },
     {
       id: 'fun:shrug',
-      label: 'Copy ¯\\_(ツ)_/¯ (/shrug)',
+      label: 'Copy ¯\_(ツ)_/¯ (/shrug)',
       group: 'Fun & Utilities',
       keywords: ['/shrug', 'ascii', 'kaomoji', 'emoji', 'shrug'],
       run: async () => {
-        try { await navigator.clipboard?.writeText('¯\\_(ツ)_/¯') } catch {}
-        notifyToast('¯\\_(ツ)_/¯ copied to clipboard!')
+        try { await navigator.clipboard?.writeText('¯\_(ツ)_/¯') } catch {}
+        notifyToast('¯\_(ツ)_/¯ copied to clipboard!')
       }
     },
     {
@@ -292,10 +297,15 @@ export function buildCommands(ctx: CommandContext): Command[] {
           '🛠️ "First make it work, then make it right, then make it fast."',
           '💡 "Small, steady commits turn into massive milestones."',
           '🎮 "Great games are not made; they are iterated into greatness."',
-          '☕ "Code. Test. Breathe. You got this!"'
+          '☕ "Code. Test. Breathe. You got this!"',
+          '🧗 "Every expert was once a beginner."',
+          '🔥 "Ship today what you can improve tomorrow."',
+          '🌱 "Progress, not perfection."',
+          '🎯 "Focus on impact, not hours."',
+          '🚀 "The best time to refactor was last sprint. The second best is now."'
         ]
         const quote = quotes[Math.floor(Math.random() * quotes.length)]
-        showToast(quote, { duration: 6000 })
+        notifyToast(quote, { duration: 6000 })
       }
     }
   )
