@@ -3,6 +3,16 @@
 /** the longest side a dropped picture takes, about the old fixed box */
 export const IMAGE_LONGEST_SIDE = 320
 
+/** zoom level below which animated GIFs pause on the wall to save decoding and compositor resources */
+export const GIF_PAUSE_ZOOM_THRESHOLD = 0.35
+
+/** true when a wall item points to an animated GIF */
+export function isAnimatedGif(item: { ref?: string; text?: string }): boolean {
+  const ref = item.ref ?? ''
+  const text = item.text ?? ''
+  return /\.gif($|[?#])/i.test(ref) || /\.gif($|[?#])/i.test(text)
+}
+
 /** the item floors, so a tiny icon is still something to click */
 const MIN_WIDTH = 40
 const MIN_HEIGHT = 32

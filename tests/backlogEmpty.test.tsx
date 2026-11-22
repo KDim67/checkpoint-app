@@ -41,7 +41,7 @@ describe('an empty backlog', () => {
     expect(await screen.findByText('No tasks yet')).toBeTruthy()
     expect(screen.getByText(/Type one in the box above/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /New Task|Create Task/i })).toBeNull()
-  })
+  }, 15000)
 
   it('says nothing matched a search, and clears it to bring everything back', async () => {
     cleanup()

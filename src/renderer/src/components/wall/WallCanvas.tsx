@@ -394,7 +394,7 @@ export default function WallCanvas({ wallView }: { wallView: WallViewState }) {
               onMapTopic={addMapTopic}
               onNeedRoom={growItemRoom}
               cropping={cropping === item.id}
-              zoom={cropping === item.id ? camera.zoom : undefined}
+              zoom={cropping === item.id || item.kind === 'image' ? camera.zoom : undefined}
               onCrop={applyCrop}
             />
           )

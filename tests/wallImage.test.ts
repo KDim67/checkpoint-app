@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fitImageBox, IMAGE_LONGEST_SIDE, rowCentres } from '../src/shared/wallImage'
+import { fitImageBox, GIF_PAUSE_ZOOM_THRESHOLD, IMAGE_LONGEST_SIDE, isAnimatedGif, rowCentres } from '../src/shared/wallImage'
 
 describe('the box a dropped picture gets', () => {
   it('keeps a portrait photo tall and a landscape one wide', () => {
@@ -27,5 +27,28 @@ describe('laying several pictures out', () => {
 
   it('centres a single picture on the point itself', () => {
     expect(rowCentres([{ width: 120, height: 90 }], { x: 10, y: 20 })).toStrictEqual([{ x: 10, y: 20 }])
+  })
+})
+
+describe('animated GIF detection', () => {
+  it('detects .gif extensions across case and query parameters', () => {
+    expect(isAnimatedGif({ ref: 'animation.gif' })).toBe(true)
+    expect(isAnimatedGif({ ref: 'dance.GIF' })).toBe(true)
+    expect(isAnimatedGif({ ref: 'checkpoint-media://clip.gif?w=500' })).toBe(true)
+    expect(isAnimatedGif({ ref: 'clip.gif#frame' })).toBe(true)
+    expect(isAnimatedGif({ text: 'meme.gif' })).toBe(true)
+  })
+
+  it('ignores non-gif images and partial name matches', () => {
+    expect(isAnimatedGif({ ref: 'photo.png' })).toBe(false)
+    expect(isAnimatedGif({ ref: 'photo.jpg' })).toBe(false)
+    expect(isAnimatedGif({ ref: 'vector.svg' })).toBe(false)
+    expect(isAnimatedGif({ ref: 'gift-shop.png' })).toBe(false)
+    expect(isAnimatedGif({ ref: 'cat.gif.png' })).toBe(false)
+    expect(isAnimatedGif({})).toBe(false)
+  })
+
+  it('defines a zoom pause threshold at 35%', () => {
+    expect(GIF_PAUSE_ZOOM_THRESHOLD).toBe(0.35)
   })
 })

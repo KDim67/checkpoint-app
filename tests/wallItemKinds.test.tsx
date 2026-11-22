@@ -130,6 +130,77 @@ describe('a cropped picture', () => {
   })
 })
 
+describe('animated GIF playback on the wall', () => {
+  it('plays an animated GIF when zoomed in and in view', () => {
+    const { container } = view({ kind: 'image', ref: 'dance.gif' }, { zoom: 1 })
+
+    const img = container.querySelector('img') as HTMLImageElement
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(img).not.toBeNull()
+    expect(canvas).not.toBeNull()
+    expect(img.style.display).toBe('block')
+    expect(canvas.style.display).toBe('none')
+    expect(container.querySelector('[data-wall-gif]')).not.toBeNull()
+    expect(container.querySelector('[data-wall-gif-paused]')).toBeNull()
+  })
+
+  it('pauses an animated GIF and displays the frozen canvas when zoomed out past threshold', () => {
+    const { container } = view({ kind: 'image', ref: 'dance.gif' }, { zoom: 0.2 })
+
+    const img = container.querySelector('img') as HTMLImageElement
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(img.style.display).toBe('none')
+    expect(canvas.style.display).toBe('block')
+    expect(container.querySelector('[data-wall-gif-paused]')).not.toBeNull()
+  })
+
+  it('keeps an animated GIF playing while cropping even when zoomed out', () => {
+    const { container } = view({ kind: 'image', ref: 'dance.gif' }, { zoom: 0.2, cropping: true })
+
+    const img = container.querySelector('img') as HTMLImageElement
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(img.style.display).toBe('block')
+    expect(canvas.style.display).toBe('none')
+    expect(container.querySelector('[data-wall-gif-paused]')).toBeNull()
+  })
+
+  it('pauses when scrolled out of view and resumes when brought into view', () => {
+    let notify: (entries: IntersectionObserverEntry[]) => void = () => {}
+    class MockObserver {
+      constructor(cb: IntersectionObserverCallback) {
+        notify = cb as (entries: IntersectionObserverEntry[]) => void
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('IntersectionObserver', MockObserver)
+
+    const { container } = view({ kind: 'image', ref: 'dance.gif' }, { zoom: 1 })
+
+    const img = container.querySelector('img') as HTMLImageElement
+    const canvas = container.querySelector('canvas') as HTMLCanvasElement
+    expect(img.style.display).toBe('block')
+    expect(canvas.style.display).toBe('none')
+
+    act(() => {
+      notify([{ isIntersecting: false } as IntersectionObserverEntry])
+    })
+    expect(img.style.display).toBe('none')
+    expect(canvas.style.display).toBe('block')
+    expect(container.querySelector('[data-wall-gif-paused]')).not.toBeNull()
+
+    act(() => {
+      notify([{ isIntersecting: true } as IntersectionObserverEntry])
+    })
+    expect(img.style.display).toBe('block')
+    expect(canvas.style.display).toBe('none')
+    expect(container.querySelector('[data-wall-gif-paused]')).toBeNull()
+
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('a mind map topic', () => {
   it('adds one under it on Tab and one beside it on Enter, while writing', () => {
     const onMapTopic = vi.fn()

@@ -1,10 +1,11 @@
 /** cards render from the live item, so renames follow and deletions say so */
 
-import React, { useLayoutEffect, useRef, useState, useEffect } from 'react'
+import React, { useCallback, useLayoutEffect, useRef, useState, useEffect } from 'react'
 import { FileQuestion, FileText, Globe } from 'lucide-react'
 import { fontSizeOf, inkNaturalSize, inkPath, SHAPE_TYPES, type ImageCrop, type TextAlign, type WallItem } from '../../../../shared/wallModel'
 import { shapeOutline, shapeTextBox, textAlignOf } from '../../../../shared/wallShape'
 import { cropFrame } from '../../../../shared/wallCrop'
+import { GIF_PAUSE_ZOOM_THRESHOLD, isAnimatedGif } from '../../../../shared/wallImage'
 import { fitTextSizeSoon, useFontLoads } from '../../lib/fitText'
 import { getTextColorForBackground } from '../../lib/contrast'
 import type { Item, NoteMetadata } from '../../../../shared/types'
@@ -89,13 +90,25 @@ function TextBox({ item, style, onAutoSize }: {
 
 function WallImageItem({
   item,
-  base
+  base,
+  zoom,
+  cropping
 }: {
   item: WallItem
   base: React.CSSProperties
+  zoom?: number
+  cropping?: boolean
 }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [loadError, setLoadError] = useState(false)
+  const [inView, setInView] = useState(true)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  const isGif = isAnimatedGif(item)
+  const isZoomedOut = zoom !== undefined && zoom < GIF_PAUSE_ZOOM_THRESHOLD
+  const shouldPause = isGif && !cropping && (!inView || isZoomedOut)
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -108,6 +121,51 @@ function WallImageItem({
     window.addEventListener('collab-asset-received', handler)
     return () => window.removeEventListener('collab-asset-received', handler)
   }, [item.ref])
+
+  useEffect(() => {
+    if (!isGif) return
+    if (typeof IntersectionObserver === 'undefined') return
+
+    const el = containerRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          setInView(entry.isIntersecting)
+        }
+      },
+      { rootMargin: '100px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [isGif, item.ref])
+
+  const syncFrozenFrame = useCallback(() => {
+    const img = imgRef.current
+    const canvas = canvasRef.current
+    if (!img || !canvas || !img.naturalWidth || !img.naturalHeight) return
+
+    if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+    }
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      try {
+        ctx.drawImage(img, 0, 0)
+      } catch {
+        // Tainted canvas defensive catch
+      }
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (shouldPause) {
+      syncFrozenFrame()
+    }
+  }, [shouldPause, syncFrozenFrame])
 
   if (loadError) {
     return (
@@ -138,46 +196,76 @@ function WallImageItem({
     )
   }
 
-  const picture = (
-    <img
-      key={reloadKey}
-      className="wall-paper"
-      // a cropped picture is drawn wider than its box, so its copy is fetched for that width
-      src={`checkpoint-media://${item.ref}?w=${Math.round((item.width / (item.crop?.w ?? 1)) * 2)}&k=${reloadKey}`}
-      alt={item.text || 'Wall image'}
-      draggable={false}
-      decoding="async"
-      onError={() => setLoadError(true)}
-      onLoad={() => setLoadError(false)}
-      style={item.crop
-        // preflight caps images at their box, which squeezed the whole picture in instead of cropping it
-        ? { position: 'absolute', ...cropFrame(item.crop), maxWidth: 'none', objectFit: 'fill', display: 'block' }
-        : {
-            ...base,
-            objectFit: 'cover',
-            borderRadius: 'var(--radius-sm)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            display: 'block'
-          }}
-    />
-  )
-
-  // the crop is a window: the picture is laid out bigger behind it and the box shows one part
-  if (item.crop) {
+  if (!isGif && !item.crop) {
     return (
-      <div style={{
+      <img
+        key={reloadKey}
+        className="wall-paper"
+        src={`checkpoint-media://${item.ref}?w=${Math.round(item.width * 2)}&k=${reloadKey}`}
+        alt={item.text || 'Wall image'}
+        draggable={false}
+        decoding="async"
+        onError={() => setLoadError(true)}
+        onLoad={() => setLoadError(false)}
+        style={{
+          ...base,
+          objectFit: 'cover',
+          borderRadius: 'var(--radius-sm)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          display: 'block'
+        }}
+      />
+    )
+  }
+
+  const elementStyle: React.CSSProperties = item.crop
+    ? { position: 'absolute', ...cropFrame(item.crop), maxWidth: 'none', objectFit: 'fill' }
+    : { width: '100%', height: '100%', objectFit: 'cover' }
+
+  return (
+    <div
+      ref={containerRef}
+      data-wall-gif={isGif || undefined}
+      data-wall-gif-paused={isGif && shouldPause ? 'true' : undefined}
+      style={{
         ...base,
         position: 'relative',
         overflow: 'hidden',
         borderRadius: 'var(--radius-sm)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-      }}>
-        {picture}
-      </div>
-    )
-  }
-
-  return picture
+      }}
+    >
+      <img
+        ref={imgRef}
+        key={reloadKey}
+        className="wall-paper"
+        src={`checkpoint-media://${item.ref}?w=${Math.round((item.width / (item.crop?.w ?? 1)) * 2)}&k=${reloadKey}`}
+        alt={item.text || 'Wall image'}
+        draggable={false}
+        decoding="async"
+        onError={() => setLoadError(true)}
+        onLoad={() => {
+          setLoadError(false)
+          if (shouldPause) syncFrozenFrame()
+        }}
+        style={{
+          ...elementStyle,
+          display: shouldPause ? 'none' : 'block'
+        }}
+      />
+      {isGif && (
+        <canvas
+          ref={canvasRef}
+          className="wall-paper"
+          data-wall-gif-canvas
+          style={{
+            ...elementStyle,
+            display: shouldPause ? 'block' : 'none'
+          }}
+        />
+      )}
+    </div>
+  )
 }
 
 interface Props {
@@ -568,7 +656,7 @@ function WallItemView({ item, card, note, editing, onTextChange, onFinishEditing
   if (item.kind === 'image') {
     return (
       <>
-        <WallImageItem item={item} base={base} />
+        <WallImageItem item={item} base={base} zoom={zoom} cropping={cropping} />
         {cropping && onCrop && (
           <WallImageCrop
             item={item}
