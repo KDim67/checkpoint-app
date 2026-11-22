@@ -59,6 +59,10 @@ describe('generating a preview', () => {
       const svg = join(dir, 'diagram.svg')
       writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9"/></svg>')
       expect(ensurePreview(svg, 960)).toBeNull()
+
+      const gif = join(dir, 'anim.gif')
+      writeFileSync(gif, 'GIF89a')
+      expect(ensurePreview(gif, 960)).toBeNull()
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

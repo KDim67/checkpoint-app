@@ -13,6 +13,8 @@ export const EAGER_WIDTHS = [480, 960]
 
 /** pay the sync scale while the user waits on the drop, not a day later; failures ignored, built on demand anyway */
 export function warmPreviews(sourcePath: string): void {
+  const ext = extname(sourcePath).toLowerCase()
+  if (ext === '.gif' || ext === '.svg') return
   for (const width of EAGER_WIDTHS) {
     try {
       ensurePreview(sourcePath, width)
@@ -69,9 +71,13 @@ export function removePreviewsFor(source: string): number {
   return freed
 }
 
-/** null means serve the original (small enough, or undecodable like SVG), not a failure */
+/** null means serve the original (small enough, or animated/vector like GIF/SVG), not a failure */
 export function ensurePreview(sourcePath: string, width: number): string | null {
   if (!existsSync(sourcePath)) return null
+
+  // Animated formats (GIF) and vector formats (SVG) must be served directly as originals
+  const ext = extname(sourcePath).toLowerCase()
+  if (ext === '.gif' || ext === '.svg') return null
 
   const cacheDir = getPreviewCacheDir()
   const target = join(cacheDir, previewFilename(basename(sourcePath), width))
