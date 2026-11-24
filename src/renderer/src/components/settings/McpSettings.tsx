@@ -241,7 +241,7 @@ export default function McpSettings(): React.JSX.Element {
             </div>
           </FieldRow>
 
-          <FieldRow label="Client setup" hint="Pick JSON config (Claude Desktop, Cursor, Antigravity) or the Claude Code CLI command." group>
+          <FieldRow label="Client configuration" hint="Pick JSON config (Claude Desktop, Cursor, Antigravity) or the Claude Code CLI command." group>
             <div className="col">
               <div style={{ display: 'flex', gap: 'var(--space-2)' }} role="tablist" aria-label="Client setup format">
                 <button

@@ -121,6 +121,7 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   { name: 'Relay Server', tab: 'sync', terms: ['turn', 'firewall', 'relay'] },
 
   { name: 'MCP server', tab: 'mcp', terms: ['agents', 'claude', 'model context protocol', 'enable'] },
+  { name: 'Read-only mode', tab: 'mcp', terms: ['read only', 'permissions', 'safe'] },
   { name: 'Port', tab: 'mcp', terms: ['mcp port'] },
   { name: 'Access token', tab: 'mcp', terms: ['token', 'regenerate', 'new token'] },
   { name: 'Client configuration', tab: 'mcp', terms: ['config', 'json'] },
