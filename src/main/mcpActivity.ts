@@ -1,12 +1,13 @@
 /** apart from mcpServer, which loads lazily with the SDK: undo has to work with the server off */
 
 import { v4 as uuidv4 } from 'uuid'
-import { normalizeWallDoc } from '../shared/wallModel'
+import { normalizeWallDoc, normalizeWallIndex, removeWall, renameWall } from '../shared/wallModel'
 import { restoreWallSnapshot } from '../shared/wallEdit'
 import {
   deleteItem,
   deleteRecurrence,
   deleteRenewalRow,
+  deleteSetting,
   deleteSubtask,
   updateSubtask,
   deleteRelation,
@@ -111,6 +112,34 @@ function runUndoAction(action: McpUndoAction): void {
       if (stored === null) break
       const doc = normalizeWallDoc(stored)
       setSetting(action.key, { ...doc, items: restoreWallSnapshot(doc.items, action.items, action.removeIds) })
+      break
+    }
+    case 'delete_wall': {
+      const storedIndex = getSetting<unknown>(action.indexKey, null)
+      if (storedIndex !== null) {
+        const next = removeWall(normalizeWallIndex(storedIndex), action.wallId)
+        setSetting(action.indexKey, next)
+      }
+      deleteSetting(action.docKey)
+      break
+    }
+    case 'restore_wall_meta': {
+      if (action.name !== undefined) {
+        const storedIndex = getSetting<unknown>(action.indexKey, null)
+        if (storedIndex !== null) {
+          const index = normalizeWallIndex(storedIndex)
+          if (index.walls.some(w => w.id === action.wallId)) {
+            setSetting(action.indexKey, renameWall(index, action.wallId, action.name))
+          }
+        }
+      }
+      if (action.background !== undefined) {
+        const storedDoc = getSetting<unknown>(action.docKey, null)
+        if (storedDoc !== null) {
+          const doc = normalizeWallDoc(storedDoc)
+          setSetting(action.docKey, { ...doc, background: action.background })
+        }
+      }
       break
     }
     case 'delete_note':

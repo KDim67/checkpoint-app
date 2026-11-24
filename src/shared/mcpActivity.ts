@@ -19,6 +19,8 @@ export type McpUndoAction =
   | { kind: 'remove_wall_item'; key: string; itemId: string }
   /** items put back as they were and the ones the call added taken away, onto the wall as it is by then */
   | { kind: 'restore_wall_items'; key: string; items: WallItem[]; removeIds: string[] }
+  | { kind: 'delete_wall'; indexKey: string; docKey: string; wallId: string }
+  | { kind: 'restore_wall_meta'; indexKey: string; docKey: string; wallId: string; name?: string; background?: string }
 
 export interface McpActivityEntry {
   id: string
@@ -78,6 +80,21 @@ export function normalizeUndoAction(raw: unknown): McpUndoAction | null {
       if (items.some(i => i === null) || o.removeIds.some(id => typeof id !== 'string')) return null
       return { kind: 'restore_wall_items', key: str(o.key), items: items as WallItem[], removeIds: o.removeIds as string[] }
     }
+    case 'delete_wall':
+      return str(o.indexKey) && str(o.docKey) && str(o.wallId)
+        ? { kind: 'delete_wall', indexKey: str(o.indexKey), docKey: str(o.docKey), wallId: str(o.wallId) }
+        : null
+    case 'restore_wall_meta':
+      return str(o.indexKey) && str(o.docKey) && str(o.wallId) && (typeof o.name === 'string' || typeof o.background === 'string')
+        ? {
+            kind: 'restore_wall_meta',
+            indexKey: str(o.indexKey),
+            docKey: str(o.docKey),
+            wallId: str(o.wallId),
+            ...(typeof o.name === 'string' ? { name: o.name } : {}),
+            ...(typeof o.background === 'string' ? { background: o.background } : {})
+          }
+        : null
     case 'delete_subtask':
       return str(o.id) ? { kind: 'delete_subtask', id: str(o.id) } : null
     case 'set_subtask_done':

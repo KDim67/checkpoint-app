@@ -329,14 +329,17 @@ export function registerWallTools(mcp: McpServer): void {
     async ({ context: ctx, wall_id, operations }) => {
       if (!ctx.trim()) return error('Workspace context cannot be empty.')
 
-      let index = normalizeWallIndex(getSetting<unknown>(wallIndexKey(ctx), null))
+      const idxKey = wallIndexKey(ctx)
+      let index = normalizeWallIndex(getSetting<unknown>(idxKey, null))
       let activeWallId = wall_id
+      const createdWallIds: string[] = []
       const firstOp = operations[0]
       if (firstOp.op === 'create_wall' && !activeWallId) {
         // creating a wall first allows follow-up ops in the same call to populate it directly
         const created = createWall(index, firstOp.name)
         index = created.index
         activeWallId = created.wall.id
+        createdWallIds.push(created.wall.id)
       }
 
       const targetRef = activeWallId
@@ -349,11 +352,14 @@ export function registerWallTools(mcp: McpServer): void {
 
       const key = wallDocKey(ctx, targetRef.id)
       const originalDoc = readWallDoc(key)
+      const originalName = targetRef.name
+      const originalBg = originalDoc.background
       let currentItems = [...originalDoc.items]
       let currentBin = originalDoc.bin
       let currentBg = originalDoc.background
       let wallName = targetRef.name
-      let indexChanged = firstOp.op === 'create_wall' && activeWallId === targetRef.id
+      let indexChanged = createdWallIds.length > 0
+      let renamed = false
       let bgChanged = false
 
       const aliases = new Map<string, string>()
@@ -367,7 +373,7 @@ export function registerWallTools(mcp: McpServer): void {
         const op = operations[idx]
 
         if (op.op === 'create_wall') {
-          if (idx === 0 && indexChanged) {
+          if (idx === 0 && createdWallIds.includes(targetRef.id)) {
             summarySteps.push(`created wall "${wallName}"`)
             results.push({ op: 'create_wall', wall_id: targetRef.id, name: wallName })
             continue
@@ -375,6 +381,7 @@ export function registerWallTools(mcp: McpServer): void {
           const created = createWall(index, op.name)
           index = created.index
           indexChanged = true
+          createdWallIds.push(created.wall.id)
           summarySteps.push(`created wall "${created.wall.name}"`)
           results.push({ op: 'create_wall', wall_id: created.wall.id, name: created.wall.name })
           continue
@@ -386,6 +393,7 @@ export function registerWallTools(mcp: McpServer): void {
           index = renameWall(index, targetRef.id, nextName)
           wallName = nextName
           indexChanged = true
+          renamed = true
           summarySteps.push(`renamed wall to "${nextName}"`)
           results.push({ op: 'rename_wall', wall_id: targetRef.id, name: nextName })
           continue
@@ -620,7 +628,7 @@ export function registerWallTools(mcp: McpServer): void {
       }
 
       if (indexChanged) {
-        setSetting(wallIndexKey(ctx), index)
+        setSetting(idxKey, index)
       }
       const itemsChanged = currentItems !== originalDoc.items && JSON.stringify(currentItems) !== JSON.stringify(originalDoc.items)
       if (itemsChanged || currentBin !== originalDoc.bin || bgChanged) {
@@ -632,8 +640,26 @@ export function registerWallTools(mcp: McpServer): void {
         })
       }
 
-      const undo = itemsChanged ? undoFor(key, originalDoc.items, currentItems) : null
-      recordMcpActivity('edit_wall', ctx, `Wall "${wallName}": ${summarySteps.join(', ')}`, undo)
+      const undo: McpUndoAction[] = []
+      const targetCreated = createdWallIds.includes(targetRef.id)
+      if (itemsChanged && !targetCreated) {
+        undo.push(...undoFor(key, originalDoc.items, currentItems))
+      }
+      if ((renamed || bgChanged) && !targetCreated) {
+        undo.push({
+          kind: 'restore_wall_meta',
+          indexKey: idxKey,
+          docKey: key,
+          wallId: targetRef.id,
+          ...(renamed ? { name: originalName } : {}),
+          ...(bgChanged ? { background: originalBg } : {})
+        })
+      }
+      for (const wallId of createdWallIds) {
+        undo.push({ kind: 'delete_wall', indexKey: idxKey, docKey: wallDocKey(ctx, wallId), wallId })
+      }
+
+      recordMcpActivity('edit_wall', ctx, `Wall "${wallName}": ${summarySteps.join(', ')}`, undo.length > 0 ? undo : null)
       notifyRenderer()
       return json({
         wall: { id: targetRef.id, name: wallName, background: currentBg },

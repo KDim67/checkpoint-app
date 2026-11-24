@@ -17,6 +17,10 @@ describe('normalizeUndoAction', () => {
       .toEqual({ kind: 'restore_item', id: 'a', fields: { status: 'open' } })
     expect(normalizeUndoAction({ kind: 'board_ops', context: 'c', operations: [] }))
       .toEqual({ kind: 'board_ops', context: 'c', operations: [] })
+    expect(normalizeUndoAction({ kind: 'delete_wall', indexKey: 'wall_index_c', docKey: 'wall_doc_w', wallId: 'w' }))
+      .toEqual({ kind: 'delete_wall', indexKey: 'wall_index_c', docKey: 'wall_doc_w', wallId: 'w' })
+    expect(normalizeUndoAction({ kind: 'restore_wall_meta', indexKey: 'wall_index_c', docKey: 'wall_c', wallId: 'main', name: 'Wall', background: 'miro-white' }))
+      .toEqual({ kind: 'restore_wall_meta', indexKey: 'wall_index_c', docKey: 'wall_c', wallId: 'main', name: 'Wall', background: 'miro-white' })
   })
 
   it('treats an empty note body as legitimate but still demands a title', () => {

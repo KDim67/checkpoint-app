@@ -180,4 +180,41 @@ describe('wall batch editing, image drop, and image reading', () => {
     expect(res.isError).toBe(true)
     expect(res.content[0].text).toContain('Unsupported image format')
   })
+
+  it('undoes create_wall, rename_wall, and set_background atomically', async () => {
+    // create a wall and populate it in one batch, then undo deletes the whole wall
+    const createdRes = parseJson(
+      await tools.edit_wall.handler({
+        context: 'work',
+        operations: [
+          { op: 'create_wall', name: 'Architecture' },
+          { op: 'set_background', background: 'canvas-dark' },
+          { op: 'place', kind: 'note', text: 'API' }
+        ]
+      })
+    )
+    const createdWallId = (createdRes.wall as { id: string }).id
+    let list = parseJson(await tools.get_wall.handler({ context: 'work', list_only: true })).walls as Array<{ id: string; name: string }>
+    expect(list.some(w => w.id === createdWallId && w.name === 'Architecture')).toBe(true)
+
+    expect(undoMcpActivity(listMcpActivity(5)[0].id)).toEqual({ ok: true })
+    list = parseJson(await tools.get_wall.handler({ context: 'work', list_only: true })).walls as Array<{ id: string; name: string }>
+    expect(list.some(w => w.id === createdWallId)).toBe(false)
+
+    // rename + change background on default wall, then undo restores both
+    await tools.edit_wall.handler({
+      context: 'work',
+      operations: [
+        { op: 'rename_wall', name: 'Renamed' },
+        { op: 'set_background', background: '#112233' }
+      ]
+    })
+    let current = parseJson(await tools.get_wall.handler({ context: 'work' })).wall as { name: string; background: string }
+    expect(current).toMatchObject({ name: 'Renamed', background: '#112233' })
+
+    expect(undoMcpActivity(listMcpActivity(5)[0].id)).toEqual({ ok: true })
+    current = parseJson(await tools.get_wall.handler({ context: 'work' })).wall as { name: string; background: string }
+    expect(current.name).toBe('Wall')
+    expect(current.background).not.toBe('#112233')
+  })
 })
