@@ -2,7 +2,8 @@
 
 // zod/v3 not zod: the SDK types target v3 and the root import breaks AnySchema
 import { z } from 'zod/v3'
-import { getSetting, setSetting } from '../db'
+import { getContextSlugs, getSetting, setSetting } from '../db'
+import { wallDocKey, wallIndexKey } from '../../shared/wallModel'
 import {
   normalizeBoardConfig,
   migrateLegacy,
@@ -20,6 +21,34 @@ export { z }
 /** repeated in every priority tool, the direction isn't guessable */
 export const PRIORITY_SCALE = '0 none, 1 low, 2 medium, 3 high.'
 
+export const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false
+} as const
+
+export const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false
+} as const
+
+export const IDEMPOTENT_WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false
+} as const
+
+export const DESTRUCTIVE_WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: false
+} as const
+
 /** lets writes nudge the open window to reload */
 let onDataChanged: (() => void) | null = null
 
@@ -29,6 +58,24 @@ export function setMcpDataChangedHandler(fn: (() => void) | null): void {
 
 // explicit workspace, so a UI click mid-task can't retarget an agent
 export const context = z.string().describe('Workspace slug. Use list_workspaces to discover valid values.')
+
+/** fails fast on typo workspace slugs when the workspace already has data */
+export function validateWorkspace(slug: string): string | null {
+  const clean = slug.trim()
+  if (!clean) return 'Workspace slug cannot be empty. Use list_workspaces to discover valid values.'
+  const known = getContextSlugs()
+  if (
+    known.includes(clean) ||
+    getSetting<unknown>(wallIndexKey(clean), null) !== null ||
+    getSetting<unknown>(wallDocKey(clean), null) !== null
+  ) {
+    return null
+  }
+  if (known.length > 0) {
+    return `Unknown workspace "${clean}". Available workspaces: ${known.join(', ')}.`
+  }
+  return null
+}
 
 /** same legacy migration as the renderer, via shared/boardModel */
 export function readBoardConfig(context: string): BoardConfig {
@@ -55,6 +102,10 @@ export function json(value: unknown): { content: { type: 'text'; text: string }[
 
 export function text(value: string): { content: { type: 'text'; text: string }[] } {
   return { content: [{ type: 'text' as const, text: value }] }
+}
+
+export function error(message: string): { content: { type: 'text'; text: string }[]; isError: true } {
+  return { content: [{ type: 'text' as const, text: message }], isError: true }
 }
 
 /** trimmed, full bodies blow the context on big boards */

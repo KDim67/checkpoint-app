@@ -2,69 +2,64 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { getClipboardHistory, getFocusSessions } from '../../db'
 import { checkRepo, getGitLog, getGitStatus } from '../../gitService'
 import { getAnalyticsData } from '../../analyticsService'
-import { context, json, text, z } from '../toolKit'
+import { error, json, READ_ONLY_ANNOTATIONS, validateWorkspace, z } from '../toolKit'
 
-/** repo state, activity, focus time, clipboard */
+/** repo state, activity analytics, focus time, clipboard */
 export function registerTrackingTools(mcp: McpServer): void {
-  // a workspace bound to a repo can answer "what changed since this card"
-
   mcp.registerTool(
-    'get_git_status',
+    'get_git_info',
     {
-      description: 'Branch and working-tree status for a git repository path.',
-      inputSchema: { repoPath: z.string().describe('Absolute path to the repository.') }
+      title: 'Get Git Info',
+      description: 'Read working-tree status, recent commits, or both for a local git repository path.',
+      inputSchema: {
+        repoPath: z.string().describe('Absolute path to the repository.'),
+        include: z.enum(['status', 'log', 'both']).optional().describe('What to return. Defaults to both.')
+      },
+      annotations: READ_ONLY_ANNOTATIONS
     },
-    async ({ repoPath }) => {
-      if (!(await checkRepo(repoPath))) return text(`"${repoPath}" is not a git repository.`)
-      return json(await getGitStatus(repoPath))
+    async ({ repoPath, include }) => {
+      if (!(await checkRepo(repoPath))) return error(`"${repoPath}" is not a git repository.`)
+      const mode = include ?? 'both'
+      const [status, commits] = await Promise.all([
+        mode === 'status' || mode === 'both' ? getGitStatus(repoPath) : Promise.resolve(undefined),
+        mode === 'log' || mode === 'both' ? getGitLog(repoPath) : Promise.resolve(undefined)
+      ])
+      return json({
+        ...(status !== undefined ? { status } : {}),
+        ...(commits !== undefined ? { commits } : {})
+      })
     }
   )
 
   mcp.registerTool(
-    'get_git_log',
+    'get_tracking_data',
     {
-      description: 'Recent commits for a git repository path.',
-      inputSchema: { repoPath: z.string() }
-    },
-    async ({ repoPath }) => {
-      if (!(await checkRepo(repoPath))) return text(`"${repoPath}" is not a git repository.`)
-      return json({ commits: await getGitLog(repoPath) })
-    }
-  )
-
-  mcp.registerTool(
-    'get_analytics',
-    {
-      description:
-        'Activity analytics: completions over time, tag distribution, active vs passive time, contribution heatmap.',
+      title: 'Get Tracking Data',
+      description: "Read productivity analytics ('analytics'), focus-timer sessions ('focus'), or clipboard captures ('clipboard').",
       inputSchema: {
-        context: z.string().optional().describe('Workspace slug, or omit for all workspaces.')
+        kind: z.enum(['analytics', 'focus', 'clipboard']),
+        context: z.string().optional().describe('Workspace slug. Required for focus; optional filter for analytics.'),
+        limit: z.number().int().positive().max(200).optional().describe('Max clipboard entries (default 50).'),
+        pinnedOnly: z.boolean().optional().describe('Clipboard only: return only starred snippets.')
+      },
+      annotations: READ_ONLY_ANNOTATIONS
+    },
+    async ({ kind, context: ctx, limit, pinnedOnly }) => {
+      if (ctx) {
+        const bad = validateWorkspace(ctx)
+        if (bad) return error(bad)
       }
-    },
-    async ({ context: ctx }) => json(getAnalyticsData(ctx ?? null))
-  )
 
-  mcp.registerTool(
-    'get_focus_sessions',
-    {
-      description: 'Recorded focus-timer sessions for a workspace.',
-      inputSchema: { context }
-    },
-    async ({ context: ctx }) => json({ sessions: getFocusSessions(ctx) })
-  )
-
-  mcp.registerTool(
-    'get_clipboard_history',
-    {
-      description: 'Recent clipboard captures and saved snippets.',
-      inputSchema: {
-        limit: z.number().int().positive().max(200).optional(),
-        pinnedOnly: z.boolean().optional().describe('Only starred snippets.')
+      if (kind === 'analytics') {
+        return json(getAnalyticsData(ctx ?? null))
       }
-    },
-    async ({ limit, pinnedOnly }) => {
+
+      if (kind === 'focus') {
+        if (!ctx) return error('context (workspace slug) is required when reading focus sessions.')
+        return json({ sessions: getFocusSessions(ctx) })
+      }
+
       const all = getClipboardHistory()
-      // SQLite 0/1, not a boolean
       const filtered = pinnedOnly ? all.filter(c => c.is_pinned === 1) : all
       return json({ items: filtered.slice(0, limit ?? 50) })
     }

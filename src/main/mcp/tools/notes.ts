@@ -2,63 +2,70 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { listNotes, readNote, searchNotes, writeNote } from '../../notesFsService'
 import { recordMcpActivity } from '../../mcpActivity'
 import { shorten, type McpUndoAction } from '../../../shared/mcpActivity'
-import { json, notifyRenderer, text, z } from '../toolKit'
+import { error, IDEMPOTENT_WRITE_ANNOTATIONS, json, notifyRenderer, READ_ONLY_ANNOTATIONS, text, z } from '../toolKit'
 
 /** markdown notes */
 export function registerNoteTools(mcp: McpServer): void {
   mcp.registerTool(
-    'list_notes',
-    { description: 'List all markdown notes with their metadata.' },
-    async () => json({ notes: await listNotes() })
-  )
-
-  mcp.registerTool(
-    'read_note',
+    'notes',
     {
-      description: 'Read one markdown note by title.',
-      inputSchema: { title: z.string() }
+      title: 'Notes',
+      description: 'List all markdown notes (default), read one note by exact title, or search across note contents with query.',
+      inputSchema: {
+        title: z.string().optional().describe('Exact note title to read.'),
+        query: z.string().optional().describe('Text to search across note titles and bodies.')
+      },
+      annotations: READ_ONLY_ANNOTATIONS
     },
-    async ({ title }) => text(await readNote(title))
-  )
-
-  mcp.registerTool(
-    'search_notes',
-    {
-      description: 'Search note contents.',
-      inputSchema: { query: z.string() }
-    },
-    async ({ query }) => json({ results: await searchNotes(query) })
+    async ({ title, query }) => {
+      if (title !== undefined) {
+        const available = await listNotes()
+        const exists = available.some(n => n.title === title)
+        if (!exists) {
+          return error(
+            `No note titled "${title}". Available: ${available.slice(0, 20).map(n => n.title).join(', ') || '(none)'}`
+          )
+        }
+        return text(await readNote(title))
+      }
+      if (query !== undefined) {
+        return json({ results: await searchNotes(query) })
+      }
+      return json({ notes: await listNotes() })
+    }
   )
 
   mcp.registerTool(
     'write_note',
     {
+      title: 'Write Note',
       description:
         'Create a markdown note, or replace the whole content of an existing one. ' +
-        'Writing to a title that already exists overwrites it. Read_note first if the current content matters.',
+        'Writing to an existing title overwrites it; read it first with notes if current content matters.',
       inputSchema: {
-        title: z.string(),
+        title: z.string().min(1),
         content: z.string(),
         oldTitle: z.string().optional().describe('Set when renaming an existing note.')
-      }
+      },
+      annotations: IDEMPOTENT_WRITE_ANNOTATIONS
     },
     async ({ title, content, oldTitle }) => {
-      // read first, the only moment the previous body exists
-      let previous: string | null = null
-      try {
-        previous = await readNote(oldTitle ?? title)
-      } catch {
-        previous = null   // no such note yet, so undo means deleting this one
-      }
+      const targetTitle = oldTitle ?? title
+      const existing = (await listNotes()).some(n => n.title === targetTitle)
+      const previous = existing ? await readNote(targetTitle) : null
 
-      await writeNote(title, content, oldTitle)
+      try {
+        await writeNote(title, content, oldTitle)
+      } catch (err) {
+        return error(err instanceof Error ? err.message : `Could not write note "${title}".`)
+      }
 
       const undo: McpUndoAction[] = []
       if (previous === null) {
         undo.push({ kind: 'delete_note', title })
       } else {
         if (oldTitle && oldTitle !== title) undo.push({ kind: 'delete_note', title })
-        undo.push({ kind: 'write_note', title: oldTitle ?? title, content: previous })
+        undo.push({ kind: 'write_note', title: targetTitle, content: previous })
       }
       recordMcpActivity(
         'write_note',

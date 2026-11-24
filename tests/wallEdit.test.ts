@@ -70,6 +70,21 @@ describe('editWallItem', () => {
     expect(editWallItem(items, 'line', { x: 10 })).toHaveProperty('error')
     expect(ok(editWallItem(items, 'l', { x: 10, locked: false })).item).not.toHaveProperty('locked')
   })
+
+  it('updates typography, arrow strokeWidth/layer, and reactions with validation', () => {
+    const items = [
+      item('n'),
+      item('img', { kind: 'image', ref: 'a.png' }),
+      item('line', { kind: 'arrow', from: 'n', to: 'img' })
+    ]
+    const styled = ok(editWallItem(items, 'n', { font: 'mono', fontSize: 18, reactions: { '🔥': 2, '': 1 } })).item
+    expect(styled).toMatchObject({ font: 'mono', fontSize: 18, reactions: { '🔥': 2 } })
+    expect(ok(editWallItem([styled], 'n', { font: 'sans', fontSize: null, reactions: {} })).item).not.toHaveProperty('font')
+
+    expect(editWallItem(items, 'img', { font: 'mono' })).toHaveProperty('error')
+    expect(editWallItem(items, 'n', { layer: 'front' })).toHaveProperty('error')
+    expect(ok(editWallItem(items, 'line', { strokeWidth: 8, layer: 'front' })).item).toMatchObject({ strokeWidth: 8, layer: 'front' })
+  })
 })
 
 describe('connectWallItems', () => {

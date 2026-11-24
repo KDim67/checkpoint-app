@@ -115,15 +115,15 @@ export function normalizeUndo(raw: unknown): McpUndoAction[] | null {
 export const MCP_WRITE_TOOLS = [
   'create_item',
   'update_item',
+  'archive_item',
   'configure_board',
   'write_note',
   'create_tag',
-  'link_items',
-  'archive_item',
-  'create_recurrence',
-  'delete_recurrence',
-  'add_subtask',
-  'set_subtask_done'
+  'manage_relations',
+  'manage_subtasks',
+  'manage_recurrences',
+  'create_renewal',
+  'edit_wall'
 ] as const
 
 type McpWriteTool = (typeof MCP_WRITE_TOOLS)[number]

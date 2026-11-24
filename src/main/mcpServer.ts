@@ -2,9 +2,13 @@
 
 import http from 'http'
 import crypto from 'crypto'
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { app } from 'electron'
+import { extname } from 'path'
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { getSetting, setSetting } from './db'
+import { getContextSlugs, getSetting, setSetting } from './db'
+import { readMediaBuffer } from './mediaService'
+import { listNotes, readNote } from './notesFsService'
 import { MCP_DEFAULT_PORT } from '../shared/ports'
 import { registerBoardTools } from './mcp/tools/board'
 import { registerItemTools } from './mcp/tools/items'
@@ -12,7 +16,6 @@ import { registerNoteTools } from './mcp/tools/notes'
 import { registerWallTools } from './mcp/tools/walls'
 import { registerOrganisationTools } from './mcp/tools/organisation'
 import { registerSubtaskTools } from './mcp/tools/subtasks'
-import { registerViewTools } from './mcp/tools/views'
 import { registerRecurrenceTools } from './mcp/tools/recurrences'
 import { registerRenewalTools } from './mcp/tools/renewals'
 import { registerReferenceTools } from './mcp/tools/reference'
@@ -21,10 +24,29 @@ import { registerTrackingTools } from './mcp/tools/tracking'
 // re-exported for the dynamic importers in index.ts
 export { MCP_DEFAULT_PORT }
 const TOKEN_SETTING_KEY = 'mcp_auth_token'
+const MAX_REQUEST_BYTES = 16 * 1024 * 1024
 export { setMcpDataChangedHandler } from './mcp/toolKit'
 
 /** anything else is a rebinding attempt */
 const ALLOWED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
+
+const RESOURCE_MIME_BY_EXT: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.bmp': 'image/bmp'
+}
+
+const SERVER_INSTRUCTIONS = [
+  'Checkpoint is a local-first workspace app with Kanban boards, backlog tasks, logs, markdown notes, walls (freeform canvases), renewals, recurrences, cheatsheets, and assistant memories.',
+  'Always call list_workspaces first to discover valid workspace slugs (context).',
+  'Cards, tasks, and logs live in SQLite (query_items, create_item, update_item, archive_item); markdown notes live as .md files (notes, write_note).',
+  'On walls, placement/update coordinates (x, y) specify the CENTRE of an item, while get_wall reports top-left corners alongside width and height.',
+  'Use read_wall_image or the checkpoint://media/{filename} resource to inspect image items stored on walls.'
+].join(' ')
 
 let server: http.Server | null = null
 let activePort: number | null = null
@@ -81,8 +103,72 @@ function isAuthorized(req: http.IncomingMessage): boolean {
   return tokenMatches(header.slice('Bearer '.length).trim(), getOrCreateMcpToken())
 }
 
-function buildMcpServer(): McpServer {
-  const mcp = new McpServer({ name: 'checkpoint', version: '1.0.0' })
+function registerResources(mcp: McpServer): void {
+  mcp.registerResource(
+    'workspaces',
+    'checkpoint://workspaces',
+    {
+      title: 'Workspaces',
+      description: 'List of all Checkpoint workspace slugs.',
+      mimeType: 'application/json'
+    },
+    async uri => ({
+      contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ workspaces: getContextSlugs() }, null, 2) }]
+    })
+  )
+
+  mcp.registerResource(
+    'note',
+    new ResourceTemplate('checkpoint://notes/{title}', {
+      list: async () => ({
+        resources: (await listNotes()).map(n => ({
+          uri: `checkpoint://notes/${encodeURIComponent(n.title)}`,
+          name: n.title,
+          description: n.excerpt || undefined,
+          mimeType: 'text/markdown'
+        }))
+      })
+    }),
+    {
+      title: 'Markdown Note',
+      description: 'Read a Checkpoint markdown note by title.',
+      mimeType: 'text/markdown'
+    },
+    async (uri, variables) => {
+      const title = decodeURIComponent(String(variables.title ?? ''))
+      const text = await readNote(title)
+      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text }] }
+    }
+  )
+
+  mcp.registerResource(
+    'media',
+    new ResourceTemplate('checkpoint://media/{filename}', { list: undefined }),
+    {
+      title: 'Wall Media Asset',
+      description: 'Binary or SVG media asset referenced by a wall item.'
+    },
+    async (uri, variables) => {
+      const filename = decodeURIComponent(String(variables.filename ?? ''))
+      const buf = readMediaBuffer(filename)
+      if (!buf) {
+        throw new Error(`Media file "${filename}" not found.`)
+      }
+      const ext = extname(filename).toLowerCase()
+      const mimeType = RESOURCE_MIME_BY_EXT[ext] ?? 'application/octet-stream'
+      if (ext === '.svg') {
+        return { contents: [{ uri: uri.href, mimeType, text: buf.toString('utf8') }] }
+      }
+      return { contents: [{ uri: uri.href, mimeType, blob: buf.toString('base64') }] }
+    }
+  )
+}
+
+export function buildMcpServer(): McpServer {
+  const mcp = new McpServer(
+    { name: 'checkpoint', version: app.getVersion() },
+    { instructions: SERVER_INSTRUCTIONS }
+  )
 
   registerBoardTools(mcp)
   registerItemTools(mcp)
@@ -90,11 +176,11 @@ function buildMcpServer(): McpServer {
   registerWallTools(mcp)
   registerOrganisationTools(mcp)
   registerSubtaskTools(mcp)
-  registerViewTools(mcp)
   registerRecurrenceTools(mcp)
   registerRenewalTools(mcp)
   registerReferenceTools(mcp)
   registerTrackingTools(mcp)
+  registerResources(mcp)
 
   return mcp
 }
@@ -119,6 +205,18 @@ function startMcpServer(requestedPort: number): Promise<number> {
         // vague on purpose, don't say which half was wrong
         res.writeHead(401, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'Unauthorized' }))
+        return
+      }
+      // stateless transport handles JSON-RPC POST requests only
+      if (req.method !== 'POST') {
+        res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'POST' })
+        res.end(JSON.stringify({ error: 'Method Not Allowed. Use POST for stateless MCP requests.' }))
+        return
+      }
+      const contentLength = Number(req.headers['content-length'] ?? 0)
+      if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+        res.writeHead(413, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Payload Too Large' }))
         return
       }
 

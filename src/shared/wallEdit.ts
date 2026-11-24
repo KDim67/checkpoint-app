@@ -1,8 +1,9 @@
 /** changing what's already on a wall, for the assistant; every refusal is decided before anything changes */
 
 import {
-  cleanTags, createWallItem, moveItems, pruneArrows, withFrameContents, ARROW_HEAD_MODES, ARROW_LINES, ARROW_SHAPES, SHAPE_TYPES,
-  type ArrowHeads, type ArrowLine, type ArrowShape, type ShapeType, type TextAlign, type WallItem
+  cleanTags, createWallItem, moveItems, pruneArrows, withFrameContents,
+  ARROW_HEAD_MODES, ARROW_LINES, ARROW_SHAPES, MAX_FONT_SIZE, MIN_FONT_SIZE, SHAPE_TYPES, STROKE_WIDTHS, WALL_FONTS,
+  type ArrowHeads, type ArrowLine, type ArrowShape, type ShapeType, type TextAlign, type WallFont, type WallItem
 } from './wallModel'
 import { isLinkable, normalizeLinkInput } from './wallLink'
 import { CODE_LANGUAGES, isCodeLanguage } from './wallCode'
@@ -24,6 +25,9 @@ export interface WallItemPatch {
   rotation?: number
   locked?: boolean
   align?: TextAlign
+  font?: WallFont
+  /** null resets to auto-fit size */
+  fontSize?: number | null
   /** null goes back to the default outline */
   borderColor?: string | null
   radius?: number
@@ -32,6 +36,10 @@ export interface WallItemPatch {
   tags?: string[]
   /** a code block's language, null for plain text */
   language?: string | null
+  strokeWidth?: number
+  layer?: 'front' | 'back' | null
+  /** replaces reactions map when provided; empty object clears */
+  reactions?: Record<string, number>
 }
 
 export interface ArrowStyle {
@@ -40,6 +48,8 @@ export interface ArrowStyle {
   heads?: ArrowHeads
   label?: string
   color?: string
+  strokeWidth?: number
+  layer?: 'front' | 'back'
 }
 
 /** words of their own; a card or doc shows another record's title */
@@ -74,6 +84,18 @@ export function editWallItem(items: WallItem[], id: string, patch: WallItemPatch
   if (patch.language !== undefined && item.kind !== 'code') return { error: 'Only a code block has a language.' }
   if (typeof patch.language === 'string' && !isCodeLanguage(patch.language)) {
     return { error: `language '${patch.language}' isn't one of ${CODE_LANGUAGES.map(l => l.id).join(', ')}.` }
+  }
+  if ((patch.font !== undefined || patch.fontSize !== undefined) && item.kind !== 'note' && item.kind !== 'text' && item.kind !== 'shape') {
+    return { error: 'Only stickies, text boxes and shapes have typography settings.' }
+  }
+  if (patch.font !== undefined && !WALL_FONTS.includes(patch.font)) {
+    return { error: `font '${patch.font}' isn't one of ${WALL_FONTS.join(', ')}.` }
+  }
+  if (patch.strokeWidth !== undefined && item.kind !== 'arrow' && item.kind !== 'ink') {
+    return { error: 'Only arrows and ink strokes have a stroke width.' }
+  }
+  if (patch.layer !== undefined && item.kind !== 'arrow') {
+    return { error: 'Only arrows support front/back layer placement.' }
   }
   if (moves && item.kind === 'arrow') return { error: 'An arrow is drawn between its ends. Move the items it connects instead.' }
   if (moves && item.locked && patch.locked !== false) return { error: 'That item is locked. Pass locked: false in the same call to move it.' }
@@ -120,6 +142,23 @@ export function editWallItem(items: WallItem[], id: string, patch: WallItemPatch
   }
   if (patch.language === null) delete next.language
   else if (patch.language !== undefined) next.language = patch.language
+  if (patch.font === WALL_FONTS[0]) delete next.font
+  else if (patch.font !== undefined) next.font = patch.font
+  if (patch.fontSize === null) delete next.fontSize
+  else if (typeof patch.fontSize === 'number' && Number.isFinite(patch.fontSize)) {
+    next.fontSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(patch.fontSize)))
+  }
+  if (patch.strokeWidth !== undefined && patch.strokeWidth > 0) next.strokeWidth = patch.strokeWidth
+  if (patch.layer === null) delete next.layer
+  else if (patch.layer !== undefined) next.layer = patch.layer
+  if (patch.reactions !== undefined) {
+    const clean: Record<string, number> = {}
+    for (const [k, v] of Object.entries(patch.reactions)) {
+      if (k.trim() && typeof v === 'number' && Number.isFinite(v) && v > 0) clean[k.trim()] = Math.round(v)
+    }
+    if (Object.keys(clean).length > 0) next.reactions = clean
+    else delete next.reactions
+  }
 
   // a frame carries what's in it, as when it's dragged; a resize alone leaves them
   const carried = item.kind === 'frame' && (dx !== 0 || dy !== 0)
@@ -143,6 +182,8 @@ export function connectWallItems(items: WallItem[], fromId: string, toId: string
     to: toId,
     ...(label ? { text: label } : {}),
     ...(style.color ? { color: style.color } : {}),
+    ...(style.strokeWidth && STROKE_WIDTHS.includes(style.strokeWidth) ? { strokeWidth: style.strokeWidth } : {}),
+    ...(style.layer ? { layer: style.layer } : {}),
     // defaults left out, as the wall stores them
     ...(style.route && style.route !== ARROW_SHAPES[0] ? { arrowShape: style.route } : {}),
     ...(style.line && style.line !== ARROW_LINES[0] ? { arrowLine: style.line } : {}),

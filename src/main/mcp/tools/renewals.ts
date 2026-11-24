@@ -7,7 +7,7 @@ import { describeCycle, expiryPhrase, formatMoney, type RenewalCycle, type Renew
 import { kindById, newRenewalMeta } from '../../../shared/renewalKinds'
 import { looksLikeSecret, normalizeHost } from '../../../shared/renewalText'
 import type { RenewalRecord } from '../../../shared/renewalApi'
-import { json, notifyRenderer, text, z } from '../toolKit'
+import { error, json, notifyRenderer, READ_ONLY_ANNOTATIONS, validateWorkspace, WRITE_ANNOTATIONS, z } from '../toolKit'
 
 /** what an agent sees of a field; a key hint is left out, it identifies a key and an agent has no use for it */
 function fieldValue(field: RenewalField): unknown {
@@ -52,14 +52,20 @@ export function registerRenewalTools(mcp: McpServer): void {
   mcp.registerTool(
     'list_renewals',
     {
+      title: 'List Renewals',
       description:
-        'List things that expire and renew: API keys, subscriptions, domains, certificates, licences and kinds ' +
-        'the user made. Each has an expiry date, how it renews and the user\'s own fields. Never contains secrets.',
+        "List things that expire and renew: API keys, subscriptions, domains, certificates, licences and kinds " +
+        "the user made. Each has an expiry date, how it renews and the user's own fields. Never contains secrets.",
       inputSchema: {
         context: z.string().optional().describe('Restrict to one workspace. Omit for every workspace.')
-      }
+      },
+      annotations: READ_ONLY_ANNOTATIONS
     },
     async ({ context: ctx }) => {
+      if (ctx) {
+        const bad = validateWorkspace(ctx)
+        if (bad) return error(bad)
+      }
       const now = Date.now()
       return json({ renewals: listRenewals(ctx, now).map(r => summarize(r, now)) })
     }
@@ -68,9 +74,10 @@ export function registerRenewalTools(mcp: McpServer): void {
   mcp.registerTool(
     'create_renewal',
     {
+      title: 'Create Renewal',
       description:
-        'Track something that expires so the user is warned before it does. Never pass a key, password or card ' +
-        'number: record where the secret lives in notes instead. Fields come from the kind\'s template, empty.',
+        "Track something that expires so the user is warned before it does. Never pass a key, password or card " +
+        "number: record where the secret lives in notes instead. Fields come from the kind's template, empty.",
       inputSchema: {
         context: z.string().describe('Workspace slug. Use list_workspaces to discover valid values.'),
         title: z.string().min(1).describe('A name the user will recognise, e.g. "acme.dev" or "OpenAI key (prod)".'),
@@ -82,8 +89,8 @@ export function registerRenewalTools(mcp: McpServer): void {
           .string()
           .optional()
           .describe('YYYY-MM-DD for a whole day, which is how most things expire; add a time only when it matters.'),
-        renews: z.enum(['auto', 'manual']).optional().describe('Defaults to the kind\'s own.'),
-        cycle: z.enum(['monthly', 'quarterly', 'yearly', 'once']).optional().describe('Defaults to the kind\'s own.'),
+        renews: z.enum(['auto', 'manual']).optional().describe("Defaults to the kind's own."),
+        cycle: z.enum(['monthly', 'quarterly', 'yearly', 'once']).optional().describe("Defaults to the kind's own."),
         warnDaysBefore: z.array(z.number().int().min(0).max(365)).max(6).optional(),
         renewPage: z.string().url().optional().describe('Where to renew or pay.'),
         lookupTarget: z
@@ -91,30 +98,30 @@ export function registerRenewalTools(mcp: McpServer): void {
           .optional()
           .describe('Domain kind: the domain. Certificate kind: the host. Checkpoint then reads the real date itself.'),
         notes: z.string().optional()
-      }
+      },
+      annotations: WRITE_ANNOTATIONS
     },
     async ({ context: ctx, title, kind, expiresOn, renews, cycle, warnDaysBefore, renewPage, lookupTarget, notes }) => {
-      // refused here, an agent pasting a key into a note would sync it to every device
       for (const value of [title, notes ?? '', lookupTarget ?? '']) {
         if (looksLikeSecret(value)) {
-          return text('That looks like a key or token. Renewals never hold secrets: say where the key lives in notes instead.')
+          return error('That looks like a key or token. Renewals never hold secrets: say where the key lives in notes instead.')
         }
       }
       const kinds = getKinds()
       const chosen = kindById(kinds, kind ?? 'other')
-      if (kind && chosen.id !== kind) return text(`There is no kind "${kind}". Kinds: ${kinds.map(k => k.id).join(', ')}.`)
+      if (kind && chosen.id !== kind) return error(`There is no kind "${kind}". Kinds: ${kinds.map(k => k.id).join(', ')}.`)
 
       let expiresAt: number | null = null
       if (expiresOn) {
         expiresAt = dueFromText(expiresOn)
-        if (expiresAt === null) return text(`"${expiresOn}" is not a date. Use YYYY-MM-DD.`)
+        if (expiresAt === null) return error(`"${expiresOn}" is not a date. Use YYYY-MM-DD.`)
       }
 
       const meta = newRenewalMeta(chosen, () => crypto.randomUUID())
       let lookup: RenewalLookupConfig | null = null
       if (lookupTarget && chosen.lookupSource) {
         const target = chosen.lookupSource === 'rdap' ? normalizeHost(lookupTarget) : lookupTarget.trim()
-        if (!target) return text(`"${lookupTarget}" is not a domain or host name.`)
+        if (!target) return error(`"${lookupTarget}" is not a domain or host name.`)
         lookup = { source: chosen.lookupSource, target, port: null, auto: true }
       }
       const created = createRenewal({
@@ -131,7 +138,7 @@ export function registerRenewalTools(mcp: McpServer): void {
           lookup
         }
       })
-      if (!created.ok) return text(created.reason)
+      if (!created.ok) return error(created.reason)
 
       recordMcpActivity('create_renewal', ctx, `Started tracking "${shorten(title)}"`, [{ kind: 'delete_renewal', id: created.value.id }])
       notifyRenderer()

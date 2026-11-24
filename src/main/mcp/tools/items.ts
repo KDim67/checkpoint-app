@@ -1,83 +1,124 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { createItem, getDb, getItemById, queryTasks, searchItems, updateItem } from '../../db'
+import { createItem, getDb, getItemById, getSetting, getSubtasks, queryTasks, searchItems, updateItem } from '../../db'
 import { recordMcpActivity } from '../../mcpActivity'
 import { shorten } from '../../../shared/mcpActivity'
+import { BUILT_IN_VIEWS, describeView, normalizeSavedViews, toQueryParams } from '../../../shared/savedViews'
+import { normalizeSubtasks } from '../../../shared/subtasks'
 import type { CreateItemPayload, Item } from '../../../shared/types'
-import { context, json, notifyRenderer, PRIORITY_SCALE, readBoardConfig, summarizeItem, text, z } from '../toolKit'
+import {
+  context,
+  error,
+  IDEMPOTENT_WRITE_ANNOTATIONS,
+  json,
+  notifyRenderer,
+  PRIORITY_SCALE,
+  READ_ONLY_ANNOTATIONS,
+  readBoardConfig,
+  summarizeItem,
+  text,
+  validateWorkspace,
+  WRITE_ANNOTATIONS,
+  z
+} from '../toolKit'
 
-/** logs, cards and tasks: find, create, change */
+/** logs, cards and tasks: query, search, create, update, archive */
 export function registerItemTools(mcp: McpServer): void {
   mcp.registerTool(
-    'search_items',
+    'query_items',
     {
+      title: 'Query Items',
       description:
-        'Full-text search across logs, cards and tasks. Use this when looking for wording, ' +
-        'a phrase in a title or body. Use query_tasks instead to filter by status, priority or due date.',
+        'Find logs, cards and tasks. Supports full-text search (query), saved views by id or name (view — check get_board for available views), ' +
+        'and filtering/sorting by status, priority or type. Omit context only for full-text search across all workspaces.',
       inputSchema: {
-        query: z.string().describe('Search text.'),
-        context: z.string().optional().describe('Restrict to one workspace.'),
+        context: z.string().optional().describe('Workspace slug. Required for saved views and structured task queries; optional for text search.'),
+        query: z.string().optional().describe('Full-text search text across titles and bodies.'),
+        view: z.string().optional().describe('Saved view id or exact name (e.g. "Overdue", "High priority"). Relative dates resolve now.'),
         type: z.enum(['log', 'card', 'task']).optional(),
-        limit: z.number().int().positive().max(200).optional()
-      }
-    },
-    async ({ query, context: ctx, type, limit }) =>
-      json({
-        results: searchItems({ query, context: ctx, type, page: 0, pageSize: limit ?? 25 })
-          .items.map(summarizeItem)
-      })
-  )
-
-  mcp.registerTool(
-    'query_tasks',
-    {
-      description:
-        'Filter and sort a workspace\'s tasks by status, priority or due date. ' +
-        'Use search_items instead to find something by its wording.',
-      inputSchema: {
-        context,
-        query: z.string().optional().describe('Narrows to tasks whose title or body contains this.'),
-        status: z
-          .array(z.string())
-          .optional()
-          .describe('Column ids to include. get_board lists them.'),
-        priority: z
-          .array(z.number().int())
-          .optional()
-          .describe(`Priority levels to include. ${PRIORITY_SCALE}`),
-        // enum: unknown fields used to fall back to created_at and only look sorted
+        status: z.array(z.string()).optional().describe('Column or status ids to include. get_board lists them.'),
+        priority: z.array(z.number().int()).optional().describe(`Priority levels to include. ${PRIORITY_SCALE}`),
         sortBy: z
           .enum(['status', 'priority', 'title', 'created_at', 'due_at', 'relations_count'])
           .optional()
           .describe('Defaults to created_at.'),
         sortDesc: z.boolean().optional().describe('Highest or latest first.'),
-        pageSize: z.number().int().positive().max(200).optional()
-      }
+        limit: z.number().int().positive().max(200).optional().describe('Max results (default 50, max 200).'),
+        includeSubtasks: z.boolean().optional().describe('Include each item\'s subtasks inline.')
+      },
+      annotations: READ_ONLY_ANNOTATIONS
     },
-    async ({ context: ctx, ...params }) =>
-      json({
-        tasks: queryTasks(getDb(), ctx, {
-          ...params,
-          page: 1,
-          pageSize: params.pageSize ?? 50
-        }).items.map(summarizeItem)
+    async ({ context: ctx, query, view, type, status, priority, sortBy, sortDesc, limit, includeSubtasks }) => {
+      if (ctx) {
+        const bad = validateWorkspace(ctx)
+        if (bad) return error(bad)
+      }
+
+      const attachSubtasks = (item: Item) => {
+        const base = summarizeItem(item)
+        if (!includeSubtasks) return base
+        const subs = normalizeSubtasks(getSubtasks(item.id)).map(s => ({ id: s.id, title: s.title, done: s.done }))
+        return { ...base, subtasks: subs }
+      }
+
+      if (view) {
+        if (!ctx) return error('context is required when running a saved view. Use list_workspaces first.')
+        const stored = getSetting<unknown>('saved_views', null)
+        const views = [...BUILT_IN_VIEWS, ...normalizeSavedViews(stored)]
+        const match =
+          views.find(v => v.id === view) ??
+          views.find(v => v.name.toLowerCase() === view.trim().toLowerCase())
+        if (!match) {
+          return error(`No view called "${view}". Available: ${views.map(v => v.name).join(', ')}.`)
+        }
+        const params = { ...toQueryParams(match, Date.now()), ...(query ? { query } : {}), page: 1, pageSize: limit ?? 50 }
+        const result = queryTasks(getDb(), ctx, params)
+        return json({
+          view: { id: match.id, name: match.name, describes: describeView(match) },
+          total: result.total,
+          items: result.items.map(attachSubtasks)
+        })
+      }
+
+      // pure full-text search when no board/task filters are passed
+      if (query && !status && !priority && !sortBy && sortDesc === undefined) {
+        const found = searchItems({ query, context: ctx, type, page: 0, pageSize: limit ?? 25 })
+        return json({ total: found.total, items: found.items.map(attachSubtasks) })
+      }
+
+      if (!ctx) return error('context is required when filtering or sorting tasks. Pass query alone to search across all workspaces.')
+
+      const result = queryTasks(getDb(), ctx, {
+        query,
+        status,
+        priority,
+        sortBy,
+        sortDesc,
+        page: 1,
+        pageSize: limit ?? 50
       })
+      const items = type ? result.items.filter(i => i.type === type) : result.items
+      return json({ total: items.length, items: items.map(attachSubtasks) })
+    }
   )
 
   mcp.registerTool(
     'create_item',
     {
+      title: 'Create Item',
       description: 'Create a log entry, Kanban card or backlog task.',
       inputSchema: {
         context,
         type: z.enum(['log', 'card', 'task']),
-        title: z.string(),
+        title: z.string().min(1),
         body: z.string().optional(),
         status: z.string().optional().describe('Column id for cards. Defaults to the first column.'),
         priority: z.number().int().min(0).max(3).optional().describe(PRIORITY_SCALE),
-        due_at: z.number().nullable().optional().describe('Epoch milliseconds. A due date with no time of day is midnight UTC of that date, Date.UTC(year, month, day); any other value is a moment.')
-      }
+        due_at: z.number().nullable().optional().describe('Epoch milliseconds. Midnight UTC Date.UTC(year, month, day) for date-only.')
+      },
+      annotations: WRITE_ANNOTATIONS
     },
     async ({ context: ctx, type, title, body, status, priority, due_at }) => {
+      if (!ctx.trim()) return error('Workspace context cannot be empty.')
       const config = readBoardConfig(ctx)
       const payload: CreateItemPayload = {
         type,
@@ -85,21 +126,19 @@ export function registerItemTools(mcp: McpServer): void {
         title,
         body: body ?? '',
         // a status no column owns hides the card, so fall back to the first real column
-        status: status && config.columns.some(c => c.id === status)
-          ? status
-          : type === 'card' ? config.columns[0].id : 'open',
+        status:
+          status && config.columns.some(c => c.id === status)
+            ? status
+            : type === 'card'
+              ? config.columns[0].id
+              : 'open',
         priority: (priority ?? 2) as Item['priority'],
         position: Date.now(),
         due_at: due_at ?? null,
         metadata: '{}'
       }
       const created = createItem(getDb(), payload)
-      recordMcpActivity(
-        'create_item',
-        ctx,
-        `Created ${type} "${shorten(title)}"`,
-        [{ kind: 'delete_item', id: created.id }]
-      )
+      recordMcpActivity('create_item', ctx, `Created ${type} "${shorten(title)}"`, [{ kind: 'delete_item', id: created.id }])
       notifyRenderer()
       return json({ created: summarizeItem(created) })
     }
@@ -108,39 +147,35 @@ export function registerItemTools(mcp: McpServer): void {
   mcp.registerTool(
     'update_item',
     {
+      title: 'Update Item',
       description: 'Update an existing log, card or task by id.',
       inputSchema: {
         id: z.string(),
         title: z.string().optional(),
         body: z.string().optional(),
-        status: z
-          .string()
-          .optional()
-          .describe('Move to this column id. get_board lists them; this is how a card changes column.'),
+        status: z.string().optional().describe('Move to this column id. get_board lists them; this is how a card changes column.'),
         priority: z.number().int().min(0).max(3).optional().describe(PRIORITY_SCALE),
-        due_at: z.number().nullable().optional().describe('Epoch milliseconds, or null to clear. A due date with no time of day is midnight UTC of that date, Date.UTC(year, month, day); any other value is a moment.')
-      }
+        due_at: z.number().nullable().optional().describe('Epoch milliseconds, or null to clear.')
+      },
+      annotations: IDEMPOTENT_WRITE_ANNOTATIONS
     },
     async ({ id, ...patch }) => {
-      if (!getItemById(id)) return text(`No item with id "${id}".`)
-      const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))
-      if (Object.keys(clean).length === 0) return text('Nothing to update.')
-
-      // captured before the write, only changed fields are worth restoring
       const before = getItemById(id)
+      if (!before) return error(`No item with id "${id}".`)
+      const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))
+      if (Object.keys(clean).length === 0) return error('Nothing to update. Supply at least one field to change.')
+
       const restored: Record<string, unknown> = {}
-      if (before) {
-        for (const key of Object.keys(clean)) {
-          restored[key] = (before as unknown as Record<string, unknown>)[key]
-        }
+      for (const key of Object.keys(clean)) {
+        restored[key] = (before as unknown as Record<string, unknown>)[key]
       }
 
       const updated = updateItem(getDb(), id, clean as Partial<Item>)
       recordMcpActivity(
         'update_item',
-        before?.context ?? null,
-        `Updated "${shorten(before?.title ?? id)}" (${Object.keys(clean).join(', ')})`,
-        before ? [{ kind: 'restore_item', id, fields: restored }] : null
+        before.context,
+        `Updated "${shorten(before.title)}" (${Object.keys(clean).join(', ')})`,
+        [{ kind: 'restore_item', id, fields: restored }]
       )
       notifyRenderer()
       return json({ updated: summarizeItem(updated) })
@@ -150,21 +185,20 @@ export function registerItemTools(mcp: McpServer): void {
   mcp.registerTool(
     'archive_item',
     {
-      description:
-        'Archive an item, removing it from the board while keeping it recoverable. ' +
-        'This is the safe alternative to deletion. Nothing is destroyed.',
-      inputSchema: { id: z.string() }
+      title: 'Archive Item',
+      description: 'Archive an item, removing it from the active board while keeping it recoverable.',
+      inputSchema: { id: z.string() },
+      annotations: IDEMPOTENT_WRITE_ANNOTATIONS
     },
     async ({ id }) => {
-      if (!getItemById(id)) return text(`No item with id "${id}".`)
-      // archive not delete, a misread instruction shouldn't destroy work
       const before = getItemById(id)
+      if (!before) return error(`No item with id "${id}".`)
       updateItem(getDb(), id, { status: 'archived' })
       recordMcpActivity(
         'archive_item',
-        before?.context ?? null,
-        `Archived "${shorten(before?.title ?? id)}"`,
-        before ? [{ kind: 'restore_item', id, fields: { status: before.status } }] : null
+        before.context,
+        `Archived "${shorten(before.title)}"`,
+        [{ kind: 'restore_item', id, fields: { status: before.status } }]
       )
       notifyRenderer()
       return text(`Archived "${id}". It can be restored from the archive bin.`)

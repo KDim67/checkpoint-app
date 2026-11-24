@@ -1,81 +1,79 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { randomUUID } from 'crypto'
-import { getItemById, getSubtasks, insertSubtask, updateSubtask } from '../../db'
+import { getItemById, getSubtaskById, getSubtasks, insertSubtask, updateSubtask } from '../../db'
 import { recordMcpActivity } from '../../mcpActivity'
 import { computeProgress, nextPosition, normalizeSubtasks } from '../../../shared/subtasks'
 import { shorten } from '../../../shared/mcpActivity'
-import { json, notifyRenderer, text, z } from '../toolKit'
+import { error, json, notifyRenderer, text, WRITE_ANNOTATIONS, z } from '../toolKit'
 
 /** subtasks of a card or task */
 export function registerSubtaskTools(mcp: McpServer): void {
-  // rows, not body checkboxes, so they can be listed, counted and ticked
-
   mcp.registerTool(
-    'list_subtasks',
+    'manage_subtasks',
     {
-      description: 'List the subtasks of a card or task, with how many are done.',
-      inputSchema: { id: z.string().describe('The parent item id.') }
-    },
-    async ({ id }) => {
-      if (!getItemById(id)) return text('No item with id "' + id + '".')
-      const subtasks = normalizeSubtasks(getSubtasks(id))
-      const progress = computeProgress(subtasks)
-      return json({
-        progress: { done: progress.done, total: progress.total },
-        subtasks: subtasks.map(s => ({ id: s.id, title: s.title, done: s.done }))
-      })
-    }
-  )
-
-  mcp.registerTool(
-    'add_subtask',
-    {
-      description: 'Add a subtask to a card or task. Use this to break work down rather than editing the description.',
+      title: 'Manage Subtasks',
+      description:
+        "List, add, or toggle subtasks on a card or task. Use action='list' or 'add' with id (the parent item id), " +
+        "or action='set_done' with id (the subtask id) and done.",
       inputSchema: {
-        id: z.string().describe('The parent item id.'),
-        title: z.string().min(1)
+        action: z.enum(['list', 'add', 'set_done']),
+        id: z.string().describe('Parent item id for list/add, or subtask id for set_done.'),
+        title: z.string().min(1).optional().describe('Subtask title (required for add).'),
+        done: z.boolean().optional().describe('Completion state (required for set_done).')
+      },
+      annotations: WRITE_ANNOTATIONS
+    },
+    async ({ action, id, title, done }) => {
+      if (action === 'list') {
+        if (!getItemById(id)) return error(`No item with id "${id}".`)
+        const subtasks = normalizeSubtasks(getSubtasks(id))
+        const progress = computeProgress(subtasks)
+        return json({
+          progress: { done: progress.done, total: progress.total },
+          subtasks: subtasks.map(s => ({ id: s.id, title: s.title, done: s.done }))
+        })
       }
-    },
-    async ({ id, title }) => {
-      const parent = getItemById(id)
-      if (!parent) return text('No item with id "' + id + '".')
 
-      const subtaskId = randomUUID()
-      insertSubtask({
-        id: subtaskId,
-        item_id: id,
-        title: title.trim(),
-        done: 0,
-        position: nextPosition(normalizeSubtasks(getSubtasks(id))),
-        created_at: Date.now()
-      })
-      recordMcpActivity(
-        'add_subtask',
-        parent.context,
-        'Added subtask "' + shorten(title) + '" to "' + shorten(parent.title) + '"',
-        [{ kind: 'delete_subtask', id: subtaskId }]
-      )
-      notifyRenderer()
-      return json({ created: { id: subtaskId, title: title.trim() } })
-    }
-  )
+      if (action === 'add') {
+        const parent = getItemById(id)
+        if (!parent) return error(`No item with id "${id}".`)
+        const cleanTitle = title?.trim()
+        if (!cleanTitle) return error('title is required when adding a subtask.')
 
-  mcp.registerTool(
-    'set_subtask_done',
-    {
-      description: 'Tick or untick a subtask.',
-      inputSchema: { id: z.string().describe('The subtask id.'), done: z.boolean() }
-    },
-    async ({ id, done }) => {
+        const subtaskId = randomUUID()
+        insertSubtask({
+          id: subtaskId,
+          item_id: id,
+          title: cleanTitle,
+          done: 0,
+          position: nextPosition(normalizeSubtasks(getSubtasks(id))),
+          created_at: Date.now()
+        })
+        recordMcpActivity(
+          'manage_subtasks',
+          parent.context,
+          `Added subtask "${shorten(cleanTitle)}" to "${shorten(parent.title)}"`,
+          [{ kind: 'delete_subtask', id: subtaskId }]
+        )
+        notifyRenderer()
+        return json({ created: { id: subtaskId, title: cleanTitle } })
+      }
+
+      // action === 'set_done'
+      if (done === undefined) return error('done (boolean) is required when action is set_done.')
+      const existing = getSubtaskById(id)
+      if (!existing) return error(`No subtask with id "${id}".`)
+      const parent = getItemById(existing.item_id)
+
       updateSubtask(id, { done })
       recordMcpActivity(
-        'set_subtask_done',
-        null,
-        (done ? 'Completed' : 'Reopened') + ' a subtask',
+        'manage_subtasks',
+        parent?.context ?? null,
+        `${done ? 'Completed' : 'Reopened'} subtask "${shorten(existing.title)}"`,
         [{ kind: 'set_subtask_done', id, done: !done }]
       )
       notifyRenderer()
-      return text('Subtask marked ' + (done ? 'done' : 'not done') + '.')
+      return text(`Subtask "${existing.title}" marked ${done ? 'done' : 'not done'}.`)
     }
   )
 }

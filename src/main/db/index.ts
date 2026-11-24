@@ -35,7 +35,7 @@ export { applyBoardBaselineTx, applyRemoteMutationTx } from './remote'
 export { getAllTags, createTag, updateTag, deleteTag } from './tags'
 export { deleteSetting, getSetting, setSetting } from './settings'
 export { getRelations, createRelation, deleteRelation } from './relations'
-export { getSubtasks, insertSubtask, updateSubtask, deleteSubtask } from './subtasks'
+export { getSubtasks, getSubtaskById, insertSubtask, updateSubtask, deleteSubtask } from './subtasks'
 export {
   insertMcpActivity,
   getMcpActivity,

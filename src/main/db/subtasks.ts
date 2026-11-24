@@ -1,12 +1,17 @@
 import { getDb } from './connection'
 
-interface SubtaskRow {
+export interface SubtaskRow {
   id: string
   item_id: string
   title: string
   done: number
   position: number
   created_at: number
+}
+
+export function getSubtaskById(id: string): SubtaskRow | null {
+  const row = getDb().prepare(`SELECT * FROM subtasks WHERE id = ?`).get(id) as SubtaskRow | undefined
+  return row ?? null
 }
 
 export function getSubtasks(itemId: string): SubtaskRow[] {
