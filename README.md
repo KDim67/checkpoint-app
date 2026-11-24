@@ -36,9 +36,10 @@ late, the last thing you changed, and a strip of the two weeks either side of
 today, with focus time above the line and what's due below it. Click one to
 switch, drag or Alt+arrow to reorder, and rename, export or import them there.
 
-**The Wall.** A freeform canvas. Drop cards, notes, images and text anywhere,
-draw on it, connect things with arrows. It's where I think before anything is
-organised enough for a board.
+**The Wall.** A freeform canvas. Drop cards, notes, images, animated GIFs and
+text anywhere, draw with ink or a presentation laser pointer, stamp emoji
+reactions, connect items with layered arrows, and export or merge single walls
+via JSON. It's where I think before anything is organised enough for a board.
 
 **Game dev helpers.** Batch renaming, a dialogue tree editor, palette
 extraction, PBR map generation, seamless texture tiling, a sprite atlas packer,
@@ -289,6 +290,15 @@ This one writes to your notes, so here is exactly what it changes:
   make the next one; its date stays Obsidian's too.
 - The folder is remembered on this computer only. Checkpoint's one-off vault
   import, in the Notes sidebar, still never writes to your vault.
+
+### Local MCP server
+
+Checkpoint can expose your workspaces, boards, notes, walls (including dropping
+and inspecting images), renewals, cheatsheets and memories over a local HTTP
+Model Context Protocol endpoint on `127.0.0.1:9990`. Turn it on under Settings →
+MCP Server, copy the JSON snippet or Claude Code CLI command, toggle read-only
+mode if an agent only needs to look, and undo any agent write from the activity
+log.
 
 ### Webhooks
 
