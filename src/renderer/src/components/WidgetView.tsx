@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Logo from './ui/Logo'
 import { getStringSetting } from '../lib/settings'
 import { readItems, latestItem } from '../data/items'
+import { useVisibleInterval } from '../lib/useVisibleInterval'
 
 interface WidgetData {
   totalCount: number
@@ -70,7 +71,6 @@ export default function WidgetView() {
   })
   
   const [hovered, setHovered] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const contextRef = useRef<string>('default')
 
   const refresh = async () => {
@@ -79,20 +79,15 @@ export default function WidgetView() {
   }
 
   useEffect(() => {
-    // then poll every 5s
     getStringSetting('active_context', '').then((ctx) => {
       if (ctx) {
         contextRef.current = ctx
       }
       refresh()
     }).catch(() => refresh())
-
-    intervalRef.current = setInterval(refresh, 5000)
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
   }, [])
+
+  useVisibleInterval(refresh, 15000)
 
   const percentage = data.totalCount > 0 ? Math.round((data.doneCount / data.totalCount) * 100) : 0
   const radius = 18

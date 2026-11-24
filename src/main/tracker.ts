@@ -11,6 +11,8 @@ let currentWindowProcess = ''
 let currentWindowTitle = ''
 let currentWindowContext = ''
 let currentWindowDuration = 0
+let contextResolvedAt = 0
+const CONTEXT_CACHE_TTL_MS = 60_000
 
 function flushBuffer(): void {
   if (currentWindowDuration <= 0) return
@@ -25,6 +27,7 @@ function flushBuffer(): void {
     console.error('[Tracker] Failed to flush activity log to database:', err)
   }
   currentWindowDuration = 0
+  contextResolvedAt = 0
 }
 
 function handleTrackerTick(line: string): void {
@@ -48,22 +51,20 @@ function handleTrackerTick(line: string): void {
     return
   }
 
-  // map process/window names to contexts
-  let tickContext = ''
-  try {
-    const contexts = getContextSlugs()
-    const searchStr = `${processName} ${windowTitle}`.toLowerCase()
-    const matched = contexts.find(slug => searchStr.includes(slug.toLowerCase()))
-    
-    if (matched) {
-      tickContext = matched
-    } else {
-      // fall back to the active context
-      tickContext = getSetting<string>('active_context', 'default')
+  const sameWindow = processName === currentWindowProcess && windowTitle === currentWindowTitle
+  const now = Date.now()
+  let tickContext = currentWindowContext
+  if (!sameWindow || !tickContext || now - contextResolvedAt > CONTEXT_CACHE_TTL_MS) {
+    try {
+      const contexts = getContextSlugs()
+      const searchStr = `${processName} ${windowTitle}`.toLowerCase()
+      const matched = contexts.find(slug => searchStr.includes(slug.toLowerCase()))
+      tickContext = matched ?? getSetting<string>('active_context', 'default')
+    } catch (err) {
+      console.error('[Tracker] Failed to resolve context slugs:', err)
+      tickContext = 'default'
     }
-  } catch (err) {
-    console.error('[Tracker] Failed to resolve context slugs:', err)
-    tickContext = 'default'
+    contextResolvedAt = now
   }
 
   const windowChanged =

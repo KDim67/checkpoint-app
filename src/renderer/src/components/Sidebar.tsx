@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { readViewFeatures, defaultViewEnabledMap, type ViewEnabledMap } from '../lib/features'
 import { getBoolSetting } from '../lib/settings'
 import { useAppStore, type ActiveView } from '../store/appStore'
+import { useVisibleInterval } from '../lib/useVisibleInterval'
 import Logo from './ui/Logo'
 import * as syncApi from '../data/sync'
 import { defaultBindings, loadBindings, type ShortcutBindings } from '../lib/shortcuts'
@@ -266,12 +267,8 @@ export function Sidebar() {
     return () => window.removeEventListener('settings-update-sync', checkSyncStatus)
   }, [checkSyncStatus])
 
-  // poll only while sync is on, it used to IPC every 5s regardless
-  useEffect(() => {
-    if (!syncEnabled) return
-    const interval = setInterval(checkSyncStatus, 5000)
-    return () => clearInterval(interval)
-  }, [syncEnabled, checkSyncStatus])
+  // poll sync status only while visible and enabled
+  useVisibleInterval(checkSyncStatus, 15000, syncEnabled)
 
   const activeContextEntry = workspaceList.find(c => c.slug === activeWorkspace)
   const ctxLabel = activeContextEntry ? activeContextEntry.name : activeWorkspace.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())

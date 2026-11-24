@@ -10,6 +10,7 @@ import { errorMessage } from '../../../../shared/errors'
 import { SYNC_TCP_PORT } from '../../../../shared/ports'
 import { getBoolSetting, getJsonSetting, setBoolSetting, setJsonSetting } from '../../lib/settings'
 import * as syncApi from '../../data/sync'
+import { useVisibleInterval } from '../../lib/useVisibleInterval'
 import Presence from '../ui/Presence'
 
 interface Peer {
@@ -79,24 +80,17 @@ export default function SyncSettings() {
     loadSetting()
   }, [])
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (syncEnabled) {
-      interval = setInterval(async () => {
-        try {
-          const status = await syncApi.getStatus()
-          setHostStatus(status)
-          if (status.progress && status.progress !== 'Idle') {
-            addLog(`[LAN] ${status.progress}`)
-          }
-
-          const peers = await syncApi.getDiscoveredPeers()
-          setDiscoveredPeers(peers)
-        } catch {}
-      }, 3000)
-    }
-    return () => clearInterval(interval)
-  }, [syncEnabled])
+  useVisibleInterval(async () => {
+    try {
+      const status = await syncApi.getStatus()
+      setHostStatus(status)
+      if (status.progress && status.progress !== 'Idle') {
+        addLog(`[LAN] ${status.progress}`)
+      }
+      const peers = await syncApi.getDiscoveredPeers()
+      setDiscoveredPeers(peers)
+    } catch {}
+  }, 3000, syncEnabled)
 
   const handleToggleSync = async (checked: boolean) => {
     try {

@@ -19,6 +19,7 @@ import type { ClipboardItem } from '../../../shared/types'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { useToast, useFailureReport } from './ui/Toast'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
+import { useVisibleInterval } from '../lib/useVisibleInterval'
 import * as clipboardApi from '../data/clipboard'
 import * as appApi from '../data/app'
 import { SkeletonBlocks } from './ui/Skeleton'
@@ -104,14 +105,11 @@ export default function ClipboardView() {
   useEffect(() => {
     loadHistory()
     // instant refresh when the watcher captures
-    const unsubscribe = clipboardApi.onHistoryChanged(loadHistory)
-    // plus a slow poll in case an event is missed
-    const interval = setInterval(loadHistory, 5000)
-    return () => {
-      unsubscribe()
-      clearInterval(interval)
-    }
+    return clipboardApi.onHistoryChanged(loadHistory)
   }, [loadHistory])
+
+  // backup poll paused when hidden
+  useVisibleInterval(loadHistory, 30000)
 
   const handleTogglePin = async (id: string, isPinned: boolean) => {
     try {

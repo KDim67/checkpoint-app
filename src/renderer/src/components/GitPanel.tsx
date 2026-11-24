@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, GitBranch, AlertTriangle, Copy, Check, FileText, Settings, FolderGit } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
+import { useVisibleInterval } from '../lib/useVisibleInterval'
 import type { GitCommit, GitStatusResult } from '../../../shared/types'
 import { COPIED_FEEDBACK_MS } from '../lib/timings'
 import { readWorkspaceList } from '../lib/workspaceList'
@@ -85,17 +86,14 @@ export default function GitPanel() {
   useEffect(() => {
     if (gitPath) {
       loadGitData(gitPath)
-      const interval = setInterval(() => {
-        loadGitData(gitPath)
-      }, 30000)
-      return () => clearInterval(interval)
     } else {
       setIsValidRepo(false)
       setStatus(null)
       setCommits([])
-      return undefined
     }
   }, [gitPath, loadGitData])
+
+  useVisibleInterval(() => { if (gitPath) loadGitData(gitPath) }, 30000, Boolean(gitPath))
 
   const handleCopyHash = async (hash: string) => {
     try {
