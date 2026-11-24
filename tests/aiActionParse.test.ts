@@ -5,6 +5,7 @@ import {
   normalizeCardJson,
   normalizeColumnJson,
   parseBatchBoardJson,
+  parseWallDiagramJson,
   resolveColor
 } from '../src/renderer/src/components/ai/aiActionParse'
 
@@ -147,5 +148,30 @@ describe('linkifyCardTitles', () => {
 
   it('returns the text as it was when there are no titles to find', () => {
     expect(linkifyCardTitles('Login page', [])).toBe('Login page')
+  })
+})
+
+describe('parseWallDiagramJson', () => {
+  it('parses items, auto-lays out missing coordinates, and parses connections', () => {
+    const diagram = parseWallDiagramJson(JSON.stringify({
+      wallName: 'Combat Loop',
+      items: [
+        { id: 'input', kind: 'shape', shape: 'rounded', text: 'Player Input', color: 'blue' },
+        { id: 'fsm', kind: 'note', text: 'Combat State' }
+      ],
+      connections: [
+        { from: 'input', to: 'fsm', label: 'triggers', route: 'curved', line: 'solid' }
+      ]
+    }))
+    expect(diagram).not.toBeNull()
+    expect(diagram?.wallName).toBe('Combat Loop')
+    expect(diagram?.items[0]).toMatchObject({ id: 'input', kind: 'shape', shape: 'rounded', x: 0, y: 0, color: '#3b82f6' })
+    expect(diagram?.items[1]).toMatchObject({ id: 'fsm', kind: 'note', x: 280, y: 0 })
+    expect(diagram?.connections[0]).toEqual({ from: 'input', to: 'fsm', label: 'triggers', route: 'curved', line: 'solid' })
+  })
+
+  it('returns null when no valid wall items are present', () => {
+    expect(parseWallDiagramJson('{"wallName": "Empty", "items": []}')).toBeNull()
+    expect(parseWallDiagramJson('not json')).toBeNull()
   })
 })

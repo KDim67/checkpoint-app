@@ -14,6 +14,7 @@ import CreateTaskActionBlock from './actions/CreateTaskActionBlock'
 import CreateColumnActionBlock from './actions/CreateColumnActionBlock'
 import CreatePlanActionBlock from './actions/CreatePlanActionBlock'
 import CreateDialogueTreeActionBlock from './actions/CreateDialogueTreeActionBlock'
+import CreateWallDiagramActionBlock from './actions/CreateWallDiagramActionBlock'
 import { useBoardTitles } from './useBoardTitles'
 import * as appApi from '../../data/app'
 
@@ -441,6 +442,9 @@ function ChatMessage({ message, messageIndex, onResend, onRewrite, onRevert, onC
                   }
                   if (lang === 'create_dialogue_tree' || lang.includes('create_dialogue_tree')) {
                     return <CreateDialogueTreeActionBlock jsonString={rawContent} />
+                  }
+                  if (lang === 'create_wall_diagram' || lang === 'wall_diagram' || lang.includes('create_wall_diagram')) {
+                    return <CreateWallDiagramActionBlock jsonString={rawContent} />
                   }
 
                   // generic JSON: the batch parser handles every AI output format

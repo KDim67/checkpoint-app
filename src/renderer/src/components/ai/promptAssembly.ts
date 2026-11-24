@@ -46,6 +46,7 @@ FORMAT (only when creating):
 - Batch (preferred for cards): \`\`\`json { "cards": [ { "title", "body", "status", "priority", "tags": [{ "name", "color" }] } ], "columns": [ { "name", "color", "colorMode": "header" } ] } \`\`\`. Omit "columns" unless adding new stages.
 - Implementation plan: \`\`\`json:create_plan { "title", "overview", "steps": [{ "title", "details", "status": "pending" }] } \`\`\`
 - Branching dialogue: \`\`\`json:create_dialogue_tree { "startNode", "nodes": [{ "id", "speaker", "text", "choices": [{ "text", "target" }] }] } \`\`\`
+- Wall diagram: \`\`\`json:create_wall_diagram { "wallName": "Optional new wall", "items": [{ "id", "kind": "note|shape|frame|text|code", "text", "x", "y", "color" }], "connections": [{ "from", "to", "label", "route": "straight|curved|elbow" }] } \`\`\`
 - Valid JSON only: no trailing commas, no comments. priority is 1|2|3. colors are hex like "#a855f7". status is an existing column name or id.`
   return baseSystemPromptContent
 }

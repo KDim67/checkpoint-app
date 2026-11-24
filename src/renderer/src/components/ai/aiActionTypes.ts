@@ -111,3 +111,34 @@ export interface AiDialogueBlock {
   startNode: string
   nodes: AiDialogueNode[]
 }
+
+export type AiWallItemKind = 'note' | 'text' | 'frame' | 'shape' | 'code'
+
+export interface AiWallItemSpec {
+  id: string
+  kind: AiWallItemKind
+  text: string
+  x: number
+  y: number
+  width?: number
+  height?: number
+  color?: string
+  shape?: 'rectangle' | 'rounded' | 'oval' | 'diamond' | 'triangle'
+  language?: string
+}
+
+export interface AiWallConnectionSpec {
+  from: string
+  to: string
+  label?: string
+  route?: 'straight' | 'curved' | 'elbow'
+  line?: 'solid' | 'dashed' | 'dotted'
+  heads?: 'end' | 'both' | 'none'
+  color?: string
+}
+
+export interface AiWallDiagramBlock {
+  wallName?: string
+  items: AiWallItemSpec[]
+  connections: AiWallConnectionSpec[]
+}

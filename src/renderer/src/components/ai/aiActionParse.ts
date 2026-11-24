@@ -1,6 +1,17 @@
 // model output is malformed often, so readers return null instead of throwing
 
-import type { BatchBoard, BatchCard, BatchColumn, JsonObject, ParsedCardJson, ParsedColumnJson } from './aiActionTypes'
+import type {
+  AiWallConnectionSpec,
+  AiWallDiagramBlock,
+  AiWallItemKind,
+  AiWallItemSpec,
+  BatchBoard,
+  BatchCard,
+  BatchColumn,
+  JsonObject,
+  ParsedCardJson,
+  ParsedColumnJson
+} from './aiActionTypes'
 import { asArray, asObject, str, toItemPriority } from './aiActionTypes'
 
 // the AI sometimes writes colour names instead of hex
@@ -248,4 +259,83 @@ export function linkifyCardTitles(content: string, entries: Array<{ title: strin
     segments[s] = out
   }
   return segments.join('')
+}
+
+const WALL_DIAGRAM_KINDS = new Set<AiWallItemKind>(['note', 'text', 'frame', 'shape', 'code'])
+const WALL_SHAPES = new Set(['rectangle', 'rounded', 'oval', 'diamond', 'triangle'])
+const WALL_ROUTES = new Set(['straight', 'curved', 'elbow'])
+const WALL_LINES = new Set(['solid', 'dashed', 'dotted'])
+const WALL_HEADS = new Set(['end', 'both', 'none'])
+
+export function parseWallDiagramJson(raw: string): AiWallDiagramBlock | null {
+  const root = asObject(faultTolerantParseJSON(raw))
+  if (!root) return null
+
+  const rawItems = asArray(root.items ?? root.nodes)
+  if (rawItems.length === 0) return null
+
+  const items: AiWallItemSpec[] = []
+  rawItems.forEach((entry, index) => {
+    const o = asObject(entry)
+    if (!o) return
+    const rawKind = str(o.kind || 'note').trim().toLowerCase() as AiWallItemKind
+    if (!WALL_DIAGRAM_KINDS.has(rawKind)) return
+
+    const text = str(o.text ?? o.label ?? o.title).trim()
+    if (!text && rawKind !== 'frame' && rawKind !== 'shape') return
+
+    // place in a neat grid if the model omits coordinates
+    const col = index % 3
+    const row = Math.floor(index / 3)
+    const x = typeof o.x === 'number' && Number.isFinite(o.x) ? o.x : col * 280
+    const y = typeof o.y === 'number' && Number.isFinite(o.y) ? o.y : row * 240
+
+    const id = str(o.id).trim() || `node_${index}`
+    const shape = str(o.shape).trim().toLowerCase()
+    const rawColor = str(o.color).trim()
+
+    items.push({
+      id,
+      kind: rawKind,
+      text,
+      x,
+      y,
+      ...(typeof o.width === 'number' && o.width > 0 ? { width: o.width } : {}),
+      ...(typeof o.height === 'number' && o.height > 0 ? { height: o.height } : {}),
+      ...(rawColor ? { color: resolveColor(rawColor) } : {}),
+      ...(WALL_SHAPES.has(shape) ? { shape: shape as AiWallItemSpec['shape'] } : {}),
+      ...(str(o.language).trim() ? { language: str(o.language).trim() } : {})
+    })
+  })
+
+  if (items.length === 0) return null
+
+  const connections: AiWallConnectionSpec[] = []
+  for (const entry of asArray(root.connections ?? root.arrows ?? root.edges)) {
+    const o = asObject(entry)
+    if (!o) continue
+    const from = str(o.from ?? o.from_id).trim()
+    const to = str(o.to ?? o.to_id).trim()
+    if (!from || !to || from === to) continue
+    const route = str(o.route).trim().toLowerCase()
+    const line = str(o.line).trim().toLowerCase()
+    const heads = str(o.heads).trim().toLowerCase()
+    const color = str(o.color).trim()
+    connections.push({
+      from,
+      to,
+      ...(str(o.label ?? o.text).trim() ? { label: str(o.label ?? o.text).trim() } : {}),
+      ...(WALL_ROUTES.has(route) ? { route: route as AiWallConnectionSpec['route'] } : {}),
+      ...(WALL_LINES.has(line) ? { line: line as AiWallConnectionSpec['line'] } : {}),
+      ...(WALL_HEADS.has(heads) ? { heads: heads as AiWallConnectionSpec['heads'] } : {}),
+      ...(color ? { color: resolveColor(color) } : {})
+    })
+  }
+
+  const wallName = str(root.wallName ?? root.wall_name ?? root.title).trim()
+  return {
+    ...(wallName ? { wallName } : {}),
+    items,
+    connections
+  }
 }
