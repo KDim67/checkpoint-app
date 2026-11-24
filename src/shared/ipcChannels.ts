@@ -107,6 +107,7 @@ export const enum IpcChannels {
   // MCP server
   MCP_TOGGLE             = 'mcp:toggle',
   MCP_GET_STATUS         = 'mcp:getStatus',
+  MCP_SET_READ_ONLY      = 'mcp:setReadOnly',
   MCP_REGENERATE_TOKEN   = 'mcp:regenerateToken',
   /** main to renderer: data changed outside the UI */
   MCP_DATA_CHANGED       = 'mcp:dataChanged',

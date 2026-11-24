@@ -164,22 +164,42 @@ function registerResources(mcp: McpServer): void {
   )
 }
 
-export function buildMcpServer(): McpServer {
+export function buildMcpServer(options: { readOnly?: boolean } = {}): McpServer {
+  const readOnly = options.readOnly ?? getSetting<string>('mcp_read_only', 'false') === 'true'
+  const instructions = readOnly
+    ? `${SERVER_INSTRUCTIONS} Note: Server is currently in READ-ONLY mode; write tools are disabled.`
+    : SERVER_INSTRUCTIONS
+
   const mcp = new McpServer(
     { name: 'checkpoint', version: app.getVersion() },
-    { instructions: SERVER_INSTRUCTIONS }
+    { instructions }
   )
 
-  registerBoardTools(mcp)
-  registerItemTools(mcp)
-  registerNoteTools(mcp)
-  registerWallTools(mcp)
-  registerOrganisationTools(mcp)
-  registerSubtaskTools(mcp)
-  registerRecurrenceTools(mcp)
-  registerRenewalTools(mcp)
-  registerReferenceTools(mcp)
-  registerTrackingTools(mcp)
+  const toolHost: McpServer = readOnly
+    ? ({
+        registerTool: (
+          name: string,
+          config: Parameters<McpServer['registerTool']>[1],
+          cb: Parameters<McpServer['registerTool']>[2]
+        ) => {
+          if ((config as { annotations?: { readOnlyHint?: boolean } }).annotations?.readOnlyHint !== true) {
+            return undefined
+          }
+          return mcp.registerTool(name, config, cb)
+        }
+      } as unknown as McpServer)
+    : mcp
+
+  registerBoardTools(toolHost)
+  registerItemTools(toolHost)
+  registerNoteTools(toolHost)
+  registerWallTools(toolHost)
+  registerOrganisationTools(toolHost)
+  registerSubtaskTools(toolHost)
+  registerRecurrenceTools(toolHost)
+  registerRenewalTools(toolHost)
+  registerReferenceTools(toolHost)
+  registerTrackingTools(toolHost)
   registerResources(mcp)
 
   return mcp

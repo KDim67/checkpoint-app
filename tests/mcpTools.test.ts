@@ -78,6 +78,18 @@ describe('MCP server registration & annotations', () => {
     expect(server._registeredTools.get_wall.annotations?.readOnlyHint).toBe(true)
     expect(server._registeredTools.edit_wall.annotations?.readOnlyHint).toBe(false)
   })
+
+  it('excludes write tools when built in readOnly mode', () => {
+    const server = buildMcpServer({ readOnly: true }) as unknown as {
+      _registeredTools: Record<string, { annotations?: { readOnlyHint?: boolean } }>
+    }
+    const entries = Object.entries(server._registeredTools)
+    expect(entries.length).toBeGreaterThan(0)
+    expect(entries.every(([, tool]) => tool.annotations?.readOnlyHint === true)).toBe(true)
+    expect(server._registeredTools.edit_wall).toBeUndefined()
+    expect(server._registeredTools.get_wall).toBeDefined()
+    expect(server._registeredTools.read_wall_image).toBeDefined()
+  })
 })
 
 describe('consolidated items, views, subtasks, and error signaling', () => {

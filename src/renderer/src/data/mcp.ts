@@ -12,6 +12,9 @@ export const onDataChanged = (...args: Parameters<Bridge['onDataChanged']>): Ret
 export const regenerateToken = (...args: Parameters<Bridge['regenerateToken']>): ReturnType<Bridge['regenerateToken']> =>
   window.electronAPI.mcp.regenerateToken(...args)
 
+export const setReadOnly = (...args: Parameters<Bridge['setReadOnly']>): ReturnType<Bridge['setReadOnly']> =>
+  window.electronAPI.mcp.setReadOnly(...args)
+
 export const toggle = (...args: Parameters<Bridge['toggle']>): ReturnType<Bridge['toggle']> =>
   window.electronAPI.mcp.toggle(...args)
 

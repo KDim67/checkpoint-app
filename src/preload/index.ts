@@ -596,8 +596,11 @@ const api = {
     toggle: (active: boolean, port: number): Promise<number | null> =>
       ipcRenderer.invoke(IpcChannels.MCP_TOGGLE, active, port),
 
-    getStatus: (): Promise<{ running: boolean; port: number; enabled: boolean; token: string }> =>
+    getStatus: (): Promise<{ running: boolean; port: number; enabled: boolean; readOnly: boolean; token: string }> =>
       ipcRenderer.invoke(IpcChannels.MCP_GET_STATUS),
+
+    setReadOnly: (readOnly: boolean): Promise<boolean> =>
+      ipcRenderer.invoke(IpcChannels.MCP_SET_READ_ONLY, readOnly),
 
     listActivity: (limit?: number): Promise<McpActivityEntry[]> =>
       ipcRenderer.invoke(IpcChannels.MCP_ACTIVITY_LIST, limit),

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Copy, Check, RefreshCw, AlertTriangle, Plug, Link2, History } from 'lucide-react'
+import { Copy, Check, RefreshCw, AlertTriangle, ShieldCheck, Plug, Link2, History } from 'lucide-react'
 import SettingsSection, { FieldRow, SettingsInput, ToggleRow, Divider, SettingsCardSkeleton } from './SettingsSection'
 import { useToast } from '../ui/Toast'
 import { useConfirm } from '../ui/ConfirmDialog'
@@ -7,16 +7,20 @@ import McpActivityLog from './McpActivityLog'
 import { COPIED_FEEDBACK_MS } from '../../lib/timings'
 import * as mcpApi from '../../data/mcp'
 
-/** full read/write to every workspace: off by default, token masked, regenerate behind a confirm */
+type ClientTab = 'json' | 'cli'
+
+/** off by default, token masked, optional read-only lock, regenerate behind a confirm */
 export default function McpSettings(): React.JSX.Element {
   const { toast } = useToast()
   const confirm = useConfirm()
 
   const [enabled, setEnabled] = useState(false)
   const [running, setRunning] = useState(false)
+  const [readOnly, setReadOnly] = useState(false)
   const [port, setPort] = useState('9990')
   const [token, setToken] = useState('')
   const [revealed, setRevealed] = useState(false)
+  const [clientTab, setClientTab] = useState<ClientTab>('json')
   const [copied, setCopied] = useState<'token' | 'config' | null>(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -26,6 +30,7 @@ export default function McpSettings(): React.JSX.Element {
       const status = await mcpApi.getStatus()
       setEnabled(status.enabled)
       setRunning(status.running)
+      setReadOnly(Boolean(status.readOnly))
       setPort(String(status.port))
       setToken(status.token)
     } catch (err) {
@@ -38,7 +43,6 @@ export default function McpSettings(): React.JSX.Element {
 
   const handleToggle = async (next: boolean): Promise<void> => {
     setBusy(true)
-    // optimistic, then reconciled: a port clash mustn't leave it looking on
     setEnabled(next)
     try {
       await mcpApi.toggle(next, parseInt(port, 10) || 9990)
@@ -49,6 +53,19 @@ export default function McpSettings(): React.JSX.Element {
     } finally {
       await refresh()
       setBusy(false)
+    }
+  }
+
+  const handleReadOnlyToggle = async (next: boolean): Promise<void> => {
+    setReadOnly(next)
+    try {
+      const saved = await mcpApi.setReadOnly(next)
+      setReadOnly(saved)
+      toast(saved ? 'MCP server set to read-only' : 'MCP write tools enabled')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      toast(`Could not update read-only mode: ${message}`)
+      await refresh()
     }
   }
 
@@ -92,7 +109,7 @@ export default function McpSettings(): React.JSX.Element {
     }
   }
 
-  const clientConfig = JSON.stringify(
+  const clientJson = JSON.stringify(
     {
       mcpServers: {
         checkpoint: {
@@ -105,6 +122,9 @@ export default function McpSettings(): React.JSX.Element {
     null,
     2
   )
+
+  const cliCommand = `claude mcp add --transport http checkpoint http://127.0.0.1:${port}/ --header "Authorization: Bearer ${token}"`
+  const activeSnippet = clientTab === 'json' ? clientJson : cliCommand
 
   const copy = async (value: string, which: 'token' | 'config'): Promise<void> => {
     try {
@@ -137,26 +157,42 @@ export default function McpSettings(): React.JSX.Element {
         <div className="col-xl">
           <ToggleRow
             label="MCP server"
-            description="Serves your workspaces, notes and boards to MCP clients on this computer, such as Claude Desktop or an editor."
+            description="Serves your workspaces, notes, boards and walls (22 tools + 3 resources) to MCP clients on this computer."
             checked={enabled}
             onChange={handleToggle}
             disabled={busy}
           >
             <div style={{ marginTop: 'var(--space-2)' }}>
               <span className="plugin-status" data-status={running ? 'running' : 'off'} role="status">
-                {running ? `Running on 127.0.0.1:${port}` : 'Stopped'}
+                {running ? `Running on 127.0.0.1:${port}${readOnly ? ' · Read-only' : ''}` : 'Stopped'}
               </span>
             </div>
           </ToggleRow>
 
-          {/* say plainly it grants full read and write */}
-          <div className="settings-callout" data-tone="warning">
-            <AlertTriangle size={14} aria-hidden="true" />
-            <span>
-              Anything holding the token can <strong>read and change</strong> every workspace, note and board.
-              The server only answers this computer, and never starts without the token.
-            </span>
-          </div>
+          <ToggleRow
+            label="Read-only mode"
+            description="Disable write and delete tools so agents can inspect boards, notes, walls and images without changing anything."
+            checked={readOnly}
+            onChange={handleReadOnlyToggle}
+          />
+
+          {readOnly ? (
+            <div className="settings-callout">
+              <ShieldCheck size={14} aria-hidden="true" />
+              <span>
+                <strong>Read-only mode is on.</strong> Clients can query items, read notes, inspect walls and view images,
+                but all write tools are hidden.
+              </span>
+            </div>
+          ) : (
+            <div className="settings-callout" data-tone="warning">
+              <AlertTriangle size={14} aria-hidden="true" />
+              <span>
+                Anything holding the token can <strong>read and change</strong> every workspace, note, board and wall.
+                The server only answers this computer, and never starts without the token.
+              </span>
+            </div>
+          )}
 
           <Divider />
 
@@ -205,14 +241,34 @@ export default function McpSettings(): React.JSX.Element {
             </div>
           </FieldRow>
 
-          <FieldRow label="Client configuration" hint="Paste it into your MCP client's settings, then restart the client." group>
+          <FieldRow label="Client setup" hint="Pick JSON config (Claude Desktop, Cursor, Antigravity) or the Claude Code CLI command." group>
             <div className="col">
-              <pre style={{ ...mono, margin: 0, maxHeight: '12rem', overflow: 'auto', whiteSpace: 'pre' }}>
-                {revealed ? clientConfig : clientConfig.replace(token, '•'.repeat(48))}
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }} role="tablist" aria-label="Client setup format">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={clientTab === 'json'}
+                  className={clientTab === 'json' ? 'btn-primary btn-small' : 'btn-secondary btn-small'}
+                  onClick={() => setClientTab('json')}
+                >
+                  JSON config
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={clientTab === 'cli'}
+                  className={clientTab === 'cli' ? 'btn-primary btn-small' : 'btn-secondary btn-small'}
+                  onClick={() => setClientTab('cli')}
+                >
+                  Claude Code CLI
+                </button>
+              </div>
+              <pre style={{ ...mono, margin: 0, maxHeight: '12rem', overflow: 'auto', whiteSpace: clientTab === 'json' ? 'pre' : 'pre-wrap' }}>
+                {revealed ? activeSnippet : activeSnippet.replace(token, '•'.repeat(48))}
               </pre>
-              <button type="button" className="btn-secondary btn-with-icon" onClick={() => copy(clientConfig, 'config')} style={{ alignSelf: 'flex-start' }}>
+              <button type="button" className="btn-secondary btn-with-icon" onClick={() => copy(activeSnippet, 'config')} style={{ alignSelf: 'flex-start' }}>
                 {copied === 'config' ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                {copied === 'config' ? 'Copied' : 'Copy the configuration'}
+                {copied === 'config' ? 'Copied' : clientTab === 'json' ? 'Copy JSON config' : 'Copy CLI command'}
               </button>
             </div>
           </FieldRow>

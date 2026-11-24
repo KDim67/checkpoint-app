@@ -42,8 +42,16 @@ export function registerMcpHandlers(): void {
       running: getMcpPort() !== null,
       port: getMcpPort() ?? (parseInt(getSetting<string>('mcp_port', String(fallback)), 10) || fallback),
       enabled: getSetting<string>('feature_mcp', 'false') === 'true',
+      readOnly: getSetting<string>('mcp_read_only', 'false') === 'true',
       token: getOrCreateMcpToken()
     }
+  })
+
+  ipcMain.handle(IpcChannels.MCP_SET_READ_ONLY, async (_event, readOnly: boolean) => {
+    const { setSetting } = await import('../db')
+    const next = Boolean(readOnly)
+    setSetting('mcp_read_only', next ? 'true' : 'false')
+    return next
   })
 
   ipcMain.handle(IpcChannels.MCP_REGENERATE_TOKEN, async () => {
