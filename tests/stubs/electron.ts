@@ -32,6 +32,18 @@ export const nativeImage = {
   }
 }
 
+export const safeStorage = {
+  isEncryptionAvailable(): boolean {
+    return true
+  },
+  encryptString(plainText: string): Buffer {
+    return Buffer.from(plainText, 'utf8')
+  },
+  decryptString(encrypted: Buffer): string {
+    return encrypted.toString('utf8')
+  }
+}
+
 /** records raised notifications for assertions; cleared between tests */
 export const shown: { title: string; body: string }[] = []
 
@@ -78,4 +90,4 @@ export const clipboard = {
   }
 }
 
-export default { ipcMain, nativeTheme, app, BrowserWindow, shell, clipboard, Notification, nativeImage }
+export default { ipcMain, nativeTheme, app, BrowserWindow, shell, clipboard, Notification, nativeImage, safeStorage }
