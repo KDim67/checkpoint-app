@@ -10,7 +10,6 @@ export const KanbanView = lazyView(() => import('./KanbanView'))
 export const BacklogView = lazyView(() => import('./BacklogView'))
 export const RenewalsView = lazyView(() => import('./RenewalsView'))
 export const CalendarView = lazyView(() => import('./CalendarView'))
-export const CookbookView = lazyView(() => import('./CookbookView'))
 export const WallView = lazyView(() => import('./wall/WallView'))
 export const SettingsView = lazyView(() => import('./SettingsView'))
 export const WorkspacesView = lazyView(() => import('./workspaces/WorkspacesView'))
@@ -32,7 +31,6 @@ const SCREENS: Record<ActiveView, { preload: () => Promise<void> }> = {
   backlog: BacklogView,
   renewals: RenewalsView,
   calendar: CalendarView,
-  cookbook: CookbookView,
   wall: WallView,
   settings: SettingsView,
   workspaces: WorkspacesView,

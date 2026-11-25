@@ -220,11 +220,6 @@ const VIEW_COPY: Record<string, { key: string; icon: React.ReactNode; descriptio
     icon: <BarChart2 size={16} />,
     description: 'Charts of the apps you used, your focus sessions and where the time went.'
   },
-  'feature_view_cookbook': {
-    key: 'view_cookbook',
-    icon: <Sparkles size={16} />,
-    description: 'Ready-made prompts and the models you can run them with.'
-  },
   'feature_view_cheatsheets': {
     key: 'view_cheatsheets',
     icon: <Book size={16} />,
@@ -261,7 +256,7 @@ const AI_CONFIG: ToggleConfig = {
   key: AI_FEATURE_KEY,
   icon: <Sparkles size={16} />,
   title: 'AI Assistant',
-  description: 'The assistant panel and every way into it: the Cookbook, AI Standup, AI Assist on a card, and Ask AI on a cheatsheet.',
+  description: 'The assistant panel and every way into it: Local Models in Settings, AI Standup, AI Assist on a card, and Ask AI on a cheatsheet.',
   offNote: 'No model is contacted and no AI buttons show. Saved chats, memories and keys are kept.',
   getState: () => readAiEnabled(),
   toggle: (active: boolean) => setAiEnabled(active)

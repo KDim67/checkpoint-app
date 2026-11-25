@@ -59,15 +59,6 @@ function IconBacklog(props: React.SVGProps<SVGSVGElement>) {
   )
 }
 
-function IconCookbook(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-    </svg>
-  )
-}
-
 function IconFocus(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -195,7 +186,6 @@ const NAV_ITEMS: Array<{
   { view: 'wall',        label: 'Wall',        Icon: IconWall },
   { view: 'clipboard',   label: 'Clipboard',   Icon: IconClipboard },
   { view: 'analytics',   label: 'Analytics',   Icon: IconAnalytics },
-  { view: 'cookbook',    label: 'AI Cookbook', Icon: IconCookbook },
   { view: 'cheatsheets', label: 'Cheatsheets', Icon: IconCheatsheets }
 ]
 
@@ -339,7 +329,7 @@ export function Sidebar() {
             }}
           />
         ) : (
-          <div style={{ filter: 'drop-shadow(0 2px 6px rgba(187, 254, 43, 0.35))', display: 'flex' }}>
+          <div style={{ filter: 'drop-shadow(0 1px 4px rgba(0, 0, 0, 0.28))', display: 'flex' }}>
             <Logo size={32} />
           </div>
         )}
@@ -567,7 +557,6 @@ export function Sidebar() {
         #nav-notes:not([aria-current]):hover,
         #nav-clipboard:not([aria-current]):hover,
         #nav-analytics:not([aria-current]):hover,
-        #nav-cookbook:not([aria-current]):hover,
         #nav-cheatsheets:not([aria-current]):hover,
         #nav-gamedev:not([aria-current]):hover,
         #nav-settings:not([aria-current]):hover {

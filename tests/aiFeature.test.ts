@@ -7,7 +7,7 @@ import type { ActiveView } from '../src/renderer/src/store/appStore'
 
 const allOn = (): ViewEnabledMap => ({
   kanban: true, log: true, backlog: true, focus: true, notes: true, wall: true,
-  clipboard: true, analytics: true, cookbook: true, cheatsheets: true,
+  clipboard: true, analytics: true, cheatsheets: true,
   gamedev: true, settings: true
 } as ViewEnabledMap)
 
@@ -32,26 +32,10 @@ describe('the AI switch', () => {
     expect(AI_FEATURE_KEY).toBe('feature_ai')
   })
 
-  it('leaves every view alone while AI is on', () => {
+  it('leaves every view alone regardless of AI state (local models live in Settings)', () => {
     const map = allOn()
     expect(applyAiGate(map, true)).toBe(map)
-  })
-
-  it('takes the Cookbook with it, since that is a library of AI prompts', () => {
-    expect(applyAiGate(allOn(), false).cookbook).toBe(false)
-  })
-
-  it('touches nothing else', () => {
-    const gated = applyAiGate(allOn(), false)
-    const others = Object.entries(gated).filter(([view]) => view !== 'cookbook')
-    expect(others.every(([, on]) => on)).toBe(true)
-  })
-
-  it('does not mutate the map it was given', () => {
-    // don't mutate the caller's map, it'd disable the Cookbook's own toggle
-    const map = allOn()
-    applyAiGate(map, false)
-    expect(map.cookbook).toBe(true)
+    expect(applyAiGate(map, false)).toBe(map)
   })
 })
 

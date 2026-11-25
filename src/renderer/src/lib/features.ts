@@ -22,7 +22,6 @@ export const VIEW_FEATURES: ViewFeature[] = [
   // the only view off by default, it records every copy
   { view: 'clipboard',   key: 'feature_view_clipboard',   label: 'Clipboard',   defaultOn: false },
   { view: 'analytics',   key: 'feature_view_analytics',   label: 'Analytics',   defaultOn: true },
-  { view: 'cookbook',    key: 'feature_view_cookbook',    label: 'AI Cookbook', defaultOn: true },
   { view: 'cheatsheets', key: 'feature_view_cheatsheets', label: 'Cheatsheets', defaultOn: true },
   { view: 'gamedev',     key: 'feature_gamedev_helpers',  label: 'Game Dev',    defaultOn: false }
 ]
@@ -44,9 +43,9 @@ export type ViewEnabledMap = Record<ActiveView, boolean>
 /** no switch of their own: Settings is where the others are turned off, and the Workspaces page is how you change workspace */
 const ALWAYS_OPEN: ActiveView[] = ['settings', 'workspaces']
 
-/** the Cookbook follows the AI switch */
-export function applyAiGate(map: ViewEnabledMap, aiEnabled: boolean): ViewEnabledMap {
-  return aiEnabled ? map : { ...map, cookbook: false }
+/** kept for callers; local models now live inside Settings → AI Assistant */
+export function applyAiGate(map: ViewEnabledMap, _aiEnabled: boolean): ViewEnabledMap {
+  return map
 }
 
 /** optimistic default so nav never flickers */

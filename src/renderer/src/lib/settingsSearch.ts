@@ -24,7 +24,7 @@ export const SECTION_TERMS: Record<SettingsTab, readonly string[]> = {
   general: ['startup', 'launch', 'tray', 'widget'],
   appearance: ['colors', 'colours', 'theme', 'font', 'presets', 'dark', 'light'],
   workspaces: ['columns', 'kanban', 'wip', 'limits'],
-  ai: ['model', 'provider', 'api key'],
+  ai: ['model', 'provider', 'api key', 'ollama', 'local models', 'cookbook'],
   connections: ['github', 'issues', 'integrations', 'key'],
   hotkeyBinder: ['keys', 'bindings', 'hotkeys', 'rebind', 'mouse', 'buttons'],
   features: ['toggles', 'extensions'],
@@ -72,6 +72,8 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   { name: 'Test connection', tab: 'ai', terms: ['check'], needsAi: true },
   { name: 'Email voice', tab: 'ai', terms: ['writing style', 'tone', 'samples', 'drafts'], needsAi: true },
   { name: 'Memory', tab: 'ai', terms: ['memories', 'rules', 'lore', 'remember', 'facts'], needsAi: true },
+  { name: 'Local models', tab: 'ai', terms: ['ollama', 'cookbook', 'download', 'vram', 'hardware'], needsAi: true },
+  { name: 'Safe Mode', tab: 'ai', under: 'Local models', terms: ['4b', 'vram', 'hide large models'], needsAi: true },
 
   ...CONNECTION_SERVICES.map(service => ({ name: SERVICES[service].name, tab: 'connections' as const, terms: ['connect', 'disconnect', 'key', 'sync'] })),
 

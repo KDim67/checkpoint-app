@@ -25,7 +25,7 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_notes',       label: 'Go to Notes',       defaultCombo: 'Ctrl+5', action: { kind: 'view', view: 'notes' } },
   { id: 'view_wall',        label: 'Go to Wall',        defaultCombo: 'Ctrl+6', action: { kind: 'view', view: 'wall' } },
   { id: 'view_clipboard',   label: 'Go to Clipboard',   defaultCombo: 'Ctrl+7', action: { kind: 'view', view: 'clipboard' } },
-  { id: 'view_cookbook',    label: 'Go to Cookbook',    defaultCombo: 'Ctrl+8', action: { kind: 'view', view: 'cookbook' } },
+
   { id: 'view_analytics',   label: 'Go to Analytics',   defaultCombo: 'Ctrl+9', action: { kind: 'view', view: 'analytics' } },
   { id: 'view_cheatsheets', label: 'Go to Cheatsheets', defaultCombo: 'Ctrl+0', action: { kind: 'view', view: 'cheatsheets' } },
   // eleventh view, out of digits: the key after 0 on the same row

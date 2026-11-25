@@ -11,7 +11,7 @@ import {
 /** what the palette can make, each in the view that owns it */
 export type CreateIntent = 'card' | 'task' | 'note' | 'sticky' | 'wall' | 'renewal' | 'workspace'
 
-export type ActiveView = 'log' | 'kanban' | 'backlog' | 'calendar' | 'renewals' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'cookbook' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev' | 'workspaces'
+export type ActiveView = 'log' | 'kanban' | 'backlog' | 'calendar' | 'renewals' | 'focus' | 'notes' | 'wall' | 'clipboard' | 'settings' | 'analytics' | 'cheatsheets' | 'gamedev' | 'workspaces'
 
 /** type-only, so no runtime cycle back into lib */
 export type { WorkspaceEntry } from '../lib/createWorkspace'

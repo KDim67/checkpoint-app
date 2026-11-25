@@ -69,7 +69,7 @@ describe('fetching screens ahead after starting', () => {
     }))
     vi.doMock('../src/renderer/src/lib/features', async importOriginal => ({
       ...(await importOriginal<typeof import('../src/renderer/src/lib/features')>()),
-      readViewFeatures: async () => ({ kanban: true, log: false, backlog: true, calendar: false, renewals: false, focus: false, notes: false, wall: true, clipboard: false, analytics: false, cookbook: false, cheatsheets: false, gamedev: false })
+      readViewFeatures: async () => ({ kanban: true, log: false, backlog: true, calendar: false, renewals: false, focus: false, notes: false, wall: true, clipboard: false, analytics: false, cheatsheets: false, gamedev: false })
     }))
     try {
       const { preloadScreensWhenIdle } = await import('../src/renderer/src/components/screens')

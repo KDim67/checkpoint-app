@@ -52,7 +52,6 @@ const VIEWS: { view: ActiveView; label: string; keywords?: string[] }[] = [
   { view: 'wall', label: 'Wall', keywords: ['canvas', 'freeform', 'moodboard', 'sticky', 'whiteboard'] },
   { view: 'clipboard', label: 'Clipboard', keywords: ['history', 'snippets', 'paste'] },
   { view: 'analytics', label: 'Analytics', keywords: ['stats', 'charts', 'metrics'] },
-  { view: 'cookbook', label: 'Cookbook', keywords: ['models', 'ai', 'ollama'] },
   { view: 'cheatsheets', label: 'Cheatsheets', keywords: ['reference', 'docs', 'pdf'] },
   { view: 'gamedev', label: 'Game Dev', keywords: ['textures', 'sprites', 'atlas'] },
   { view: 'workspaces', label: 'Workspaces', keywords: ['switch', 'manage', 'projects', 'context', 'rename', 'reorder'] }

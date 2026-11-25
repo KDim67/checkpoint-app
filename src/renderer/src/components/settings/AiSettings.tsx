@@ -10,6 +10,7 @@ import { MAX_EMAIL_SAMPLES } from '../../../../shared/emailSamples'
 import * as aiApi from '../../data/ai'
 import { setSetting } from '../../data/settings'
 import MemoryVaultManager from './MemoryVaultManager'
+import LocalModelsSection from './LocalModelsSection'
 import { useAppStore } from '../../store/appStore'
 import { workspaceName } from '../../lib/createWorkspace'
 
@@ -438,6 +439,15 @@ export default function AiSettings() {
       >
         <MemoryVaultManager />
       </SettingsSection>
+
+      <LocalModelsSection
+        activeModel={model}
+        onUseModel={(tag) => {
+          setModel(tag)
+          updateActiveProvider({ model: tag })
+          toast(`Active model set to "${tag}"`, { type: 'success' })
+        }}
+      />
     </>
   )
 }

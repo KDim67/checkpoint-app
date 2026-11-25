@@ -50,7 +50,7 @@ import { withViewTransition } from './lib/viewTransition'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePresence } from './lib/presence'
 import {
-  AiStreamPanel, AnalyticsView, BacklogView, CalendarView, CheatsheetsView, ClipboardView, CookbookView, FocusView,
+  AiStreamPanel, AnalyticsView, BacklogView, CalendarView, CheatsheetsView, ClipboardView, FocusView,
   GameDevView, GitPanel, ItemDetailPanel, KanbanView, LogView, NotesView, preloadScreensWhenIdle, RenewalsView,
   SettingsView, WallView, WorkspacesView
 } from './components/screens'
@@ -1030,7 +1030,6 @@ export default function App() {
       case 'notes':     return <NotesView />
       case 'wall':      return <WallView />
       case 'clipboard': return <ClipboardView />
-      case 'cookbook':  return <CookbookView />
       case 'analytics': return <AnalyticsView />
       case 'settings':  return <SettingsView />
       case 'workspaces': return <WorkspacesView />
