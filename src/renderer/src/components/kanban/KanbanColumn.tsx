@@ -205,7 +205,7 @@ function ColumnBody({
   const isDefaultCol = id === 'open' || id === 'done' || id === 'in_progress' || id === 'in_review'
 
   const statusAccent: Record<string, string> = {
-    open:        '#535e85',
+    open:        '#71717a',
     in_progress: '#3b82f6',
     in_review:   '#f97316',
     done:        '#10b981'
@@ -229,7 +229,7 @@ function ColumnBody({
           width: '48px',
           minWidth: '48px',
           flex: '0 0 48px',
-          backgroundColor: isOver ? 'var(--color-surface-2)' : 'var(--color-surface-1)',
+          backgroundColor: isOver ? 'var(--color-surface-2)' : 'var(--kanban-column-bg)',
           borderRadius: 'var(--radius-lg)',
           border: isOver ? `1px solid ${accentColor}` : '1px solid var(--color-surface-offset)',
           display: 'flex',
@@ -292,7 +292,7 @@ function ColumnBody({
         flex: '0 0 300px',
         backgroundColor: isOver
           ? 'var(--color-surface-2)'
-          : (isFullCol ? activeColor : 'var(--color-surface-1)'),
+          : (isFullCol ? activeColor : 'var(--kanban-column-bg)'),
         borderRadius: 'var(--radius-lg)',
         border: isOver
           ? `1px solid ${accentColor}`

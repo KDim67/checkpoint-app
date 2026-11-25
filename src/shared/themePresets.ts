@@ -22,17 +22,17 @@ export type ThemeVariables = Record<ThemeVarName, string>
 
 /** what Reset to Defaults returns to */
 export const DEFAULT_THEME: ThemeVariables = {
-  '--color-background': '#0b0c10',
-  '--color-surface-1': '#131622',
-  '--color-surface-2': '#1b1f30',
-  '--color-surface-offset': '#24293f',
-  '--color-surface-elevated': '#2e3450',
-  '--color-primary': '#1e45fc',
-  '--color-secondary': '#cdf12b',
-  '--color-balance': '#535e85',
-  '--color-text-base': '#f1f5f9',
-  '--color-text-muted': '#94a3b8',
-  '--color-text-faint': '#475569',
+  '--color-background': '#0a0a0b',
+  '--color-surface-1': '#121214',
+  '--color-surface-2': '#18181b',
+  '--color-surface-offset': '#27272b',
+  '--color-surface-elevated': '#222226',
+  '--color-primary': '#f4f4f5',
+  '--color-secondary': '#f23636',
+  '--color-balance': '#71717a',
+  '--color-text-base': '#f4f4f5',
+  '--color-text-muted': '#a1a1aa',
+  '--color-text-faint': '#71717a',
   '--font-sans': "'Inter', sans-serif"
 }
 
@@ -59,6 +59,7 @@ export function deriveThemeVars(vars: ThemeVariables): Record<string, string> {
     ...vars,
     '--color-primary-muted': primary + PRIMARY_TINT_ALPHA,
     '--color-primary-hover': lighten(primary, HOVER_LIGHTEN),
+    '--color-on-accent': readableForegroundOn(primary),
     '--color-secondary-muted': secondary + SECONDARY_TINT_ALPHA,
     // secondary buttons put their label on it
     '--color-text-inverted': readableForegroundOn(secondary),
@@ -74,8 +75,33 @@ export function buildCssVariablesString(vars: Record<string, string>): string {
   return `:root {\n${declarations}\n}`
 }
 
-/** eight light, eight dark; Ink for OLED; tests hold 7:1 body, 4.5:1 accents */
+/** signature dark & light plus curated alternatives; tests hold 7:1 body, 4.5:1 accents */
 export const BUILT_IN_PRESETS: ThemePreset[] = [
+  {
+    id: 'builtin-checkpoint',
+    name: 'Checkpoint',
+    builtIn: true,
+    vars: { ...DEFAULT_THEME }
+  },
+  {
+    id: 'builtin-checkpoint-light',
+    name: 'Checkpoint Light',
+    builtIn: true,
+    vars: {
+      '--color-background': '#f3f3f5',
+      '--color-surface-1': '#ffffff',
+      '--color-surface-2': '#f7f7f8',
+      '--color-surface-offset': '#d4d4d8',
+      '--color-surface-elevated': '#ffffff',
+      '--color-primary': '#111113',
+      '--color-secondary': '#d41414',
+      '--color-balance': '#6e6e78',
+      '--color-text-base': '#111113',
+      '--color-text-muted': '#52525b',
+      '--color-text-faint': '#63636d',
+      '--font-sans': "'Inter', sans-serif"
+    }
+  },
   {
     id: 'builtin-midnight',
     name: 'Midnight',

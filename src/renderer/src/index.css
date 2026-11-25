@@ -5,63 +5,65 @@
 /* in a layer so an unlayered user theme always wins; left unindented to keep blame */
 @layer theme {
 :root {
-  /* canvas layers, luminance steps */
-  --color-background:       #0b0c10;   /* L≈4, deepest canvas, app background */
-  --color-surface-1:        #131622;   /* L≈8, card/panel base */
-  --color-surface-2:        #1b1f30;   /* L≈12, nested panels, input backgrounds */
-  --color-surface-offset:   #24293f;   /* L≈16, hover states, secondary rails, dividers */
-  --color-surface-elevated: #2e3450;   /* L≈20, tooltips, popovers, context menus */
-  --color-surface-3:        var(--color-surface-2);  /* alias: call sites pair it with a surface-offset border, i.e. they mean "nested panel" */
+  /* canvas layers, neutral obsidian-graphite luminance steps */
+  --color-background:       #0a0a0b;   /* deepest obsidian canvas, matches logo black planes */
+  --color-surface-1:        #121214;   /* card, panel and sidebar base */
+  --color-surface-2:        #1a1a1d;   /* nested panels, input backgrounds */
+  --color-surface-offset:   #27272b;   /* hairline borders, hover states, dividers */
+  --color-surface-elevated: #222226;   /* tooltips, popovers, context menus */
+  --color-surface-3:        var(--color-surface-2);
+  --kanban-column-bg:       var(--color-surface-1);
+  --kanban-card-bg:         color-mix(in srgb, var(--color-surface-1) 45%, var(--color-surface-2));
 
-  /* brand anchors */
-  --color-primary:          #1e45fc;   /* Electric Blue, interactive, links, focus rings */
-  --color-primary-hover:    #3559ff;   /* Electric Blue +15% for hover */
-  --color-primary-muted:    rgba(30, 69, 252, 0.15); /* 15% opacity, selection bg */
-  --color-on-accent:        #ffffff;   /* text on saturated accent fills */
+  /* brand anchors: monochrome structure + signal red checkpoint flag */
+  --color-primary:          #f4f4f5;   /* crisp chalk white, primary CTAs, links, focus rings */
+  --color-primary-hover:    #ffffff;   /* pure white lift on hover */
+  --color-primary-muted:    rgba(244, 244, 245, 0.10);
+  --color-on-accent:        #09090b;   /* obsidian ink on chalk primary fills */
 
-  /* named so the AI purple follows the theme */
-  --color-accent-ai:        #9333ea;
-  --color-accent-ai-hover:  #7c3aed;
+  /* AI distinction */
+  --color-accent-ai:        #a855f7;
+  --color-accent-ai-hover:  #9333ea;
 
   /* -soft tints for text on surfaces, the bare token for fills */
-  --color-info:             #38bdf8;   /* sky, a tool running, a stream open */
-  --color-primary-soft:     #60a5fa;
+  --color-info:             #60a5fa;
+  --color-primary-soft:     #d4d4d8;
   --color-success-soft:     #4ade80;
   --color-accent-ai-soft:   #c084fc;
-  --color-secondary:        #cdf12b;   /* Volt Lime, active nav, selected states */
-  --color-secondary-muted:  rgba(205, 241, 43, 0.1); /* 10% opacity, highlight tint */
-  --color-balance:          #535e85;   /* Steel-Slate, neutral midtone, borders */
+  --color-secondary:        #e02424;   /* Signal Crimson, active nav bar, brand mark, highlights */
+  --color-secondary-muted:  rgba(224, 36, 36, 0.15);
+  --color-balance:          #71717a;   /* neutral zinc-slate, idle icons, quiet outlines */
 
   /* semantic status */
-  --color-success:          #10b981;
-  --color-success-muted:    rgba(16, 185, 129, 0.12);
-  --color-warning:          #f97316;
-  --color-warning-muted:    rgba(249, 115, 22, 0.12);
-  --color-error:            #ef4444;
-  --color-error-muted:      rgba(239, 68, 68, 0.12);
+  --color-success:          #22c55e;
+  --color-success-muted:    rgba(34, 197, 94, 0.13);
+  --color-warning:          #f59e0b;
+  --color-warning-muted:    rgba(245, 158, 11, 0.13);
+  --color-error:            #f43f5e;
+  --color-error-muted:      rgba(244, 63, 94, 0.13);
   --color-destructive:       var(--color-error);
   --color-destructive-muted: var(--color-error-muted);
 
   /* priority colors */
-  --color-priority-high:    #ef4444;
-  --color-priority-med:     #eab308;
-  --color-priority-low:     #3b82f6;
-  --color-priority-none:    #535e85;
+  --color-priority-high:    #e02424;
+  --color-priority-med:     #f59e0b;
+  --color-priority-low:     #60a5fa;
+  --color-priority-none:    #71717a;
 
-  /* code blocks on the wall, one colour per kind of piece */
+  /* code blocks on the wall */
   --color-code-keyword:     #c792ea;
   --color-code-string:      #c3e88d;
-  --color-code-comment:     #838cb0;
+  --color-code-comment:     #848494;
   --color-code-number:      #f78c6c;
   --color-code-function:    #82aaff;
   --color-code-type:        #ffcb6b;
   --color-code-attr:        #89ddff;
   
   /* text scale */
-  --color-text-base:        #f1f5f9;   /* near-white, primary text */
-  --color-text-muted:       #94a3b8;   /* Slate-400, secondary labels, metadata */
-  --color-text-faint:       #475569;   /* Slate-600, placeholder, disabled */
-  --color-text-inverted:    #0b0c10;   /* on Volt Lime buttons */
+  --color-text-base:        #f4f4f5;   /* crisp chalk white, primary text */
+  --color-text-muted:       #a1a1aa;   /* Zinc-400, secondary labels, metadata */
+  --color-text-faint:       #71717a;   /* Zinc-500, placeholder, disabled */
+  --color-text-inverted:    #ffffff;   /* crisp white on crimson/danger fills */
   --color-text:             var(--color-text-base);  /* alias */
   
   /* typography */
@@ -117,10 +119,10 @@
   /* one look for unavailable, it used to range from 0.3 to 0.8 */
   --opacity-disabled: 0.5;
 
-  --radius-sm:   4px;
-  --radius-md:   8px;
-  --radius-lg:   12px;
-  --radius-xl:   16px;
+  --radius-sm:   3px;
+  --radius-md:   6px;
+  --radius-lg:   10px;
+  --radius-xl:   12px;
   --radius-full: 9999px;
 
   /* the top of the stacking ladder, in the order these layers cover each other;
@@ -276,67 +278,65 @@ html[data-compact="true"] {
 }
 
 html[data-theme="light"] {
-  /* canvas layers, elevation rises toward white */
-  /* inverse of the dark ladder, lighter is nearer; surface-elevated used to be the darkest token */
-  --color-background:       #f2f4f8;   /* L≈90, soft canvas; full white glares */
-  --color-surface-1:        #ffffff;   /* L=100, card/panel base */
-  --color-surface-2:        #eef1f6;   /* L≈88, nested panels, input backgrounds */
-  --color-surface-offset:   #e0e4ec;   /* L≈77, hover states, dividers */
-  --color-surface-elevated: #ffffff;   /* L=100, popovers; depth comes from --shadow-* */
+  /* canvas layers: crisp architectural white + subtle concrete paper contrast */
+  --color-background:       #f3f3f5;   /* airy off-white canvas, zero blue cast */
+  --color-surface-1:        #ffffff;   /* pure crisp card/panel/sidebar base */
+  --color-surface-2:        #f7f7f8;   /* clean nested panels, buttons, input backgrounds */
+  --color-surface-offset:   #d4d4d8;   /* crisp hairline borders, hover states, dividers */
+  --color-surface-elevated: #ffffff;   /* popovers; depth from crisp border + tight shadow */
+  --kanban-column-bg:       color-mix(in srgb, var(--color-background) 70%, var(--color-surface-offset));
+  --kanban-card-bg:         var(--color-surface-1);
 
-  /* brand anchors */
-  /* darkened to clear 4.5:1; muted tints come from the bright lime, the dark one composites to khaki */
-  --color-primary:          #2b4ad8;   /* 6.0:1, links, focus rings */
-  --color-primary-hover:    #1e3ab8;
-  --color-primary-muted:    rgba(43, 74, 216, 0.10);
-  --color-on-accent:        #ffffff;   /* 6.6:1 on the blue above */
-  --color-accent-ai:        #7e22ce;   /* darkened so white on it still reads */
+  /* brand anchors: obsidian black structure + vivid signal crimson */
+  --color-primary:          #111113;   /* 17.0:1, primary CTAs, links, focus rings */
+  --color-primary-hover:    #27272a;
+  --color-primary-muted:    rgba(17, 17, 19, 0.08);
+  --color-on-accent:        #ffffff;   /* crisp white on obsidian primary fills */
+  --color-accent-ai:        #7e22ce;
   --color-accent-ai-hover:  #6b21a8;
-  /* darkened here, the surface underneath is pale */
   --color-info:             #0369a1;
-  --color-primary-soft:     #1d4ed8;
+  --color-primary-soft:     #27272a;
   --color-success-soft:     #15803d;
   --color-accent-ai-soft:   #7e22ce;
-  --color-secondary:        #4b7a0f;   /* 4.5:1, lime, not the olive a flat darkening gives */
-  --color-secondary-muted:  rgba(132, 204, 22, 0.18);  /* tinted from the BRIGHT lime, not the dark one */
-  --color-balance:          #6f7a8c;   /* 3.8:1, borders and neutral marks */
+  --color-secondary:        #d41414;   /* 4.8:1+ on #f3f3f5, vivid signal red */
+  --color-secondary-muted:  rgba(212, 20, 20, 0.08);
+  --color-balance:          #6e6e78;   /* 4.6:1, neutral borders and sidebar icons */
 
   /* semantic status */
-  /* fell through to dark values tuned for #0b0c10 and failed contrast on white */
-  --color-success:          #157d3c;   /* 4.6:1, green; #047857 read as dark teal */
-  --color-success-muted:    rgba(21, 125, 60, 0.12);
-  --color-warning:          #b05109;   /* 4.6:1, amber; #a34d07 read as brown */
-  --color-warning-muted:    rgba(176, 81, 9, 0.12);
-  --color-error:            #c53030;   /* 4.8:1 */
-  --color-error-muted:      rgba(197, 48, 48, 0.12);
+  --color-success:          #15803d;
+  --color-success-muted:    rgba(21, 128, 61, 0.11);
+  --color-warning:          #b45309;
+  --color-warning-muted:    rgba(180, 83, 9, 0.11);
+  --color-error:            #b91c1c;
+  --color-error-muted:      rgba(185, 28, 28, 0.11);
 
   /* priority colors */
-  --color-priority-high:    #c53030;
-  --color-priority-med:     #b05109;   /* was #eab308 at 1.8:1, effectively invisible */
-  --color-priority-low:     #2563eb;
-  --color-priority-none:    #6f7a8c;
+  --color-priority-high:    #cc1414;
+  --color-priority-med:     #b45309;
+  --color-priority-low:     #1d4ed8;
+  --color-priority-none:    #6e6e78;
 
-  /* code darkened to read on the pale panel */
+  /* code darkened to read on crisp pale panels */
   --color-code-keyword:     #7c3aed;
   --color-code-string:      #13753a;
-  --color-code-comment:     #646c7e;
+  --color-code-comment:     #63636d;
   --color-code-number:      #c2410c;
   --color-code-function:    #1d4ed8;
   --color-code-type:        #925906;
   --color-code-attr:        #0e7490;
 
   /* text scale */
-  --color-text-base:        #161d2b;   /* 14.9:1, softened off pure black, same undertone */
-  --color-text-muted:       #525b6c;   /* 6.0:1 */
-  --color-text-faint:       #646c7e;   /* 4.7:1, was #94a3b8 at 2.4:1 */
-  --color-text-inverted:    #ffffff;   /* on the darkened Volt Lime */
+  --color-text-base:        #111113;   /* obsidian ink */
+  --color-text-muted:       #52525b;   /* Zinc-600 */
+  --color-text-faint:       #63636d;   /* neutral readable placeholder/hint */
+  --color-text-inverted:    #ffffff;   /* crisp white on crimson/dark badges */
 
-  /* elevation and shadow */
-  --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.05);
-  --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-  --shadow-lg:   0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-xl:   0 12px 40px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-2xl:  0 24px 64px rgba(0, 0, 0, 0.2), 0 8px 20px rgba(0, 0, 0, 0.12);
+  /* elevation and tight architectural shadow */
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:   0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-lg:   0 8px 24px rgba(0, 0, 0, 0.11), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-xl:   0 12px 32px rgba(0, 0, 0, 0.14), 0 4px 10px rgba(0, 0, 0, 0.08);
+  --shadow-2xl:  0 20px 48px rgba(0, 0, 0, 0.18), 0 8px 16px rgba(0, 0, 0, 0.10);
 
   /* on a light ground the brands' own darker hues read */
   --logo-jira:     #0052cc;
@@ -1500,7 +1500,7 @@ html[data-overlay] body {
 
 .btn-primary {
   background-color: var(--color-primary);
-  color: var(--color-text-inverted);
+  color: var(--color-on-accent);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
@@ -3832,7 +3832,7 @@ html[data-overlay] body {
 
 .collab-panel-host-collab:hover {
   background: var(--color-secondary);
-  color: #fff;
+  color: var(--color-text-inverted);
 }
 
 .collab-panel-remove:hover {
@@ -3870,7 +3870,7 @@ html[data-overlay] body {
   flex-shrink: 0;
   border: 1px solid var(--color-surface-offset);
   border-radius: var(--radius-md);
-  background: var(--color-surface-1);
+  background: var(--kanban-card-bg);
 }
 
 /* here once: each card used to bring its own copy, and a big board's style updates checked every one of them against every card */
@@ -5865,8 +5865,8 @@ html[data-overlay] body {
 }
 
 .clipboard-view-card:hover {
-  border-color: rgba(30, 69, 252, 0.35);
-  box-shadow: 0 2px 10px -6px rgba(0,0,0,0.4);
+  border-color: var(--color-balance);
+  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-context-trigger {
@@ -5882,7 +5882,7 @@ html[data-overlay] body {
 }
 
 .git-panel-commit:hover {
-  border-color: rgba(205, 241, 43, 0.25);
+  border-color: color-mix(in srgb, var(--color-secondary) 35%, transparent);
 }
 
 .right-panel-resizer:hover {

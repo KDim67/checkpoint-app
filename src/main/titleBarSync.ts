@@ -9,7 +9,7 @@ export interface TitleBarColors {
 }
 
 /** the dark theme's, for a first launch before the page has said */
-export const DEFAULT_TITLE_BAR: TitleBarColors = { color: '#0b0c10', symbolColor: '#f1f5f9' }
+export const DEFAULT_TITLE_BAR: TitleBarColors = { color: '#0a0a0b', symbolColor: '#f4f4f5' }
 
 /** kept so the next launch opens in the colours the last one closed in, with no flash of the default */
 export const TITLE_BAR_SETTING = 'window_title_bar_colors'

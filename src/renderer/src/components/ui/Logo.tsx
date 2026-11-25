@@ -35,7 +35,7 @@ export default function Logo({
           height: `${size}px`,
           objectFit: 'contain',
           flexShrink: 0,
-          filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))'
+          filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.22))'
         }}
       />
 

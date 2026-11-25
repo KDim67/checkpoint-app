@@ -129,10 +129,10 @@ function CardFace({
       : hovered && !isDragging
         ? '1px solid var(--color-balance)'
         : '1px solid var(--color-surface-offset)',
-    backgroundColor: isFullCover ? cover.value : (isDragging ? 'var(--color-surface-2)' : 'var(--color-surface-1)'),
+    backgroundColor: isFullCover ? cover.value : (isDragging ? 'var(--color-surface-2)' : 'var(--kanban-card-bg)'),
     boxShadow: hovered && !isDragging
-      ? '0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2)'
-      : '0 1px 3px rgba(0,0,0,0.2)',
+      ? 'var(--shadow-md)'
+      : 'var(--shadow-sm)',
     overflow: 'hidden',
     flexShrink: 0,
     // the whole card drags, so no text selection sweeping the board

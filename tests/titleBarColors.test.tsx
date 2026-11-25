@@ -104,7 +104,7 @@ describe('the window\'s side', () => {
     const win = { isDestroyed: () => false, setTitleBarOverlay: vi.fn(), setBackgroundColor: vi.fn() }
     paintTitleBar(win as never, DEFAULT_TITLE_BAR)
     expect(win.setTitleBarOverlay).toHaveBeenCalledWith(DEFAULT_TITLE_BAR)
-    expect(win.setBackgroundColor).toHaveBeenCalledWith('#0b0c10')
+    expect(win.setBackgroundColor).toHaveBeenCalledWith('#0a0a0b')
 
     const bare = { isDestroyed: () => false, setTitleBarOverlay: vi.fn(() => { throw new Error('no overlay') }), setBackgroundColor: vi.fn() }
     expect(() => paintTitleBar(bare as never, DEFAULT_TITLE_BAR)).not.toThrow()

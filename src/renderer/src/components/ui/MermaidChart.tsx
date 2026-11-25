@@ -4,10 +4,10 @@ import { themeToken, useThemeVersion } from '../../lib/themeTokens'
 
 /** rebuilt from theme tokens per render; literals left every diagram dark blue */
 function mermaidConfig() {
-  const surface = themeToken('--color-surface-1', '#1b1f30')
-  const canvas = themeToken('--color-surface-2', '#131622')
-  const text = themeToken('--color-text-base', '#f1f5f9')
-  const border = themeToken('--color-surface-offset', '#24293f')
+  const surface = themeToken('--color-surface-1', '#121214')
+  const canvas = themeToken('--color-surface-2', '#1a1a1d')
+  const text = themeToken('--color-text-base', '#f4f4f5')
+  const border = themeToken('--color-surface-offset', '#27272b')
 
   return {
     startOnLoad: false,
@@ -20,9 +20,9 @@ function mermaidConfig() {
       primaryColor: surface,
       primaryTextColor: text,
       primaryBorderColor: border,
-      secondaryColor: themeToken('--color-secondary', '#cdf12b'),
+      secondaryColor: themeToken('--color-secondary', '#e02424'),
       tertiaryColor: canvas,
-      lineColor: themeToken('--color-text-faint', '#535e85'),
+      lineColor: themeToken('--color-text-faint', '#71717a'),
       textColor: text,
       mainBkg: surface,
       nodeBorder: border,
