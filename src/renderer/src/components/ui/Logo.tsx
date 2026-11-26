@@ -52,7 +52,7 @@ export function Wordmark({
         <rect x="561.28" y="406.86" width="46.34" height="16.99" />
         <rect x="468.59" y="355.94" width="30.9" height="16.99" />
         <rect x="453.14" y="373.07" width="15.45" height="33.97" />
-        <rect x="468.59" y="408.58" width="46.35" height="15.45" />
+        <rect x="468.59" y="407.04" width="46.35" height="16.99" />
         <rect x="468.59" y="372.84" width="46.35" height="16.99" />
         <rect x="286.92" y="339.05" width="46.34" height="16.95" />
         <rect x="271.47" y="356" width="15.45" height="50.85" />
