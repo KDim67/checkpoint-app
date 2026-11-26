@@ -79,19 +79,22 @@ export function toggleHud(): void {
 let activeHotkey = ''
 
 /** registers the shortcut and pre-creates the window hidden */
-export function enableHud(shortcut: string = 'CommandOrControl+Shift+Space'): void {
+export function enableHud(shortcut: string = 'CommandOrControl+Alt+K'): void {
   if (activeHotkey) {
     globalShortcut.unregister(activeHotkey)
+    activeHotkey = ''
   }
 
-  activeHotkey = shortcut
-  const registered = globalShortcut.register(activeHotkey, () => {
-    toggleHud()
-  })
+  if (shortcut) {
+    activeHotkey = shortcut
+    const registered = globalShortcut.register(activeHotkey, () => {
+      toggleHud()
+    })
 
-  if (!registered) {
-    console.warn(`[shortcuts] Could not register global HUD hotkey "${activeHotkey}" — another application or Windows may already be using it.`)
-    activeHotkey = ''
+    if (!registered) {
+      console.warn(`[shortcuts] Could not register global HUD hotkey "${activeHotkey}" — another application or Windows may already be using it.`)
+      activeHotkey = ''
+    }
   }
 
   createHudWindow()

@@ -10,11 +10,11 @@ let activeClipboardHotkey = ''
 
 /** the keys you bound in Shortcuts, or the defaults when they can't be read; picking a light or dark theme used to switch yours off with the custom colours */
 function boundKeys(): { hudKey: string; clipboardKey: string } {
-  const keys = { hudKey: 'CommandOrControl+Shift+Space', clipboardKey: 'CommandOrControl+Shift+V' }
+  const keys = { hudKey: 'CommandOrControl+Alt+K', clipboardKey: 'CommandOrControl+Alt+V' }
   try {
     const shortcuts = JSON.parse(getSetting<string>('customizer_shortcuts', '{}'))
-    if (shortcuts.hud_toggle) keys.hudKey = shortcuts.hud_toggle
-    if (shortcuts.clipboard_toggle) keys.clipboardKey = shortcuts.clipboard_toggle
+    if (typeof shortcuts.hud_toggle === 'string') keys.hudKey = shortcuts.hud_toggle
+    if (typeof shortcuts.clipboard_toggle === 'string') keys.clipboardKey = shortcuts.clipboard_toggle
   } catch (err) {
     console.error('[shortcuts] Failed to parse customizer_shortcuts:', err)
   }
@@ -32,11 +32,17 @@ export function registerAppShortcuts(): void {
     activeClipboardHotkey = ''
   }
 
+  const globalEnabled = getSetting<string>('global_shortcuts_enabled', 'true')
+  if (globalEnabled === 'false') {
+    disableHud()
+    return
+  }
+
   const { hudKey, clipboardKey } = boundKeys()
 
   try {
     const featureHud = getSetting<string>('feature_hud', 'true')
-    if (featureHud !== 'false') {
+    if (featureHud !== 'false' && hudKey) {
       enableHud(hudKey)
     } else {
       disableHud()
@@ -44,6 +50,8 @@ export function registerAppShortcuts(): void {
   } catch (err) {
     console.error('[shortcuts] Failed to bind HUD shortcut:', err)
   }
+
+  if (!clipboardKey) return
 
   activeClipboardHotkey = clipboardKey
   const registered = globalShortcut.register(activeClipboardHotkey, () => {

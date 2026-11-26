@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useFailureReport } from '../ui/Toast'
 import { useAiEnabled } from '../../lib/useAiEnabled'
-import { getEnumSetting, setStringSetting } from '../../lib/settings'
+import { getBoolSetting, getEnumSetting, setBoolSetting, setStringSetting } from '../../lib/settings'
 import {
   PAN_BUTTONS_KEY, MENU_BUTTON_KEY, PAN_BUTTON_MODES, MENU_BUTTON_MODES,
   type PanButtons, type MenuButton
 } from '../../lib/wallInput'
-import { AlertTriangle, Globe, Keyboard, LayoutGrid, Mouse } from 'lucide-react'
-import SettingsSection from './SettingsSection'
+import { AlertTriangle, Globe, Keyboard, LayoutGrid, Mouse, X } from 'lucide-react'
+import SettingsSection, { ToggleSwitch } from './SettingsSection'
 import {
   APP_SHORTCUTS,
   VIEW_SHORTCUTS,
@@ -32,12 +32,12 @@ const ACTION_LABELS: Record<GlobalAction, { label: string; desc: string; default
   hud_toggle: {
     label: 'Open quick capture',
     desc: 'The bar for jotting a task or log entry, over whatever you have open.',
-    defaultKey: 'Ctrl+Shift+Space'
+    defaultKey: 'Ctrl+Alt+K'
   },
   clipboard_toggle: {
     label: 'Open clipboard history',
     desc: 'Brings Checkpoint to the front on the Clipboard page.',
-    defaultKey: 'Ctrl+Shift+V'
+    defaultKey: 'Ctrl+Alt+V'
   }
 }
 
@@ -95,21 +95,25 @@ function ShortcutRow({
   label,
   desc,
   combo,
+  emptyLabel = 'None',
   isRecording,
   problem,
   onStartRecording,
   onStopRecording,
-  onKeyDown
+  onKeyDown,
+  onClear
 }: {
   label: string
   desc?: string
   combo: string
+  emptyLabel?: string
   isRecording: boolean
   /** why the keys just pressed can't be used, said under the row they were meant for */
   problem: string | null
   onStartRecording: () => void
   onStopRecording: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
+  onClear?: () => void
 }) {
   return (
     <li
@@ -154,29 +158,53 @@ function ShortcutRow({
           }}
         />
       ) : (
-        <button
-          type="button"
-          onClick={onStartRecording}
-          aria-label={`Change the shortcut for ${label}, now ${combo || 'none'}`}
-          className={`hotkey-binder-shortcut-trigger border-offset ${combo ? 'text-base' : 'text-faint'}`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-1-5)',
-            minWidth: '7.5rem',
-            justifyContent: 'center',
-            padding: 'var(--space-1) var(--space-3)',
-            background: 'var(--color-surface-2)',
-            borderRadius: 'var(--radius-sm)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'var(--text-xs)',
-            cursor: 'pointer',
-            transition: 'border-color var(--duration-fast) var(--ease-default)'
-          }}
-        >
-          <Keyboard size={12} aria-hidden="true" />
-          {combo || 'None'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
+          <button
+            type="button"
+            onClick={onStartRecording}
+            aria-label={`Change the shortcut for ${label}, now ${combo || 'none'}`}
+            className={`hotkey-binder-shortcut-trigger border-offset ${combo ? 'text-base' : 'text-faint'}`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-1-5)',
+              minWidth: '7.5rem',
+              justifyContent: 'center',
+              padding: 'var(--space-1) var(--space-3)',
+              background: 'var(--color-surface-2)',
+              borderRadius: 'var(--radius-sm)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--text-xs)',
+              cursor: 'pointer',
+              transition: 'border-color var(--duration-fast) var(--ease-default)'
+            }}
+          >
+            <Keyboard size={12} aria-hidden="true" />
+            {combo || emptyLabel}
+          </button>
+          {onClear && combo && (
+            <button
+              type="button"
+              onClick={onClear}
+              aria-label={`Disable shortcut for ${label}`}
+              title="Disable shortcut"
+              className="bg-clear hover-bg-surface-2"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid transparent',
+                color: 'var(--color-text-faint)',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={12} aria-hidden="true" />
+            </button>
+          )}
+        </div>
       )}
     </li>
   )
@@ -185,9 +213,10 @@ function ShortcutRow({
 export default function HotkeyBinder() {
   const report = useFailureReport()
   const aiEnabled = useAiEnabled()
+  const [globalEnabled, setGlobalEnabled] = useState(true)
   const [bindings, setBindings] = useState<Record<string, string>>({
-    hud_toggle: 'Ctrl+Shift+Space',
-    clipboard_toggle: 'Ctrl+Shift+V'
+    hud_toggle: ACTION_LABELS.hud_toggle.defaultKey,
+    clipboard_toggle: ACTION_LABELS.clipboard_toggle.defaultKey
   })
   const [appBindings, setAppBindings] = useState<ShortcutBindings>(defaultBindings)
   const [viewBindings, setViewBindings] = useState<ShortcutBindings>(defaultViewBindings)
@@ -208,6 +237,7 @@ export default function HotkeyBinder() {
       }
       setAppBindings(await loadBindings())
       setViewBindings(await loadViewBindings())
+      setGlobalEnabled(await getBoolSetting('global_shortcuts_enabled', true))
       setPanButtons(await getEnumSetting(PAN_BUTTONS_KEY, PAN_BUTTON_MODES, PAN_BUTTON_MODES[0]))
       setMenuButton(await getEnumSetting(MENU_BUTTON_KEY, MENU_BUTTON_MODES, MENU_BUTTON_MODES[0]))
     }
@@ -312,17 +342,37 @@ export default function HotkeyBinder() {
     saveViewBindings(defaults).catch(err => report('reset the view shortcuts', err))
   }
 
-  const row = (target: RecordingTarget, label: string, combo: string, desc?: string) => (
+  const clearGlobalShortcut = (action: GlobalAction) => {
+    const next = { ...bindings, [action]: '' }
+    setBindings(next)
+    setRecording(null)
+    setProblem(null)
+    customizerApi.registerShortcuts(next).catch(err => report('clear the shortcut', err))
+  }
+
+  const toggleGlobalShortcuts = async (next: boolean) => {
+    setGlobalEnabled(next)
+    try {
+      await setBoolSetting('global_shortcuts_enabled', next)
+      await customizerApi.registerShortcuts(bindings)
+    } catch (err) {
+      report('update global shortcuts', err)
+    }
+  }
+
+  const row = (target: RecordingTarget, label: string, combo: string, desc?: string, onClear?: () => void) => (
     <ShortcutRow
       key={target.id}
       label={label}
       desc={desc}
       combo={combo}
+      emptyLabel={target.scope === 'global' ? 'Off' : 'None'}
       isRecording={recording?.scope === target.scope && recording.id === target.id}
       problem={problemFor(target)}
       onStartRecording={() => startRecording(target)}
       onStopRecording={stopRecording}
       onKeyDown={handleKeyDown}
+      onClear={onClear}
     />
   )
 
@@ -331,8 +381,25 @@ export default function HotkeyBinder() {
       <SettingsSection icon={<Globe size={14} />} title="Global Shortcuts" description="Work anywhere in Windows, even while Checkpoint is in the background.">
         <div className="col-md">
           <ul className="settings-list">
+            <li className="settings-list-row">
+              <div className="settings-row-text">
+                <span className="field-label">Enable global shortcuts</span>
+                <span className="text-sub">Turn off while gaming so Windows key combinations don&apos;t fire in the background.</span>
+              </div>
+              <ToggleSwitch
+                checked={globalEnabled}
+                onChange={v => void toggleGlobalShortcuts(v)}
+                label="Enable global shortcuts"
+              />
+            </li>
             {(Object.keys(ACTION_LABELS) as GlobalAction[]).map(action =>
-              row({ scope: 'global', id: action }, ACTION_LABELS[action].label, bindings[action], ACTION_LABELS[action].desc)
+              row(
+                { scope: 'global', id: action },
+                ACTION_LABELS[action].label,
+                bindings[action],
+                ACTION_LABELS[action].desc,
+                () => clearGlobalShortcut(action)
+              )
             )}
           </ul>
           <div>

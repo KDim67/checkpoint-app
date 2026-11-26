@@ -31,6 +31,8 @@ vi.mock('../src/renderer/src/data/memory', () => ({
   deleteMemory: api.deleteMemory
 }))
 vi.mock('../src/renderer/src/lib/settings', () => ({
+  getBoolSetting: async (_key: string, fallback: boolean) => fallback,
+  setBoolSetting: vi.fn(async () => {}),
   getStringSetting: async (_key: string, fallback: string) => fallback,
   setStringSetting: vi.fn(async () => {}),
   setJsonSetting: vi.fn(async () => {}),
@@ -128,7 +130,7 @@ describe('changing a shortcut', () => {
     const field = await record('Open quick capture')
     fireEvent.keyDown(field, { key: 'Q', code: 'KeyQ', altKey: true })
 
-    await waitFor(() => expect(api.registerShortcuts).toHaveBeenCalledWith({ hud_toggle: 'Alt+Q', clipboard_toggle: 'Ctrl+Shift+V' }))
+    await waitFor(() => expect(api.registerShortcuts).toHaveBeenCalledWith({ hud_toggle: 'Alt+Q', clipboard_toggle: 'Ctrl+Alt+V' }))
     expect(screen.queryByRole('button', { name: /^Apply/ })).toBeNull()
     expect(screen.queryByText(/Customization Engine/)).toBeNull()
   })
