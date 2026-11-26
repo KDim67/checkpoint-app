@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/checkpoint-logo.png" alt="Checkpoint" width="320" />
+</p>
+
 # Checkpoint
 
 A local-first desktop workspace for keeping track of what you're doing.
@@ -377,6 +381,8 @@ If you add a package, build and check whether it appears in `out/main`.
 
 Electron, React, TypeScript, SQLite via `better-sqlite3`, Vite, Zustand,
 Three.js for the texture previews, and Mermaid for diagrams in notes.
+
+Logo redesigned by [panost835](https://github.com/panost835).
 
 ## Licence
 
