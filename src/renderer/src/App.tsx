@@ -13,6 +13,7 @@ import { applyStoredTheme, watchTheme, injectCustomCss } from './lib/themeBoot'
 import { DEFAULT_THEME, deriveThemeVars, buildCssVariablesString } from '../../shared/themePresets'
 import Lightbox from './components/ui/Lightbox'
 import UpdateIndicator from './components/ui/UpdateIndicator'
+import { Wordmark } from './components/ui/Logo'
 import { readViewFeatures, firstEnabledView, resolveStartView } from './lib/features'
 import {
   getBoolSetting,
@@ -266,17 +267,7 @@ function Titlebar() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', userSelect: 'none' }}>
-        <span
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--weight-bold)',
-            color: 'var(--color-secondary)',
-            letterSpacing: 'var(--tracking-widest)',
-            textTransform: 'uppercase'
-          }}
-        >
-          Checkpoint
-        </span>
+        <Wordmark height={15} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', WebkitAppRegion: 'no-drag' as React.CSSProperties['WebkitAppRegion'] }}>
           <button
             type="button"

@@ -42,12 +42,12 @@ describe('the logo', () => {
     expect(picture.getAttribute('src')).toBe('checkpoint-media://work-logo.webp')
     expect(picture.style.width).toBe('32px')
     // the logo still there, now the small one in the corner
-    expect(button.querySelectorAll('[alt="Checkpoint Logo"]')).toHaveLength(1)
+    expect(button.querySelectorAll('[aria-label="Checkpoint Logo"]')).toHaveLength(1)
     expect(button.textContent).not.toContain('W')
 
     fireEvent.error(picture)
     expect(button.querySelector('img[src^="checkpoint-media"]')).toBeNull()
-    expect(button.querySelectorAll('[alt="Checkpoint Logo"]')).toHaveLength(1)
+    expect(button.querySelectorAll('[aria-label="Checkpoint Logo"]')).toHaveLength(1)
     expect(button.textContent).toContain('W')
   })
 
