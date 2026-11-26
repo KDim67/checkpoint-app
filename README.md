@@ -11,10 +11,7 @@ It's a personal tool that got big enough to share. If it suits how you work,
 take it.
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/checkpoint-logo-dark.png" />
-    <img src="docs/checkpoint-logo.png" alt="Checkpoint" width="320" />
-  </picture>
+  <img src="docs/checkpoint-logo.png" alt="Checkpoint" width="320" />
   <br />
   <sub>Logo redesigned by <a href="https://github.com/panost835">panost835</a></sub>
 </p>
