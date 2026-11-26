@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="docs/checkpoint-logo.png" alt="Checkpoint" width="320" />
-</p>
-
 # Checkpoint
 
 A local-first desktop workspace for keeping track of what you're doing.
@@ -13,6 +9,15 @@ Checkpoint is all of that in one window, on my machine, with no account.
 
 It's a personal tool that got big enough to share. If it suits how you work,
 take it.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/checkpoint-logo-dark.png" />
+    <img src="docs/checkpoint-logo.png" alt="Checkpoint" width="320" />
+  </picture>
+  <br />
+  <sub>Logo redesigned by <a href="https://github.com/panost835">panost835</a></sub>
+</p>
 
 ## Screenshots
 
@@ -381,8 +386,6 @@ If you add a package, build and check whether it appears in `out/main`.
 
 Electron, React, TypeScript, SQLite via `better-sqlite3`, Vite, Zustand,
 Three.js for the texture previews, and Mermaid for diagrams in notes.
-
-Logo redesigned by [panost835](https://github.com/panost835).
 
 ## Licence
 
