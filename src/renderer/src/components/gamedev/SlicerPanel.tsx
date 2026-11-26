@@ -144,10 +144,10 @@ export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
                     onClick={tool.handleSlicerExport}
                     disabled={tool.isSlicerSaving}
                     style={{
-                      background: 'var(--color-secondary)',
+                      background: 'var(--color-primary)',
                       border: 'none',
                       borderRadius: 'var(--radius-md)',
-                      color: 'var(--color-text-inverted)',
+                      color: 'var(--color-on-accent)',
                       fontWeight: 'var(--weight-semibold)',
                       padding: '10px 20px',
                       cursor: 'pointer',

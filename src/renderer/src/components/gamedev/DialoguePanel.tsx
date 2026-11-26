@@ -65,8 +65,8 @@ export default function DialoguePanel({
           <button
             onClick={tool.addDialogueNode}
             style={{
-              background: 'var(--color-secondary)',
-              color: 'var(--color-text-inverted)',
+              background: 'var(--color-primary)',
+              color: 'var(--color-on-accent)',
               border: 'none',
               padding: 'var(--space-2)',
               borderRadius: 'var(--radius-md)',

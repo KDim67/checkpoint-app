@@ -30,8 +30,8 @@ export default function PalettePanel({
         <button
           onClick={tool.addColorToPalette}
           style={{
-            background: 'var(--color-secondary)',
-            color: 'var(--color-text-inverted)',
+            background: 'var(--color-primary)',
+            color: 'var(--color-on-accent)',
             border: 'none',
             padding: 'var(--space-1-5) var(--space-4)',
             borderRadius: 'var(--radius-md)',

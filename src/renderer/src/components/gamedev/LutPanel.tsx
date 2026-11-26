@@ -143,10 +143,10 @@ export default function LutPanel({ tool }: { tool: LutTool }) {
                   onClick={tool.handleLutExport}
                   disabled={tool.isLutSaving}
                   style={{
-                    background: 'var(--color-secondary)',
+                    background: 'var(--color-primary)',
                     border: 'none',
                     borderRadius: 'var(--radius-md)',
-                    color: 'var(--color-text-inverted)',
+                    color: 'var(--color-on-accent)',
                     fontWeight: 'var(--weight-semibold)',
                     padding: '10px 20px',
                     cursor: 'pointer',

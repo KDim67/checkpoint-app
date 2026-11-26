@@ -234,8 +234,8 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
                 onClick={tool.handleApplyRename}
                 disabled={tool.renaming}
                 style={{
-                  background: 'var(--color-secondary)',
-                  color: 'var(--color-text-inverted)',
+                  background: 'var(--color-primary)',
+                  color: 'var(--color-on-accent)',
                   border: 'none',
                   padding: 'var(--space-1-5) var(--space-4)',
                   borderRadius: 'var(--radius-md)',

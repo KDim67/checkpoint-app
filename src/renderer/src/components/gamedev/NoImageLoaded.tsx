@@ -15,17 +15,10 @@ export default function NoImageLoaded({ icon, hint, onChoose }: NoImageLoadedPro
         <span className="text-hint">{hint}</span>
       </div>
       <button
+        type="button"
         onClick={onChoose}
-        style={{
-          background: 'var(--color-primary)',
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          color: 'white',
-          fontWeight: 'var(--weight-semibold)',
-          fontSize: 'var(--text-xs)',
-          padding: '10px 20px',
-          cursor: 'pointer',
-        }}
+        className="btn-primary"
+        style={{ fontSize: 'var(--text-xs)', padding: '10px 20px' }}
       >
         Choose Image
       </button>

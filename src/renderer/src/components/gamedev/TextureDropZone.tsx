@@ -1,4 +1,4 @@
-import type { DragEventHandler } from 'react'
+import { useState, type DragEventHandler } from 'react'
 import { Download, Loader } from 'lucide-react'
 
 interface TextureDropZoneProps {
@@ -12,10 +12,14 @@ interface TextureDropZoneProps {
 }
 
 export default function TextureDropZone({ onDragOver, onDrop, onClick, processing, label, outcome }: TextureDropZoneProps) {
+  const [isDragOver, setIsDragOver] = useState(false)
+
   return (
     <div
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDragEnter={() => setIsDragOver(true)}
+      onDragOver={(e) => { setIsDragOver(true); onDragOver(e) }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => { setIsDragOver(false); onDrop(e) }}
       onClick={onClick}
       className="texture-drop-zone"
       style={{
@@ -29,6 +33,8 @@ export default function TextureDropZone({ onDragOver, onDrop, onClick, processin
         justifyContent: 'center',
         gap: 'var(--space-4)',
         cursor: 'pointer',
+        borderColor: isDragOver ? 'var(--color-secondary)' : undefined,
+        background: isDragOver ? 'var(--color-secondary-muted)' : undefined,
         transition: 'border-color var(--duration-fast), background var(--duration-fast)',
       }}
     >
