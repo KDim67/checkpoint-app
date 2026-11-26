@@ -40,9 +40,9 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
-// windows heads toasts from the AppUserModelID; must match electron-builder's appId, set before whenReady
+// windows heads toasts from the AppUserModelID; must match electron-builder's appId in packaged builds (avoid colliding with an installed shortcut in dev)
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.checkpoint.app')
+  app.setAppUserModelId(app.isPackaged ? 'com.checkpoint.app' : 'com.checkpoint.app.dev')
 }
 
 // before whenReady; keeps timers running alongside Unity/VS/JetBrains
