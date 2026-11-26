@@ -247,13 +247,6 @@ export function useToast() {
   return context
 }
 
-/** triggers a toast from anywhere via window event */
-export function showToast(text: string, options?: ToastOptions): void {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('checkpoint-toast', { detail: { text, options } }))
-  }
-}
-
 /**
  * says a failed action out loud, as "Could not <what>: <reason>", and logs it; a failure only in the
  * console looked like success. Stable, so effects can list it without running again

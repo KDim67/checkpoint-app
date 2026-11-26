@@ -342,7 +342,7 @@ export function Sidebar() {
             background: 'var(--color-surface-2)',
             border: `1.5px solid ${activeContextEntry?.color || 'var(--color-secondary)'}`,
             color: activeContextEntry?.color || 'var(--color-secondary)',
-            fontSize: '10px',
+            fontSize: 'var(--text-2xs)',
             fontWeight: 'var(--weight-extrabold)',
             display: 'flex',
             alignItems: 'center',

@@ -25,13 +25,11 @@ export const APP_SHORTCUTS: AppShortcut[] = [
   { id: 'view_notes',       label: 'Go to Notes',       defaultCombo: 'Ctrl+5', action: { kind: 'view', view: 'notes' } },
   { id: 'view_wall',        label: 'Go to Wall',        defaultCombo: 'Ctrl+6', action: { kind: 'view', view: 'wall' } },
   { id: 'view_clipboard',   label: 'Go to Clipboard',   defaultCombo: 'Ctrl+7', action: { kind: 'view', view: 'clipboard' } },
-
-  { id: 'view_analytics',   label: 'Go to Analytics',   defaultCombo: 'Ctrl+9', action: { kind: 'view', view: 'analytics' } },
-  { id: 'view_cheatsheets', label: 'Go to Cheatsheets', defaultCombo: 'Ctrl+0', action: { kind: 'view', view: 'cheatsheets' } },
+  { id: 'view_analytics',   label: 'Go to Analytics',   defaultCombo: 'Ctrl+8', action: { kind: 'view', view: 'analytics' } },
+  { id: 'view_cheatsheets', label: 'Go to Cheatsheets', defaultCombo: 'Ctrl+9', action: { kind: 'view', view: 'cheatsheets' } },
+  { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+0', action: { kind: 'view', view: 'gamedev' } },
   // eleventh view, out of digits: the key after 0 on the same row
-  { id: 'view_gamedev',     label: 'Go to Game Dev',    defaultCombo: 'Ctrl+-', action: { kind: 'view', view: 'gamedev' } },
-  // twelfth, the next key along; the app has no menu, so Ctrl+= is nobody's zoom
-  { id: 'view_renewals',    label: 'Go to Renewals',    defaultCombo: 'Ctrl+=', action: { kind: 'view', view: 'renewals' } },
+  { id: 'view_renewals',    label: 'Go to Renewals',    defaultCombo: 'Ctrl+-', action: { kind: 'view', view: 'renewals' } },
   // past the number row; C for calendar, as most apps' Go to Calendar
   { id: 'view_calendar',    label: 'Go to Calendar',    defaultCombo: 'Ctrl+Shift+C', action: { kind: 'view', view: 'calendar' } },
   { id: 'toggle_ai_panel',  label: 'Toggle AI panel',   defaultCombo: 'Ctrl+L', action: { kind: 'toggleAiPanel' } },
@@ -77,7 +75,7 @@ export const VIEW_SHORTCUTS: ViewShortcut[] = [
   // G toggles; Shift+G stays for hands used to other canvas apps
   { id: 'wall_group',            label: 'Group, or ungroup a group', scope: 'wall', defaultCombo: 'Ctrl+G' },
   { id: 'wall_ungroup',          label: 'Ungroup',                 scope: 'wall',   defaultCombo: 'Ctrl+Shift+G' },
-  // bare keys like the tools, Ctrl+- already opens Game Dev
+  // bare keys like the tools, Ctrl+- already opens Renewals
   { id: 'wall_zoom_in',          label: 'Zoom in',                 scope: 'wall',   defaultCombo: '=' },
   { id: 'wall_zoom_out',         label: 'Zoom out',                scope: 'wall',   defaultCombo: '-' },
   { id: 'wall_zoom_reset',       label: 'Zoom to 100%',            scope: 'wall',   defaultCombo: 'Alt+0' },
