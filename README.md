@@ -53,7 +53,7 @@ a slicer, LUT export and a pixel-art upscaler. None of it replaces a real DCC
 tool; all of it saves a round trip.
 
 **The odds and ends.** Clipboard history, a quick-capture overlay on
-`Ctrl+Shift+Space`, PDF cheatsheets, and time analytics if you want them.
+`Ctrl+Alt+K`, PDF cheatsheets, and time analytics if you want them.
 
 **AI, if you want it.** Bring your own endpoint: Ollama on localhost, or
 anything OpenAI-compatible. There's a single switch in settings that removes
