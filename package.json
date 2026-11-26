@@ -96,7 +96,7 @@
     "remark-gfm": "^4.0.1",
     "simple-icons": "16.32.0",
     "three": "0.185.0",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vite": "^6.4.5",
     "vitest": "^4.1.11",
     "zustand": "5.0.14"
