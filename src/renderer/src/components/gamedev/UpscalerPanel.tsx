@@ -1,6 +1,7 @@
 import React from 'react'
 import type { UpscaleAlgorithm } from './types'
-import { CheckCircle, Download, Loader, Maximize2 } from 'lucide-react'
+import { ArrowRight, CheckCircle, Download, Loader, Maximize2 } from 'lucide-react'
+import { useAppStore } from '../../store/appStore'
 import type { UpscalerTool } from './useUpscalerTool'
 import FilePickerButton from './FilePickerButton'
 import SettingsColumn from './SettingsColumn'
@@ -9,13 +10,6 @@ import NoImageLoaded from './NoImageLoaded'
 export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
   return (
       <div className="col-lg-full">
-        <div className="gamedev-info-banner">
-          <Maximize2 size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>Pixel Art Upscaler:</strong> Upscale retro low-resolution textures using crisp integer multipliers or classic Scale2x/Scale3x interpolation rules.
-          </div>
-        </div>
-
         <div className="tool-layout">
           <SettingsColumn title="Upscale Settings">
 
@@ -164,20 +158,38 @@ export default function UpscalerPanel({ tool }: { tool: UpscalerTool }) {
                 {tool.upscaleExportedPath && (
                   <div style={{
                     background: 'var(--color-success-muted)',
-                    border: '1px solid rgba(0, 255, 128, 0.2)',
+                    border: '1px solid var(--color-success)',
                     borderRadius: 'var(--radius-md)',
                     padding: 'var(--space-2) var(--space-3)',
                     fontSize: 'var(--text-xs)',
-                    color: 'var(--color-secondary)',
+                    color: 'var(--color-success)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '2px'
+                    gap: '6px'
                   }}>
                     <div className="row-6px">
                       <CheckCircle size={13} />
                       <strong>Upscaled successfully saved!</strong>
                     </div>
                     <span className="text-nano">Saved Path: {tool.upscaleExportedPath}</span>
+                    <div className="flex-gap">
+                      <button
+                        type="button"
+                        className="btn-secondary btn-small"
+                        onClick={() => useAppStore.getState().setGamedevPreloadSeamless(tool.upscaleExportedPath, null)}
+                      >
+                        <span>Send to Seamless</span>
+                        <ArrowRight size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-small"
+                        onClick={() => useAppStore.getState().setGamedevPreloadTexture(tool.upscaleExportedPath, null)}
+                      >
+                        <span>Send to PBR Maps</span>
+                        <ArrowRight size={12} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

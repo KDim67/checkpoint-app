@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { Item } from '../../../shared/types'
+import type { GameDevTab } from '../components/gamedev/types'
 import {
   isFocusInterval,
   DEFAULT_FOCUS_SETTINGS,
@@ -75,6 +76,7 @@ interface AppState {
   // seamless generator preload
   gamedevPreloadSeamlessPath: string | null
   gamedevSourceSeamlessCardId: string | null
+  gamedevActiveTab: GameDevTab | null
 
   // focus timer lives here so it survives navigation
   focusStep: 'setup' | 'active' | 'retro'
@@ -112,6 +114,7 @@ interface AppState {
   setPendingRecurring: (open: boolean) => void
   setGamedevPreloadTexture: (path: string | null, cardId?: string | null) => void
   setGamedevPreloadSeamless: (path: string | null, cardId?: string | null) => void
+  setGamedevActiveTab: (tab: GameDevTab | null) => void
 
   focusSetStep: (step: 'setup' | 'active' | 'retro') => void
   focusSetSelectedTasks: (tasks: Item[] | ((prev: Item[]) => Item[])) => void
@@ -156,6 +159,7 @@ export const useAppStore = create<AppState>()(
     gamedevSourceCardId: null,
     gamedevPreloadSeamlessPath: null,
     gamedevSourceSeamlessCardId: null,
+    gamedevActiveTab: null,
 
     focusStep: 'setup',
     focusSelectedTasks: [],
@@ -393,6 +397,11 @@ export const useAppStore = create<AppState>()(
       set(state => {
         state.gamedevPreloadSeamlessPath = path
         state.gamedevSourceSeamlessCardId = cardId
+      }),
+
+    setGamedevActiveTab: (tab: GameDevTab | null) =>
+      set(state => {
+        state.gamedevActiveTab = tab
       }),
 
     // timestamp-based, so throttled background timers can't drift it

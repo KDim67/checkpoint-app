@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import type { RenamerPreset, RenamerSuffixPreset } from './types'
-import { Info, Trash2, RefreshCw, CheckCircle, Layers } from 'lucide-react'
+import { Trash2, RefreshCw, CheckCircle, Layers } from 'lucide-react'
 import type { RenamerTool } from './useRenamerTool'
 
 /** with its trailing separator */
@@ -25,12 +25,6 @@ export default function RenamerPanel({ tool }: { tool: RenamerTool }) {
 
   return (
       <div className="col-lg-full">
-        <div className="gamedev-info-banner">
-          <Info size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>Batch Asset Renamer:</strong> Standardize your file naming workflow. Import textures, models, or audio assets to apply game engine naming conventions, search-and-replace strings, or automatic number indexing.
-          </div>
-        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 'var(--space-4)' }}>
           
           <div className="panel">

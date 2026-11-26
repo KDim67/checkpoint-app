@@ -1,19 +1,12 @@
 import React from 'react'
 import type { AtlasMaxSize } from './types'
-import { AlertTriangle, Box, CheckCircle, Download, Grid, Loader, Settings } from 'lucide-react'
+import { AlertTriangle, Box, CheckCircle, Download, Loader, Settings } from 'lucide-react'
 import type { AtlasTool } from './useAtlasTool'
 import FilePickerButton from './FilePickerButton'
 
 export default function AtlasPanel({ tool }: { tool: AtlasTool }) {
   return (
       <div className="col-lg-full">
-        <div className="gamedev-info-banner">
-          <Grid size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>Atlas Forge:</strong> Mathematically pack loose sprite sheets and UI assets into highly-optimized texture atlases. Select a directory containing loose PNG assets, tweak spacing, and automatically trim alpha borders.
-          </div>
-        </div>
-
         <div className="tool-layout">
           {/* left: packing config */}
           <div className="panel-scroll">

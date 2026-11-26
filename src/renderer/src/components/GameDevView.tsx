@@ -33,8 +33,8 @@ const RECENT_MAX = 4
 
 export default function GameDevView() {
   const { toast } = useToast()
-  // null is the launcher, don't drop someone into a tool they didn't pick
-  const [activeTab, setActiveTab] = useState<GameDevTab | null>(null)
+  const activeTab = useAppStore(s => s.gamedevActiveTab)
+  const setActiveTab = useAppStore(s => s.setGamedevActiveTab)
   const [recent, setRecent] = useState<GameDevTab[]>([])
 
   useEffect(() => {
@@ -52,19 +52,19 @@ export default function GameDevView() {
       void setStringSetting(RECENT_KEY, next.join(','))
       return next
     })
-  }, [])
+  }, [setActiveTab])
 
   const paletteTool = usePaletteTool()
   const renamerTool = useRenamerTool()
   const slicerTool = useSlicerTool()
   const atlasTool = useAtlasTool()
   const upscalerTool = useUpscalerTool(activeTab === 'upscaler')
-  const dialogueTool = useDialogueTool(useCallback(() => setActiveTab('dialogue'), []))
+      const dialogueTool = useDialogueTool(useCallback(() => setActiveTab('dialogue'), [setActiveTab]))
   const seamlessTool = useSeamlessTool(
     activeTab === 'seamless',
-    useCallback(() => setActiveTab('seamless'), [])
+    useCallback(() => setActiveTab('seamless'), [setActiveTab])
   )
-  const pbrTool = usePbrTool(activeTab === 'pbr', useCallback(() => setActiveTab('pbr'), []))
+  const pbrTool = usePbrTool(activeTab === 'pbr', useCallback(() => setActiveTab('pbr'), [setActiveTab]))
 
   // the grader writes next to whatever asset a sibling tool has open
   const lutTool = useLutTool(
@@ -106,56 +106,6 @@ export default function GameDevView() {
       fontFamily: 'var(--font-sans)',
       boxSizing: 'border-box'
     }}>
-      <style>{`
-        .gamedev-tab-btn {
-          background: transparent;
-          border: 1px solid transparent;
-          color: var(--color-text-muted);
-          font-size: var(--text-xs);
-          font-weight: var(--weight-medium);
-          padding: 7px 13px;
-          border-radius: var(--radius-md);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: var(--space-2);
-          white-space: nowrap;
-          transition: all 120ms ease;
-        }
-        .gamedev-tab-btn:hover {
-          background: var(--color-surface-2);
-          color: var(--color-text-base);
-        }
-        .gamedev-tab-btn.active {
-          background: var(--color-secondary-muted);
-          color: var(--color-secondary);
-          border-color: var(--color-secondary);
-          font-weight: var(--weight-semibold);
-          box-shadow: var(--shadow-sm);
-        }
-        .gamedev-info-banner {
-          display: flex;
-          align-items: flex-start;
-          gap: var(--space-3);
-          padding: 12px 16px;
-          background: var(--color-surface-1);
-          border: 1px solid var(--color-surface-offset);
-          border-radius: var(--radius-lg);
-          font-size: var(--text-xs);
-          line-height: 1.5;
-          color: var(--color-text-muted);
-          margin-bottom: var(--space-4);
-        }
-        .gamedev-info-banner strong {
-          color: var(--color-text-base);
-          font-weight: var(--weight-semibold);
-        }
-        .gamedev-info-banner-icon {
-          color: var(--color-secondary);
-          flex-shrink: 0;
-          margin-top: 2px;
-        }
-      `}</style>
 {activeTab && <ToolSwitcher activeTab={activeTab} onPick={openTool} onHome={() => setActiveTab(null)} />}
 
       {!activeTab && <GameDevLauncher onPick={openTool} recent={recent} />}

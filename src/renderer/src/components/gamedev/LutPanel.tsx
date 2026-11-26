@@ -1,17 +1,10 @@
 import React from 'react'
-import { CheckCircle, Download, Loader, Settings, Sliders } from 'lucide-react'
+import { CheckCircle, Download, Loader, Settings } from 'lucide-react'
 import type { LutTool } from './useLutTool'
 
 export default function LutPanel({ tool }: { tool: LutTool }) {
   return (
       <div className="col-lg-full">
-        <div className="gamedev-info-banner">
-          <Sliders size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>LUT Color Grader:</strong> Real-time color correction editor. Adjust filters and sliders to grade a standard neutral 3D look-up table strip ($256\times16$ pixels), compatible with Unity, Unreal, and Godot.
-          </div>
-        </div>
-
         <div className="tool-layout">
           <div className="panel-scroll">
             <div className="section-head">

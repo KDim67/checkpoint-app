@@ -159,6 +159,11 @@ export default function ToolSwitcher({ activeTab, onPick, onHome }: Props) {
       <span className="text-hint-faint">
         {groupOf(activeTab)}
       </span>
+      {current?.blurb && (
+        <span className="text-hint truncate" style={{ marginLeft: 'auto' }}>
+          {current.blurb}
+        </span>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { CheckCircle, Download, Loader, Repeat, Settings } from 'lucide-react'
+import { ArrowRight, CheckCircle, Download, Loader, Settings } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { SeamlessTool } from './useSeamlessTool'
 import TextureDropZone from './TextureDropZone'
@@ -8,13 +8,6 @@ import ActiveTextureHeader from './ActiveTextureHeader'
 export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool; onCardDone: (cardId: string) => Promise<void> }) {
   return (
       <div className="col-lg-full">
-        <div className="gamedev-info-banner">
-          <Repeat size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>Seamless Texture Generator:</strong> Convert any non-tiling texture into an infinitely repeating seamless material. Adjust the blend width and stitch edges seamlessly using edge mirror or linear/bilinear feathering overlaps.
-          </div>
-        </div>
-
         {!tool.seamlessUrl ? (
           <TextureDropZone
             onDragOver={tool.handleSeamlessDragOver}
@@ -24,7 +17,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
             label="Drag & Drop Base Texture"
           />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>
+          <div className="tool-layout">
             
             {/* left: tweak sliders */}
             <div className="panel-scroll">
@@ -249,8 +242,20 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       Saves file next to original image with a _seamless suffix.
                     </span>
                   </div>
-                  <button
-                    onClick={tool.handleSeamlessExport}
+                  <div className="flex-gap">
+                    {(tool.seamlessExportedFile || tool.seamlessPath) && (
+                      <button
+                        type="button"
+                        className="btn-secondary btn-small"
+                        onClick={() => useAppStore.getState().setGamedevPreloadTexture(tool.seamlessExportedFile || tool.seamlessPath, null)}
+                        title="Open this texture in PBR Maps"
+                      >
+                        <span>Send to PBR Maps</span>
+                        <ArrowRight size={13} />
+                      </button>
+                    )}
+                    <button
+                      onClick={tool.handleSeamlessExport}
                     disabled={tool.isSeamlessSaving}
                     style={{
                       background: 'var(--color-secondary)',
@@ -278,6 +283,7 @@ export default function SeamlessPanel({ tool, onCardDone }: { tool: SeamlessTool
                       </>
                     )}
                   </button>
+                  </div>
                 </div>
 
                 {/* offer to finish the kanban card */}

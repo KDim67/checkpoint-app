@@ -8,13 +8,6 @@ import NoImageLoaded from './NoImageLoaded'
 export default function SlicerPanel({ tool }: { tool: SlicerTool }) {
   return (
       <div className="col-lg-full">
-        <div className="gamedev-info-banner">
-          <Scissors size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>Sprite Slicer:</strong> Dissect large composite texture sheets into separate frames. Choose between a uniform pixel grid or auto-slicing (pixel island clustering).
-          </div>
-        </div>
-
         <div className="tool-layout">
           <SettingsColumn title="Slicing Settings">
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Info, Copy, Plus } from 'lucide-react'
+import { Copy, Plus } from 'lucide-react'
 import ColorPicker from '../ui/ColorPicker'
 import type { PaletteTool } from './usePaletteTool'
 
@@ -14,13 +14,6 @@ export default function PalettePanel({
 
   return (
   <div className="col-lg">
-    <div className="gamedev-info-banner">
-      <Info size={15} className="gamedev-info-banner-icon" />
-      <div>
-        <strong>Shader Palette & Code Generator:</strong> Build clean color schemes and immediately generate array codes for Unity C#, Unreal Engine C++, or HLSL pixel shaders.
-      </div>
-    </div>
-
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 'var(--space-4)' }}>
     
     <div className="panel">

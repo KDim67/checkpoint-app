@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, CheckCircle, Download, Loader, RefreshCw, Settings, Sparkles } from 'lucide-react'
+import { Box, CheckCircle, Download, Loader, RefreshCw, Settings } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { PbrTool } from './usePbrTool'
 import TextureDropZone from './TextureDropZone'
@@ -45,13 +45,6 @@ function MapPreview({ label, children }: { label: string; children: React.ReactN
 export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDone: (cardId: string) => Promise<void> }) {
   return (
       <div className="col-lg-full">
-        <div className="gamedev-info-banner">
-          <Sparkles size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>PBR Map Generator:</strong> Drag and drop a flat Albedo texture to automatically estimate and generate corresponding Normal, Height, Roughness, and Ambient Occlusion (AO) maps. Tweak parameters and preview in real time on a 3D model.
-          </div>
-        </div>
-
         {!tool.albedoUrl ? (
           <TextureDropZone
             onDragOver={tool.handlePbrDragOver}
@@ -62,7 +55,7 @@ export default function PbrPanel({ tool, onCardDone }: { tool: PbrTool; onCardDo
             outcome="Returns Normal, Height, Roughness and Ambient Occlusion, previewed on a 3D model"
           />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>
+          <div className="tool-layout">
             
             {/* left: 3D preview and sliders */}
             <div className="panel-scroll">

@@ -77,13 +77,10 @@ export default function GameDevLauncher({ onPick, recent }: Props) {
            240px the window had going and left most of a wide row empty. */
         .gamedev-launcher-grid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: var(--space-3);
         }
-        @media (max-width: 1100px) {
-          .gamedev-launcher-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        }
-        @media (max-width: 820px) {
+        @media (max-width: 900px) {
           .gamedev-launcher-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 560px) {

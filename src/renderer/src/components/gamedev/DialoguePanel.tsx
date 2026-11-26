@@ -1,5 +1,5 @@
 import React from 'react'
-import { Info, Plus, Trash2, Copy } from 'lucide-react'
+import { Plus, Trash2, Copy } from 'lucide-react'
 import MermaidChart from '../ui/MermaidChart'
 import type { DialogueTool } from './useDialogueTool'
 
@@ -14,13 +14,6 @@ export default function DialoguePanel({
 
   return (
       <div className="col-lg">
-        <div className="gamedev-info-banner">
-          <Info size={15} className="gamedev-info-banner-icon" />
-          <div>
-            <strong>Dialogue & Quest Tree Builder:</strong> Structure branching narrative decisions and interactive flows. Export your quest nodes instantly as a standard Mermaid flowchart.
-          </div>
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: 'var(--space-4)' }}>
         
         <div className="panel">

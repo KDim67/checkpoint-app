@@ -984,6 +984,11 @@ html[data-overlay] body {
   grid-template-columns: 320px 1fr;
   min-height: 0;
 }
+@media (max-width: 820px) {
+  .tool-layout {
+    grid-template-columns: 1fr;
+  }
+}
 
 .text-base {
   color: var(--color-text-base);
