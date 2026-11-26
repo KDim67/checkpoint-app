@@ -21,6 +21,8 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
   const [exportedFiles, setExportedFiles] = useState<string[]>([])
   const [shape, setShape] = useState<'sphere' | 'cube' | 'plane'>('sphere')
   const [rotate, setRotate] = useState(true)
+  const rotateRef = useRef(rotate)
+  rotateRef.current = rotate
 
   const [normalIntensity, setNormalIntensity] = useState(2.5)
   const [heightDepth, setHeightDepth] = useState(1.0)
@@ -385,17 +387,17 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
     scene.add(dirLight)
 
     let animationFrameId: number
-    let angle = 0
+    let angle = Math.PI / 4
+    pointLight.position.set(Math.cos(angle) * 2, 2, Math.sin(angle) * 2)
 
     const animate = () => {
-      if (rotate) {
+      if (rotateRef.current) {
         mesh.rotation.y += 0.005
         mesh.rotation.x += 0.002
+        angle += 0.015
+        pointLight.position.x = Math.cos(angle) * 2
+        pointLight.position.z = Math.sin(angle) * 2
       }
-
-      angle += 0.015
-      pointLight.position.x = Math.cos(angle) * 2
-      pointLight.position.z = Math.sin(angle) * 2
 
       renderer.render(scene, camera)
       animationFrameId = requestAnimationFrame(animate)
@@ -427,7 +429,7 @@ export function usePbrTool(isActive: boolean, onActivate: () => void) {
         material: null
       }
     }
-  }, [isActive, shape, rotate])
+  }, [isActive, shape])
 
   return {
     setAlbedoPath,
