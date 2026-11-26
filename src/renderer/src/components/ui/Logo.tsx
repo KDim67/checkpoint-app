@@ -34,7 +34,7 @@ export function Wordmark({
         ...style
       }}
     >
-      <g fill="var(--color-text-base)">
+      <g fill="var(--color-text-base)" stroke="var(--color-text-base)" strokeWidth="0.8">
         <polyline points="638.52 424.05 689.63 424.05 653.7 387.34 687.75 355.92 638.52 355.92" />
         <rect x="1058.86" y="355.32" width="15.45" height="16.99" />
         <rect x="1074.31" y="355.32" width="15.45" height="16.99" />
@@ -172,7 +172,7 @@ export default function Logo({
           filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.22))'
         }}
       >
-        <g fill="var(--color-text-base)">
+        <g fill="var(--color-text-base)" stroke="var(--color-text-base)" strokeWidth="0.8">
           <rect x="787.99" y="209.72" width="66.27" height="364.66" />
           <polygon points="511.74 501.51 731.02 501.32 578.01 355.3 731.02 209.25 511.74 209.72 511.74 501.51" />
         </g>
