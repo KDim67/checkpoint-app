@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CalendarClock, LayoutGrid, Zap, Power } from 'lucide-react'
 import { ToggleSwitch } from './settings/SettingsSection'
+import { Wordmark } from './ui/Logo'
 import { applyStoredTheme, watchTheme } from '../lib/themeBoot'
 import {
   DEFAULT_STARTUP_SETTINGS,
@@ -135,15 +136,10 @@ export default function TrayPanel(): React.JSX.Element {
       }}
     >
       <div style={{
-        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-3-5) var(--space-2)'
       }}>
-        <span style={{
-          fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)',
-          color: 'var(--color-secondary)', letterSpacing: 'var(--tracking-wider)'
-        }}>
-          CHECKPOINT
-        </span>
+        <Wordmark height={14} />
         {summary.context && (
           <span style={{
             fontSize: 'var(--text-xs)', color: 'var(--color-text-faint)', minWidth: 0,

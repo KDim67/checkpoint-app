@@ -329,7 +329,7 @@ export function Sidebar() {
             }}
           />
         ) : (
-          <div style={{ filter: 'drop-shadow(0 1px 4px rgba(0, 0, 0, 0.28))', display: 'flex' }}>
+          <div style={{ display: 'flex' }}>
             <Logo size={32} />
           </div>
         )}

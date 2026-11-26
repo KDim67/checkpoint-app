@@ -168,8 +168,7 @@ export default function Logo({
           width: `${size}px`,
           height: `${size}px`,
           flexShrink: 0,
-          display: 'block',
-          filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.22))'
+          display: 'block'
         }}
       >
         <g fill="var(--color-text-base)" stroke="var(--color-text-base)" strokeWidth="0.8">
