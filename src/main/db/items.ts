@@ -22,10 +22,12 @@ let stmtUpdateItemPosition: Database.Statement
 /** an item's tags as one string, for each row returned; joining the tags and grouping sorted the whole workspace before a page could be taken */
 export const TAG_DATA = `(SELECT GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') FROM item_tags it JOIN tags t ON t.id = it.tag_id WHERE it.item_id = i.id) AS tag_data`
 
+export const BLOCKED_BY_COUNT = `(SELECT COUNT(*) FROM relations r JOIN items b ON b.id = r.from_id WHERE r.to_id = i.id AND r.type = 'blocks' AND b.status NOT IN ('done', 'archived')) AS blocked_by_count`
+
 /** the page's own rows first, read in order from idx_items_list, then their tags */
 function pageQuery(order: string): string {
   return `
-    SELECT i.*, ${TAG_DATA}
+    SELECT i.*, ${TAG_DATA}, ${BLOCKED_BY_COUNT}
     FROM (SELECT * FROM items WHERE context = ? AND type = ? ORDER BY ${order} LIMIT ? OFFSET ?) i
     ORDER BY ${order}
   `
@@ -41,7 +43,7 @@ export function prepareItemStatements(db: Database.Database): void {
   )
 
   stmtGetItemById = db.prepare(`
-    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data
+    SELECT i.*, GROUP_CONCAT(t.id || '|' || t.name || '|' || t.color, ';;') as tag_data, ${BLOCKED_BY_COUNT}
     FROM items i
     LEFT JOIN item_tags it ON i.id = it.item_id
     LEFT JOIN tags t ON it.tag_id = t.id
@@ -88,6 +90,9 @@ function parseTagData(tagData: string | null): Tag[] {
 }
 
 export function rowToItem(row: Record<string, unknown>): Item {
+  const blockedByCount = typeof row.blocked_by_count === 'number'
+    ? row.blocked_by_count
+    : Number(row.blocked_by_count ?? 0)
   return {
     id: row.id as string,
     type: row.type as Item['type'],
@@ -101,7 +106,8 @@ export function rowToItem(row: Record<string, unknown>): Item {
     updated_at: row.updated_at as number,
     due_at: (row.due_at as number | null) ?? null,
     metadata: row.metadata as string,
-    tags: parseTagData(row.tag_data as string | null)
+    tags: parseTagData(row.tag_data as string | null),
+    ...(blockedByCount > 0 ? { blockedByCount } : {})
   }
 }
 
@@ -123,7 +129,7 @@ export function getItemsPaginated(
 export function getAllItems(context: string, type: string): Item[] {
   const order = type === 'log' ? 'i.position DESC' : 'i.position ASC'
   const rows = prepareOnce(getDb(), `
-    SELECT i.*, ${TAG_DATA}
+    SELECT i.*, ${TAG_DATA}, ${BLOCKED_BY_COUNT}
     FROM items i
     WHERE i.context = ? AND i.type = ?
     ORDER BY ${order}, i.created_at DESC

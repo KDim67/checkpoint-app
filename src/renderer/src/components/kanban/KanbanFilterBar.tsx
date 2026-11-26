@@ -1,10 +1,10 @@
-import { X } from 'lucide-react'
+import { Clock, AlertTriangle, X } from 'lucide-react'
 import type { KanbanBoard } from './useKanbanBoard'
 
 export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBoard }) {
   const {
     searchQuery, setSearchQuery, filterPriority, setFilterPriority, filterTagId, setFilterTagId,
-    allTags
+    filterDue = 'all', setFilterDue, allTags
   } = kanbanBoard
 
   const cards = kanbanBoard.cards ?? []
@@ -15,7 +15,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
     ? columns.reduce((acc, col) => acc + (getCardsForColumn(col.id)?.length || 0), 0)
     : 0
   const hiddenCount = typeof getCardsForColumn === 'function' && columns.length > 0 ? Math.max(0, totalActive - visibleCount) : 0
-  const hasActiveFilter = Boolean(searchQuery.trim() || filterPriority !== -1 || filterTagId !== 'all')
+  const hasActiveFilter = Boolean(searchQuery.trim() || filterPriority !== -1 || filterTagId !== 'all' || filterDue !== 'all')
 
   return (
     <div style={{
@@ -24,7 +24,7 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
       justifyContent: 'space-between',
       padding: '6px var(--space-6)',
       borderBottom: '1px solid var(--color-surface-offset)',
-      background: 'var(--color-surface-1)90',
+      background: 'color-mix(in srgb, var(--color-surface-1) 90%, transparent)',
       backdropFilter: 'blur(8px)',
       flexShrink: 0,
       gap: 'var(--space-4)',
@@ -120,9 +120,56 @@ export default function KanbanFilterBar({ kanbanBoard }: { kanbanBoard: KanbanBo
           </select>
         </div>
 
+        <div className="row-6px">
+          <button
+            type="button"
+            onClick={() => setFilterDue?.(filterDue === 'overdue' ? 'all' : 'overdue')}
+            aria-pressed={filterDue === 'overdue'}
+            title="Show only overdue cards"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: filterDue === 'overdue' ? 'var(--color-error-muted)' : 'var(--color-surface-2)',
+              border: `1px solid ${filterDue === 'overdue' ? 'var(--color-error)' : 'var(--color-surface-offset)'}`,
+              borderRadius: 'var(--radius-full)',
+              color: filterDue === 'overdue' ? 'var(--color-error)' : 'var(--color-text-muted)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: filterDue === 'overdue' ? 'var(--weight-bold)' : 'var(--weight-medium)',
+              padding: '2px 8px',
+              cursor: 'pointer'
+            }}
+          >
+            <AlertTriangle size={11} />
+            Overdue
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterDue?.(filterDue === 'soon' ? 'all' : 'soon')}
+            aria-pressed={filterDue === 'soon'}
+            title="Show cards due within the next 3 days"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: filterDue === 'soon' ? 'var(--color-secondary-muted)' : 'var(--color-surface-2)',
+              border: `1px solid ${filterDue === 'soon' ? 'var(--color-secondary)' : 'var(--color-surface-offset)'}`,
+              borderRadius: 'var(--radius-full)',
+              color: filterDue === 'soon' ? 'var(--color-secondary)' : 'var(--color-text-muted)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: filterDue === 'soon' ? 'var(--weight-bold)' : 'var(--weight-medium)',
+              padding: '2px 8px',
+              cursor: 'pointer'
+            }}
+          >
+            <Clock size={11} />
+            Due soon
+          </button>
+        </div>
+
         {hasActiveFilter && (
           <button
-            onClick={() => { setSearchQuery(''); setFilterPriority(-1); setFilterTagId('all') }}
+            onClick={() => { setSearchQuery(''); setFilterPriority(-1); setFilterTagId('all'); setFilterDue?.('all') }}
             aria-label="Clear all filters"
             style={{
               display: 'inline-flex',

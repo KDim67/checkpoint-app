@@ -48,6 +48,8 @@ interface KanbanColumnProps {
   remoteCardDrags?: Map<string, { peerId: string; name: string; color: string }>
   /** remote drop indicators hovering over this column */
   remoteDropTargets?: Array<{ peerId: string; name: string; color: string; beforeCardId?: string }>
+  selectedIds?: Set<string>
+  onToggleCardSelect?: (id: string) => void
 }
 
 interface ColumnBodyProps extends KanbanColumnProps {
@@ -126,6 +128,8 @@ function ColumnBody({
   dropHeight = 0,
   remoteCardDrags,
   remoteDropTargets,
+  selectedIds,
+  onToggleCardSelect,
   nodeRef,
   pointedAt
 }: ColumnBodyProps) {
@@ -397,7 +401,7 @@ function ColumnBody({
                   style={{
                     background: 'var(--color-secondary)',
                     border: 'none',
-                    color: '#ffffff',
+                    color: 'var(--color-text-inverted)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -457,7 +461,7 @@ function ColumnBody({
                       borderRadius: '4px',
                       border: (editColorMode !== 'full') ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
                       background: (editColorMode !== 'full') ? 'var(--color-secondary)' : 'transparent',
-                      color: (editColorMode !== 'full') ? '#0f172a' : 'var(--color-text-base)',
+                      color: (editColorMode !== 'full') ? 'var(--color-text-inverted)' : 'var(--color-text-base)',
                       cursor: 'pointer'
                     }}
                   >
@@ -477,7 +481,7 @@ function ColumnBody({
                       borderRadius: '4px',
                       border: (editColorMode === 'full') ? '1px solid var(--color-secondary)' : '1px solid var(--color-surface-offset)',
                       background: (editColorMode === 'full') ? 'var(--color-secondary)' : 'transparent',
-                      color: (editColorMode === 'full') ? '#0f172a' : 'var(--color-text-base)',
+                      color: (editColorMode === 'full') ? 'var(--color-text-inverted)' : 'var(--color-text-base)',
                       cursor: 'pointer'
                     }}
                   >
@@ -746,6 +750,9 @@ function ColumnBody({
                 display={cardDisplay}
                 remoteDrag={remoteCardDrags?.get(card.id)}
                 eager={i < EAGER_CARDS}
+                selected={selectedIds?.has(card.id) ?? false}
+                selectionActive={Boolean(selectedIds && selectedIds.size > 0)}
+                onToggleSelect={onToggleCardSelect}
               />
             </React.Fragment>
           ))}
@@ -965,6 +972,14 @@ function areKanbanColumnPropsEqual(prev: KanbanColumnProps, next: KanbanColumnPr
   if (prev.cards.length !== next.cards.length) return false
   for (let i = 0; i < prev.cards.length; i++) {
     if (prev.cards[i] !== next.cards[i]) return false
+  }
+  if (prev.onToggleCardSelect !== next.onToggleCardSelect) return false
+  if (prev.selectedIds !== next.selectedIds) {
+    if ((prev.selectedIds?.size ?? 0) > 0 !== (next.selectedIds?.size ?? 0) > 0) return false
+    for (let i = 0; i < next.cards.length; i++) {
+      const id = next.cards[i].id
+      if ((prev.selectedIds?.has(id) ?? false) !== (next.selectedIds?.has(id) ?? false)) return false
+    }
   }
 
   // remote drags comparison

@@ -105,4 +105,40 @@ describe('KanbanFilterBar', () => {
     render(<KanbanFilterBar kanbanBoard={mockBoard as unknown as KanbanBoard} />)
     expect(screen.getByText('2 hidden')).toBeTruthy()
   })
+
+  it('toggles Overdue and Due soon pills and clears them on Reset', () => {
+    function DueBoard() {
+      const [searchQuery, setSearchQuery] = useState('')
+      const [filterPriority, setFilterPriority] = useState(-1)
+      const [filterTagId, setFilterTagId] = useState('all')
+      const [filterDue, setFilterDue] = useState<'all' | 'overdue' | 'soon'>('all')
+      const board = {
+        searchQuery, setSearchQuery, filterPriority, setFilterPriority,
+        filterTagId, setFilterTagId, filterDue, setFilterDue, allTags: tags
+      }
+      return (
+        <>
+          <KanbanFilterBar kanbanBoard={board as unknown as KanbanBoard} />
+          <output aria-label="Due">{filterDue}</output>
+        </>
+      )
+    }
+
+    render(<DueBoard />)
+    const dueOutput = () => screen.getByLabelText('Due').textContent
+    const overdueBtn = screen.getByRole('button', { name: 'Overdue' })
+    const soonBtn = screen.getByRole('button', { name: 'Due soon' })
+
+    fireEvent.click(overdueBtn)
+    expect(dueOutput()).toBe('overdue')
+    expect(overdueBtn.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(soonBtn)
+    expect(dueOutput()).toBe('soon')
+    expect(soonBtn.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByText('Reset'))
+    expect(dueOutput()).toBe('all')
+    expect(screen.queryByText('Reset')).toBeNull()
+  })
 })

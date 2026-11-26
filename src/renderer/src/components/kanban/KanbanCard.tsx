@@ -1,7 +1,7 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Edit2, Trash2, ArrowRightLeft, Calendar, GripVertical, Play, Check, CheckSquare } from 'lucide-react'
+import { Edit2, Trash2, ArrowRightLeft, Calendar, GripVertical, Play, Check, CheckSquare, Ban } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { Item, ItemPriority } from '../../../../shared/types'
 import { getTextColorForBackground } from '../../lib/contrast'
@@ -33,6 +33,9 @@ interface KanbanCardProps {
   remoteDrag?: RemoteCardDragInfo | null
   /** among its column's first cards, so drawn without waiting to come near */
   eager?: boolean
+  selected?: boolean
+  selectionActive?: boolean
+  onToggleSelect?: (id: string) => void
 }
 
 function stripMarkdown(md: string): string {
@@ -77,7 +80,10 @@ function CardFace({
   onUpdate,
   display = DEFAULT_CARD_DISPLAY,
   dragAttributes,
-  isDragging
+  isDragging,
+  selected = false,
+  selectionActive = false,
+  onToggleSelect
 }: CardFaceProps) {
   const [hovered, setHovered] = useState(false)
   const { match: matchKey } = useViewShortcuts('kanban')
@@ -126,13 +132,17 @@ function CardFace({
     borderRadius: 'var(--radius-md)',
     border: isDragging
       ? '2px dashed var(--color-secondary)'
-      : hovered && !isDragging
-        ? '1px solid var(--color-balance)'
-        : '1px solid var(--color-surface-offset)',
+      : selected
+        ? '2px solid var(--color-secondary)'
+        : hovered && !isDragging
+          ? '1px solid var(--color-balance)'
+          : '1px solid var(--color-surface-offset)',
     backgroundColor: isFullCover ? cover.value : (isDragging ? 'var(--color-surface-2)' : 'var(--kanban-card-bg)'),
-    boxShadow: hovered && !isDragging
-      ? 'var(--shadow-md)'
-      : 'var(--shadow-sm)',
+    boxShadow: selected && !isDragging
+      ? '0 0 0 2px var(--color-secondary-muted), var(--shadow-sm)'
+      : hovered && !isDragging
+        ? 'var(--shadow-md)'
+        : 'var(--shadow-sm)',
     overflow: 'hidden',
     flexShrink: 0,
     // the whole card drags, so no text selection sweeping the board
@@ -152,6 +162,8 @@ function CardFace({
   const showDue = display.due && Boolean(dueDateStr)
   const showChecklist = display.checklist && totalChecklist > 0
   const showTemplate = display.template && isTemplate
+  const blockedCount = card.blockedByCount ?? 0
+  const showBlocked = blockedCount > 0 && card.status !== 'done'
 
   /** the board says why a save failed, so a shortcut here only has to not throw */
   const save = useCallback(async (patch: Partial<Item>): Promise<void> => {
@@ -266,7 +278,14 @@ function CardFace({
       style={{ ...cardStyle, outline: 'none' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={() => onClick(card.id)}
+      onClick={e => {
+        if ((e.ctrlKey || e.metaKey || selectionActive) && onToggleSelect) {
+          e.stopPropagation()
+          onToggleSelect(card.id)
+          return
+        }
+        onClick(card.id)
+      }}
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
@@ -420,6 +439,37 @@ function CardFace({
               </div>
 
               {/* the whole card drags, this only signals it */}
+              {onToggleSelect && (hovered || selected || selectionActive) && (
+                <button
+                  type="button"
+                  title={selected ? 'Deselect card (Ctrl+Click)' : 'Select card (Ctrl+Click)'}
+                  aria-label={selected ? 'Deselect card' : 'Select card'}
+                  aria-pressed={selected}
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => {
+                    e.stopPropagation()
+                    onToggleSelect(card.id)
+                  }}
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '3px',
+                    border: `1.5px solid ${selected ? 'var(--color-secondary)' : (isFullCover ? coverTextColor : 'var(--color-text-faint)')}`,
+                    background: selected ? 'var(--color-secondary)' : 'transparent',
+                    color: 'var(--color-text-inverted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                    marginRight: '2px',
+                    flexShrink: 0
+                  }}
+                >
+                  {selected && <Check size={9} strokeWidth={3.5} />}
+                </button>
+              )}
+
               <div
                 aria-hidden
                 style={{
@@ -480,7 +530,7 @@ function CardFace({
             </div>
           )}
 
-          {(showDue || showChecklist || showTemplate || link) && (
+          {(showDue || showChecklist || showTemplate || showBlocked || link) && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -491,6 +541,28 @@ function CardFace({
               flexWrap: 'wrap'
             }}>
               {link && <LinkBadge link={link} />}
+
+              {showBlocked && (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: 'var(--text-2xs)',
+                  fontWeight: 'var(--weight-semibold)',
+                  color: isFullCover ? coverTextColor : 'var(--color-error)',
+                  backgroundColor: isFullCover
+                    ? (coverTextColor === '#ffffff' ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.6)')
+                    : 'var(--color-error-muted)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  border: isFullCover
+                    ? `1px solid ${coverTextColor === '#ffffff' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}`
+                    : '1px solid var(--color-error)'
+                }}>
+                  <Ban size={10} />
+                  {blockedCount > 1 ? `Blocked (${blockedCount})` : 'Blocked'}
+                </span>
+              )}
 
               {showDue && (
                 <span style={{

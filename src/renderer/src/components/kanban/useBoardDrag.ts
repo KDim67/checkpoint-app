@@ -7,7 +7,7 @@ import { rebalancePositions, updateItem } from '../../data/items'
 import { canAimAtSlot } from './dropSlots'
 import type { BoardState } from './useBoardState'
 import { useFailureReport } from '../ui/Toast'
-import { dueSortKey } from '../../../../shared/dueDate'
+import { DAY_MS, dueDeadline, dueSortKey, isOverdue } from '../../../../shared/dueDate'
 import { triggerConfetti } from '../../lib/celebration'
 
 /** columns, cards and each card's column, from board state: a col:: sortable read as a card sent drops to the end */
@@ -20,26 +20,45 @@ interface DropGeometry {
 // shared empty array so memoized columns don't re-render on a fresh []
 const EMPTY_ITEMS: Item[] = []
 
+export function filterBoardCards(
+  cards: Item[],
+  filters: { searchQuery: string; filterPriority: number; filterTagId: string; filterDue: 'all' | 'overdue' | 'soon' },
+  now: number = Date.now()
+): Item[] {
+  const q = filters.searchQuery.trim().toLowerCase()
+  const soonCutoff = now + 3 * DAY_MS
+  return cards.filter(c => {
+    if (c.status === 'archived') return false
+    if (q && !(
+      c.title.toLowerCase().includes(q) ||
+      c.body.toLowerCase().includes(q) ||
+      (c.tags && c.tags.some(t => t.name.toLowerCase().includes(q)))
+    )) return false
+    if (filters.filterPriority !== -1 && c.priority !== filters.filterPriority) return false
+    if (filters.filterTagId !== 'all' && !(c.tags && c.tags.some(t => t.id === filters.filterTagId))) return false
+    if (filters.filterDue !== 'all') {
+      if (c.due_at === null || c.status === 'done') return false
+      let dueDone = false
+      try { dueDone = JSON.parse(c.metadata || '{}').dueDateCompleted === true } catch {}
+      if (dueDone) return false
+      if (filters.filterDue === 'overdue' && !isOverdue(c.due_at, now)) return false
+      if (filters.filterDue === 'soon' && (isOverdue(c.due_at, now) || dueDeadline(c.due_at) > soonCutoff)) return false
+    }
+    return true
+  })
+}
+
 export function useBoardDrag(boardState: BoardState) {
   const report = useFailureReport()
   const {
     activeWorkspace, cards, setCards, columns, swimlanesEnabled, columnsRef, persistColumns,
     setActiveDragCard, setDropTarget, setDragHeight, searchQuery, filterPriority, filterTagId,
-    isReadOnlyMode, loadCards
+    filterDue, isReadOnlyMode, loadCards
   } = boardState
   // one memoized pass groups, filters and sorts; per-column refiltering was O(columns x cards) per drag frame
   const cardsByColumn = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
     const map = new Map<string, Item[]>()
-    for (const c of cards) {
-      if (c.status === 'archived') continue
-      if (q && !(
-        c.title.toLowerCase().includes(q) ||
-        c.body.toLowerCase().includes(q) ||
-        (c.tags && c.tags.some(t => t.name.toLowerCase().includes(q)))
-      )) continue
-      if (filterPriority !== -1 && c.priority !== filterPriority) continue
-      if (filterTagId !== 'all' && !(c.tags && c.tags.some(t => t.id === filterTagId))) continue
+    for (const c of filterBoardCards(cards, { searchQuery, filterPriority, filterTagId, filterDue })) {
       let arr = map.get(c.status)
       if (!arr) { arr = []; map.set(c.status, arr) }
       arr.push(c)
@@ -65,7 +84,7 @@ export function useBoardDrag(boardState: BoardState) {
       arr.sort(mode === 'priority' ? byPriority : mode === 'due' ? byDue : byPosition)
     }
     return map
-  }, [cards, searchQuery, filterPriority, filterTagId, swimlanesEnabled, columns])
+  }, [cards, searchQuery, filterPriority, filterTagId, filterDue, swimlanesEnabled, columns])
 
   const getCardsForColumn = useCallback(
     (columnId: string): Item[] => cardsByColumn.get(columnId) || EMPTY_ITEMS,

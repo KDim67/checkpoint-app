@@ -24,9 +24,10 @@ export interface Item {
   due_at: number | null  // nullable unix ms
   metadata: string       // JSON string, per-type extensions
   tags?: Tag[]           // populated by join queries
+  blockedByCount?: number
 }
 
-export type CreateItemPayload = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'tags'>
+export type CreateItemPayload = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'tags' | 'blockedByCount'>
 
 export interface Tag {
   id: string

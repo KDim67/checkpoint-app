@@ -4,6 +4,7 @@ import { useFailureReport } from '../ui/Toast'
 import { bulkUpdateItems, createItem, deleteItem, updateItem } from '../../data/items'
 import { cardFromTemplate, isTemplateCard } from '../../../../shared/cardTemplates'
 import { buildKanbanJsonExport, parseKanbanJsonExport } from '../../../../shared/kanbanExport'
+import { formatDueDate } from '../../../../shared/dueDate'
 import { loadBoardConfig } from '../../lib/boardConfig'
 import { tagResolver } from '../../data/tags'
 import * as appApi from '../../data/app'
@@ -15,7 +16,8 @@ export function useBoardActions(boardState: BoardState) {
     activeWorkspace, toast, confirm, cards, setCards, columns, setColumns, columnsRef,
     persistColumns, persistConfig, setShowAddColModal, setActiveCardId, setPendingDeleteColId,
     allTags, archivedColumns, setArchivedColumns, archivedColumnsRef, showArchiveBin,
-    selectedArchived, setSelectedArchived, setShowTemplateSelector, loadCards
+    selectedArchived, setSelectedArchived, selectedCardIds, setSelectedCardIds,
+    setShowTemplateSelector, loadCards
   } = boardState
 
   const report = useFailureReport()
@@ -496,6 +498,105 @@ export function useBoardActions(boardState: BoardState) {
     }
   }, [activeWorkspace, columnsRef, persistColumns, setColumns, loadCards, toast])
 
+  const handleBulkUpdateStatus = useCallback(async (status: string) => {
+    if (selectedCardIds.length === 0) return
+    try {
+      await bulkUpdateItems({ ids: selectedCardIds, patch: { status } })
+      const colName = columnsRef.current.find(c => c.id === status)?.name ?? status
+      toast(`Moved ${selectedCardIds.length} card${selectedCardIds.length > 1 ? 's' : ''} to ${colName}`)
+      setSelectedCardIds([])
+      await loadCards()
+    } catch (err) {
+      report('move the cards', err)
+    }
+  }, [selectedCardIds, columnsRef, toast, setSelectedCardIds, loadCards, report])
+
+  const handleBulkUpdatePriority = useCallback(async (priority: number) => {
+    if (selectedCardIds.length === 0) return
+    try {
+      await bulkUpdateItems({ ids: selectedCardIds, patch: { priority: priority as Item['priority'] } })
+      toast(`Updated priority of ${selectedCardIds.length} card${selectedCardIds.length > 1 ? 's' : ''}`)
+      setSelectedCardIds([])
+      await loadCards()
+    } catch (err) {
+      report('change the priority', err)
+    }
+  }, [selectedCardIds, toast, setSelectedCardIds, loadCards, report])
+
+  const handleBulkAddTag = useCallback(async (tagId: string) => {
+    const selected = cards.filter(c => selectedCardIds.includes(c.id))
+    if (selected.length === 0) return
+    try {
+      await Promise.all(
+        selected.map(card => {
+          const existing = card.tags?.map(t => t.id) ?? []
+          if (existing.includes(tagId)) return Promise.resolve()
+          return updateItem(card.id, {}, [...existing, tagId])
+        })
+      )
+      toast(`Added tag to ${selected.length} card${selected.length > 1 ? 's' : ''}`)
+      setSelectedCardIds([])
+      await loadCards()
+    } catch (err) {
+      report('add the tag', err)
+    }
+  }, [cards, selectedCardIds, toast, setSelectedCardIds, loadCards, report])
+
+  const handleBulkArchiveSelected = useCallback(async () => {
+    const selected = cards.filter(c => selectedCardIds.includes(c.id))
+    if (selected.length === 0) return
+    const originalStatuses = selected.map(c => ({ id: c.id, status: c.status }))
+    const ids = selected.map(c => c.id)
+    try {
+      await bulkUpdateItems({ ids, patch: { status: 'archived' } })
+      setSelectedCardIds([])
+      await loadCards()
+      toast(`Archived ${selected.length} card${selected.length > 1 ? 's' : ''}`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await Promise.all(originalStatuses.map(s => updateItem(s.id, { status: s.status })))
+              await loadCards()
+              toast('Cards restored')
+            } catch (err) {
+              report('restore the cards', err)
+            }
+          }
+        }
+      })
+    } catch (err) {
+      report('archive the cards', err)
+    }
+  }, [cards, selectedCardIds, setSelectedCardIds, loadCards, toast, report])
+
+  const handleBulkExportMarkdown = useCallback(async () => {
+    const selected = cards.filter(c => selectedCardIds.includes(c.id))
+    if (selected.length === 0) return
+    const priorityNames = ['None', 'Low', 'Medium', 'High']
+    let content = `# Checkpoint Kanban Export - ${new Date().toLocaleDateString()}\n\n`
+    for (const card of selected) {
+      const colName = columnsRef.current.find(c => c.id === card.status)?.name ?? card.status
+      content += `- [${card.status === 'done' ? 'x' : ' '}] ${card.title}\n`
+      content += `  - Column: ${colName}\n`
+      content += `  - Priority: ${priorityNames[card.priority] ?? 'None'}\n`
+      if (card.due_at) content += `  - Due Date: ${formatDueDate(card.due_at)}\n`
+      if (card.tags && card.tags.length > 0) content += `  - Tags: ${card.tags.map(t => t.name).join(', ')}\n`
+      if (card.body.trim()) {
+        content += `\n${card.body.split('\n').map(l => `    ${l}`).join('\n')}\n\n`
+      } else {
+        content += '\n'
+      }
+    }
+    const success = await appApi.saveFile('kanban-export.md', content)
+    if (success) {
+      toast(`Exported ${selected.length} card${selected.length > 1 ? 's' : ''} to markdown`)
+      setSelectedCardIds([])
+    } else {
+      toast('Export failed: file could not be saved', { type: 'error' })
+    }
+  }, [cards, selectedCardIds, columnsRef, toast, setSelectedCardIds])
+
   const templateCards = cards.filter(isTemplateCard)
 
   return {
@@ -516,6 +617,11 @@ export function useBoardActions(boardState: BoardState) {
     handleBulkDeleteArchived,
     handleBulkRestoreArchived,
     handleDeleteArchivedCard,
+    handleBulkUpdateStatus,
+    handleBulkUpdatePriority,
+    handleBulkAddTag,
+    handleBulkArchiveSelected,
+    handleBulkExportMarkdown,
     handleExportBoard,
     handleImportBoard,
     templateCards

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { initDb, closeDb, getDb, createItem, getAllItems, getItemsPaginated } from '../src/main/db'
+import { initDb, closeDb, getDb, createItem, updateItem, createRelation, getAllItems, getItemsPaginated } from '../src/main/db'
 import type { Item } from '../src/shared/types'
 
 let dir: string
@@ -50,5 +50,24 @@ describe('reading every item of a type', () => {
     seed({ context: 'elsewhere' })
 
     expect(getAllItems('work', 'card').map(i => i.id)).toEqual([card.id])
+  })
+
+  it('counts open blocking relations in blockedByCount and excludes done/archived blockers', () => {
+    const blocked = seed({ title: 'Blocked card' })
+    const blocker1 = seed({ title: 'Open blocker', status: 'todo' })
+    const blocker2 = seed({ title: 'Second blocker', status: 'in_progress' })
+    const related = seed({ title: 'Related only', status: 'todo' })
+
+    createRelation(blocker1.id, blocked.id, 'blocks')
+    createRelation(blocker2.id, blocked.id, 'blocks')
+    createRelation(related.id, blocked.id, 'relates_to')
+
+    expect(getAllItems('work', 'card').find(i => i.id === blocked.id)?.blockedByCount).toBe(2)
+
+    updateItem(getDb(), blocker1.id, { status: 'done' })
+    expect(getAllItems('work', 'card').find(i => i.id === blocked.id)?.blockedByCount).toBe(1)
+
+    updateItem(getDb(), blocker2.id, { status: 'archived' })
+    expect(getAllItems('work', 'card').find(i => i.id === blocked.id)?.blockedByCount).toBeUndefined()
   })
 })

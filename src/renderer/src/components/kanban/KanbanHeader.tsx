@@ -137,26 +137,11 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
       </div>
 
       {/* never shrinks, a button past the edge can't be pressed */}
-      <div className="row no-shrink">
+      <div className="row no-shrink" style={{ gap: 'var(--space-1-5)' }}>
         <CollabPresenceRoster members={collab?.roster ?? []} />
         <CollabPanel session={collab} />
 
-        <BoardThemeMenu theme={theme} persistConfig={persistConfig} />
-        <BoardExportMenu kanbanBoard={kanbanBoard} />
-
-        <HeaderBtn
-          onClick={() => setShowArchiveBin(true)}
-          title="View archived cards and lists"
-          icon={
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="20" height="5" x="2" y="3" rx="1"/>
-              <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>
-            </svg>
-          }
-          active={showArchiveBin}
-        >
-          Archive Bin
-        </HeaderBtn>
+        <span aria-hidden style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px', flexShrink: 0 }} />
 
         <HeaderBtn
           active={swimlanesEnabled}
@@ -236,6 +221,25 @@ export default function KanbanHeader({ kanbanBoard }: { kanbanBoard: KanbanBoard
             onPick={handleCreateCardFromTemplate}
           />
         )}
+
+        <span aria-hidden style={{ width: '1px', height: '16px', background: 'var(--color-surface-offset)', margin: '0 2px', flexShrink: 0 }} />
+
+        <BoardThemeMenu theme={theme} persistConfig={persistConfig} />
+        <BoardExportMenu kanbanBoard={kanbanBoard} />
+
+        <HeaderBtn
+          onClick={() => setShowArchiveBin(true)}
+          title="View archived cards and lists"
+          icon={
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="20" height="5" x="2" y="3" rx="1"/>
+              <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>
+            </svg>
+          }
+          active={showArchiveBin}
+        >
+          Archive Bin
+        </HeaderBtn>
 
         {/* add column lives at the end of the column row */}
 

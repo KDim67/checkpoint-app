@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { useAppStore } from '../store/appStore'
 import {
   DndContext,
@@ -35,6 +35,7 @@ import KanbanFilterBar from './kanban/KanbanFilterBar'
 import { canAimAtSlot } from './kanban/dropSlots'
 import { useRemoteCardDrags } from '../lib/useRemoteCardDrags'
 import Presence from './ui/Presence'
+import BulkActionsBar from './backlog/BulkActionsBar'
 
 
 // re-exported for existing importers, lib/boardConfig owns the shape
@@ -64,6 +65,8 @@ interface SortableColumnProps {
   remoteCardDrags?: Map<string, { peerId: string; name: string; color: string }>
   /** remote drop indicators hovering over this column */
   remoteDropTargets?: Array<{ peerId: string; name: string; color: string; beforeCardId?: string }>
+  selectedIds?: Set<string>
+  onToggleCardSelect?: (id: string) => void
 }
 
 function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableColumnProps) {
@@ -76,6 +79,14 @@ function areSortableColumnPropsEqual(prev: SortableColumnProps, next: SortableCo
   if (prev.cards.length !== next.cards.length) return false
   for (let i = 0; i < prev.cards.length; i++) {
     if (prev.cards[i] !== next.cards[i]) return false
+  }
+  if (prev.onToggleCardSelect !== next.onToggleCardSelect) return false
+  if (prev.selectedIds !== next.selectedIds) {
+    if ((prev.selectedIds?.size ?? 0) > 0 !== (next.selectedIds?.size ?? 0) > 0) return false
+    for (let i = 0; i < next.cards.length; i++) {
+      const id = next.cards[i].id
+      if ((prev.selectedIds?.has(id) ?? false) !== (next.selectedIds?.has(id) ?? false)) return false
+    }
   }
 
   // Compare remoteCardDrags
@@ -121,7 +132,9 @@ const SortableColumn = React.memo(function SortableColumn({
   dropSlot = null,
   dropHeight,
   remoteCardDrags,
-  remoteDropTargets
+  remoteDropTargets,
+  selectedIds,
+  onToggleCardSelect
 }: SortableColumnProps) {
   const {
     attributes,
@@ -172,6 +185,8 @@ const SortableColumn = React.memo(function SortableColumn({
         dropHeight={dropHeight}
         remoteCardDrags={remoteCardDrags}
         remoteDropTargets={remoteDropTargets}
+        selectedIds={selectedIds}
+        onToggleCardSelect={onToggleCardSelect}
       />
     </div>
   )
@@ -189,8 +204,24 @@ export default function KanbanView() {
     performDeleteColumn, handleDeleteColumn, handleClearColumnCards, handleArchiveColumn,
     handleUpdateCardDetails, handleCardDelete, handleCardConvertToTask, handleAddCardToColumn,
     handleRestoreColumn, handleDeleteColumnPermanently, handleRestoreCard, handleBulkDeleteArchived,
-    handleBulkRestoreArchived, handleDeleteArchivedCard
+    handleBulkRestoreArchived, handleDeleteArchivedCard,
+    allTags, selectedCardIds, toggleCardSelection, clearCardSelection,
+    handleBulkUpdateStatus, handleBulkUpdatePriority, handleBulkAddTag,
+    handleBulkArchiveSelected, handleBulkExportMarkdown
   } = kanbanBoard
+
+  const selectedIdsSet = useMemo(() => new Set(selectedCardIds), [selectedCardIds])
+
+  useEffect(() => {
+    if (selectedCardIds.length === 0) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !activeCardId && !showAddColModal && !showArchiveBin && !pendingDeleteColId) {
+        clearCardSelection()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedCardIds.length, activeCardId, showAddColModal, showArchiveBin, pendingDeleteColId, clearCardSelection])
 
   const remoteCardDrags = useRemoteCardDrags()
 
@@ -273,7 +304,6 @@ export default function KanbanView() {
               overflowX: 'auto',
               overflowY: 'hidden',
               alignItems: 'stretch',
-              height: 'calc(100% - 98px)', // header 52px + filter bar 46px
               minHeight: 0
             }}>
               {columns.map(col => {
@@ -333,6 +363,8 @@ export default function KanbanView() {
                   onToggleCollapse={handleToggleCollapse}
                   onSetSort={handleSetColumnSort}
                   cardDisplay={cardDisplay}
+                  selectedIds={isReadOnlyMode ? undefined : selectedIdsSet}
+                  onToggleCardSelect={isReadOnlyMode ? undefined : toggleCardSelection}
                 />
                 )
               })}
@@ -434,6 +466,20 @@ export default function KanbanView() {
         onConfirm={() => pendingDeleteColId && performDeleteColumn(pendingDeleteColId)}
         onCancel={() => setPendingDeleteColId(null)}
       />
+
+      {!isReadOnlyMode && selectedCardIds.length > 0 && (
+        <BulkActionsBar
+          selectedItems={cards.filter(c => selectedIdsSet.has(c.id))}
+          columns={columns}
+          allTags={allTags}
+          onClearSelection={clearCardSelection}
+          onBulkUpdateStatus={handleBulkUpdateStatus}
+          onBulkUpdatePriority={handleBulkUpdatePriority}
+          onBulkAddTag={handleBulkAddTag}
+          onBulkDelete={handleBulkArchiveSelected}
+          onExportMarkdown={handleBulkExportMarkdown}
+        />
+      )}
     </div>
   )
 }

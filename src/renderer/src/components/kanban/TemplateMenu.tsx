@@ -35,7 +35,7 @@ export default function TemplateMenu({ templates, open, setOpen, onPick }: Templ
         }
         active={open}
       >
-        From Template
+        Templates
       </HeaderBtn>
       
       {open && (

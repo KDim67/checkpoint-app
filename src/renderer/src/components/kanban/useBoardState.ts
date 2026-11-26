@@ -14,6 +14,8 @@ import { readItems } from '../../data/items'
 import { useCollab } from '../../context/CollabContext'
 import { useBoardTheme } from './useBoardTheme'
 
+export type DueFilter = 'all' | 'overdue' | 'soon'
+
 export function useBoardState() {
   const activeWorkspace = useAppStore(s => s.activeWorkspace)
   const availableWorkspaces = useAppStore(s => s.availableWorkspaces)
@@ -130,7 +132,30 @@ export function useBoardState() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [filterPriority, setFilterPriority] = useState<number>(-1)
   const [filterTagId, setFilterTagId] = useState<string>('all')
+  const [filterDue, setFilterDue] = useState<DueFilter>('all')
   const [allTags, setAllTags] = useState<Tag[]>([])
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([])
+
+  const toggleCardSelection = useCallback((id: string) => {
+    setSelectedCardIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  }, [])
+
+  const clearCardSelection = useCallback(() => {
+    setSelectedCardIds([])
+  }, [])
+
+  useEffect(() => {
+    setSelectedCardIds([])
+  }, [activeWorkspace])
+
+  useEffect(() => {
+    setSelectedCardIds(prev => {
+      if (prev.length === 0) return prev
+      const activeIds = new Set(cards.filter(c => c.status !== 'archived').map(c => c.id))
+      const next = prev.filter(id => activeIds.has(id))
+      return next.length === prev.length ? prev : next
+    })
+  }, [cards])
 
   const [archivedColumns, setArchivedColumns] = useState<ColumnConfig[]>([])
   /** columns keep stale archive handlers, so read the live list via ref */
@@ -268,7 +293,13 @@ export function useBoardState() {
     setFilterPriority,
     filterTagId,
     setFilterTagId,
+    filterDue,
+    setFilterDue,
     allTags,
+    selectedCardIds,
+    setSelectedCardIds,
+    toggleCardSelection,
+    clearCardSelection,
     archivedColumns,
     setArchivedColumns,
     archivedColumnsRef,

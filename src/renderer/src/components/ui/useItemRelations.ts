@@ -42,6 +42,7 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
       setRelations(rels)
       setRelationSearchQuery('')
       setRelationSearchResults([])
+      window.dispatchEvent(new CustomEvent('kanban-refresh'))
     } catch (err) {
       report('link the items', err)
     }
@@ -51,6 +52,7 @@ export function useItemRelations(itemId: string, owner: Item | null, activeWorks
     try {
       await deleteRelation(relationId)
       setRelations(prev => prev.filter(r => r.id !== relationId))
+      window.dispatchEvent(new CustomEvent('kanban-refresh'))
     } catch (err) {
       report('remove the link', err)
     }

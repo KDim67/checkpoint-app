@@ -14,7 +14,8 @@ export function useKanbanBoard() {
     cardDisplayRef, loading, persistConfig, handleToggleCollapse, handleSetColumnSort,
     showAddColModal, setShowAddColModal, activeCardId, setActiveCardId, activeDragCard, dropTarget,
     dragHeight, pendingDeleteColId, setPendingDeleteColId, theme, boardBg, searchQuery,
-    setSearchQuery, filterPriority, setFilterPriority, filterTagId, setFilterTagId, allTags,
+    setSearchQuery, filterPriority, setFilterPriority, filterTagId, setFilterTagId, filterDue, setFilterDue, allTags,
+    selectedCardIds, setSelectedCardIds, toggleCardSelection, clearCardSelection,
     archivedColumns, showArchiveBin, setShowArchiveBin, closeArchiveBin, selectedArchived,
     setSelectedArchived, showTemplateSelector, setShowTemplateSelector, collab, isReadOnlyMode,
     sensors
@@ -28,7 +29,9 @@ export function useKanbanBoard() {
     handleClearColumnCards, handleArchiveColumn, handleUpdateCardDetails, handleCardDelete,
     handleCardConvertToTask, handleAddCardToColumn, handleCreateCardFromTemplate,
     handleRestoreColumn, handleDeleteColumnPermanently, handleRestoreCard, handleBulkDeleteArchived,
-    handleBulkRestoreArchived, handleDeleteArchivedCard, handleExportBoard, handleImportBoard, templateCards
+    handleBulkRestoreArchived, handleDeleteArchivedCard, handleBulkUpdateStatus,
+    handleBulkUpdatePriority, handleBulkAddTag, handleBulkArchiveSelected,
+    handleBulkExportMarkdown, handleExportBoard, handleImportBoard, templateCards
   } = boardActions
 
   return {
@@ -71,7 +74,13 @@ export function useKanbanBoard() {
     setFilterPriority,
     filterTagId,
     setFilterTagId,
+    filterDue,
+    setFilterDue,
     allTags,
+    selectedCardIds,
+    setSelectedCardIds,
+    toggleCardSelection,
+    clearCardSelection,
     archivedColumns,
     showArchiveBin,
     setShowArchiveBin,
@@ -106,6 +115,11 @@ export function useKanbanBoard() {
     handleBulkDeleteArchived,
     handleBulkRestoreArchived,
     handleDeleteArchivedCard,
+    handleBulkUpdateStatus,
+    handleBulkUpdatePriority,
+    handleBulkAddTag,
+    handleBulkArchiveSelected,
+    handleBulkExportMarkdown,
     handleExportBoard,
     handleImportBoard,
     templateCards

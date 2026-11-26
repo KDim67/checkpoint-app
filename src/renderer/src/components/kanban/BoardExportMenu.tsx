@@ -20,7 +20,7 @@ export default function BoardExportMenu({ kanbanBoard }: BoardExportMenuProps) {
         title="Export or import Kanban board"
         icon={<ArrowUpDown size={13} />}
       >
-        Export / Import
+        Export
       </HeaderBtn>
 
       {open && (
