@@ -299,15 +299,16 @@ export function Sidebar() {
         onClick={() => withViewTransition(() => (onWorkspaces ? goBack() : setView('workspaces')))}
         className="sidebar-context-trigger"
         style={{
-          position: 'relative',
           padding: '4px',
           borderRadius: 'var(--radius-md)',
           border: `1px solid ${onWorkspaces ? 'var(--color-secondary)' : 'transparent'}`,
           cursor: 'pointer',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 'var(--space-2)',
+          gap: '4px',
+          marginBottom: 'var(--space-1)',
           transition: 'all var(--duration-fast) var(--ease-default)',
           flexShrink: 0
         }}
@@ -335,26 +336,22 @@ export function Sidebar() {
         )}
         <span
           style={{
-            position: 'absolute',
-            bottom: '0px',
-            right: '0px',
-            width: '14px',
-            height: '14px',
-            borderRadius: '50%',
-            background: 'var(--color-surface-1)',
+            width: '18px',
+            height: '16px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--color-surface-2)',
             border: `1.5px solid ${activeContextEntry?.color || 'var(--color-secondary)'}`,
             color: activeContextEntry?.color || 'var(--color-secondary)',
-            fontSize: 'var(--text-xs)',
+            fontSize: '10px',
             fontWeight: 'var(--weight-extrabold)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             lineHeight: 1,
-            overflow: 'hidden',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.5)'
+            overflow: 'hidden'
           }}
         >
-          {picture ? <Logo size={9} /> : ctxInitial}
+          {picture ? <Logo size={10} /> : ctxInitial}
         </span>
       </button>
 
