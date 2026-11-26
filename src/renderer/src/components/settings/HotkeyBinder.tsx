@@ -384,7 +384,7 @@ export default function HotkeyBinder() {
             <li className="settings-list-row">
               <div className="settings-row-text">
                 <span className="field-label">Enable global shortcuts</span>
-                <span className="text-sub">Turn off while gaming so Windows key combinations don&apos;t fire in the background.</span>
+                <span className="text-sub">Turn off so key combinations don&apos;t fire in the background.</span>
               </div>
               <ToggleSwitch
                 checked={globalEnabled}
